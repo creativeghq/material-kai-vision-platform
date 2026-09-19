@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { GaBreakdownTable, num, sessionsColumn } from './seo/GaBreakdownTable';
+import { GaBreakdownTable, num, sessionsColumn, trendColumn } from './seo/GaBreakdownTable';
 import { breakdownOf, formatDuration, type GaBreakdowns } from './seo/gaBreakdowns';
 import { useGaBreakdowns } from './seo/useGaBreakdowns';
 import type { UserWebsite } from '@/services/userWebsitesService';
@@ -23,7 +23,7 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
         breakdown={breakdownOf(b, 'device')}
         head="Device"
         renderName={plain}
-        columns={[sessionsColumn, num('engaged_sessions', 'Engaged'), engagement, num('conversions', 'Conv.')]}
+        columns={[sessionsColumn, trendColumn, num('engaged_sessions', 'Engaged'), engagement, num('conversions', 'Conv.')]}
       />
 
       <GaBreakdownTable
@@ -32,7 +32,7 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
         breakdown={breakdownOf(b, 'returning')}
         head="Visitor"
         renderName={plain}
-        columns={[sessionsColumn, num('active_users', 'Users'), engagement, num('conversions', 'Conv.')]}
+        columns={[sessionsColumn, trendColumn, num('active_users', 'Users'), engagement, num('conversions', 'Conv.')]}
       />
 
       <GaBreakdownTable
@@ -60,6 +60,26 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
         head="Operating system"
         renderName={plain}
         columns={[sessionsColumn, engagement]}
+        limit={15}
+      />
+
+      <GaBreakdownTable
+        title="Languages"
+        description="The browser language people arrive with — which is not the language they read the site in."
+        breakdown={breakdownOf(b, 'language')}
+        head="Language"
+        renderName={plain}
+        columns={[sessionsColumn, engagement]}
+        limit={15}
+      />
+
+      <GaBreakdownTable
+        title="Hostnames"
+        description="A hostname you do not recognise is a staging copy or someone else reporting into your property."
+        breakdown={breakdownOf(b, 'hostname')}
+        head="Hostname"
+        renderName={(row) => <span className="truncate font-mono text-xs">{row.value}</span>}
+        columns={[sessionsColumn, num('screen_page_views', 'Views')]}
         limit={15}
       />
     </div>

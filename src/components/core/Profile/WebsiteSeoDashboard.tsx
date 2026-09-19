@@ -16,6 +16,7 @@ import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalytic
 import { WebsiteAnalyticsPagesPanel } from '@/components/core/Profile/WebsiteAnalyticsPagesPanel';
 import { WebsiteAnalyticsGeoPanel } from '@/components/core/Profile/WebsiteAnalyticsGeoPanel';
 import { WebsiteAnalyticsTechPanel } from '@/components/core/Profile/WebsiteAnalyticsTechPanel';
+import { WebsiteAnalyticsCommercePanel } from '@/components/core/Profile/WebsiteAnalyticsCommercePanel';
 import { WebsiteArticlesPanel } from '@/components/core/Profile/WebsiteArticlesPanel';
 import { WebsiteKeywordResearchPanel } from '@/components/core/Profile/WebsiteKeywordResearchPanel';
 import { WebsiteToolkitRunsPanel } from '@/components/core/Profile/WebsiteToolkitRunsPanel';
@@ -227,6 +228,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
 
         <TabsContent value="analytics-tech" className="space-y-4">
           <WebsiteAnalyticsTechPanel website={website} />
+        </TabsContent>
+
+        <TabsContent value="analytics-commerce" className="space-y-4">
+          <WebsiteAnalyticsCommercePanel website={website} />
         </TabsContent>
 
         <TabsContent value="cannibalisation" className="space-y-4">

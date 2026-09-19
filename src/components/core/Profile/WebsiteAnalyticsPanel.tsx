@@ -17,7 +17,8 @@ import {
 } from '@/services/userWebsitesService';
 import { SeoMetricTile } from './seo/SeoMetricTile';
 import { ANALYTICS_METRICS, compact, type SeoMetric } from './seo/seoMetrics';
-import { GaBreakdownTable, num, sessionsColumn } from './seo/GaBreakdownTable';
+import { GaBreakdownTable, num, sessionsColumn, trendColumn } from './seo/GaBreakdownTable';
+import { GaRealtimeCard } from './seo/GaRealtimeCard';
 import { breakdownOf, formatDuration } from './seo/gaBreakdowns';
 import { useGaBreakdowns } from './seo/useGaBreakdowns';
 
@@ -235,6 +236,7 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
 
       {/* Channel groups above say Google sent them; this says WHICH google and how. The two
           disagree on purpose — a channel is Google's bucketing, a source is the referrer. */}
+      {connected && <GaRealtimeCard websiteId={website.id} />}
       {connected && <AcquisitionSources websiteId={website.id} />}
     </div>
   );
@@ -258,6 +260,7 @@ const AcquisitionSources: React.FC<{ websiteId: string }> = ({ websiteId }) => {
       )}
       columns={[
         sessionsColumn,
+        trendColumn,
         num('new_users', 'New users'),
         num('secs_per_session', 'Avg. time', (n) => formatDuration(n)),
         num('conversions', 'Conv.'),

@@ -358,6 +358,14 @@ export interface GaSummary {
 
 export interface GaProperty { property: string; name: string; account: string; measurement_id?: string | null }
 
+export interface GaRealtimeRow { value: string; users: number }
+export interface GaRealtime {
+  active_users: number | null;
+  pages: GaRealtimeRow[];
+  countries: GaRealtimeRow[];
+  devices: GaRealtimeRow[];
+}
+
 export type { GaBreakdowns, GaBreakdown, GaBreakdownRow } from '@/components/core/Profile/seo/gaBreakdowns';
 
 export interface SeoReportRow {
@@ -1171,6 +1179,15 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as GaSummary) ?? null;
+  },
+
+  async gaRealtime(websiteId: string): Promise<GaRealtime> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', {
+      body: { action: 'ga_realtime', website_id: websiteId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not read realtime'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not read realtime');
+    return data as GaRealtime;
   },
 
   async gaBreakdowns(websiteId: string, limit = 50): Promise<GaBreakdowns | null> {

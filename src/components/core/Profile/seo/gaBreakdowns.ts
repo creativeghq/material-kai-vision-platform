@@ -14,6 +14,16 @@ export interface GaBreakdownRow {
   total_revenue: number | null;
   /** Derived in SQL: GA reports engagement as a total across sessions, which reads as nonsense. */
   secs_per_session: number | null;
+  items_viewed: number | null;
+  items_added_to_cart: number | null;
+  items_purchased: number | null;
+  ad_cost: number | null;
+  ad_clicks: number | null;
+  ad_impressions: number | null;
+  /** Return on ad spend, as GA derives it. Null where no Ads account is linked. */
+  roas: number | null;
+  /** This value day by day, for the dimensions that collect a trend. Empty, never null. */
+  series: { date: string; v: number | null }[];
 }
 
 export interface GaBreakdown {

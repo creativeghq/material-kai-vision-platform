@@ -5,7 +5,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
 import { inspectSiteUrls, buildInspectionQueue, INSPECT_QUOTA_PER_DAY } from './urlInspection.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { GA_BREAKDOWNS, type GaBreakdownSpec } from '../_shared/gaVocabulary.generated.ts';
+import { GA_BREAKDOWNS, GA_REALTIME, type GaBreakdownSpec } from '../_shared/gaVocabulary.generated.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -226,21 +226,69 @@ const gaNum = (v: any): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+interface GaCapabilities { dimensions: Set<string>; metrics: Set<string> }
+
+/** Asked once per sync: naming ONE field a property lacks fails the whole report. */
+async function gaCapabilities(token: string, property: string): Promise<GaCapabilities | null> {
+  try {
+    const r = await fetch(`https://analyticsdata.googleapis.com/v1beta/${property}/metadata`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return {
+      dimensions: new Set<string>((j.dimensions || []).map((d: any) => d.apiName).filter(Boolean)),
+      metrics: new Set<string>((j.metrics || []).map((m: any) => m.apiName).filter(Boolean)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+interface ResolvedSpec {
+  dimensions: string[];
+  limit: number;
+  metrics: { ga: string; col: string }[];
+  /** What the property does not have, for the note. */
+  missing: string[];
+}
+
+/** Narrow a spec to this property. With no capability list it is used verbatim. */
+function resolveSpec(spec: GaBreakdownSpec, caps: GaCapabilities | null): ResolvedSpec {
+  if (!caps) {
+    return { dimensions: [...spec.dimensions], limit: spec.limit, metrics: spec.metrics.map((m) => ({ ga: m.ga, col: m.col })), missing: [] };
+  }
+  const missing: string[] = [];
+  const dimensions = spec.dimensions.filter((d) => {
+    if (caps.dimensions.has(d)) return true;
+    missing.push(d);
+    return false;
+  });
+  const metrics: { ga: string; col: string }[] = [];
+  for (const m of spec.metrics) {
+    const name = caps.metrics.has(m.ga) ? m.ga : (m.alt && caps.metrics.has(m.alt) ? m.alt : null);
+    if (name) metrics.push({ ga: name, col: m.col });
+    else missing.push(m.alt ? `${m.ga}/${m.alt}` : m.ga);
+  }
+  return { dimensions, limit: spec.limit, metrics, missing };
+}
+
 /** One GA4 breakdown report, mapped onto the `ga_breakdown` column set. */
 async function gaBreakdownReport(
-  token: string, property: string, spec: GaBreakdownSpec, startDate: string, endDate: string,
+  token: string, property: string, spec: ResolvedSpec, startDate: string, endDate: string,
+  withDate = false,
 ): Promise<Record<string, unknown>[]> {
   const resp = await fetch(GA_DATA_URL(property), {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       dateRanges: [{ startDate, endDate }],
-      dimensions: spec.dimensions.map((name) => ({ name })),
+      dimensions: (withDate ? ['date', ...spec.dimensions] : spec.dimensions).map((name) => ({ name })),
       metrics: spec.metrics.map((m) => ({ name: m.ga })),
-      // Ordered by the spec's FIRST metric, which is what `limit` then truncates against —
-      // sessions for everything except events, which are counted rather than sessionised.
+      // Ordered by the FIRST metric, which is what `limit` then truncates against — sessions for
+      // everything except events and products, which are counted rather than sessionised.
       orderBys: [{ desc: true, metric: { metricName: spec.metrics[0].ga } }],
-      limit: spec.limit,
+      limit: withDate ? 20000 : spec.limit,
     }),
   });
   let body: any;
@@ -257,45 +305,68 @@ async function gaBreakdownReport(
   return (body.rows || []).map((r: any) => {
     const d = r.dimensionValues || [];
     const m = r.metricValues || [];
+    // With `date` prepended the identity shifts one place right; nothing else about the row moves.
+    const off = withDate ? 1 : 0;
+    const raw = String(d[0]?.value || '');
     const out: Record<string, unknown> = {
-      value: d[0]?.value ?? '',
-      label: spec.dimensions.length > 1 ? (d[1]?.value ?? null) : null,
+      value: d[off]?.value ?? '',
+      label: spec.dimensions.length > 1 ? (d[off + 1]?.value ?? null) : null,
     };
+    if (withDate) out.date = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
     spec.metrics.forEach((bind, i) => { out[bind.col] = gaNum(m[i]?.value); });
     return out;
   });
 }
 
 /**
- * Collect every breakdown, one report each, and record each one's own outcome.
- *
- * Independent on purpose: a single dimension GA rejects (an incompatible metric, a property with
- * no ecommerce) must not take the other nine down, and "we could not fetch this" has to reach the
- * panel as a stated reason rather than an empty table that reads as "no visitors".
+ * One report per breakdown, each recording its own outcome. A dimension GA rejects must not take
+ * the others down, and "we could not fetch this" has to reach the panel as a stated reason.
  */
 async function syncGaBreakdowns(
   supabase: any, websiteId: string, workspaceId: string, property: string, token: string,
   startDate: string, endDate: string, windowDays: number,
-): Promise<{ ok: number; failed: string[]; rows: number }> {
+): Promise<{ ok: number; failed: string[]; unsupported: string[]; rows: number; capabilities: boolean }> {
   const failed: string[] = [];
+  const unsupported: string[] = [];
   let ok = 0;
   let rows = 0;
+
+  const caps = await gaCapabilities(token, property);
+
   for (const spec of GA_BREAKDOWNS) {
+    const resolved = resolveSpec(spec, caps);
     let status = 'ok';
     let error: string | null = null;
     let payload: Record<string, unknown>[] = [];
-    try {
-      payload = await gaBreakdownReport(token, property, spec, startDate, endDate);
-      if (!payload.length) status = 'no_data';
-    } catch (e) {
-      status = 'collector_failed';
-      error = String(e instanceof Error ? e.message : e).slice(0, 900);
-      failed.push(spec.key);
+    let daily: Record<string, unknown>[] | null = null;
+
+    // Cannot answer the question at all: not a failure, and not an absence of visitors.
+    if (resolved.dimensions.length < spec.dimensions.length || !resolved.metrics.length) {
+      status = 'not_supported';
+      error = `This property does not report ${resolved.missing.join(', ')}`
+        + (spec.requires ? ` — it needs ${spec.requires}.` : '.');
+      unsupported.push(spec.key);
+    } else {
+      try {
+        payload = await gaBreakdownReport(token, property, resolved, startDate, endDate);
+        if (!payload.length) status = 'no_data';
+        // A trend failure costs the sparkline, never the row — caught separately on purpose.
+        if (status === 'ok' && spec.daily) {
+          try {
+            daily = await gaBreakdownReport(token, property, resolved, startDate, endDate, true);
+          } catch { daily = null; }
+        }
+      } catch (e) {
+        status = 'collector_failed';
+        error = String(e instanceof Error ? e.message : e).slice(0, 900);
+        failed.push(spec.key);
+      }
     }
+
     const { error: rpcErr } = await supabase.rpc('ga_replace_breakdown', {
       p_website_id: websiteId, p_dimension: spec.key, p_window_days: windowDays,
       p_period_start: startDate, p_period_end: endDate,
-      p_rows: payload, p_status: status, p_error: error,
+      p_rows: payload, p_status: status, p_error: error, p_daily: daily,
     });
     if (rpcErr) {
       failed.push(`${spec.key}:store`);
@@ -308,9 +379,46 @@ async function syncGaBreakdowns(
       }, { onConflict: 'website_id,dimension' });
       continue;
     }
-    if (status !== 'collector_failed') { ok++; rows += payload.length; }
+    if (status === 'ok' || status === 'no_data') { ok++; rows += payload.length; }
   }
-  return { ok, failed, rows };
+  return { ok, failed, unsupported, rows, capabilities: !!caps };
+}
+
+/** Who is on the site right now. Never stored: a realtime figure at rest is a wrong figure. */
+async function gaRealtime(token: string, property: string): Promise<{
+  active_users: number | null;
+  pages: { value: string; users: number }[];
+  countries: { value: string; users: number }[];
+  devices: { value: string; users: number }[];
+}> {
+  const call = async (dimension: string) => {
+    const r = await fetch(`https://analyticsdata.googleapis.com/v1beta/${property}:runRealtimeReport`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dimensions: [{ name: dimension }],
+        metrics: [{ name: GA_REALTIME.metric }],
+        orderBys: [{ desc: true, metric: { metricName: GA_REALTIME.metric } }],
+        limit: GA_REALTIME.limit,
+      }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j?.error?.message || `realtime ${dimension}: HTTP ${r.status}`);
+    }
+    const j = await r.json();
+    return (j.rows || []).map((row: any) => ({
+      value: row.dimensionValues?.[0]?.value ?? '(not set)',
+      users: Number(row.metricValues?.[0]?.value ?? 0) || 0,
+    }));
+  };
+
+  const [pages, countries, devices] = await Promise.all(
+    GA_REALTIME.dimensions.map((d) => call(d)),
+  );
+  // From the DEVICE split — every session has exactly one. Pages would double-count open tabs.
+  const active = devices.reduce((n: number, d: any) => n + d.users, 0);
+  return { active_users: active, pages, countries, devices };
 }
 
 /** Map GA4 report rows onto ga_performance and upsert them. */
@@ -645,6 +753,21 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           .eq('website_id', websiteId);
         if (error) return json({ error: error.message }, 400);
         return json({ ok: true, ga_property_id: prop, ga_property_name: match.name, ga_measurement_id: match.measurement_id ?? null });
+      }
+
+      case 'ga_realtime': {
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, ga_property_id, access_token, refresh_token, token_expires_at')
+          .eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+        if (!conn.ga_property_id) return json({ error: 'No Analytics property selected for this site yet.' }, 400);
+        try {
+          const token = await validAccessToken(supabase, conn);
+          return json({ ok: true, ...(await gaRealtime(token, conn.ga_property_id)) });
+        } catch (e) {
+          // Never zero: nobody on the site and we could not ask are different answers.
+          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 400) }, 502);
+        }
       }
 
       case 'ga_sync': {

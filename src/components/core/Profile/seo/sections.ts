@@ -1,7 +1,7 @@
 /** The per-website SEO rail — ONE declaration, read by the dashboard that renders it. */
 import {
   Bot, FileBarChart, FileStack, FileText, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard,
-  LineChart, MonitorSmartphone, Radar, Scissors, Search, ShieldCheck, Sparkles, Spline, Swords,
+  LineChart, MonitorSmartphone, Radar, Scissors, Search, ShieldCheck, ShoppingBag, Sparkles, Spline, Swords,
   Target, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -9,7 +9,7 @@ import type { LucideIcon } from 'lucide-react';
 export type SeoSectionId =
   | 'overview'
   | 'gsc' | 'cannibalisation' | 'ranks'
-  | 'analytics' | 'analytics-pages' | 'analytics-geo' | 'analytics-tech'
+  | 'analytics' | 'analytics-pages' | 'analytics-geo' | 'analytics-tech' | 'analytics-commerce'
   | 'ai' | 'rankings' | 'competitors' | 'domains'
   | 'articles' | 'research' | 'brand'
   | 'crawl' | 'health' | 'llms'
@@ -51,6 +51,7 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'analytics-pages', label: 'Pages', icon: FileStack, group: 'audience' },
   { value: 'analytics-geo', label: 'Geography', icon: Globe2, group: 'audience' },
   { value: 'analytics-tech', label: 'Devices & events', icon: MonitorSmartphone, group: 'audience' },
+  { value: 'analytics-commerce', label: 'Products & ads', icon: ShoppingBag, group: 'audience' },
 
   { value: 'ai', label: 'AI Visibility', icon: Sparkles, group: 'visibility' },
   { value: 'rankings', label: 'Backlinks & Authority', icon: TrendingUp, group: 'visibility' },

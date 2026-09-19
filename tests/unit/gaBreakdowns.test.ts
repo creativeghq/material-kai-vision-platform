@@ -29,9 +29,38 @@ describe('the GA breakdown vocabulary is one list', () => {
     // Both are written out in migrations, so they cannot import this list. This is the only place
     // the three can be compared.
     expect([...GA_BREAKDOWN_KEYS].sort()).toEqual([
-      'browser', 'city', 'country', 'device', 'event',
-      'landing_page', 'os', 'page', 'returning', 'source',
+      'ads_campaign', 'age', 'browser', 'city', 'country', 'device', 'event', 'gender',
+      'hostname', 'item', 'landing_page', 'language', 'os', 'page', 'returning', 'source',
     ]);
+  });
+
+  it('a renamed metric declares BOTH names', () => {
+    // `conversions` became `keyEvents`, and a property answers to one or the other. Asking for the
+    // wrong one fails the WHOLE report, so every binding for it has to carry the alternative.
+    for (const spec of GA_BREAKDOWNS) {
+      const conv = spec.metrics.find((m) => m.col === 'conversions');
+      if (!conv) continue;
+      expect(conv.alt, `${spec.key} asks for ${conv.ga} with no alternative name`).toBeTruthy();
+      expect([conv.ga, conv.alt].sort()).toEqual(['conversions', 'keyEvents']);
+    }
+  });
+
+  it('a breakdown that needs setting up says so', () => {
+    // Without `requires`, "not available" is a dead end — the reader cannot tell what would make
+    // it available.
+    for (const key of ['item', 'ads_campaign'] as const) {
+      const spec = GA_BREAKDOWNS.find((b) => b.key === key)!;
+      expect(spec.requires, `${key} can be unavailable and does not say what it needs`).toBeTruthy();
+    }
+  });
+
+  it('only low-cardinality dimensions collect a per-day series', () => {
+    // `date x page` on a 5,000-page site is 140k rows for a sparkline nobody asked for.
+    const daily = GA_BREAKDOWNS.filter((b) => b.daily).map((b) => b.key).sort();
+    expect(daily).toEqual(['country', 'device', 'returning', 'source']);
+    for (const key of ['page', 'landing_page', 'city', 'event'] as const) {
+      expect(GA_BREAKDOWNS.find((b) => b.key === key)!.daily, `${key} must not collect a daily series`).toBeFalsy();
+    }
   });
 
   it('each spec orders by a metric it asked for', () => {
@@ -117,7 +146,9 @@ describe('breakdown formatting', () => {
 describe('the Audience rail', () => {
   it('offers a pane for each Analytics surface', () => {
     const audience = SEO_SECTIONS.filter((s) => s.group === 'audience').map((s) => s.value);
-    expect(audience).toEqual(['analytics', 'analytics-pages', 'analytics-geo', 'analytics-tech']);
+    expect(audience).toEqual([
+      'analytics', 'analytics-pages', 'analytics-geo', 'analytics-tech', 'analytics-commerce',
+    ]);
   });
 
   it('every section id is unique — a duplicate silently shadows a pane', () => {

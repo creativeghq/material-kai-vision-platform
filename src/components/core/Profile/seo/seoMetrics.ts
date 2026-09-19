@@ -6,7 +6,8 @@ export type SeoMetricStatus =
   | 'no_data'
   | 'collector_failed'
   | 'not_collected'
-  | 'not_connected';
+  | 'not_connected'
+  | 'not_supported';
 
 export interface SeoMetric {
   value: number | null;
@@ -51,6 +52,13 @@ const PRESENTATION: Record<SeoMetricStatus, SeoStatusPresentation> = {
   not_connected: {
     placeholder: 'Not connected',
     explain: 'Needs a connection before any data can arrive.',
+    tone: 'info',
+    actionable: true,
+  },
+  // Cannot answer until something is set up on it. "No data" sends the reader hunting traffic.
+  not_supported: {
+    placeholder: 'Not available',
+    explain: 'This source does not report this yet — it needs to be set up before anything can arrive.',
     tone: 'info',
     actionable: true,
   },

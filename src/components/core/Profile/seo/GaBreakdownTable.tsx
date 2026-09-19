@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { compact } from './seoMetrics';
 import { statusPresentation } from './seoMetrics';
 import { shareOf, type GaBreakdown, type GaBreakdownRow } from './gaBreakdowns';
+import { Sparkline } from './Sparkline';
 
 export interface GaColumn {
   key: string;
@@ -42,6 +43,23 @@ export const num = (key: keyof GaBreakdownRow, label: string, fmt: (n: number) =
     return <span className="tabular-nums">{v == null ? '—' : fmt(v)}</span>;
   },
 });
+
+/** The row day by day, where the dimension collects one. */
+export const trendColumn: GaColumn = {
+  key: 'series',
+  label: 'Trend',
+  render: (row) => {
+    const pts = (row.series ?? []).map((p) => p.v).filter((v): v is number => v != null);
+    if (pts.length < 2) return <span className="text-muted-foreground">—</span>;
+    return (
+      <Sparkline
+        points={pts}
+        className="ml-auto h-6 w-24"
+        ariaLabel={`${row.value} sessions over the period`}
+      />
+    );
+  },
+};
 
 /**
  * One breakdown, with its own verdict. A collector that FAILED renders as an explanation, never as

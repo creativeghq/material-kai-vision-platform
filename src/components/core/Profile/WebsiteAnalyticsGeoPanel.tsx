@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Globe2 } from 'lucide-react';
 
 import { WorldChoropleth } from './seo/WorldChoropleth';
-import { GaBreakdownTable, num, sessionsColumn } from './seo/GaBreakdownTable';
+import { GaBreakdownTable, num, sessionsColumn, trendColumn } from './seo/GaBreakdownTable';
 import { breakdownOf, countryFlag, countryName, formatDuration, type GaBreakdowns } from './seo/gaBreakdowns';
 import { useGaBreakdowns } from './seo/useGaBreakdowns';
 import { statusPresentation } from './seo/seoMetrics';
@@ -64,7 +64,7 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
             <span className="truncate">{countryName(row.value, row.label)}</span>
           </span>
         )}
-        columns={[sessionsColumn, num('active_users', 'Users'), num('new_users', 'New'), engagement]}
+        columns={[sessionsColumn, trendColumn, num('active_users', 'Users'), num('new_users', 'New'), engagement]}
       />
 
       <GaBreakdownTable
@@ -78,6 +78,23 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
             {row.label && <span className="shrink-0 text-xs text-muted-foreground">{row.label}</span>}
           </span>
         )}
+        columns={[sessionsColumn, num('active_users', 'Users'), engagement]}
+      />
+
+      <GaBreakdownTable
+        title="Age"
+        description="Google only reports these for visitors it has signals for, so the totals are a SAMPLE and will not match sessions."
+        breakdown={breakdownOf(data as GaBreakdowns | null, 'age')}
+        head="Age bracket"
+        renderName={(row) => <span className="truncate">{row.value}</span>}
+        columns={[sessionsColumn, num('active_users', 'Users'), engagement]}
+      />
+
+      <GaBreakdownTable
+        title="Gender"
+        breakdown={breakdownOf(data as GaBreakdowns | null, 'gender')}
+        head="Gender"
+        renderName={(row) => <span className="truncate capitalize">{row.value}</span>}
         columns={[sessionsColumn, num('active_users', 'Users'), engagement]}
       />
     </div>
