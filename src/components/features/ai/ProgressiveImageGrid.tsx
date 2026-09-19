@@ -21,6 +21,7 @@ import { onEnterOrSpace } from '@/utils/a11y';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { imageUrlToBase64 } from '@/utils/imageToBase64';
 import { safeHref } from '@/utils/safeUrl';
+import { selectableModels } from '@/config/generationModels.generated';
 /** Video models and what they cost, in one place. */
 const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   value: string; label: string; description: string; credits?: number;
@@ -55,6 +56,15 @@ const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   { value: 'ray-3.2-720p', label: 'Ray3.2 720p', description: 'Luma Ray3.2 — 5 or 10s, first-to-last frame', credits: 20 },
   { value: 'ray-3.2-1080p', label: 'Ray3.2 1080p', description: 'Luma Ray3.2 — the same at 1080p', credits: 70 },
 ];
+
+// Offer only what the registry says can run. A model whose provider has no credential deployed
+// is refused by generate-interior-video-v2 with a 503 — correctly, and before any debit — but
+// only after the user picked it from this menu. `auto` is always kept: it resolves server-side
+// through TYPE_MODEL_PREFERENCE, which does its own availability walk.
+const SELECTABLE_VIDEO_MODEL_IDS = new Set(selectableModels('video').map((m) => m.id));
+const AVAILABLE_VIDEO_MODEL_OPTIONS = VIDEO_MODEL_OPTIONS.filter(
+  (vm) => vm.value === 'auto' || SELECTABLE_VIDEO_MODEL_IDS.has(vm.value),
+);
 
 interface ModelResult {
   model_id: string;
@@ -1252,7 +1262,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-64">
                           <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground pb-1">Used Model</DropdownMenuLabel>
-                          {VIDEO_MODEL_OPTIONS.map(vm => (
+                          {AVAILABLE_VIDEO_MODEL_OPTIONS.map(vm => (
                             <DropdownMenuItem key={vm.value} onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }} className="gap-1.5">
                               <Check className={cn('w-3 h-3 flex-shrink-0', videoModel === vm.value ? 'opacity-100' : 'opacity-0')} />
                               <div className="flex-1 min-w-0">
@@ -1280,9 +1290,9 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                               {/* Priced by the selected MODEL, not by the style — every style row
                                   read a hardcoded "30 cr", so choosing Kling showed 30 and charged
                                   20, and choosing Runway showed 30 and charged 40. */}
-                              {VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits != null && (
+                              {AVAILABLE_VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits != null && (
                                 <span className="ml-2 text-[11px] text-muted-foreground flex-shrink-0">
-                                  {VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits} cr
+                                  {AVAILABLE_VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits} cr
                                 </span>
                               )}
                             </DropdownMenuItem>

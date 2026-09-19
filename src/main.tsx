@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/react';
 import App from './App';
 import './index.css';
 import { initializeGlobalErrorHandlers } from './utils/globalErrorHandler';
+import { NOISE_PATTERNS, isNoiseMessage, rebuildConsoleMessage } from './utils/sentryConsoleMessage';
 
 // Initialize global error handlers (sends errors to backend database)
 initializeGlobalErrorHandlers();
@@ -83,28 +84,25 @@ Sentry.init({
       return null;
     }
 
+    // A console event's title is the arguments joined with String(), so an error object lands as
+    // "[object Object]" — unreadable, and invisible to `ignoreErrors`, which matches the title.
+    // The reason is on the event already, under extra.arguments; put it back in the title, then
+    // re-apply the noise list by hand: the SDK's own title filter has already run by now.
+    if (event.logger === 'console') {
+      const rebuilt = rebuildConsoleMessage((event.extra as { arguments?: unknown } | undefined)?.arguments);
+      if (rebuilt) {
+        if (isNoiseMessage(rebuilt)) return null;
+        event.message = rebuilt;
+        if (event.logentry) event.logentry.message = rebuilt;
+      }
+    }
+
     return event;
   },
 
-  // Ignore certain errors that are not actionable
-  ignoreErrors: [
-    // Browser extensions
-    'top.GLOBALS',
-    'chrome-extension://',
-    'moz-extension://',
-    // Network errors that are expected
-    'NetworkError',
-    'Failed to fetch',
-    // ResizeObserver errors (harmless)
-    'ResizeObserver loop limit exceeded',
-    'ResizeObserver loop completed with undelivered notifications',
-    // Vite HMR transient errors (dev only, not actionable)
-    /\[vite\] Failed to reload/,
-    'Failed to fetch dynamically imported module',
-    // Supabase auth refresh-token noise (session expired, SDK retries silently)
-    'Invalid Refresh Token',
-    'Refresh Token Not Found',
-  ],
+  // Not actionable: browser extensions, network conditions, layout-observer chatter and expired
+  // sessions the SDK already retries. One list, shared with the console-title check above.
+  ignoreErrors: [...NOISE_PATTERNS],
 });
 
 // Register the PWA service worker so the app is installable to the home screen

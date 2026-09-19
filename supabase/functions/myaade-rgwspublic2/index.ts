@@ -115,7 +115,6 @@ async function translateBasicRec(
     postal_area_description: basicRec.postal_area_description,
     primary_activity_descr: primaryActivityDescr,
   };
-  // Nothing to translate.
   if (!Object.values(src).some((v) => v && v.trim())) return null;
 
   const schema = z.object({
@@ -340,7 +339,8 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
         error: 'aade_not_configured',
         message: 'ΑΑΔΕ Special Access Codes are not set for this workspace. Enter your TAXISnet username + password under Finance → Settings (myAADE credentials).',
         secret_sources: { username: creds.sources.username, password: creds.sources.password },
-      }, 503);
+        // 412, not 503: an unmet precondition the caller can fix. 5xx is what api-logger reports.
+      }, 412);
     }
 
     // 90-day cache check (skips the SOAP call + TAXISnet notification)

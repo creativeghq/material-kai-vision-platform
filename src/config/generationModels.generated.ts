@@ -122,7 +122,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "xai-aurora",
     "tier": "standard",
     "status": "degraded",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 30
   },
   {
@@ -548,7 +548,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "proplabs-virtual-staging",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 190
   },
   {
@@ -573,7 +573,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "wan-3.0-480p",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 190
   },
   {
@@ -598,7 +598,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "wan-3.0-720p",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 192
   },
   {
@@ -623,7 +623,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "wan-3.0-1080p",
     "tier": "premium",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 194
   },
   {
@@ -671,7 +671,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "seedance-2.5-480p",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 196
   },
   {
@@ -718,7 +718,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "h3-max-480p",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 197
   },
   {
@@ -766,7 +766,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "seedance-2.5-720p",
     "tier": "premium",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 198
   },
   {
@@ -790,7 +790,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "h3-max-768p",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 199
   },
   {
@@ -837,7 +837,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "ray-3.2-720p",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 201
   },
   {
@@ -861,7 +861,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "ray-3.2-1080p",
     "tier": "premium",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 202
   },
   {
@@ -884,7 +884,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "kling-3.0",
     "tier": "premium",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 210
   },
   {
@@ -948,7 +948,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '0428749d29e6197a5223f766287d431f';
+export const PROJECTION_FINGERPRINT = '1809bf50de4adfde243de06633888cf5';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

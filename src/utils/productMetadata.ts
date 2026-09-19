@@ -6,25 +6,14 @@ export interface ProductLike {
   metadata?: Record<string, any> | null;
 }
 
-/**
- * Supabase SELECT fragment that embeds the highest-scored product image.
- * Use as: `.select(\`*, ${PRODUCT_IMAGE_SELECT}\`)`
- *
- * Pair with `getProductImageUrl()` on the result row.
- */
+/** Use as `.select(\`*, ${PRODUCT_IMAGE_SELECT}\`)`, with `getProductImageUrl()` on the row. */
 export const PRODUCT_IMAGE_SELECT = `image_product_associations(
   overall_score,
   document_images(image_url)
 )`;
 
-/**
- * Returns the maker / brand name. The canonical schema stores this as
- * `factory_name`; ingestion-side normalization (Python `normalize_factory_keys`)
- * folds legacy aliases (manufacturer / brand / supplier / factory) into it
- * before write. The legacy aliases below are kept as a defensive fallback for
- * any older rows that haven't been backfilled yet — they can be removed once
- * the backfill is run platform-wide.
- */
+/** The maker / brand name. `factory_name` is canonical — Python `normalize_factory_keys` folds
+ *  the aliases below into it on write; they remain only for rows predating that. */
 export function getManufacturer(metadata?: Record<string, any> | null): string | null {
   if (!metadata) return null;
   const fn = metadata.factory_name;
@@ -125,18 +114,9 @@ export function formatMaterialCategory(
     .join(' ');
 }
 
-/**
- * Picks the best image URL for a product. Accepts a row that may have
- * `image_product_associations` embedded via PRODUCT_IMAGE_SELECT.
- *
- * Resolution order:
- *   1. Highest-scored image_product_associations join
- *   2. metadata.image_url / metadata.thumbnail_url (legacy / rare)
- *
- * Returns null when no image is available.
- */
+/** Best image URL for a product row: the highest-scored PRODUCT_IMAGE_SELECT embed, else
+ *  metadata.image_url / thumbnail_url, else null. */
 export function getProductImageUrl(product: any): string | null {
-  // 1. Embedded relationship (preferred)
   const ipa = product?.image_product_associations;
   if (Array.isArray(ipa) && ipa.length > 0) {
     const sorted = [...ipa].sort(
