@@ -22,9 +22,9 @@ export default defineConfig({
     ],
     // Integration tests hit prod; give them room. Unit tests finish in ms regardless.
     testTimeout: 30_000,
-    // Teardown needs MORE room than a test: one workspace delete cascades 349 FKs (2.0s EMPTY)
-    // and a suite tears down four. At 30s the job went red with every assertion passing.
-    hookTimeout: 120_000,
+    // Teardown is one RPC, but it deletes workspaces and each cascades 349 FKs (2.0s EMPTY), with
+    // several suites tearing down at once. At 30s the job went red with every assertion passing.
+    hookTimeout: 60_000,
     // Retry transport flakes: ~68 real network calls to live endpoints, so a single ECONNRESET
     // is a matter of when, not if. On 2026-07-28 `hr-careers-public` died on one with 67 of 68
     // passing and held an email-guard fix back for half an hour.

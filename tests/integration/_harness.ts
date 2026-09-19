@@ -112,66 +112,33 @@ export async function grantModule(svc: SupabaseClient, wsId: string, moduleSlug:
   if (error) throw new Error(`grantModule(${moduleSlug}): ${error.message}`);
 }
 
-/** Swallow the failure but REMEMBER it, so a broken teardown can be reported instead of hidden. */
-async function step(
-  problems: string[],
-  label: string,
-  run: () => PromiseLike<{ error?: { message?: string } | null } | unknown>,
-): Promise<void> {
-  try {
-    const res = (await run()) as { error?: { message?: string } | null } | null;
-    if (res && typeof res === 'object' && 'error' in res && res.error) {
-      problems.push(`${label}: ${res.error.message ?? String(res.error)}`);
-    }
-  } catch (e) {
-    problems.push(`${label}: ${(e as Error).message}`);
-  }
-}
-
-// Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
-// the email-prefix cron is the backstop if anything here fails.
-// It must never throw, but it MUST NOT be silent.
+// Best-effort teardown: ONE call to public.cleanup_test_fixture — fixture workspaces (including
+// the personal one each test user gets at signup), the reseller mirror, the child rows no cascade
+// takes, the users. One call because it was a dozen and the tier runs its files CONCURRENTLY: a
+// workspace delete cascades 349 FKs, so they contended and died on the PostgREST statement
+// timeout, leaking the fixture. Fenced by NAME, so a real workspace id deletes nothing.
+// Never throws, but MUST NOT be silent.
 export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; userIds?: string[] }): Promise<void> {
-  const explicitWs = (opts.wsIds || []).filter(Boolean);
+  const wsIds = (opts.wsIds || []).filter(Boolean);
   const userIds = (opts.userIds || []).filter(Boolean);
+  if (wsIds.length === 0 && userIds.length === 0) return;
 
-  // EVERY test user is auto-provisioned a personal workspace at signup, which spawns a
-  // "(reseller)" crm_companies mirror in the parent. Deleting the auth user does NOT remove it
-  // (created_by → SET NULL), so collect each user's owned workspaces and delete them outright.
-  const wsIds = new Set<string>(explicitWs);
-  const owned = await Promise.all(userIds.map((u) => svc.from('workspaces').select('id').eq('created_by', u)
-    .then((r) => r, () => ({ data: [] as Array<{ id: string }> }))));
-  for (const { data } of owned) for (const w of (data ?? [])) wsIds.add(w.id);
-
-  // The reseller mirror lives in the PARENT workspace, not the child, so `delete where
-  // workspace_id = child` never touches it. Deleting the child fires the cleanup trigger, but
-  // delete the mirror explicitly too so teardown never depends on the trigger being enabled.
   const problems: string[] = [];
+  const { data, error } = await svc
+    .rpc('cleanup_test_fixture', { p_ws_ids: wsIds, p_user_ids: userIds })
+    .then((r) => r, (e: Error) => ({ data: null, error: { message: e.message } }));
 
-  // The GROUPS stay ordered (that order is the FK graph); inside one the steps are independent,
-  // so they go together — a workspace delete measured 2.0s EMPTY, and a suite has up to four.
-  const each = <T>(xs: Iterable<T>, run: (x: T) => Promise<void>) => Promise.all([...xs].map(run));
-
-  await each(wsIds, async (ws) => {
-    const { data } = await svc.from('workspaces').select('parent_crm_company_id').eq('id', ws).maybeSingle()
-      .then((r) => r, () => ({ data: null as { parent_crm_company_id: string | null } | null }));
-    if (data?.parent_crm_company_id) {
-      await step(problems, `crm mirror ${data.parent_crm_company_id}`,
-        () => svc.from('crm_companies').delete().eq('id', data.parent_crm_company_id!));
-    }
-  });
-  await each(wsIds, (ws) => step(problems, `crm_companies of ${ws}`, () => svc.from('crm_companies').delete().eq('workspace_id', ws)));
-  await each(wsIds, (ws) => step(problems, `members of ${ws}`, () => svc.from('workspace_members').delete().eq('workspace_id', ws)));
-  await each(wsIds, (ws) => step(problems, `workspace ${ws}`, () => svc.from('workspaces').delete().eq('id', ws)));
-  await each(userIds, (u) => step(problems, `auth user ${u}`, () => svc.auth.admin.deleteUser(u)));
-
-  // Check the WORLD, not the return value: a delete can report no error and still leave the row
-  // (that is exactly what happened here). This is the assertion that would have caught the leak
-  // on run #1 instead of after 3,057 of them.
-  if (wsIds.size > 0) {
-    const { data: left } = await svc.from('workspaces').select('id, name').in('id', [...wsIds])
-      .then((r) => r, () => ({ data: [] as Array<{ id: string; name: string }> }));
-    for (const w of left ?? []) problems.push(`workspace ${w.id} (${w.name}) SURVIVED deletion`);
+  if (error) {
+    problems.push(`cleanup_test_fixture: ${error.message}`);
+  } else {
+    // Check the WORLD, not the return value: a delete can report no error and still leave the
+    // row. That is the check that would have caught the leak on run #1 rather than after 3,057.
+    const report = (data ?? {}) as {
+      errors?: Record<string, string>;
+      survivors?: Array<{ id: string; name: string }>;
+    };
+    for (const [where, why] of Object.entries(report.errors ?? {})) problems.push(`${where}: ${why}`);
+    for (const w of report.survivors ?? []) problems.push(`workspace ${w.id} (${w.name}) SURVIVED deletion`);
   }
 
   if (problems.length > 0) {
