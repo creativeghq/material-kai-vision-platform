@@ -9,23 +9,22 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { generateImageWithGemini, generateImageWithGrok } from '../_shared/ai-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
-// `GOOGLE_GENERATIVE_AI_API_KEY`, not `GEMINI_API_KEY` — the long name is what every other
-// Google caller reads and what ai-client bootstraps. This was the last holder of the short
-// name outside the health probe, and the short name is set nowhere, so this function could
-// only ever have run unauthenticated. (It has no `api_usage_logs` rows at all.)
-const GEMINI_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 
 type ImageModel = 'aurora' | 'gemini' | 'flux' | 'auto';
 type ImageType = 'lifestyle' | 'product' | 'interior' | 'artistic';
 type AspectRatio = '1:1' | '4:5' | '9:16' | '16:9';
 
+const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image' as const;
+
 const MODEL_SERVICE_KEYS: Record<Exclude<ImageModel, 'auto'>, string> = {
   aurora: 'xai-aurora',
-  gemini: 'flux-2-pro', // Gemini billed at cheapest rate; actual Gemini billing via AI usage logs
+  // The key names the model that RUNS, or the credit line is another model's price.
+  gemini: GEMINI_IMAGE_MODEL,
   flux:   'flux-2-pro',
 };
 
@@ -35,75 +34,21 @@ const CREDIT_COSTS: Record<Exclude<ImageModel, 'auto'>, number> = {
   flux:   6,
 };
 
-const ASPECT_RATIO_TO_SIZE: Record<AspectRatio, string> = {
-  '1:1':  '1024x1024',
-  '4:5':  '1024x1280',
-  '9:16': '1024x1792',
-  '16:9': '1792x1024',
+// xAI's image endpoint 400s on a `size` argument rather than ignoring it, and offers no
+// aspect-ratio control at all — so a pinned ratio routes elsewhere.
+const HONOURS_ASPECT_RATIO: Record<Exclude<ImageModel, 'auto'>, boolean> = {
+  aurora: false,
+  gemini: true,
+  flux:   true,
 };
 
-function autoSelectModel(imageType: ImageType): Exclude<ImageModel, 'auto'> {
-  switch (imageType) {
-    case 'lifestyle': return 'aurora';
-    case 'product':
-    case 'interior':  return 'gemini';
-    case 'artistic':  return 'flux';
-    default:          return 'aurora';
-  }
+function autoSelectModel(imageType: ImageType, ratioPinned: boolean): Exclude<ImageModel, 'auto'> {
+  const preferred: Exclude<ImageModel, 'auto'> = imageType === 'product' || imageType === 'interior'
+    ? 'gemini'
+    : imageType === 'artistic' ? 'flux' : 'aurora';
+  return ratioPinned && !HONOURS_ASPECT_RATIO[preferred] ? 'gemini' : preferred;
 }
 
-
-// ── xAI Aurora (OpenAI-compatible) ───────────────────────────────────────────
-async function generateWithAurora(prompt: string, size: string): Promise<string> {
-  const res = await fetch('https://api.x.ai/v1/images/generations', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${XAI_API_KEY()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: 'grok-2-aurora', prompt, n: 1, size }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Aurora API error ${res.status}: ${text}`);
-  }
-
-  const data = await res.json() as { data: Array<{ url?: string; b64_json?: string }> };
-  const imageData = data.data?.[0];
-  if (!imageData?.url && !imageData?.b64_json) throw new Error('Aurora returned no image');
-  return imageData.url || `data:image/png;base64,${imageData.b64_json}`;
-}
-
-// ── Google Gemini Imagen ──────────────────────────────────────────────────────
-async function generateWithGemini(prompt: string, aspectRatio: AspectRatio): Promise<string> {
-  const geminiAspect = aspectRatio === '1:1' ? '1:1'
-    : aspectRatio === '9:16' ? '9:16'
-    : aspectRatio === '16:9' ? '16:9'
-    : '4:5';
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY()}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: geminiAspect },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${text}`);
-  }
-
-  const data = await res.json() as { predictions: Array<{ bytesBase64Encoded: string }> };
-  const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-  if (!b64) throw new Error('Gemini returned no image');
-  return `data:image/png;base64,${b64}`;
-}
 
 // ── Replicate FLUX 2 Pro ──────────────────────────────────────────────────────
 async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promise<string> {
@@ -145,9 +90,15 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
     const pollRes = await fetch(pollUrl, {
       headers: { 'Authorization': `Token ${token}` },
     });
-    const status = await pollRes.json() as { status: string; output?: string[]; error?: string };
+    const status = await pollRes.json() as { status: string; output?: string | string[]; error?: string };
 
-    if (status.status === 'succeeded' && status.output?.[0]) return status.output[0];
+    if (status.status === 'succeeded') {
+      // A single-output Replicate model returns a bare STRING, so the old `output[0]` took the
+      // first CHARACTER: every succeeded prediction was delivered as `image_url: "h"`, billed.
+      const out = Array.isArray(status.output) ? status.output[0] : status.output;
+      if (typeof out === 'string' && out.startsWith('http')) return out;
+      throw new Error(`FLUX succeeded but returned no usable image URL: ${JSON.stringify(status.output)}`);
+    }
     if (status.status === 'failed') throw new Error(`FLUX failed: ${status.error || 'unknown'}`);
   }
 
@@ -168,9 +119,7 @@ async function storeImage(
     const { data, error } = await supabase.storage
       .from('generation-images')
       .upload(`social/${filename}`, bytes, { contentType: 'image/webp', upsert: true });
-    // Returning `imageData` here handed back the PROVIDER's URL, which expires within the hour —
-    // the caller then persisted an expiring link onto social_posts.image_urls and the picture was
-    // gone by the time the post published. Throw instead; the caller refunds and reports.
+    // Never fall back to the PROVIDER's URL: it expires within the hour, and it gets persisted.
     if (error) throw new Error(`Storage upload failed: ${error.message}`);
     const { data: urlData } = supabase.storage.from('generation-images').getPublicUrl(data.path);
     return urlData.publicUrl;
@@ -187,10 +136,12 @@ async function storeImage(
     return urlData.publicUrl;
   }
 
-  return imageData;
+  // Passing anything else through is a failure the caller cannot detect and the refund never sees.
+  throw new Error(`Generator returned no usable image (got ${JSON.stringify(imageData.slice(0, 40))})`);
 }
 
 Deno.serve(withApiLogging('generate-social-image', async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -207,9 +158,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     model = 'auto' as ImageModel,
     aspect_ratio = '1:1' as AspectRatio,
     post_id,
-    // The caller's target channel. It was accepted by the tool, sent on the wire and never read
-    // here, so the fallback draft below was hardcoded `instagram` — a LinkedIn image filed under
-    // the wrong platform, in a table whose analytics group BY platform.
+    // The draft below was hardcoded `instagram`, in a table whose analytics group BY platform.
     platform,
   } = body;
   // Reassigned below when a post_id pins the workspace — the post's workspace is authoritative,
@@ -262,8 +211,10 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
 
   if (!prompt) return jsonResponse({ success: false, error: 'prompt is required' }, 400);
 
+  // A ratio the CALLER named is a constraint; the default is not.
+  const ratioPinned = typeof body.aspect_ratio === 'string';
   const resolvedModel: Exclude<ImageModel, 'auto'> = model === 'auto'
-    ? autoSelectModel(image_type)
+    ? autoSelectModel(image_type, ratioPinned)
     : model as Exclude<ImageModel, 'auto'>;
 
   const creditCost = CREDIT_COSTS[resolvedModel];
@@ -290,17 +241,24 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   }
 
   try {
-    // ③ Generate image
+    // ③ Generate. Through `_shared/ai-client.ts`, which holds the current model ids and logs
+    // the cost — the two hand-rolled fetches here were pinned to models retired upstream.
     let imageUrl: string;
-    const size = ASPECT_RATIO_TO_SIZE[aspect_ratio];
+    const attribution = { userId, workspaceId: workspace_id ?? undefined, task: 'social_image_generation' };
 
     switch (resolvedModel) {
-      case 'aurora':
-        imageUrl = await generateWithAurora(prompt, size);
+      case 'aurora': {
+        const img = await generateImageWithGrok(prompt, attribution);
+        imageUrl = `data:${img.mimeType};base64,${img.base64}`;
         break;
-      case 'gemini':
-        imageUrl = await generateWithGemini(prompt, aspect_ratio);
+      }
+      case 'gemini': {
+        const img = await generateImageWithGemini(prompt, {
+          ...attribution, model: GEMINI_IMAGE_MODEL, aspectRatio: aspect_ratio,
+        });
+        imageUrl = `data:${img.mimeType};base64,${img.base64}`;
         break;
+      }
       case 'flux':
         imageUrl = await generateWithFlux(prompt, aspect_ratio);
         break;
@@ -365,7 +323,10 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
       model_used: resolvedModel,
       credits_used: debitResult.credits_debited,
       credits_remaining: debitResult.new_balance,
-      aspect_ratio,
+      // What the picture IS, not what was asked for.
+      aspect_ratio: HONOURS_ASPECT_RATIO[resolvedModel] ? aspect_ratio : null,
+      aspect_ratio_requested: aspect_ratio,
+      aspect_ratio_enforced: HONOURS_ASPECT_RATIO[resolvedModel],
     });
 
   } catch (err) {

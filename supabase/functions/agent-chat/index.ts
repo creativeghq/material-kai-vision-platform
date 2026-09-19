@@ -1193,12 +1193,16 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
+      'knowledge_base_search', 'read_document_section', 'visual_search',
       'material_search', 'generate_3d', 'generate_gemini', 'virtual_staging', 'analyze_inspiration_url',
       // Vision starts renders, so Vision has to be able to ask whether one finished. It was
       // ALREADY receiving this tool — the push site fired on `generate_3d` and named no id, so it
       // slipped past the toolkit filter and the audience clamp, both of which read this list.
       // Declared here and gated there: the list is the boundary, and now it says what is true.
       'check_generation_status',
+      // An `alwaysOn` catalog cluster is advertised on every agent, but THIS list is the binding.
+      // The orchestrator routes silently, so a gap here loses the tool mid-turn.
+      'web_search', 'web_fetch', 'web_research_validate',
       // Core record search (see Pepper's note): every specialist the router can pick gets it.
       'find_records',
       // The platform's own API, for work no dedicated tool covers. Every specialist the router
@@ -1241,7 +1245,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Real-estate advisor — listings, valuations, viewings, offers, buyer/seller matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
+      'visual_search',
       'manage_real_estate',
+      'web_search', 'web_fetch', 'web_research_validate',
       // Core record search (see Pepper's note): every specialist the router can pick gets it.
       'find_records',
       // The platform's own API, for work no dedicated tool covers. Every specialist the router
@@ -1271,6 +1277,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Product & business — catalogs, B2B research, product knowledge-graph, tech radar, job research',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
       'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
@@ -1317,6 +1324,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Marketing, SEO & reputation — keyword/SERP research, audits, content, brand & LLM-visibility monitoring',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
+      'visual_search',
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
       'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url',
@@ -1358,7 +1367,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Finance & quotes — build client quotes + branded PDFs, customer/supplier overviews, price history',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
+      'visual_search', 'analyze_inspiration_url',
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       'knowledge_base_search', 'read_document_section', 'material_search',
+      'web_search', 'web_fetch', 'web_research_validate',
       // Trinity quotes and invoices, so it must be able to FIND one by number or customer name.
       'find_records',
       // The platform's own API, for work no dedicated tool covers. Every specialist the router
@@ -1412,7 +1424,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Social media — publish/schedule posts and read analytics across connected accounts',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
+      'material_search', 'visual_search', 'analyze_inspiration_url',
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       'knowledge_base_search', 'read_document_section',
+      'web_search', 'web_fetch', 'web_research_validate',
       // Core record search (see Pepper's note): every specialist the router can pick gets it.
       'find_records',
       // The platform's own API, for work no dedicated tool covers. Every specialist the router

@@ -128,3 +128,53 @@ describe('#395 — the admin axis, offered vs bound', () => {
     expect(sig.slice(0, sig.indexOf('=> {'))).not.toMatch(/isAdmin/);
   });
 });
+
+describe('the routing axis, offered vs bound', () => {
+  function routableSlugs(): string[] {
+    const block = binderSrc.slice(
+      binderSrc.indexOf('const ROUTABLE_SPECIALISTS'),
+      binderSrc.indexOf('];', binderSrc.indexOf('const ROUTABLE_SPECIALISTS')),
+    );
+    return [...block.matchAll(/slug: '([a-z-]+)'/g)].map((m) => m[1]);
+  }
+
+  function agentTools(slug: string): string[] {
+    const key = binderSrc.indexOf(`\n  '${slug}': {`) >= 0 ? `\n  '${slug}': {` : `\n  ${slug}: {`;
+    const at = binderSrc.indexOf(key);
+    if (at < 0) return [];
+    const from = binderSrc.indexOf('tools: [', at);
+    return [...binderSrc.slice(from, binderSrc.indexOf('\n    ],', from)).matchAll(/'([a-z0-9_]+)'/g)]
+      .map((m) => m[1]);
+  }
+
+  function alwaysOnToolIds(): Map<string, string[]> {
+    const out = new Map<string, string[]>();
+    for (const m of catalogSrc.matchAll(/\n    id: '([a-z0-9-]+)',\n([\s\S]{0,900}?)tool_ids: \[([^\]]*)\]/g)) {
+      const [, id, between, ids] = m;
+      if (!between.includes('alwaysOn: true')) continue;
+      out.set(id, [...ids.matchAll(/'([a-z0-9_]+)'/g)].map((t) => t[1]));
+    }
+    return out;
+  }
+
+  it('reads both sides', () => {
+    expect(routableSlugs().length).toBeGreaterThanOrEqual(5);
+    expect(alwaysOnToolIds().size).toBeGreaterThan(0);
+    for (const slug of routableSlugs()) expect(agentTools(slug).length, slug).toBeGreaterThan(3);
+  });
+
+  it('every routable specialist lists the tools of every alwaysOn toolkit', () => {
+    const offenders: string[] = [];
+    for (const slug of routableSlugs()) {
+      const bound = new Set(agentTools(slug));
+      for (const [kit, ids] of alwaysOnToolIds()) {
+        const missing = ids.filter((t) => !bound.has(t));
+        if (missing.length) offenders.push(`${slug} is missing ${kit}: ${missing.join(', ')}`);
+      }
+    }
+    expect(offenders,
+      `AGENT_CONFIGS[agentId].tools is the binding. An alwaysOn toolkit the catalog offers on every `
+      + `agent must be listed by every agent the router can pick:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+});
