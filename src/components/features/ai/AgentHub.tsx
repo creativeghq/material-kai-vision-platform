@@ -316,6 +316,13 @@ const STATUS_STEP_COPY: Record<string, string> = {
 };
 
 /** SEOGenericCard's chunks. One predicate, so the two branches below cannot disagree. */
+// A `run:` quick-start calls its tool with no model turn, so silence is by design and the card
+// IS the answer — "No response from agent" reads as a failure on a turn that succeeded.
+const emptyTurnText = (directRun?: { quickStartLabel?: string } | null) =>
+  directRun?.quickStartLabel
+    ? `${directRun.quickStartLabel} — the result is in the card below.`
+    : 'No response from agent';
+
 const isSeoToolkitCard = (type: unknown): type is string =>
   typeof type === 'string' && type.startsWith('seo_') && type.endsWith('_card') && type !== 'seo_research_card';
 
@@ -4016,7 +4023,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-response`,
         role: 'assistant',
-        content: cleanedText || 'No response from agent',
+        content: cleanedText || emptyTurnText(directRun),
         timestamp: new Date(),
         agentId: data.agentId || selectedAgent,
         routed: data.routed ?? undefined,
@@ -4055,7 +4062,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         await saveAndLinkMessage(assistantMessage.id, {
           conversationId,
           role: 'assistant',
-          content: cleanedText || 'No response from agent',
+          content: cleanedText || emptyTurnText(directRun),
           metadata: {
             // `data.agentId` is the agent that ACTUALLY ran — the specialist when JARVIS routed.
             // It used to arrive as `orchestrator` on every routed turn, which is why no stored
