@@ -5,6 +5,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
 import { inspectSiteUrls, buildInspectionQueue, INSPECT_QUOTA_PER_DAY } from './urlInspection.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { GA_BREAKDOWNS, type GaBreakdownSpec } from '../_shared/gaVocabulary.generated.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -209,6 +210,74 @@ const gaNum = (v: any): number | null => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+
+/** One GA4 breakdown report, mapped onto the `ga_breakdown` column set. */
+async function gaBreakdownReport(
+  token: string, property: string, spec: GaBreakdownSpec, startDate: string, endDate: string,
+): Promise<Record<string, unknown>[]> {
+  const resp = await fetch(GA_DATA_URL(property), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: spec.dimensions.map((name) => ({ name })),
+      metrics: spec.metrics.map((m) => ({ name: m.ga })),
+      // Ordered by the spec's FIRST metric, which is what `limit` then truncates against —
+      // sessions for everything except events, which are counted rather than sessionised.
+      orderBys: [{ desc: true, metric: { metricName: spec.metrics[0].ga } }],
+      limit: spec.limit,
+    }),
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(body?.error?.message || `HTTP ${resp.status}`);
+  return (body.rows || []).map((r: any) => {
+    const d = r.dimensionValues || [];
+    const m = r.metricValues || [];
+    const out: Record<string, unknown> = {
+      value: d[0]?.value ?? '',
+      label: spec.dimensions.length > 1 ? (d[1]?.value ?? null) : null,
+    };
+    spec.metrics.forEach((bind, i) => { out[bind.col] = gaNum(m[i]?.value); });
+    return out;
+  });
+}
+
+/**
+ * Collect every breakdown, one report each, and record each one's own outcome.
+ *
+ * Independent on purpose: a single dimension GA rejects (an incompatible metric, a property with
+ * no ecommerce) must not take the other nine down, and "we could not fetch this" has to reach the
+ * panel as a stated reason rather than an empty table that reads as "no visitors".
+ */
+async function syncGaBreakdowns(
+  supabase: any, websiteId: string, property: string, token: string,
+  startDate: string, endDate: string, windowDays: number,
+): Promise<{ ok: number; failed: string[]; rows: number }> {
+  const failed: string[] = [];
+  let ok = 0;
+  let rows = 0;
+  for (const spec of GA_BREAKDOWNS) {
+    let status = 'ok';
+    let error: string | null = null;
+    let payload: Record<string, unknown>[] = [];
+    try {
+      payload = await gaBreakdownReport(token, property, spec, startDate, endDate);
+      if (!payload.length) status = 'no_data';
+    } catch (e) {
+      status = 'collector_failed';
+      error = String(e instanceof Error ? e.message : e).slice(0, 900);
+      failed.push(spec.key);
+    }
+    const { error: rpcErr } = await supabase.rpc('ga_replace_breakdown', {
+      p_website_id: websiteId, p_dimension: spec.key, p_window_days: windowDays,
+      p_period_start: startDate, p_period_end: endDate,
+      p_rows: payload, p_status: status, p_error: error,
+    });
+    if (rpcErr) { failed.push(`${spec.key}:store`); continue; }
+    if (status !== 'collector_failed') { ok++; rows += payload.length; }
+  }
+  return { ok, failed, rows };
+}
 
 /** Map GA4 report rows onto ga_performance and upsert them. */
 async function storeGaRows(
@@ -559,10 +628,15 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           const byChannel = await gaRunReport(token, conn.ga_property_id, start, end, true);
           const n = await storeGaRows(supabase, websiteId, website.workspace_id, totals, false)
                   + await storeGaRows(supabase, websiteId, website.workspace_id, byChannel, true);
+          // Geography, pages, devices, sources, events. Each records its own outcome, so a
+          // dimension GA rejects leaves the other nine and the daily totals intact.
+          const bd = await syncGaBreakdowns(
+            supabase, websiteId, conn.ga_property_id, token, start, end, days,
+          );
           await supabase.from('website_gsc_connections')
             .update({ ga_last_sync_at: new Date().toISOString(), ga_last_sync_error: null })
             .eq('website_id', websiteId);
-          return json({ ok: true, rows: n, days });
+          return json({ ok: true, rows: n, days, breakdowns: bd });
         } catch (e) {
           const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
           // Recorded, not swallowed: an Analytics panel that is empty because the

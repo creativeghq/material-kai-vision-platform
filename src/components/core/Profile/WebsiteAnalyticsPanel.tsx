@@ -17,6 +17,9 @@ import {
 } from '@/services/userWebsitesService';
 import { SeoMetricTile } from './seo/SeoMetricTile';
 import { ANALYTICS_METRICS, compact, type SeoMetric } from './seo/seoMetrics';
+import { GaBreakdownTable, num, sessionsColumn } from './seo/GaBreakdownTable';
+import { breakdownOf, formatDuration } from './seo/gaBreakdowns';
+import { useGaBreakdowns } from './seo/useGaBreakdowns';
 
 /** Websites → Search Performance → Analytics. */
 
@@ -111,6 +114,7 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
   const channelTotal = topChannels.reduce((s, c) => s + (c.sessions ?? 0), 0) || 1;
 
   return (
+    <div className="space-y-4">
     <Card className="dashboard-card">
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div>
@@ -212,6 +216,38 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
         )}
       </CardContent>
     </Card>
+
+      {/* Channel groups above say Google sent them; this says WHICH google and how. The two
+          disagree on purpose — a channel is Google's bucketing, a source is the referrer. */}
+      {connected && <AcquisitionSources websiteId={website.id} />}
+    </div>
+  );
+};
+
+const AcquisitionSources: React.FC<{ websiteId: string }> = ({ websiteId }) => {
+  const { data } = useGaBreakdowns(websiteId);
+  const sources = breakdownOf(data, 'source');
+  if (sources.status === 'not_collected') return null;
+  return (
+    <GaBreakdownTable
+      title="Sources"
+      description="The referrer and medium behind each session."
+      breakdown={sources}
+      head="Source / medium"
+      renderName={(row) => (
+        <span className="flex items-center gap-2">
+          <span className="truncate font-medium">{row.value}</span>
+          {row.label && <span className="shrink-0 text-xs text-muted-foreground">/ {row.label}</span>}
+        </span>
+      )}
+      columns={[
+        sessionsColumn,
+        num('new_users', 'New users'),
+        num('secs_per_session', 'Avg. time', (n) => formatDuration(n)),
+        num('conversions', 'Conv.'),
+      ]}
+      limit={20}
+    />
   );
 };
 

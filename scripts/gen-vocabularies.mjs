@@ -301,6 +301,12 @@ export const VOCABULARIES = [
     'src/utils/fieldKeyNormalize.ts',
     'supabase/functions/_shared/fieldKeyNormalize.generated.ts',
   ],
+  [
+    // What we ask GA4 for beyond the daily totals. The edge builds the reports, the panels render
+    // them, and `ga_breakdown_dimension_check` is the enforcer — three readers, one list.
+    'src/components/core/Profile/seo/gaVocabulary.ts',
+    'supabase/functions/_shared/gaVocabulary.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

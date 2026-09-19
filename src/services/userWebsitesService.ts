@@ -9,6 +9,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
+import type { GaBreakdowns } from '@/components/core/Profile/seo/gaBreakdowns';
 
 export interface UserWebsite {
   id: string;
@@ -353,6 +354,8 @@ export interface GaSummary {
 }
 
 export interface GaProperty { property: string; name: string; account: string }
+
+export type { GaBreakdowns, GaBreakdown, GaBreakdownRow } from '@/components/core/Profile/seo/gaBreakdowns';
 
 export interface SeoReportRow {
   id: string;
@@ -1165,6 +1168,14 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as GaSummary) ?? null;
+  },
+
+  async gaBreakdowns(websiteId: string, limit = 50): Promise<GaBreakdowns | null> {
+    const { data, error } = await supabase.rpc(
+      'seo_website_ga_breakdowns' as any, { p_website_id: websiteId, p_limit: limit } as any,
+    );
+    if (error) throw error;
+    return (data as GaBreakdowns) ?? null;
   },
 
   async gaListProperties(websiteId: string): Promise<GaProperty[]> {

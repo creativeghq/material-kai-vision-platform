@@ -1,19 +1,21 @@
 /** The per-website SEO rail — ONE declaration, read by the dashboard that renders it. */
 import {
-  Bot, FileBarChart, FileText, FlaskConical, Gauge, Globe, LayoutDashboard, LineChart, Radar,
-  Scissors, Search, ShieldCheck, Sparkles, Spline, Swords, Target, TrendingUp,
+  Bot, FileBarChart, FileStack, FileText, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard,
+  LineChart, MonitorSmartphone, Radar, Scissors, Search, ShieldCheck, Sparkles, Spline, Swords,
+  Target, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type SeoSectionId =
   | 'overview'
-  | 'gsc' | 'analytics' | 'cannibalisation' | 'ranks'
+  | 'gsc' | 'cannibalisation' | 'ranks'
+  | 'analytics' | 'analytics-pages' | 'analytics-geo' | 'analytics-tech'
   | 'ai' | 'rankings' | 'competitors' | 'domains'
   | 'articles' | 'research' | 'brand'
   | 'crawl' | 'health' | 'llms'
   | 'runs' | 'reports';
 
-export type SeoGroupId = 'search' | 'visibility' | 'content' | 'technical' | 'activity';
+export type SeoGroupId = 'search' | 'audience' | 'visibility' | 'content' | 'technical' | 'activity';
 
 export interface SeoSection {
   /** The `?section=` key — the external contract. Labels are free to change; this is not. */
@@ -27,6 +29,7 @@ export interface SeoSection {
 
 export const SEO_SECTION_GROUPS = {
   search: 'Search',
+  audience: 'Audience',
   visibility: 'Visibility',
   content: 'Content',
   technical: 'Technical',
@@ -41,9 +44,13 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard, landing: true },
 
   { value: 'gsc', label: 'Search Console', icon: LineChart, group: 'search' },
-  { value: 'analytics', label: 'Analytics', icon: Spline, group: 'search' },
   { value: 'cannibalisation', label: 'Cannibalisation', icon: Scissors, group: 'search' },
   { value: 'ranks', label: 'Rank Tracker', icon: Target, group: 'search' },
+
+  { value: 'analytics', label: 'Overview', icon: Spline, group: 'audience' },
+  { value: 'analytics-pages', label: 'Pages', icon: FileStack, group: 'audience' },
+  { value: 'analytics-geo', label: 'Geography', icon: Globe2, group: 'audience' },
+  { value: 'analytics-tech', label: 'Devices & events', icon: MonitorSmartphone, group: 'audience' },
 
   { value: 'ai', label: 'AI Visibility', icon: Sparkles, group: 'visibility' },
   { value: 'rankings', label: 'Backlinks & Authority', icon: TrendingUp, group: 'visibility' },
