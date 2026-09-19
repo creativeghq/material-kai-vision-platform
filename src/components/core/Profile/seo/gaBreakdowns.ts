@@ -89,3 +89,38 @@ export function countryFlag(alpha2: string): string {
   if (!/^[A-Z]{2}$/.test(c)) return '';
   return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 }
+
+export interface GaFunnelStepRow {
+  step_index: number;
+  step_label: string;
+  event_name: string;
+  active_users: number | null;
+  completion_rate: number | null;
+  abandonments: number | null;
+  abandonment_rate: number | null;
+  of_first: number | null;
+  of_previous: number | null;
+  dropped: number | null;
+}
+
+export interface GaCohortPeriod { nth: number; active_users: number | null; retention: number | null }
+export interface GaCohortRow {
+  cohort_label: string;
+  cohort_start: string | null;
+  total_users: number | null;
+  periods: GaCohortPeriod[];
+}
+
+export interface GaJourney {
+  funnel: {
+    status: string; note: string | null; ladder: string | null;
+    window_days: number | null; captured_at: string | null;
+    steps: GaFunnelStepRow[];
+  };
+  cohorts: {
+    status: string; note: string | null;
+    window_days: number | null; captured_at: string | null;
+    periods: number[];
+    rows: GaCohortRow[];
+  };
+}

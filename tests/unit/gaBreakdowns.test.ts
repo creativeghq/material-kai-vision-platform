@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  GA_BREAKDOWNS, GA_BREAKDOWN_COLUMNS, GA_BREAKDOWN_KEYS,
+  GA_BREAKDOWNS, GA_BREAKDOWN_COLUMNS, GA_BREAKDOWN_KEYS, GA_FUNNELS, GA_FUNNEL_MIN_STEPS,
 } from '@/components/core/Profile/seo/gaVocabulary';
 import { COUNTRY_TOPO_ID } from '@/components/core/Profile/seo/countryTopoIds.generated';
 import { SEO_SECTIONS } from '@/components/core/Profile/seo/sections';
@@ -148,6 +148,7 @@ describe('the Audience rail', () => {
     const audience = SEO_SECTIONS.filter((s) => s.group === 'audience').map((s) => s.value);
     expect(audience).toEqual([
       'analytics', 'analytics-pages', 'analytics-geo', 'analytics-tech', 'analytics-commerce',
+      'analytics-funnel', 'analytics-retention',
     ]);
   });
 
@@ -158,5 +159,31 @@ describe('the Audience rail', () => {
 
   it('exactly one section is the landing pane', () => {
     expect(SEO_SECTIONS.filter((s) => s.landing).map((s) => s.value)).toEqual(['overview']);
+  });
+});
+
+describe('the funnel ladders', () => {
+  it('every ladder is long enough to be a journey', () => {
+    for (const l of GA_FUNNELS) {
+      expect(l.steps.length, l.key).toBeGreaterThanOrEqual(GA_FUNNEL_MIN_STEPS);
+    }
+  });
+
+  it('every ladder starts at arrival', () => {
+    for (const l of GA_FUNNELS) {
+      expect(l.steps[0].event, l.key).toBe('session_start');
+    }
+  });
+
+  it('no ladder repeats an event', () => {
+    for (const l of GA_FUNNELS) {
+      const events = l.steps.map((st) => st.event);
+      expect(new Set(events).size, `${l.key} repeats a step`).toBe(events.length);
+    }
+  });
+
+  it('the ladders describe different journeys', () => {
+    const ends = GA_FUNNELS.map((l) => l.steps[l.steps.length - 1].event);
+    expect(new Set(ends).size).toBe(ends.length);
   });
 });

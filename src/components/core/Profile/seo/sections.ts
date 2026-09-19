@@ -1,7 +1,8 @@
 /** The per-website SEO rail — ONE declaration, read by the dashboard that renders it. */
 import {
-  Bot, FileBarChart, FileStack, FileText, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard,
-  LineChart, MonitorSmartphone, Radar, Scissors, Search, ShieldCheck, ShoppingBag, Sparkles, Spline, Swords,
+  Bot, FileBarChart, FileStack, FileText, Filter, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard,
+  LineChart, MonitorSmartphone, Radar, Repeat, Scissors, Search, ShieldCheck, ShoppingBag, Sparkles,
+  Spline, Swords,
   Target, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -10,6 +11,7 @@ export type SeoSectionId =
   | 'overview'
   | 'gsc' | 'cannibalisation' | 'ranks'
   | 'analytics' | 'analytics-pages' | 'analytics-geo' | 'analytics-tech' | 'analytics-commerce'
+  | 'analytics-funnel' | 'analytics-retention'
   | 'ai' | 'rankings' | 'competitors' | 'domains'
   | 'articles' | 'research' | 'brand'
   | 'crawl' | 'health' | 'llms'
@@ -52,6 +54,8 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'analytics-geo', label: 'Geography', icon: Globe2, group: 'audience' },
   { value: 'analytics-tech', label: 'Devices & events', icon: MonitorSmartphone, group: 'audience' },
   { value: 'analytics-commerce', label: 'Products & ads', icon: ShoppingBag, group: 'audience' },
+  { value: 'analytics-funnel', label: 'Funnel', icon: Filter, group: 'audience' },
+  { value: 'analytics-retention', label: 'Retention', icon: Repeat, group: 'audience' },
 
   { value: 'ai', label: 'AI Visibility', icon: Sparkles, group: 'visibility' },
   { value: 'rankings', label: 'Backlinks & Authority', icon: TrendingUp, group: 'visibility' },

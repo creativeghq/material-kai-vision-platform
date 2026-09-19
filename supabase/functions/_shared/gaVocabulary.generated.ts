@@ -107,3 +107,38 @@ export const GA_REALTIME = {
   metric: 'activeUsers',
   limit: 50,
 } as const;
+
+export interface GaFunnelStep { event: string; label: string }
+export interface GaFunnelLadder { key: string; label: string; description: string; steps: GaFunnelStep[] }
+
+/** Which journey a site is ON is DERIVED from the events it reports. */
+export const GA_FUNNELS: readonly GaFunnelLadder[] = [
+  {
+    key: 'ecommerce',
+    label: 'Purchase journey',
+    description: 'Arrival through to purchase, on GA4 recommended ecommerce events.',
+    steps: [
+      { event: 'session_start', label: 'Arrived' },
+      { event: 'view_item_list', label: 'Browsed a list' },
+      { event: 'view_item', label: 'Viewed a product' },
+      { event: 'add_to_cart', label: 'Added to cart' },
+      { event: 'begin_checkout', label: 'Started checkout' },
+      { event: 'purchase', label: 'Purchased' },
+    ],
+  },
+  {
+    key: 'lead',
+    label: 'Enquiry journey',
+    description: 'Arrival through to an enquiry, for a site that sells by conversation.',
+    steps: [
+      { event: 'session_start', label: 'Arrived' },
+      { event: 'page_view', label: 'Viewed a page' },
+      { event: 'view_search_results', label: 'Searched' },
+      { event: 'generate_lead', label: 'Enquired' },
+    ],
+  },
+];
+
+export const GA_FUNNEL_MIN_STEPS = 3;
+
+export const GA_COHORT = { weeks: 6, granularity: 'WEEKLY' } as const;

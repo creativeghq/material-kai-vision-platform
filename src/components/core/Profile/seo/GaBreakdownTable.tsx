@@ -44,7 +44,6 @@ export const num = (key: keyof GaBreakdownRow, label: string, fmt: (n: number) =
   },
 });
 
-/** The row day by day, where the dimension collects one. */
 export const trendColumn: GaColumn = {
   key: 'series',
   label: 'Trend',

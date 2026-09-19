@@ -8,7 +8,6 @@ import { countryFlag, countryName } from './gaBreakdowns';
 
 const REFRESH_MS = 60_000;
 
-/** "0 people" and "we could not ask" are the same picture and opposite facts, so this says which. */
 export const GaRealtimeCard: React.FC<{ websiteId: string }> = ({ websiteId }) => {
   const [data, setData] = useState<GaRealtime | null>(null);
   const [error, setError] = useState<string | null>(null);

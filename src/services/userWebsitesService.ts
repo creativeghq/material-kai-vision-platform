@@ -9,7 +9,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import type { GaBreakdowns } from '@/components/core/Profile/seo/gaBreakdowns';
+import type { GaBreakdowns, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
 export interface UserWebsite {
   id: string;
@@ -366,7 +366,9 @@ export interface GaRealtime {
   devices: GaRealtimeRow[];
 }
 
-export type { GaBreakdowns, GaBreakdown, GaBreakdownRow } from '@/components/core/Profile/seo/gaBreakdowns';
+export type {
+  GaBreakdowns, GaBreakdown, GaBreakdownRow, GaJourney, GaFunnelStepRow, GaCohortRow,
+} from '@/components/core/Profile/seo/gaBreakdowns';
 
 export interface SeoReportRow {
   id: string;
@@ -1188,6 +1190,14 @@ export const userWebsitesService = {
     if (error) throw new Error(await edgeErrorMessage(error, 'Could not read realtime'));
     if (!data?.ok) throw new Error(data?.error || 'Could not read realtime');
     return data as GaRealtime;
+  },
+
+  async gaJourney(websiteId: string): Promise<GaJourney | null> {
+    const { data, error } = await supabase.rpc(
+      'seo_website_ga_journey' as any, { p_website_id: websiteId } as any,
+    );
+    if (error) throw error;
+    return (data as GaJourney) ?? null;
   },
 
   async gaBreakdowns(websiteId: string, limit = 50): Promise<GaBreakdowns | null> {

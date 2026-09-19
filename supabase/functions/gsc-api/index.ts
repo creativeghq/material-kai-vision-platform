@@ -5,7 +5,10 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
 import { inspectSiteUrls, buildInspectionQueue, INSPECT_QUOTA_PER_DAY } from './urlInspection.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { GA_BREAKDOWNS, GA_REALTIME, type GaBreakdownSpec } from '../_shared/gaVocabulary.generated.ts';
+import {
+  GA_BREAKDOWNS, GA_COHORT, GA_FUNNELS, GA_FUNNEL_MIN_STEPS, GA_REALTIME,
+  type GaBreakdownSpec,
+} from '../_shared/gaVocabulary.generated.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -228,7 +231,6 @@ const gaNum = (v: any): number | null => {
 
 interface GaCapabilities { dimensions: Set<string>; metrics: Set<string> }
 
-/** Asked once per sync: naming ONE field a property lacks fails the whole report. */
 async function gaCapabilities(token: string, property: string): Promise<GaCapabilities | null> {
   try {
     const r = await fetch(`https://analyticsdata.googleapis.com/v1beta/${property}/metadata`, {
@@ -253,7 +255,6 @@ interface ResolvedSpec {
   missing: string[];
 }
 
-/** Narrow a spec to this property. With no capability list it is used verbatim. */
 function resolveSpec(spec: GaBreakdownSpec, caps: GaCapabilities | null): ResolvedSpec {
   if (!caps) {
     return { dimensions: [...spec.dimensions], limit: spec.limit, metrics: spec.metrics.map((m) => ({ ga: m.ga, col: m.col })), missing: [] };
@@ -325,9 +326,10 @@ async function gaBreakdownReport(
 async function syncGaBreakdowns(
   supabase: any, websiteId: string, workspaceId: string, property: string, token: string,
   startDate: string, endDate: string, windowDays: number,
-): Promise<{ ok: number; failed: string[]; unsupported: string[]; rows: number; capabilities: boolean }> {
+): Promise<{ ok: number; failed: string[]; unsupported: string[]; rows: number; capabilities: boolean; events: Set<string> }> {
   const failed: string[] = [];
   const unsupported: string[] = [];
+  const events = new Set<string>();
   let ok = 0;
   let rows = 0;
 
@@ -379,12 +381,162 @@ async function syncGaBreakdowns(
       }, { onConflict: 'website_id,dimension' });
       continue;
     }
+    // Which events this property fires — the funnel picks its ladder from this.
+    if (spec.key === 'event' && status === 'ok') {
+      for (const r of payload) { const v = String(r.value ?? ''); if (v) events.add(v); }
+    }
     if (status === 'ok' || status === 'no_data') { ok++; rows += payload.length; }
   }
-  return { ok, failed, unsupported, rows, capabilities: !!caps };
+  return { ok, failed, unsupported, rows, capabilities: !!caps, events };
 }
 
-/** Who is on the site right now. Never stored: a realtime figure at rest is a wrong figure. */
+async function syncGaFunnel(
+  supabase: any, websiteId: string, property: string, token: string,
+  startDate: string, endDate: string, windowDays: number, presentEvents: Set<string>,
+): Promise<string> {
+  let best: { ladder: typeof GA_FUNNELS[number]; steps: typeof GA_FUNNELS[number]['steps'] } | null = null;
+  for (const ladder of GA_FUNNELS) {
+    const steps = ladder.steps.filter((st) => presentEvents.has(st.event));
+    if (steps.length >= GA_FUNNEL_MIN_STEPS && (!best || steps.length > best.steps.length)) {
+      best = { ladder, steps };
+    }
+  }
+
+  if (!best) {
+    const wanted = GA_FUNNELS.map((l) => `${l.label} (${l.steps.map((st) => st.event).join(' → ')})`).join('; ');
+    await supabase.rpc('ga_replace_funnel', {
+      p_website_id: websiteId, p_ladder: 'none', p_window_days: windowDays,
+      p_period_start: startDate, p_period_end: endDate, p_rows: null, p_status: 'not_supported',
+      p_error: `This property does not report enough of a recognised journey to draw one. Wanted at least ${GA_FUNNEL_MIN_STEPS} steps of: ${wanted}`,
+    });
+    return 'not_supported';
+  }
+
+  let status = 'ok';
+  let error: string | null = null;
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const resp = await fetch(`https://analyticsdata.googleapis.com/v1alpha/${property}:runFunnelReport`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dateRanges: [{ startDate, endDate }],
+        funnel: {
+          steps: best.steps.map((st) => ({
+            name: st.label,
+            filterExpression: { funnelEventFilter: { eventName: st.event } },
+          })),
+        },
+      }),
+    });
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      throw new Error(j?.error?.message || `runFunnelReport: HTTP ${resp.status}`);
+    }
+    const body = await resp.json();
+    const table = body.funnelTable || {};
+    const metricNames: string[] = (table.metricHeaders || []).map((h: any) => h.name);
+    const idx = (name: string) => metricNames.indexOf(name);
+
+    rows = (table.rows || []).map((r: any, i: number) => {
+      const m = r.metricValues || [];
+      const at = (name: string) => {
+        const k = idx(name);
+        return k >= 0 ? gaNum(m[k]?.value) : null;
+      };
+      const step = best!.steps[i];
+      return {
+        step_index: i,
+        step_label: step?.label ?? r.dimensionValues?.[0]?.value ?? `Step ${i + 1}`,
+        event_name: step?.event ?? '',
+        active_users: at('activeUsers'),
+        completion_rate: at('funnelStepCompletionRate'),
+        abandonments: at('funnelStepAbandonments'),
+        abandonment_rate: at('funnelStepAbandonmentRate'),
+      };
+    });
+    if (!rows.length) status = 'no_data';
+  } catch (e) {
+    status = 'collector_failed';
+    error = String(e instanceof Error ? e.message : e).slice(0, 900);
+  }
+
+  await supabase.rpc('ga_replace_funnel', {
+    p_website_id: websiteId, p_ladder: best.ladder.key, p_window_days: windowDays,
+    p_period_start: startDate, p_period_end: endDate, p_rows: rows, p_status: status, p_error: error,
+  });
+  return status;
+}
+
+async function syncGaCohorts(
+  supabase: any, websiteId: string, property: string, token: string, windowDays: number,
+): Promise<string> {
+  const weeks = GA_COHORT.weeks;
+  const day = 86400000;
+  // Whole weeks from the last COMPLETE day — never a part week posing as a full one.
+  const end = new Date(Date.now() - day);
+  const cohorts = Array.from({ length: weeks }, (_, i) => {
+    const from = new Date(end.getTime() - (weeks - i) * 7 * day);
+    const to = new Date(from.getTime() + 6 * day);
+    return { name: `cohort_${i}`, start: ymd(from), end: ymd(to) };
+  });
+
+  let status = 'ok';
+  let error: string | null = null;
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const resp = await fetch(GA_DATA_URL(property), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cohortSpec: {
+          cohorts: cohorts.map((c) => ({
+            cohort: c.name,
+            dimension: 'firstSessionDate',
+            dateRange: { startDate: c.start, endDate: c.end },
+          })),
+          cohortsRange: { granularity: GA_COHORT.granularity, startOffset: 0, endOffset: weeks - 1 },
+        },
+        dimensions: [{ name: 'cohort' }, { name: 'cohortNthWeek' }],
+        metrics: [{ name: 'cohortActiveUsers' }, { name: 'cohortTotalUsers' }],
+        limit: 500,
+      }),
+    });
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      throw new Error(j?.error?.message || `cohort report: HTTP ${resp.status}`);
+    }
+    const body = await resp.json();
+    const byName = new Map(cohorts.map((c) => [c.name, c]));
+    rows = (body.rows || []).map((r: any) => {
+      const d = r.dimensionValues || [];
+      const m = r.metricValues || [];
+      const name = String(d[0]?.value ?? '');
+      const c = byName.get(name);
+      // GA returns the offset as `0000` — a string that parses but does not compare.
+      const nth = Number(String(d[1]?.value ?? '').replace(/\D/g, '')) || 0;
+      return {
+        cohort_label: c ? `Week of ${c.start}` : name,
+        cohort_start: c?.start ?? null,
+        nth_period: nth,
+        active_users: gaNum(m[0]?.value),
+        total_users: gaNum(m[1]?.value),
+      };
+    });
+    if (!rows.length) status = 'no_data';
+  } catch (e) {
+    status = 'collector_failed';
+    error = String(e instanceof Error ? e.message : e).slice(0, 900);
+  }
+
+  await supabase.rpc('ga_replace_cohort', {
+    p_website_id: websiteId, p_window_days: windowDays,
+    p_period_start: cohorts[0].start, p_period_end: ymd(end),
+    p_rows: rows, p_status: status, p_error: error,
+  });
+  return status;
+}
+
 async function gaRealtime(token: string, property: string): Promise<{
   active_users: number | null;
   pages: { value: string; users: number }[];
@@ -792,10 +944,14 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           const bd = await syncGaBreakdowns(
             supabase, websiteId, website.workspace_id, conn.ga_property_id, token, start, end, days,
           );
+          const funnel = await syncGaFunnel(
+            supabase, websiteId, conn.ga_property_id, token, start, end, days, bd.events,
+          );
+          const cohorts = await syncGaCohorts(supabase, websiteId, conn.ga_property_id, token, days);
           await supabase.from('website_gsc_connections')
             .update({ ga_last_sync_at: new Date().toISOString(), ga_last_sync_error: null })
             .eq('website_id', websiteId);
-          return json({ ok: true, rows: n, days, breakdowns: bd });
+          return json({ ok: true, rows: n, days, breakdowns: { ...bd, events: bd.events.size }, funnel, cohorts });
         } catch (e) {
           const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
           // Recorded, not swallowed: an Analytics panel that is empty because the
