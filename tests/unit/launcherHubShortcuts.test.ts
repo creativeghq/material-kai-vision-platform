@@ -1,8 +1,5 @@
-/**
- * The App Launcher's "Jump to" rail follows the Hub selected on the left. Two ways that goes wrong,
- * and neither is visible to TypeScript — a `LauncherSection[]` is a valid `LauncherSection[]` in
- * both cases:
- */
+/** The App Launcher's "Jump to" rail follows the Hub selected on the left. Neither way it goes wrong
+ *  is visible to TypeScript — a `LauncherSection[]` is a valid `LauncherSection[]` in both cases. */
 import { describe, it, expect } from 'vitest';
 import { HUBS, SIDEBAR_NAV_ITEMS, type HubId } from '@/config/nav-items';
 import {

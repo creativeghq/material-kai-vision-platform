@@ -32,6 +32,7 @@ import { crmCategoriesService, isHandAssignableKind, type CrmCategorySummary } f
 import { humanizeLabel } from '@/utils/humanize';
 import { CategoriesPanel } from './CategoriesPage';
 import { AddCompanyModal } from '../components/AddCompanyModal';
+import { AddContactModal } from '../components/AddContactModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, useFilterValues, type FilterOption, type FilterValues } from '@/components/core/filters';
@@ -212,17 +213,18 @@ export const CRMManagement: React.FC = () => {
   const [selContacts, setSelContacts] = useState<Set<string>>(new Set());
   const [selCompanies, setSelCompanies] = useState<Set<string>>(new Set());
   const [showAddCompany, setShowAddCompany] = useState(false);
+  const [showAddContact, setShowAddContact] = useState(false);
 
-  // App Launcher deep-links: /crm?new=contact | /crm?new=company open the create flow.
+  // App Launcher deep-links: /crm?new=contact | /crm?new=company open the role-first modal.
   useEffect(() => {
     const n = searchParams.get('new');
     if (n !== 'contact' && n !== 'company') return;
     const params = new URLSearchParams(searchParams);
     params.delete('new');
     setSearchParams(params, { replace: true });
-    if (n === 'contact') navigate('/crm/contacts/new');
+    if (n === 'contact') setShowAddContact(true);
     else setShowAddCompany(true);
-  }, [searchParams, setSearchParams, navigate]);
+  }, [searchParams, setSearchParams]);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   // Add-user modal
@@ -604,6 +606,11 @@ export const CRMManagement: React.FC = () => {
     <div className="min-h-screen">
       <GlobalAdminHeader title="CRM Management" description="Manage users and customer contacts" badge="Admin" />
       <AddCompanyModal open={showAddCompany} onOpenChange={setShowAddCompany} />
+      <AddContactModal
+        open={showAddContact}
+        onOpenChange={setShowAddContact}
+        onAddCompanyInstead={() => { setShowAddContact(false); setShowAddCompany(true); }}
+      />
 
       <div className="p-3 sm:p-6 space-y-6">
         <div className="flex justify-end">
@@ -765,7 +772,7 @@ export const CRMManagement: React.FC = () => {
                     groups={contactGroups} values={contactValues} onChange={onContactFilters}
                     title="Filter contacts" searchPlaceholder="Search contacts…" className="flex-1"
                   />
-                  <Button size="sm" onClick={() => navigate('/crm/contacts/new')}>
+                  <Button size="sm" onClick={() => setShowAddContact(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add contact
                   </Button>
                 </div>
@@ -811,7 +818,7 @@ export const CRMManagement: React.FC = () => {
                               : 'A contact is a person you deal with. Add one directly, or let an inbound lead, quote request or imported list create them for you.'}
                             action={Object.keys(contactValues).length
                               ? <Button size="sm" variant="outline" onClick={() => onContactFilters({})}>Clear filters</Button>
-                              : <Button size="sm" onClick={() => navigate('/crm/contacts/new')}><Plus /> Add contact</Button>}
+                              : <Button size="sm" onClick={() => setShowAddContact(true)}><Plus /> Add contact</Button>}
                           />
                         </TableCell></TableRow>
                       ) : contacts.map((contact) => (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, MessageCircle, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
@@ -25,6 +25,8 @@ import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
 import { CrmPhonesCard } from '@/components/business/crm/CrmPhonesCard';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
+import { CONTACT_TYPE_OPTIONS } from '@/modules/crm/contactType';
+import { humanizeLabel } from '@/utils/humanize';
 import { GoogleBusinessCard } from '@/modules/crm/components/GoogleBusinessCard';
 import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { formatAddressOneLine } from '@/utils/address';
@@ -61,12 +63,8 @@ import { PartyDealsCard } from '@/components/business/crm/PartyDealsCard';
 /** Radix <Select> forbids an empty-string item value, so "not set" needs a sentinel. */
 const UNSET = '__unset__';
 
-/**
- * The Company tab is a signpost, not a second copy of the company record: a
- * business-linked contact's orders, invoices, VAT and balance all live on the
- * company. These are the parts of that record worth a direct way in — every
- * `tab` value is one the company page actually renders (see `resolveRecordTab`).
- */
+/** The Company tab is a signpost, not a second copy: a business-linked contact's orders, invoices,
+ *  VAT and balance live on the company. Every `tab` is one the company page renders. */
 const COMPANY_RECORD_LINKS: { tab: string; label: string; hint: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { tab: 'account', label: 'Account', hint: 'Orders, invoices & balance', icon: Wallet },
   { tab: 'details', label: 'Details', hint: 'Address, tax & VAT', icon: Receipt },
@@ -149,6 +147,9 @@ export const ContactDetailPage: React.FC = () => {
   const { enabled: realEstateEnabled } = useModule('real-estate'); // Property tab when module on
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
+  // What AddContactModal picked. Absent is legitimate — a bookmark on /crm/contacts/new.
+  const location = useLocation();
+  const prefill = (location.state as { prefill?: Partial<Contact> } | null)?.prefill;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [contact, setContact] = useState<Contact | null>(isNew ? {
@@ -185,6 +186,7 @@ export const ContactDetailPage: React.FC = () => {
     country_code: '',
     tax_office: '',
     created_at: new Date().toISOString(),
+    ...prefill,
   } : null);
   const [linkedUser, setLinkedUser] = useState<any>(null);
   // items 6/7/8 — the contact's primary company (full row), used to display the
@@ -1060,8 +1062,13 @@ export const ContactDetailPage: React.FC = () => {
                               <SelectTrigger id="contact_type" className="w-44"><SelectValue placeholder="Not set" /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__unset">Not set</SelectItem>
-                                <SelectItem value="private">Private (B2C)</SelectItem>
-                                <SelectItem value="company">Company (B2B)</SelectItem>
+                                {CONTACT_TYPE_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                ))}
+                                {/* A stored value we do not offer renders as the placeholder — a classified contact reading as unclassified. */}
+                                {contact.contact_type && !CONTACT_TYPE_OPTIONS.some((o) => o.value === contact.contact_type) && (
+                                  <SelectItem value={contact.contact_type}>{humanizeLabel(contact.contact_type)}</SelectItem>
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
