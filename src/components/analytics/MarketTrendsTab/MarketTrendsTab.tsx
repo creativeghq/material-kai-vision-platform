@@ -639,9 +639,9 @@ export const MarketTrendsTab: React.FC = () => {
   return (
     <div className="space-y-5">
       {isDemoData && (
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600">
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-400">
           <span className="text-xs font-semibold">Demo data</span>
-          <span className="text-amber-500/80">—</span>
+          <span className="text-amber-800 dark:text-amber-400/80">—</span>
           <span className="text-xs">Sample data shown. Automatically replaced with live data once activity is recorded.</span>
         </div>
       )}
@@ -685,9 +685,9 @@ export const MarketTrendsTab: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <KpiCard label="Active Demand Signals" value={kpis.activeDemandSignals} icon={TrendingUp} />
         <KpiCard label="Top Demanded Material" value={kpis.topDemandedMaterial} icon={Package} color="text-violet-600" />
-        <KpiCard label="Most Saved Category" value={kpis.topCategory} icon={Star} color="text-amber-500" />
+        <KpiCard label="Most Saved Category" value={kpis.topCategory} icon={Star} color="text-amber-800 dark:text-amber-400" />
         <KpiCard label="Total Category Saves" value={kpis.totalCategorySaves} icon={Eye} color="text-cyan-600" />
-        <KpiCard label="Top Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-600" />
+        <KpiCard label="Top Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-800 dark:text-green-400" />
       </div>
 
 
@@ -731,7 +731,7 @@ export const MarketTrendsTab: React.FC = () => {
                         <LifecycleBadge stage={row.lifecycle} />
                       </div>
                       <div className="text-right shrink-0">
-                        <div className={`text-sm font-bold tabular-nums ${row.growthPct > 0 ? 'text-green-600' : row.growthPct < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        <div className={`text-sm font-bold tabular-nums ${row.growthPct > 0 ? 'text-green-800 dark:text-green-400' : row.growthPct < 0 ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>
                           {row.growthPct > 0 ? '+' : ''}{row.growthPct}%
                         </div>
                         <div className="text-[11px] text-muted-foreground">{row.thisWeek} saves</div>
@@ -761,7 +761,7 @@ export const MarketTrendsTab: React.FC = () => {
                           />
                         </div>
                       </div>
-                      <div className={`text-sm font-bold tabular-nums shrink-0 ${row.growthPct > 0 ? 'text-green-600' : row.growthPct < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                      <div className={`text-sm font-bold tabular-nums shrink-0 ${row.growthPct > 0 ? 'text-green-800 dark:text-green-400' : row.growthPct < 0 ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>
                         {row.growthPct > 0 ? '+' : ''}{row.growthPct}%
                       </div>
                     </div>
@@ -784,7 +784,7 @@ export const MarketTrendsTab: React.FC = () => {
                         <div className="text-xs font-medium">{formatProfType(row.type)}</div>
                         <div className="text-[11px] text-muted-foreground">{row.thisWeek} new this period</div>
                       </div>
-                      <div className={`text-sm font-bold tabular-nums shrink-0 ${row.growthPct > 0 ? 'text-green-600' : row.growthPct === 0 ? 'text-muted-foreground' : 'text-red-500'}`}>
+                      <div className={`text-sm font-bold tabular-nums shrink-0 ${row.growthPct > 0 ? 'text-green-800 dark:text-green-400' : row.growthPct === 0 ? 'text-muted-foreground' : 'text-red-700 dark:text-red-400'}`}>
                         {row.growthPct > 0 ? '+' : ''}{row.growthPct}%
                       </div>
                     </div>
@@ -851,13 +851,13 @@ export const MarketTrendsTab: React.FC = () => {
                           <LifecycleBadge stage={getLifecycle(null, null, row.mentions, materialGrowthRates.find(g => g.name === row.name)?.growthPct)} />
                         </td>
                         <td className="px-3 py-2 text-right font-mono tabular-nums">{row.mentions > 0 ? row.mentions : <span className="text-muted-foreground/40">—</span>}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-green-500">{row.saves}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-violet-500">{row.in3d > 0 ? row.in3d : <span className="text-muted-foreground/40">—</span>}</td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums text-green-800 dark:text-green-400">{row.saves}</td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums text-violet-700 dark:text-violet-400">{row.in3d > 0 ? row.in3d : <span className="text-muted-foreground/40">—</span>}</td>
                         <td className="px-4 py-2 text-right">
                           {row.momentum === 'hot'
-                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/20">▲ HOT</span>
+                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-800 dark:text-green-400 border border-green-500/20">▲ HOT</span>
                             : row.momentum === 'warm'
-                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">→ WARM</span>
+                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-500/20">→ WARM</span>
                             : <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/30">↓ COOL</span>}
                         </td>
                       </tr>
@@ -952,11 +952,11 @@ export const MarketTrendsTab: React.FC = () => {
                         <td className="py-2.5 pr-4 font-medium truncate max-w-[160px]">{row.name}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground">{row.thisWeek}</td>
                         {fc.map((v, j) => (
-                          <td key={j} className={`py-2.5 px-3 text-right tabular-nums font-semibold ${up ? 'text-green-600' : down ? 'text-red-500' : 'text-foreground'}`}>{v}</td>
+                          <td key={j} className={`py-2.5 px-3 text-right tabular-nums font-semibold ${up ? 'text-green-800 dark:text-green-400' : down ? 'text-red-700 dark:text-red-400' : 'text-foreground'}`}>{v}</td>
                         ))}
                         <td className="py-2.5 pl-3 text-right">
-                          {up   ? <ChevronUp   className="h-4 w-4 text-green-500 ml-auto" />
-                          : down ? <ChevronDown className="h-4 w-4 text-red-400 ml-auto" />
+                          {up   ? <ChevronUp   className="h-4 w-4 text-green-800 dark:text-green-400 ml-auto" />
+                          : down ? <ChevronDown className="h-4 w-4 text-red-700 dark:text-red-400 ml-auto" />
                           :        <Minus       className="h-4 w-4 text-muted-foreground ml-auto" />}
                         </td>
                       </tr>
@@ -1039,9 +1039,9 @@ export const MarketTrendsTab: React.FC = () => {
                   <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs text-muted-foreground">
                       <th className="text-left px-4 py-2.5 font-medium">Product</th>
-                      <th className="text-right px-2 py-2.5 font-medium text-blue-500">Search</th>
-                      <th className="text-right px-2 py-2.5 font-medium text-violet-500">AI Agent</th>
-                      <th className="text-right px-2 py-2.5 font-medium text-amber-500">3D Scene</th>
+                      <th className="text-right px-2 py-2.5 font-medium text-blue-700 dark:text-blue-400">Search</th>
+                      <th className="text-right px-2 py-2.5 font-medium text-violet-700 dark:text-violet-400">AI Agent</th>
+                      <th className="text-right px-2 py-2.5 font-medium text-amber-800 dark:text-amber-400">3D Scene</th>
                       <th className="text-right px-2 py-2.5 font-medium text-muted-foreground">Manual</th>
                       <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Page</th>
                     </tr>
@@ -1051,7 +1051,7 @@ export const MarketTrendsTab: React.FC = () => {
                       const total = row.search + row.agent + row.threeD + row.manual + row.page || 1;
                       const dom = Math.max(row.search, row.agent, row.threeD);
                       const domLabel = dom === row.search ? 'Search' : dom === row.agent ? 'AI Agent' : '3D Scene';
-                      const domColor = dom === row.search ? 'text-blue-500' : dom === row.agent ? 'text-violet-500' : 'text-amber-500';
+                      const domColor = dom === row.search ? 'text-blue-700 dark:text-blue-400' : dom === row.agent ? 'text-violet-700 dark:text-violet-400' : 'text-amber-800 dark:text-amber-400';
                       return (
                         <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-2.5">
@@ -1085,7 +1085,7 @@ export const MarketTrendsTab: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
               <p className="text-xs text-muted-foreground mb-1">Total Unmet Demands</p>
-              <p className="text-2xl font-bold text-amber-600">{zeroResultDemands.length}</p>
+              <p className="text-2xl font-bold text-amber-800 dark:text-amber-400">{zeroResultDemands.length}</p>
               <p className="text-xs text-muted-foreground mt-1">active gaps with no current supply</p>
             </div>
             <div className="rounded-xl border border-border/50 bg-card px-4 py-3">
@@ -1095,7 +1095,7 @@ export const MarketTrendsTab: React.FC = () => {
             </div>
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
               <p className="text-xs text-muted-foreground mb-1">Opportunity Signal</p>
-              <p className="text-sm font-semibold text-emerald-600">First-mover advantage</p>
+              <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-400">First-mover advantage</p>
               <p className="text-xs text-muted-foreground mt-1">No supplier currently serves these searches</p>
             </div>
           </div>
@@ -1128,12 +1128,12 @@ export const MarketTrendsTab: React.FC = () => {
                           <td className="px-3 py-2.5">
                             <span className="font-medium">{row.term}</span>
                           </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-amber-600">{row.count}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-amber-800 dark:text-amber-400">{row.count}</td>
                           <td className="px-3 py-2.5">
                             {urgency === 'high'
-                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-red-500/10 text-red-600 border-red-500/20">High</span>
+                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20">High</span>
                               : urgency === 'medium'
-                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/20">Medium</span>
+                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20">Medium</span>
                               : <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-muted text-muted-foreground border-border/40">Low</span>}
                           </td>
                           <td className="px-4 py-2.5 text-right text-muted-foreground">{row.lastSeen}</td>
@@ -1204,7 +1204,7 @@ export const MarketTrendsTab: React.FC = () => {
                         <td className="py-2 pr-3 font-medium">{formatProfType(row.type)}</td>
                         <td className="py-2 pr-3 text-right font-mono tabular-nums">{row.saves}</td>
                         <td className="py-2 pr-3 text-right font-mono tabular-nums text-primary">{row.quotes}</td>
-                        <td className="py-2 text-right font-mono tabular-nums text-green-500">
+                        <td className="py-2 text-right font-mono tabular-nums text-green-800 dark:text-green-400">
                           {convRate(row.quotes, row.saves)}
                         </td>
                       </tr>
@@ -1239,7 +1239,7 @@ export const MarketTrendsTab: React.FC = () => {
               value={`${lifecycleKpi.saveToQuoteRate}%`}
               sub="Share of saved materials that eventually become quote requests"
               icon={Award}
-              color="text-green-600"
+              color="text-green-800 dark:text-green-400"
             />
           </div>
         </>
@@ -1331,7 +1331,7 @@ export const MarketTrendsTab: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-violet-500">{row.boardCount}</td>
+                      <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-violet-700 dark:text-violet-400">{row.boardCount}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1429,7 +1429,7 @@ export const MarketTrendsTab: React.FC = () => {
           <div className="grid grid-cols-3 gap-3 mb-4">
             <KpiCard label="3D Generations with These Materials" value={vrKpis.totalGenerations} icon={Activity} color="text-violet-600" />
             <KpiCard label="Unique Materials Used in 3D" value={vrKpis.uniqueMaterials} icon={Package} color="text-cyan-600" />
-            <KpiCard label="Top Room Type" value={vrKpis.topRoomType} icon={Globe} color="text-amber-500" />
+            <KpiCard label="Top Room Type" value={vrKpis.topRoomType} icon={Globe} color="text-amber-800 dark:text-amber-400" />
           </div>
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
             <div className="mb-4">

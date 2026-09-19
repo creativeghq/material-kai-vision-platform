@@ -75,7 +75,7 @@ export const AccountStatusCard: React.FC = () => {
     return (
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="flex items-center gap-2 text-amber-500">
+          <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
             <PowerOff className="h-4 w-4" /> This account is disabled
           </CardTitle>
         </CardHeader>
@@ -84,7 +84,7 @@ export const AccountStatusCard: React.FC = () => {
             Disabled{disabledAt ? ` on ${formatDate(disabledAt)}` : ''}. Your customers were
             moved to the operator. No new invoices, quotes or orders can be created.
           </p>
-          <p className="flex items-start gap-1.5 text-xs text-emerald-500">
+          <p className="flex items-start gap-1.5 text-xs text-emerald-800 dark:text-emerald-400">
             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             Your invoices, credit notes and delivery notes are still here and still readable — nothing was deleted.
           </p>

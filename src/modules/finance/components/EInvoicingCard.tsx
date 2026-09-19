@@ -84,11 +84,11 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium flex items-center gap-2"><KeyRound className="h-4 w-4" /> Provider connection</div>
             {status?.master_key_configured ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-medium text-emerald-500">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800 dark:text-emerald-400">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Connected{status.is_sandbox ? ' · Sandbox' : ' · Live'}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-500">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-400">
                 <AlertTriangle className="h-3.5 w-3.5" /> Master key not configured
               </span>
             )}
@@ -117,20 +117,20 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
         <div className="rounded-md border border-border/60 p-3 space-y-2">
           <div className="text-sm font-medium">Issuer identity</div>
           {missing.length === 0 ? (
-            <p className="text-xs text-emerald-500 flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> All mandatory issuer fields are filled.</p>
+            <p className="text-xs text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> All mandatory issuer fields are filled.</p>
           ) : (
             <>
               {onGoToIdentity ? (
                 <button
                   type="button"
                   onClick={onGoToIdentity}
-                  className="group flex items-center gap-1.5 text-left text-xs text-amber-500 hover:underline"
+                  className="group flex items-center gap-1.5 text-left text-xs text-amber-800 dark:text-amber-400 hover:underline"
                 >
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {missing.length} mandatory field{missing.length > 1 ? 's' : ''} missing — myDATA will reject transmission until filled.
                   <ArrowRight className="h-3 w-3 shrink-0 opacity-70 transition-transform group-hover:translate-x-0.5" />
                 </button>
               ) : (
-                <p className="text-xs text-amber-500 flex items-center gap-1.5">
+                <p className="text-xs text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5" /> {missing.length} mandatory field{missing.length > 1 ? 's' : ''} missing — myDATA will reject transmission until filled.
                 </p>
               )}

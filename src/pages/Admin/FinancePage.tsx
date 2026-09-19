@@ -623,7 +623,7 @@ const FinancePage: React.FC = () => {
               <Card>
                 <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center gap-2"><BanknoteIcon className="h-4 w-4" /> Received, not yet invoiced — deposits / on-account</CardTitle>
-                  <span className="text-sm font-semibold text-amber-600">{formatMoney(deposits.total, deposits.currency)}</span>
+                  <span className="text-sm font-semibold text-amber-800 dark:text-amber-400">{formatMoney(deposits.total, deposits.currency)}</span>
                 </CardHeader>
                 <CardContent className="p-0">
                   <p className="px-5 pt-3 text-xs text-muted-foreground">Cash you've received that isn't a receipt/invoice yet — it's held as a customer deposit (not revenue, not in AR). Issue a document to recognise it.</p>
@@ -720,7 +720,7 @@ const FinancePage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <div className="text-right">
                               <div className="flex items-center justify-end gap-1.5">
-                                {mD && <span title="Transmitted to myDATA" className="text-emerald-500 text-xs">mD ✓</span>}
+                                {mD && <span title="Transmitted to myDATA" className="text-emerald-800 dark:text-emerald-400 text-xs">mD ✓</span>}
                                 <span className={`text-[10px] capitalize ${statusTone(i.status)}`}>{i.status}</span>
                               </div>
                               <div className="mt-1 text-sm font-medium">{formatMoney(i.amount_due, i.currency)}</div>
@@ -926,13 +926,13 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2">
                           {isCredit
                             ? <span className="text-xs text-muted-foreground">—</span>
-                            : <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>}
+                            : <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>}
                         </td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.total, r.currency)}</td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.amount_paid, r.currency)}</td>
                         <td className="px-4 py-2 text-right font-medium">
                           {isCredit
-                            ? <span className="text-emerald-600 dark:text-emerald-400" title="Not owed to us — money we hold for this customer">{formatMoney(r.amount_due, r.currency)} credit</span>
+                            ? <span className="text-emerald-800 dark:text-emerald-400" title="Not owed to us — money we hold for this customer">{formatMoney(r.amount_due, r.currency)} credit</span>
                             : formatMoney(r.amount_due, r.currency)}
                         </td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
@@ -1127,7 +1127,7 @@ const FinancePage: React.FC = () => {
                           ) : (r.category_name ?? '—')}
                         </td>
                         <td className="px-4 py-2">
-                          <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>
+                          <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>
                         </td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.total, r.currency)}</td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.amount_paid, r.currency)}</td>
@@ -1549,7 +1549,7 @@ const BucketSummary: React.FC<{
             <tr className="border-b border-border/30 bg-muted/20">
               <td className="px-4 py-2 text-xs text-muted-foreground" title="Confirmed orders not yet invoiced — no due date, so not aged above">Expected (uninvoiced orders)</td>
               <td className="px-4 py-2" />
-              <td className="px-4 py-2 text-right font-medium text-amber-600">{formatMoney(expected, money.currency)}</td>
+              <td className="px-4 py-2 text-right font-medium text-amber-800 dark:text-amber-400">{formatMoney(expected, money.currency)}</td>
             </tr>
           )}
           {credit > 0 && (
@@ -1606,8 +1606,8 @@ const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b border-border/60">
               <th className="px-4 py-2 text-left">Month</th>
-              <th className="px-4 py-2 text-right text-emerald-500">In</th>
-              <th className="px-4 py-2 text-right text-red-400">Out</th>
+              <th className="px-4 py-2 text-right text-emerald-800 dark:text-emerald-400">In</th>
+              <th className="px-4 py-2 text-right text-red-700 dark:text-red-400">Out</th>
               <th className="px-4 py-2 text-right">Net</th>
             </tr>
           </thead>
@@ -1618,8 +1618,8 @@ const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
             {grouped.map(([month, cell]) => (
               <tr key={month} className="border-b border-border/30">
                 <td className="px-4 py-2">{month}</td>
-                <td className="px-4 py-2 text-right text-emerald-500">{formatMoney(cell.in)}</td>
-                <td className="px-4 py-2 text-right text-red-400">{formatMoney(cell.out)}</td>
+                <td className="px-4 py-2 text-right text-emerald-800 dark:text-emerald-400">{formatMoney(cell.in)}</td>
+                <td className="px-4 py-2 text-right text-red-700 dark:text-red-400">{formatMoney(cell.out)}</td>
                 <td className={`px-4 py-2 text-right font-medium ${cell.in - cell.out < 0 ? 'text-destructive' : ''}`}>{formatMoney(cell.in - cell.out)}</td>
               </tr>
             ))}
@@ -1746,7 +1746,7 @@ const RevenueTrendCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => {
     if (pct == null) return null;
     const up = pct >= 0;
     return (
-      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${up ? 'bg-emerald-500/15 text-emerald-500' : 'bg-destructive/15 text-destructive'}`}>
+      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${up ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400' : 'bg-destructive/15 text-destructive'}`}>
         {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% <span className="text-muted-foreground">{label}</span>
       </span>
     );

@@ -760,7 +760,7 @@ const PosPage: React.FC = () => {
               className="flex flex-col items-center rounded-md bg-emerald-600 px-3 py-1 text-sm font-bold leading-tight hover:bg-emerald-500">
               {dt.shortEn}
             </button>
-            <div className="flex items-center gap-2 text-neutral-400">
+            <div className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
               <CreditCard className={`h-4 w-4 ${selectedTerminal ? 'text-emerald-400' : ''}`} />
               <Wifi className="h-4 w-4 text-emerald-400" />
               <ScanLine className="h-4 w-4" />
@@ -780,18 +780,18 @@ const PosPage: React.FC = () => {
             </div>
             <div className="max-h-[34vh] divide-y divide-neutral-800 overflow-auto bg-white text-neutral-900">
               {cart.length === 0 ? (
-                <div className="px-3 py-10 text-center text-xs text-neutral-400">—</div>
+                <div className="px-3 py-10 text-center text-xs text-neutral-600 dark:text-neutral-400">—</div>
               ) : cart.map((l) => (
                 <div key={l.id} className="grid grid-cols-[1fr_64px_36px_48px_72px] items-center gap-1 px-3 py-1.5 text-xs">
                   <div className="flex items-center gap-1 truncate">
-                    <button type="button" onClick={() => removeLine(l.id)} className="text-neutral-400 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => removeLine(l.id)} className="text-neutral-600 dark:text-neutral-400 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>
                     <span className="truncate">{l.name}</span>
                   </div>
                   <span className="text-right tabular-nums">{formatMoney(l.unit_price, l.currency)}</span>
                   <span className="flex items-center justify-center gap-0.5">
-                    <button type="button" onClick={() => setQty(l.id, -1)} className="text-neutral-400 hover:text-neutral-900"><Minus className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => setQty(l.id, -1)} className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"><Minus className="h-3 w-3" /></button>
                     {l.qty}
-                    <button type="button" onClick={() => setQty(l.id, 1)} className="text-neutral-400 hover:text-neutral-900"><Plus className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => setQty(l.id, 1)} className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"><Plus className="h-3 w-3" /></button>
                   </span>
                   <span className="text-right tabular-nums">{l.line_vat}%</span>
                   <span className="text-right font-medium tabular-nums">{formatMoney(l.unit_price * l.qty, l.currency)}</span>
@@ -804,7 +804,7 @@ const PosPage: React.FC = () => {
           <div className="grid grid-cols-[1fr_1fr_1fr_84px] gap-1.5 bg-neutral-900 p-2">
             {/* amount display spans first 3 cols */}
             <div className="col-span-3 flex items-center justify-end rounded-md bg-neutral-950 px-4 py-3 text-2xl font-semibold tabular-nums">
-              {pendingQty ? <span className="mr-2 text-sm text-neutral-400">{pendingQty} ×</span> : null}
+              {pendingQty ? <span className="mr-2 text-sm text-neutral-600 dark:text-neutral-400">{pendingQty} ×</span> : null}
               {display || '0.00'}
             </div>
             <Key onClick={keyBack} className="bg-red-500/90 text-white hover:bg-red-500"><Delete className="h-5 w-5" /></Key>
@@ -1050,7 +1050,7 @@ const PosPage: React.FC = () => {
       <Dialog open={!!result} onOpenChange={(o) => !o && setResult(null)}>
         <DialogContent className="max-h-[92vh] max-w-sm overflow-y-auto">
           <div className="space-y-4 py-1 text-center">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-800 dark:text-emerald-400" />
             <div>
               <div className="text-sm font-medium">Document created</div>
               <div className="text-xs text-muted-foreground"># {result?.number}</div>

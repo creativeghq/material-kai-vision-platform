@@ -132,10 +132,10 @@ export function EmptyState({ message = 'No data yet for this period' }: { messag
 // ── Lifecycle Badge ───────────────────────────────────────────
 export function LifecycleBadge({ stage }: { stage: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    emerging:    { label: '✦ Emerging',    cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
-    growing:     { label: '▲ Growing',     cls: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+    emerging:    { label: '✦ Emerging',    cls: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20' },
+    growing:     { label: '▲ Growing',     cls: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20' },
     established: { label: '● Established', cls: 'bg-muted text-muted-foreground border-border/40' },
-    declining:   { label: '▼ Declining',   cls: 'bg-red-500/10 text-red-500 border-red-500/20' },
+    declining:   { label: '▼ Declining',   cls: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20' },
   };
   const { label, cls } = map[stage] ?? map.established;
   return <span className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded border ${cls}`}>{label}</span>;

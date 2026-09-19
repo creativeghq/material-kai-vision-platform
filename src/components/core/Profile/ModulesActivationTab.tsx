@@ -306,7 +306,7 @@ export const ModulesActivationTab: React.FC = () => {
       status = <span className="text-xs text-muted-foreground">Included in {planName}</span>;
     } else if (hasIt && canceling) {
       status = (
-        <span className="text-xs text-amber-500">
+        <span className="text-xs text-amber-800 dark:text-amber-400">
           Cancels{periodEnd ? ` ${periodEnd}` : ' at period end'} — active until then
         </span>
       );
@@ -314,12 +314,12 @@ export const ModulesActivationTab: React.FC = () => {
       status = <span className="text-xs text-destructive">Payment failed — update your card</span>;
     } else if (hasIt && sub) {
       status = (
-        <span className="text-xs text-emerald-500">
+        <span className="text-xs text-emerald-800 dark:text-emerald-400">
           {price ?? 'Add-on'}{periodEnd ? ` · renews ${periodEnd}` : ''}
         </span>
       );
     } else if (hasIt) {
-      status = <span className="text-xs text-emerald-500">Active add-on{price ? ` · ${price}` : ''}</span>;
+      status = <span className="text-xs text-emerald-800 dark:text-emerald-400">Active add-on{price ? ` · ${price}` : ''}</span>;
     } else if (purchasable) {
       status = <span className="text-xs text-muted-foreground">Add-on{price ? ` · ${price}` : ''}</span>;
     } else {
@@ -444,7 +444,7 @@ export const ModulesActivationTab: React.FC = () => {
               {/* Credit disclosure — a subscription fee is not the whole cost for metered modules. */}
               {m.consumes_credits && (
                 <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <Coins className="h-3 w-3 shrink-0 text-amber-500" />
+                  <Coins className="h-3 w-3 shrink-0 text-amber-800 dark:text-amber-400" />
                   <span className="truncate">{m.credit_note || 'Also uses credits per operation'}</span>
                 </div>
               )}

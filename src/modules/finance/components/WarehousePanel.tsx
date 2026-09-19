@@ -261,7 +261,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                     <td className="px-4 py-2 font-medium">
                       {it.name} <span className="text-xs text-muted-foreground">/ {it.unit}</span>
                       {listed && (
-                        <span className="ml-2 inline-flex items-center text-xs text-emerald-500">
+                        <span className="ml-2 inline-flex items-center text-xs text-emerald-800 dark:text-emerald-400">
                           <Store className="h-3 w-3 mr-1" />listed €{listed.price}
                         </span>
                       )}
@@ -277,7 +277,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                     <td className="px-4 py-2 text-muted-foreground">{it.location ?? '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">
                       {it.qty_on_hand}
-                      {low && <span className="ml-2 inline-flex items-center text-xs text-amber-500"><AlertTriangle className="h-3 w-3 mr-1" />low</span>}
+                      {low && <span className="ml-2 inline-flex items-center text-xs text-amber-800 dark:text-amber-400"><AlertTriangle className="h-3 w-3 mr-1" />low</span>}
                     </td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{it.qty_reserved}</td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{it.reorder_point}</td>
@@ -289,8 +289,8 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                         <Button size="sm" variant="ghost" title="Edit codes & myDATA classification" onClick={() => setEditItem(it)}><Tag className="h-4 w-4" /></Button>
                         {listed ? (
                           <>
-                            <Button size="sm" variant="ghost" title={'Record a marketplace sale (decrements stock)'} onClick={() => sellListing(it)}><Coins className="h-4 w-4 text-emerald-500" /></Button>
-                            <Button size="sm" variant="ghost" title={`Listed €${listed.price} · ${listed.qty_remaining} ${it.unit} — withdraw`} onClick={() => unlist(it)}><Store className="h-4 w-4 text-emerald-500" /></Button>
+                            <Button size="sm" variant="ghost" title={'Record a marketplace sale (decrements stock)'} onClick={() => sellListing(it)}><Coins className="h-4 w-4 text-emerald-800 dark:text-emerald-400" /></Button>
+                            <Button size="sm" variant="ghost" title={`Listed €${listed.price} · ${listed.qty_remaining} ${it.unit} — withdraw`} onClick={() => unlist(it)}><Store className="h-4 w-4 text-emerald-800 dark:text-emerald-400" /></Button>
                           </>
                         ) : (
                           <Button size="sm" variant="ghost" title={available > 0 ? 'List to Marketplace' : 'No available stock to list'} disabled={available <= 0} onClick={() => setListItem(it)}><Store className="h-4 w-4" /></Button>
@@ -399,7 +399,7 @@ const ImportOpeningStockDialog: React.FC<{
         />
         <div className="text-xs text-muted-foreground">
           {parsed.lines.length} valid row{parsed.lines.length === 1 ? '' : 's'}
-          {parsed.bad > 0 && <span className="text-amber-500"> · {parsed.bad} unparseable line{parsed.bad === 1 ? '' : 's'} skipped</span>}
+          {parsed.bad > 0 && <span className="text-amber-800 dark:text-amber-400"> · {parsed.bad} unparseable line{parsed.bad === 1 ? '' : 's'} skipped</span>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
@@ -936,7 +936,7 @@ const ListToMarketplaceDialog: React.FC<{
 
           {/* Market price-cap feedback (surplus may not exceed market_median × (1 + cap%)). */}
           {(pcLoading || pc) && (
-            <div className={`rounded-md border px-3 py-2 text-xs ${pcLoading || !pc || pc.unverified ? 'border-border/60 text-muted-foreground' : pc.allowed ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : 'border-destructive/50 text-destructive'}`}>
+            <div className={`rounded-md border px-3 py-2 text-xs ${pcLoading || !pc || pc.unverified ? 'border-border/60 text-muted-foreground' : pc.allowed ? 'border-emerald-500/40 text-emerald-800 dark:text-emerald-400' : 'border-destructive/50 text-destructive'}`}>
               {pcLoading ? (
                 <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking market price…</span>
               ) : pc!.unverified ? (

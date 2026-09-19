@@ -83,11 +83,11 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
           <div className="divide-y divide-border/40">
             {paginate(punches, page).map((p) => (
               <div key={p.id} className="flex items-center gap-2 py-2 text-sm">
-                <span className={`text-sm font-medium w-10 ${p.punch_type === 'arrival' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{p.punch_type === 'arrival' ? 'In' : 'Out'}</span>
+                <span className={`text-sm font-medium w-10 ${p.punch_type === 'arrival' ? 'text-emerald-800 dark:text-emerald-400' : 'text-muted-foreground'}`}>{p.punch_type === 'arrival' ? 'In' : 'Out'}</span>
                 <input type="datetime-local" defaultValue={toLocalInput(p.punched_at)} onBlur={(e) => { const v = e.target.value; if (v && new Date(v).toISOString() !== p.punched_at) editTime(p, v); }}
                   className="bg-transparent border border-border/50 rounded px-2 py-1 text-xs" disabled={busy === p.id} />
-                {p.is_late && <span className="text-xs text-amber-500">late</span>}
-                {p.status === 'submitted' && <span className="text-xs text-emerald-500" title={p.ergani_protocol ?? 'Ergani'}>Ergani ✓</span>}
+                {p.is_late && <span className="text-xs text-amber-800 dark:text-amber-400">late</span>}
+                {p.status === 'submitted' && <span className="text-xs text-emerald-800 dark:text-emerald-400" title={p.ergani_protocol ?? 'Ergani'}>Ergani ✓</span>}
                 <span className="text-[10px] text-muted-foreground ml-auto uppercase">{p.source}</span>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={busy === p.id} onClick={() => del(p.id)} title="Delete"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
               </div>
@@ -150,7 +150,7 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
             <TableBody>
               {paginate(rows, page).map((r) => (
                 <TableRow key={r.employee_id}>
-                  <TableCell className="font-medium">{r.name}{r.open && <span className="ml-2 text-xs text-amber-500" title="Has an unmatched clock-in">open</span>}</TableCell>
+                  <TableCell className="font-medium">{r.name}{r.open && <span className="ml-2 text-xs text-amber-800 dark:text-amber-400" title="Has an unmatched clock-in">open</span>}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{r.days.length}</TableCell>
                   <TableCell className="text-right font-mono">{r.total_hours.toFixed(2)}</TableCell>
                 </TableRow>
