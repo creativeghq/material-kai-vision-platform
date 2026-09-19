@@ -28,7 +28,13 @@ interface LineState { include: boolean; creditQty: string; }
 /** How much of each invoice line earlier credit notes have already taken (#351 B4). */
 type CreditedQty = Record<string, number>;
 
-const pctOfCat = (cat: number | null) => VAT_CATEGORIES.find((v) => v.code === String(cat ?? ''))?.pct ?? 0;
+// NULL vat_category (any line with no catalogue product) defaulted to 0% — printed AND written.
+const pctOfLine = (cat: number | null, net: number, vat: number) => {
+  const byCat = VAT_CATEGORIES.find((v) => v.code === String(cat ?? ''))?.pct;
+  if (byCat != null) return byCat;
+  return net > 0 ? Math.round((vat / net) * 100) : 0;
+};
+const catOfPct = (pct: number) => VAT_CATEGORIES.find((v) => v.pct === pct)?.code ?? null;
 
 export const NewCreditNoteDialog: React.FC<{
   workspaceId: string; open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void;
@@ -143,11 +149,14 @@ export const NewCreditNoteDialog: React.FC<{
       const ratio = it.quantity > 0 ? Math.min(cq, remaining) / it.quantity : 1;
       const lineNet = round2(Number(it.net_value) * ratio);
       const lineVat = round2(Number(it.vat_amount) * ratio);
+      const linePct = pctOfLine(it.vat_category, lineNet, lineVat);
       net = round2(net + lineNet); vat = round2(vat + lineVat);
       return [{
         source_invoice_item_id: it.id, product_id: it.product_id, description: it.description,
         sku: it.sku, unit: it.unit, quantity: Math.min(cq, remaining), unit_price: Number(it.unit_price),
-        net_value: lineNet, vat_amount: lineVat, vat_category: it.vat_category, vat_percent: pctOfCat(it.vat_category),
+        net_value: lineNet, vat_amount: lineVat,
+        vat_category: it.vat_category ?? (linePct > 0 ? Number(catOfPct(linePct)) : null),
+        vat_percent: linePct,
         income_classification_type: it.income_classification_type, income_classification_category: it.income_classification_category,
       }];
     });
@@ -255,7 +264,7 @@ export const NewCreditNoteDialog: React.FC<{
                         </span>
                         <span className="text-right tabular-nums text-muted-foreground">{Number(it.quantity)}{it.unit ? ` ${it.unit}` : ''}</span>
                         <Input className="h-7 text-right text-xs" type="text" inputMode="decimal" value={st.creditQty} disabled={!st.include || remaining <= 0} onChange={(e) => setLine(it.id, { creditQty: e.target.value })} />
-                        <span className="text-right tabular-nums text-muted-foreground">{pctOfCat(it.vat_category)}%</span>
+                        <span className="text-right tabular-nums text-muted-foreground">{pctOfLine(it.vat_category, Number(it.net_value), Number(it.vat_amount))}%</span>
                         <span className="text-right tabular-nums">{formatMoney(lineNet, cur)}</span>
                       </div>
                     );
