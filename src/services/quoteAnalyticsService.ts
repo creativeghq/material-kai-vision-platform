@@ -65,7 +65,7 @@ class QuoteAnalyticsService {
           user_id: user?.id ?? null,
           session_id: this.sessionId,
           source_page: typeof window !== 'undefined' ? window.location.pathname : undefined,
-          metadata,
+          metadata: metadata ?? {},
           created_at: new Date().toISOString(),
         });
         if (this.queue.length >= BATCH_SIZE) this.flush();
@@ -80,10 +80,7 @@ class QuoteAnalyticsService {
       .from('quote_analytics_events')
       .insert(batch as never[])
       .then(({ error }) => {
-        if (error) {
-          console.warn('[QuoteAnalytics] flush failed:', error.message);
-          if (this.queue.length < 200) this.queue.unshift(...batch);
-        }
+        if (error) console.warn('[QuoteAnalytics] flush failed, batch dropped:', error.message);
       })
       .catch(() => { /* swallow network errors */ });
   }

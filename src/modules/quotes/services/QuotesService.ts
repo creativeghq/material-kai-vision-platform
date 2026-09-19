@@ -1809,11 +1809,17 @@ export class QuotesService {
       };
     }
 
-    // Update quote status to accepted
-    await this.updateQuote(quoteId, { status: 'accepted' });
+    // Timeline BEFORE the status flip: quote_timeline's INSERT policy is
+    // user_can_write_quote(), which is false once status is 'accepted'. Written after, the
+    // insert is refused 42501 every time, so an accepted quote had no timeline at all.
+    // Non-fatal — a timeline hiccup must never block the sale it describes.
+    try {
+      await this.initializeQuoteTimeline(quoteId);
+    } catch (err) {
+      console.warn('[quotes] timeline init failed, accepting anyway:', err);
+    }
 
-    // Initialize timeline for the quote
-    await this.initializeQuoteTimeline(quoteId);
+    await this.updateQuote(quoteId, { status: 'accepted' });
 
     // Acceptance may materialize an upstream purchase order + mirrored parent sales
     // order (resale tree) via the accept trigger. The supplier workspace is notified server-side

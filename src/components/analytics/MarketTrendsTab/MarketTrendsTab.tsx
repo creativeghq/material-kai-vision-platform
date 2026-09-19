@@ -57,7 +57,8 @@ export const MarketTrendsTab: React.FC = () => {
   const [platformCategories, setPlatformCategories] = useState<{ key: string; label: string }[]>([]);
 
   // ── Core data (both modes)
-  const [kpis, setKpis] = useState({ activeDemandSignals: 0, topDemandedMaterial: '—', topCategory: '—', totalCategorySaves: 0, topBuyerType: '—' });
+  const [kpis, setKpis] = useState<{ activeDemandSignals: number | string; topDemandedMaterial: string; topCategory: string; totalCategorySaves: number; topBuyerType: string }>(
+    { activeDemandSignals: 0, topDemandedMaterial: '—', topCategory: '—', totalCategorySaves: 0, topBuyerType: '—' });
   const [topDemands, setTopDemands] = useState<{ name: string; mentions: number; saves: number; in3d: number; momentum: string }[]>([]);
   const [discoveryChannels, setDiscoveryChannels] = useState<{ name: string; value: number }[]>([]);
   const [topMoodboardItems, setTopMoodboardItems] = useState<{ name: string; category: string; materialType?: string; boardCount: number }[]>([]);
@@ -327,17 +328,15 @@ export const MarketTrendsTab: React.FC = () => {
         // ── PLATFORM BRANCH (always runs) ─────────────────────
         const [
           { data: popularSearches },
-          { data: demandData },
           { data: qItems },
           { data: mbItems },
         ] = await Promise.all([
           supabase.from('popular_searches').select('*').order('search_count', { ascending: false }).limit(30),
-          supabase.from('material_demand_analytics').select('*').order('mention_count', { ascending: false }).limit(20),
-          supabase.from('quote_items').select('product_id, added_from, products(id, name, metadata)').gte('created_at', ago.toISOString()).limit(500),
-          supabase.from('moodboard_items').select('moodboard_id, material_id, products(id, name, metadata)').gte('created_at', ago.toISOString()).limit(1000),
+          supabase.from('quote_items').select('product_id, added_from, products(id, name, metadata)').gte('added_at', ago.toISOString()).limit(500),
+          supabase.from('moodboard_items').select('moodboard_id, material_id, products(id, name, metadata)').gte('added_at', ago.toISOString()).limit(1000),
         ]);
 
-        const hasRealData = (popularSearches ?? []).length > 0 || (demandData ?? []).length > 0;
+        const hasRealData = (popularSearches ?? []).length > 0 || (qItems ?? []).length > 0 || (mbItems ?? []).length > 0;
         if (!hasRealData) return;
 
         // Apply category filter in-memory
@@ -349,16 +348,8 @@ export const MarketTrendsTab: React.FC = () => {
         const filteredMbItems = (mbItems ?? []).filter(catFilter);
         const filteredQItems = (qItems ?? []).filter(catFilter);
 
-        // Demands with momentum
-        const now = new Date();
-        const demands = (demandData ?? []).slice(0, 15).map((d: any) => ({
-          name: String(d.material_name ?? '').slice(0, 35),
-          mentions: d.mention_count ?? 0,
-          saves: d.times_saved ?? 0,
-          in3d: d.times_used_in_3d ?? 0,
-          momentum: getMomentum(d.last_requested ?? null),
-        }));
-        void now;
+        // `material_demand_analytics` was never created, so this list has no source at all.
+        const demands: { name: string; mentions: number; saves: number; in3d: number; momentum: ReturnType<typeof getMomentum> }[] = [];
         setTopDemands(demands);
 
         // Metadata attribute aggregation from moodboard product metadata (for attribute picker)
@@ -469,7 +460,7 @@ export const MarketTrendsTab: React.FC = () => {
         coreTotals.current = { saves: (mbItems ?? []).length, quoted: (qItems ?? []).length };
         setIsDemoData(false);
         setKpis({
-          activeDemandSignals: (demandData ?? []).length,
+          activeDemandSignals: '—',
           topDemandedMaterial: demands[0]?.name ?? '—',
           topCategory: '—',
           totalCategorySaves: filteredMbItems.length,
@@ -488,8 +479,8 @@ export const MarketTrendsTab: React.FC = () => {
       const cut4w = weeksAgo(4);
       const cut8w = weeksAgo(8);
       const [{ data: recentMb }, { data: priorMb }, { data: recentGen }, { data: priorGen }, { data: recentProf }, { data: priorProf }] = await Promise.all([
-        supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut4w.toISOString()).limit(2000),
-        supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).limit(2000),
+        supabase.from('moodboard_items').select('material_id, products(name)').gte('added_at', cut4w.toISOString()).limit(2000),
+        supabase.from('moodboard_items').select('material_id, products(name)').gte('added_at', cut8w.toISOString()).lt('added_at', cut4w.toISOString()).limit(2000),
         supabase.from('generation_3d').select('room_type').gte('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
         supabase.from('generation_3d').select('room_type').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
         supabase.from('user_profiles').select('professional_type').gte('created_at', cut4w.toISOString()).limit(500),
@@ -603,7 +594,7 @@ export const MarketTrendsTab: React.FC = () => {
       const { data: basketItems } = await supabase
         .from('quote_items')
         .select('quote_id, products(name)')
-        .gte('created_at', ago.toISOString())
+        .gte('added_at', ago.toISOString())
         .limit(1000);
       {
         const quoteMap = new Map<string, string[]>();
