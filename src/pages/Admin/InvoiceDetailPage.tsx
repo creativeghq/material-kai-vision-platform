@@ -199,8 +199,9 @@ const InvoiceDetailPage: React.FC = () => {
 
   const totalMargin = invoice.items.reduce((acc, it) => acc + (it.line_margin ?? 0), 0);
   const totalCogs = invoice.items.reduce((acc, it) => acc + (it.line_cost ?? 0), 0);
+  const costKnown = invoice.items.some((it) => it.line_cost != null);
   const marginPct =
-    invoice.subtotal_net > 0 ? (totalMargin / invoice.subtotal_net) * 100 : null;
+    costKnown && invoice.subtotal_net > 0 ? (totalMargin / invoice.subtotal_net) * 100 : null;
 
   return (
     <div className="px-3 sm:px-6 space-y-6 py-6">
@@ -226,7 +227,7 @@ const InvoiceDetailPage: React.FC = () => {
               {invoice.issued_at
                 ? `Issued ${formatDate(invoice.issued_at)}`
                 : 'Not issued yet'}
-              {invoice.due_at && ` · Due ${invoice.due_at}`}
+              {invoice.due_at && ` · Due ${formatDate(invoice.due_at)}`}
               {Number((invoice as any).branch_code ?? 0) > 0 && ` · Establishment #${(invoice as any).branch_code}`}
               {(invoice as any).series && ` · Series ${(invoice as any).series}`}
               {(invoice as any).order_id && (
@@ -393,11 +394,11 @@ const InvoiceDetailPage: React.FC = () => {
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground">Margin (admin)</div>
             <div className="mt-1 text-xl font-semibold">
-              {formatMoney(totalMargin, invoice.currency)}{' '}
+              {costKnown ? formatMoney(totalMargin, invoice.currency) : '—'}{' '}
               {marginPct != null && <span className="text-sm text-muted-foreground">({marginPct.toFixed(1)}%)</span>}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              COGS {formatMoney(totalCogs, invoice.currency)}
+              {costKnown ? `COGS ${formatMoney(totalCogs, invoice.currency)}` : 'No cost recorded on any line'}
             </div>
           </CardContent>
         </Card>
