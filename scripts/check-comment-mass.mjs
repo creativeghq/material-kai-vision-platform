@@ -3,9 +3,8 @@
  * Comment mass: how much of the repo is comment, by area, against a down-only baseline.
  *
  * The per-comment budget caps one comment and nothing caps how many there are, which is how the
- * platform reached 12.2% comment while passing every check. This is the other half.
- *
- * `--write` lowers the baseline to what the tree now holds. It REFUSES to raise it.
+ * platform reached 12.2% comment while passing every check. This is the other half. `--write`
+ * lowers the baseline to what the tree now holds. It REFUSES to raise it.
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
