@@ -1,9 +1,7 @@
 /**
- * The comment budget: how long a comment may be, in ONE place.
- *
- * Read by the ESLint rule (src/, api/), the guard test (every other runtime) and the
- * `comments:trim` codemod, so the rule that fails a build and the tool that fixes it
- * cannot disagree.
+ * The comment budget: how long a comment may be, in ONE place. Read by the ESLint rule (src/,
+ * api/), the guard test (every other runtime) and the `comments:trim` codemod, so the rule that
+ * fails a build and the tool that fixes it cannot disagree.
  */
 
 import { createRequire } from 'node:module';
@@ -341,6 +339,10 @@ export const SCAN_SKIP_DIRS = new Set([
 
 export const SCAN_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
+// Pure in the tree; a caller that creates files and re-walks in one process must clear these.
+const walkCache = new Map();
+const massCache = new Map();
+
 /** Which bucket a file's comment mass is charged to. One definition, so every reader agrees. */
 export function areaOf(relPath) {
   const parts = relPath.split('/');
@@ -367,6 +369,8 @@ export function commentLineTotal(source, fileName = 'file.tsx') {
 
 /** The repo's comment mass by area: the number the ratchet defends. */
 export async function measureCommentMass(root) {
+  const hit = massCache.get(root);
+  if (hit) return hit;
   const { readFile } = await import('node:fs/promises');
   const { relative, sep } = await import('node:path');
   const areas = {};
@@ -383,7 +387,9 @@ export async function measureCommentMass(root) {
     areas[areaOf(rel)] = (areas[areaOf(rel)] ?? 0) + n;
     total += n;
   }
-  return { total, codeLines, areas };
+  const result = { total, codeLines, areas };
+  massCache.set(root, result);
+  return result;
 }
 
 /**
@@ -391,21 +397,27 @@ export async function measureCommentMass(root) {
  * "which files does the budget apply to" has a single answer.
  */
 export async function walkRepo(root) {
+  const hit = walkCache.get(root);
+  if (hit) return hit;
   const { readdir, stat } = await import('node:fs/promises');
   const { join, extname } = await import('node:path');
   const out = [];
   const visit = async (dir) => {
     let entries;
-    try { entries = await readdir(dir); } catch { return; }
+    // A symlink's Dirent describes the link, not the target, so only that case still stats.
+    try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
-      if (SCAN_SKIP_DIRS.has(e)) continue;
-      const p = join(dir, e);
-      let st;
-      try { st = await stat(p); } catch { continue; }
-      if (st.isDirectory()) await visit(p);
-      else if (SCAN_EXT.has(extname(e))) out.push(p);
+      if (SCAN_SKIP_DIRS.has(e.name)) continue;
+      const p = join(dir, e.name);
+      let isDir = e.isDirectory();
+      if (e.isSymbolicLink()) {
+        try { isDir = (await stat(p)).isDirectory(); } catch { continue; }
+      }
+      if (isDir) await visit(p);
+      else if (SCAN_EXT.has(extname(e.name))) out.push(p);
     }
   };
   await visit(root);
+  walkCache.set(root, out);
   return out;
 }
