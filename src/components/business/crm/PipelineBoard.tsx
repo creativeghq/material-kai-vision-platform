@@ -694,6 +694,7 @@ const DealDialog: React.FC<{
   };
 
   const subjectLabel = subjectKind === 'property' ? 'Property' : 'Project';
+  const subjectPlural = subjectKind === 'property' ? 'properties' : 'projects';
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -744,7 +745,7 @@ const DealDialog: React.FC<{
               )}
               {!subjectError && subjects.length === 0 && (
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  This workspace has no {subjectLabel.toLowerCase()}s yet.
+                  This workspace has no {subjectPlural} yet.
                 </p>
               )}
             </div>
