@@ -243,8 +243,17 @@ async function gaBreakdownReport(
       limit: spec.limit,
     }),
   });
-  const body = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(body?.error?.message || `HTTP ${resp.status}`);
+  let body: any;
+  if (resp.ok) {
+    try {
+      body = await resp.json();
+    } catch (e) {
+      throw new Error(`GA returned 200 with an unreadable body: ${e instanceof Error ? e.message : e}`);
+    }
+  } else {
+    body = await resp.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `HTTP ${resp.status}`);
+  }
   return (body.rows || []).map((r: any) => {
     const d = r.dimensionValues || [];
     const m = r.metricValues || [];
@@ -265,7 +274,7 @@ async function gaBreakdownReport(
  * panel as a stated reason rather than an empty table that reads as "no visitors".
  */
 async function syncGaBreakdowns(
-  supabase: any, websiteId: string, property: string, token: string,
+  supabase: any, websiteId: string, workspaceId: string, property: string, token: string,
   startDate: string, endDate: string, windowDays: number,
 ): Promise<{ ok: number; failed: string[]; rows: number }> {
   const failed: string[] = [];
@@ -288,7 +297,17 @@ async function syncGaBreakdowns(
       p_period_start: startDate, p_period_end: endDate,
       p_rows: payload, p_status: status, p_error: error,
     });
-    if (rpcErr) { failed.push(`${spec.key}:store`); continue; }
+    if (rpcErr) {
+      failed.push(`${spec.key}:store`);
+      await supabase.from('ga_breakdown_status').upsert({
+        website_id: websiteId, workspace_id: workspaceId, dimension: spec.key,
+        status: 'collector_failed',
+        error: `could not store this breakdown: ${rpcErr.message}`.slice(0, 1000),
+        window_days: windowDays, period_start: startDate, period_end: endDate,
+        row_count: 0, captured_at: new Date().toISOString(),
+      }, { onConflict: 'website_id,dimension' });
+      continue;
+    }
     if (status !== 'collector_failed') { ok++; rows += payload.length; }
   }
   return { ok, failed, rows };
@@ -648,7 +667,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
                   + await storeGaRows(supabase, websiteId, website.workspace_id, byChannel, true);
           // Each records its own outcome, so a dimension GA rejects leaves the other nine intact.
           const bd = await syncGaBreakdowns(
-            supabase, websiteId, conn.ga_property_id, token, start, end, days,
+            supabase, websiteId, website.workspace_id, conn.ga_property_id, token, start, end, days,
           );
           await supabase.from('website_gsc_connections')
             .update({ ga_last_sync_at: new Date().toISOString(), ga_last_sync_error: null })

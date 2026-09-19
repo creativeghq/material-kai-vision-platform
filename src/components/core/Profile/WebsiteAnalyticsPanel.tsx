@@ -30,13 +30,16 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
   const [props, setProps] = useState<GaProperty[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setSummary(await userWebsitesService.gaSummary(website.id, 28));
-    } catch {
+      setLoadError(null);
+    } catch (e: any) {
       setSummary(null);
+      setLoadError(e?.message || 'Could not read the Analytics summary.');
     } finally {
       setLoading(false);
     }
@@ -141,6 +144,13 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {loadError && (
+          <div className="flex items-start gap-2 rounded-sm border border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>{loadError}</span>
+          </div>
+        )}
+
         {summary?.note && (
           <div className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-xs leading-snug ${
             summary.status === 'collector_failed' || summary.status === 'needs_reauth'
@@ -195,7 +205,8 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
             <SeoMetricTile
               key={d.key}
               descriptor={d}
-              metric={(summary?.metrics?.[d.key] as SeoMetric | undefined) ?? null}
+              metric={(summary?.metrics?.[d.key] as SeoMetric | undefined)
+                ?? (loadError ? { value: null, previous: null, delta: null, delta_pct: null, status: 'collector_failed', note: loadError, series: [] } : null)}
               deltaCaption="vs previous period"
             />
           ))}

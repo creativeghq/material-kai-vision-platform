@@ -6,6 +6,7 @@ import { WorldChoropleth } from './seo/WorldChoropleth';
 import { GaBreakdownTable, num, sessionsColumn } from './seo/GaBreakdownTable';
 import { breakdownOf, countryFlag, countryName, formatDuration, type GaBreakdowns } from './seo/gaBreakdowns';
 import { useGaBreakdowns } from './seo/useGaBreakdowns';
+import { statusPresentation } from './seo/seoMetrics';
 import type { UserWebsite } from '@/services/userWebsitesService';
 
 const engagement = num('secs_per_session', 'Avg. time', (n) => formatDuration(n));
@@ -41,8 +42,12 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
                 .map((r) => ({ code: r.value, value: r.sessions as number, label: r.label }))}
             />
           ) : (
-            <p className="py-8 text-center text-xs text-muted-foreground">
-              {countries.note || 'No country data yet.'}
+            <p className={`py-8 text-center text-xs ${
+              countries.status === 'collector_failed' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'
+            }`}>
+              <span className="font-medium">{statusPresentation(countries.status).placeholder}</span>
+              {' — '}
+              {countries.note || statusPresentation(countries.status).explain}
             </p>
           )}
         </CardContent>
