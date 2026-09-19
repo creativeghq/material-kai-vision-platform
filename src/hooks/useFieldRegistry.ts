@@ -5,6 +5,7 @@ import {
   type FieldRegistrySnapshot,
   categoryHasField,
   categoryHasSection,
+  identityFieldsForCategory,
   isInternalFieldKey,
   loadFieldRegistry,
   sectionsForCategory,
@@ -19,6 +20,7 @@ export interface FieldRegistryView {
   sections: (categoryKey: string) => DisplaySection[];
   hasSection: (categoryKey: string, sectionKey: string) => boolean;
   hasField: (categoryKey: string, fieldName: string) => boolean;
+  identityFields: (categoryKey: string) => Array<{ key: string; label: string; section: string }>;
   /**
    * Whether a jsonb key is internal. `null` = cannot judge (registry has never seen the key
    * and the pattern did not load) — withhold, do not render.
@@ -56,6 +58,8 @@ export function useFieldRegistry(): FieldRegistryView {
       (snapshot ? categoryHasSection(snapshot, categoryKey, sectionKey) : false),
     hasField: (categoryKey, fieldName) =>
       (snapshot ? categoryHasField(snapshot, categoryKey, fieldName) : false),
+    identityFields: (categoryKey) =>
+      (snapshot ? identityFieldsForCategory(snapshot, categoryKey) : []),
     isInternalField: (key) => (snapshot ? isInternalFieldKey(snapshot, key) : null),
   }), [snapshot, error]);
 }

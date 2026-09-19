@@ -2018,8 +2018,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 if (style) categorySpecRows.push({ label: 'Style', value: style });
                 const handmade = tryExtract(allData?.handmade);
                 if (handmade) categorySpecRows.push({ label: 'Handmade', value: handmade });
-              } else {
-                // general_materials or unknown — show generic specs
+              } else if (uploadCat === 'general_materials') {
                 const bodyType = tryExtract(materialPropsData?.body_type);
                 if (bodyType) categorySpecRows.push({ label: 'Body Type', value: bodyType });
                 categorySpecRows.push({ label: 'Finish', value: finish });
@@ -2027,6 +2026,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 if (subtype) categorySpecRows.push({ label: 'Subtype', value: subtype });
                 if (size !== 'N/A') categorySpecRows.push({ label: 'Size', value: size });
                 if (thickness) categorySpecRows.push({ label: 'Thickness', value: thickness });
+              } else {
+                // No curated branch. The registry's identity fields ARE "what tells these
+                // products apart", so a category added in admin gets real headline specs
+                // rather than the tile-shaped rows this used to fall through to.
+                const bag = allData as Record<string, unknown>;
+                for (const f of fieldRegistry.identityFields(uploadCat)) {
+                  if (categorySpecRows.length >= 8) break;
+                  const nested = bag?.[f.section] as Record<string, unknown> | undefined;
+                  const v = tryExtract(bag?.[f.key], nested?.[f.key]);
+                  if (v) categorySpecRows.push({ label: f.label, value: v });
+                }
               }
 
               // Dimensions — shown for non-tile categories that have W/H/D

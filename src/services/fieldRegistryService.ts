@@ -13,6 +13,7 @@ export interface RegistryField {
   categories: string[] | null;
   sortOrder: number;
   sensitivity: FieldSensitivity;
+  role: 'identity' | 'descriptive';
   /** {category_key: label} — a per-category name for the same field. */
   labelByCategory: Record<string, string> | null;
   descriptionByCategory: Record<string, string> | null;
@@ -74,7 +75,7 @@ async function fetchSnapshot(): Promise<FieldRegistrySnapshot> {
     supabase
       .from('material_metadata_fields')
       .select('field_name, display_name, section, applies_to_categories, is_global, sort_order, '
-            + 'sensitivity, label_by_category, description, description_by_category')
+            + 'sensitivity, label_by_category, description, description_by_category, role')
       .eq('status', 'active'),
     supabase.rpc('internal_product_field_pattern' as never),
   ]);
@@ -95,6 +96,7 @@ async function fetchSnapshot(): Promise<FieldRegistrySnapshot> {
     section: (r.section as string) || 'other',
     categories: r.is_global === true ? null : ((r.applies_to_categories as string[]) ?? []),
     sortOrder: typeof r.sort_order === 'number' ? r.sort_order : 0,
+    role: r.role === 'identity' ? 'identity' : 'descriptive',
     sensitivity: r.sensitivity === 'internal' ? 'internal' : 'public',
     labelByCategory: (r.label_by_category as Record<string, string> | null) ?? null,
     descriptionByCategory: (r.description_by_category as Record<string, string> | null) ?? null,
@@ -172,6 +174,19 @@ export function sectionsForCategory(
         .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
         .map((f) => ({ key: f.name, label: labelForField(f, categoryKey) })),
     }));
+}
+
+export function identityFieldsForCategory(
+  snapshot: FieldRegistrySnapshot,
+  categoryKey: string,
+): Array<{ key: string; label: string; section: string }> {
+  const rank = (key: string) => SECTION_ORDER.get(key) ?? SECTION_META.length;
+  return snapshot.fields
+    .filter((f) => f.role === 'identity' && fieldAppliesTo(f, categoryKey) && f.sensitivity !== 'internal')
+    .sort((a, b) => rank(a.section) - rank(b.section)
+      || a.sortOrder - b.sortOrder
+      || a.name.localeCompare(b.name))
+    .map((f) => ({ key: f.name, label: labelForField(f, categoryKey), section: f.section }));
 }
 
 /** Does this category use packaging / warranty / any other section at all? */
