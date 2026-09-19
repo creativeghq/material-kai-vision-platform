@@ -22,12 +22,12 @@ export default defineConfig({
     ],
     // Integration tests hit prod; give them room. Unit tests finish in ms regardless.
     testTimeout: 30_000,
-    hookTimeout: 30_000,
-    // Retry transport flakes. The integration tier makes ~68 real network calls to live
-    // endpoints, so a single ECONNRESET is a matter of when, not if — and because the deploy
-    // job gates on this suite, one blip blocks EVERY deploy. That happened on 2026-07-28:
-    // `hr-careers-public` died on `read ECONNRESET` with 67 of 68 passing, and it held back an
-    // email-guard fix for half an hour while the bug it fixed kept firing.
+    // Teardown needs MORE room than a test: one workspace delete cascades 349 FKs (2.0s EMPTY)
+    // and a suite tears down four. At 30s the job went red with every assertion passing.
+    hookTimeout: 120_000,
+    // Retry transport flakes: ~68 real network calls to live endpoints, so a single ECONNRESET
+    // is a matter of when, not if. On 2026-07-28 `hr-careers-public` died on one with 67 of 68
+    // passing and held an email-guard fix back for half an hour.
     retry: 2,
   },
 });

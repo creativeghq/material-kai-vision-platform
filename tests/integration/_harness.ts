@@ -135,36 +135,35 @@ export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; us
   const explicitWs = (opts.wsIds || []).filter(Boolean);
   const userIds = (opts.userIds || []).filter(Boolean);
 
-  // EVERY test user is auto-provisioned a personal "<email>'s workspace" at signup
-  // (handle_new_user_workspace_assignment: a child of root with created_by = user, which in turn
-  // spawns a "(reseller)" crm_companies mirror in the parent via _autolink_dealer_crm). Deleting
-  // the auth user does NOT remove it — created_by → SET NULL, not cascade — so it and its mirror
-  // would linger until the name-cron backstop (visible in the CRM Companies list for up to the
-  // cron's grace window). Collect each user's owned workspaces here so we delete them outright.
+  // EVERY test user is auto-provisioned a personal workspace at signup, which spawns a
+  // "(reseller)" crm_companies mirror in the parent. Deleting the auth user does NOT remove it
+  // (created_by → SET NULL), so collect each user's owned workspaces and delete them outright.
   const wsIds = new Set<string>(explicitWs);
-  for (const u of userIds) {
-    const { data } = await svc.from('workspaces').select('id').eq('created_by', u)
-      .then((r) => r, () => ({ data: [] as Array<{ id: string }> }));
-    for (const w of (data ?? [])) wsIds.add(w.id);
-  }
+  const owned = await Promise.all(userIds.map((u) => svc.from('workspaces').select('id').eq('created_by', u)
+    .then((r) => r, () => ({ data: [] as Array<{ id: string }> }))));
+  for (const { data } of owned) for (const w of (data ?? [])) wsIds.add(w.id);
 
   // The reseller mirror lives in the PARENT workspace, not the child, so `delete where
   // workspace_id = child` never touches it. Deleting the child fires the cleanup trigger, but
   // delete the mirror explicitly too so teardown never depends on the trigger being enabled.
   const problems: string[] = [];
 
-  for (const ws of wsIds) {
+  // The GROUPS stay ordered (that order is the FK graph); inside one the steps are independent,
+  // so they go together — a workspace delete measured 2.0s EMPTY, and a suite has up to four.
+  const each = <T>(xs: Iterable<T>, run: (x: T) => Promise<void>) => Promise.all([...xs].map(run));
+
+  await each(wsIds, async (ws) => {
     const { data } = await svc.from('workspaces').select('parent_crm_company_id').eq('id', ws).maybeSingle()
       .then((r) => r, () => ({ data: null as { parent_crm_company_id: string | null } | null }));
     if (data?.parent_crm_company_id) {
       await step(problems, `crm mirror ${data.parent_crm_company_id}`,
         () => svc.from('crm_companies').delete().eq('id', data.parent_crm_company_id!));
     }
-  }
-  for (const ws of wsIds) await step(problems, `crm_companies of ${ws}`, () => svc.from('crm_companies').delete().eq('workspace_id', ws));
-  for (const ws of wsIds) await step(problems, `members of ${ws}`, () => svc.from('workspace_members').delete().eq('workspace_id', ws));
-  for (const ws of wsIds) await step(problems, `workspace ${ws}`, () => svc.from('workspaces').delete().eq('id', ws));
-  for (const u of userIds) await step(problems, `auth user ${u}`, () => svc.auth.admin.deleteUser(u));
+  });
+  await each(wsIds, (ws) => step(problems, `crm_companies of ${ws}`, () => svc.from('crm_companies').delete().eq('workspace_id', ws)));
+  await each(wsIds, (ws) => step(problems, `members of ${ws}`, () => svc.from('workspace_members').delete().eq('workspace_id', ws)));
+  await each(wsIds, (ws) => step(problems, `workspace ${ws}`, () => svc.from('workspaces').delete().eq('id', ws)));
+  await each(userIds, (u) => step(problems, `auth user ${u}`, () => svc.auth.admin.deleteUser(u)));
 
   // Check the WORLD, not the return value: a delete can report no error and still leave the row
   // (that is exactly what happened here). This is the assertion that would have caught the leak
