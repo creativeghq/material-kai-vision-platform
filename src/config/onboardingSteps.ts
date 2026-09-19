@@ -138,7 +138,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
       'Rather than hunting through screens, you ask. The Agent Hub is one chat with a canvas beside '
       + 'it, and behind it sit specialists that pick themselves up when they are relevant — Trinity '
       + 'for quotes and invoices, Vision for interiors and renders, Edith for SEO and content, '
-      + 'Pepper for products and company research, Hermes for messages and social, Estate for '
+      + 'Pepper for products and company research, Hermes for messages and social, Baxter for '
       + 'property. They share your data, so a question can cross modules.',
     icon: Bot,
     requireCapability: 'agent.use',

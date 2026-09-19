@@ -226,7 +226,7 @@ const AGENTS: AgentDefinition[] = [
   },
   {
     id: 'property-advisor',
-    name: 'Estate',
+    name: 'Baxter',
     description: 'Real estate — listings, valuations, viewings, offers, leads, lettings',
     color: 'text-teal-500',
     requiredRole: 'member',

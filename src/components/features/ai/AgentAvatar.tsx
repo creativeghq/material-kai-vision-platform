@@ -92,8 +92,8 @@ const EdithFace = () => (
   </Base>
 );
 
-/** Estate — a little house: roof hat with chimney. */
-const EstateFace = () => (
+/** Baxter — a little house: roof hat with chimney. */
+const BaxterFace = () => (
   <Base head={{ y: 22 }}>
     <rect x={41} y={11} width={4.5} height={8} fill="currentColor" />
     <path d="M32 7 L50 22 L14 22 Z" fill="currentColor" />
@@ -169,7 +169,7 @@ const FACES: Record<string, React.FC> = {
   'interior-designer': VisionFace,
   'product-business': PepperFace,
   marketing: EdithFace,
-  'property-advisor': EstateFace,
+  'property-advisor': BaxterFace,
   erp: TrinityFace,
   'social-media': HermesFace,
   demo: DemoFace,

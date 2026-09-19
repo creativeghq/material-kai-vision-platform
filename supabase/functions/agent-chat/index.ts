@@ -931,7 +931,7 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
   { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
   { slug: 'social-media', name: 'Hermes', blurb: 'publishing or scheduling social-media posts, social analytics, best time to post' },
-  { slug: 'property-advisor', name: 'Estate', blurb: 'real estate — property listings, instant valuations, viewings, offers, buyer/seller lead matching, portal syndication, lettings (tenancies, rent, maintenance)' },
+  { slug: 'property-advisor', name: 'Baxter', blurb: 'real estate — property listings, instant valuations, viewings, offers, buyer/seller lead matching, portal syndication, lettings (tenancies, rent, maintenance)' },
 ];
 
 /**
@@ -1237,11 +1237,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     // generate_3d triggers async generation and returns job ID immediately
     // material_search is only injected when user message contains keywords like "find materials"
   },
-  // Estate: the real-estate specialist. Every tool self-gates on the real-estate
+  // Baxter: the real-estate specialist. Every tool self-gates on the real-estate
   // module + entitlement, so binding is safe even for workspaces without the module.
   'property-advisor': {
     id: 'property-advisor',
-    name: 'Estate',
+    name: 'Baxter',
     description: 'Real-estate advisor — listings, valuations, viewings, offers, buyer/seller matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
@@ -1261,7 +1261,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // core search + calculators (all users)
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
-      // AI Assessment — the real-estate subject. Estate is the agent that would be asked "why is
+      // AI Assessment — the real-estate subject. Baxter is the agent that would be asked "why is
       // this listing not moving", and this is the tool that answers it from the data.
       'assess_property', 'get_property_assessment', 'list_assessment_actions', 'apply_assessment_action',
     ],
@@ -1733,7 +1733,7 @@ async function executeAgent(
     } catch (e) { console.warn('[agent-chat] toolkit audit failed', e); }
   }
 
-  // PREVENTION (Estate, 2026-08-23): every agent in the roster must have a LOADABLE prompt.
+  // PREVENTION (Baxter, 2026-08-23): every agent in the roster must have a LOADABLE prompt.
   if (!(globalThis as any).__agentPromptAuditLogged) {
     (globalThis as any).__agentPromptAuditLogged = true;
     try {

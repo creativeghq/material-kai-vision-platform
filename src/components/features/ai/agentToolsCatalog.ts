@@ -1470,7 +1470,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     alwaysOn: true,
     // Bound everywhere, OFFERED only where the maths belongs. Heat-pump sizing, annual
     // running cost and a fitted-kitchen price are dwelling questions: Trinity quotes them,
-    // Vision designs the room, Estate advises on the property. On Edith's opening screen
+    // Vision designs the room, Baxter advises on the property. On Edith's opening screen
     // — an SEO agent — they read as the app having no idea what it is for.
     starterAgents: ['erp', 'interior-designer', 'property-advisor'],
     tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost'],
@@ -3814,15 +3814,15 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   projects: ['interior-designer', 'erp'],
   // Same two owners as the projects cluster: Vision runs the engagement, Trinity reads its money.
   'project-assessment': ['interior-designer', 'erp'],
-  // Trinity owns the books; Estate owns the listings.
+  // Trinity owns the books; Baxter owns the listings.
   'finance-assessment': ['erp'],
   'real-estate-assessment': ['property-advisor'],
   // Contracts → Trinity (finance/legal) — also on kai via the generalist
   contracts: ['erp'],
-  // Real estate + the viewings calendar → Estate. Estate is the ONLY specialist that binds
+  // Real estate + the viewings calendar → Baxter. Baxter is the ONLY specialist that binds
   // `manage_real_estate` and `manage_appointments`, and it owned no cluster at all until now:
-  // the picker scopes to the selected agent, so picking Estate hid the one toolkit she exists
-  // for and left her with nothing but the three always-on clusters — the ai-visibility shape
+  // the picker scopes to the selected agent, so picking Baxter hid the one toolkit it exists
+  // for and left it with nothing but the three always-on clusters — the ai-visibility shape
   // one row up, on a whole agent instead of one cluster.
   'real-estate': ['property-advisor'], appointments: ['property-advisor'],
   // Operating expenses + the storefront widget → Trinity. Both are bound by `erp` in full and
