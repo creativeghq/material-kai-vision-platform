@@ -69,8 +69,8 @@ describe('category vocabulary — one source', () => {
     // The exact drift this phase found: present in the DB, absent from the TypeScript copy.
     for (const [value, expected] of [
       ['carpet', 'wood'],
-      ['door', 'building_materials'],
-      ['window', 'building_materials'],
+      ['door', 'openings'],
+      ['window', 'openings'],
       ['fabric_swatch', 'general_materials'],
       ['leather_swatch', 'general_materials'],
     ] as const) {
@@ -126,8 +126,8 @@ describe('category vocabulary — one source', () => {
 
   it('resolveDisplayCategory is the one resolver and knows the whole vocabulary', () => {
     expect(resolveDisplayCategory('whirlpool_bath')).toBe('sanitary');
-    expect(resolveDisplayCategory('interior_door')).toBe('building_materials');
-    expect(resolveDisplayCategory('glass_partition')).toBe('building_materials');
+    expect(resolveDisplayCategory('interior_door')).toBe('openings');
+    expect(resolveDisplayCategory('glass_partition')).toBe('openings');
     expect(resolveDisplayCategory('sauna_cabin')).toBe('wellness');
     expect(resolveDisplayCategory('hammam_steam_room')).toBe('wellness');
     expect(resolveDisplayCategory('marble')).toBe('stone');

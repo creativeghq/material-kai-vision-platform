@@ -17,16 +17,34 @@ export interface CategoryVocabEntry {
 
 export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
   {
+    key: 'appliances',
+    displayName: 'Appliances',
+    controlledVocab: ['dishwasher', 'dryer', 'extractor', 'hob', 'microwave', 'oven', 'refrigerator', 'washing_machine'],
+    aliases: ['appliances', 'syskeves', 'white_goods'],
+  },
+  {
     key: 'building_materials',
     displayName: 'Building Materials',
-    controlledVocab: ['door_frame', 'entrance_door', 'fire_door', 'garage_door', 'glass_partition', 'interior_door', 'roof_window', 'shutter', 'sliding_door', 'window'],
-    aliases: ['building_materials', 'door', 'doors', 'fenestration', 'joinery', 'windows'],
+    controlledVocab: ['admixture', 'aggregate', 'brick', 'cement', 'concrete_block', 'expanding_foam', 'grout', 'lintel', 'mortar', 'plaster', 'primer', 'rebar', 'rebar_mesh', 'render', 'sand', 'screed', 'sealant', 'tile_adhesive', 'waterproofing'],
+    aliases: ['aggregates', 'building_materials', 'cement', 'construction_chemicals', 'domika_ylika', 'masonry', 'mortar'],
   },
   {
     key: 'decor',
     displayName: 'Decor',
     controlledVocab: ['candle_holder', 'curtain', 'cushion', 'mirror', 'planter', 'rug', 'sculpture', 'vase', 'wall_art'],
     aliases: ['decor'],
+  },
+  {
+    key: 'drywall',
+    displayName: 'Drywall & Partitions',
+    controlledVocab: ['access_panel', 'ceiling_channel', 'corner_bead', 'drywall_screw', 'joint_compound', 'jointing_mesh', 'metal_profile', 'plasterboard'],
+    aliases: ['drywall', 'gypsosanida', 'gypsum', 'plasterboard'],
+  },
+  {
+    key: 'electrical',
+    displayName: 'Electrical',
+    controlledVocab: ['cable', 'cable_gland', 'cable_tray', 'circuit_breaker', 'conduit', 'data_outlet', 'distribution_board', 'doorbell_intercom', 'driver_transformer', 'junction_box', 'led_profile', 'rcd', 'socket_outlet', 'trunking', 'wall_switch'],
+    aliases: ['electric', 'electrical', 'ilektrologika', 'switchgear', 'wiring'],
   },
   {
     key: 'furniture',
@@ -41,10 +59,28 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
     aliases: ['granite', 'marble', 'stone'],
   },
   {
+    key: 'hardware',
+    displayName: 'Hardware & Ironmongery',
+    controlledVocab: ['bracket', 'catch', 'drawer_box', 'drawer_runner', 'fixing', 'furniture_leg', 'handle', 'hanging_rail', 'hinge', 'knob', 'lock', 'screw'],
+    aliases: ['exartimata', 'fittings', 'hardware', 'ironmongery'],
+  },
+  {
     key: 'heating',
     displayName: 'Heating',
     controlledVocab: ['boiler', 'convector', 'fireplace', 'heat_pump', 'radiator', 'towel_rail', 'underfloor_heating'],
     aliases: ['heating'],
+  },
+  {
+    key: 'hvac',
+    displayName: 'Ventilation & Air Conditioning',
+    controlledVocab: ['air_conditioner', 'diffuser', 'duct', 'extract_fan', 'grille', 'mvhr_unit'],
+    aliases: ['air_conditioning', 'hvac', 'klimatismos', 'ventilation'],
+  },
+  {
+    key: 'insulation',
+    displayName: 'Insulation',
+    controlledVocab: ['acoustic_insulation', 'eps', 'mineral_wool', 'pir_board', 'reflective_membrane', 'xps'],
+    aliases: ['insulation', 'monosi'],
   },
   {
     key: 'kitchen',
@@ -55,14 +91,32 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
   {
     key: 'lighting',
     displayName: 'Lighting',
-    controlledVocab: ['ceiling_light', 'chandelier', 'floor_lamp', 'lighting', 'outdoor_light', 'pendant_light', 'recessed_light', 'spotlight', 'table_lamp', 'track_light', 'wall_light'],
+    controlledVocab: ['ceiling_light', 'chandelier', 'floor_lamp', 'lamp', 'lighting', 'outdoor_light', 'pendant_light', 'recessed_light', 'spotlight', 'table_lamp', 'track_light', 'wall_light'],
     aliases: ['lighting'],
   },
   {
+    key: 'openings',
+    displayName: 'Doors, Windows & Openings',
+    controlledVocab: ['door_frame', 'entrance_door', 'fire_door', 'garage_door', 'glass_partition', 'interior_door', 'roof_window', 'shutter', 'sliding_door', 'window'],
+    aliases: ['door', 'door_window', 'doors', 'fenestration', 'joinery', 'openings', 'windows'],
+  },
+  {
     key: 'paint_wall_decor',
-    displayName: 'Paint / Wall Decors',
+    displayName: 'Paint & Wall Coverings',
     controlledVocab: ['decorative_plaster', 'wall_coating', 'wall_paint', 'wall_panel', 'wallpaper'],
     aliases: ['paint'],
+  },
+  {
+    key: 'panel_boards',
+    displayName: 'Panel Boards & Edging',
+    controlledVocab: ['chipboard', 'edge_tape', 'hpl', 'mdf', 'melamine_board', 'osb', 'plywood', 'veneer', 'worktop_blank'],
+    aliases: ['boards', 'edgebanding', 'melamine', 'panel_boards'],
+  },
+  {
+    key: 'plumbing',
+    displayName: 'Plumbing & Pipework',
+    controlledVocab: ['expansion_vessel', 'floor_drain', 'manifold', 'pipe', 'pipe_fitting', 'pipe_insulation', 'pump', 'siphon', 'valve', 'water_filter'],
+    aliases: ['pipework', 'plumbing', 'ydravlika'],
   },
   {
     key: 'sanitary',
@@ -75,6 +129,12 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
     displayName: 'Tiles',
     controlledVocab: ['bathroom_tile', 'ceramic_tile', 'floor_tile', 'porcelain_tile', 'shower_tile', 'wall_tile'],
     aliases: ['ceramic', 'ceramic_tile', 'floor_tile', 'mosaic', 'mosaic_tile', 'porcelain', 'porcelain_tile', 'tile', 'wall_tile'],
+  },
+  {
+    key: 'tools',
+    displayName: 'Tools & Site Equipment',
+    controlledVocab: ['access_equipment', 'cutting_consumable', 'hand_tool', 'measuring', 'power_tool', 'ppe', 'site_equipment'],
+    aliases: ['ergaleia', 'tools'],
   },
   {
     key: 'wellness',
@@ -96,7 +156,7 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
  * the union for months, so a door resolved to `general_materials` and rendered under the
  * wrong heading (#368 PD-5).
  */
-export const CATEGORY_KEYS = ['building_materials', 'decor', 'furniture', 'general_materials', 'heating', 'kitchen', 'lighting', 'paint_wall_decor', 'sanitary', 'tiles', 'wellness', 'wood'] as const;
+export const CATEGORY_KEYS = ['appliances', 'building_materials', 'decor', 'drywall', 'electrical', 'furniture', 'general_materials', 'hardware', 'heating', 'hvac', 'insulation', 'kitchen', 'lighting', 'openings', 'paint_wall_decor', 'panel_boards', 'plumbing', 'sanitary', 'tiles', 'tools', 'wellness', 'wood'] as const;
 
 export type CategoryKey = typeof CATEGORY_KEYS[number];
 

@@ -67,7 +67,23 @@ export function resolveUploadCategory(materialCategory: unknown): UploadCategory
   if (lower.includes('light') || lower.includes('lamp') || lower.includes('chandelier') || lower.includes('spotlight')) return 'lighting';
   if (lower.includes('rug') || lower.includes('curtain') || lower.includes('cushion') || lower.includes('mirror') || lower.includes('vase') || lower.includes('decor')) return 'decor';
   if (lower.includes('door') || lower.includes('window') || lower.includes('shutter')
-    || lower.includes('glazing') || lower.includes('partition')) return 'building_materials';
+    || lower.includes('glazing') || lower.includes('partition')) return 'openings';
+  if (lower.includes('cable') || lower.includes('breaker') || lower.includes('socket')
+    || lower.includes('switch') || lower.includes('conduit') || lower.includes('trunking')) return 'electrical';
+  if (lower.includes('pipe') || lower.includes('valve') || lower.includes('siphon')
+    || lower.includes('fitting') || lower.includes('manifold')) return 'plumbing';
+  if (lower.includes('plasterboard') || lower.includes('drywall') || lower.includes('gypsum')) return 'drywall';
+  if (lower.includes('melamine') || lower.includes('chipboard') || lower.includes('plywood')
+    || lower.includes('mdf') || lower.includes('edge tape') || lower.includes('edge_tape')) return 'panel_boards';
+  if (lower.includes('insulation') || lower.includes('polystyrene')) return 'insulation';
+  if (lower.includes('cement') || lower.includes('mortar') || lower.includes('grout')
+    || lower.includes('adhesive') || lower.includes('screed') || lower.includes('aggregate')) return 'building_materials';
+  if (lower.includes('hinge') || lower.includes('screw') || lower.includes('runner')
+    || lower.includes('bracket') || lower.includes('fixing')) return 'hardware';
+  if (lower.includes('washing machine') || lower.includes('dishwasher') || lower.includes('refrigerator')
+    || lower.includes('oven') || lower.includes('freezer')) return 'appliances';
+  if (lower.includes('ventilation') || lower.includes('air condition') || lower.includes('extract fan')) return 'hvac';
+  if (lower.includes('drill') || lower.includes('power tool') || lower.includes('vacuum')) return 'tools';
   if (lower.includes('stone') || lower.includes('marble') || lower.includes('granite') || lower.includes('quartz') || lower.includes('glass') || lower.includes('metal') || lower.includes('composite') || lower.includes('concrete')) return 'general_materials';
 
   return DEFAULT_UPLOAD_CATEGORY;

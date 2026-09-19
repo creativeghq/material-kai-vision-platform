@@ -47,9 +47,11 @@ describe('category vocabulary ↔ the DB registry', () => {
     }
   });
 
-  it('building_materials — the category the hand-written union lost — resolves', () => {
-    expect(resolveUploadCategory('door')).toBe('building_materials');
-    expect(resolveUploadCategory('window')).toBe('building_materials');
+  it('openings — carved out of building_materials, which now means cement — resolves', () => {
+    expect(resolveUploadCategory('door')).toBe('openings');
+    expect(resolveUploadCategory('window')).toBe('openings');
+    expect(resolveUploadCategory('cement')).toBe('building_materials');
+    expect(resolveUploadCategory('tile_adhesive')).toBe('building_materials');
   });
 });
 
