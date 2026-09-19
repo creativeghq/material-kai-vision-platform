@@ -6,8 +6,7 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 //  1. GET /companies/{id} must return the attachments FLATTENED as `contacts` — the raw
 //     nested crm_company_contacts shape made the Contacts tab render "Contacts (0)" even
 //     though the join row existed, so the contact looked unassigned.
-//  2. POST /companies/{id}/contacts with a `contact` object creates AND attaches atomically —
-//     a two-call client flow strands an orphan contact when the attach leg fails.
+//  2. POST /companies/{id}/contacts with a `contact` object creates AND attaches atomically.
 const suite = hasCreds ? describe : describe.skip;
 
 suite('crm-api · company contacts', () => {
@@ -53,8 +52,7 @@ suite('crm-api · company contacts', () => {
     const { status, body } = await api(`/companies/${companyA}/contacts`, {
       method: 'POST',
       body: JSON.stringify({
-        contact: { name: `Ada ${rid}`, email: `ada-${rid}@example.com` },
-        role: 'Buyer',
+        contact: { name: `Ada ${rid}`, email: `ada-${rid}@example.com`, position: 'Buyer' },
         is_primary: true,
       }),
     });
@@ -80,7 +78,9 @@ suite('crm-api · company contacts', () => {
     expect(row.contact_name).toBe(`Ada ${rid}`);
     expect(row.contact_email).toBe(`ada-${rid}@example.com`);
     expect(row.relationship_id).toBeTruthy();
-    expect(row.role).toBe('Buyer');
+    // The title is the PERSON's, off crm_contacts.position; the junction `role` is retired.
+    expect(row.contact_position).toBe('Buyer');
+    expect(row.role).toBeUndefined();
     expect(row.is_primary).toBe(true);
     // The raw nested key must be gone — leaving both invites readers to drift apart.
     expect(body.data.crm_company_contacts).toBeUndefined();
@@ -103,7 +103,7 @@ suite('crm-api · company contacts', () => {
   it('rejects a request with neither contact_id nor contact', async () => {
     const { status } = await api(`/companies/${companyA}/contacts`, {
       method: 'POST',
-      body: JSON.stringify({ role: 'Buyer' }),
+      body: JSON.stringify({ position: 'Buyer' }),
     });
     expect(status).toBe(400);
   });

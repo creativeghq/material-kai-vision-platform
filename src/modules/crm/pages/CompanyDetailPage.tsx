@@ -220,7 +220,7 @@ export const CompanyDetailPage: React.FC = () => {
   } : null);
   const [showAddContactDialog, setShowAddContactDialog] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string>('');
-  const [contactRole, setContactRole] = useState<string>('');
+
   const [isPrimaryContact, setIsPrimaryContact] = useState(false);
   const [contactNotes, setContactNotes] = useState<string>('');
   const [attachingContact, setAttachingContact] = useState(false);
@@ -230,7 +230,8 @@ export const CompanyDetailPage: React.FC = () => {
   const [newContactName, setNewContactName] = useState<string>('');
   const [newContactEmail, setNewContactEmail] = useState<string>('');
   const [newContactPhone, setNewContactPhone] = useState<string>('');
-  const [newContactPosition, setNewContactPosition] = useState<string>('');
+  // One field for both tabs: a person's title is the person's, not the attachment's.
+  const [contactPosition, setContactPosition] = useState<string>('');
 
   useEffect(() => {
     if (id && !isNew) {
@@ -527,13 +528,12 @@ export const CompanyDetailPage: React.FC = () => {
     setShowAddContactDialog(false);
     setContactMode('existing');
     setSelectedContactId('');
-    setContactRole('');
+    setContactPosition('');
     setIsPrimaryContact(false);
     setContactNotes('');
     setNewContactName('');
     setNewContactEmail('');
     setNewContactPhone('');
-    setNewContactPosition('');
   };
 
   const handleAttachContact = async () => {
@@ -552,9 +552,8 @@ export const CompanyDetailPage: React.FC = () => {
             name: newContactName.trim(),
             email: newContactEmail.trim() || undefined,
             phone: newContactPhone.trim() || undefined,
-            position: newContactPosition.trim() || undefined,
+            position: contactPosition.trim() || undefined,
           },
-          contactRole,
           isPrimaryContact,
           contactNotes,
         );
@@ -562,7 +561,7 @@ export const CompanyDetailPage: React.FC = () => {
         await companiesAPI.attachContact(
           id,
           selectedContactId,
-          contactRole,
+          contactPosition.trim(),
           isPrimaryContact,
           contactNotes,
         );
@@ -1106,7 +1105,7 @@ export const CompanyDetailPage: React.FC = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Role</TableHead>
+                        <TableHead>Position / Title</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -1127,11 +1126,8 @@ export const CompanyDetailPage: React.FC = () => {
                               <span className="ml-2 text-[10px] text-emerald-600 dark:text-emerald-400">Primary</span>
                             )}
                           </TableCell>
-                          {/* The attachment role is optional and usually unset; the person's own
-                              job title is the same fact seen from the other side of the
-                              relationship, so fall back to it instead of an empty column. */}
                           <TableCell>
-                            {contact.role || contact.contact_position || <span className="text-muted-foreground">—</span>}
+                            {contact.contact_position || <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell>
                             {contact.contact_email ? (
@@ -1339,7 +1335,10 @@ export const CompanyDetailPage: React.FC = () => {
               <TabsContent value="existing" className="mt-4 space-y-2">
                 <Label>Contact *</Label>
                 <ContactSearchDropdown
-                  onSelect={setSelectedContactId}
+                  onSelect={(contactId, contact) => {
+                    setSelectedContactId(contactId);
+                    setContactPosition(contact?.position ?? '');
+                  }}
                   excludeContactIds={company?.contacts?.map((c: any) => c.contact_id) || []}
                   placeholder="Search contacts..."
                   selectedContactId={selectedContactId || null}
@@ -1383,27 +1382,18 @@ export const CompanyDetailPage: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-contact-position">Position / Title</Label>
-                  <Input
-                    id="new-contact-position"
-                    value={newContactPosition}
-                    onChange={(e) => setNewContactPosition(e.target.value)}
-                    placeholder="e.g. Procurement Manager"
-                  />
-                </div>
               </TabsContent>
             </Tabs>
 
-            {/* Role */}
             <div className="space-y-2">
-              <Label htmlFor="contact-role">Role at Company</Label>
+              <Label htmlFor="contact-position">Position / Title</Label>
               <Input
-                id="contact-role"
-                value={contactRole}
-                onChange={(e) => setContactRole(e.target.value)}
-                placeholder="e.g., CEO, Sales Manager, Developer"
+                id="contact-position"
+                value={contactPosition}
+                onChange={(e) => setContactPosition(e.target.value)}
+                placeholder="e.g. CEO, Sales Manager, Procurement"
 />
+              <p className="text-xs text-muted-foreground">Saved on the person, so it reads the same everywhere.</p>
             </div>
 
             {/* Primary Contact */}

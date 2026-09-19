@@ -11,8 +11,6 @@ const INDEX = sourceIndex({ roots: ['src'] });
 
 describe('launcher create actions', () => {
   it('every ?new= value is acted on where it is read', () => {
-    // Windowed, not file-wide: an unrelated literal elsewhere in a reader would otherwise answer
-    // for a value nobody compares against.
     const windows = INDEX.stripped().flatMap(([, src]) =>
       [...src.matchAll(/get\(\s*['"]new['"]\s*\)/g)].map((m) => src.slice(m.index!, m.index! + 400)));
     const inert: string[] = [];

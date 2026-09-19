@@ -577,7 +577,7 @@ export const companiesAPI = {
     return response.json();
   },
 
-  async attachContact(companyId: string, contactId: string, role?: string, isPrimary?: boolean, notes?: string) {
+  async attachContact(companyId: string, contactId: string, position?: string, isPrimary?: boolean, notes?: string) {
     const token = await getAuthToken();
 
     const response = await fetch(`${getApiBase()}/crm-api/companies/${companyId}/contacts`, {
@@ -588,7 +588,7 @@ export const companiesAPI = {
       },
       body: JSON.stringify({
         contact_id: contactId,
-        role,
+        position,
         is_primary: isPrimary,
         notes,
       }),
@@ -611,7 +611,6 @@ export const companiesAPI = {
   async createAndAttachContact(
     companyId: string,
     contact: { name: string; email?: string; phone?: string; position?: string },
-    role?: string,
     isPrimary?: boolean,
     notes?: string,
   ) {
@@ -625,7 +624,6 @@ export const companiesAPI = {
       },
       body: JSON.stringify({
         contact,
-        role,
         is_primary: isPrimary,
         notes,
       }),

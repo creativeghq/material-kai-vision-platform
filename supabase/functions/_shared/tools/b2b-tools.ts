@@ -2286,10 +2286,18 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
                 .upsert({
                   company_id: companyId,
                   contact_id: existingContactId,
-                  role: contact.position,
                   is_primary: contact.is_primary || false,
                   notes: `Linked via B2B Research Agent`,
                 }, { onConflict: 'company_id,contact_id', ignoreDuplicates: true });
+              // Research fills a title the CRM lacks; it never overwrites one a person put there.
+              if (contact.position) {
+                const { data: prior } = await supabase
+                  .from('crm_contacts').select('position').eq('id', existingContactId).single();
+                if (!String(prior?.position ?? '').trim()) {
+                  await supabase.from('crm_contacts')
+                    .update({ position: contact.position }).eq('id', existingContactId);
+                }
+              }
               continue;
             }
 
@@ -2340,7 +2348,6 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
               .insert({
                 company_id: companyId,
                 contact_id: contactData.id,
-                role: contact.position,
                 is_primary: contact.is_primary || false,
                 notes: `Added via B2B Research Agent`,
               });

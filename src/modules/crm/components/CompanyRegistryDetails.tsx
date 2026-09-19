@@ -60,7 +60,6 @@ export const CompanyRegistryDetails: React.FC<{
       await companiesAPI.createAndAttachContact(
         companyId,
         { name, position: person.role ?? undefined },
-        person.role ?? 'Registry contact',
         false,
         person.percentage ? `ΓΕΜΗ: ${person.role ?? ''} ${person.percentage ? `(${person.percentage})` : ''}`.trim() : 'From ΓΕΜΗ registry',
       );

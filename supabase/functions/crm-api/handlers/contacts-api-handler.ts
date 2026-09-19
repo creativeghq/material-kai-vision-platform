@@ -386,7 +386,6 @@ export async function handleContacts(req: Request): Promise<Response> {
           crm_company_contacts(
             id,
             company_id,
-            role,
             is_primary,
             crm_companies(
               id,
@@ -404,13 +403,11 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
-      // Flatten the company attachments (crm_company_contacts) into the `companies`
-      // shape the contact detail page reads — { relationship_id, company_id,
-      // company_name, is_primary, role }. This is what drives the attached-company
-      // badge AND the Pricing / Invoicing / Tax & VAT inheritance (a contact with a
-      // primary company inherits the company's commercial fields unless overridden).
+      // Flatten the attachments into the `companies` shape the contact page reads. It drives the
+      // attached-company badge AND the Pricing / Invoicing / Tax & VAT inheritance (a contact
+      // with a primary company inherits its commercial fields unless overridden).
       const attachments = (data as { crm_company_contacts?: Array<{
-        id: string; company_id: string; role: string | null; is_primary: boolean;
+        id: string; company_id: string; is_primary: boolean;
         crm_companies?: { id: string; name: string } | null;
       }> }).crm_company_contacts ?? [];
       const companies = attachments.map((a) => ({
@@ -418,7 +415,6 @@ export async function handleContacts(req: Request): Promise<Response> {
         company_id: a.company_id,
         company_name: a.crm_companies?.name ?? null,
         is_primary: a.is_primary,
-        role: a.role,
       }));
       delete (data as { crm_company_contacts?: unknown }).crm_company_contacts;
       (data as { companies?: unknown }).companies = companies;

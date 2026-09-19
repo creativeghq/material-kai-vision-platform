@@ -398,7 +398,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
           crm_company_contacts(
             id,
             contact_id,
-            role,
             is_primary,
             notes,
             created_at,
@@ -422,13 +421,10 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
-      // Flatten the contact attachments (crm_company_contacts) into the `contacts`
-      // shape the company detail page reads — { relationship_id, contact_id,
-      // contact_name, contact_email, contact_phone, contact_position, role,
-      // is_primary, notes }.
-      // Mirrors the inverse flatten in contacts-api-handler's GET /contacts/{id}.
+      // Flatten the attachments into the `contacts` shape the company page reads. Mirrors the
+      // inverse flatten in contacts-api-handler's GET /contacts/{id}.
       const attachments = (data as { crm_company_contacts?: Array<{
-        id: string; contact_id: string; role: string | null; is_primary: boolean;
+        id: string; contact_id: string; is_primary: boolean;
         notes: string | null; created_at: string;
         crm_contacts?: {
           id: string; name: string; email: string | null; phone: string | null;
@@ -442,7 +438,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
         contact_email: a.crm_contacts?.email ?? null,
         contact_phone: a.crm_contacts?.phone ?? null,
         contact_position: a.crm_contacts?.position ?? null,
-        role: a.role,
         is_primary: a.is_primary,
         notes: a.notes,
         created_at: a.created_at,
@@ -582,7 +577,12 @@ export async function handleCompanies(req: Request): Promise<Response> {
     if (method === 'POST' && path.length === 2 && path[1] === 'contacts') {
       const companyId = path[0];
       const body = await req.json();
-      const { role, is_primary, notes } = body;
+      const { is_primary, notes } = body;
+      // A title is the PERSON's: crm_contacts.position, nowhere else. Supplied-but-EMPTY clears
+      // it, so presence decides, not truthiness. The retired `role` is not read as an alias — it
+      // was per-relationship, and promoting one would rewrite that person's title everywhere.
+      const positionGiven = typeof body.position === 'string';
+      const position = positionGiven ? String(body.position).trim() : '';
       const newContact = body.contact as Record<string, unknown> | undefined;
       let contact_id = body.contact_id as string | undefined;
 
@@ -615,8 +615,8 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
-      // Create-and-attach: the contact lands in the company's workspace, and is rolled
-      // back below if the join insert fails, so the two writes succeed or fail together.
+      // Create-and-attach: the contact lands in the company's workspace, rolled back below if
+      // the join insert fails, so the two writes succeed or fail together.
       let createdContactId: string | null = null;
       if (!contact_id) {
         const name = typeof newContact?.name === 'string' ? newContact.name.trim() : '';
@@ -639,6 +639,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
           .from('crm_contacts')
           .insert({
             ...pickContactFields(newContact ?? {}),
+            ...(positionGiven ? { position: position || null } : {}),
             name,
             workspace_id: companyWs,
             created_by: userId || 'system',
@@ -665,12 +666,26 @@ export async function handleCompanies(req: Request): Promise<Response> {
         }
       }
 
+      if (positionGiven && !createdContactId && contact_id) {
+        const { data: current } = await supabase
+          .from('crm_contacts').select('position').eq('id', contact_id).single();
+        if ((current?.position ?? '') !== position) {
+          const { error: titleErr } = await supabase
+            .from('crm_contacts').update({ position: position || null }).eq('id', contact_id);
+          if (titleErr) {
+            return new Response(
+              JSON.stringify({ error: `Could not save the position/title: ${titleErr.message}` }),
+              { status: 400, headers: corsHeaders },
+            );
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('crm_company_contacts')
         .insert({
           company_id: companyId,
           contact_id,
-          role,
           is_primary: is_primary || false,
           notes,
         })

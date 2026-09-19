@@ -21,19 +21,14 @@ import { QuickCreatePartyDialog } from '@/components/business/crm/QuickCreatePar
 const PAGE_SIZE = 50;
 
 interface ContactSearchDropdownProps {
-  onSelect: (contactId: string) => void;
+  /** The row comes with the id — a caller showing one of the contact's own fields would otherwise overwrite what it never read. */
+  onSelect: (contactId: string, contact?: Contact) => void;
   excludeContactIds?: string[];
   placeholder?: string;
   selectedContactId?: string | null;
-  /**
-   * Offer "create it" when the search finds nothing.
-   *
-   * Deliberately opt-in and deliberately only reachable from a search that came back
-   * empty: this platform's rule is that a CRM party is searched for before it is created,
-   * because the same customer entered twice (once in Greek script, once in Latin) is the
-   * failure a CRM never recovers from. Reaching create THROUGH the search means the
-   * duplicate check has already run and the user has already seen the misses.
-   */
+  /** Offer "create it" when the search finds nothing — opt-in, and only from a search that came
+   *  back empty, because the same customer entered twice (once in Greek, once in Latin) is the
+   *  failure a CRM never recovers from. Reaching create THROUGH the search proves the miss. */
   allowCreate?: boolean;
 }
 
@@ -112,7 +107,7 @@ export function ContactSearchDropdown({
 
   const handleSelect = (contact: Contact) => {
     setSelectedContact(contact);
-    onSelect(contact.id);
+    onSelect(contact.id, contact);
     setOpen(false);
     setSearch('');
   };
@@ -222,7 +217,7 @@ export function ContactSearchDropdown({
           onCreated={(id, name) => {
             setCreating(false);
             setSelectedContact({ id, name } as Contact);
-            onSelect(id);
+            onSelect(id, { id, name });
             setOpen(false);
             setSearch('');
           }}
