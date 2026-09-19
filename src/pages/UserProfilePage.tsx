@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, CalendarCheck, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook, BadgeCheck } from 'lucide-react';
+import { User } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { filterUrl } from '@/components/core/filters';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { HubRailSectionLabel } from '@/components/core/hub';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
 import { AmbassadorTab } from '@/components/core/Profile/AmbassadorTab';
 import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
@@ -20,6 +21,7 @@ import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import SupplierPortalPage from './SupplierPortalPage';
 import { SchedulePanel } from '@/components/core/Profile/SchedulePanel';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
+import { DEFAULT_PROFILE_TAB, profileRailRows } from '@/components/core/Profile/sections';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -64,10 +66,16 @@ export const UserProfilePage: React.FC = () => {
   // reach the Supplier Portal under Finance → Payables instead, so we only surface it here for
   // marketplace business users who are not finance-managed.
   const showSupplierPortal = can('marketplace.browse') && !can('finance.manage');
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') ?? 'profile');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') ?? DEFAULT_PROFILE_TAB);
+
+  const railRows = profileRailRows({
+    team: showTeam,
+    modules: showModules,
+    supplierPortal: showSupplierPortal,
+  });
 
   useEffect(() => {
-    const tab = searchParams.get('tab') ?? 'profile';
+    const tab = searchParams.get('tab') ?? DEFAULT_PROFILE_TAB;
     const retired = RETIRED_TABS[tab];
     if (retired) { navigate(retired, { replace: true }); return; }
     setActiveTab(tab);
@@ -79,7 +87,8 @@ export const UserProfilePage: React.FC = () => {
     // the content streams in behind it.
     React.startTransition(() => {
       setActiveTab(tab);
-      setSearchParams(tab === 'profile' ? {} : { tab });
+      // Only the tab survives: `?section=`/`?website=` address a pane inside the tab being left.
+      setSearchParams(tab === DEFAULT_PROFILE_TAB ? {} : { tab });
     });
   };
 
@@ -92,78 +101,24 @@ export const UserProfilePage: React.FC = () => {
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8">
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="profile" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger value="ambassador" className="flex items-center gap-2">
-            <BadgeCheck className="h-4 w-4" />
-            Ambassador
-          </TabsTrigger>
-          {/* Availability + Appointments + Calendar, which were three tabs answering one
-              question between them. The rail inside splits them into sections. */}
-          <TabsTrigger value="schedule" className="flex items-center gap-2">
-            <CalendarCheck className="h-4 w-4" />
-            Schedule
-          </TabsTrigger>
-          <TabsTrigger value="reviews" className="flex items-center gap-2">
-            <Star className="h-4 w-4" />
-            Reviews
-          </TabsTrigger>
-          <TabsTrigger value="subscription" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Subscription
-          </TabsTrigger>
-          <TabsTrigger value="credits" className="flex items-center gap-2">
-            <Coins className="h-4 w-4" />
-            Credits
-          </TabsTrigger>
-          <TabsTrigger value="billing" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Billing
-          </TabsTrigger>
-          <TabsTrigger value="documents" className="flex items-center gap-2">
-            <ReceiptText className="h-4 w-4" />
-            My Account
-          </TabsTrigger>
-          <TabsTrigger value="social-accounts" className="flex items-center gap-2">
-            <Share2 className="h-4 w-4" />
-            Social Accounts
-          </TabsTrigger>
-          <TabsTrigger value="websites" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            Websites
-          </TabsTrigger>
-          <TabsTrigger value="keys" className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4" />
-            Keys
-          </TabsTrigger>
-          <TabsTrigger value="webhooks" className="flex items-center gap-2">
-            <Webhook className="h-4 w-4" />
-            Webhooks
-          </TabsTrigger>
-          {showTeam && (
-            <TabsTrigger value="team" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Team
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        orientation="vertical"
+        className="flex flex-col gap-4 lg:flex-row lg:items-start"
+      >
+        {/* From `PROFILE_SECTIONS`; `.section-rail` collapses it to a strip below `lg`. */}
+        <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+          {railRows.map((row) => (row.kind === 'heading' ? (
+            <HubRailSectionLabel key={`group:${row.label}`}>{row.label}</HubRailSectionLabel>
+          ) : (
+            <TabsTrigger key={row.section.value} value={row.section.value} className="w-full justify-start gap-2">
+              <row.section.icon className="h-4 w-4 shrink-0" /> {row.section.label}
             </TabsTrigger>
-          )}
-          {showModules && (
-            <TabsTrigger value="modules" className="flex items-center gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              Modules
-            </TabsTrigger>
-          )}
-          {showSupplierPortal && (
-            <TabsTrigger value="supplier-portal" className="flex items-center gap-2">
-              <Truck className="h-4 w-4" />
-              Supplier Portal
-            </TabsTrigger>
-          )}
+          )))}
         </TabsList>
 
+        <div className="min-w-0 flex-1 space-y-6">
         <TabsContent value="profile" className="space-y-6">
           <ProfileTab />
           {/* Renders nothing unless the user has a workspace; shows a status card once disabled. */}
@@ -231,6 +186,7 @@ export const UserProfilePage: React.FC = () => {
             <SupplierPortalPage embedded />
           </TabsContent>
         )}
+        </div>
       </Tabs>
       </div>
     </div>

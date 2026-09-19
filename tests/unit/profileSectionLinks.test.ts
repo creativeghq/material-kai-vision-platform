@@ -31,11 +31,11 @@ const sourceFiles = ['src', 'supabase/functions'].flatMap((r) => walk(join(ROOT,
  * one takes the whole suite down with "Missing Supabase environment variables", which is a worse
  * failure than the one being guarded against.
  */
-function idsFromSource(file: string, re: RegExp): Set<string> {
+function idsFromSource(file: string, re: RegExp, inner = /'([a-z0-9-]+)'/g): Set<string> {
   const src = blankedSource(join(ROOT, file));
   const m = src.match(re);
   if (!m) return new Set();
-  return new Set([...m[1].matchAll(/'([a-z0-9-]+)'/g)].map((x) => x[1]));
+  return new Set([...m[1].matchAll(inner)].map((x) => x[1]));
 }
 
 const RAILS: Record<string, { file: string; ids: Set<string> }> = {
@@ -51,6 +51,14 @@ const RAILS: Record<string, { file: string; ids: Set<string> }> = {
     ids: idsFromSource(
       'src/modules/social-media/components/SocialHubPanel.tsx',
       /const SECTIONS: Record<SectionId, React\.ComponentType> = \{([\s\S]*?)\n\};/,
+    ),
+  },
+  websites: {
+    file: 'src/components/core/Profile/seo/sections.ts',
+    ids: idsFromSource(
+      'src/components/core/Profile/seo/sections.ts',
+      /export const SEO_SECTIONS: readonly SeoSection\[\] = \[([\s\S]*?)\n\];/,
+      /value: '([a-z0-9-]+)'/g,
     ),
   },
   keys: {

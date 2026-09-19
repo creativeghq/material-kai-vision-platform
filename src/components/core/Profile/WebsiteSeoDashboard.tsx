@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDate, timeAgo } from '@/utils/datetime';
 import {
-  ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
-  FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
-  LayoutDashboard, Sparkles, Swords, Plus, Target, FileBarChart, Trash2, ShieldCheck,
+  ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, Search,
+  AlertTriangle, CalendarClock, Check, Plus, Target, Trash2,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
@@ -20,7 +19,8 @@ import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
 import { WebsiteCannibalisationPanel } from '@/components/core/Profile/WebsiteCannibalisationPanel';
 import { WebsiteBrandProfilePanel } from '@/components/core/Profile/WebsiteBrandProfilePanel';
-import { HubEmptyState, HubStatGrid, HubStatTile } from '@/components/core/hub';
+import { HubEmptyState, HubRailSectionLabel, HubStatGrid, HubStatTile } from '@/components/core/hub';
+import { resolveSeoSection, seoRailRows, type SeoSectionId } from '@/components/core/Profile/seo/sections';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -61,9 +61,30 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 
-export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () => void; initialTab?: string }> = ({ website, onBack, initialTab }) => {
+export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () => void }> = ({ website, onBack }) => {
   const { toast } = useToast();
-  const [tab, setTab] = useState(initialTab || 'overview');
+
+  // The open pane is `?section=`, the site is `?website=` (WebsitesTab writes it). In `useState`
+  // neither had an address: a reload dropped you at the site list and no pane could be linked to.
+  const [params, setParams] = useSearchParams();
+  const rawSection = params.get('section');
+  const tab = resolveSeoSection(rawSection);
+
+  // Normalise only when `?section=` was SET — its absence is the default, not a stale bookmark.
+  useEffect(() => {
+    if (rawSection && rawSection !== tab) {
+      const next = new URLSearchParams(params);
+      next.set('section', tab);
+      setParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawSection, tab]);
+
+  const setTab = (id: string) => {
+    const next = new URLSearchParams(params);
+    next.set('section', id as SeoSectionId);
+    setParams(next, { replace: true });
+  };
   const [overview, setOverview] = useState<WebsiteSeoOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [recrawling, setRecrawling] = useState(false);
@@ -378,11 +399,8 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         <HubStatTile label="Tracked domains" value={loading ? '—' : overview?.tracked_domains.total ?? 0} onClick={() => setTab('domains')} />
       </HubStatGrid>
 
-      {/* Eleven sections. That is a RAIL, not a tab row — the same call SocialHubPanel made at
-          the same count. Eleven triggers in one horizontal strip is a row nobody can scan, and
-          `bg-muted` on the list put them in a filled padding box, which is the one thing the tab
-          treatment is defined not to be (see TabsList in components/core/ui/tabs.tsx).
-          `.section-rail` collapses it back to a single swipeable strip below `lg`. */}
+      {/* Rendered from `SEO_SECTIONS` — seo/sections.ts. `HubRailSectionLabel` is how a group
+          heading sits inside a Radix `TabsList`; `.section-rail` collapses it below `lg`. */}
       <Tabs
         value={tab}
         onValueChange={setTab}
@@ -390,62 +408,41 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         className="flex flex-col gap-4 lg:flex-row lg:items-start"
       >
         <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
-          <TabsTrigger value="overview" className="w-full justify-start gap-2"><LayoutDashboard className="w-3.5 h-3.5" /> Overview</TabsTrigger>
-          <TabsTrigger value="ai" className="w-full justify-start gap-2"><Sparkles className="w-3.5 h-3.5" /> AI Visibility</TabsTrigger>
-          {/* "Rank Tracker", not "Rankings" — `rankings` is already taken by the
-              domain-intel + backlinks tab below. Two tabs both called Rankings that
-              answer different questions is worse than a slightly longer label. */}
-          <TabsTrigger value="ranks" className="w-full justify-start gap-2"><Target className="w-3.5 h-3.5" /> Rank Tracker</TabsTrigger>
-          <TabsTrigger value="reports" className="w-full justify-start gap-2"><FileBarChart className="w-3.5 h-3.5" /> Reports</TabsTrigger>
-          <TabsTrigger value="competitors" className="w-full justify-start gap-2"><Swords className="w-3.5 h-3.5" /> Competitors</TabsTrigger>
-          <TabsTrigger value="articles" className="w-full justify-start gap-2"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
-          <TabsTrigger value="brand" className="w-full justify-start gap-2"><ShieldCheck className="w-3.5 h-3.5" /> Brand Profile</TabsTrigger>
-          <TabsTrigger value="research" className="w-full justify-start gap-2"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
-          <TabsTrigger value="runs" className="w-full justify-start gap-2"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
-          <TabsTrigger value="domains" className="w-full justify-start gap-2"><Radar className="w-3.5 h-3.5" /> Domain Audits</TabsTrigger>
-          <TabsTrigger value="gsc" className="w-full justify-start gap-2"><LineChart className="w-3.5 h-3.5" /> Search Performance</TabsTrigger>
-          <TabsTrigger value="rankings" className="w-full justify-start gap-2"><TrendingUp className="w-3.5 h-3.5" /> Rankings &amp; Links</TabsTrigger>
-          <TabsTrigger value="health" className="w-full justify-start gap-2"><Gauge className="w-3.5 h-3.5" /> Site Health</TabsTrigger>
-          <TabsTrigger value="llms" className="w-full justify-start gap-2"><Bot className="w-3.5 h-3.5" /> llms.txt</TabsTrigger>
+          {seoRailRows().map((row) => (row.kind === 'heading' ? (
+            <HubRailSectionLabel key={`group:${row.label}`}>{row.label}</HubRailSectionLabel>
+          ) : (
+            <TabsTrigger key={row.section.value} value={row.section.value} className="w-full justify-start gap-2">
+              <row.section.icon className="w-3.5 h-3.5 shrink-0" /> {row.section.label}
+            </TabsTrigger>
+          )))}
         </TabsList>
 
         <div className="min-w-0 flex-1 space-y-4">
 
-        {/*
-          Overview — the derived metric strip. Everything on it comes from
-          `get_website_seo_overview` / `seo_website_*_summary`, which decide both the
-          number AND whether the number can be trusted, so a tile can say "the
-          backlink source failed" instead of quietly not rendering. See
-          `seo/seoMetrics.ts`.
-        */}
+        {/* `get_website_seo_overview` decides the number AND whether it can be trusted, so a tile
+            says "the backlink source failed" rather than quietly not rendering. See seoMetrics.ts. */}
         <TabsContent value="overview">
           <WebsiteSeoOverviewPanel website={website} onOpenTab={setTab} />
         </TabsContent>
 
-        {/* AI Visibility — what assistants say about you (llm_mention_probes). */}
         <TabsContent value="ai">
           <WebsiteAiVisibilityPanel website={website} />
         </TabsContent>
 
-        {/* Rankings — the keywords the operator CHOSE, followed daily. Everything
-            else in this module is discovery ("what do we rank for"); this is the
-            only surface that answers "did what I care about move". */}
+        {/* The keywords the operator CHOSE. Every other pane here is discovery. */}
         <TabsContent value="ranks">
           <WebsiteRankTrackerPanel website={website} />
         </TabsContent>
 
-        {/* Reports — a saved selection of the SAME derivations every other tab reads,
-            frozen per build so an old report still shows its own period. */}
+        {/* The same derivations, frozen per build so an old report keeps its own period. */}
         <TabsContent value="reports">
           <WebsiteReportsPanel website={website} />
         </TabsContent>
 
-        {/* Competitors — your line beside theirs, same metric, same window. */}
         <TabsContent value="competitors">
           <WebsiteCompetitorsPanel website={website} />
         </TabsContent>
 
-        {/* Articles */}
         <TabsContent value="brand" className="space-y-4">
           <WebsiteBrandProfilePanel />
         </TabsContent>
@@ -614,7 +611,6 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           </Card>
         </TabsContent>
 
-        {/* Keyword Research */}
         <TabsContent value="research">
           <Card className="dashboard-card">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
@@ -916,7 +912,6 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           )}
         </TabsContent>
 
-        {/* Toolkit Runs */}
         <TabsContent value="runs">
           <Card className="dashboard-card">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
@@ -973,7 +968,6 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           </Card>
         </TabsContent>
 
-        {/* Domain Audits */}
         <TabsContent value="domains">
           <Card className="dashboard-card">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
@@ -1041,33 +1035,30 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           </Card>
         </TabsContent>
 
-        {/* Search Performance — both halves of the Google picture. Search Console
-            says what Google SHOWED people; Analytics says what those people then
-            DID. A page with rising impressions and flat sessions has a title
-            problem; rising sessions and no conversions is a page problem. Neither
-            is visible from one feed. */}
         <TabsContent value="gsc" className="space-y-4">
           <WebsiteGscPanel website={website} />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
           <WebsiteAnalyticsPanel website={website} />
-          {/* Cannibalisation lives here because it is derived entirely from Search
-              Console's query+page pair — the same feed, read a different way. */}
+        </TabsContent>
+
+        <TabsContent value="cannibalisation" className="space-y-4">
           <WebsiteCannibalisationPanel website={website} />
         </TabsContent>
 
-        {/* Rankings & Links (DataForSEO domain intel) */}
         <TabsContent value="rankings">
           <WebsiteDomainIntelPanel website={website} />
         </TabsContent>
 
-        {/* Site Health — the homepage audit AND the full crawl. They answer
-            different questions: one is "is my front door broken", the other is
-            "is my site broken", and only the second can see a redirect chain. */}
-        <TabsContent value="health" className="space-y-4">
+        <TabsContent value="crawl" className="space-y-4">
           <WebsiteCrawlPanel website={website} />
+        </TabsContent>
+
+        <TabsContent value="health" className="space-y-4">
           <WebsiteHealthPanel website={website} />
         </TabsContent>
 
-        {/* llms.txt — derived from the crawled pages (#349 C2) */}
         <TabsContent value="llms">
           <WebsiteLlmsTxtPanel website={website} />
         </TabsContent>

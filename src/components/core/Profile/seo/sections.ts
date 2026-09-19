@@ -1,0 +1,91 @@
+/** The per-website SEO rail — ONE declaration, read by the dashboard that renders it. */
+import {
+  Bot, FileBarChart, FileText, FlaskConical, Gauge, Globe, LayoutDashboard, LineChart, Radar,
+  Scissors, Search, ShieldCheck, Sparkles, Spline, Swords, Target, TrendingUp,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+export type SeoSectionId =
+  | 'overview'
+  | 'gsc' | 'analytics' | 'cannibalisation' | 'ranks'
+  | 'ai' | 'rankings' | 'competitors' | 'domains'
+  | 'articles' | 'research' | 'brand'
+  | 'crawl' | 'health' | 'llms'
+  | 'runs' | 'reports';
+
+export type SeoGroupId = 'search' | 'visibility' | 'content' | 'technical' | 'activity';
+
+export interface SeoSection {
+  /** The `?section=` key — the external contract. Labels are free to change; this is not. */
+  value: SeoSectionId;
+  label: string;
+  icon: LucideIcon;
+  group?: SeoGroupId;
+  /** The pane opened when `?section=` is absent. Exactly one section carries it. */
+  landing?: boolean;
+}
+
+export const SEO_SECTION_GROUPS = {
+  search: 'Search',
+  visibility: 'Visibility',
+  content: 'Content',
+  technical: 'Technical',
+  activity: 'Activity',
+} as const;
+
+/**
+ * Seventeen panes in five groups, ONE pane per row. A row stacking several panels has no way to
+ * address the second one, so it stops being reviewable while still looking complete.
+ */
+export const SEO_SECTIONS: readonly SeoSection[] = [
+  { value: 'overview', label: 'Overview', icon: LayoutDashboard, landing: true },
+
+  { value: 'gsc', label: 'Search Console', icon: LineChart, group: 'search' },
+  { value: 'analytics', label: 'Analytics', icon: Spline, group: 'search' },
+  { value: 'cannibalisation', label: 'Cannibalisation', icon: Scissors, group: 'search' },
+  { value: 'ranks', label: 'Rank Tracker', icon: Target, group: 'search' },
+
+  { value: 'ai', label: 'AI Visibility', icon: Sparkles, group: 'visibility' },
+  { value: 'rankings', label: 'Backlinks & Authority', icon: TrendingUp, group: 'visibility' },
+  { value: 'competitors', label: 'Competitors', icon: Swords, group: 'visibility' },
+  { value: 'domains', label: 'Domain Audits', icon: Radar, group: 'visibility' },
+
+  { value: 'articles', label: 'Articles', icon: FileText, group: 'content' },
+  { value: 'research', label: 'Keyword Research', icon: Search, group: 'content' },
+  { value: 'brand', label: 'Brand Profile', icon: ShieldCheck, group: 'content' },
+
+  { value: 'crawl', label: 'Site Crawl', icon: Globe, group: 'technical' },
+  { value: 'health', label: 'Page Health', icon: Gauge, group: 'technical' },
+  { value: 'llms', label: 'llms.txt', icon: Bot, group: 'technical' },
+
+  { value: 'runs', label: 'Toolkit Runs', icon: FlaskConical, group: 'activity' },
+  { value: 'reports', label: 'Reports', icon: FileBarChart, group: 'activity' },
+];
+
+export const DEFAULT_SEO_SECTION: SeoSectionId = 'overview';
+export const SEO_SECTION_IDS: readonly SeoSectionId[] = SEO_SECTIONS.map((s) => s.value);
+
+const OFFERED = new Set<string>(SEO_SECTION_IDS);
+
+/** The pane to render: the one asked for, or the landing pane. */
+export function resolveSeoSection(raw: string | null | undefined): SeoSectionId {
+  return raw && OFFERED.has(raw) ? (raw as SeoSectionId) : DEFAULT_SEO_SECTION;
+}
+
+export type SeoRailRow =
+  | { kind: 'heading'; label: string }
+  | { kind: 'section'; section: SeoSection };
+
+/** The rail as rendered, with a heading before the first row of each group. */
+export function seoRailRows(): SeoRailRow[] {
+  const rows: SeoRailRow[] = [];
+  let openGroup: SeoSection['group'];
+  for (const section of SEO_SECTIONS) {
+    if (section.group && section.group !== openGroup) {
+      rows.push({ kind: 'heading', label: SEO_SECTION_GROUPS[section.group] });
+    }
+    openGroup = section.group;
+    rows.push({ kind: 'section', section });
+  }
+  return rows;
+}

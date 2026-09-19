@@ -33,14 +33,15 @@ function declaredRoutes(): Set<string> {
 
 /**
  * Where each tabbed destination's tab values are DECLARED. Listed on purpose: the point of the
- * check is that the tab VALUE still exists — the profile page has seventeen tabs and renaming one
- * silently turns every link at it into a page that lands back on "profile".
+ * check is that the tab VALUE still exists — renaming one silently turns every link at it into a
+ * page that lands back on its default pane.
  *
- * Finance points at the module constant rather than the page, because FinancePage builds its
- * tab strip from `FINANCE_TAB` (the Orders pane is keyed `doc_orders`, not `orders`).
+ * Profile and Finance point at the section registry their page builds its rail FROM, not at the
+ * page: neither writes a literal trigger any more, so scanning the .tsx would find nothing and
+ * vouch for everything.
  */
 const TABBED_PAGES: Record<string, string> = {
-  '/profile': 'src/pages/UserProfilePage.tsx',
+  '/profile': 'src/components/core/Profile/sections.ts',
   '/admin/ai-configs': 'src/components/Admin/AgentConfigs/AgentConfigsPage.tsx',
   '/quotes': 'src/modules/quotes/pages/QuotesPage.tsx',
   '/finance': 'src/modules/finance/routes.ts',
@@ -52,6 +53,8 @@ function tabValues(file: string): Set<string> {
     ...[...src.matchAll(/<TabsTrigger\s+value="([^"]+)"/g)].map((m) => m[1]),
     // A tab strip built from a constant map declares its values as object properties.
     ...[...src.matchAll(/^\s{2}\w+:\s*'([a-z_]+)',$/gm)].map((m) => m[1]),
+    // …and one built from a section registry declares them as each row's `value`.
+    ...[...src.matchAll(/\bvalue: '([a-z0-9-]+)'/g)].map((m) => m[1]),
   ]);
 }
 
@@ -77,12 +80,9 @@ describe('the destination registry points at real places', () => {
     }
   });
 
-  // `?section=` used to be checked here, against ONE hardcoded rail — the channels rail was the
-  // only one with sections when it was written. There are four now (schedule, social-accounts,
-  // keys, finance settings), and a check that resolves every section against the wrong rail is
-  // worse than none: it convicts correct links and vouches for nothing. Moved and generalised to
-  // tests/unit/profileSectionLinks.test.ts, which resolves each link against the rail its OWN tab
-  // renders and covers `APP_DESTINATIONS` among the other section links in the codebase.
+  // `?section=` is checked in tests/unit/profileSectionLinks.test.ts, which resolves each link
+  // against the rail its OWN tab renders — there are five now, and one hardcoded rail convicted
+  // correct links while vouching for nothing.
 
   it('every breadcrumb names at least two segments', () => {
     // A one-word destination ("Inbox") cannot be linkified without swallowing the word wherever
