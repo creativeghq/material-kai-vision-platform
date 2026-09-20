@@ -65,7 +65,7 @@ export async function handleLlmMentions(req: Request, body: any): Promise<Respon
   const db = createClient(supabaseUrl(), supabaseServiceKey());
   const { data: site } = await db
     .from('user_websites')
-    .select('id, workspace_id, website_url, display_name')
+    .select('id, workspace_id, url, display_name')
     .eq('id', websiteId)
     .maybeSingle();
   if (!site || !(await userCanAccessWorkspace(db, auth.userId, site.workspace_id))) {
@@ -74,7 +74,7 @@ export async function handleLlmMentions(req: Request, body: any): Promise<Respon
   const ent = await resolveAndAssertSeoEntitled(db, auth.userId);
   if (ent.response) return ent.response;
 
-  const domain = host(site.website_url ?? '');
+  const domain = host(site.url ?? '');
   const keyword: string = (body?.keyword || site.display_name || domain.split('.')[0] || '').trim();
   const language = (body?.language_code || 'en').toLowerCase();
   const country = (body?.country_code || 'US').toUpperCase();
