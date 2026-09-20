@@ -10,8 +10,7 @@ import {
   type AiEngine, type AiRate, type AiRival,
 } from './aiCitations';
 
-/** One answer engine as its own column. It leads with the rate that can be UNKNOWN,
- *  so an engine that never browsed says so where the figure would be. */
+/** One answer engine as its own column, leading with the rate that can be UNKNOWN. */
 
 /** The headline rate, or the stated reason there is none. */
 const Rate: React.FC<{ rate: AiRate; label: string; help: string; big?: boolean }> = ({
@@ -111,6 +110,17 @@ const Instead: React.FC<{ rivals: AiRival[]; model: string; sourced: boolean }> 
     </div>
   );
 };
+
+/** Literal classes: Tailwind's scanner reads source text, so a built-up class emits nothing. */
+export const ENGINE_GRID_COLS: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-1 sm:grid-cols-2',
+  3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+  4: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4',
+};
+
+export const engineGridCols = (n: number): string =>
+  ENGINE_GRID_COLS[Math.min(Math.max(n, 1), 4)] ?? ENGINE_GRID_COLS[4];
 
 export const AiEngineCard: React.FC<{
   engine: AiEngine;

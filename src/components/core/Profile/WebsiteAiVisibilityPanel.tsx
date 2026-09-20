@@ -29,7 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/utils/datetime';
-import { AiEngineCard } from './seo/AiEngineCard';
+import { AiEngineCard, engineGridCols } from './seo/AiEngineCard';
 import {
   VERDICT_BADGE, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
 } from './seo/aiCitations';
@@ -467,7 +467,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       </Card>
 
       {engines.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className={cn('grid gap-3', engineGridCols(engines.length))}>
           {engines.map((e) => (
             <AiEngineCard key={e.model} engine={e} citedInstead={citedInstead} namedInstead={namedInstead} />
           ))}
