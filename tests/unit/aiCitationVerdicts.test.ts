@@ -91,6 +91,12 @@ describe('formatting', () => {
     expect(modelLabel('llama-4-maverick')).toBe('llama-4-maverick');
   });
 
+  it('the same engine reached two ways reads as two surfaces, never one rate', () => {
+    expect(modelLabel('dfs:chat_gpt')).toBe('ChatGPT · via DataForSEO');
+    expect(modelLabel('dfs:gemini')).toBe('Gemini · via DataForSEO');
+    expect(modelLabel('dfs:chat_gpt')).not.toBe(modelLabel('gpt-5-mini'));
+  });
+
   it('a source reads as its host', () => {
     expect(displayHost('https://www.peptidesciences.com/tesamorelin?x=1')).toBe('peptidesciences.com');
     expect(displayHost('not a url')).toBe('not a url');

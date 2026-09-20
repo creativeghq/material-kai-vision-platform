@@ -53,11 +53,23 @@ export interface AiCitationReport {
   named_instead: AiRival[];
 }
 
+/** Answered through DataForSEO rather than the vendor API — a different retrieval
+ *  stack and a stated country, so it is a separate surface, never the same rate. */
+export const DFS_PREFIX = 'dfs:';
+
 /** A model's own display name. Never invent a vendor label we cannot verify. */
 export function modelLabel(model: string): string {
+  if (model.startsWith(DFS_PREFIX)) {
+    const family = model.slice(DFS_PREFIX.length);
+    return `${engineName(family)} · via DataForSEO`;
+  }
+  return engineName(model);
+}
+
+function engineName(model: string): string {
   if (model.startsWith('claude')) return 'Claude';
-  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3')) return 'ChatGPT';
-  if (model.startsWith('sonar')) return 'Perplexity';
+  if (model.startsWith('chat_gpt') || model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3')) return 'ChatGPT';
+  if (model.startsWith('sonar') || model.startsWith('perplexity')) return 'Perplexity';
   if (model.startsWith('gemini')) return 'Gemini';
   return model;
 }
