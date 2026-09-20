@@ -58,7 +58,9 @@ const TASKS: Record<string, TaskSpec> = {
   },
   'mention-probe': {
     module: 'mention-monitoring',
-    path: () => '/api/v1/mention-monitoring/cron-probe-llm?limit=25&min_age_days=7',
+    // 6, not 7: probes stamped at 03:01 are a minute short of a 7d gate at 03:00, so a
+    // weekly cadence slips to 8 days, then 9, while the cron keeps reporting success.
+    path: () => '/api/v1/mention-monitoring/cron-probe-llm?limit=25&min_age_days=6',
   },
   'job-refresh': {
     module: 'job-research',
@@ -74,11 +76,9 @@ const TASKS: Record<string, TaskSpec> = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-// Logged per TASK, not as one flat 'monitoring-cron'. This function serves five tasks; under
-// a single name their outcomes are indistinguishable in api_usage_logs, and the
-// module_disabled skip below (a 200) diluted the real 5xx rate to ~74% — under every
-// threshold ops.silent_zero applies, which is how a dead feature stayed invisible for three
-// months. Per-task paths let each be judged on its own.
+// Logged per TASK, not as one flat 'monitoring-cron'. Under a single name the five tasks'
+// outcomes are indistinguishable, and the module_disabled skip (a 200) diluted the real 5xx
+// rate to ~74% — under every threshold ops.silent_zero applies.
 Deno.serve(withApiLogging(
   (req) => {
     const t = new URL(req.url).searchParams.get('task');
