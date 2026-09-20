@@ -19,8 +19,26 @@ export interface CrmCategory {
   color_hex: string | null;
   icon: string | null;
   is_active: boolean;
+  material_category_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface SupplyCategoryOption {
+  id: string;
+  name: string;
+  color_hex: string | null;
+  material_category_id: string | null;
+  category_key: string | null;
+  sort_order: number | null;
+}
+
+interface MaterialCategoryRow { id: string; category_key: string; sort_order: number | null }
+
+export interface SupplyCategoryList {
+  options: SupplyCategoryOption[];
+  /** Product categories with no CRM category yet — the sync has not been run. */
+  unsynced: number;
 }
 
 export interface CrmCategorySummary extends CrmCategory {
@@ -286,62 +304,6 @@ class CrmCategoriesService {
     }
   }
 
-  async setMembershipsForContact(contactId: string, manualCategoryIds: string[]): Promise<void> {
-    await this.assertHandAssignable(manualCategoryIds);
-    const { data: existing } = await supabase
-      .from('crm_category_members')
-      .select('id, category_id, source')
-      .eq('crm_contact_id', contactId)
-      .eq('source', 'manual');
-    const existingIds = new Set((existing || []).map((r: any) => r.category_id));
-    const wantIds = new Set(manualCategoryIds);
-    const toAdd = [...wantIds].filter((id) => !existingIds.has(id));
-    const toRemove = (existing || []).filter((r: any) => !wantIds.has(r.category_id));
-    if (toAdd.length > 0) {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error: addError } = await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
-        category_id: cid,
-        member_kind: 'crm_contact' as CrmCategoryMemberKind,
-        crm_contact_id: contactId,
-        source: 'manual',
-        added_by: user?.id ?? null,
-      })));
-      if (addError) throw addError;
-    }
-    if (toRemove.length > 0) {
-      const { error: removeError } = await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
-      if (removeError) throw removeError;
-    }
-  }
-
-  async setMembershipsForCompany(companyId: string, manualCategoryIds: string[]): Promise<void> {
-    await this.assertHandAssignable(manualCategoryIds);
-    const { data: existing } = await supabase
-      .from('crm_category_members')
-      .select('id, category_id, source')
-      .eq('crm_company_id', companyId)
-      .eq('source', 'manual');
-    const existingIds = new Set((existing || []).map((r: any) => r.category_id));
-    const wantIds = new Set(manualCategoryIds);
-    const toAdd = [...wantIds].filter((id) => !existingIds.has(id));
-    const toRemove = (existing || []).filter((r: any) => !wantIds.has(r.category_id));
-    if (toAdd.length > 0) {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error: addError } = await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
-        category_id: cid,
-        member_kind: 'crm_company' as CrmCategoryMemberKind,
-        crm_company_id: companyId,
-        source: 'manual',
-        added_by: user?.id ?? null,
-      })));
-      if (addError) throw addError;
-    }
-    if (toRemove.length > 0) {
-      const { error: removeError } = await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
-      if (removeError) throw removeError;
-    }
-  }
-
   /** List categories of a given kind (e.g. 'industry') for a scoped picker. */
   async listByKind(kind: CrmCategoryKind): Promise<CrmCategory[]> {
     const { data, error } = await supabase
@@ -355,30 +317,37 @@ class CrmCategoriesService {
   }
 
   /**
-   * Reconcile a company's manual memberships **within a bounded set of categories**
-   * (`scopeIds`) to exactly `selectedIds`. Memberships outside the scope (e.g. other
-   * manual lists) are left untouched — unlike `setMembershipsForCompany`, which
-   * replaces ALL manual memberships. Used by the per-kind pickers (industry) so they
-   * don't clobber unrelated category assignments.
+   * Reconcile ONE party's manual memberships within `scopeIds` only, so two pickers on one
+   * page cannot clobber each other. Memberships outside the scope are left untouched.
    */
-  async setCompanyMembershipsWithinScope(companyId: string, scopeIds: string[], selectedIds: string[]): Promise<void> {
+  private async setMembershipsWithinScope(
+    target: { crm_company_id: string } | { crm_contact_id: string },
+    scopeIds: string[],
+    selectedIds: string[],
+  ): Promise<void> {
+    const isCompany = 'crm_company_id' in target;
+    const column = isCompany ? 'crm_company_id' : 'crm_contact_id';
+    const targetId = isCompany ? target.crm_company_id : target.crm_contact_id;
     const scope = new Set(scopeIds);
     const want = new Set(selectedIds.filter((id) => scope.has(id)));
-    const { data: existing } = await supabase
+    const { data: existing, error: readError } = await supabase
       .from('crm_category_members')
       .select('id, category_id, source')
-      .eq('crm_company_id', companyId)
+      .eq(column, targetId)
       .eq('source', 'manual')
       .in('category_id', scopeIds.length ? scopeIds : ['00000000-0000-0000-0000-000000000000']);
+    // A failed read must not fall through: `existing` empty re-inserts everything, deletes nothing.
+    if (readError) throw readError;
     const existingIds = new Set((existing || []).map((r: any) => r.category_id));
     const toAdd = [...want].filter((id) => !existingIds.has(id));
     const toRemove = (existing || []).filter((r: any) => !want.has(r.category_id));
     if (toAdd.length > 0) {
+      await this.assertHandAssignable(toAdd);
       const { data: { user } } = await supabase.auth.getUser();
       const { error: addError } = await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
         category_id: cid,
-        member_kind: 'crm_company' as CrmCategoryMemberKind,
-        crm_company_id: companyId,
+        member_kind: (isCompany ? 'crm_company' : 'crm_contact') as CrmCategoryMemberKind,
+        [column]: targetId,
         source: 'manual',
         added_by: user?.id ?? null,
       })));
@@ -388,6 +357,93 @@ class CrmCategoriesService {
       const { error: removeError } = await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
       if (removeError) throw removeError;
     }
+  }
+
+  async setCompanyMembershipsWithinScope(companyId: string, scopeIds: string[], selectedIds: string[]): Promise<void> {
+    await this.setMembershipsWithinScope({ crm_company_id: companyId }, scopeIds, selectedIds);
+  }
+
+  async setContactMembershipsWithinScope(contactId: string, scopeIds: string[], selectedIds: string[]): Promise<void> {
+    await this.setMembershipsWithinScope({ crm_contact_id: contactId }, scopeIds, selectedIds);
+  }
+
+  async listSupplyCategories(): Promise<SupplyCategoryList> {
+    const [{ data: cats, error: catError }, { data: mats, error: matError }] = await Promise.all([
+      supabase.from('crm_categories')
+        .select('id, name, color_hex, material_category_id')
+        .eq('kind', 'industry').eq('is_active', true),
+      supabase.from('material_categories')
+        .select('id, category_key, name, display_name, sort_order')
+        .eq('is_active', true),
+    ]);
+    if (catError) throw catError;
+    if (matError) throw matError;
+
+    const matRows: MaterialCategoryRow[] = ((mats ?? []) as any[]).map((m) => ({
+      id: m.id as string,
+      category_key: m.category_key as string,
+      sort_order: (m.sort_order ?? null) as number | null,
+    }));
+    const matById = new Map<string, MaterialCategoryRow>(matRows.map((m) => [m.id, m]));
+    const linked = new Set<string>();
+    const options: SupplyCategoryOption[] = ((cats ?? []) as any[]).map((c) => {
+      const mat = c.material_category_id ? matById.get(c.material_category_id) : undefined;
+      if (mat) linked.add(mat.id);
+      return {
+        id: c.id,
+        name: c.name,
+        color_hex: c.color_hex ?? null,
+        material_category_id: c.material_category_id ?? null,
+        category_key: mat?.category_key ?? null,
+        sort_order: mat?.sort_order ?? null,
+      };
+    });
+    options.sort((a, b) => {
+      if (!!a.material_category_id !== !!b.material_category_id) return a.material_category_id ? -1 : 1;
+      const order = (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9);
+      return order !== 0 ? order : a.name.localeCompare(b.name);
+    });
+    return { options, unsynced: matRows.filter((m) => !linked.has(m.id)).length };
+  }
+
+  async listMaterialCategories(): Promise<Array<{ id: string; name: string; category_key: string }>> {
+    const { data, error } = await supabase
+      .from('material_categories')
+      .select('id, category_key, name, display_name, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true, nullsFirst: false });
+    if (error) throw error;
+    return (data || []).map((m: any) => ({
+      id: m.id,
+      name: m.display_name || m.name,
+      category_key: m.category_key,
+    }));
+  }
+
+  async syncSupplyCategories(): Promise<Array<{ out_category_id: string; out_slug: string; out_name: string | null; out_action: string }>> {
+    const { data, error } = await supabase.rpc('crm_sync_supply_categories' as any);
+    if (error) throw error;
+    return (data || []) as any;
+  }
+
+  async setMaterialMatch(categoryId: string, materialCategoryId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('crm_categories')
+      .update({ material_category_id: materialCategoryId } as any)
+      .eq('id', categoryId);
+    if (error) throw error;
+  }
+
+  /** Which categories this supplier already has products in. Empty = no products. */
+  async supplyEvidenceForCompany(companyId: string): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('category_id')
+      .eq('supplier_company_id', companyId)
+      .not('category_id', 'is', null)
+      .limit(2000);
+    if (error) throw error;
+    return new Set((data || []).map((r: any) => r.category_id as string));
   }
 
   /** Resolve category members to email recipients, scoped to the caller's workspace (membership-guarded

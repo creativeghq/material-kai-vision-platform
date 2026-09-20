@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, MessageCircle, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, MessageCircle, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home, Package } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -14,6 +14,7 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
 import { messagingService } from '@/modules/messaging/services/messagingService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
+import { SupplyCategorySelect } from '@/components/business/crm/SupplyCategorySelect';
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
 import { type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
@@ -997,6 +998,19 @@ export const ContactDetailPage: React.FC = () => {
                             <CategoryAssignmentPicker bare target={{ kind: 'contact', id: contact.id }} />
                           </CardContent>
                         </Card>
+
+                        <Card className="mt-4">
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground"/>What they deal in</CardTitle>
+                            <CardDescription>
+                              The product categories this contact supplies or works with — the same
+                              categories products are filed under on import.
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <SupplyCategorySelect target={{ kind: 'contact', id: contact.id }} />
+                          </CardContent>
+                        </Card>
                       </TabsContent>
                     )}
 
@@ -1024,11 +1038,13 @@ export const ContactDetailPage: React.FC = () => {
                             </Button>
                           </div>
                         ) : (
-                          <div className="space-y-2">
-                            <Button size="sm" onClick={() => setShowInviteDialog(true)} className="w-full" disabled={!contact.email && !isNew}>
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" onClick={() => setShowInviteDialog(true)} className="shrink-0" disabled={!contact.email && !isNew}>
                               <UserPlus className="h-3.5 w-3.5 mr-2" /> Invite
                             </Button>
-                            <UserSearchDropdown onSelect={handleLinkUser} placeholder="…or link an existing user" selectedUserId={null} />
+                            <div className="flex-1 min-w-0">
+                              <UserSearchDropdown onSelect={handleLinkUser} placeholder="…or link an existing user" selectedUserId={null} />
+                            </div>
                           </div>
                         )}
                         </CardContent>

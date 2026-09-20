@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Tags, Plus, Trash2, Loader2, RefreshCw, Users, Building2, User as UserIcon,
-  Lock, Search, X,
+  Lock, Search, X, Package,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
@@ -83,18 +83,26 @@ export const CategoriesPanel: React.FC = () => {
   const [createColor, setCreateColor] = useState('#22c55e');
   const [createKind, setCreateKind] = useState<'manual' | 'industry' | 'lead_status' | 'lead_source'>('manual');
 
+  const [materialCats, setMaterialCats] = useState<Array<{ id: string; name: string; category_key: string }>>([]);
+
   const [editing, setEditing] = useState<CrmCategorySummary | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editColor, setEditColor] = useState('');
   const [editActive, setEditActive] = useState(true);
+  const [editMaterialId, setEditMaterialId] = useState<string | null>(null);
 
   const [membersOpen, setMembersOpen] = useState<CrmCategorySummary | null>(null);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      setCategories(await crmCategoriesService.list());
+      const [list, mats] = await Promise.all([
+        crmCategoriesService.list(),
+        crmCategoriesService.listMaterialCategories(),
+      ]);
+      setCategories(list);
+      setMaterialCats(mats);
     } catch (err) {
       toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to load', variant: 'destructive' });
     } finally {
@@ -105,6 +113,11 @@ export const CategoriesPanel: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const { values, setValues, filtered, previewCount } = useFilters(categories, CRM_CATEGORY_FILTERS);
+
+  const materialLabel = useCallback(
+    (id: string) => materialCats.find((m) => m.id === id)?.name ?? 'Product category (inactive)',
+    [materialCats],
+  );
 
   const grouped = useMemo(() => {
     const out: Record<CrmCategoryKind, CrmCategorySummary[]> = {
@@ -128,6 +141,23 @@ export const CategoriesPanel: React.FC = () => {
       const inserts = result.reduce((acc, r) => acc + r.out_inserts, 0);
       const deletes = result.reduce((acc, r) => acc + r.out_deletes, 0);
       toast({ title: 'Resync complete', description: `+${inserts} added · −${deletes} removed across the derived (access role / employment / professional type) categories.` });
+      load();
+    } catch (err) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+    } finally { setBusyAction(null); }
+  };
+
+  const handleSyncSupply = async () => {
+    setBusyAction('supply');
+    try {
+      const result = await crmCategoriesService.syncSupplyCategories();
+      const created = result.filter((r) => r.out_action === 'created').length;
+      const matched = result.filter((r) => r.out_action === 'matched').length;
+      const retired = result.filter((r) => r.out_action === 'retired').length;
+      toast({
+        title: 'Product categories matched',
+        description: `${created} added · ${matched} existing matched · ${retired} retired. Members are never dropped.`,
+      });
       load();
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
@@ -159,12 +189,16 @@ export const CategoriesPanel: React.FC = () => {
     setEditDescription(c.description || '');
     setEditColor(c.color_hex || '');
     setEditActive(c.is_active);
+    setEditMaterialId(c.material_category_id ?? null);
   };
 
   const handleEditSave = async () => {
     if (!editing) return;
     setBusyAction('edit');
     try {
+      if (editing.kind === 'industry' && editMaterialId !== (editing.material_category_id ?? null)) {
+        await crmCategoriesService.setMaterialMatch(editing.id, editMaterialId);
+      }
       await crmCategoriesService.update(editing.id, {
         name: editName.trim(),
         description: editDescription.trim() || null as any,
@@ -210,6 +244,10 @@ export const CategoriesPanel: React.FC = () => {
             {busyAction === 'resync' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Resync auto
           </Button>
+          <Button variant="outline" size="sm" onClick={handleSyncSupply} disabled={busyAction === 'supply'} title="Bring the product-import categories in as Industry lists, matching the ones that already exist">
+            {busyAction === 'supply' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
+            Match product categories
+          </Button>
           <Button size="sm" onClick={() => setShowCreate(true)}>
             <Plus className="mr-2 h-4 w-4" /> New category
           </Button>
@@ -251,6 +289,12 @@ export const CategoriesPanel: React.FC = () => {
                     {AUTO_KINDS.includes(kind) && (
                       <span className="text-xs text-muted-foreground">— derived from {AUTO_SOURCE[kind]}</span>
                     )}
+                    {kind === 'industry' && (
+                      <span className="text-xs text-muted-foreground">
+                        — what a party deals in. Matched to the product-import categories, so a supplier
+                        and the products filed against it use the same word.
+                      </span>
+                    )}
                     {VOCAB_KINDS.includes(kind) && (
                       <span className="text-xs text-muted-foreground">— pick-one options for the contact {kind === 'lead_status' ? 'Lead Status' : 'Lead Source'} dropdown</span>
                     )}
@@ -271,6 +315,19 @@ export const CategoriesPanel: React.FC = () => {
                               <Badge variant="outline" className="text-[10px] py-0">{KIND_LABELS[c.kind]}</Badge>
                             </div>
                           </div>
+                          {c.kind === 'industry' && (
+                            c.material_category_id ? (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Package className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{materialLabel(c.material_category_id)}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+                                <Package className="h-3 w-3 shrink-0" />
+                                <span>No product category — Edit to match one</span>
+                              </div>
+                            )
+                          )}
                           {c.description && <p className="text-xs text-muted-foreground line-clamp-2">{c.description}</p>}
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex gap-3 text-muted-foreground">
@@ -379,6 +436,32 @@ export const CategoriesPanel: React.FC = () => {
                 <Checkbox id="active" checked={editActive} onCheckedChange={(v) => setEditActive(v === true)} />
                 <Label htmlFor="active" className="cursor-pointer">Active</Label>
               </div>
+              {editing.kind === 'industry' && (
+                <div className="space-y-1 pt-2 border-t">
+                  <Label>Product category</Label>
+                  <Select
+                    value={editMaterialId ?? '__none'}
+                    onValueChange={(v) => setEditMaterialId(v === '__none' ? null : v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Not matched" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Not matched</SelectItem>
+                      {materialCats
+                        .filter((m) => m.id === editMaterialId
+                          || !categories.some((c) => c.material_category_id === m.id))
+                        .map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Which product-import category this industry means. Matching it is what lets a
+                    supplier list and the catalogue agree; leave it unmatched for an industry the
+                    catalogue has no word for (haulage, scaffolding hire). Already-matched
+                    categories are not offered twice.
+                  </p>
+                </div>
+              )}
               {AUTO_KINDS.includes(editing.kind) && (
                 <p className="text-xs text-muted-foreground">
                   Derived from {AUTO_SOURCE[editing.kind]} — value "{editing.source_value}". You can rename, recolour, toggle Active, and add/remove members freely; auto members just re-sync on "Resync auto". (Only the slug/kind/source stay fixed so the sync keeps matching.)

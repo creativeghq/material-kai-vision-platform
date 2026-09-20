@@ -23,13 +23,12 @@ describe('#353 CRM-22 — the auto kinds are enforced, not just hidden', () => {
   });
 
   it('every membership write checks first', () => {
-    // All four, not just `addMember`: the three `setMembershipsFor*` methods each take a raw
-    // list of category ids and reconcile it, so any one of them could write the row.
+    // Every method that can write the row, not just `addMember`. setMembershipsWithinScope is
+    // the contact/company path and checks `toAdd`; a removal-only toggle has nothing to refuse.
     for (const method of [
       'async addMember(',
       'async setMembershipsForUser(',
-      'async setMembershipsForContact(',
-      'async setMembershipsForCompany(',
+      'async setMembershipsWithinScope(',
     ]) {
       const i = src.indexOf(method);
       expect(i, `${method} not found`).toBeGreaterThan(-1);

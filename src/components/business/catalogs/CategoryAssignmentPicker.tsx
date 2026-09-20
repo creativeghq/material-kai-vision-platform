@@ -87,12 +87,17 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, b
         // Only manual memberships are hand-managed for users; auto rows stay put.
         const manualIds = categories.filter((c) => c.kind === 'manual').map((c) => c.id);
         await crmCategoriesService.setMembershipsForUser(target.id, manualIds.filter((id) => next.has(id)));
-      } else if (target.kind === 'contact') {
-        // Contacts/companies have no auto memberships — every assignment is manual,
-        // so any kind can be freely toggled. Persist the full selection.
-        await crmCategoriesService.setMembershipsForContact(target.id, [...next]);
       } else {
-        await crmCategoriesService.setMembershipsForCompany(target.id, [...next]);
+        // ONLY what this picker renders: a full replace deletes what the supply picker just wrote.
+        const scopeIds = categories
+          .filter((c) => GROUPS.some((g) => g.key === c.kind))
+          .map((c) => c.id);
+        const selected = scopeIds.filter((id) => next.has(id));
+        if (target.kind === 'contact') {
+          await crmCategoriesService.setContactMembershipsWithinScope(target.id, scopeIds, selected);
+        } else {
+          await crmCategoriesService.setCompanyMembershipsWithinScope(target.id, scopeIds, selected);
+        }
       }
     } catch (err) {
       toast({ title: 'Save failed', description: getErrorMessage(err), variant: 'destructive' });

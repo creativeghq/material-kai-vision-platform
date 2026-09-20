@@ -52,6 +52,7 @@ import { GoogleBusinessCard } from '@/modules/crm/components/GoogleBusinessCard'
 import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
+import { SupplyCategorySelect } from '@/components/business/crm/SupplyCategorySelect';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
@@ -1015,6 +1016,22 @@ export const CompanyDetailPage: React.FC = () => {
                           </CardHeader>
                           <CardContent>
                             <CategoryAssignmentPicker bare target={{ kind: 'company', id: company.id }}/>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="mt-4">
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground"/>What they deal in</CardTitle>
+                            <CardDescription>
+                              The product categories this company supplies — the same categories
+                              products are filed under on import. Doubles as the Industry field.
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <SupplyCategorySelect
+                              target={{ kind: 'company', id: company.id }}
+                              onChange={(names) => patchInline({ industry: names.join(', ') })}
+                            />
                           </CardContent>
                         </Card>
                       </TabsContent>

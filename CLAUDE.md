@@ -533,6 +533,26 @@ that slug MUST be in `ROLE_MODULE_SLUGS` or the invite form has no `useModule` c
 lists of kind `role` / `employment` are DERIVED from those by `crm_resync_auto_category_members`. Never create a
 `manual` category that restates one of them.
 
+## A CRM industry IS a product-import category, matched — not a second list of the same words
+"What a supplier deals in" and "what a product is filed under on import" are one vocabulary, and
+before 2026-09-20 they were two: nine hand-typed `industry` rows beside the 22 `material_categories`,
+free-text-created from the picker, which is how "Sanity" and "Transporation" got memberships.
+`crm_categories.material_category_id` is the match; `crm_sync_supply_categories()` reconciles it and
+ADOPTS an existing row rather than creating a twin next to it (adopting keeps the members — creating
+a twin silently splits "who supplies tiles" in half). An unmatched industry is legitimate, not a
+backlog: haulage and scaffolding hire are things a party does that the catalogue has no word for, and
+they stay pickable under "Other". `SupplyCategorySelect` is the ONE picker (contacts + companies) and
+reads the registry at runtime — it must never hold a category name of its own, or a category added on
+import is an option that silently does not exist. Two more silent ones: **`crm_categories_summary`
+names its columns one by one**, so a column added to `crm_categories` is `undefined` through the view
+and every industry reads as unmatched with nothing raising; and the industry scope has TWO writers
+(`IndustrySelect`, `SupplyCategorySelect`) which both mirror `crm_companies.industry` — a third that
+skips the mirror leaves the company table showing the previous answer indefinitely. Write through
+`set{Company,Contact}MembershipsWithinScope`, NEVER `setMembershipsFor*` — that replaces *all* manual
+memberships from whatever list the CALLER loaded, and the contact Categories tab now holds two pickers,
+so the second to write deletes what the first just saved from a copy taken before it. Guarded by
+[tests/unit/supplyCategories.test.ts](tests/unit/supplyCategories.test.ts).
+
 ## Embeddings & VECS — footguns
 **VECS is the single source of truth for image embeddings.** All vectors are halfvec.
 

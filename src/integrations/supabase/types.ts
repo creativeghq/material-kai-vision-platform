@@ -4122,6 +4122,7 @@ export type Database = {
           id: string
           is_active: boolean
           kind: Database["public"]["Enums"]["crm_category_kind"]
+          material_category_id: string | null
           name: string
           slug: string
           source_value: string | null
@@ -4136,6 +4137,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           kind?: Database["public"]["Enums"]["crm_category_kind"]
+          material_category_id?: string | null
           name: string
           slug: string
           source_value?: string | null
@@ -4150,12 +4152,21 @@ export type Database = {
           id?: string
           is_active?: boolean
           kind?: Database["public"]["Enums"]["crm_category_kind"]
+          material_category_id?: string | null
           name?: string
           slug?: string
           source_value?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "crm_categories_material_category_id_fkey"
+            columns: ["material_category_id"]
+            isOneToOne: false
+            referencedRelation: "material_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       crm_category_members: {
         Row: {
@@ -34002,6 +34013,7 @@ export type Database = {
           id: string | null
           is_active: boolean | null
           kind: Database["public"]["Enums"]["crm_category_kind"] | null
+          material_category_id: string | null
           name: string | null
           slug: string | null
           source_value: string | null
