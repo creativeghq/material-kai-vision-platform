@@ -8,6 +8,7 @@
     "build": "npm run build:embed && vite build",
     "start": "vite preview",
     "lint": "eslint . --max-warnings 0",
+    "lint:fast": "eslint . --max-warnings 0 --cache --cache-strategy content --cache-location node_modules/.cache/eslint/",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:edge": "node scripts/check-edge-functions.mjs",
     "smoke:agent-chat": "deno run -A --node-modules-dir=auto --config supabase/functions/agent-chat/deno.json scripts/smoke-agent-chat-runtime.ts",

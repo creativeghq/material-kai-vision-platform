@@ -14,6 +14,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Reuse the previous run's dependency graph. tsc tracks file versions itself, so an
+       incremental run is as sound as a cold one; the cache lives under node_modules so a
+       clean checkout (CI) pays the cold cost once and nothing is committed. */
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsc/main.tsbuildinfo",
+
     /* Linting */
     "strict": false,
     "noUnusedLocals": false,

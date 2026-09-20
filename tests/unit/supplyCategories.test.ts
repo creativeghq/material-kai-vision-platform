@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
-import { blankComments } from '../helpers/stripComments';
-
-const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace(/\r\n/g, '\n');
+import { blankedSource } from '../helpers/sourceIndex';
 
 const PICKER = 'src/components/business/crm/SupplyCategorySelect.tsx';
 const SERVICE = 'src/services/crmCategoriesService.ts';
@@ -13,7 +9,7 @@ const ASSIGNMENT = 'src/components/business/catalogs/CategoryAssignmentPicker.ts
 const CONTACT_PAGE = 'src/modules/crm/pages/ContactDetailPage.tsx';
 const COMPANY_PAGE = 'src/modules/crm/pages/CompanyDetailPage.tsx';
 
-const code = (p: string) => blankComments(read(p));
+const code = blankedSource;
 
 describe('the supply vocabulary comes from the product-import registry', () => {
   it('the picker names no product category of its own', () => {
