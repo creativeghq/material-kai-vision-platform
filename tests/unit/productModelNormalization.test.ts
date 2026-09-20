@@ -21,13 +21,23 @@ beforeAll(async () => {
   scene = gltf.scene;
 });
 
-/** Bounding box after applying the transform the way the <group> does. */
+/** Bounding box after applying the transform the way the <group> does.
+ *
+ * Measures a CLONE. `normalizeModelTransform` reads world matrices and `setScalar`
+ * replaces rather than composes, so running this twice over one shared scene
+ * renormalises an already-normalised model: the second call sees maxDim = TARGET_SIZE,
+ * derives scale 1, and clobbers the real factor — leaving the raw model on screen.
+ * The viewer calls it once per load, so that is the contract worth testing. */
 function placedBox(): Box3 {
-  const { scale, offset } = normalizeModelTransform(scene);
-  scene.scale.setScalar(scale);
-  scene.position.copy(offset);
-  scene.updateMatrixWorld(true);
-  return new Box3().setFromObject(scene);
+  const model = scene.clone(true);
+  model.position.set(0, 0, 0);
+  model.scale.setScalar(1);
+  model.updateMatrixWorld(true);
+  const { scale, offset } = normalizeModelTransform(model);
+  model.scale.setScalar(scale);
+  model.position.copy(offset);
+  model.updateMatrixWorld(true);
+  return new Box3().setFromObject(model);
 }
 
 describe('product 3D model normalization', () => {
