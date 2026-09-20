@@ -3,11 +3,12 @@ import { spawn } from 'node:child_process';
 const TASKS = {
   lint: ['run', 'lint'],
   typecheck: ['run', 'typecheck'],
+  a11y: ['run', 'lint:a11y'],
   test: ['test'],
 };
 
 // vitest runs one worker per core; pairing it with anything else times its worker RPC out.
-const PHASES = [['lint', 'typecheck'], ['test']];
+const PHASES = [['lint', 'typecheck', 'a11y'], ['test']];
 
 const picked = process.argv.slice(2).filter((a) => a in TASKS);
 const wanted = new Set(picked.length ? picked : Object.keys(TASKS));

@@ -464,10 +464,28 @@ jobs:
       # baseline + declared non-a11y debt — and pinned by a11yRatchet.test.ts, so
       # it cannot be raised to go green. When you clear some, lower it there.
       - run: npm run lint
-      # The a11y ratchet (per-rule counts in .github/a11y-baseline.json, fails when
-      # one RISES). It shipped 2026-08-01 but was never wired into CI, so for its
-      # first day it gated nothing while its warnings sat inside the `npm run lint`
-      # budget above and turned this job red instead.
+
+  # ────────────────────────────────────────────────────────────────────
+  # a11y: the a11y ratchet (per-rule counts in .github/a11y-baseline.json, fails when one
+  # RISES). It shipped 2026-08-01 but was never wired into CI, so for its first day it gated
+  # nothing while its warnings sat inside the `npm run lint` budget and turned that job red
+  # instead. Split out of `lint` on 2026-09-20 for wall-clock: the two ran serially there
+  # (lint 38s + a11y 38s) in front of every deploy, and they are independent.
+  #
+  # It must stay in BOTH deploy jobs' `needs:` — the comment on deploy-frontend explains what
+  # a gate nothing depends on is worth, and this is the second check to be split out of a job
+  # that way. A ratchet that runs and is ignored is a report, not a gate.
+  # ────────────────────────────────────────────────────────────────────
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run gen:all
       - run: npm run lint:a11y
 
   # ────────────────────────────────────────────────────────────────────
@@ -478,7 +496,7 @@ jobs:
     # and NOTHING depended on it, so a red suite still shipped to production and the
     # failure was a report rather than a gate. It gates now — and `lint`, which was split
     # out of it, must stay listed here for the same reason.
-    needs: [changes, typecheck, unit-tests, lint]
+    needs: [changes, typecheck, unit-tests, lint, a11y]
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # One build+upload against the Vercel project at a time; newest push wins. A cancelled
@@ -614,7 +632,7 @@ jobs:
   # Runs in parallel with the frontend job. Skipped if no functions changed.
   # ────────────────────────────────────────────────────────────────────
   deploy-functions:
-    needs: [changes, unit-tests, lint]
+    needs: [changes, unit-tests, lint, a11y]
     # One condition, because there is now one answer. The count already folds in the manual /
     # forced dispatch (Case 1 fills the list with every function) and the missing marker (Case 2
     # does the same), so the three-way `||` this replaced was not belt-and-braces — it was a
