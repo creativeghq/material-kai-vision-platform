@@ -68,11 +68,8 @@ const userToken = smoke ? null : await mintUserToken();
 async function call(body, timeoutMs = 150_000) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/agent-eval`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${userToken ?? SERVICE_KEY}`,
-      ...(userToken ? { apikey: SERVICE_KEY } : {}),
-      'Content-Type': 'application/json',
-    },
+    // No apikey header: authenticate() matches the service key on it BEFORE validating the bearer.
+    headers: { Authorization: `Bearer ${userToken ?? SERVICE_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(
       userToken ? { workspace_id: workspaceId, ...body } : { user_id: userId, workspace_id: workspaceId, ...body },
     ),
@@ -107,11 +104,14 @@ for (let r = 1; r <= repeats; r++) {
         action: 'run', case_key: c.key, batch_id: batchId, repeat_index: r,
         ...(model ? { model_override: model } : {}),
       });
+      if (!smoke && !String(out.session ?? '').startsWith('user')) {
+        console.error(`ABORT: asked to run as the user, got session "${out.session}". Stopping before the batch is spent.`);
+        process.exit(3);
+      }
       const mark = out.passed ? 'PASS' : `FAIL ${out.failure_class ?? '?'}`;
       console.error(`  [${r}/${repeats}] ${c.key.padEnd(34)} ${mark.padEnd(32)} ${Math.round((Date.now() - t0) / 1000)}s ${out.credits ?? '?'}cr`);
     } catch (err) {
-      // The harness itself failed to get a verdict. There is no run row for this attempt, so
-      // the summary's `cases_missing` / attempts show it — it is not silently a pass.
+      // No run row for this attempt, so `cases_missing`/attempts show it — never silently a pass.
       console.error(`  [${r}/${repeats}] ${c.key.padEnd(34)} HARNESS ERROR ${err.message}`);
     }
   }
