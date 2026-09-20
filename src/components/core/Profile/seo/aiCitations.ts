@@ -15,7 +15,7 @@ export interface AiEngine {
   failed: number;
   named: number;
   cited: number;
-  /** Bar segments, partitioned in SQL — `named - cited` overflowed on a ghost citation. */
+  /** Bar segments, partitioned in SQL: `named - cited` overflows on a ghost citation. */
   named_not_cited: number;
   absent: number;
   cited_unnamed: number;
@@ -165,7 +165,6 @@ export interface CitabilityReport {
   questions: LostQuestion[];
 }
 
-/** Every assistant the tier ASKS for — one with no key leaves no probe, so a probe-derived row would drop it silently. */
 export function withRosterEngines(
   engines: AiEngine[],
   roster: { model: string; enabled: boolean }[] | undefined,
@@ -209,4 +208,18 @@ export interface LlmMentionsReport {
   window_days: number;
   note: string | null;
   targets: LlmMentionTarget[];
+}
+
+export interface AiKeywordVolume {
+  keyword: string;
+  ai_volume: number | null;
+  status: SeoMetricStatus | string;
+  note: string | null;
+  captured_at: string;
+}
+
+export interface AiKeywordVolumes {
+  status: string;
+  note: string | null;
+  volumes: AiKeywordVolume[];
 }

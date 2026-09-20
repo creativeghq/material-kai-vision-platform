@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AiCitationReport, CitabilityReport, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
+import type { AiCitationReport, AiKeywordVolumes, CitabilityReport, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -658,7 +658,7 @@ export interface AiAnswers {
   questions: AiQuestion[];
 }
 
-export type { AiCitationReport, AiEngine, AiRate, AiRival, CitabilityReport, LostQuestion, LlmMentionsReport, LlmMentionTarget } from '@/components/core/Profile/seo/aiCitations';
+export type { AiCitationReport, AiEngine, AiRate, AiRival, CitabilityReport, LostQuestion, LlmMentionsReport, LlmMentionTarget, AiKeywordVolumes, AiKeywordVolume } from '@/components/core/Profile/seo/aiCitations';
 
 export interface AiVisibility {
   status: string;
@@ -1534,6 +1534,23 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as CitabilityReport) ?? null;
+  },
+
+  async aiKeywordVolumes(keywords: string[], language = 'en'): Promise<AiKeywordVolumes | null> {
+    const { data, error } = await supabase.rpc(
+      'get_ai_keyword_volumes' as any,
+      { p_keywords: keywords, p_language: language } as any,
+    );
+    if (error) throw error;
+    return (data as AiKeywordVolumes) ?? null;
+  },
+
+  async fetchAiKeywordVolumes(keywords: string[], language = 'en'): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'ai_keyword_volume', keywords, language_code: language },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not read AI search volume'));
+    return data;
   },
 
   async llmMentions(websiteId: string, days = 90): Promise<LlmMentionsReport | null> {

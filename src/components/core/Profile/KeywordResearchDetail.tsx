@@ -8,7 +8,9 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/core/ui/tooltip';
-import { compact } from './seo/seoMetrics';
+import { cn } from '@/lib/utils';
+import { userWebsitesService, type AiKeywordVolume } from '@/services/userWebsitesService';
+import { compact, statusPresentation } from './seo/seoMetrics';
 import {
   SERP_FEATURE_GROUPS,
   buildSerpInventory,
@@ -72,6 +74,49 @@ interface ResearchRecord {
   top_keywords: any;
   serp_competitors: any;
   paa_questions: any;
+}
+
+function AiVolumeFigure({ keyword, language }: { keyword: string; language: string }) {
+  const [row, setRow] = React.useState<AiKeywordVolume | null | undefined>(undefined);
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    userWebsitesService.aiKeywordVolumes([keyword], language)
+      .then((r) => { if (!cancelled) setRow(r?.volumes?.[0] ?? null); })
+      .catch(() => { if (!cancelled) setRow(null); });
+    return () => { cancelled = true; };
+  }, [keyword, language]);
+
+  const fetchIt = async () => {
+    setBusy(true);
+    try {
+      await userWebsitesService.fetchAiKeywordVolumes([keyword], language);
+      const r = await userWebsitesService.aiKeywordVolumes([keyword], language);
+      setRow(r?.volumes?.[0] ?? null);
+    } catch { /* the stored row carries the reason */ } finally { setBusy(false); }
+  };
+
+  const present = row?.status === 'ok' && row.ai_volume != null;
+  const presentation = statusPresentation(row?.status ?? 'not_collected');
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground">Asked of AI</p>
+      <p className={cn('mt-0.5 text-xl font-semibold tabular-nums',
+        present ? 'text-foreground' : 'text-muted-foreground')}>
+        {present ? compact(row!.ai_volume as number) : presentation.placeholder}
+      </p>
+      {present ? (
+        <p className="text-[11px] text-muted-foreground">monthly, in assistants</p>
+      ) : (
+        <button type="button" className="text-[11px] text-primary hover:underline disabled:opacity-50"
+          disabled={busy} onClick={() => void fetchIt()} title={row?.note ?? presentation.explain}>
+          {busy ? 'Reading…' : 'Check AI volume'}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function Figure({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
@@ -190,11 +235,15 @@ export const KeywordResearchDetail: React.FC<{
           )}
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
             <Figure
               label="Search volume"
               value={primary.searchVolume != null ? compact(primary.searchVolume) : '—'}
               sub="monthly, this market"
+            />
+            <AiVolumeFigure
+              keyword={row.target_keyword}
+              language={row.language_code ?? 'en'}
             />
             <Figure
               label="Difficulty"

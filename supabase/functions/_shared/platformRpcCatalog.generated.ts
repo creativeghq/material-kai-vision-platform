@@ -50,6 +50,21 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_ai_keyword_volumes",
+    "subject": "ai keyword volumes",
+    "args": [
+      {
+        "name": "p_keywords",
+        "type": "text[]",
+        "required": true
+      },
+      {
+        "name": "p_language",
+        "type": "text"
+      }
+    ]
+  },
+  {
     "name": "get_article_decay",
     "subject": "article decay",
     "args": [

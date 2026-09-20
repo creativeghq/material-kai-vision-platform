@@ -6386,6 +6386,24 @@
             "desc": "Defaults to US \u2014 ChatGPT mention coverage is United States only."
           }
         ]
+      },
+      {
+        "name": "ai_keyword_volume",
+        "summary": "How often each keyword is asked of an AI assistant, as opposed to typed into Google. Stores one row per keyword, including the reason when the source refuses.",
+        "params": [
+          {
+            "name": "keywords",
+            "type": "array",
+            "required": true,
+            "desc": "Up to 200 keywords to measure."
+          },
+          {
+            "name": "language_code",
+            "type": "string",
+            "required": false,
+            "desc": "Defaults to en."
+          }
+        ]
       }
     ],
     "request": {

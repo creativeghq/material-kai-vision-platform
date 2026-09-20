@@ -928,6 +928,20 @@
     ]
   },
   {
+    "name": "get_ai_keyword_volumes",
+    "args": [
+      {
+        "name": "p_keywords",
+        "type": "text[]",
+        "required": true
+      },
+      {
+        "name": "p_language",
+        "type": "text"
+      }
+    ]
+  },
+  {
     "name": "get_website_ai_answers",
     "args": [
       {
