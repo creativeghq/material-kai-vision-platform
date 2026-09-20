@@ -105,7 +105,7 @@ describe('nobody re-derives the rule', () => {
 
 /** The SECOND axis: what is being supplied. */
 import {
-  supplyKindOf, mydataSalesDocumentType, mydataSalesDocumentReason,
+  supplyKindOf, mydataSalesDocumentType, mydataSalesDocumentReason, mydataSaleRegimeExemption,
 } from '@/modules/finance/utils/salesDocumentKind';
 
 const BUSINESS = { isCompany: true };
@@ -155,12 +155,39 @@ describe('the 2x2 that decides the document code', () => {
   });
 
   it('only ever returns a code myDATA defines', () => {
-    const valid = new Set(['1.1', '2.1', '11.1', '11.2']);
+    const valid = new Set(['1.1', '1.2', '1.3', '2.1', '11.1', '11.2']);
     for (const buyer of [BUSINESS, CONSUMER, null]) {
       for (const supply of ['goods', 'services', 'mixed', 'unknown'] as const) {
-        expect(valid.has(mydataSalesDocumentType(buyer, supply))).toBe(true);
+        for (const regime of ['domestic', 'intra_community', 'export', 'reverse_charge_39a'] as const) {
+          expect(valid.has(mydataSalesDocumentType(buyer, supply, regime))).toBe(true);
+        }
       }
     }
+  });
+
+  it('gives a cross-border supply of GOODS its own document type, and leaves services on 2.1', () => {
+    expect(mydataSalesDocumentType(BUSINESS, 'goods', 'intra_community')).toBe('1.2');
+    expect(mydataSalesDocumentType(BUSINESS, 'goods', 'export')).toBe('1.3');
+    expect(mydataSalesDocumentType(BUSINESS, 'services', 'intra_community')).toBe('2.1');
+    expect(mydataSalesDocumentType(BUSINESS, 'services', 'export')).toBe('2.1');
+  });
+
+  it('does not change the document type for a 39a reverse charge - only the VAT treatment', () => {
+    expect(mydataSalesDocumentType(BUSINESS, 'goods', 'reverse_charge_39a')).toBe('1.1');
+    expect(mydataSaleRegimeExemption('reverse_charge_39a', 'goods')).toBe(16);
+  });
+
+  it('maps a regime to the AADE 8.3 exemption cause, and withholds on a cross-border service', () => {
+    expect(mydataSaleRegimeExemption('intra_community', 'goods')).toBe(14);
+    expect(mydataSaleRegimeExemption('export', 'goods')).toBe(8);
+    expect(mydataSaleRegimeExemption('domestic', 'goods')).toBeNull();
+    expect(mydataSaleRegimeExemption('intra_community', 'services')).toBeNull();
+    expect(mydataSaleRegimeExemption('export', 'services')).toBeNull();
+  });
+
+  it('never invents a consumer cross-border invoice - a consumer still gets 11.x', () => {
+    expect(mydataSalesDocumentType(CONSUMER, 'goods', 'intra_community')).toBe('11.1');
+    expect(mydataSalesDocumentType(CONSUMER, 'goods', 'export')).toBe('11.1');
   });
 
   it('says why, in words that name the reason', () => {

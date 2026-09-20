@@ -1,7 +1,6 @@
 /** "Is this buyer a business, and therefore what sales document do they get?" — ONE definition. */
 
-/** What we need to know about a buyer to classify them. Deliberately not a CRM row type — both
- *  a company row and a contact row map onto this. */
+/** What classifying a buyer needs — a company row and a contact row both map onto this. */
 export interface BuyerIdentity {
   /** The buyer is a linked CRM company (always a business). */
   isCompany: boolean;
@@ -35,8 +34,7 @@ export function salesDocumentKindLabel(kind: SalesDocumentKind): string {
   return kind === 'receipt' ? 'Receipt' : 'Invoice';
 }
 
-/** Why the buyer was classified this way, so the operator can see the reasoning before issuing
- *  a fiscal document rather than having to trust a bare label. */
+/** Why, so the operator sees the reasoning before issuing rather than trusting a bare label. */
 export function salesDocumentKindReason(buyer: BuyerIdentity | null | undefined): string {
   if (!buyer) return 'Buyer not resolved — defaulting to an invoice.';
   if (buyer.isCompany) return 'Buyer is a company.';
@@ -57,11 +55,8 @@ export interface SupplyLine {
 }
 
 /**
- * What a set of lines is supplying.
- *
- * A line with no product attached votes for NOTHING. It cannot be read as goods just because the
- * goods code is the fallback: "we do not know" and "it is goods" are different states, and only
- * the first should be revisited when somebody attaches a product later.
+ * What a set of lines is supplying. A line with no product attached votes for NOTHING: "we do not
+ * know" and "it is goods" are different states, and only the first is worth revisiting later.
  */
 export function supplyKindOf(lines: readonly SupplyLine[] | null | undefined): SupplyKind {
   let goods = false;
@@ -77,8 +72,11 @@ export function supplyKindOf(lines: readonly SupplyLine[] | null | undefined): S
   return 'unknown';
 }
 
+// The THIRD axis. Not derivable from the buyer: 39a turns on WHAT is sold, which only we know.
+export type SaleRegime = 'domestic' | 'intra_community' | 'export' | 'reverse_charge_39a';
+
 /**
- * The myDATA sales document code for a buyer and a supply.
+ * The myDATA sales document code for a buyer, a supply and a regime.
  *
  * MIXED AND UNKNOWN BOTH TAKE THE GOODS CODE, deliberately. A sales invoice carrying a service
  * line is ordinary; a services invoice carrying goods is the questionable direction. And an
@@ -88,10 +86,24 @@ export function supplyKindOf(lines: readonly SupplyLine[] | null | undefined): S
 export function mydataSalesDocumentType(
   buyer: BuyerIdentity | null | undefined,
   supply: SupplyKind,
+  regime: SaleRegime = 'domestic',
 ): string {
-  const consumer = buyerIsConsumer(buyer);
-  if (supply === 'services') return consumer ? '11.2' : '2.1';
-  return consumer ? '11.1' : '1.1';
+  if (buyerIsConsumer(buyer)) return supply === 'services' ? '11.2' : '11.1';
+  if (supply !== 'services') {
+    if (regime === 'intra_community') return '1.2';
+    if (regime === 'export') return '1.3';
+  }
+  return supply === 'services' ? '2.1' : '1.1';
+}
+
+/** AADE ERP v2.0.2 §8.3 — 14 intra-community, 8 exports, 16 art. 39α/45 reverse charge. A
+ *  cross-border SERVICE withholds: place-of-supply is not decidable here. */
+export function mydataSaleRegimeExemption(regime: SaleRegime, supply: SupplyKind): number | null {
+  if (regime === 'reverse_charge_39a') return 16;
+  if (supply === 'services') return null;
+  if (regime === 'intra_community') return 14;
+  if (regime === 'export') return 8;
+  return null;
 }
 
 /** Why that code, so an operator can see the reasoning before transmitting it. */
