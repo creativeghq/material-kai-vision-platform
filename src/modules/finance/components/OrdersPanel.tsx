@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , Dialog
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
 import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
 import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
+import { OrderShipmentsCard } from '@/modules/finance/components/OrderShipmentsCard';
 import { MarginAuthorityNotice } from '@/modules/finance/components/MarginAuthorityNotice';
 import { ReceptionReportCard } from '@/modules/stock/components/ReceptionReportCard';
 import { OrderLineTimelineCard } from '@/modules/finance/components/OrderLineTimelineCard';
@@ -3189,6 +3190,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <TabsTrigger value="payments">Payments</TabsTrigger>
                 {orderTabs.includes('match') && <TabsTrigger value="match">3-Way Match</TabsTrigger>}
                 <TabsTrigger value="customs">Customs</TabsTrigger>
+                <TabsTrigger value="shipping">Shipping</TabsTrigger>
                 <TabsTrigger value="contracts">Contracts</TabsTrigger>
               </TabsList>
 
@@ -4492,6 +4494,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
 
               {/* The paper behind the order (#378 L4). Counterparty prefilled from the order's own
                   party, so the signing email has a recipient without anyone retyping the name. */}
+              <TabsContent value="shipping" className="mt-3">
+                <OrderShipmentsCard orderId={order.id} workspaceId={order.workspace_id} />
+              </TabsContent>
+
               <TabsContent value="contracts" className="mt-3">
                 <ContractsSection
                   workspaceId={order.workspace_id}

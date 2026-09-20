@@ -311,6 +311,10 @@ export const VOCABULARIES = [
     'src/modules/commerce/commerceVocabulary.ts',
     'supabase/functions/_shared/commerceVocabulary.generated.ts',
   ],
+  [
+    'src/modules/stock/carrierVocabulary.ts',
+    'supabase/functions/_shared/carrierVocabulary.generated.ts',
+  ],
 ];
 
 const banner = (source) => [
