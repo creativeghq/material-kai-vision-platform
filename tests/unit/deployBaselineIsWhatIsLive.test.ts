@@ -67,22 +67,28 @@ function jobBlock(name: string): string {
 
 describe('deploy wiring', () => {
   it('keeps lint gating BOTH deploys, wherever the lint steps live', () => {
-    // `npm run lint` is the check people skip: it is the one gate the Deploy workflow alone
-    // runs, so a lint-only failure passes typecheck and tests and blocks the deploy silently.
-    // While it lived inside `unit-tests` it was gated for free. Now it is a `needs:` entry —
-    // one word, deletable, and nothing goes red if it goes missing.
-    const owner = ['unit-tests', 'lint'].find((j) => {
-      const b = jobBlock(j);
-      return b.includes('npm run lint') && b.includes('npm run lint:a11y');
-    });
-    expect(owner, 'no job runs both `npm run lint` and `npm run lint:a11y`').toBeDefined();
+    // `npm run lint` is the check people skip: the Deploy workflow alone runs it, so a
+    // lint-only failure passes typecheck and tests and blocks the deploy silently. Inside
+    // `unit-tests` it was gated free; as a `needs:` entry it is one word and deletable.
+    const jobNames = [...wfLF.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]);
 
-    for (const deployer of ['deploy-frontend', 'deploy-functions']) {
-      const needs = /needs:\s*\[([^\]]*)\]/.exec(jobBlock(deployer))?.[1] ?? '';
-      expect(
-        needs.split(',').map((s) => s.trim()),
-        `${deployer} no longer needs "${owner}" — a red lint would ship to production`,
-      ).toContain(owner);
+    // `npm run lint` is a PREFIX of `npm run lint:a11y`, so anchor to the step, not a substring.
+    const STEPS: [string, RegExp][] = [
+      ['npm run lint', /^\s*- run: npm run lint$/m],
+      ['npm run lint:a11y', /^\s*- run: npm run lint:a11y$/m],
+    ];
+
+    for (const [cmd, step] of STEPS) {
+      const owners = jobNames.filter((j) => step.test(jobBlock(j)));
+      expect(owners, `no job runs \`${cmd}\``).toHaveLength(1);
+
+      for (const deployer of ['deploy-frontend', 'deploy-functions']) {
+        const needs = /needs:\s*\[([^\]]*)\]/.exec(jobBlock(deployer))?.[1] ?? '';
+        expect(
+          needs.split(',').map((s) => s.trim()),
+          `${deployer} no longer needs "${owners[0]}", which runs \`${cmd}\` — it would ship to production red`,
+        ).toContain(owners[0]);
+      }
     }
   });
 
