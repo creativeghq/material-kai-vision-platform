@@ -18,3 +18,15 @@ export function isCommercePlatform(v: unknown): v is CommercePlatform {
 export function isDocumentRequest(v: unknown): v is DocumentRequest {
   return typeof v === 'string' && (DOCUMENT_REQUESTS as readonly string[]).includes(v);
 }
+
+export const SALES_CHANNELS = ['skroutz', 'shopify', 'woocommerce', 'ecommerce', 'storefront', 'pos'] as const;
+export type SalesChannel = (typeof SALES_CHANNELS)[number];
+
+export const SALES_CHANNEL_LABEL: Record<SalesChannel, string> = {
+  skroutz: 'Skroutz',
+  ecommerce: 'Shopify + WooCommerce',
+  shopify: 'Shopify only',
+  woocommerce: 'WooCommerce only',
+  storefront: 'Own online store',
+  pos: 'Register (POS)',
+};

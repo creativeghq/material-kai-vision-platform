@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export interface RefRow { category: string; code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' | 'per_unit'; is_enabled: boolean; sort_order: number | null; }
 export interface DocTypeSetting { code: string; enabled: boolean; default_income_classification_type: string | null; default_income_classification_category: string | null; default_withholding_code: string | null; }
-export interface DocSeries { id: string; doc_code: string; series: string; next_number: number; is_active: boolean; branch_id: string | null; }
+export interface DocSeries { id: string; doc_code: string; series: string; next_number: number; is_active: boolean; branch_id: string | null; sales_channel: string | null; }
 export interface FinanceBranch {
   id: string; workspace_id: string; branch_code: number; name: string;
   address: string | null; street_number: string | null; postal_code: string | null; city: string | null; is_active: boolean;
@@ -48,8 +48,8 @@ export const invoicingSetupService = {
     return (data ?? []) as DocSeries[];
   },
 
-  async addSeries(workspaceId: string, docCode: string, series: string, nextNumber: number, branchId?: string | null): Promise<void> {
-    const { error } = await supabase.from('document_series').insert({ workspace_id: workspaceId, doc_code: docCode, series, next_number: nextNumber, branch_id: branchId ?? null });
+  async addSeries(workspaceId: string, docCode: string, series: string, nextNumber: number, branchId?: string | null, salesChannel?: string | null): Promise<void> {
+    const { error } = await supabase.from('document_series').insert({ workspace_id: workspaceId, doc_code: docCode, series, next_number: nextNumber, branch_id: branchId ?? null, sales_channel: salesChannel || null });
     if (error) throw error;
   },
 

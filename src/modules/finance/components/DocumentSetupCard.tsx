@@ -12,6 +12,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { invoicingSetupService, type RefRow, type DocTypeSetting, type DocSeries, type FinanceBranch } from '@/services/invoicingSetupService';
+import { SALES_CHANNELS, SALES_CHANNEL_LABEL, type SalesChannel } from '@/modules/commerce/commerceVocabulary';
 
 export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -29,6 +30,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
   const [newSeries, setNewSeries] = useState('');
   const [newStart, setNewStart] = useState('1');
   const [newBranchId, setNewBranchId] = useState<string>('');
+  const [newChannel, setNewChannel] = useState<string>('');
   const [nextEdits, setNextEdits] = useState<Record<string, string>>({});
   const branchLabel = (id: string | null) => {
     const b = branches.find((x) => x.id === id);
@@ -79,12 +81,12 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
-  const startAdd = (code: string) => { setAddingFor(code); setNewSeries(''); setNewStart('1'); setNewBranchId(branches.find((b) => b.branch_code === 0)?.id ?? ''); };
+  const startAdd = (code: string) => { setAddingFor(code); setNewSeries(''); setNewStart('1'); setNewChannel(''); setNewBranchId(branches.find((b) => b.branch_code === 0)?.id ?? ''); };
   const submitNewSeries = async (code: string) => {
     if (!newSeries.trim()) { toast({ title: 'Enter a series code (e.g. INV-)', variant: 'destructive' }); return; }
     const start = parseInt(newStart, 10) || 1;
     try {
-      await invoicingSetupService.addSeries(workspaceId, code, newSeries.trim(), start, newBranchId || null);
+      await invoicingSetupService.addSeries(workspaceId, code, newSeries.trim(), start, newBranchId || null, newChannel || null);
       setAddingFor(null); await load();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
@@ -175,13 +177,14 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         </div>
 
                         {typeSeries.length === 0 && addingFor !== t.code && (
-                          <p className="text-xs text-muted-foreground">No series — uses the default sequential number.</p>
+                          <p className="text-xs text-muted-foreground">No series yet — one is created automatically on the first document, numbered from 1.</p>
                         )}
 
                         {typeSeries.map((s) => (
                           <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
                             <Badge variant="outline" className="font-mono">{s.series}</Badge>
                             {branches.length > 1 && <Badge variant="secondary" className="text-[10px]">{branchLabel(s.branch_id)}</Badge>}
+                            <Badge variant={s.sales_channel ? 'info' : 'neutral'} className="text-[10px]">{s.sales_channel ? SALES_CHANNEL_LABEL[s.sales_channel as SalesChannel] ?? s.sales_channel : 'All sales'}</Badge>
                             <span className="text-xs text-muted-foreground">Next #</span>
                             <Input
                               className="h-7 w-24 text-xs"
@@ -218,11 +221,21 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                                 </Select>
                               </div>
                             )}
+                            <div className="space-y-1">
+                              <span className="text-[10px] text-muted-foreground">Applies to</span>
+                              <Select value={newChannel || 'all'} onValueChange={(v) => setNewChannel(v === 'all' ? '' : v)}>
+                                <SelectTrigger className="h-7 w-52 text-xs"><SelectValue placeholder="All sales" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All sales</SelectItem>
+                                  {SALES_CHANNELS.map((c) => <SelectItem key={c} value={c}>{SALES_CHANNEL_LABEL[c]}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
                             <Button size="sm" className="h-7" onClick={() => submitNewSeries(t.code)}>Add</Button>
                             <Button size="sm" variant="ghost" className="h-7" onClick={() => setAddingFor(null)}>Cancel</Button>
                           </div>
                         )}
-                        <p className="text-[11px] text-muted-foreground">Set the start number to continue from your previous software (e.g. last invoice was 1450 → start at 1451).</p>
+                        <p className="text-[11px] text-muted-foreground">Set the start number to continue from your previous software (e.g. last invoice was 1450 → start at 1451). A range for a channel is used only by that channel&apos;s documents; everything else keeps the “All sales” range.</p>
                       </div>
                     </td></tr>
                   )}
