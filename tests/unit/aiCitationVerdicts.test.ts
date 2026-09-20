@@ -102,3 +102,13 @@ describe('formatting', () => {
     expect(displayHost('not a url')).toBe('not a url');
   });
 });
+
+describe('the verdict bar partitions its track', () => {
+  it('reads the segments SQL derived instead of inferring them from totals', () => {
+    const src = blankedSource(CARD);
+    expect(src).toContain('engine.named_not_cited');
+    expect(src).toContain('engine.absent');
+    expect(src).not.toMatch(/engine\.named\s*-\s*engine\.cited/);
+    expect(src).not.toMatch(/engine\.answered\s*-\s*engine\.named/);
+  });
+});

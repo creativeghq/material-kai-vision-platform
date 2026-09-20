@@ -57,16 +57,14 @@ const Rate: React.FC<{ rate: AiRate; label: string; help: string; big?: boolean 
   );
 };
 
-/** The denominator is `probes`, not `answered` — a bar drawn over successes alone
- *  hides the outage that produced them. */
+/** Segments come from SQL and partition `probes` exactly. The denominator is `probes`,
+ *  not `answered` — a bar over successes alone hides the outage that produced them. */
 const VerdictBar: React.FC<{ engine: AiEngine }> = ({ engine }) => {
   const total = Math.max(engine.probes, 1);
-  const namedOnly = Math.max(engine.named - engine.cited, 0);
-  const absent = Math.max(engine.answered - engine.named, 0);
   const segments: { key: keyof typeof VERDICT_FILL; n: number; label: string }[] = [
     { key: 'cited', n: engine.cited, label: 'cited you as a source' },
-    { key: 'named', n: namedOnly, label: 'named you in the prose' },
-    { key: 'absent', n: absent, label: 'left you out' },
+    { key: 'named', n: engine.named_not_cited, label: 'named you in the prose' },
+    { key: 'absent', n: engine.absent, label: 'left you out' },
     { key: 'failed', n: engine.failed, label: 'failed' },
   ];
   return (

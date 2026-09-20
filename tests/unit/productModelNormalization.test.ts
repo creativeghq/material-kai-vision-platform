@@ -21,13 +21,7 @@ beforeAll(async () => {
   scene = gltf.scene;
 });
 
-/** Bounding box after applying the transform the way the <group> does.
- *
- * Measures a CLONE. `normalizeModelTransform` reads world matrices and `setScalar`
- * replaces rather than composes, so running this twice over one shared scene
- * renormalises an already-normalised model: the second call sees maxDim = TARGET_SIZE,
- * derives scale 1, and clobbers the real factor — leaving the raw model on screen.
- * The viewer calls it once per load, so that is the contract worth testing. */
+/** Placed box, on a CLONE: a second call over one scene would renormalise it. */
 function placedBox(): Box3 {
   const model = scene.clone(true);
   model.position.set(0, 0, 0);

@@ -1010,6 +1010,21 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_website_ai_citation_report",
+    "subject": "website ai citation report",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "get_website_ai_monitoring_state",
     "subject": "website ai monitoring state",
     "args": [

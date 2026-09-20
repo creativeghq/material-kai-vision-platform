@@ -1,5 +1,5 @@
 {
-  "_comment": "Derived reads (public RPCs the platform computes in SQL) vs the ones an agent tool reads. `exposed` is scanned from supabase/functions/_shared/tools by scripts/audit-agent-data-coverage.mjs; `known_gaps` must each carry a reason — \"todo: …\" records an intention, \"unreviewed\" fails the script. Regenerate with: node scripts/audit-agent-data-coverage.mjs --write-baseline",
+  "_comment": "Derived reads (public RPCs the platform computes in SQL) vs the ones an agent tool reads. `exposed` is scanned from supabase/functions/_shared/tools by scripts/audit-agent-data-coverage.mjs; `known_gaps` must each carry a reason \u2014 \"todo: \u2026\" records an intention, \"unreviewed\" fails the script. Regenerate with: node scripts/audit-agent-data-coverage.mjs --write-baseline",
   "generated_at": "2026-09-05T16:20:00.000Z",
   "exposed": [
     "add_configuration_to_quote",
@@ -37,6 +37,7 @@
     "get_tender_bid_analysis",
     "get_tender_bid_summary",
     "get_website_ai_answers",
+    "get_website_ai_citation_report",
     "get_website_ai_visibility",
     "get_website_cannibalisation",
     "get_website_competitor_series",
@@ -106,7 +107,7 @@
     {
       "rpc": "get_deal_outcomes_by_month",
       "scope_arg": "p_workspace_id",
-      "reason": "todo: pipeline analytics for manage_deal — 'how is the pipeline / who is closing / where do deals stall' is unanswerable today"
+      "reason": "todo: pipeline analytics for manage_deal \u2014 'how is the pipeline / who is closing / where do deals stall' is unanswerable today"
     },
     {
       "rpc": "get_deal_owner_stats",
@@ -146,7 +147,7 @@
     {
       "rpc": "get_invoice_item_costs",
       "scope_arg": "p_invoice_ids",
-      "reason": "todo: profit behind an invoice — internal-only, a tool must gate on sensitivity"
+      "reason": "todo: profit behind an invoice \u2014 internal-only, a tool must gate on sensitivity"
     },
     {
       "rpc": "get_model_pricing",
@@ -166,22 +167,22 @@
     {
       "rpc": "get_order_customs_preview",
       "scope_arg": "p_order_id",
-      "reason": "todo: order tools — TARIC/customs preview per order"
+      "reason": "todo: order tools \u2014 TARIC/customs preview per order"
     },
     {
       "rpc": "get_order_item_costs",
       "scope_arg": "p_order_ids",
-      "reason": "todo: profit per order line — internal-only, gate on sensitivity"
+      "reason": "todo: profit per order line \u2014 internal-only, gate on sensitivity"
     },
     {
       "rpc": "get_order_profit_positions",
       "scope_arg": "p_order_ids",
-      "reason": "todo: profit per order for manage_finance — internal-only"
+      "reason": "todo: profit per order for manage_finance \u2014 internal-only"
     },
     {
       "rpc": "get_order_settlements",
       "scope_arg": "p_order_ids",
-      "reason": "READ by the customer-audience list_orders tool through _shared/customer-orders.ts (the one orders read, shared with the Inbox rail) — the scanner sees only _shared/tools, so it cannot list it as exposed. Not a gap. todo: manage_finance lists orders from the table and must read settlement from this too (CLAUDE.md anti-regression rule 1)"
+      "reason": "READ by the customer-audience list_orders tool through _shared/customer-orders.ts (the one orders read, shared with the Inbox rail) \u2014 the scanner sees only _shared/tools, so it cannot list it as exposed. Not a gap. todo: manage_finance lists orders from the table and must read settlement from this too (CLAUDE.md anti-regression rule 1)"
     },
     {
       "rpc": "get_package_bid_comparison",
@@ -191,7 +192,7 @@
     {
       "rpc": "get_party_profit_position",
       "scope_arg": "p_workspace_id",
-      "reason": "todo: customer_360/supplier_360 could carry the party's profit position — internal-only"
+      "reason": "todo: customer_360/supplier_360 could carry the party's profit position \u2014 internal-only"
     },
     {
       "rpc": "get_party_work",
@@ -211,7 +212,7 @@
     {
       "rpc": "get_product_costs",
       "scope_arg": "p_product_ids",
-      "reason": "todo: cost is internal-only — a tool must gate on is_internal_product_field before exposing it"
+      "reason": "todo: cost is internal-only \u2014 a tool must gate on is_internal_product_field before exposing it"
     },
     {
       "rpc": "get_product_detail",
@@ -226,7 +227,7 @@
     {
       "rpc": "get_project_cost_by_code",
       "scope_arg": "p_project_id",
-      "reason": "todo: project finance — 'is this project over budget' is unanswerable today"
+      "reason": "todo: project finance \u2014 'is this project over budget' is unanswerable today"
     },
     {
       "rpc": "get_project_finance_summary",
@@ -236,7 +237,7 @@
     {
       "rpc": "get_project_inspections",
       "scope_arg": "p_project_id",
-      "reason": "todo: construction tools — inspections per project"
+      "reason": "todo: construction tools \u2014 inspections per project"
     },
     {
       "rpc": "get_project_labor",
@@ -271,7 +272,7 @@
     {
       "rpc": "get_quote_billing_progress",
       "scope_arg": "p_quote_ids",
-      "reason": "todo: quote tools — how much of a quote has been billed"
+      "reason": "todo: quote tools \u2014 how much of a quote has been billed"
     },
     {
       "rpc": "get_quote_totals",
@@ -286,12 +287,12 @@
     {
       "rpc": "get_rent_charge_settlements",
       "scope_arg": "p_charge_ids",
-      "reason": "todo: real-estate finance — rent settlements"
+      "reason": "todo: real-estate finance \u2014 rent settlements"
     },
     {
       "rpc": "get_sale_commission_splits",
       "scope_arg": "p_sale_ids",
-      "reason": "todo: real-estate finance — commission splits"
+      "reason": "todo: real-estate finance \u2014 commission splits"
     },
     {
       "rpc": "get_sourcing_board",
@@ -301,7 +302,7 @@
     {
       "rpc": "get_supplier_inbound_orders",
       "scope_arg": "p_workspace_id",
-      "reason": "todo: supplier persona — 'what did buyers order from us'"
+      "reason": "todo: supplier persona \u2014 'what did buyers order from us'"
     },
     {
       "rpc": "get_supplier_inbound_orders_svc",
@@ -316,7 +317,7 @@
     {
       "rpc": "list_granted_catalog_products",
       "scope_arg": "p_workspace_id",
-      "reason": "todo: catalog access grants — which factory products this workspace may sell"
+      "reason": "todo: catalog access grants \u2014 which factory products this workspace may sell"
     },
     {
       "rpc": "list_supplier_products",
@@ -356,7 +357,7 @@
     {
       "rpc": "stock_overview",
       "scope_arg": "p_workspace_id",
-      "reason": "todo: manage_stock reads rows; the overview (low / out of stock) is unreachable — 'what is our stock position' is unanswerable today"
+      "reason": "todo: manage_stock reads rows; the overview (low / out of stock) is unreachable \u2014 'what is our stock position' is unanswerable today"
     }
   ]
 }

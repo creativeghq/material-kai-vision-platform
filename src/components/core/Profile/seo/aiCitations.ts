@@ -15,6 +15,10 @@ export interface AiEngine {
   failed: number;
   named: number;
   cited: number;
+  /** Bar segments, partitioned in SQL — `named - cited` overflowed on a ghost citation. */
+  named_not_cited: number;
+  absent: number;
+  cited_unnamed: number;
   /** Answers that carried ANY source. Zero means the engine did not browse. */
   sourced: number;
   avg_position: number | null;
