@@ -20,7 +20,7 @@
     "comments:mass": "node scripts/check-comment-mass.mjs",
     "comments:verify": "node scripts/verify-comment-only.mjs",
     "verify": "node scripts/verify.mjs",
-  "test": "vitest run tests/unit tests/security",
+  "test": "vitest run tests/unit tests/security --retry=0",
     "test:watch": "vitest tests/unit",
     "test:integration": "vitest run tests/integration",
     "types:generate": "node scripts/gen-types.mjs",
