@@ -740,7 +740,7 @@ export const CompanyDetailPage: React.FC = () => {
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
                   </div>
                   <div>
-                    <InlineText alwaysEdit={isNew} label="Trading Name (Διακριτικός Τίτλος)" value={company.commercial_title} onSave={(v) => patchInline({ commercial_title: v })} placeholder="e.g. Furnibath" copy={false} hint="The brand this business trades under, when it differs from the legal name. Filled by the ΑΑΔΕ / ΓΕΜΗ lookup — edit it here if the registry has it wrong or never answered." />
+                    <InlineText alwaysEdit={isNew} label="Trading Name (Διακριτικός Τίτλος)" value={company.commercial_title} onSave={(v) => patchInline({ commercial_title: v })} placeholder="e.g. Furnibath" copy={false} />
                   </div>
                   {isNew ? (
                     <div>
