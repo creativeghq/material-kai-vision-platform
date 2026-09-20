@@ -1771,7 +1771,7 @@ async function buildPaymentReceiptPdf(d: {
     customer?.vat_number ? `${L.vatNo}: ${customer.vat_number}` : '',
     customer?.tax_office ? `${L.taxOffice}: ${customer.tax_office}` : '',
   ].filter(Boolean) as string[];
-  const invRefs = [...new Set((allocations ?? []).map((a: any) => a.invoice?.legal_number || a.invoice?.internal_number).filter(Boolean))];
+  const invRefs = [...new Set((allocations ?? []).map((a: any) => a.invoice?.internal_number || a.invoice?.legal_number).filter(Boolean))];
   const ordRefs = [...new Set((allocations ?? []).map((a: any) => a.order?.order_number).filter(Boolean))];
   const marks = [...new Set((allocations ?? []).map((a: any) => a.invoice?.fiscal_mark).filter(Boolean))];
   const allocated = (allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
@@ -1822,7 +1822,7 @@ async function buildPaymentReceiptPdf(d: {
 
   type Row = { doc: string; descr: string; mark: string; date: string; amount: number };
   const rows: Row[] = (allocations ?? []).map((a: any) => ({
-    doc: a.invoice?.legal_number || a.invoice?.internal_number || a.supplier_bill?.supplier_bill_number || '—',
+    doc: a.invoice?.internal_number || a.invoice?.legal_number || a.supplier_bill?.supplier_bill_number || '—',
     descr: a.invoice ? L.invoiceNo : a.supplier_bill ? L.supplierBill : L.appliedTo,
     mark: a.invoice?.fiscal_mark ?? '',
     date: '',

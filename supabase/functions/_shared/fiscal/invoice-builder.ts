@@ -522,10 +522,16 @@ export async function buildInvoiceInputFromDb(
   const totalGross = round2(totalNet + totalVat);
 
   const invoiceType = overrides.invoiceType ?? inv.document_type ?? (counterpart.vatNumber ? '1.1' : '11.1');
-  // Prefer the per-branch series + counter resolved at creation (document_series);
-  // fall back to the workspace prefix / internal number for pre-series invoices.
-  const series = overrides.series ?? (inv.series || fs?.invoice_number_prefix || 'A');
-  const aa = overrides.aa ?? String(inv.series_number ?? inv.legal_number ?? inv.internal_number ?? '');
+  // series and aa come from document_series and nowhere else: the old prefix fallback sent
+  // series='INV-' aa='INV-000001' for every type at once, so no type's sequence was continuous.
+  const series = overrides.series ?? inv.series;
+  const aa = overrides.aa ?? (inv.series_number == null ? null : String(inv.series_number));
+  if (!series || !aa) {
+    throw new Error(
+      `Refusing to build a ${invoiceType} envelope with no numbering range: series=${series ?? 'null'} aa=${aa ?? 'null'}. `
+      + 'Issue the document through the numbering path so document_series assigns both.',
+    );
+  }
   const issueDate = String(inv.issued_at ?? inv.created_at ?? new Date().toISOString()).slice(0, 10);
 
   // Digital transaction fee (Ψηφιακό Τέλος Συναλλαγής) rides in the other-taxes bucket for myDATA.
