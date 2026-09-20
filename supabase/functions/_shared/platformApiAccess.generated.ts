@@ -67,6 +67,7 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   { name: 'stripe-api', reason: 'Moves real money through the Stripe account.' },
   { name: 'stripe-connect', reason: 'Changes the workspace payment account.' },
   { name: 'revolut-api', reason: 'Acts directly on the business bank account.' },
+  { name: 'store-orders-sync', reason: 'Calls the merchant\'s own Shopify or WooCommerce store and creates orders in bulk from what it finds.' },
   // Reaches a customer or the public.
   { name: 'finance-send-invoice-email', reason: 'Sends an email to the customer named on the invoice.' },
   { name: 'finance-send-statement', reason: 'Emails a customer their account statement.' },

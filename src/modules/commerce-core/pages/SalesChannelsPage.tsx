@@ -19,7 +19,7 @@ import { formatDate } from '@/utils/datetime';
 import { COMMERCE_PLATFORMS, type CommercePlatform } from '@/modules/commerce/commerceVocabulary';
 import { generateWebhookSecret, WOO_UNSAFE_SECRET } from '@/modules/commerce/webhookSecret';
 import {
-  storeConnectionsService, type StoreConnection, type StoreSyncLogRow,
+  storeConnectionsService, webhookUrl, type StoreConnection, type StoreSyncLogRow,
 } from '@/services/commerce/storeConnectionsService';
 import {
   productFeedsService, feedUrl, FEED_FORMATS, type ProductFeed, type FeedFormat,
@@ -41,6 +41,13 @@ const CREDENTIAL_FIELDS: Record<CommercePlatform, { key: string; label: string; 
     { key: 'consumer_secret', label: 'Consumer secret' },
   ],
   generic: [{ key: 'api_token', label: 'API token' }],
+};
+
+const WEBHOOK_HINT: Record<string, string> = {
+  shopify: 'Shopify → Settings → Notifications → Webhooks. Subscribe orders/create, orders/updated, orders/paid and orders/cancelled.',
+  woocommerce: 'WooCommerce → Settings → Advanced → Webhooks. Topic order.created and order.updated, Delivery URL below, Secret above.',
+  skroutz: 'Skroutz Merchants → Smart Cart webhook settings.',
+  generic: 'POST the order here, signed with X-Signature: base64 HMAC-SHA256 of the raw body.',
 };
 
 const OUTCOME_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
@@ -173,10 +180,12 @@ export default function SalesChannelsPage() {
     catch (err) { toast({ title: 'Could not remove', description: err instanceof Error ? err.message : String(err), variant: 'destructive' }); }
   };
 
-  const copyFeed = async (f: ProductFeed) => {
-    try { await navigator.clipboard.writeText(feedUrl(f.public_token)); toast({ title: 'Link copied' }); }
+  const copyText = async (value: string, title: string) => {
+    try { await navigator.clipboard.writeText(value); toast({ title }); }
     catch { toast({ title: 'Could not copy', description: 'Select the field and copy it by hand.', variant: 'destructive' }); }
   };
+
+  const copyFeed = (f: ProductFeed) => copyText(feedUrl(f.public_token), 'Link copied');
 
   const remove = async (row: StoreConnection) => {
     try { await storeConnectionsService.remove(row.id); await load(); }
@@ -296,6 +305,17 @@ export default function SalesChannelsPage() {
                     <span>{row.last_error}</span>
                   </p>
                 )}
+
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground">Webhook endpoint</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input readOnly value={webhookUrl(row.id)} className="h-7 flex-1 font-mono text-[11px]" onFocus={(e) => e.currentTarget.select()} />
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => copyText(webhookUrl(row.id), 'Webhook URL copied')}>
+                      <Copy className="mr-1 h-3 w-3" /> Copy
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{WEBHOOK_HINT[row.platform] ?? 'Point the store at this URL and sign with the secret above.'}</p>
+                </div>
 
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground">What happens when an order arrives</p>

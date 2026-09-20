@@ -16330,5 +16330,66 @@
         "desc": "RSS 2.0 + g:, or a Skroutz <mywebstore> document."
       }
     ]
+  },
+  {
+    "name": "store-orders-sync",
+    "tag": "Commerce",
+    "summary": "Pulls recent orders from a connected store to close the gap a missed webhook leaves.",
+    "description": "A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held returns skipped_dupe. The store URL is operator-supplied, so the fetch goes through the shared SSRF guard: https only, DNS-resolved, private and link-local ranges refused. With discover_only it ingests nothing and instead returns the note_attribute / meta_data keys that actually appear on recent orders, counted, so the VAT-number and invoice-request keys are picked from what the shop really sends rather than guessed.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "connection_id",
+        "type": "string",
+        "required": true,
+        "desc": "The store_connections id to pull for. Membership is checked against the verified JWT."
+      },
+      {
+        "name": "days",
+        "type": "number",
+        "required": false,
+        "desc": "How far back to pull, 1-90. Default 7."
+      },
+      {
+        "name": "discover_only",
+        "type": "boolean",
+        "required": false,
+        "desc": "Return the observed attribute keys without ingesting anything."
+      }
+    ],
+    "response": [
+      {
+        "name": "scanned",
+        "type": "number",
+        "desc": "Orders returned by the store."
+      },
+      {
+        "name": "created",
+        "type": "number",
+        "desc": "Orders the webhook should have delivered and did not. This is the gap."
+      },
+      {
+        "name": "duplicate",
+        "type": "number",
+        "desc": "Already held, so skipped."
+      },
+      {
+        "name": "review",
+        "type": "number",
+        "desc": "Ingested but flagged: totals disagreed, or a line matched no product."
+      },
+      {
+        "name": "keys",
+        "type": "array",
+        "desc": "Attribute keys seen on recent orders, with a count each."
+      }
+    ]
   }
 ]

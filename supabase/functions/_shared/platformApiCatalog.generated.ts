@@ -2413,6 +2413,15 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "store-orders-sync",
+    "tag": "Commerce",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Pulls recent orders from a connected store to close the gap a missed webhook leaves.",
+    "description": "A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held return"
+  },
+  {
     "name": "stripe-api",
     "tag": "Payments",
     "methods": [

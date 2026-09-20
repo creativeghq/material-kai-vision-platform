@@ -59,6 +59,11 @@ export interface ConnectionPolicyPatch {
   invoice_request_key?: string | null;
 }
 
+export function webhookUrl(connectionId: string): string {
+  const base = (import.meta.env?.VITE_SUPABASE_URL as string | undefined) ?? '';
+  return `${base.replace(/\/$/, '')}/functions/v1/store-orders-webhook?connection=${encodeURIComponent(connectionId)}`;
+}
+
 export const storeConnectionsService = {
   async list(workspaceId: string): Promise<StoreConnection[]> {
     const { data, error } = await supabase.rpc('list_store_connections', { p_workspace_id: workspaceId });

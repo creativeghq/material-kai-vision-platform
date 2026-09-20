@@ -24,7 +24,7 @@ Deno.serve(withApiLogging('store-orders-webhook', async (req) => {
 
   const { data: conn } = await supabase
     .from('store_connections')
-    .select('id, workspace_id, platform, store_url, webhook_secret, enabled, vat_number_key, invoice_request_key')
+    .select('id, workspace_id, platform, store_url, webhook_secret, enabled, auto_issue_document, vat_number_key, invoice_request_key')
     .eq('id', connectionId)
     .maybeSingle();
 
@@ -80,6 +80,16 @@ Deno.serve(withApiLogging('store-orders-webhook', async (req) => {
     .update({ last_sync_at: new Date().toISOString(), last_error: null })
     .eq('id', conn.id);
 
+  const outcome = (result as Record<string, unknown>)?.outcome;
+  let document: unknown = null;
+  if (conn.auto_issue_document && outcome === 'created') {
+    const orderId = (result as Record<string, unknown>).order_id as string | undefined;
+    if (orderId) {
+      const { data: doc } = await supabase.rpc('issue_document_for_store_order', { p_order_id: orderId });
+      document = doc ?? null;
+    }
+  }
+
   // 200 even for needs_review: a non-2xx makes both platforms retry a delivery we already stored.
-  return json({ ok: true, ...(result as Record<string, unknown>) }, 200);
+  return json({ ok: true, ...(result as Record<string, unknown>), document }, 200);
 }));
