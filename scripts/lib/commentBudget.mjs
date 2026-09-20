@@ -37,7 +37,22 @@ export function isGeneratedFile(relPath, source) {
  * TypeScript's own parser when it is available, because only a real parser knows that `//` in
  * JSX text is not a comment. The lexer below is the fallback and cannot see JSX at all.
  */
+const scanCache = new Map();
+let scanCacheSize = 0;
+
 export function scanComments(text, fileName = 'file.tsx') {
+  const hit = scanCache.get(fileName)?.get(text);
+  if (hit) return hit;
+  const result = Object.freeze(scanCommentsUncached(text, fileName));
+  if (scanCacheSize > 8000) { scanCache.clear(); scanCacheSize = 0; }
+  let byText = scanCache.get(fileName);
+  if (!byText) { byText = new Map(); scanCache.set(fileName, byText); }
+  byText.set(text, result);
+  scanCacheSize++;
+  return result;
+}
+
+function scanCommentsUncached(text, fileName) {
   // Only a .tsx/.jsx file can hold JSX, and JSX is the one thing the lexer cannot see — so that
   // is the only case worth a parse. Parsing everything cost 50s on the guard test alone.
   if (!ts || !/\.[jt]sx$/.test(fileName)) return scanWithLexer(text);
