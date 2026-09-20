@@ -16391,5 +16391,68 @@
         "desc": "Attribute keys seen on recent orders, with a count each."
       }
     ]
+  },
+  {
+    "name": "finance-document-link",
+    "tag": "Finance",
+    "summary": "Redirects a document token to a freshly signed link to the PDF.",
+    "description": "Public and token-only. The token is stable and revocable (set invoices.document_token to NULL); the storage URL it redirects to is minted per request and expires in an hour. That split is deliberate: writing a signed URL into a Shopify metafield or a WooCommerce order note would hand the merchant a link that dies when the signature does, and persisting a URL for a private bucket is forbidden anyway. A draft is refused, because a document with no legal number does not exist as far as AADE is concerned.",
+    "security": [
+      "queryToken"
+    ],
+    "docs": null,
+    "methods": [
+      "GET"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "token",
+        "type": "string",
+        "required": true,
+        "desc": "invoices.document_token."
+      }
+    ],
+    "response": [
+      {
+        "name": "302",
+        "type": "string",
+        "desc": "Location: a signed storage URL valid for one hour."
+      }
+    ]
+  },
+  {
+    "name": "store-document-writeback",
+    "tag": "Commerce",
+    "summary": "Hands the issued fiscal document back to the store the order came from.",
+    "description": "Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guard, https only. A draft is refused. Every attempt, successful or not, lands in store_order_sync_log.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "invoice_id",
+        "type": "string",
+        "required": true,
+        "desc": "The issued invoice to hand back. Its order must have come from a channel."
+      }
+    ],
+    "response": [
+      {
+        "name": "link",
+        "type": "string",
+        "desc": "The stable document link written upstream."
+      },
+      {
+        "name": "number",
+        "type": "string",
+        "desc": "The document number written alongside it."
+      }
+    ]
   }
 ]

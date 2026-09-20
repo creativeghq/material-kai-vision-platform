@@ -24,7 +24,7 @@ Deno.serve(withApiLogging('store-orders-webhook', async (req) => {
 
   const { data: conn } = await supabase
     .from('store_connections')
-    .select('id, workspace_id, platform, store_url, webhook_secret, enabled, auto_issue_document, vat_number_key, invoice_request_key')
+    .select('id, workspace_id, platform, store_url, webhook_secret, enabled, auto_issue_document, auto_send_document_back, vat_number_key, invoice_request_key')
     .eq('id', connectionId)
     .maybeSingle();
 
@@ -87,6 +87,17 @@ Deno.serve(withApiLogging('store-orders-webhook', async (req) => {
     if (orderId) {
       const { data: doc } = await supabase.rpc('issue_document_for_store_order', { p_order_id: orderId });
       document = doc ?? null;
+      const invoiceId = (doc as Record<string, unknown> | null)?.invoice_id as string | undefined;
+      if (conn.auto_send_document_back && invoiceId && (doc as Record<string, unknown>)?.outcome === 'issued') {
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/store-document-writeback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ invoice_id: invoiceId }),
+        }).catch(() => { });
+      }
     }
   }
 

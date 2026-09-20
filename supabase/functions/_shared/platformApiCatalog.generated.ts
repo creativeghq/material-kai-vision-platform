@@ -2413,6 +2413,15 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "store-document-writeback",
+    "tag": "Commerce",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Hands the issued fiscal document back to the store the order came from.",
+    "description": "Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guar"
+  },
+  {
     "name": "store-orders-sync",
     "tag": "Commerce",
     "methods": [
