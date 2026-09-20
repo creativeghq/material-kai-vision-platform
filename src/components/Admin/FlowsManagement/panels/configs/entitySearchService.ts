@@ -171,6 +171,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'storage-orphan-cleanup-cron', label: 'storage-orphan-cleanup-cron', sublabel: 'Nightly cron (04:00 UTC): delete storage objects with no live DB reference' },
   { id: 'stripe-api', label: 'stripe-api', sublabel: 'Stripe Checkout and Customer Portal session creator' },
   { id: 'stripe-connect', label: 'stripe-connect', sublabel: 'Stripe Connect onboarding and status for per-workspace payouts' },
+  { id: 'store-orders-webhook', label: 'store-orders-webhook', sublabel: 'Receives orders from a connected sales channel (Shopify, WooCommerce, generic).' },
   { id: 'stripe-webhooks', label: 'stripe-webhooks', sublabel: 'Stripe webhook receiver for subscription, payment, and invoice events' },
   { id: 'supplier-orders-api', label: 'supplier-orders-api', sublabel: 'Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back' },
   { id: 'taric-classify', label: 'taric-classify', sublabel: 'Propose a TARIC commodity code for catalog products' },

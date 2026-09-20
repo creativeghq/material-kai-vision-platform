@@ -17,9 +17,9 @@ import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import { COMMERCE_PLATFORMS, type CommercePlatform } from '@/modules/commerce/commerceVocabulary';
+import { generateWebhookSecret, WOO_UNSAFE_SECRET } from '@/modules/commerce/webhookSecret';
 import {
-  storeConnectionsService, generateWebhookSecret, WOO_UNSAFE_SECRET,
-  type StoreConnection, type StoreSyncLogRow,
+  storeConnectionsService, type StoreConnection, type StoreSyncLogRow,
 } from '@/services/commerce/storeConnectionsService';
 
 const PLATFORM_LABEL: Record<CommercePlatform, string> = {

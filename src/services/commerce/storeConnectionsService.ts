@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { CommercePlatform, SyncOutcome } from '@/modules/commerce/commerceVocabulary';
+import { WOO_UNSAFE_SECRET } from '@/modules/commerce/webhookSecret';
 
 export interface StoreConnection {
   id: string;
@@ -38,14 +39,6 @@ export interface StoreSyncLogRow {
   invoice_id: string | null;
   message: string | null;
   created_at: string;
-}
-
-export const WOO_UNSAFE_SECRET = /[&'"<>]/;
-
-export function generateWebhookSecret(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 export interface ConnectionPolicyPatch {

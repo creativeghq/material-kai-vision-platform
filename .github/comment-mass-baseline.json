@@ -1,5 +1,5 @@
 {
-  "total": 79086,
+  "total": 79087,
   "areas": {
     "api": 20,
     "cloudflare": 31,
@@ -9,7 +9,7 @@
     "src/api": 33,
     "src/App.tsx": 159,
     "src/auth": 148,
-    "src/components": 12284,
+    "src/components": 12275,
     "src/config": 1195,
     "src/constants": 32,
     "src/contexts": 114,
@@ -27,7 +27,7 @@
     "src/utils": 917,
     "src/vite-env.d.ts": 1,
     "src/_system": 25,
-    "supabase/functions": 25776,
+    "supabase/functions": 25786,
     "tailwind.config.ts": 27,
     "tests/e2e": 48,
     "tests/fixtures": 46,

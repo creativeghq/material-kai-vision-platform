@@ -16251,5 +16251,55 @@
         }
       }
     }
+  },
+  {
+    "name": "store-orders-webhook",
+    "tag": "Commerce",
+    "summary": "Receives orders from a connected sales channel (Shopify, WooCommerce, generic).",
+    "description": "Accepts POST from a store connected in Sales Channels, identified by ?connection=<uuid>. The signature is verified over the RAW body before any parse — X-Shopify-Hmac-Sha256 or X-WC-Webhook-Signature, HMAC-SHA256 base64 against the connection's webhook secret, compared in constant time — and an unset secret fails closed with 503. WooCommerce deliveries additionally have X-WC-Webhook-Source checked against the connection's store URL. The payload is mapped to a canonical order and written through upsert_inbound_order, which is idempotent on (connection, external order id): a replay is recorded as skipped_dupe, never a second order. Returns 200 even when the order lands for review, because a non-2xx makes both platforms retry a delivery already stored.",
+    "security": [
+      "storeWebhookSignature"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "connection",
+        "type": "string",
+        "required": true,
+        "desc": "Query parameter: the store_connections id this delivery belongs to."
+      },
+      {
+        "name": "<platform payload>",
+        "type": "object",
+        "required": true,
+        "desc": "The store's native order payload, verbatim. Shopify Order, WooCommerce Order, or the generic canonical shape."
+      }
+    ],
+    "response": [
+      {
+        "name": "ok",
+        "type": "boolean",
+        "desc": "True when the delivery was accepted."
+      },
+      {
+        "name": "outcome",
+        "type": "string",
+        "desc": "created | updated | skipped_dupe | needs_review | error"
+      },
+      {
+        "name": "order_id",
+        "type": "string",
+        "desc": "The sales order written, when one was created."
+      },
+      {
+        "name": "unmatched_lines",
+        "type": "number",
+        "desc": "Lines that matched no product, and therefore carry no cost."
+      }
+    ]
   }
 ]

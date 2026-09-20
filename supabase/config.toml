@@ -184,6 +184,11 @@ verify_jwt = false
 [functions.real-estate-feed]
 verify_jwt = false
 
+# #386 — commerce channel webhooks. Signature-verified per connection (readVerifiedWebhook),
+# so a JWT would be meaningless: Shopify and WooCommerce cannot send one.
+[functions.store-orders-webhook]
+verify_jwt = false
+
 # #219 — Surplus marketplace price check. Resolves market price (via MIVAA market-check) + tells the
 # seller if a listing price is within the Operator cap. authenticate() handles auth internally.
 [functions.marketplace-price-check]
