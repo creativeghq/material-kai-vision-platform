@@ -57,7 +57,7 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'analytics-funnel', label: 'Funnel', icon: Filter, group: 'audience' },
   { value: 'analytics-retention', label: 'Retention', icon: Repeat, group: 'audience' },
 
-  { value: 'ai', label: 'AI Visibility', icon: Sparkles, group: 'visibility' },
+  { value: 'ai', label: 'AI Citations', icon: Sparkles, group: 'visibility' },
   { value: 'rankings', label: 'Backlinks & Authority', icon: TrendingUp, group: 'visibility' },
   { value: 'competitors', label: 'Competitors', icon: Swords, group: 'visibility' },
   { value: 'domains', label: 'Domain Audits', icon: Radar, group: 'visibility' },

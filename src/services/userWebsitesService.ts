@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import type { AiCitationReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -656,6 +657,8 @@ export interface AiAnswers {
   window_days: number;
   questions: AiQuestion[];
 }
+
+export type { AiCitationReport, AiEngine, AiRate, AiRival } from '@/components/core/Profile/seo/aiCitations';
 
 export interface AiVisibility {
   status: string;
@@ -1513,6 +1516,15 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as AiVisibility) ?? null;
+  },
+
+  async aiCitationReport(websiteId: string, days = 90): Promise<AiCitationReport | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_ai_citation_report' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as AiCitationReport) ?? null;
   },
 
   /** The matrix behind the visibility figures: every assistant's latest reply to every question. */

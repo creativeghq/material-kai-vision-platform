@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bot, Loader2, MessageSquareQuote, Play, Power, Plus, Users } from 'lucide-react';
+import { AlertTriangle, Bot, Loader2, MessageSquareQuote, Play, Power, Plus, Quote, Users } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -11,7 +11,9 @@ import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import {
   userWebsitesService,
   type AiAnswers,
+  type AiCitationReport,
   type AiMonitoringState,
+  type AiRival,
   type AiVisibility,
   type UserWebsite,
 } from '@/services/userWebsitesService';
@@ -25,41 +27,13 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkline } from './seo/Sparkline';
+import { cn } from '@/lib/utils';
 import { timeAgo } from '@/utils/datetime';
+import { AiEngineCard } from './seo/AiEngineCard';
+import {
+  VERDICT_BADGE, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
+} from './seo/aiCitations';
 import { compact } from './seo/seoMetrics';
-
-/** Websites → AI Visibility. */
-
-/** A model's own display name. Never invent a vendor label we cannot verify. */
-function modelLabel(model: string): string {
-  if (model.startsWith('claude')) return 'Claude';
-  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3')) return 'ChatGPT';
-  if (model === 'sonar' || model.startsWith('sonar')) return 'Perplexity';
-  if (model.startsWith('gemini')) return 'Gemini';
-  return model;
-}
-
-function ShareCell({ share, note }: { share: number | null; note: string | null }) {
-  if (share == null) {
-    return (
-      <div className="flex items-center justify-end gap-1.5">
-        <AlertTriangle className="h-3 w-3 text-amber-700 dark:text-amber-300" aria-hidden="true" />
-        <span className="text-xs font-medium text-amber-800 dark:text-amber-300" title={note ?? undefined}>
-          No verdict
-        </span>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center justify-end gap-2">
-      <div className="h-1.5 w-16 overflow-hidden rounded-sm bg-muted" aria-hidden="true">
-        <div className="h-full bg-primary" style={{ width: `${Math.min(share, 100)}%` }} />
-      </div>
-      <span className="w-12 text-right text-sm font-semibold tabular-nums text-foreground">{share}%</span>
-    </div>
-  );
-}
 
 /** The feed's own health, above its numbers. */
 function MonitoringBanner({
@@ -117,14 +91,41 @@ function MonitoringBanner({
   );
 }
 
+const RivalList: React.FC<{ rivals: AiRival[]; empty: string }> = ({ rivals, empty }) => {
+  if (rivals.length === 0) {
+    return <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>;
+  }
+  const top = rivals[0].answers || 1;
+  return (
+    <ol className="space-y-2">
+      {rivals.map((r, i) => (
+        <li key={r.domain ?? r.name} className="flex items-center gap-3">
+          <span className="w-4 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
+          <span className="w-44 shrink-0 truncate text-xs text-foreground" title={r.domain ?? r.name}>
+            {r.domain ?? r.name}
+          </span>
+          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-sm bg-muted">
+            <div className="h-full bg-primary/60" style={{ width: `${(r.answers / top) * 100}%` }} />
+          </div>
+          <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{r.answers}</span>
+          <span className="hidden w-28 shrink-0 truncate text-[11px] text-muted-foreground sm:block">
+            {r.engines.map(modelLabel).join(', ')}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+};
+
 export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
   const [data, setData] = useState<AiVisibility | null>(null);
+  const [report, setReport] = useState<AiCitationReport | null>(null);
   const [state, setState] = useState<AiMonitoringState | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   // What the tier ASKS for versus what can run. A model dropped for a missing key leaves
-  // no row anywhere, so "By assistant" showing two rows read as a two-assistant design.
+  // no row anywhere, so a two-engine report read as a two-engine design.
   const [roster, setRoster] = useState<ProbeProviderRoster | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -140,14 +141,16 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     try {
       // `allSettled`: the monitoring state is the thing that EXPLAINS an empty or
       // stale report, so it must still render when the report itself fails.
-      const [v, m, a] = await Promise.allSettled([
+      const [v, m, a, c] = await Promise.allSettled([
         userWebsitesService.aiVisibility(website.id, 90),
         userWebsitesService.aiMonitoringState(website.id),
         userWebsitesService.aiAnswers(website.id, 90),
+        userWebsitesService.aiCitationReport(website.id, 90),
       ]);
       setData(v.status === 'fulfilled' ? v.value : null);
       setState(m.status === 'fulfilled' ? m.value : null);
       setAnswers(a.status === 'fulfilled' ? a.value : null);
+      setReport(c.status === 'fulfilled' ? c.value : null);
     } finally {
       setLoading(false);
     }
@@ -163,20 +166,16 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         subject_label: label,
         // `brand_name` is REQUIRED by `chk_tracked_mentions_subject` for a brand or
         // keyword subject that carries no product_id. Sending only `subject_label`
-        // passed the route's own validation and died one layer down as a raw 23514
-        // check violation surfaced as a 500 — the API accepts a shape the constraint
-        // rejects, which is the vocabulary-wider-than-the-CHECK trap.
+        // passes the route's own validation and dies one layer down as a raw 23514.
         brand_name: label,
         homepage_domain: state?.site_host,
         // Switched ON at creation. Every existing subject in this workspace was
-        // created inactive and silently never probed; repeating that default here
-        // would reproduce the exact defect this panel exists to surface.
+        // created inactive and silently never probed.
         sources_enabled: { llm: true, news: true, blogs: true, rss: true, youtube: false },
         run_first_refresh: false,
       });
       // Attach it to THIS site. Without the link the subject is workspace-level and
-      // this panel deliberately ignores it — which is exactly the bug that put price
-      // monitoring subjects into a website's AI Visibility report.
+      // this panel deliberately ignores it.
       if (created?.id) {
         const { error: linkErr } = await supabase
           .from('tracked_mentions')
@@ -251,7 +250,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       aliases: ((data as any)?.aliases ?? []).join(', '),
       languages: ((data as any)?.language_codes ?? []).join(', '),
       countries: ((data as any)?.country_codes ?? []).join(', '),
-      // Absent means ON (an existing subject must not silently lose its baseline); only an explicit false is off.
+      // Absent means ON; only an explicit false is off.
       includeDefaults: cfg.include_default_probes !== false,
     });
     setEditing(true);
@@ -351,10 +350,10 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Bot className="h-4 w-4 text-primary" />
-            AI Visibility
+            AI Citations
           </CardTitle>
           <CardDescription>
-            What AI assistants say about you when someone asks for a recommendation.
+            What the assistants answer when a buyer asks for what you sell — and who they cite instead of you.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -366,10 +365,18 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           )}
           <HubEmptyState
             variant="empty"
-            title="Nothing is being probed yet"
+            title="Nothing is being asked yet"
             description={
               data?.note ||
-              'Add a brand or product as a tracked subject and we will ask the assistants about it on a schedule, then report who they name.'
+              'Track this site’s brand and we will put a buyer’s questions to every assistant on a schedule, then report who gets named and cited.'
+            }
+            action={
+              state && !state.own_brand_tracked && !state.own_brand_subject_id ? (
+                <Button size="sm" disabled={!!busy} onClick={trackOwnBrand}>
+                  {busy === 'track' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
+                  Track this site&rsquo;s brand
+                </Button>
+              ) : undefined
             }
           />
         </CardContent>
@@ -380,115 +387,69 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const t = data.totals;
   const failedShare = t.probes > 0 ? Math.round((t.failed / t.probes) * 100) : 0;
   const sentimentTotal = Object.values(data.sentiment).reduce((s, n) => s + n, 0);
+  const engines = report?.engines ?? [];
+  const citedInstead = report?.cited_instead ?? [];
+  const namedInstead = report?.named_instead ?? [];
+  // Nobody browsed, so "cited" has no denominator. Say it once, at the top.
+  const noSources = report?.status === 'no_sources';
 
   return (
     <div className="space-y-4">
       {editorDialog}
-      {/* ── Headline ───────────────────────────────────────────────────── */}
+
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Bot className="h-4 w-4 text-primary" />
-            AI Visibility
-          </CardTitle>
-          <CardDescription>
-            {compact(t.answered)} answered probes across {data.models.length} assistants, over the last{' '}
-            {data.window_days} days · last run {timeAgo(t.last_run_at)}
-          </CardDescription>
-          {/* Always offered, not only inside the diagnosis banner: after the questions are
-              edited, the numbers on this screen are answers to the OLD questions until a run
-              happens, and the nightly one is at 03:00 UTC. */}
-          {state?.own_brand_subject_id && !state.own_brand_inactive && (
-            <div className="mt-2">
-              <Button size="sm" variant="outline" disabled={!!busy} onClick={() => runNow(state.own_brand_subject_id!)}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Bot className="h-4 w-4 text-primary" />
+                AI Citations
+              </CardTitle>
+              <CardDescription>
+                What the assistants answer when a buyer asks for what you sell — and who they cite instead of
+                you. {compact(t.answered)} answered questions across {data.models.length} assistants over{' '}
+                {data.window_days} days · last asked {timeAgo(t.last_run_at)}
+                {report?.totals.cost_usd ? ` · ${formatUsd(report.totals.cost_usd)} spent` : ''}
+              </CardDescription>
+            </div>
+            {state?.own_brand_subject_id && !state.own_brand_inactive && (
+              <Button size="sm" variant="secondary" className="shrink-0" disabled={!!busy} onClick={() => runNow(state.own_brand_subject_id!)}>
                 {busy === 'run' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Play className="mr-1 h-3.5 w-3.5" />}
                 Run probes now
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {state && (
             <MonitoringBanner
               state={state} busy={busy}
               onTrack={trackOwnBrand} onTurnOn={turnOn} onRun={runNow}
             />
           )}
+          {noSources && report?.note && (
+            <div className="flex items-start gap-2 rounded-sm border border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
+              <Quote className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>{report.note}</span>
+            </div>
+          )}
           {failedShare >= 10 && (
             <div className="flex items-start gap-2 rounded-sm border border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>
-                {compact(t.failed)} of {compact(t.probes)} probes ({failedShare}%) failed and were excluded from
-                every figure here. A failed probe is not an absent mention — where a whole assistant failed, it
-                is marked <b>No verdict</b> below rather than 0%.
+                {compact(t.failed)} of {compact(t.probes)} questions ({failedShare}%) never got an answer and are
+                excluded from every rate here. A failed call is not an absent mention — where a whole assistant
+                failed it reads <b>Unknown</b> below, never 0%.
               </span>
             </div>
           )}
-
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground">Share of voice</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-                {t.share_of_voice != null ? `${t.share_of_voice}%` : 'Unknown'}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                named in {compact(t.mentioned)} of {compact(t.answered)} answers
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground">Avg. mention rank</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-                {t.avg_position != null ? `#${t.avg_position}` : '—'}
-              </p>
-              <p className="text-[11px] text-muted-foreground">position in the list when named</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground">Subjects probed</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{t.subjects_probed}</p>
-              <p className="text-[11px] text-muted-foreground">of {data.subjects_tracked} tracked</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground">Answers citing you</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-                {t.with_citations > 0 ? compact(t.with_citations) : 'Not captured'}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {t.with_citations > 0
-                  ? 'answers that linked your site'
-                  : 'no probe in this window recorded citation links'}
-              </p>
-            </div>
-          </div>
-
-          {data.trend.filter((p) => p.v != null).length >= 2 && (
-            <div className="border-t border-hairline pt-3">
-              <p className="mb-1 text-xs text-muted-foreground">Share of voice, weekly</p>
-              <Sparkline
-                points={data.trend.filter((p) => p.v != null).map((p) => p.v as number)}
-                className="h-12 w-full"
-                ariaLabel="Weekly share of voice"
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ── By assistant ───────────────────────────────────────────────── */}
-      <Card className="dashboard-card">
-        <CardHeader>
-          <CardTitle className="text-base">By assistant</CardTitle>
-          <CardDescription>
-            Each assistant is a different audience with a different answer. A row with no verdict had no
-            successful probe — that is a broken feed, not an absence of mentions.
-          </CardDescription>
           {(() => {
-            // The default ("cheap") tier is what every subject runs unless switched to
-            // frontier in Mention Monitoring; that roster is the one to explain here.
+            // The "cheap" tier is what every subject runs unless switched to frontier.
             const wanted = roster?.tiers?.cheap ?? [];
             const missing = wanted.filter((m) => !m.enabled);
             if (!roster || wanted.length === 0) return null;
             return (
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {wanted.map((m) => (
                   <Badge key={m.model} variant={m.enabled ? 'neutral' : 'warning'} title={`${m.provider} key: ${m.key_source}`}>
                     {modelLabel(m.model)}{m.enabled ? '' : ' — no key configured'}
@@ -502,146 +463,69 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
               </div>
             );
           })()}
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Assistant</TableHead>
-                  <TableHead className="text-right">Answered</TableHead>
-                  <TableHead className="text-right">Failed</TableHead>
-                  <TableHead className="text-right">Named you</TableHead>
-                  <TableHead className="text-right">Avg. rank</TableHead>
-                  <TableHead className="text-right">Share of voice</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.models.map((m) => (
-                  <TableRow key={m.model}>
-                    <TableCell>
-                      <div className="font-medium text-foreground">{modelLabel(m.model)}</div>
-                      <div className="text-[11px] text-muted-foreground">{m.model}</div>
-                      {m.note && (
-                        <div className="mt-1 max-w-md text-[11px] leading-snug text-amber-800 dark:text-amber-300">
-                          {m.note}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{m.answered}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {m.failed > 0 ? (
-                        <Badge variant="warning">{m.failed}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{m.mentioned}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {m.avg_position != null ? `#${m.avg_position}` : '—'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <ShareCell share={m.share_of_voice} note={m.note} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
         </CardContent>
       </Card>
 
-      {/* ── Subjects ───────────────────────────────────────────────────── */}
-      {data.subjects.length > 0 && (
-        <Card className="dashboard-card">
-          <CardHeader>
-            <CardTitle className="text-base">By subject</CardTitle>
-            <CardDescription>Which of your brands and products the assistants actually know.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Answered</TableHead>
-                    <TableHead className="text-right">Named</TableHead>
-                    <TableHead className="text-right">Share of voice</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.subjects.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="max-w-[280px] truncate font-medium">{s.label}</TableCell>
-                      <TableCell className="text-muted-foreground capitalize">{s.subject_type}</TableCell>
-                      <TableCell className="text-right tabular-nums">{s.answered}</TableCell>
-                      <TableCell className="text-right tabular-nums">{s.mentioned}</TableCell>
-                      <TableCell className="text-right">
-                        <ShareCell
-                          share={s.share_of_voice}
-                          note={s.status !== 'ok' ? 'No probe for this subject answered in this window.' : null}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+      {engines.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {engines.map((e) => (
+            <AiEngineCard key={e.model} engine={e} citedInstead={citedInstead} namedInstead={namedInstead} />
+          ))}
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* ── Competitors ─────────────────────────────────────────────── */}
+        <Card className="dashboard-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Quote className="h-4 w-4 text-primary" />
+              Cited instead of you
+            </CardTitle>
+            <CardDescription>
+              The pages an assistant linked as its source in answers that did <b>not</b> link yours. This is the
+              page you have to beat, not a brand you have to out-shout.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RivalList
+              rivals={citedInstead}
+              empty={
+                noSources
+                  ? 'No assistant returned a single source in this window, so there is nothing to compare against — this is unknown, not "nobody beat you".'
+                  : 'Every sourced answer in this window linked you.'
+              }
+            />
+          </CardContent>
+        </Card>
+
         <Card className="dashboard-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4 text-primary" />
-              Who they name instead
+              Named instead of you
             </CardTitle>
             <CardDescription>
-              Brands the assistants mentioned in the same answers. This is the competitive set as the model sees
-              it, which is not always the one you would list.
+              Brands the assistants reached for in answers that never mentioned you. This is the competitive set
+              as the model sees it, which is not always the one you would list.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {data.competitors.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No competing brands were named in these answers.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {data.competitors.map((c) => {
-                  const top = data.competitors[0].mentions || 1;
-                  return (
-                    <div key={c.name} className="flex items-center gap-3">
-                      <span className="w-40 shrink-0 truncate text-xs text-foreground">{c.name}</span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-sm bg-muted">
-                        <div className="h-full bg-primary/60" style={{ width: `${(c.mentions / top) * 100}%` }} />
-                      </div>
-                      <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
-                        {c.mentions}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <RivalList rivals={namedInstead} empty="No competing brand was named in an answer that left you out." />
           </CardContent>
         </Card>
+      </div>
 
-        {/* ── Prompts ─────────────────────────────────────────────────── */}
-        <Card className="dashboard-card">
-          <CardHeader className="flex flex-row items-start justify-between gap-3">
-            <div>
+      <Card className="dashboard-card">
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 text-base">
                 <MessageSquareQuote className="h-4 w-4 text-primary" />
-                Questions we asked
+                Question by question
               </CardTitle>
               <CardDescription>
-                The prompts behind these numbers, and how often each one produced a mention. They are the
-                measurement — if they are not what your customers ask, nothing below means anything.
+                Every assistant&rsquo;s latest answer to every question we ask. They are the measurement — if they
+                are not what your customers ask, nothing above means anything.
               </CardDescription>
             </div>
             {state?.own_brand_subject_id && (
@@ -649,93 +533,140 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                 Edit questions
               </Button>
             )}
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const questions = answers?.questions ?? [];
-              if (questions.length === 0) {
-                return <p className="py-6 text-center text-sm text-muted-foreground">No prompts recorded.</p>;
-              }
-              // Every assistant the tier asks for gets a row on every question, so an
-              // assistant that never ran (no key, unfunded) is a visible gap next to the
-              // ones that answered — not a column that quietly does not exist.
-              const rosterModels = (roster?.tiers?.cheap ?? []).map((m) => m.model);
-              const seenModels = Array.from(new Set(questions.flatMap((q) => q.answers.map((a) => a.model))));
-              const allModels = Array.from(new Set([...rosterModels, ...seenModels]));
-              return (
-                <div className="space-y-4">
-                  {questions.map((q) => (
-                    <div key={`${q.subject}:${q.template_key}`} className="rounded-sm border border-hairline p-3">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-xs font-medium leading-snug text-foreground">{q.prompt_text}</p>
-                        <span className="shrink-0 text-[11px] text-muted-foreground" title={q.template_key}>
-                          asked {timeAgo(q.asked_at)}
-                        </span>
-                      </div>
-                      <div className="mt-2 space-y-1.5">
-                        {allModels.map((model) => {
-                          const a = q.answers.find((x) => x.model === model);
-                          const rosterEntry = roster?.tiers?.cheap?.find((m) => m.model === model);
-                          const key = `${q.subject}:${q.template_key}:${model}`;
-                          const open = !!openAnswer[key];
-                          return (
-                            <div key={model} className="rounded-sm bg-surface-sunken px-2.5 py-1.5">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="w-24 shrink-0 text-xs font-medium text-foreground">{modelLabel(model)}</span>
-                                {!a ? (
-                                  <Badge variant="warning">
-                                    {rosterEntry && !rosterEntry.enabled ? 'not run — no key configured' : 'not run'}
-                                  </Badge>
-                                ) : a.error ? (
-                                  <Badge variant="warning" title={a.error}>failed — {a.error.slice(0, 40)}</Badge>
-                                ) : a.mentioned ? (
-                                  <Badge variant="success">named you{a.position != null ? ` · #${a.position}` : ''}{a.brand_cited ? ' · linked' : ''}</Badge>
-                                ) : (
-                                  <Badge variant="neutral">did not name you</Badge>
-                                )}
-                                {a && !a.error && a.competitors.length > 0 && (
-                                  <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={a.competitors.join(', ')}>
-                                    named: {a.competitors.slice(0, 6).join(', ')}{a.competitors.length > 6 ? ` +${a.competitors.length - 6}` : ''}
-                                  </span>
-                                )}
-                                {a && !a.error && a.answer && (
-                                  <button
-                                    type="button"
-                                    className="ml-auto shrink-0 text-[11px] text-primary hover:underline"
-                                    onClick={() => setOpenAnswer((s) => ({ ...s, [key]: !open }))}
-                                  >
-                                    {open ? 'Hide answer' : 'Show answer'}
-                                  </button>
-                                )}
-                              </div>
-                              {a && !a.error && open && (
-                                <div className="mt-2 border-t border-hairline pt-2">
-                                  <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground">
-                                    {a.answer}{a.answer_truncated ? ' …' : ''}
-                                  </p>
-                                  {a.cited_urls.length > 0 && (
-                                    <p className="mt-1.5 text-[11px] text-muted-foreground">
-                                      Cited: {a.cited_urls.slice(0, 5).map((u, i) => (
-                                        <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="mr-2 text-primary hover:underline">{u.replace(/^https?:\/\//, '').slice(0, 40)}</a>
-                                      ))}
-                                    </p>
-                                  )}
-                                </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const questions = answers?.questions ?? [];
+            if (questions.length === 0) {
+              return <p className="py-6 text-center text-sm text-muted-foreground">No questions recorded.</p>;
+            }
+            // Every assistant the tier asks for gets a chip, so one that never ran is
+            // a visible gap rather than a column that quietly does not exist.
+            const rosterModels = (roster?.tiers?.cheap ?? []).map((m) => m.model);
+            const seenModels = Array.from(new Set(questions.flatMap((q) => q.answers.map((a) => a.model))));
+            const allModels = Array.from(new Set([...rosterModels, ...seenModels]));
+            return (
+              <ul className="space-y-2.5">
+                {questions.map((q) => (
+                  <li key={`${q.subject}:${q.template_key}`} className="rounded-sm border border-hairline">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 bg-surface-sunken px-3 py-2">
+                      <p className="min-w-0 flex-1 text-xs font-medium leading-snug text-foreground">{q.prompt_text}</p>
+                      <span className="shrink-0 text-[11px] text-muted-foreground" title={q.template_key}>
+                        {q.subject} · asked {timeAgo(q.asked_at)}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-hairline">
+                      {allModels.map((model) => {
+                        const a = q.answers.find((x) => x.model === model);
+                        const rosterEntry = roster?.tiers?.cheap?.find((m) => m.model === model);
+                        const verdict = answerVerdict(a);
+                        const key = `${q.subject}:${q.template_key}:${model}`;
+                        const open = !!openAnswer[key];
+                        return (
+                          <div key={model} className="px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="w-20 shrink-0 text-xs font-medium text-foreground">{modelLabel(model)}</span>
+                              <Badge
+                                variant={VERDICT_BADGE[verdict]}
+                                title={verdict === 'failed' ? (a?.error ?? undefined) : undefined}
+                              >
+                                {verdict === 'not_run' && rosterEntry && !rosterEntry.enabled
+                                  ? 'Not run — no key'
+                                  : VERDICT_LABEL[verdict]}
+                                {verdict === 'named' && a?.position != null ? ` · #${a.position}` : ''}
+                              </Badge>
+                              {a && !a.error && a.cited_urls.length > 0 && (
+                                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                                  sources: {a.cited_urls.slice(0, 4).map(displayHost).join(', ')}
+                                  {a.cited_urls.length > 4 ? ` +${a.cited_urls.length - 4}` : ''}
+                                </span>
+                              )}
+                              {a && !a.error && a.cited_urls.length === 0 && a.competitors.length > 0 && (
+                                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={a.competitors.join(', ')}>
+                                  named: {a.competitors.slice(0, 5).join(', ')}
+                                  {a.competitors.length > 5 ? ` +${a.competitors.length - 5}` : ''}
+                                </span>
+                              )}
+                              {a && !a.error && a.answer && (
+                                <button
+                                  type="button"
+                                  className="ml-auto shrink-0 text-[11px] text-primary hover:underline"
+                                  onClick={() => setOpenAnswer((s) => ({ ...s, [key]: !open }))}
+                                >
+                                  {open ? 'Hide answer' : 'Show answer'}
+                                </button>
                               )}
                             </div>
-                          );
-                        })}
-                      </div>
+                            {a && !a.error && open && (
+                              <div className="mt-2 border-t border-hairline pt-2">
+                                <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground">
+                                  {a.answer}{a.answer_truncated ? ' …' : ''}
+                                </p>
+                                {a.cited_urls.length > 0 && (
+                                  <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                                    {a.cited_urls.slice(0, 8).map((u, i) => (
+                                      <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                        {displayHost(u)}
+                                      </a>
+                                    ))}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              );
-            })()}
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      {data.subjects.length > 1 && (
+        <Card className="dashboard-card">
+          <CardHeader>
+            <CardTitle className="text-base">By subject</CardTitle>
+            <CardDescription>Which of your brands and products the assistants actually know.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Answered</TableHead>
+                  <TableHead className="text-right">Named</TableHead>
+                  <TableHead className="text-right">Named rate</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.subjects.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="max-w-[280px] truncate font-medium">{s.label}</TableCell>
+                    <TableCell className="capitalize text-muted-foreground">{s.subject_type}</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.answered}</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.mentioned}</TableCell>
+                    <TableCell className="text-right">
+                      {s.share_of_voice == null ? (
+                        <span className={cn('text-xs font-medium', 'text-amber-800 dark:text-amber-300')}>
+                          Unknown
+                        </span>
+                      ) : (
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{s.share_of_voice}%</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      {/* ── Sentiment ──────────────────────────────────────────────────── */}
       {sentimentTotal > 0 && (
         <Card className="dashboard-card">
           <CardHeader>
@@ -743,7 +674,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             <CardDescription>Tone of the answers that named you, across {sentimentTotal} mentions.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-6">
               {Object.entries(data.sentiment).map(([k, n]) => (
                 <div key={k}>
                   <p className="text-[11px] capitalize text-muted-foreground">{k}</p>
