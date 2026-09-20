@@ -62,7 +62,8 @@ export async function readVerifiedWebhook(
     // One tenant's leaked secret plus a spoofed body must not reach another's connection.
     const claimed = normaliseStoreUrl(req.headers.get('x-wc-webhook-source'));
     const expected = normaliseStoreUrl(connection.store_url);
-    if (expected && claimed && claimed !== expected) {
+    // A MISSING source is unverifiable, not acceptable — Woo always sends it.
+    if (expected && claimed !== expected) {
       throw new WebhookRefusal(404, 'Not found');
     }
   }

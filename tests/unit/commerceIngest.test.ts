@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { normaliseMoney, MONEY_TOLERANCE } from '../../supabase/functions/_shared/commerce/money';
-import { normaliseStoreUrl } from '../../supabase/functions/_shared/commerce/verify';
+import { normaliseStoreUrl, readVerifiedWebhook, WebhookRefusal } from '../../supabase/functions/_shared/commerce/verify';
 import { fromShopify, fromWooCommerce } from '../../supabase/functions/_shared/commerce/adapters';
 import { generateWebhookSecret, WOO_UNSAFE_SECRET } from '../../src/modules/commerce/webhookSecret';
 
@@ -55,13 +55,37 @@ describe('§12.4 gross vs net — our reading is checked against theirs', () => 
     expect(wrong.totalDelta).toBeGreaterThan(MONEY_TOLERANCE);
   });
 
-  it('counts shipping into the comparison, because the platform states it in the total', () => {
+  it('refuses to reconcile when the VAT disagrees even though the gross total matches', () => {
     const m = normaliseMoney(
-      [{ name: 'A', qty: 1, unit_price: 100, vat_percent: 24 }],
-      { total: 134, vat: 24, shipping_cost: 10 },
+      [{ name: 'A', qty: 2, unit_price: 50, vat_percent: 24 }],
+      { total: 124, vat: 13 },
       false,
     );
-    expect(m.reconciles).toBe(true);
+    expect(m.totalDelta).toBeLessThanOrEqual(MONEY_TOLERANCE);
+    expect(m.vatDelta).toBeGreaterThan(MONEY_TOLERANCE);
+    expect(m.reconciles).toBe(false);
+  });
+
+  it('carries shipping as a taxed revenue line, so its VAT is counted', () => {
+    const o = fromShopify({
+      id: 7, currency: 'EUR', taxes_included: false, total_price: '136.40', total_tax: '26.40',
+      line_items: [{ title: 'A', quantity: 2, price: '50.00', tax_lines: [{ rate: 0.24 }] }],
+      shipping_lines: [{ price: '10.00', tax_lines: [{ price: '2.40' }] }],
+    }, CONN, null);
+    expect(o.lines.map((l) => l.name)).toContain('Shipping');
+    expect(o.totals.net).toBe(110);
+    expect(o.totals.vat).toBe(26.4);
+    expect(o.reconciles).toBe(true);
+  });
+
+  it('sums EVERY Shopify tax line, not just the first', () => {
+    const o = fromShopify({
+      id: 8, currency: 'EUR', taxes_included: false, total_price: '124.00', total_tax: '24.00',
+      line_items: [{ title: 'A', quantity: 2, price: '50.00',
+        tax_lines: [{ rate: 0.17 }, { rate: 0.07 }] }],
+    }, CONN, null);
+    expect(o.lines[0].vat_percent).toBeCloseTo(24, 5);
+    expect(o.reconciles).toBe(true);
   });
 
   it('cannot reconcile when the platform states no total — unknown is not agreement', () => {
@@ -180,5 +204,56 @@ describe('WooCommerce line money', () => {
     expect(o.lines[0].vat_percent).toBe(24);
     expect(o.totals.net).toBe(100);
     expect(o.reconciles).toBe(true);
+  });
+});
+
+describe('the verifier against a real signature', () => {
+  const SECRET = 'abcDEF-123_xyz';
+  const BODY = JSON.stringify({ id: 1, total: '10.00' });
+
+  async function sign(secret: string, raw: string): Promise<string> {
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(raw));
+    return Buffer.from(new Uint8Array(sig)).toString('base64');
+  }
+
+  const conn = { id: 'c', workspace_id: 'w', platform: 'shopify', webhook_secret: SECRET };
+
+  function req(body: string, headers: Record<string, string>) {
+    return new Request('https://example.test/hook', { method: 'POST', body, headers });
+  }
+
+  it('accepts a genuine delivery', async () => {
+    const { body } = await readVerifiedWebhook(
+      req(BODY, { 'x-shopify-hmac-sha256': await sign(SECRET, BODY) }), conn, 'shopify');
+    expect(body.id).toBe(1);
+  });
+
+  it('rejects a body mutated by one byte', async () => {
+    const good = await sign(SECRET, BODY);
+    await expect(readVerifiedWebhook(
+      req(BODY.replace('10.00', '99.00'), { 'x-shopify-hmac-sha256': good }), conn, 'shopify'),
+    ).rejects.toThrow(WebhookRefusal);
+  });
+
+  it('fails CLOSED when the connection has no secret', async () => {
+    await expect(readVerifiedWebhook(
+      req(BODY, { 'x-shopify-hmac-sha256': 'whatever' }), { ...conn, webhook_secret: null }, 'shopify'),
+    ).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('refuses a WooCommerce delivery whose source header is ABSENT, not just mismatched', async () => {
+    const woo = { ...conn, platform: 'woocommerce', store_url: 'https://shop.gr' };
+    const sig = await sign(SECRET, BODY);
+    await expect(readVerifiedWebhook(
+      req(BODY, { 'x-wc-webhook-signature': sig }), woo, 'woocommerce'),
+    ).rejects.toMatchObject({ status: 404 });
+
+    const ok = await readVerifiedWebhook(
+      req(BODY, { 'x-wc-webhook-signature': sig, 'x-wc-webhook-source': 'https://www.shop.gr/' }),
+      woo, 'woocommerce');
+    expect(ok.body.id).toBe(1);
   });
 });

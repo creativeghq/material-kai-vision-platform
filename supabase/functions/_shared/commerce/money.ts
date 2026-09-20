@@ -21,7 +21,6 @@ export interface NormalisedLine extends RawLine {
 export interface StatedTotals {
   total?: number | null;
   vat?: number | null;
-  shipping_cost?: number | null;
 }
 
 export interface NormalisedMoney {
@@ -57,19 +56,19 @@ export function normaliseMoney(
     };
   });
 
-  const shipping = Number(stated.shipping_cost ?? 0) || 0;
   const net = round2(lines.reduce((s, l) => s + l.net_value, 0));
   const vat = round2(lines.reduce((s, l) => s + l.vat_amount, 0));
   const total = round2(net + vat);
 
   const theirTotal = stated.total == null ? null : Number(stated.total);
   const theirVat = stated.vat == null ? null : Number(stated.vat);
-  const totalDelta = theirTotal == null ? null : Math.abs(round2(total + shipping) - round2(theirTotal));
+  const totalDelta = theirTotal == null ? null : Math.abs(total - round2(theirTotal));
   const vatDelta = theirVat == null ? null : Math.abs(vat - round2(theirVat));
 
   return {
     lines, net, vat, total,
     totalDelta, vatDelta,
-    reconciles: totalDelta != null && totalDelta <= MONEY_TOLERANCE,
+    reconciles: totalDelta != null && totalDelta <= MONEY_TOLERANCE
+      && (vatDelta == null || vatDelta <= MONEY_TOLERANCE),
   };
 }

@@ -54,6 +54,16 @@ function deriveDocumentRequest(
   return { request: 'receipt', reason: 'No VAT number on the order and no invoice requested.' };
 }
 
+function shippingLine(amount: number, tax: number, pricesIncludeTax: boolean): RawLine {
+  const netAmount = pricesIncludeTax && tax > 0 ? amount - tax : amount;
+  return {
+    name: 'Shipping',
+    qty: 1,
+    unit_price: amount,
+    vat_percent: netAmount > 0 ? Math.round((tax / netAmount) * 10000) / 100 : 0,
+  };
+}
+
 function finish(
   base: Omit<CanonicalOrder, 'lines' | 'totals' | 'reconciles'>,
   money: NormalisedMoney,
@@ -79,8 +89,7 @@ export function fromShopify(payload: any, conn: AdapterConnection, eventType: st
   const rawLines: RawLine[] = (payload?.line_items ?? []).map((li: any) => {
     const props: any[] = Array.isArray(li?.properties) ? li.properties : [];
     const claimed = props.find((p) => String(p?.name ?? '') === '_materialkai_product_id')?.value;
-    // tax_lines[].rate is a FRACTION on Shopify (0.24), not a percentage.
-    const rate = num(li?.tax_lines?.[0]?.rate) * 100;
+    const rate = (li?.tax_lines ?? []).reduce((s: number, t: any) => s + num(t?.rate), 0) * 100;
     return {
       sku: li?.sku ?? null,
       barcode: li?.barcode ?? null,
@@ -93,8 +102,11 @@ export function fromShopify(payload: any, conn: AdapterConnection, eventType: st
   });
 
   const shipping = (payload?.shipping_lines ?? []).reduce((s: number, l: any) => s + num(l?.price), 0);
+  const shippingTax = (payload?.shipping_lines ?? []).reduce(
+    (s: number, l: any) => s + (l?.tax_lines ?? []).reduce((t: number, x: any) => t + num(x?.price), 0), 0);
+  if (shipping > 0) rawLines.push(shippingLine(shipping, shippingTax, Boolean(payload?.taxes_included)));
   const money = normaliseMoney(rawLines, {
-    total: payload?.total_price, vat: payload?.total_tax, shipping_cost: shipping,
+    total: payload?.total_price, vat: payload?.total_tax,
   }, Boolean(payload?.taxes_included));
 
   return finish({
@@ -141,8 +153,9 @@ export function fromWooCommerce(payload: any, conn: AdapterConnection, eventType
   });
 
   const shipping = num(payload?.shipping_total);
+  if (shipping > 0) rawLines.push(shippingLine(shipping, num(payload?.shipping_tax), false));
   const money = normaliseMoney(rawLines, {
-    total: payload?.total, vat: payload?.total_tax, shipping_cost: shipping,
+    total: payload?.total, vat: payload?.total_tax,
   }, false);
 
   return finish({
@@ -175,8 +188,9 @@ export function fromGeneric(payload: any, _conn: AdapterConnection, eventType: s
     vat_percent: num(l?.vat_percent),
   }));
   const shipping = num(payload?.totals?.shipping_cost);
+  if (shipping > 0) rawLines.push(shippingLine(shipping, num(payload?.totals?.shipping_tax), Boolean(payload?.prices_include_tax)));
   const money = normaliseMoney(rawLines, {
-    total: payload?.totals?.total, vat: payload?.totals?.vat, shipping_cost: shipping,
+    total: payload?.totals?.total, vat: payload?.totals?.vat,
   }, Boolean(payload?.prices_include_tax));
 
   const vat = payload?.customer?.vat_number ? String(payload.customer.vat_number) : null;
