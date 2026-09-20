@@ -188,3 +188,25 @@ export function withRosterEngines(
   });
   return [...engines, ...absent];
 }
+
+export interface LlmMentionTarget {
+  target: string;
+  target_kind: 'domain' | 'keyword';
+  platform: string | null;
+  language_code: string | null;
+  status: SeoMetricStatus | string;
+  note: string | null;
+  metrics: Record<string, number | string | null>;
+  top_domains: { domain?: string; citations?: number; mentions?: number }[];
+  top_pages: { url?: string; citations?: number }[];
+  top_brands: { brand?: string; mentions?: number }[];
+  series: { date?: string; value?: number }[];
+  captured_at: string;
+}
+
+export interface LlmMentionsReport {
+  status: string;
+  window_days: number;
+  note: string | null;
+  targets: LlmMentionTarget[];
+}

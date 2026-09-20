@@ -1141,6 +1141,21 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_website_llm_mentions",
+    "subject": "website llm mentions",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "get_website_opportunities",
     "subject": "website opportunities",
     "args": [

@@ -13,6 +13,7 @@ import {
   type AiAnswers,
   type AiCitationReport,
   type CitabilityReport,
+  type LlmMentionsReport,
   type AiMonitoringState,
   type AiRival,
   type AiVisibility,
@@ -32,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { timeAgo } from '@/utils/datetime';
 import { AiEngineCard, engineGridCols } from './seo/AiEngineCard';
 import { CitabilityPanel } from './seo/CitabilityPanel';
+import { LlmMentionsPanel } from './seo/LlmMentionsPanel';
 import {
   VERDICT_BADGE, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
   withRosterEngines,
@@ -125,6 +127,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const [data, setData] = useState<AiVisibility | null>(null);
   const [report, setReport] = useState<AiCitationReport | null>(null);
   const [citability, setCitability] = useState<CitabilityReport | null>(null);
+  const [corpus, setCorpus] = useState<LlmMentionsReport | null>(null);
   const [state, setState] = useState<AiMonitoringState | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -145,18 +148,20 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     try {
       // `allSettled`: the monitoring state is the thing that EXPLAINS an empty or
       // stale report, so it must still render when the report itself fails.
-      const [v, m, a, c, q] = await Promise.allSettled([
+      const [v, m, a, c, q, x] = await Promise.allSettled([
         userWebsitesService.aiVisibility(website.id, 90),
         userWebsitesService.aiMonitoringState(website.id),
         userWebsitesService.aiAnswers(website.id, 90),
         userWebsitesService.aiCitationReport(website.id, 90),
         userWebsitesService.citabilityReport(website.id, 90),
+        userWebsitesService.llmMentions(website.id, 90),
       ]);
       setData(v.status === 'fulfilled' ? v.value : null);
       setState(m.status === 'fulfilled' ? m.value : null);
       setAnswers(a.status === 'fulfilled' ? a.value : null);
       setReport(c.status === 'fulfilled' ? c.value : null);
       setCitability(q.status === 'fulfilled' ? q.value : null);
+      setCorpus(x.status === 'fulfilled' ? x.value : null);
     } finally {
       setLoading(false);
     }
@@ -520,6 +525,18 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           </CardContent>
         </Card>
       </div>
+
+      <LlmMentionsPanel
+        report={corpus}
+        onRefresh={async () => {
+          try {
+            await userWebsitesService.refreshLlmMentions(website.id);
+            setCorpus(await userWebsitesService.llmMentions(website.id, 90));
+          } catch (e: any) {
+            toast({ title: 'Could not read the corpus', description: e?.message, variant: 'destructive' });
+          }
+        }}
+      />
 
       <CitabilityPanel
         report={citability}

@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AiCitationReport, CitabilityReport } from '@/components/core/Profile/seo/aiCitations';
+import type { AiCitationReport, CitabilityReport, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -658,7 +658,7 @@ export interface AiAnswers {
   questions: AiQuestion[];
 }
 
-export type { AiCitationReport, AiEngine, AiRate, AiRival, CitabilityReport, LostQuestion } from '@/components/core/Profile/seo/aiCitations';
+export type { AiCitationReport, AiEngine, AiRate, AiRival, CitabilityReport, LostQuestion, LlmMentionsReport, LlmMentionTarget } from '@/components/core/Profile/seo/aiCitations';
 
 export interface AiVisibility {
   status: string;
@@ -1534,6 +1534,23 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as CitabilityReport) ?? null;
+  },
+
+  async llmMentions(websiteId: string, days = 90): Promise<LlmMentionsReport | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_llm_mentions' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as LlmMentionsReport) ?? null;
+  },
+
+  async refreshLlmMentions(websiteId: string, keyword?: string): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'llm_mentions', website_id: websiteId, keyword },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not read the mentions corpus'));
+    return data;
   },
 
   /** Read the page that should have answered this question, and score it. Demand-driven. */

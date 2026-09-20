@@ -17,6 +17,7 @@ import { handleAddFaq } from './handlers/faq.ts';
 import { handlePageIdeas } from './handlers/page-ideas.ts';
 import { handleScoreUrl } from './handlers/score-url.ts';
 import { handleCitability } from './handlers/citability.ts';
+import { handleLlmMentions } from './handlers/llm-mentions.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   research: handleResearch,
@@ -33,6 +34,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   add_faq: handleAddFaq,
   score_url: handleScoreUrl,
   citability: handleCitability,
+  llm_mentions: handleLlmMentions,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {

@@ -137,3 +137,40 @@ describe('the scorer measures the page it was given', () => {
     expect(r.score).toBeLessThan(40);
   });
 });
+
+describe('the corpus is a separate sample, not a second opinion', () => {
+  const MENTIONS = join(ROOT, 'supabase/functions/seo-api/handlers/llm-mentions.ts');
+
+  it('a refused upstream is collector_failed, never no_data', () => {
+    const code = blankComments(src(MENTIONS));
+    expect(code).toContain("snap.status = 'collector_failed'");
+    expect(code).toContain("snap.status = 'no_data'");
+    expect(code).toMatch(/failures\.length === results\.length/);
+  });
+
+  it('a partial failure is named rather than silently averaged in', () => {
+    const code = blankComments(src(MENTIONS));
+    expect(code).toMatch(/failures\.length > 0/);
+    expect(code).toContain('mentions calls failed');
+  });
+
+  it('the write is checked and tenancy comes from the verified JWT', () => {
+    const code = blankComments(src(MENTIONS));
+    expect(code).toContain('userCanAccessWorkspace(db, auth.userId, site.workspace_id)');
+    expect(code).toMatch(/error: saveErr/);
+    expect(code).toMatch(/error: 'Not found' \}, 404/);
+  });
+
+  it('it reaches DataForSEO only through the one dispatcher', () => {
+    const code = blankComments(src(MENTIONS));
+    expect(code).toContain('callDataForSEO');
+    expect(code).not.toMatch(/fetch\(\s*['"`]https:\/\/api\.dataforseo/);
+  });
+
+  it('the agent can read the corpus, and it is a different kind from our probes', () => {
+    const tools = src(join(ROOT, 'supabase/functions/_shared/tools/seo-agent-tools.ts'));
+    expect(tools).toContain("case 'ai_corpus':");
+    expect(tools).toContain('get_website_llm_mentions');
+    expect(tools).toContain("'ai_citations', 'ai_citability', 'ai_corpus'");
+  });
+});

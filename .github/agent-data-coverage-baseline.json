@@ -45,6 +45,7 @@
     "get_website_crawl_report",
     "get_website_domain_intel",
     "get_website_health",
+    "get_website_llm_mentions",
     "get_website_opportunities",
     "get_website_rank_summary",
     "get_website_search_metrics",

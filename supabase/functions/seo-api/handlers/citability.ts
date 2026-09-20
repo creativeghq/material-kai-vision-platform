@@ -13,7 +13,6 @@ const supabaseServiceKey = () => Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-/** Re-read after this: a score from last quarter is a guess about today's page. */
 const STALE_AFTER_DAYS = 14;
 const MAX_BYTES = 1_500_000;
 

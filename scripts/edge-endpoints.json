@@ -6356,6 +6356,36 @@
             "desc": "Score this exact page instead of letting the matcher pick one."
           }
         ]
+      },
+      {
+        "name": "llm_mentions",
+        "summary": "Read DataForSEO's LLM Mentions corpus for this site \u2014 how often the domain is cited in real AI answers, and which domains, pages and brands lead for a keyword. Stores a snapshot.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true,
+            "desc": "Connected website. Must belong to the caller's workspace."
+          },
+          {
+            "name": "keyword",
+            "type": "string",
+            "required": false,
+            "desc": "Market keyword for the leaderboards. Defaults to the site's display name."
+          },
+          {
+            "name": "language_code",
+            "type": "string",
+            "required": false,
+            "desc": "Defaults to en."
+          },
+          {
+            "name": "country_code",
+            "type": "string",
+            "required": false,
+            "desc": "Defaults to US \u2014 ChatGPT mention coverage is United States only."
+          }
+        ]
       }
     ],
     "request": {
