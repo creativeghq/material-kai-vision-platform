@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarCheck, CalendarDays, Clock } from 'lucide-react';
-import { HubSideNav, type HubNavGroup } from '@/components/core/hub/HubSideNav';
+import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
 import { AppointmentsPage } from '@/pages/AppointmentsPage';
 import { ProfileMeetingsTab } from './ProfileMeetingsTab';
 import { AvailabilitySettings } from './AvailabilitySettings';
@@ -26,25 +26,11 @@ const SECTIONS: Record<ScheduleSectionId, React.ComponentType> = {
   calendar: ProfileMeetingsTab,
 };
 
-/**
- * Two groups, because these are two different kinds of time and merging them into one list would
- * imply they are the same: **Calendar** is what strangers do to your calendar through your public
- * profile, **Meetings** is what you logged against a CRM party yourself.
- *
- * Labels are free to change; the `id`s are the external contract (`?section=`) and are not.
- */
-const GROUPS: HubNavGroup[] = [
-  {
-    label: 'Calendar',
-    items: [
-      { id: 'appointments', label: 'Bookings', icon: CalendarCheck },
-      { id: 'availability', label: 'Availability', icon: Clock },
-    ],
-  },
-  {
-    label: 'Meetings',
-    items: [{ id: 'calendar', label: 'My calendar', icon: CalendarDays }],
-  },
+/** Labels are free to change; the `id`s are the external contract (`?section=`) and are not. */
+const TABS: HubTabItem[] = [
+  { id: 'appointments', label: 'Bookings', icon: CalendarCheck },
+  { id: 'availability', label: 'Availability', icon: Clock },
+  { id: 'calendar', label: 'My calendar', icon: CalendarDays },
 ];
 
 const OFFERED = new Set<string>(SCHEDULE_SECTION_IDS);
@@ -76,14 +62,9 @@ export const SchedulePanel: React.FC = () => {
   const Section = useMemo(() => SECTIONS[active], [active]);
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
-      <HubSideNav
-        groups={GROUPS}
-        activeId={active}
-        onSelect={select}
-        aria-label="Schedule sections"
-      />
-      <div className="min-w-0 flex-1">
+    <div className="space-y-6">
+      <HubTabNav items={TABS} activeId={active} onSelect={select} aria-label="Schedule sections" />
+      <div className="min-w-0">
         <Section />
       </div>
     </div>

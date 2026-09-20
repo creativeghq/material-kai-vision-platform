@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { timeAgo } from '@/utils/datetime';
-import { ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { Globe, ExternalLink, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
 import { WebsiteHealthPanel } from '@/components/core/Profile/WebsiteHealthPanel';
@@ -37,7 +38,7 @@ import {
   type WebsiteSeoOverview,
 } from '@/services/userWebsitesService';
 
-export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () => void }> = ({ website, onBack }) => {
+export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
 
   // The open pane is `?section=`, the site is `?website=` (WebsitesTab writes it). In `useState`
@@ -100,36 +101,34 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
   const domainLabel = website.display_name || website.url.replace(/^https?:\/\//, '');
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex items-start gap-3 min-w-0">
-          <Button variant="ghost" size="icon" onClick={onBack} title="Back to websites">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Globe className="w-5 h-5 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold truncate">{domainLabel}</h2>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-              <a href={website.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-foreground min-w-0">
-                <span className="truncate max-w-[280px]">{website.url}</span>
-                <ExternalLink className="w-3 h-3 shrink-0" />
+    <div className="min-h-screen">
+      {/* `recordTitle` — a domain is a stored string, and Aleo has no Greek. */}
+      <PageHeader
+        icon={Globe}
+        title={domainLabel}
+        recordTitle
+        subtitle={`${website.page_count} pages indexed · Last crawl: ${timeAgo(website.last_crawled_at)}`}
+        breadcrumbs={[
+          { label: 'My Profile', to: '/profile' },
+          { label: 'Websites', to: '/profile?tab=websites' },
+          { label: domainLabel },
+        ]}
+        actions={(
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <a href={website.url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-1" /> Visit
               </a>
-              <span>·</span>
-              <span>{website.page_count} pages indexed</span>
-              <span>·</span>
-              <span>Last crawl: {timeAgo(website.last_crawled_at)}</span>
-            </div>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={handleRecrawl} disabled={recrawling}>
-          {recrawling ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-          Recrawl
-        </Button>
-      </div>
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRecrawl} disabled={recrawling}>
+              {recrawling ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+              Recrawl
+            </Button>
+          </>
+        )}
+      />
 
+      <div className="p-3 sm:p-6 space-y-6">
       {website.last_crawl_error && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-[hsl(var(--error-bg))] border border-[hsl(var(--error)/0.25)] text-xs">
           <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--error))] mt-0.5 flex-shrink-0" />
@@ -265,7 +264,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         </TabsContent>
         </div>
       </Tabs>
-
+      </div>
     </div>
   );
 };

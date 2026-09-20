@@ -50,6 +50,7 @@ const Index = lazy(() => import('./pages/Index'));
 const RoomPlannerPage = lazy(() => import('./pages/RoomPlannerPage').then(m => ({ default: m.RoomPlannerPage })));
 const SurfaceVisualizerPage = lazy(() => import('./pages/SurfaceVisualizerPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
+const WebsiteDetailPage = lazy(() => import('./pages/WebsiteDetailPage').then(m => ({ default: m.WebsiteDetailPage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
@@ -286,6 +287,18 @@ const App = () => (
                       <AuthGuard>
                         <Layout>
                           <UserProfilePage />
+                        </Layout>
+                      </AuthGuard>
+                    </PageErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/websites/:websiteId"
+                  element={
+                    <PageErrorBoundary name="Website">
+                      <AuthGuard>
+                        <Layout>
+                          <WebsiteDetailPage />
                         </Layout>
                       </AuthGuard>
                     </PageErrorBoundary>

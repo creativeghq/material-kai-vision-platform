@@ -821,23 +821,24 @@ All colors MUST be HSL.
     scroll-snap-align: start;
   }
 
-  /* "There's more" affordance: fade whichever edge still has off-screen items.
-     Driven by the data-overflow attribute `useStripAffordance` sets from the
-     scroll position. Keyed on the ATTRIBUTE, not on `role=tablist`: the same
-     strip is a <nav> when it is a HubSideNav rail, and only the tablist form
-     used to get the fade. 24px keeps a label edge faintly visible. */
-  [data-overflow='right'] {
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
-    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
-  }
-  [data-overflow='left'] {
-    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px);
-    mask-image: linear-gradient(to right, transparent 0, #000 24px);
-  }
-  [data-overflow='both'] {
-    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-  }
+}
+
+/* "There's more" affordance: fade whichever edge still has off-screen items. Driven by the
+   data-overflow attribute `useStripAffordance` sets, so it costs nothing when the strip fits
+   ("none" matches no rule) — which is why it is NOT inside a width query. It used to be, and
+   every strip that scrolls above 767px hid its scrollbar with no fade to replace it: a rail
+   between 768 and 1023px, and `HubTabNav` at any width. 24px keeps a label edge visible. */
+[data-overflow='right'] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+}
+[data-overflow='left'] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px);
+}
+[data-overflow='both'] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
 }
 
 /* ============================================================

@@ -1,14 +1,17 @@
 import React from 'react';
 import { Link, useMatch, useResolvedPath } from 'react-router-dom';
 import { Plus } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useStripAffordance } from '@/hooks/useStripAffordance';
 
 export interface HubTabItem {
   id: string;
   label: string;
   /** Route for a link tab. Omit and pass `onSelect` for a controlled tab. */
   to?: string;
+  icon?: LucideIcon;
   /** Right-hand count. `0` renders nothing — an empty count is noise. */
   count?: number;
   /** Marks a saved/pinned view (a dot before the label). */
@@ -39,6 +42,7 @@ const TabBody: React.FC<{ item: HubTabItem }> = ({ item }) => (
     {item.pinned && (
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="Saved view" />
     )}
+    {item.icon && <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
     {item.label}
     {!!item.count && <span className="tabular-nums opacity-70">{item.count}</span>}
   </>
@@ -85,11 +89,19 @@ export const HubTabNav: React.FC<HubTabNavProps> = ({
   trailing,
   className,
   'aria-label': ariaLabel = 'Sections',
-}) => (
+}) => {
+  // A strip long enough to scroll needs the same two things a collapsed rail needs: the
+  // selected tab brought into view, and a fade on the edge that still has tabs behind it.
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const overflow = useStripAffordance(ref);
+
+  return (
   <div
+    ref={ref}
     role="tablist"
     aria-label={ariaLabel}
     aria-orientation="horizontal"
+    data-overflow={overflow}
     className={cn(
       'flex w-full items-center gap-1 overflow-x-auto border-b border-hairline [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
       className,
@@ -115,7 +127,8 @@ export const HubTabNav: React.FC<HubTabNavProps> = ({
 
     {trailing && <div className="ml-2 flex shrink-0 items-center gap-2 pl-1">{trailing}</div>}
   </div>
-);
+  );
+};
 
 /** "+ Add view" — the standard trailing action on a saved-views strip. */
 export const HubTabAddAction: React.FC<{ label: string; onClick?: () => void }> = ({

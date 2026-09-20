@@ -142,12 +142,8 @@ describe('wide tables are reachable on a phone', () => {
     ).toEqual([]);
   });
 
-  /**
-   * The clip that makes the above matter. If someone removes it, horizontal overflow becomes
-   * visible again (a page that rocks sideways) — noisy, but no longer silent, and the guidance in
-   * `.claude/design-system.md` about why table wrappers must scroll would need revisiting.
-   * Pinned so that removal is a deliberate, reviewed decision rather than a drive-by.
-   */
+  /** Remove the clip and overflow goes back to LOUD, not silent — fine, but docs/design-system.md
+   *  references it, so update that in the same change. */
   it('Layout still clips <main>, which is what makes the rule above necessary', () => {
     const layout = readFileSync(join(SRC, 'components/core/Layout.tsx'), 'utf8');
     // `<main` also appears in a prose comment a few lines above the element, so match the
@@ -332,5 +328,102 @@ describe('page content clears the mobile tab bar', () => {
     for (const cls of ['overflow-y-auto', 'flex', 'flex-col', 'mobile-content']) {
       expect(main, `<main> lost "${cls}"`).toContain(cls);
     }
+  });
+});
+
+describe('a rail never contains another rail', () => {
+  function walkTs(dir: string, out: string[] = []): string[] {
+    let entries: string[];
+    try { entries = readdirSync(dir); } catch { return out; }
+    for (const e of entries) {
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) walkTs(p, out);
+      else if (p.endsWith('.ts') || p.endsWith('.tsx')) out.push(p);
+    }
+    return out;
+  }
+
+  const sources = new Map<string, string>();
+  for (const f of walkTs(SRC)) sources.set(f, readFileSync(f, 'utf8'));
+
+  const isRail = (src: string) => src.includes('section-rail') || rendersTag(src, 'HubSideNav');
+
+  function resolveImport(spec: string, from: string): string | null {
+    let base: string;
+    if (spec.startsWith('@/')) base = join(SRC, spec.slice(2));
+    else if (spec.startsWith('.')) base = join(from, '..', spec);
+    else return null;
+    for (const c of [`${base}.tsx`, `${base}.ts`, join(base, 'index.tsx'), join(base, 'index.ts')]) {
+      if (sources.has(c)) return c;
+    }
+    return null;
+  }
+
+  /** No regex escape on purpose: `[\s/>]` lost its backslash here once, and `[s/>]` matched
+   *  almost nothing while the test stayed green. */
+  function rendersTag(src: string, name: string): boolean {
+    const tag = `<${name}`;
+    for (let i = src.indexOf(tag); i !== -1; i = src.indexOf(tag, i + 1)) {
+      const next = src[i + tag.length];
+      if (next === undefined || !/[A-Za-z0-9_]/.test(next)) return true;
+    }
+    return false;
+  }
+
+  function rendered(f: string): Map<string, string> {
+    const src = sources.get(f) ?? '';
+    const out = new Map<string, string>();
+    for (const m of src.matchAll(/import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g)) {
+      const target = resolveImport(m[2], f);
+      if (!target) continue;
+      for (const raw of m[1].split(',')) {
+        const name = raw.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()!.trim();
+        if (name && rendersTag(src, name)) out.set(name, target);
+      }
+    }
+    return out;
+  }
+
+  function railBelow(f: string, stack: string[] = []): string[] | null {
+    if (stack.includes(f) || stack.length > 6) return null;
+    if (isRail(sources.get(f) ?? '')) return [f];
+    for (const target of rendered(f).values()) {
+      const deeper = railBelow(target, [...stack, f]);
+      if (deeper) return [f, ...deeper];
+    }
+    return null;
+  }
+
+  /** Shrink-only. An entry claims the outer nav is a horizontal strip and the rails sit in
+   *  mutually exclusive `TabsContent` panes — verified by opening the page. */
+  const NOT_TWO_SIDEBARS = new Set([
+    'src/modules/crm/pages/CompanyDetailPage.tsx -> <PartyWorkTab>',
+    'src/modules/crm/pages/CompanyDetailPage.tsx -> <CompanyMarketTab>',
+    'src/modules/crm/pages/ContactDetailPage.tsx -> <PartyWorkTab>',
+  ]);
+
+  it('finds the rails to check', () => {
+    const rails = [...sources].filter(([, s]) => isRail(s));
+    expect(rails.length, 'no rails found — this check is scanning nothing').toBeGreaterThan(8);
+  });
+
+  it('no rail renders a component that is, or contains, another rail', () => {
+    const offenders: string[] = [];
+    for (const [outer, src] of sources) {
+      if (!isRail(src)) continue;
+      for (const [name, target] of rendered(outer)) {
+        if (target === outer) continue;
+        if (NOT_TWO_SIDEBARS.has(`${rel(outer)} -> <${name}>`)) continue;
+        const chain = railBelow(target, [outer]);
+        if (chain) offenders.push(`${rel(outer)} -> <${name}> -> ${chain.map(rel).join(' -> ')}`);
+      }
+    }
+    expect(
+      offenders,
+      'A section rail is rendered inside another section rail — two sidebars on one screen, and '
+      + 'the page header only describes the outer one. Either give the inner surface its own page '
+      + '(a record drill-down: `/websites/:id`) or switch it to `HubTabNav`, the horizontal '
+      + 'underline strip.\n' + offenders.join('\n'),
+    ).toEqual([]);
   });
 });

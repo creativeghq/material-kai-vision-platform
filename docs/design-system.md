@@ -288,6 +288,28 @@ reported. `flex-wrap` is the same bug with fewer rows.
 The collapse breakpoint is `lg`, in the CSS **and** in the utilities. A rail that goes `sm:flex-col`
 spends 640–1023px with the media query forcing a row and the utilities asking for a column.
 
+**One rail per screen.** A rail is *the page's* section nav, so a second one beside it gives the
+reader two columns of navigation that each claim to say where they are — and the page header
+describes only the outer one. Profile → Websites opened a site's 23-section rail next to the
+profile's own fourteen, under a band reading "My Profile · Manage your account, credits, and
+billing". The fix is never a third nav:
+
+- A drill-down into a **record** becomes its own page. A website is `/websites/:id`, with the domain
+  in the `PageHeader` (`recordTitle` — a stored string, and Aleo has no Greek) and breadcrumbs back
+  to the list. The rail it carries is then the only one on screen.
+- A **settings section** with a handful of panes uses `HubTabNav`, the horizontal underline strip.
+  Schedule (3) and Social Accounts (up to 11) went that way.
+
+Flattening a grouped rail into a strip drops the group captions, so any label that relied on its
+caption to be unambiguous has to say its own subject: Social Accounts has two analytics panes, and
+one of them is now "WhatsApp analytics".
+
+A horizontal tab strip above a rail is *not* this bug — the CRM record pages put their sub-rails in
+mutually exclusive `TabsContent` panes, so one is ever on screen. Guarded by the "a rail never
+contains another rail" case in
+[tests/unit/responsiveTableOverflow.test.ts](../tests/unit/responsiveTableOverflow.test.ts), whose
+exemption list is shrink-only with a reason per entry.
+
 ---
 
 ## 6. Patterns (the `hub/` library)

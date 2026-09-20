@@ -56,13 +56,18 @@ export function useStripAffordance(
       measure();
     });
     ro.observe(el);
-    // Re-centre + re-measure whenever the selection changes. `class` covers the
-    // nav rail (`.sidebar-item.active`), `data-state` covers Radix.
+    // `class` = the nav rail, `data-state` = Radix. `childList` because a strip gated on
+    // permissions grows 2 → 11 after mount, and its own box never changes, so RO misses it.
     const mo = new MutationObserver(() => {
       centerActive();
       measure();
     });
-    mo.observe(el, { attributes: true, subtree: true, attributeFilter: ['data-state', 'class'] });
+    mo.observe(el, {
+      attributes: true,
+      subtree: true,
+      childList: true,
+      attributeFilter: ['data-state', 'class'],
+    });
 
     return () => {
       el.removeEventListener('scroll', onScroll);
