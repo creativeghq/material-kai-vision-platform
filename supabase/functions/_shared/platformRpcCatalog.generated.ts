@@ -1070,6 +1070,21 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_website_citability_report",
+    "subject": "website citability report",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "get_website_competitor_series",
     "subject": "website competitor series",
     "args": [

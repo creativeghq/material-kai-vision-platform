@@ -956,6 +956,20 @@
     ]
   },
   {
+    "name": "get_website_citability_report",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "get_website_ai_monitoring_state",
     "args": [
       {

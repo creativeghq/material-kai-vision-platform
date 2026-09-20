@@ -23,6 +23,10 @@ const read = (p: string) => readFileSync(p, 'utf8').split('\r\n').join('\n');
  * findings hide, which is why the reasons are themselves asserted below.
  */
 const EXEMPT: Record<string, string> = {
+  'seo-api/handlers/citability.ts':
+    'website_id is read back as a row FIRST, then userCanAccessWorkspace(db, auth.userId, '
+    + "site.workspace_id) must pass, and the stored workspace_id is site.workspace_id — the "
+    + 'fetched row, never the body. The two cannot disagree.',
   'crm-api/handlers/address-units-api-handler.ts':
     'parentWorkspace({company_id, contact_id}, scope) resolves the workspace FROM the party within '
     + "the caller's scope and 404s otherwise; the row's workspace_id is that result.",

@@ -40,6 +40,7 @@
     "get_website_ai_citation_report",
     "get_website_ai_visibility",
     "get_website_cannibalisation",
+    "get_website_citability_report",
     "get_website_competitor_series",
     "get_website_crawl_report",
     "get_website_domain_intel",

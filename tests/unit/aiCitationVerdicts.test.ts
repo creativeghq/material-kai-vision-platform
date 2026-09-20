@@ -112,3 +112,45 @@ describe('the verdict bar partitions its track', () => {
     expect(src).not.toMatch(/engine\.answered\s*-\s*engine\.named/);
   });
 });
+
+describe('an engine that never ran still gets a card', () => {
+  it('a rostered assistant with no probes is not_collected, not absent', async () => {
+    const { withRosterEngines } = await import('@/components/core/Profile/seo/aiCitations');
+    const out = withRosterEngines([], [
+      { model: 'claude-haiku-4-5-20251001', enabled: true },
+      { model: 'gemini-2.0-flash', enabled: false },
+    ]);
+    expect(out).toHaveLength(2);
+    const gemini = out.find((e) => e.model === 'gemini-2.0-flash')!;
+    expect(gemini.status).toBe('not_collected');
+    expect(gemini.citation_rate.value).toBeNull();
+    expect(gemini.note).toContain('No API key');
+  });
+
+  it('an engine that did run is left exactly as the RPC derived it', async () => {
+    const { withRosterEngines } = await import('@/components/core/Profile/seo/aiCitations');
+    const real = { model: 'sonar', probes: 5, answered: 0, failed: 5 } as any;
+    const out = withRosterEngines([real], [{ model: 'sonar', enabled: true }]);
+    expect(out).toEqual([real]);
+  });
+});
+
+describe('the column count comes from the roster, not from who answered', () => {
+  it('the panel augments with the roster BEFORE sizing the grid', () => {
+    const src = blankedSource(PANEL);
+    const augment = src.indexOf('withRosterEngines(report?.engines');
+    const sizing = src.indexOf('engineGridCols(engines.length)');
+    expect(augment).toBeGreaterThan(-1);
+    expect(sizing).toBeGreaterThan(augment);
+    // Sizing on the probed list turned a missing key into a layout decision.
+    expect(src).not.toMatch(/engineGridCols\(\s*\(?report/);
+  });
+
+  it('four rostered assistants lay out as four columns, three as three', async () => {
+    const { engineGridCols } = await import('@/components/core/Profile/seo/AiEngineCard');
+    expect(engineGridCols(4)).toContain('xl:grid-cols-4');
+    expect(engineGridCols(3)).toContain('lg:grid-cols-3');
+    expect(engineGridCols(1)).toBe('grid-cols-1');
+    expect(engineGridCols(9)).toContain('grid-cols-');
+  });
+});

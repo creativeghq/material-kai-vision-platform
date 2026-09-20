@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (156)
+## 1. Supabase Edge Functions (163)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -100,6 +100,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `finance-assessment` | JWT | Derive the workspace's finance health signals, and optionally write the AI assessment of them |
 | `finance-customer-documents` _(GET + POST)_ | JWT | Customer self-service view of their own invoices, receipts and orders |
 | `finance-digest-aggregate` | JWT | Send finance digest emails and dispatch quote follow-up bell notifications |
+| `finance-document-link` _(GET)_ | token | Redirects a document token to a freshly signed link to the PDF. |
 | `finance-fiscal-offline-recovery` | cron | Re-query connector for pending MARK on offline-accepted fiscal documents |
 | `finance-inbound-sync` | JWT / cron | Pull inbound documents from myDATA (RequestDocs) for configured workspaces |
 | `finance-invoice-pdf` | JWT | Render a legal invoice, credit note, or delivery note as a PDF |
@@ -112,6 +113,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `finance-storefront` | public | Public online storefront: browse products and submit cart checkout |
 | `generate-contract-pdf` | JWT | Render a signed/draft contract to PDF |
 | `generate-purchase-sheet-pdf` | JWT / secret | Render a project purchase sheet (doors/windows + other purchase items) to PDF |
+| `novus-onboarding` | JWT | Register a workspace's VAT with Novus so it can transmit to myDATA |
 | `parse-supplier-cost-list` | JWT | Parse a KB doc supplier cost list and apply costs to matching products |
 | `revolut-api` | JWT | Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync |
 | `revolut-sync` | JWT / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
@@ -325,6 +327,15 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `bank-statement-import` | public | Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces. |
 | `inbox-draft-cron` | public | Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send. |
 
+**Commerce**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `product-feed` _(GET)_ | token | Serves a workspace's product catalogue as an XML feed for a marketplace importer. |
+| `store-document-writeback` | JWT | Hands the issued fiscal document back to the store the order came from. |
+| `store-orders-sync` | JWT | Pulls recent orders from a connected store to close the gap a missed webhook leaves. |
+| `store-orders-webhook` | storeWebhookSignature | Receives orders from a connected sales channel (Shopify, WooCommerce, generic). |
+
 **Customs**
 
 | Function | Auth | Summary |
@@ -397,6 +408,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `novus-onboarding-webhook` | novusSignature | Novus onboarding status callbacks |
 | `page-watch-webhook` | sharedSecretHeader | Receives Firecrawl Monitoring callbacks for watched non-price pages and records the diff. |
 | `workspace-webhook-dispatcher` | cron | Deliver queued outbound webhook events to tenant endpoints |
 | `workspace-webhooks-api` | JWT | Manage a workspace's outbound webhook endpoints |

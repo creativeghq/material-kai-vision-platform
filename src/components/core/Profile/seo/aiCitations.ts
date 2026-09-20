@@ -130,3 +130,61 @@ export function formatUsd(v: number | null | undefined): string {
   if (v == null) return '—';
   return v < 0.01 && v > 0 ? '<$0.01' : `$${v.toFixed(2)}`;
 }
+
+export interface LostQuestionPage {
+  url: string;
+  score: number | null;
+  status: SeoMetricStatus | string;
+  note: string | null;
+  gaps: string[];
+  words: number | null;
+  analysed_at: string | null;
+}
+
+export interface LostQuestion {
+  prompt_text: string;
+  template_key: string;
+  answers: number;
+  cited: number;
+  named: number;
+  engines: string[];
+  last_asked: string | null;
+  rival_urls: string[];
+  rival_brands: string[];
+  page: LostQuestionPage | null;
+  status: SeoMetricStatus | string;
+}
+
+export interface CitabilityReport {
+  status: string;
+  window_days: number;
+  note: string | null;
+  pages_known: number;
+  pages_read: number;
+  pages_note: string | null;
+  questions: LostQuestion[];
+}
+
+/** Every assistant the tier ASKS for — one with no key leaves no probe, so a probe-derived row would drop it silently. */
+export function withRosterEngines(
+  engines: AiEngine[],
+  roster: { model: string; enabled: boolean }[] | undefined,
+): AiEngine[] {
+  const seen = new Set(engines.map((e) => e.model));
+  const missing = (roster ?? []).filter((m) => !seen.has(m.model));
+  const absent = missing.map((m): AiEngine => {
+    const note = m.enabled
+      ? 'This assistant is configured but produced no probe in this window.'
+      : 'No API key is configured for this assistant, so it is dropped from the run entirely — it has never answered.';
+    const rate: AiRate = { value: null, status: 'not_collected', note };
+    return {
+      model: m.model,
+      probes: 0, answered: 0, failed: 0, named: 0, cited: 0,
+      named_not_cited: 0, absent: 0, cited_unnamed: 0, sourced: 0,
+      avg_position: null, cost_usd: null, avg_latency_ms: null, last_run_at: null,
+      mention_rate: rate, citation_rate: rate,
+      browses: false, status: 'not_collected', note,
+    };
+  });
+  return [...engines, ...absent];
+}

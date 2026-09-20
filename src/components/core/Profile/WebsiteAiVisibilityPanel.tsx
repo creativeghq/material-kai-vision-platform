@@ -12,6 +12,7 @@ import {
   userWebsitesService,
   type AiAnswers,
   type AiCitationReport,
+  type CitabilityReport,
   type AiMonitoringState,
   type AiRival,
   type AiVisibility,
@@ -30,8 +31,10 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/utils/datetime';
 import { AiEngineCard, engineGridCols } from './seo/AiEngineCard';
+import { CitabilityPanel } from './seo/CitabilityPanel';
 import {
   VERDICT_BADGE, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
+  withRosterEngines,
 } from './seo/aiCitations';
 import { compact } from './seo/seoMetrics';
 
@@ -121,6 +124,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const { toast } = useToast();
   const [data, setData] = useState<AiVisibility | null>(null);
   const [report, setReport] = useState<AiCitationReport | null>(null);
+  const [citability, setCitability] = useState<CitabilityReport | null>(null);
   const [state, setState] = useState<AiMonitoringState | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -141,16 +145,18 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     try {
       // `allSettled`: the monitoring state is the thing that EXPLAINS an empty or
       // stale report, so it must still render when the report itself fails.
-      const [v, m, a, c] = await Promise.allSettled([
+      const [v, m, a, c, q] = await Promise.allSettled([
         userWebsitesService.aiVisibility(website.id, 90),
         userWebsitesService.aiMonitoringState(website.id),
         userWebsitesService.aiAnswers(website.id, 90),
         userWebsitesService.aiCitationReport(website.id, 90),
+        userWebsitesService.citabilityReport(website.id, 90),
       ]);
       setData(v.status === 'fulfilled' ? v.value : null);
       setState(m.status === 'fulfilled' ? m.value : null);
       setAnswers(a.status === 'fulfilled' ? a.value : null);
       setReport(c.status === 'fulfilled' ? c.value : null);
+      setCitability(q.status === 'fulfilled' ? q.value : null);
     } finally {
       setLoading(false);
     }
@@ -387,7 +393,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const t = data.totals;
   const failedShare = t.probes > 0 ? Math.round((t.failed / t.probes) * 100) : 0;
   const sentimentTotal = Object.values(data.sentiment).reduce((s, n) => s + n, 0);
-  const engines = report?.engines ?? [];
+  const engines = withRosterEngines(report?.engines ?? [], roster?.tiers?.cheap);
   const citedInstead = report?.cited_instead ?? [];
   const namedInstead = report?.named_instead ?? [];
   // Nobody browsed, so "cited" has no denominator. Say it once, at the top.
@@ -514,6 +520,18 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           </CardContent>
         </Card>
       </div>
+
+      <CitabilityPanel
+        report={citability}
+        onAnalyse={async (question) => {
+          try {
+            await userWebsitesService.analyseCitability(website.id, question);
+            setCitability(await userWebsitesService.citabilityReport(website.id, 90));
+          } catch (e: any) {
+            toast({ title: 'Could not read the page', description: e?.message, variant: 'destructive' });
+          }
+        }}
+      />
 
       <Card className="dashboard-card">
         <CardHeader>

@@ -11,6 +11,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** [source, target] pairs, repo-relative. One line per vocabulary. */
 export const VOCABULARIES = [
   [
+    // The citability dimensions. The scorer measures them in Deno and the AI Citations panel
+    // names them in React; a second copy is a panel labelling something nothing measured.
+    'src/components/core/Profile/seo/citabilityDimensions.ts',
+    'supabase/functions/_shared/seo/citabilityDimensions.generated.ts',
+  ],
+  [
     // #447 — the laying patterns of the surface visualizer. The browser renders them and the
     // agent's tool offers them as an enum; one list, or the tool offers a pattern nothing draws.
     'src/lib/surfaceRenderer/patternVocabulary.ts',

@@ -2264,7 +2264,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createSEOSiteReportTool',
     description: 'A report on the workspace\'s OWN connected website from what the platform already measures — free, first-party, no upstream call.',
     params: [
-      { name: 'kind', type: 'enum', enum: ['overview', 'health', 'crawl', 'search_metrics', 'domain_intel', 'ai_visibility', 'ai_citations', 'ai_answers', 'cannibalisation', 'competitors', 'analytics', 'page_queries'], optional: false, description: 'Which report to read.' },
+      { name: 'kind', type: 'enum', enum: ['overview', 'health', 'crawl', 'search_metrics', 'domain_intel', 'ai_visibility', 'ai_citations', 'ai_citability', 'ai_answers', 'cannibalisation', 'competitors', 'analytics', 'page_queries'], optional: false, description: 'Which report to read.' },
       { name: 'website_id', type: 'string', optional: true, description: 'Connected website id. Omit to use the workspace default.' },
       { name: 'days', type: 'number', optional: true, description: 'Look-back window in days. Defaults per report (28 analytics, 90 AI/cannibalisation, 180 search/domain, 365 competitors).' },
       { name: 'page', type: 'string', optional: true, description: 'page_queries only: the page URL whose Search Console queries to list.' },

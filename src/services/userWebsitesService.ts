@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AiCitationReport } from '@/components/core/Profile/seo/aiCitations';
+import type { AiCitationReport, CitabilityReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -658,7 +658,7 @@ export interface AiAnswers {
   questions: AiQuestion[];
 }
 
-export type { AiCitationReport, AiEngine, AiRate, AiRival } from '@/components/core/Profile/seo/aiCitations';
+export type { AiCitationReport, AiEngine, AiRate, AiRival, CitabilityReport, LostQuestion } from '@/components/core/Profile/seo/aiCitations';
 
 export interface AiVisibility {
   status: string;
@@ -1525,6 +1525,24 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as AiCitationReport) ?? null;
+  },
+
+  async citabilityReport(websiteId: string, days = 90): Promise<CitabilityReport | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_citability_report' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as CitabilityReport) ?? null;
+  },
+
+  /** Read the page that should have answered this question, and score it. Demand-driven. */
+  async analyseCitability(websiteId: string, question: string, url?: string): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'citability', website_id: websiteId, question, url },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not analyse the page'));
+    return data;
   },
 
   /** The matrix behind the visibility figures: every assistant's latest reply to every question. */

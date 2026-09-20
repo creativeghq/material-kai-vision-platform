@@ -136,6 +136,10 @@
       "description": "Uncategorised."
     },
     {
+      "name": "Commerce",
+      "description": "Commerce functions."
+    },
+    {
       "name": "Customs",
       "description": "Customs functions."
     },
@@ -10470,6 +10474,127 @@
         }
       }
     },
+    "/novus-onboarding": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Register a workspace's VAT with Novus so it can transmit to myDATA",
+        "operationId": "post_novus_onboarding",
+        "description": "Novus Onboarding API v1.0 under the platform's software-house key. Creates the onboarding application, downloads the generated contract PDF, uploads the signed copy, records acknowledgements for the manual steps, and syncs the provider's own status back. Approval triggers Novus provisioning and the Δήλωση Παρόχου filing with ΑΑΔΕ. Operator-only webhook_* actions register the signed callback endpoint.\n\n**Response:** (`application/json or application/pdf`)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/novus-onboarding-webhook": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Novus onboarding status callbacks",
+        "operationId": "post_novus_onboarding_webhook",
+        "description": "Receives request.status_changed / request.provisioned / request.provisioning_failed / client.statement_recalled from Novus. Verifies X-Novus-Signature (HMAC-SHA256 of the exact body) before any processing and fails closed with 503 when no secret is configured. The payload is treated as a nudge: the request is re-read from Novus and that answer is what gets stored. Duplicate X-Novus-Event-Id values are recognised and ignored.\n\n**Response:** (`application/json`)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "description": "Provider event payload (verified by signature).",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/parse-supplier-cost-list": {
       "post": {
         "tags": [
@@ -12477,6 +12602,35 @@
                       }
                     },
                     "description": "Returns: {success: boolean, url: string, fetched: {title, description, http_status, word_count}, keyword: string, keyword_source: string, analysis: ContentAnalysisResult, checks_skipped: string[], credits_charged: number}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "website_id",
+                      "question"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "citability"
+                        ],
+                        "description": "Score the page that should have answered a buyer question, on the eight extraction dimensions. Reads the page on demand through the SSRF guard and stores the result."
+                      },
+                      "website_id": {
+                        "type": "string",
+                        "description": "Connected website whose pages to search. Must belong to the caller's workspace."
+                      },
+                      "question": {
+                        "type": "string",
+                        "description": "The buyer question the page is judged against. Citability is relative to a question."
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "Score this exact page instead of letting the matcher pick one."
+                      }
+                    }
                   }
                 ],
                 "discriminator": {
@@ -28606,6 +28760,387 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/store-orders-webhook": {
+      "post": {
+        "tags": [
+          "Commerce"
+        ],
+        "summary": "Receives orders from a connected sales channel (Shopify, WooCommerce, generic).",
+        "operationId": "post_store_orders_webhook",
+        "description": "Accepts POST from a store connected in Sales Channels, identified by ?connection=<uuid>. The signature is verified over the RAW body before any parse — X-Shopify-Hmac-Sha256 or X-WC-Webhook-Signature, HMAC-SHA256 base64 against the connection's webhook secret, compared in constant time — and an unset secret fails closed with 503. WooCommerce deliveries additionally have X-WC-Webhook-Source checked against the connection's store URL. The payload is mapped to a canonical order and written through upsert_inbound_order, which is idempotent on (connection, external order id): a replay is recorded as skipped_dupe, never a second order. Returns 200 even when the order lands for review, because a non-2xx makes both platforms retry a delivery already stored.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "connection": {
+                    "type": "string",
+                    "description": "Query parameter: the store_connections id this delivery belongs to."
+                  },
+                  "<platform payload>": {
+                    "type": "object",
+                    "description": "The store's native order payload, verbatim. Shopify Order, WooCommerce Order, or the generic canonical shape."
+                  }
+                },
+                "required": [
+                  "connection",
+                  "<platform payload>"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product-feed": {
+      "get": {
+        "tags": [
+          "Commerce"
+        ],
+        "summary": "Serves a workspace's product catalogue as an XML feed for a marketplace importer.",
+        "operationId": "get_product_feed",
+        "description": "Public, token-only: a server-side poller has no fixed Origin, so a domain allowlist is impossible and the rotatable token plus the feed's `enabled` switch plus the storefront-publication gate are the boundary. ?token=<public_token> selects the saved feed definition. format=google renders RSS 2.0 with the g: namespace (Google Merchant Center, and the Shopify/WooCommerce importers); format=skroutz renders Skroutz's own <mywebstore> dialect, which is not RSS. Prices are rendered VAT-INCLUSIVE from the per-product AADE VAT category, falling back to the workspace rate. Responses over ~512KB are gzipped, which Skroutz requires above 10MB.",
+        "security": [
+          {
+            "queryToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/store-orders-sync": {
+      "post": {
+        "tags": [
+          "Commerce"
+        ],
+        "summary": "Pulls recent orders from a connected store to close the gap a missed webhook leaves.",
+        "operationId": "post_store_orders_sync",
+        "description": "A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held returns skipped_dupe. The store URL is operator-supplied, so the fetch goes through the shared SSRF guard: https only, DNS-resolved, private and link-local ranges refused. With discover_only it ingests nothing and instead returns the note_attribute / meta_data keys that actually appear on recent orders, counted, so the VAT-number and invoice-request keys are picked from what the shop really sends rather than guessed.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "connection_id": {
+                    "type": "string",
+                    "description": "The store_connections id to pull for. Membership is checked against the verified JWT."
+                  },
+                  "days": {
+                    "type": "number",
+                    "description": "How far back to pull, 1-90. Default 7."
+                  },
+                  "discover_only": {
+                    "type": "boolean",
+                    "description": "Return the observed attribute keys without ingesting anything."
+                  }
+                },
+                "required": [
+                  "connection_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finance-document-link": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Redirects a document token to a freshly signed link to the PDF.",
+        "operationId": "get_finance_document_link",
+        "description": "Public and token-only. The token is stable and revocable (set invoices.document_token to NULL); the storage URL it redirects to is minted per request and expires in an hour. That split is deliberate: writing a signed URL into a Shopify metafield or a WooCommerce order note would hand the merchant a link that dies when the signature does, and persisting a URL for a private bucket is forbidden anyway. A draft is refused, because a document with no legal number does not exist as far as AADE is concerned.",
+        "security": [
+          {
+            "queryToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/store-document-writeback": {
+      "post": {
+        "tags": [
+          "Commerce"
+        ],
+        "summary": "Hands the issued fiscal document back to the store the order came from.",
+        "operationId": "post_store_document_writeback",
+        "description": "Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guard, https only. A draft is refused. Every attempt, successful or not, lands in store_order_sync_log.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "invoice_id": {
+                    "type": "string",
+                    "description": "The issued invoice to hand back. Its order must have come from a channel."
+                  }
+                },
+                "required": [
+                  "invoice_id"
+                ]
               }
             }
           }

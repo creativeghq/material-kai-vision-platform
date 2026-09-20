@@ -618,7 +618,7 @@ export const createSEOMyRankingsTool = (
  */
 const SITE_REPORT_DEFAULT_DAYS: Record<string, number> = {
   search_metrics: 180, domain_intel: 180, ai_visibility: 90, ai_answers: 90,
-  ai_citations: 90,
+  ai_citations: 90, ai_citability: 90,
   cannibalisation: 90, competitors: 365, analytics: 28, page_queries: 90,
 };
 
@@ -793,6 +793,8 @@ async function readSiteReport(
         return { data: await rpc('get_website_ai_answers', { p_website_id: siteId, p_days: days }) };
       case 'ai_citations':
         return { data: await rpc('get_website_ai_citation_report', { p_website_id: siteId, p_days: days }) };
+      case 'ai_citability':
+        return { data: await rpc('get_website_citability_report', { p_website_id: siteId, p_days: days }) };
       case 'cannibalisation':
         return { data: await rpc('get_website_cannibalisation', { p_website_id: siteId, p_days: days, p_min_impressions: 10 }) };
       case 'competitors':
@@ -856,9 +858,9 @@ export const createSEOSiteReportTool = (
     },
     {
       name: 'seo_site_report',
-      description: 'A report on the workspace\'s OWN connected website from what the platform already measures — free, first-party, no upstream call. kind: overview (site, tracked domains, research, articles at a glance) · health (latest Lighthouse/on-page audit: scores + issues) · crawl (last site crawl: pages, issues by severity, issue groups) · search_metrics (Search Console + tracked-domain metrics with verdicts) · domain_intel (the weekly DataForSEO snapshot of the site itself: rank, keywords, backlinks, trend) · ai_visibility (how often ChatGPT/Gemini/Claude probes mention the site, by model and prompt, with competitors) · ai_citations (the citation half: per-assistant citation rate and mention rate each with a verdict on whether the figure is real, plus who is CITED and who is NAMED instead of us in the answers that left us out - an assistant that returned no sources reports citation as not_collected, never 0%) · ai_answers (what each assistant answered each question) · cannibalisation (queries where two of our pages compete) · competitors (tracked competitors\' series for a metric) · analytics (Google Analytics summary) · page_queries (Search Console queries for ONE page — needs page). Use this before any paid crawl or third-party lookup when the question is about our own site. Defaults to the connected website.',
+      description: 'A report on the workspace\'s OWN connected website from what the platform already measures — free, first-party, no upstream call. kind: overview (site, tracked domains, research, articles at a glance) · health (latest Lighthouse/on-page audit: scores + issues) · crawl (last site crawl: pages, issues by severity, issue groups) · search_metrics (Search Console + tracked-domain metrics with verdicts) · domain_intel (the weekly DataForSEO snapshot of the site itself: rank, keywords, backlinks, trend) · ai_visibility (how often ChatGPT/Gemini/Claude probes mention the site, by model and prompt, with competitors) · ai_citations (the citation half: per-assistant citation rate and mention rate each with a verdict on whether the figure is real, plus who is CITED and who is NAMED instead of us in the answers that left us out - an assistant that returned no sources reports citation as not_collected, never 0%) · ai_citability (for each question we lost, the page of ours that should have answered it, scored on eight extraction dimensions, with the specific fixes) · ai_answers (what each assistant answered each question) · cannibalisation (queries where two of our pages compete) · competitors (tracked competitors\' series for a metric) · analytics (Google Analytics summary) · page_queries (Search Console queries for ONE page — needs page). Use this before any paid crawl or third-party lookup when the question is about our own site. Defaults to the connected website.',
       schema: z.object({
-        kind: z.enum(['overview', 'health', 'crawl', 'search_metrics', 'domain_intel', 'ai_visibility', 'ai_citations', 'ai_answers', 'cannibalisation', 'competitors', 'analytics', 'page_queries'])
+        kind: z.enum(['overview', 'health', 'crawl', 'search_metrics', 'domain_intel', 'ai_visibility', 'ai_citations', 'ai_citability', 'ai_answers', 'cannibalisation', 'competitors', 'analytics', 'page_queries'])
           .describe('Which report to read.'),
         website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
         days: z.number().int().min(7).max(365).optional().describe('Look-back window in days. Defaults per report (28 analytics, 90 AI/cannibalisation, 180 search/domain, 365 competitors).'),

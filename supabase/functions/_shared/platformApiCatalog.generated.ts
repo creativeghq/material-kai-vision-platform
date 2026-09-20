@@ -2419,7 +2419,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Hands the issued fiscal document back to the store the order came from.",
-    "description": "Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guar"
+    "description": "Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guar",
+    "fields": {
+      "invoice_id": {
+        "type": "string",
+        "required": true,
+        "description": "The issued invoice to hand back. Its order must have come from a channel."
+      }
+    }
   },
   {
     "name": "store-orders-sync",
@@ -2428,7 +2435,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Pulls recent orders from a connected store to close the gap a missed webhook leaves.",
-    "description": "A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held return"
+    "description": "A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held return",
+    "fields": {
+      "connection_id": {
+        "type": "string",
+        "required": true,
+        "description": "The store_connections id to pull for. Membership is checked against the verified JWT."
+      },
+      "days": {
+        "type": "number",
+        "description": "How far back to pull, 1-90. Default 7."
+      },
+      "discover_only": {
+        "type": "boolean",
+        "description": "Return the observed attribute keys without ingesting anything."
+      }
+    }
   },
   {
     "name": "stripe-api",
