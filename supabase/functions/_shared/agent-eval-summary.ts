@@ -18,6 +18,7 @@ export interface EvalRunRow {
   model: string | null;
   routed_agent: string | null;
   reply?: string | null;
+  session_mode?: string | null;
 }
 
 export interface EvalCaseRow {
@@ -64,6 +65,8 @@ export interface BatchSummary {
   agent_failures_total: number;
   failure_classes: Partial<Record<AgentEvalFailureClass, number>>;
   credits_total: number;
+  /** Only an agent measurement when this reads ['user']; service_role is smoke. */
+  session_modes: string[];
   cases: CaseSummary[];
 }
 
@@ -187,6 +190,8 @@ export function summarizeBatch(
     agent_failures_total: attemptsTotal - passedTotal - harnessTotal,
     failure_classes: totals,
     credits_total: round(runs.reduce((a, r) => a + (Number(r.credits) || 0), 0), 2) ?? 0,
+    // 'unrecorded', never dropped: unknown provenance must not read as a clean batch.
+    session_modes: [...new Set(runs.map((r) => r.session_mode || 'unrecorded'))].sort(),
     cases: summaries,
   };
 }

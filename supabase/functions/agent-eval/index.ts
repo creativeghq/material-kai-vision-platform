@@ -339,7 +339,7 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
     const [{ data: cases, error: caseErr }, { data: runs, error: runErr }] = await Promise.all([
       sb.from('agent_eval_cases').select('key, title, agent_id').eq('is_active', true).order('sort_order'),
       sb.from('agent_eval_runs')
-        .select('case_key, passed, failure_class, failure_classes, tools_called, credits, latency_ms, model, routed_agent, reply')
+        .select('case_key, passed, failure_class, failure_classes, tools_called, credits, latency_ms, model, routed_agent, reply, session_mode')
         .eq('batch_id', batchId)
         .order('created_at'),
     ]);
@@ -441,6 +441,7 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
     failure_class: failureClass,
     failure_classes: failureClasses,
     repeat_index: repeatIndex,
+    session_mode: asUser ? 'user' : 'service_role',
     credits,
     latency_ms: turn.ms,
     error: turn.error,

@@ -1000,10 +1000,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Cross-entity record lookup — "find Tsatsos", "open the Botguard company". Before this the
       // agent had 171 tools and none of them answered "find the record called X".
       'find_records',
-      // The platform's own API, for work no dedicated tool covers. Every specialist the router
-      // can pick gets it, for the same reason they all get find_records: which capability is
-      // missing is not predictable per agent, and an agent that can only apologise for a gap
-      // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
       'discover_platform_data', 'call_platform_rpc',
       // Docs module — internal workspace docs FTS. Currently a free tool for all workspaces

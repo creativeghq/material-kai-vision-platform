@@ -8,10 +8,8 @@
  *     SUPABASE_SERVICE_ROLE_KEY=… VOYAGE_API_KEY=… ANTHROPIC_API_KEY=… \
  *       node scripts/eval-rerank.mjs [--limit 50] [--json out.json]
  *
- * @see kb_retrieval_eval_cases — the 27 LABELLED cases. Rank-of-first-relevant needs a
- *   label, so these are the only rows that can answer it. The plan asked for 50 logged
- *   `knowledge_base_search` queries; only 16 distinct ones have >= 2 results and none
- *   carry labels, so they could show disagreement but never which ranker was right.
+ * @see kb_retrieval_eval_cases — the 27 LABELLED cases. Rank-of-first-relevant needs a label,
+ *   so logged queries can show disagreement but never which ranker was right.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
