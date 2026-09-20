@@ -16301,5 +16301,34 @@
         "desc": "Lines that matched no product, and therefore carry no cost."
       }
     ]
+  },
+  {
+    "name": "product-feed",
+    "tag": "Commerce",
+    "summary": "Serves a workspace's product catalogue as an XML feed for a marketplace importer.",
+    "description": "Public, token-only: a server-side poller has no fixed Origin, so a domain allowlist is impossible and the rotatable token plus the feed's `enabled` switch plus the storefront-publication gate are the boundary. ?token=<public_token> selects the saved feed definition. format=google renders RSS 2.0 with the g: namespace (Google Merchant Center, and the Shopify/WooCommerce importers); format=skroutz renders Skroutz's own <mywebstore> dialect, which is not RSS. Prices are rendered VAT-INCLUSIVE from the per-product AADE VAT category, falling back to the workspace rate. Responses over ~512KB are gzipped, which Skroutz requires above 10MB.",
+    "security": [
+      "queryToken"
+    ],
+    "docs": null,
+    "methods": [
+      "GET"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "token",
+        "type": "string",
+        "required": true,
+        "desc": "Query parameter: the feed's public_token."
+      }
+    ],
+    "response": [
+      {
+        "name": "<xml>",
+        "type": "string",
+        "desc": "RSS 2.0 + g:, or a Skroutz <mywebstore> document."
+      }
+    ]
   }
 ]

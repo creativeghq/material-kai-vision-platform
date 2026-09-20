@@ -128,6 +128,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'product-document-url', label: 'product-document-url', sublabel: "Signed, short-lived link to the original file behind a product's knowledge doc or certificate" },
   { id: 'product-market-price', label: 'product-market-price', sublabel: 'What a catalogue product is worth on the open market' },
   { id: 'public-price', label: 'public-price', sublabel: 'Open market-price lookup: the band, and the one to show' },
+  { id: 'product-feed', label: 'product-feed', sublabel: "Serves a workspace's product catalogue as an XML feed for a marketplace importer." },
   { id: 'products-3d-api', label: 'products-3d-api', sublabel: 'Public product + 3D model read for the website embed SDK (embed-key authenticated)' },
   { id: 'finance-assessment', label: 'finance-assessment', sublabel: "Derive the workspace's finance health signals, and optionally write the AI assessment of them" },
   { id: 'project-assessment', label: 'project-assessment', sublabel: "Derive a project's health signals, and optionally write the AI assessment of them" },

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plug, Plus, Trash2, KeyRound, AlertTriangle } from 'lucide-react';
+import { Plug, Plus, Trash2, KeyRound, AlertTriangle, Rss, Copy, RefreshCw } from 'lucide-react';
 
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -21,6 +21,9 @@ import { generateWebhookSecret, WOO_UNSAFE_SECRET } from '@/modules/commerce/web
 import {
   storeConnectionsService, type StoreConnection, type StoreSyncLogRow,
 } from '@/services/commerce/storeConnectionsService';
+import {
+  productFeedsService, feedUrl, FEED_FORMATS, type ProductFeed, type FeedFormat,
+} from '@/services/commerce/productFeedsService';
 
 const PLATFORM_LABEL: Record<CommercePlatform, string> = {
   skroutz: 'Skroutz',
@@ -59,6 +62,10 @@ export default function SalesChannelsPage() {
   const [newUrl, setNewUrl] = useState('');
   const [creds, setCreds] = useState<Record<string, string>>({});
   const [secret, setSecret] = useState('');
+  const [feeds, setFeeds] = useState<ProductFeed[]>([]);
+  const [addingFeed, setAddingFeed] = useState(false);
+  const [feedName, setFeedName] = useState('');
+  const [feedFormat, setFeedFormat] = useState<FeedFormat>('google');
   const [rotating, setRotating] = useState<string | null>(null);
   const [rotateCreds, setRotateCreds] = useState<Record<string, string>>({});
   const [rotateSecret, setRotateSecret] = useState('');
@@ -69,12 +76,14 @@ export default function SalesChannelsPage() {
     if (!ws) return;
     setLoading(true);
     try {
-      const [conns, entries] = await Promise.all([
+      const [conns, entries, feedRows] = await Promise.all([
         storeConnectionsService.list(ws),
         storeConnectionsService.syncLog(ws),
+        productFeedsService.list(ws),
       ]);
       setRows(conns);
       setLog(entries);
+      setFeeds(feedRows);
     } catch (err) {
       toast({ title: 'Could not load sales channels', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     } finally {
@@ -136,6 +145,37 @@ export default function SalesChannelsPage() {
     } catch (err) {
       toast({ title: 'Could not save', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
+  };
+
+  const submitFeed = async () => {
+    if (!feedName.trim()) { toast({ title: 'Give the feed a name', variant: 'destructive' }); return; }
+    try { await productFeedsService.create(ws, { name: feedName, format: feedFormat }); setAddingFeed(false); await load(); }
+    catch (err) { toast({ title: 'Could not create the feed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' }); }
+  };
+
+  const patchFeed = async (f: ProductFeed, enabled: boolean) => {
+    try { await productFeedsService.setEnabled(f.id, enabled); await load(); }
+    catch (err) { toast({ title: 'Could not save', description: err instanceof Error ? err.message : String(err), variant: 'destructive' }); }
+  };
+
+  const rotateFeed = async (f: ProductFeed) => {
+    try {
+      await productFeedsService.rotateToken(f.id);
+      await load();
+      toast({ title: 'Link rotated', description: 'The old link stops working immediately.' });
+    } catch (err) {
+      toast({ title: 'Could not rotate', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    }
+  };
+
+  const removeFeed = async (f: ProductFeed) => {
+    try { await productFeedsService.remove(f.id); await load(); }
+    catch (err) { toast({ title: 'Could not remove', description: err instanceof Error ? err.message : String(err), variant: 'destructive' }); }
+  };
+
+  const copyFeed = async (f: ProductFeed) => {
+    try { await navigator.clipboard.writeText(feedUrl(f.public_token)); toast({ title: 'Link copied' }); }
+    catch { toast({ title: 'Could not copy', description: 'Select the field and copy it by hand.', variant: 'destructive' }); }
   };
 
   const remove = async (row: StoreConnection) => {
@@ -316,6 +356,71 @@ export default function SalesChannelsPage() {
               </CardContent>
             </Card>
           ))}
+
+          <Card>
+            <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2"><Rss className="h-4 w-4" aria-hidden="true" /> Product feeds</CardTitle>
+                <CardDescription>The XML a marketplace polls to list your catalogue. Anyone holding the link can read your published products, so rotate it to revoke.</CardDescription>
+              </div>
+              {!addingFeed && <Button size="sm" variant="outline" onClick={() => { setAddingFeed(true); setFeedName(''); }}><Plus className="mr-1 h-3.5 w-3.5" /> New feed</Button>}
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {addingFeed && (
+                <div className="grid gap-3 rounded-sm border border-hairline p-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Name</Label>
+                    <Input value={feedName} onChange={(e) => setFeedName(e.target.value)} placeholder="Skroutz listing" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Dialect</Label>
+                    <Select value={feedFormat} onValueChange={(v) => setFeedFormat(v as FeedFormat)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {FEED_FORMATS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">{FEED_FORMATS.find((f) => f.value === feedFormat)?.hint}</p>
+                  </div>
+                  <div className="flex gap-2 sm:col-span-2">
+                    <Button size="sm" onClick={submitFeed}>Create</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setAddingFeed(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+
+              {feeds.length === 0 && !addingFeed ? (
+                <HubEmptyState
+                  icon={Rss}
+                  title="No feed yet"
+                  description="A feed lists your published products as XML so a marketplace can import them. Skroutz needs its own dialect; Google, Shopify and WooCommerce share one."
+                  action={<Button size="sm" onClick={() => { setAddingFeed(true); setFeedName(''); }}><Plus className="mr-1 h-3.5 w-3.5" /> New feed</Button>}
+                />
+              ) : feeds.map((f) => (
+                <div key={f.id} className="space-y-2 border-t border-hairline pt-3 first:border-0 first:pt-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{f.name}</span>
+                    <Badge variant="neutral" className="text-[10px]">{FEED_FORMATS.find((x) => x.value === f.format)?.label ?? f.format}</Badge>
+                    <Badge variant={f.enabled ? 'success' : 'neutral'} className="text-[10px]">{f.enabled ? 'live' : 'off'}</Badge>
+                    <Switch checked={f.enabled} onCheckedChange={(v) => patchFeed(f, v)} aria-label="Enable feed" />
+                    <Button size="sm" variant="ghost" className="h-7 px-1" onClick={() => removeFeed(f)} aria-label="Remove feed">
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input readOnly value={feedUrl(f.public_token)} className="h-7 flex-1 font-mono text-[11px]" onFocus={(e) => e.currentTarget.select()} />
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => copyFeed(f)}><Copy className="mr-1 h-3 w-3" /> Copy</Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => rotateFeed(f)}><RefreshCw className="mr-1 h-3 w-3" /> Rotate</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {f.last_fetched_at
+                      ? `Last read ${formatDate(f.last_fetched_at, { withTime: true })} · ${f.fetch_count} reads · ${f.last_item_count ?? 0} products`
+                      : 'Never read. If the importer is configured and this stays empty, it is not reaching us.'}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
