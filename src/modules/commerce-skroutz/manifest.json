@@ -1,0 +1,10 @@
+{
+  "slug": "commerce-skroutz",
+  "name": "Skroutz Marketplace",
+  "description": "Sell on Skroutz: product feed, order intake with the accept window, and the fiscal document uploaded back to the order.",
+  "category": "integrations",
+  "priceTier": "pro",
+  "icon": "Store",
+  "version": "0.1.0",
+  "parent": "commerce-core"
+}

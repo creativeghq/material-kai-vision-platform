@@ -1,0 +1,10 @@
+{
+  "slug": "commerce-woocommerce",
+  "name": "WooCommerce",
+  "description": "Sell through WooCommerce: product feed, order webhooks, and the document written back to the order meta.",
+  "category": "integrations",
+  "priceTier": "pro",
+  "icon": "ShoppingBasket",
+  "version": "0.1.0",
+  "parent": "commerce-core"
+}

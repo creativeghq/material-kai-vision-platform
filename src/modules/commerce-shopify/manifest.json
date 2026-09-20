@@ -1,0 +1,10 @@
+{
+  "slug": "commerce-shopify",
+  "name": "Shopify",
+  "description": "Sell through Shopify: product feed, order webhooks, and the document written back to the order metafields.",
+  "category": "integrations",
+  "priceTier": "pro",
+  "icon": "ShoppingBag",
+  "version": "0.1.0",
+  "parent": "commerce-core"
+}

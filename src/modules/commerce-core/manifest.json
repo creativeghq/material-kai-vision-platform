@@ -1,0 +1,9 @@
+{
+  "slug": "commerce-core",
+  "name": "Commerce Core",
+  "description": "Shared engine behind every sales channel: connections, inbound orders, document issuance and categorisation. Not sold on its own — any channel module grants it.",
+  "category": "integrations",
+  "priceTier": "pro",
+  "icon": "Plug",
+  "version": "0.1.0"
+}
