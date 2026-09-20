@@ -382,6 +382,14 @@ export const createManageDealTool = (
     async ({ action, deal_type, deal_id, title, contact_query, value, stage, lost_reason }: AnyRow) => {
       const denied = await moduleGate(workspaceId, 'deals');
       if (denied) return denied;
+      // `Bearer ` with nothing after it is malformed, not anonymous: the request dies as "Empty
+      // JWT is sent in Authorization header". RLS is the boundary, so service role is not the fix.
+      if (!jwt) {
+        return JSON.stringify({
+          success: false,
+          error: 'Deals need a signed-in user session and this request has none.',
+        });
+      }
       const db = sb();
 
       /** Resolve a deal type by fuzzy label/key, or the workspace default when unspecified. */

@@ -929,7 +929,7 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   // without it "what is product discovery?" matches no specialist and is answered unsearched.
   { slug: 'product-business', name: 'Pepper', blurb: 'building or publishing catalogs, B2B manufacturer research, company/contact enrichment and CRM, product knowledge-graph (provenance, brand, related products, specs), tech radar, job research; ALSO any question answerable from the workspace knowledge base — product-management practice, product discovery, roadmaps, frameworks, internal playbooks and "what do our docs say about X"' },
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
-  { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
+  { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees); stock and warehouse levels — on-hand quantities, what is low or out of stock, reorder thresholds' },
   { slug: 'social-media', name: 'Hermes', blurb: 'publishing or scheduling social-media posts, social analytics, best time to post' },
   { slug: 'property-advisor', name: 'Baxter', blurb: 'real estate — property listings, instant valuations, viewings, offers, buyer/seller lead matching, portal syndication, lettings (tenancies, rent, maintenance)' },
 ];
@@ -1373,10 +1373,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'web_search', 'web_fetch', 'web_research_validate',
       // Trinity quotes and invoices, so it must be able to FIND one by number or customer name.
       'find_records',
-      // The platform's own API, for work no dedicated tool covers. Every specialist the router
-      // can pick gets it, for the same reason they all get find_records: which capability is
-      // missing is not predictable per agent, and an agent that can only apologise for a gap
-      // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
       'discover_platform_data', 'call_platform_rpc',
       'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
@@ -1416,6 +1412,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Where the money goes. Trinity pays expenses and reads supplier overviews, so the account
       // a supplier is paid INTO is its business; the write half is confirm-gated in the tool.
       'manage_counterparty_bank_account',
+      // Stock toolkit (module-gated + finance-manager RBAC in stock-api, which is Trinity's
+      // audience). Bound to kai alone while no blurb named stock, so the router never found it.
+      'manage_stock',
     ],
   },
   'social-media': {
