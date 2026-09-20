@@ -114,8 +114,7 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/realEstateVocabulary.generated.ts',
   ],
   [
-    // #391 — asset `category` and `acquisition_type`: a union pair in the service and an
-    // `as const` pair feeding a z.enum in the tool.
+    // #391 — asset `category`/`acquisition_type`: a union in the service, an `as const` in the tool.
     'src/services/assets/assetVocabulary.ts',
     'supabase/functions/_shared/assetVocabulary.generated.ts',
   ],
@@ -126,8 +125,7 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/agents/agentVocabulary.generated.ts',
   ],
   [
-    // #391 — page-watch change status (a union one side, a Set the other) and judge
-    // confidence.
+    // #391 — page-watch change status (a union one side, a Set the other) and judge confidence.
     'src/services/pageWatch/pageWatchVocabulary.ts',
     'supabase/functions/_shared/pageWatchVocabulary.generated.ts',
   ],
@@ -306,6 +304,12 @@ export const VOCABULARIES = [
     // them, and `ga_breakdown_dimension_check` is the enforcer — three readers, one list.
     'src/components/core/Profile/seo/gaVocabulary.ts',
     'supabase/functions/_shared/gaVocabulary.generated.ts',
+  ],
+  [
+    // #386 — channel platform, sync outcome and the buyer's document request. The webhook handler
+    // refuses an unknown platform, the settings UI offers them, and all three are DB CHECKs.
+    'src/modules/commerce/commerceVocabulary.ts',
+    'supabase/functions/_shared/commerceVocabulary.generated.ts',
   ],
 ];
 
