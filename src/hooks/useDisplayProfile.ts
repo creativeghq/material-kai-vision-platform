@@ -8,13 +8,13 @@ import {
 } from '@/services/displayProfilesService';
 
 export function useDisplayProfile(userId?: string | null): DisplayProfile | null {
-  const profile = useSyncExternalStore(
+  const cached = useSyncExternalStore(
     subscribeDisplayProfiles,
-    () => (userId ? getCachedDisplayProfile(userId) ?? null : null),
+    () => (userId ? getCachedDisplayProfile(userId) : null),
     () => null,
   );
   useEffect(() => {
-    if (userId) requestDisplayProfiles([userId]);
-  }, [userId]);
-  return profile;
+    if (userId && cached === undefined) requestDisplayProfiles([userId]);
+  }, [userId, cached]);
+  return cached ?? null;
 }

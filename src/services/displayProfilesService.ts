@@ -24,7 +24,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const CHUNK = 200;
 
 // Names and emails resolved as one person must not be rendered to the next one in the same tab.
-supabase.auth.onAuthStateChange(() => {
+let signedInUserId: string | null | undefined;
+supabase.auth.onAuthStateChange((_event, session) => {
+  const nextUserId = session?.user?.id ?? null;
+  const previous = signedInUserId;
+  signedInUserId = nextUserId;
+  if (previous === undefined || previous === nextUserId) return;
   cache.clear();
   pending.clear();
   for (const fn of subscribers) fn();
@@ -74,6 +79,7 @@ async function flush(): Promise<void> {
         console.warn('[displayProfiles] lookup failed; leaving these ids unresolved rather than caching them as absent', error.message);
         continue;
       }
+      if (signedInUserId !== undefined && signedInUserId !== session.user.id) return;
       for (const id of slice) cache.set(id, null);
       for (const row of (data ?? []) as DisplayProfileRow[]) {
         cache.set(row.user_id, {
