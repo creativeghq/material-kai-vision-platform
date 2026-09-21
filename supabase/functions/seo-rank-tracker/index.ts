@@ -165,15 +165,16 @@ async function serp(
   return { ...data, depth };
 }
 
-/**
- * Three attempts with a short backoff. DataForSEO fails 8–12% of Greek depth-100
- * SERP tasks on the first try — 40106 "partial results, some pages could not be
- * retrieved after several retry attempts" and 40101 "internal SE server error",
- * both transient by their own description. One retry still left 5–8% of a sweep as
- * unknown (measured 2026-09-05: 15 failures in 128 calls, 8 keywords left failed).
- */
+/** Three attempts: DataForSEO fails 8–12% of Greek depth-100 tasks on the first try
+ *  (40106 partial, 40101 internal SE), transient by their own description, and one
+ *  retry still left 5–8% of a sweep unknown (2026-09-05: 15 of 128). */
 const SERP_ATTEMPTS = 3;
 const SERP_BACKOFF_MS = [1500, 4000];
+
+/** Payment, auth and quota are states of the ACCOUNT, not the request: the backoff buys
+ *  nothing and, once funded, turns one charge per keyword into three. */
+const TERMINAL_UPSTREAM = /\b(402|401|403)\b|payment required|unauthor|forbidden|quota|credit|insufficient|balance/i;
+
 async function serpWithRetry(
   keyword: string, country: string, language: string, userId: string | null, deadline: number,
 ): Promise<any> {
@@ -190,7 +191,12 @@ async function serpWithRetry(
       return await serp(keyword, country, language, userId, attempt === SERP_ATTEMPTS - 1, 100, deadline);
     } catch (e) {
       last = e;
-      console.warn(`[seo-rank-tracker] attempt ${attempt + 1} failed for "${keyword}":`, e instanceof Error ? e.message : e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[seo-rank-tracker] attempt ${attempt + 1} failed for "${keyword}":`, msg);
+      if (TERMINAL_UPSTREAM.test(msg)) {
+        console.warn(`[seo-rank-tracker] not retrying "${keyword}" — the account refused, not the request`);
+        break;
+      }
       if (attempt < SERP_ATTEMPTS - 1) await new Promise((r) => setTimeout(r, SERP_BACKOFF_MS[attempt] ?? 4000));
     }
   }
