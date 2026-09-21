@@ -178,6 +178,9 @@ export interface InboundDocument {
   lines: InboundDocLine[];
   status: 'new' | 'classified' | 'received' | 'partially_received' | 'dismissed';
   created_supplier_bill_id: string | null;
+  /** Set = paid outside the platform, so the cost is excluded from the P&L and reported apart. */
+  settled_outside_at?: string | null;
+  settled_outside_note?: string | null;
   category_id: string | null;
   created_at: string;
 }
@@ -233,6 +236,22 @@ export interface InboundBookableIssuerRow {
   learned_category_name: string | null;
   first_issue_date: string | null;
   last_issue_date: string | null;
+}
+
+export interface SettleOutcome {
+  outcome: 'settled_outside' | 'already_settled_outside' | 'booked_and_paid' | 'already_paid' | 'unknown';
+  supplier_bill_id: string | null;
+  payment_id: string | null;
+  amount: number;
+}
+
+export interface ReceivedCreditNoteFetch {
+  created: number;
+  skipped: number;
+  failed: number;
+  total: number;
+  remaining: number;
+  first_error: string | null;
 }
 
 /** `skipped` is a document the rules would not book; `failed` is one that tried and broke. */
@@ -294,6 +313,9 @@ export interface IssuerMoney {
   /** Null when the window mixes currencies — the totals are then not addable and must not be shown. */
   currency: string | null;
   mixed_currency: boolean;
+  /** Paid outside the platform: deliberately not booked, so counted apart from `booked_*`. */
+  settled_outside_documents: number;
+  settled_outside_total: number;
 }
 
 /** One candidate from `suggest_orders_for_inbound_doc`. `net_delta` is the derived disagreement
@@ -330,6 +352,7 @@ export const inboundService = {
     'move_purpose', 'vat_payment_suspension', 'total_withheld', 'total_fees', 'total_stamp_duty',
     'total_other_taxes', 'total_deductions', 'currency', 'total_net', 'total_vat', 'total_gross',
     'status', 'created_supplier_bill_id', 'category_id', 'created_at', 'updated_at',
+    'settled_outside_at', 'settled_outside_note',
   ].join(', '),
 
   /**
@@ -430,6 +453,8 @@ export const inboundService = {
       paid: Number(row.paid ?? 0),
       credited: Number(row.credited ?? 0),
       outstanding: Number(row.outstanding ?? 0),
+      settled_outside_documents: Number(row.settled_outside_documents ?? 0),
+      settled_outside_total: Number(row.settled_outside_total ?? 0),
       currency: row.currency ?? null,
       mixed_currency: !!row.mixed_currency,
     };
@@ -578,6 +603,52 @@ export const inboundService = {
     });
     if (error) throw error;
     return Number(data ?? 0);
+  },
+
+  /** Nothing converted these, so the list could only ever show what somebody re-keyed. */
+  async fetchReceivedCreditNotes(workspaceId: string, limit = 100): Promise<ReceivedCreditNoteFetch> {
+    const { data, error } = await (supabase as any).rpc('fetch_received_supplier_credit_notes', {
+      p_workspace_id: workspaceId, p_limit: limit,
+    });
+    if (error) throw await edgeError(error);
+    return ((data ?? [])[0] ?? {
+      created: 0, skipped: 0, failed: 0, total: 0, remaining: 0, first_error: null,
+    }) as ReceivedCreditNoteFetch;
+  },
+
+  /** How many are waiting, so the list can say so instead of looking complete. */
+  async countUnfetchedCreditNotes(workspaceId: string): Promise<{ waiting: number; waiting_total: number }> {
+    const { data, error } = await (supabase as any).rpc('count_unfetched_supplier_credit_notes', {
+      p_workspace_id: workspaceId,
+    });
+    if (error) throw error;
+    return ((data ?? [])[0] ?? { waiting: 0, waiting_total: 0 });
+  },
+
+  /**
+   * The ACCOUNT chooses the outcome: name one and the purchase is booked and the money leaves it;
+   * leave it empty and the cost is settled OUTSIDE the books and excluded from the P&L.
+   */
+  async settleDocument(
+    docId: string,
+    opts: { bankAccountId?: string | null; paidOn?: string | null; amount?: number | null; note?: string | null } = {},
+  ): Promise<SettleOutcome> {
+    const { data, error } = await (supabase as any).rpc('settle_inbound_document', {
+      p_doc_id: docId,
+      p_bank_account_id: opts.bankAccountId ?? null,
+      p_paid_on: opts.paidOn ?? null,
+      p_amount: opts.amount ?? null,
+      p_note: opts.note ?? null,
+    });
+    if (error) throw await edgeError(error);
+    return ((data ?? [])[0] ?? { outcome: 'unknown', supplier_bill_id: null, payment_id: null, amount: 0 }) as SettleOutcome;
+  },
+
+  /** Put an excluded cost back. A mis-click must not be permanent, or the P&L stays wrong. */
+  async unsettleDocument(docId: string): Promise<boolean> {
+    const { data, error } = await (supabase as any).rpc('unsettle_inbound_document', { p_doc_id: docId });
+    if (error) throw await edgeError(error);
+    return Boolean(data);
   },
 
   /** Per state: what is waiting to become an expense, and for the rest, why it never will. */

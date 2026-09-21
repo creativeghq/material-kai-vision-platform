@@ -8,7 +8,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2 } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -37,6 +37,10 @@ interface Props {
   onCreateOrder?: () => void;
   /** This document already produced an order — offered as done rather than repeated. */
   hasOrder?: boolean;
+  /** Open the "mark as paid" form. Absent → the host does not offer settling. */
+  onSettle?: () => void;
+  /** Put an excluded cost back into the P&L. */
+  onUnsettle?: () => void;
   /** Book this document against a purchase order that ALREADY exists. Absent → not offered. */
   onBillExistingOrder?: () => void;
   /**
@@ -56,7 +60,8 @@ interface Props {
   onChanged?: () => void;
 }
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onSettle, onUnsettle, onChanged }) => {
+  const settledOutside = !!(doc as { settled_outside_at?: string | null }).settled_outside_at;
   const navigate = useNavigate();
 
   // ONE goods receipt per purchase. Receiving the document and receiving the purchase order it
@@ -85,6 +90,23 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // save, which produced a paid bill with no order to match it against: the exact shape the
   // Money section was reorganised to prevent.
   const canPay = doc.status !== 'dismissed' && !isCancelled && !!doc.created_supplier_bill_id;
+  /**
+   * What `settle_inbound_document` will actually accept. Offered wider than that, the item was a
+   * dialog that always ends in the server refusing — payroll, credit notes and value-less
+   * delivery notes all reach it.
+   */
+  const settleBlockedReason = isCancelled
+    ? 'Cancelled at AADE — a void document was never payable.'
+    : doc.status === 'dismissed'
+      ? 'Dismissed. Undismiss it first.'
+      : isPayroll
+        ? 'Payroll is recorded in HR, never as a supplier bill.'
+        : docFamily(doc.doc_type) === '5'
+          ? 'A credit note reduces an expense — it is not paid.'
+          : (doc.total_gross ?? 0) <= 0
+            ? 'This document states no money, so there is nothing to pay.'
+            : null;
+  const canSettle = settleBlockedReason === null;
   const hasIssuer = !!(doc.issuer_vat || doc.issuer_name);
   /** Already a CRM company — adding again would only make a duplicate to merge later. */
   const inCrm = !!crmCompanyId;
@@ -179,6 +201,20 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           <DropdownMenuItem onClick={onDismiss} disabled={!canDismiss}>
             <Trash2 className="h-4 w-4 mr-2" /> Dismiss
           </DropdownMenuItem>
+          {/* The other way a document leaves the queue without becoming a cost of this period. */}
+          {settledOutside ? (
+            <DropdownMenuItem onClick={onUnsettle} disabled={!onUnsettle}>
+              <Undo2 className="h-4 w-4 mr-2" /> Count it again
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onClick={onSettle}
+              disabled={!onSettle || !canSettle}
+              title={settleBlockedReason ?? undefined}
+            >
+              <BadgeCheck className="h-4 w-4 mr-2" /> Mark as paid&hellip;
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

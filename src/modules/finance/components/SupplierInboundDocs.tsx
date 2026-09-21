@@ -108,6 +108,14 @@ const MoneyStrip: React.FC<{ money: IssuerMoney | null | undefined; loading: boo
             </>}
         tone={nothingBooked ? 'text-muted-foreground' : undefined}
       />
+      {money.settled_outside_documents > 0 && (
+        <Tile
+          label="Settled outside the books"
+          value={formatMoney(money.settled_outside_total, cur)}
+          note={`${money.settled_outside_documents} document${money.settled_outside_documents === 1 ? '' : 's'} · kept out of the P&L on purpose`}
+          tone="text-muted-foreground"
+        />
+      )}
     </div>
   );
 };
@@ -191,7 +199,7 @@ export const SupplierInboundDocs: React.FC<{
     onCounts?.({
       total,
       loaded: rows.length,
-      notInBooks: rows.filter((d) => !d.created_supplier_bill_id && d.status !== 'dismissed').length,
+      notInBooks: rows.filter((d) => !d.created_supplier_bill_id && d.status !== 'dismissed' && !d.settled_outside_at).length,
       windowed,
     });
   }, [loading, rows, total, windowed, onCounts]);

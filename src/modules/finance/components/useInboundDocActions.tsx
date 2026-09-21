@@ -8,6 +8,7 @@ import { CompleteLinesDialog } from '@/modules/finance/components/CompleteLinesD
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { SettleExpenseDialog } from '@/modules/finance/components/SettleExpenseDialog';
 import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
 import { BillToExistingOrderDialog } from '@/modules/finance/components/BillToExistingOrderDialog';
 import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
@@ -58,6 +59,7 @@ export function useInboundDocActions({
   /** Being booked against a purchase order that already exists. */
   const [billOrderDoc, setBillOrderDoc] = useState<InboundDocument | null>(null);
   const [previewDoc, setPreviewDoc] = useState<InboundDocument | null>(null);
+  const [settleDoc, setSettleDoc] = useState<InboundDocument | null>(null);
   /** The bill whose ledger is open, when the host did not claim that job. */
   const [paymentsBillId, setPaymentsBillId] = useState<string | null>(null);
   const [ordered, setOrdered] = useState<Set<string>>(new Set());
@@ -84,6 +86,21 @@ export function useInboundDocActions({
     try { await inboundService.dismiss(id); onChanged(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusyId(null); }
+  }, [onChanged, toast]);
+
+  const unsettle = useCallback(async (id: string) => {
+    setBusyId(id);
+    try {
+      const changed = await inboundService.unsettleDocument(id);
+      // The RPC returns whether a row actually moved. Saying "back in the P&L" either way is a
+      // claim about the books that may not be true.
+      toast(changed
+        ? { title: 'Counted again', description: 'It is back in the queue and back in the P&L.' }
+        : { title: 'Nothing changed', description: 'This document was not marked settled outside.' });
+      onChanged();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusyId(null); }
   }, [onChanged, toast]);
 
   const openPayments = useCallback((billId: string) => {
@@ -115,14 +132,25 @@ export function useInboundDocActions({
       onReceiveStock={() => setReceiveDoc(doc)}
       onAddLineDetail={() => setDetailDoc(doc)}
       onDismiss={() => dismiss(doc.id)}
+      onSettle={() => setSettleDoc(doc)}
+      onUnsettle={() => void unsettle(doc.id)}
       onChanged={onChanged}
     />
-  ), [workspaceId, busyId, crmCompanyIdFor, ordered, openPayments, dismiss, onChanged]);
+  ), [workspaceId, busyId, crmCompanyIdFor, ordered, openPayments, dismiss, unsettle, onChanged]);
 
   const orderCategories = categories ?? ownCategories;
 
   const dialogs = (
     <>
+      {workspaceId && settleDoc && (
+        <SettleExpenseDialog
+          workspaceId={workspaceId}
+          doc={settleDoc}
+          open
+          onOpenChange={(v) => { if (!v) setSettleDoc(null); }}
+          onSettled={onChanged}
+        />
+      )}
       {previewDoc && (
         <InboundDocPreviewDialog
           doc={previewDoc}

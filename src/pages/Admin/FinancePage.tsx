@@ -285,6 +285,10 @@ const FinancePage: React.FC = () => {
   const loadPnl = async (wsId: string, period: DashPeriod) => {
     const { from, to } = dashRange(period);
     setPnlLoading(true);
+    // Cleared before the read, not after it: the card keys its heading off the SELECTED period,
+    // so leaving the last one's figures up puts one period's money under another's label.
+    setPnlOverview(null);
+    setPnlMonths([]);
     try {
       const [overview, months] = await Promise.all([
         financeService.getPnlOverview(wsId, from, to),
@@ -980,7 +984,7 @@ const FinancePage: React.FC = () => {
                           ) : isCredit ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.credit_number ?? r.description}</span>
-                              <span className="text-[10px] text-muted-foreground" title="The customer paid more than their orders — we hold the extra for their next order or a refund">· Customer credit (overpayment)</span>
+                              <span className="text-[10px] text-muted-foreground" title="Money of theirs we hold — it covers their next order, or is refunded">· Customer credit</span>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
@@ -1040,9 +1044,8 @@ const FinancePage: React.FC = () => {
                 <TablePagination page={arPage} total={arFiltered.length} onPageChange={setArPage} label="receivables" />
               </CardContent>
             </Card>
-            {/* Customer credit (money held on account) lives in the receivables list above as a
-                positively-signed row labelled "Customer credit (overpayment)" — aggregates key
-                off entry_kind === 'credit', never off a negative amount. See loadAll's creditRows. */}
+            {/* Customer credit (money held on account) is a positively-signed row in the list
+                above — aggregates key off entry_kind === 'credit', never off a negative amount. */}
           </TabsContent>
 
           {/* ─────────── PAYABLES ─────────── */}
@@ -1625,7 +1628,7 @@ const BucketSummary: React.FC<{
           )}
           {credit > 0 && (
             <tr className="border-b border-border/30 bg-muted/20">
-              <td className="px-4 py-2 text-xs text-muted-foreground" title="Customer money we hold (overpayments) — covers what they owe before any new money is due">Customer credit we hold</td>
+              <td className="px-4 py-2 text-xs text-muted-foreground" title="Customer money we hold — covers what they owe before any new money is due">Customer credit we hold</td>
               <td className="px-4 py-2" />
               <td className="px-4 py-2 text-right font-medium text-emerald-700 dark:text-emerald-400">{formatMoney(credit, money.currency)}</td>
             </tr>

@@ -189,6 +189,16 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, periodLabel, loadin
               </div>
             )}
 
+            {/* Excluded ON PURPOSE is still excluded, so it is stated rather than simply absent
+                — the whole reason the marker is a marker and not a delete. */}
+            {overview && overview.excluded_docs > 0 && (
+              <p className="border-t border-hairline px-5 py-2 text-[11px] text-muted-foreground">
+                <strong>{overview.excluded_docs.toLocaleString()}</strong> cost{overview.excluded_docs === 1 ? '' : 's'} worth{' '}
+                <strong>{formatMoney(overview.excluded_total, 'EUR')}</strong> {overview.excluded_docs === 1 ? 'is' : 'are'} marked
+                settled outside the books and are NOT in the figures above.
+              </p>
+            )}
+
             {overview && (settle.hasFigures ? (
               <div className="grid grid-cols-2 gap-4 border-t border-hairline px-5 py-3 sm:grid-cols-4">
                 <div>

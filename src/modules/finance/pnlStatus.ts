@@ -47,6 +47,7 @@ export const booksVerdict = (s: PnlBooksStatus | string | null | undefined): Pnl
 export const BOOKING_STATE_COPY: Record<string, { label: string; detail: string }> = {
   bookable: { label: 'Ready to book', detail: 'These become supplier bills, and then reach Payables and the P&L.' },
   booked: { label: 'Already in Expenses', detail: 'A supplier bill exists for these.' },
+  settled_outside: { label: 'Settled outside the books', detail: 'Paid, but not through this platform — deliberately kept out of the P&L. Undo it from the row menu.' },
   dismissed: { label: 'Dismissed', detail: 'Set aside by hand — not ours to book.' },
   cancelled: { label: 'Cancelled at ΑΑΔΕ', detail: 'The issuer cancelled these. A void document is not an expense.' },
   payroll: { label: 'Payroll', detail: 'Recorded in HR. Booking it here would double it against payroll.' },

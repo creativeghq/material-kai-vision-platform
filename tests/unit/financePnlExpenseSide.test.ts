@@ -124,7 +124,7 @@ describe('a P&L figure carries the verdict on itself', () => {
   });
 
   it('every booking state the view can emit has copy that names why', () => {
-    for (const s of ['bookable', 'booked', 'dismissed', 'cancelled', 'payroll', 'credit_note', 'no_value', 'out_of_scope']) {
+    for (const s of ['bookable', 'booked', 'dismissed', 'cancelled', 'settled_outside', 'payroll', 'credit_note', 'no_value', 'out_of_scope']) {
       expect(bookingStateCopy(s).label, `${s} needs a label`).toBeTruthy();
       expect(bookingStateCopy(s).detail.length, `${s} needs a reason`).toBeGreaterThan(10);
     }
@@ -193,5 +193,112 @@ describe('building near the expenses queue never drains it', () => {
       .filter(([, src]) => /throw\s+edgeError\(/.test(src))
       .map(([f]) => posix(f));
     expect(offenders, `use \`throw await edgeError(...)\`: ${offenders.join(', ')}`).toEqual([]);
+  });
+});
+
+describe('a cost kept out of the P&L is stated, never simply absent', () => {
+  it('the excluded total is rendered beside the figures it is missing from', () => {
+    const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
+    expect(card, 'excluded costs must be counted on screen').toMatch(/excluded_docs/);
+    expect(card, 'and carry their money').toMatch(/excluded_total/);
+  });
+
+  it('a write is offered only to the role the RPC accepts', () => {
+    // These gate on is_workspace_finance_manager. isAccountant was the wrong twin: it offered the
+    // action to sales and warehouse, who are refused, and blocked nobody else.
+    const panel = strippedSource('src/modules/finance/components/OrderWorklistPanel.tsx');
+    expect(panel, 'the worklist dismissal is manager-gated').toMatch(/isWorkspaceManager/);
+    expect(panel).not.toMatch(/readOnly = isAccountant/);
+  });
+
+  it('the settle item is offered only where the server accepts it', () => {
+    const menu = strippedSource('src/modules/finance/components/InboundDocActionsMenu.tsx');
+    // Payroll, credit notes and value-less delivery notes all reached a dialog whose only
+    // possible ending was the server refusing.
+    expect(menu, 'one predicate, naming its own reason').toMatch(/settleBlockedReason/);
+    expect(menu, 'and the item asks it').toMatch(/!canSettle/);
+  });
+
+  it('the dialog states the consequence before the button, not after', () => {
+    const dlg = strippedSource('src/modules/finance/components/SettleExpenseDialog.tsx');
+    // The two answers put the same document in two different sets of books, so the sentence that
+    // says which has to be on screen while the choice is still open.
+    expect(dlg, 'the no-account branch must say it is excluded').toMatch(/kept OUT of the P&L/);
+    expect(dlg, 'and the account branch must say it counts').toMatch(/counts in the P&L/);
+    expect(dlg, 'the paid-on date is the operator\'s day, not UTC').toMatch(/todayLocalISO/);
+    // Prefilling the document total settles a part-paid bill for more than it owes, and the
+    // allocation then refuses the whole run.
+    expect(dlg, 'a blank amount means whatever is still due').toMatch(/Whatever is still due/);
+    // The reverse-charge net/gross rule has ONE statement.
+    expect(dlg, 'reuses invoicedTotal').toMatch(/invoicedTotal\(doc\)/);
+    // An empty account picker and one that could not load look identical, and the second leaves
+    // "settled outside" as the only option — silently excluding a real cost.
+    expect(dlg, 'a failed account read says so').toMatch(/accountsError/);
+    // A payment is recorded in the BILL's currency, so another account's balance would move by an
+    // amount it is not denominated in.
+    expect(dlg, 'accounts are filtered to the document currency').toMatch(/a\.currency === currency/);
+  });
+
+  it('excluding is reversible, and the undo sits with the action', () => {
+    const menu = strippedSource('src/modules/finance/components/InboundDocActionsMenu.tsx');
+    expect(menu, 'the menu offers the undo when already excluded').toMatch(/settledOutside \?/);
+    expect(menu, 'and the settle action otherwise').toMatch(/onSettle=?\}?/);
+    const svc = strippedSource('src/modules/finance/services/inboundService.ts');
+    expect(svc, 'the undo reaches the server').toMatch(/unsettle_inbound_document/);
+  });
+
+  it('the new columns are SELECTed, or the marker is invisible to the UI', () => {
+    // inbound_documents is read through an explicit column list. A column left out of it reads as
+    // undefined forever, and the undo would simply never appear.
+    const svc = strippedSource('src/modules/finance/services/inboundService.ts');
+    expect(svc, 'settled_outside_at must be in LIST_COLUMNS').toMatch(/'settled_outside_at'/);
+  });
+
+  it('the supplier record separates excluded costs from work outstanding', () => {
+    const card = strippedSource('src/modules/finance/components/SupplierInboundDocs.tsx');
+    expect(card, 'a tile of its own').toMatch(/settled_outside_documents/);
+    // Counting a deliberately-excluded document as "not in your books yet" means the one number a
+    // supplier page can drive to zero never reaches it.
+    expect(card, '"not in books" must exclude them').toMatch(/!d\.settled_outside_at/);
+  });
+});
+
+describe('a work queue never shrinks silently', () => {
+  it('hiding an order from Needs action says so and offers it back', () => {
+    const panel = strippedSource('src/modules/finance/components/OrderWorklistPanel.tsx');
+    expect(panel, 'the hidden count is on screen').toMatch(/hidden\.length/);
+    expect(panel, 'and restoring is a click').toMatch(/restore_order_to_worklist/);
+    // Nothing waiting AND nothing hidden is the only empty case: "no work" and "work you told me
+    // to stop showing" must not render identically.
+    expect(panel).toMatch(/rows\.length === 0 && hidden\.length === 0/);
+  });
+});
+
+describe('a received document is fetched, not authored', () => {
+  it('the credit-note action is side-aware', () => {
+    const page = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
+    // This button was blind to the side and opened the CUSTOMER dialog on "Received from
+    // suppliers", so the only way to fill that list was to re-key what myDATA already held.
+    expect(page, 'creating is customer-side only').toMatch(/creditSide === 'customer' && !isAccountant/);
+    expect(page, 'the received side fetches').toMatch(/creditSide === 'supplier' && isWorkspaceManager/);
+    expect(page, 'from myDATA').toMatch(/fetchSupplierCreditNotes/);
+  });
+
+  it('an incomplete received list says it is incomplete', () => {
+    const page = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
+    expect(page, 'the waiting count is surfaced').toMatch(/scnWaiting/);
+  });
+});
+
+describe('customer credit is not an overpayment', () => {
+  it('the word appears nowhere in the product', () => {
+    const offenders = INDEX.stripped()
+      .filter(([, src]) => /overpayment/i.test(src))
+      .map(([f]) => posix(f));
+    expect(
+      offenders,
+      'Money a customer has with us is credit we hold, and it is profit until they spend it — ' +
+        'calling it an overpayment reads as an error somebody made.\n' + offenders.join('\n'),
+    ).toEqual([]);
   });
 });

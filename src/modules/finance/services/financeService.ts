@@ -734,6 +734,10 @@ export interface PnlOverview {
   unbooked_net: number;
   unbooked_vat: number;
   unbooked_total: number;
+  /** Costs marked settled outside the books: kept OUT of the figures above, counted here. */
+  excluded_docs: number;
+  excluded_net: number;
+  excluded_total: number;
   /** Covers the five settlement figures below: they share one currency or none is summable. */
   settlement_status: PnlBooksStatus;
   settlement_currency: string;

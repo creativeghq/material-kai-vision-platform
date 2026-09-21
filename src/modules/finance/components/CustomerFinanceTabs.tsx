@@ -391,7 +391,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
   // not as a separate party-level section.
   const [orderStats, setOrderStats] = useState<PartyOrderPosition['stats'] | null>(null);
-  // Their cash we hold that isn't settled against anything (overpayment / deposit on account).
+  // Their cash we hold that is not settled against anything yet.
   const [credit, setCredit] = useState(0);
   const [creditReleasable, setCreditReleasable] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);

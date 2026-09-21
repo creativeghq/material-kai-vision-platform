@@ -129,7 +129,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [searchParams, setSearchParams] = useSearchParams();
   const financeBase = FINANCE_BASE;
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
-  const { isAccountant, canOperateFinance } = usePermissions();
+  const { isAccountant, canOperateFinance, isWorkspaceManager } = usePermissions();
 
   const type = embeddedType;
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -179,6 +179,8 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   // open bill), both of which resolve to the same supplier_bill id.
   const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
   const [newCreditNoteOpen, setNewCreditNoteOpen] = useState(false);
+  const [scnWaiting, setScnWaiting] = useState(0);
+  const [fetchingScn, setFetchingScn] = useState(false);
   const [categoryKind, setCategoryKind] = useState<'income' | 'expense' | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
@@ -223,6 +225,43 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     } catch (err: any) {
       toast({ title: 'Sync failed', description: err?.message, variant: 'destructive' });
     } finally { setSyncing(false); }
+  };
+
+  // Read apart from the list, so 3 re-keyed notes cannot look complete with 45 behind them.
+  useEffect(() => {
+    if (!activeWorkspaceId || type !== 'credit_notes') return;
+    void inboundService.countUnfetchedCreditNotes(activeWorkspaceId)
+      .then((r) => setScnWaiting(Number(r.waiting ?? 0)))
+      .catch(() => { /* the count is a hint; the list below is the record */ });
+  }, [activeWorkspaceId, type, creditSide]);
+
+  const fetchSupplierCreditNotes = async () => {
+    if (!activeWorkspaceId) return;
+    setFetchingScn(true);
+    try {
+      const res = await inboundService.fetchReceivedCreditNotes(activeWorkspaceId);
+      const parts = [`${res.created} recorded`];
+      if (res.total) parts.push(formatMoney(res.total, 'EUR'));
+      if (res.failed) parts.push(`${res.failed} failed`);
+      if (res.remaining) parts.push(`${res.remaining} still waiting`);
+      toast({
+        title: res.created > 0
+          ? `Recorded ${res.created} supplier credit note${res.created === 1 ? '' : 's'}`
+          : 'Nothing was recorded',
+        description: [parts.join(' · '), res.first_error].filter(Boolean).join(' — '),
+        variant: res.created === 0 ? 'destructive' : undefined,
+      });
+      setScnWaiting(Number(res.remaining ?? 0));
+      await load();
+    } catch (e) {
+      toast({
+        title: 'Could not fetch the credit notes',
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setFetchingScn(false);
+    }
   };
 
   const load = async () => {
@@ -479,8 +518,17 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {type === 'credit_notes' && !isAccountant && (
+      {/* Blind to the side, this opened the CUSTOMER dialog on "Received from suppliers". */}
+      {type === 'credit_notes' && creditSide === 'customer' && !isAccountant && (
         <Button size="sm" onClick={() => setNewCreditNoteOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+      )}
+      {type === 'credit_notes' && creditSide === 'supplier' && isWorkspaceManager && (
+        <Button size="sm" disabled={fetchingScn} onClick={() => void fetchSupplierCreditNotes()}>
+          {fetchingScn
+            ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+            : <Wallet className="h-3.5 w-3.5 mr-1" />}
+          {scnWaiting > 0 ? `Fetch ${scnWaiting} from myDATA` : 'Fetch from myDATA'}
+        </Button>
       )}
     </div>
   );
@@ -533,7 +581,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : type === 'credit_notes' ? (
                   creditSide === 'supplier'
-                    ? <SupplierCreditNoteTable rows={paginate(activeRows as SupplierCreditNote[], page)} {...emptyState} onNew={() => setNewCreditNoteOpen(true)} />
+                    ? <SupplierCreditNoteTable rows={paginate(activeRows as SupplierCreditNote[], page)} {...emptyState} waiting={scnWaiting} />
                     : <CreditNoteTable rows={paginate(activeRows as CreditNote[], page)} financeBase={financeBase} onChanged={() => void load()} />
                 ) : type === 'expenses' ? (
                   <>
@@ -1162,7 +1210,14 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
  * from Payables and then invisible. Read-only here on purpose — correcting one is a Payables
  * action against the bill it credits, not a document-list action.
  */
-const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] } & DocEmptyProps> = ({ rows, ...empty }) => (
+const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[]; waiting?: number } & DocEmptyProps> = ({ rows, waiting, ...empty }) => (
+  <>
+  {(waiting ?? 0) > 0 && (
+    <p className="border-b border-hairline bg-surface-sunken px-4 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+      {waiting!.toLocaleString()} credit note{waiting === 1 ? '' : 's'} received through myDATA
+      {waiting === 1 ? ' is' : ' are'} not in the books yet — this list is incomplete until you fetch them.
+    </p>
+  )}
   <div className="table-scroll">
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -1182,8 +1237,7 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] } & DocEmpt
           {...empty}
           colSpan={7}
           noun="supplier credit notes"
-          description="A credit a supplier has issued you — a return, a price correction, a rebate. It offsets what you owe them."
-          newLabel="New credit note"
+          description="A credit a supplier issued YOU — a return, a price correction, a rebate. It offsets what you owe them. These arrive through myDATA; use Fetch above to bring them in."
         />
       )}
       {rows.map((cn) => (
@@ -1200,6 +1254,7 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] } & DocEmpt
     </tbody>
   </table>
   </div>
+  </>
 );
 const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string } & DocEmptyProps> = ({ rows, categoryName, financeBase, ...empty }) => {
   // Deep-link the party name to its CRM record. One address — CRM is workspace work and lives

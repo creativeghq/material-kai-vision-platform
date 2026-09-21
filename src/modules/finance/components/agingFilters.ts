@@ -61,7 +61,7 @@ export function buildAgingFilters(
           options: [
             { value: 'invoice', label: side === 'ar' ? 'Invoice' : 'Supplier bill' },
             { value: 'order', label: 'Order — not invoiced' },
-            ...(side === 'ar' ? [{ value: 'credit', label: 'Customer credit (overpayment)' }] : []),
+            ...(side === 'ar' ? [{ value: 'credit', label: 'Customer credit' }] : []),
             { value: 'manual', label: 'Manual entry' },
           ],
           accessor: (r: AgingRow) => r.entry_kind ?? 'invoice',
