@@ -57,15 +57,19 @@ export interface AiCitationReport {
   named_instead: AiRival[];
 }
 
-/** Answered through DataForSEO rather than the vendor API — a different retrieval
- *  stack and a stated country, so it is a separate surface, never the same rate. */
+/** Three surfaces for one engine: the vendor API, DataForSEO, and the page a buyer is
+ *  actually shown. Different retrieval each time, so never one merged rate. */
 export const DFS_PREFIX = 'dfs:';
+
+export const SCRAPE_PREFIX = 'scrape:';
 
 /** A model's own display name. Never invent a vendor label we cannot verify. */
 export function modelLabel(model: string): string {
+  if (model.startsWith(SCRAPE_PREFIX)) {
+    return `${engineName(model.slice(SCRAPE_PREFIX.length))} · as a buyer sees it`;
+  }
   if (model.startsWith(DFS_PREFIX)) {
-    const family = model.slice(DFS_PREFIX.length);
-    return `${engineName(family)} · via DataForSEO`;
+    return `${engineName(model.slice(DFS_PREFIX.length))} · via DataForSEO`;
   }
   return engineName(model);
 }

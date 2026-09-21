@@ -154,3 +154,14 @@ describe('the column count comes from the roster, not from who answered', () => 
     expect(engineGridCols(9)).toContain('grid-cols-');
   });
 });
+
+describe('three surfaces, three labels', () => {
+  it('a scraped answer is not the API answer and not the DataForSEO one', () => {
+    expect(modelLabel('scrape:chat_gpt')).toBe('ChatGPT · as a buyer sees it');
+    expect(modelLabel('scrape:gemini')).toBe('Gemini · as a buyer sees it');
+    const surfaces = new Set([
+      modelLabel('gpt-5-mini'), modelLabel('dfs:chat_gpt'), modelLabel('scrape:chat_gpt'),
+    ]);
+    expect(surfaces.size).toBe(3);
+  });
+});
