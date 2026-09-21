@@ -87,10 +87,10 @@ export const PnlTrendCard: React.FC<Props> = ({ rows, currency, loading }) => {
       <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-start justify-between gap-3 space-y-0">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-sm">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" /> Month by month
+            <BarChart3 className="h-4 w-4 text-muted-foreground" /> Monthly P&amp;L
           </CardTitle>
           <p className="pt-1 text-[11px] text-muted-foreground">
-            Income against expenses, from {SOURCE_LABEL[source]}.
+            Income less expenses, month by month, from {SOURCE_LABEL[source]}.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">

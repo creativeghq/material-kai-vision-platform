@@ -22,6 +22,7 @@ import { formatDate } from '@/utils/datetime';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type ExpenseIssuerRow } from '@/modules/finance/services/inboundService';
 import { SupplierInboundDocs } from '@/modules/finance/components/SupplierInboundDocs';
+import { ExpenseBacklogCard } from '@/modules/finance/components/ExpenseBacklogCard';
 import { AddIssuerToCrmDialog } from '@/modules/finance/components/AddIssuerToCrmDialog';
 
 interface CategoryOption { id: string; name: string; kind?: string | null; is_system?: boolean | null }
@@ -214,7 +215,15 @@ export const ExpenseSuppliersTab: React.FC<{
 
   return (
     <>
-    <Card>
+    {/* Filing and booking are one errand: a document books into the category its supplier is
+        filed to, so doing either alone produces work nobody can see or Uncategorized expenses. */}
+    <ExpenseBacklogCard
+      workspaceId={workspaceId}
+      categories={categories}
+      canBook={!isAccountant}
+      onBooked={() => { void load(true); onFiled?.(); }}
+    />
+    <Card className="mt-4">
       <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-start justify-between gap-3 flex-wrap space-y-0">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-sm">

@@ -90,7 +90,6 @@ import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
 import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
-import { ExpenseBacklogCard } from '@/modules/finance/components/ExpenseBacklogCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { AssessmentPanel } from '@/components/features/assessment/AssessmentPanel';
@@ -677,18 +676,6 @@ const FinancePage: React.FC = () => {
               currency={pnlOverview?.currency && pnlOverview.currency !== 'MIXED' ? pnlOverview.currency : 'EUR'}
               loading={pnlLoading}
             />
-
-            {workspaceId && (
-              <ExpenseBacklogCard
-                workspaceId={workspaceId}
-                categories={expenseCats}
-                canBook={!isAccountant}
-                onBooked={() => {
-                  void loadPnl(workspaceId, dashPeriod);
-                  void loadAll(workspaceId);
-                }}
-              />
-            )}
 
             {/* Where the money sits — live balance per bank/cash account. */}
             <BankBalancesCard rows={bankBalances} onManage={() => onTabChange('settings')} />

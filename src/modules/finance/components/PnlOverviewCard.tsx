@@ -13,6 +13,14 @@ const TONE_BADGE: Record<PnlVerdict['tone'], 'success' | 'warning' | 'neutral'> 
   ok: 'success', warn: 'warning', unknown: 'neutral',
 };
 
+/**
+ * One figure pointing two ways, and which way is the answer the operator came for. It states a
+ * direction only when the figure is CERTAIN: over a partial period both halves are floors, and
+ * the difference between two floors has no reliable sign.
+ */
+const vatLabel = (v: number | null, certain: boolean) =>
+  v == null || !certain ? 'VAT return' : v < 0 ? 'VAT refundable' : 'VAT payable';
+
 /** `hasFigures` false renders the reason where the number would be. */
 const Figure: React.FC<{
   label: string; value: number | null; currency: string; verdict: PnlVerdict;
@@ -82,6 +90,11 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, periodLabel, loadin
   // gap - so without hasFigures the tiles say "unknown" while the strip asserts the shortfall.
   const showGap = gap != null && gap > 0.5 && aade.hasFigures;
   const settle = booksVerdict(overview?.settlement_status);
+  // Presentation of two figures SQL already returns, not a money derivation.
+  const aadeVatReturn = overview?.aade_income_vat != null && overview?.aade_expense_vat != null
+    ? Number(overview.aade_income_vat) - Number(overview.aade_expense_vat)
+    : null;
+  const aadeVatCertain = overview?.aade_status !== 'partial';
   const settleCcy = overview?.settlement_currency && overview.settlement_currency !== 'MIXED'
     ? overview.settlement_currency
     : ccy;
@@ -120,13 +133,12 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, periodLabel, loadin
                 sub={books.hasFigures ? 'from your documents' : undefined}
               />
               <Figure
-                label="VAT payable"
+                label={vatLabel(overview?.books_vat_payable ?? null, books.hasFigures)}
                 value={overview?.books_vat_payable ?? null}
                 currency={ccy}
                 verdict={books}
-                signed
                 sub={books.hasFigures && overview
-                  ? `${formatMoney(overview.books_vat_income, ccy)} out − ${formatMoney(overview.books_vat_expense, ccy)} in`
+                  ? `${formatMoney(overview.books_vat_income, ccy)} collected − ${formatMoney(overview.books_vat_expense, ccy)} paid`
                   : undefined}
               />
             </div>
@@ -156,16 +168,22 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, periodLabel, loadin
                   ? `${overview.aade_months_with_figures} of ${overview.aade_months_total} month(s) read`
                   : undefined}
               />
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold text-muted-foreground">What this is</div>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                  Every document filed against your ΑΦΜ. It confirms your books — it is never added to them.
-                </p>
-                <Link to={financeTabUrl(FINANCE_TAB.mydataBook)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline">
-                  Open the ΑΑΔΕ book <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
+              <Figure
+                label={vatLabel(aadeVatReturn, aadeVatCertain && aade.hasFigures)}
+                value={aadeVatReturn}
+                currency="EUR"
+                verdict={aade}
+                sub={aade.hasFigures && overview
+                  ? `${formatMoney(overview.aade_income_vat, 'EUR')} collected − ${formatMoney(overview.aade_expense_vat, 'EUR')} paid${aadeVatCertain ? '' : ' · so far'}`
+                  : undefined}
+              />
             </div>
+            <p className="flex flex-wrap items-center gap-x-2 border-t border-hairline bg-surface-sunken px-5 pb-3 text-[11px] text-muted-foreground">
+              <span>Every document filed against your ΑΦΜ. It confirms your books — it is never added to them.</span>
+              <Link to={financeTabUrl(FINANCE_TAB.mydataBook)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                Open the ΑΑΔΕ book <ArrowRight className="h-3 w-3" />
+              </Link>
+            </p>
 
             {showGap && overview && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-500/40 bg-amber-500/10 px-5 py-3">

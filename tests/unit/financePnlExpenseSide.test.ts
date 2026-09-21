@@ -10,7 +10,7 @@ const INDEX = sourceIndex({ roots: ['src'] });
 describe('the dashboard P&L includes expenses', () => {
   it('renders the expense-inclusive P&L, not only the gross-margin table', () => {
     const src = strippedSource(DASHBOARD);
-    for (const component of ['PnlOverviewCard', 'PnlTrendCard', 'ExpenseBacklogCard']) {
+    for (const component of ['PnlOverviewCard', 'PnlTrendCard']) {
       expect(
         src,
         `${DASHBOARD} must render <${component}>. Until 2026-09-21 this dashboard had five KPI ` +
@@ -31,15 +31,30 @@ describe('the dashboard P&L includes expenses', () => {
     ).toHaveLength(1);
   });
 
-  it('no card still calls a revenue-minus-COGS table a P&L', () => {
+  it('nothing calls a revenue-minus-COGS table a P&L', () => {
+    // Narrow on purpose: a card that really IS income less expenses may of course be called a
+    // Monthly P&L — PnlTrendCard is. What is banned is the pairing, a surface that says P&L in
+    // the same breath as COGS or gross_margin, which is the card that misled for so long.
     const offenders = INDEX.stripped()
-      .filter(([, src]) => /(Monthly P&(amp;)?L|Monthly PnL)/.test(src))
+      .filter(([, src]) => /(Monthly P&(amp;)?L|Monthly PnL)/.test(src)
+        && /(COGS|gross_margin)/.test(src))
       .map(([f]) => posix(f));
     expect(
       offenders,
       'A gross-margin table titled "P&L" is why nobody went looking for the operating expenses ' +
         'that were never in it. Call it Gross margin.\n' + offenders.join('\n'),
     ).toEqual([]);
+  });
+
+  it('the expenses inbox is reachable where the work is, not on the dashboard', () => {
+    // The booking card moved to By Supplier, beside the filing it depends on; the Expenses tab
+    // keeps the read-only breakdown so its list cannot read as the whole story.
+    const suppliers = strippedSource('src/modules/finance/tabs/ExpenseSuppliersTab.tsx');
+    expect(suppliers, 'booking sits with filing').toMatch(/<ExpenseBacklogCard/);
+    const docs = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
+    expect(docs, 'the Expenses tab states what is in the inbox').toMatch(/<ExpenseBacklogSummary/);
+    expect(strippedSource(DASHBOARD), 'and the dashboard does not repeat it')
+      .not.toMatch(/<ExpenseBacklogCard/);
   });
 
   it('the P&L read is not swallowed by the best-effort insights catch', () => {
@@ -287,6 +302,54 @@ describe('a received document is fetched, not authored', () => {
   it('an incomplete received list says it is incomplete', () => {
     const page = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
     expect(page, 'the waiting count is surfaced').toMatch(/scnWaiting/);
+  });
+});
+
+describe('the VAT return points the way it actually points', () => {
+  it('labels the figure by its sign rather than always "payable"', () => {
+    const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
+    // Output less input is ONE figure that points two ways, and which way is the answer the
+    // operator came for. Calling it payable while negative says you owe money you are owed.
+    expect(card, 'a label derived from the sign').toMatch(/const vatLabel =/);
+    expect(card).toMatch(/VAT refundable/);
+  });
+
+  it('renders the ΑΑΔΕ VAT it already fetches', () => {
+    const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
+    // Both halves were returned by the RPC and neither reached the screen, so the one authority
+    // figure the return can be checked against was unreachable.
+    expect(card, 'AADE output VAT').toMatch(/aade_income_vat/);
+    expect(card, 'AADE input VAT').toMatch(/aade_expense_vat/);
+  });
+});
+
+describe('planning is two questions, and both can be acted on', () => {
+  it('late lines and planned money are separate panes', () => {
+    const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
+    // Stacked, the work queue pushed the money table below the fold and the page read as a
+    // queue with a table under it.
+    expect(tab, 'a tab strip, not a stack').toMatch(/<HubTabNav/);
+    expect(tab, 'the late queue is one pane').toMatch(/pane === 'late' \? <LineWorkQueueCard/);
+  });
+
+  it('a planned payment can be edited, and offers only fields that save', () => {
+    const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
+    expect(tab, 'rows open an edit').toMatch(/onEdit=\{setEditRow\}/);
+    const dlg = strippedSource('src/modules/finance/components/NewPlannedPaymentDialog.tsx');
+    expect(dlg, 'edit mode exists').toMatch(/editing = null/);
+    // `updatePlannedPayment` carries neither direction nor currency, so an editable control for
+    // them would save nothing and report that it had.
+    expect(dlg, 'direction is fixed on edit').toMatch(/setDirection\(v as PlannedPaymentDirection\)\} disabled=\{isEdit\}/);
+    expect(dlg, 'currency is fixed on edit').toMatch(/onValueChange=\{setCurrency\} disabled=\{isEdit\}/);
+  });
+
+  it('paying for real reuses the one payment form, not a second payout path', () => {
+    const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
+    expect(tab, 'the shared dialog carries the send-or-record choice').toMatch(/<RecordPaymentDialog/);
+    expect(tab, 'and there is no second sendPayment caller here').not.toMatch(/sendPayment\(/);
+    // The payment is already recorded (possibly SENT) by the time the plan is closed, so a
+    // failure to close must be said rather than swallowed.
+    expect(tab, 'closing the plan reports its own failure').toMatch(/Payment recorded — the plan is still open/);
   });
 });
 

@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import {
-  financeService, type PlannedPaymentCategory, type PlannedPaymentDirection,
+  financeService, type PlannedPayment, type PlannedPaymentCategory, type PlannedPaymentDirection,
 } from '@/modules/finance/services/financeService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimal } from '@/utils/decimal';
@@ -26,6 +26,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
   defaultDirection?: PlannedPaymentDirection;
+  /** Editing. Direction and currency are read-only: `updatePlannedPayment` carries neither. */
+  editing?: PlannedPayment | null;
 }
 
 const CATEGORIES: { value: PlannedPaymentCategory; label: string }[] = [
@@ -41,9 +43,10 @@ const CATEGORIES: { value: PlannedPaymentCategory; label: string }[] = [
 ];
 
 export const NewPlannedPaymentDialog: React.FC<Props> = ({
-  workspaceId, open, onOpenChange, onCreated, defaultDirection = 'out',
+  workspaceId, open, onOpenChange, onCreated, defaultDirection = 'out', editing = null,
 }) => {
   const { toast } = useToast();
+  const isEdit = !!editing;
   const [busy, setBusy] = useState(false);
 
   const [direction, setDirection] = useState<PlannedPaymentDirection>(defaultDirection);
@@ -62,7 +65,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
   // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
   const clearDraft = useSessionDraft(
     `fin-planned-payment:${workspaceId}:${defaultDirection}`,
-    open,
+    open && !isEdit,
     { direction, title, amount, currency, scheduledFor, category, reminderAt, notes, party },
     (d) => {
       setDirection(d?.direction ?? defaultDirection);
@@ -77,6 +80,21 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
       setPartySearch('');
     },
   );
+
+  // Editing loads the ROW, not the draft — which would be a half-typed new plan.
+  useEffect(() => {
+    if (!open || !editing) return;
+    setDirection(editing.direction);
+    setTitle(editing.title ?? '');
+    setAmount(String(editing.amount ?? '0'));
+    setCurrency(editing.currency ?? 'EUR');
+    setScheduledFor(editing.scheduled_for ?? todayLocalISO());
+    setCategory((editing.category ?? 'other') as PlannedPaymentCategory);
+    setReminderAt(editing.reminder_at ?? '');
+    setNotes(editing.notes ?? '');
+    setParty(null);
+    setPartySearch('');
+  }, [open, editing]);
 
   // Search across CRM
   useEffect(() => {
@@ -121,15 +139,28 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
         const rolled = await financeService.resolvePrimaryCompanyId(cpContactId).catch(() => null);
         if (rolled) { cpCompanyId = rolled; cpContactId = null; }
       }
-      await financeService.createPlannedPayment({
-        workspaceId, direction, title: title.trim(), amount: parsedAmount, currency,
-        scheduledFor, category,
-        counterpartyCompanyId: cpCompanyId,
-        counterpartyContactId: cpContactId,
-        notes: notes || undefined,
-        reminderAt: reminderAt || null,
-      });
-      toast({ title: 'Planned payment added' });
+      if (editing) {
+        // Only fields the update carries; an untouched party keeps the one it has.
+        await financeService.updatePlannedPayment(editing.id, {
+          title: title.trim(),
+          amount: parsedAmount,
+          scheduled_for: scheduledFor,
+          category,
+          notes: notes || null,
+          reminder_at: reminderAt || null,
+          ...(party ? { counterparty_company_id: cpCompanyId, counterparty_contact_id: cpContactId } : {}),
+        });
+      } else {
+        await financeService.createPlannedPayment({
+          workspaceId, direction, title: title.trim(), amount: parsedAmount, currency,
+          scheduledFor, category,
+          counterpartyCompanyId: cpCompanyId,
+          counterpartyContactId: cpContactId,
+          notes: notes || undefined,
+          reminderAt: reminderAt || null,
+        });
+      }
+      toast({ title: editing ? 'Planned payment updated' : 'Planned payment added' });
       clearDraft();
       onCreated();
     } catch (err: any) {
@@ -143,9 +174,11 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add Planned Payment</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit planned payment' : 'Add Planned Payment'}</DialogTitle>
           <DialogDescription>
-            Schedule an upcoming payment (or expected receipt). Won't affect AR/AP totals until you mark it Paid.
+            {isEdit
+              ? 'Direction and currency are fixed once a plan exists — cancel it and schedule a new one to change those.'
+              : 'Schedule an upcoming payment (or expected receipt). It does not affect AR/AP totals until you mark it Paid.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -153,7 +186,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Direction</Label>
-              <Select value={direction} onValueChange={(v) => setDirection(v as PlannedPaymentDirection)}>
+              <Select value={direction} onValueChange={(v) => setDirection(v as PlannedPaymentDirection)} disabled={isEdit}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="out">Outgoing (we pay)</SelectItem>
@@ -200,6 +233,15 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
                 )}
               </div>
             )}
+            {/* Editing opens with the search box empty because the row carries ids, not a name.
+                Empty means KEEP — say so, or it reads as "this plan has no party". */}
+            {isEdit && !party && (
+              <p className="text-[11px] text-muted-foreground">
+                {editing?.counterparty_company_id || editing?.counterparty_contact_id
+                  ? 'Leave this empty to keep the party already on this plan; search to move it to another.'
+                  : 'This plan has no party attached.'}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -209,7 +251,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
             </div>
             <div className="space-y-1">
               <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select value={currency} onValueChange={setCurrency} disabled={isEdit}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EUR">EUR</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="GBP">GBP</SelectItem>
@@ -236,7 +278,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
         <DialogFooter>
           <Button variant="outline" onClick={() => { clearDraft(); onOpenChange(false); }} disabled={busy}>Cancel</Button>
           <Button onClick={handleSave} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Schedule'}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isEdit ? 'Save changes' : 'Schedule'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -25,6 +25,7 @@ import { financeService, formatMoney, type Invoice, type CreditNote, type Suppli
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
+import { ExpenseBacklogSummary } from '@/modules/finance/components/ExpenseBacklogSummary';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
@@ -539,6 +540,11 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           {/* Content — the document-type nav lives in FinancePage's DOC_TABS sidebar. */}
           <div className="min-w-0 flex-1 space-y-3">
+            {/* Above the list because 111 delivery notes and 45 credit notes in it are NOT work
+                outstanding, and without this they look exactly like work outstanding. */}
+            {type === 'expenses' && activeWorkspaceId && (
+              <ExpenseBacklogSummary workspaceId={activeWorkspaceId} />
+            )}
             {type === 'dispatch' ? (
               <>
                 <div className="flex items-center justify-between gap-2 flex-wrap">

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, CheckCircle2, X, Bell, Loader2, CalendarDays, Coins, ArrowLeftRight } from 'lucide-react';
+import { Plus, CheckCircle2, X, Bell, Loader2, CalendarDays, Coins, ArrowLeftRight, Pencil, Wallet, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -16,8 +16,9 @@ import {
   type DateRangeValue, type FilterGroupDef,
 } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { HubEmptyState } from '@/components/core/hub';
+import { HubEmptyState, HubTabNav } from '@/components/core/hub';
 import { LineWorkQueueCard } from '@/modules/finance/components/LineWorkQueueCard';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 
 interface Props { workspaceId: string }
 
@@ -91,6 +92,12 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  // Two questions: order LINES a customer waits on, and MONEY on a date. Stacked, the first
+  // pushed the second below the fold and the page read as a queue with a table under it.
+  const [pane, setPane] = useState<'plan' | 'late'>('plan');
+  const [editRow, setEditRow] = useState<PlannedPayment | null>(null);
+  /** Paying for real (Revolut / bank) rather than just recording it — outgoing plans only. */
+  const [payRow, setPayRow] = useState<PlannedPayment | null>(null);
 
   const filterGroups = useMemo(() => buildPlanningFilters(rows), [rows]);
   const { values: filterValues, setValues: setFilterValues, filtered, previewCount, reset: resetFilters } =
@@ -172,6 +179,28 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
     }
   };
 
+  /**
+   * The payment is already recorded (possibly SENT) by the time this runs, so a failure leaves
+   * money moved and the plan open. Safe direction, but it must be said rather than swallowed.
+   *
+   * This path does not set `paid_payment_id` — the dialog does not hand the id back — so the
+   * plan↔payment link only exists on the Mark-paid route. The money and its allocation are
+   * recorded either way; it is the back-pointer that is missing.
+   */
+  const closePlanAfterPayment = async (row: PlannedPayment) => {
+    try {
+      await financeService.updatePlannedPayment(row.id, { status: 'paid' } as never);
+      toast({ title: 'Paid', description: `${row.title} is settled and closed.` });
+    } catch (err: any) {
+      toast({
+        title: 'Payment recorded — the plan is still open',
+        description: `Close "${row.title}" by hand: ${err?.message ?? 'the plan could not be updated'}`,
+        variant: 'destructive',
+      });
+    }
+    await load();
+  };
+
   const cancel = async (row: PlannedPayment) => {
     try {
       await financeService.updatePlannedPayment(row.id, { status: 'cancelled' });
@@ -183,9 +212,20 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
 
   return (
     <div className="space-y-4">
+      <HubTabNav
+        aria-label="Planning sections"
+        activeId={pane}
+        onSelect={(id) => setPane(id as 'plan' | 'late')}
+        items={[
+          { id: 'plan', label: 'Planning', icon: CalendarDays },
+          { id: 'late', label: 'What is late', icon: AlertTriangle },
+        ]}
+      />
+
       {/* #432 -- the other half of planning: which order LINES are late. A kitchen customer asks
           about the line, not the payment. */}
-      <LineWorkQueueCard workspaceId={workspaceId} />
+      {pane === 'late' ? <LineWorkQueueCard workspaceId={workspaceId} /> : (
+      <>
       <SectionHeader
         title="Planning"
         subtitle="Scheduled future payments and expected receipts. Marking Paid creates a real payment + allocation."
@@ -255,15 +295,17 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
         </CardContent></Card>
       ) : groupedLayout ? (
         <div className="space-y-4">
-          {grouped.overdue.length > 0 && <Section title="Overdue" rows={grouped.overdue} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} accent="destructive" />}
-          {grouped.today.length > 0 && <Section title="Due today" rows={grouped.today} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />}
-          {grouped.next7.length > 0 && <Section title="Next 7 days" rows={grouped.next7} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />}
-          {grouped.next30.length > 0 && <Section title="Next 30 days" rows={grouped.next30} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />}
-          {grouped.later.length > 0 && <Section title="Later" rows={grouped.later} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />}
+          {grouped.overdue.length > 0 && <Section title="Overdue" rows={grouped.overdue} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} accent="destructive" />}
+          {grouped.today.length > 0 && <Section title="Due today" rows={grouped.today} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
+          {grouped.next7.length > 0 && <Section title="Next 7 days" rows={grouped.next7} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
+          {grouped.next30.length > 0 && <Section title="Next 30 days" rows={grouped.next30} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
+          {grouped.later.length > 0 && <Section title="Later" rows={grouped.later} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
         </div>
       ) : (
         /* keyed on the filter state so changing it remounts the table at page 1 */
-        <FlatTable key={filterKey} rows={filtered} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />
+        <FlatTable key={filterKey} rows={filtered} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />
+      )}
+      </>
       )}
 
       <NewPlannedPaymentDialog
@@ -271,6 +313,32 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
         onOpenChange={setNewOpen}
         onCreated={async () => { setNewOpen(false); await load(); }}
       />
+      {editRow && (
+        <NewPlannedPaymentDialog
+          workspaceId={workspaceId} open
+          editing={editRow}
+          onOpenChange={(v) => { if (!v) setEditRow(null); }}
+          onCreated={async () => { setEditRow(null); await load(); }}
+        />
+      )}
+      {/* Reuses the ONE payment form, which already carries the send-or-record choice and with
+          it the Revolut payout. A second payout path is a second place the rules can live. */}
+      {payRow && (
+        <RecordPaymentDialog
+          workspaceId={workspaceId}
+          open
+          side="supplier"
+          defaultAmount={Number(payRow.amount)}
+          orderCurrency={payRow.currency}
+          presetExpenseId={payRow.supplier_bill_id ?? undefined}
+          initialCounterparty={{
+            companyId: payRow.counterparty_company_id,
+            contactId: payRow.counterparty_contact_id,
+          }}
+          onOpenChange={(v) => { if (!v) setPayRow(null); }}
+          onSaved={async () => { await closePlanAfterPayment(payRow); setPayRow(null); }}
+        />
+      )}
     </div>
   );
 };
@@ -278,14 +346,15 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
 const Section: React.FC<{
   title: string; rows: PlannedPayment[];
   onMarkPaid: (r: PlannedPayment) => void; onCancel: (r: PlannedPayment) => void;
+  onEdit: (r: PlannedPayment) => void; onPay: (r: PlannedPayment) => void;
   markingId: string | null; accent?: 'destructive';
-}> = ({ title, rows, onMarkPaid, onCancel, markingId, accent }) => (
+}> = ({ title, rows, onMarkPaid, onCancel, onEdit, onPay, markingId, accent }) => (
   <Card className={accent === 'destructive' ? 'border-destructive/40' : ''}>
     <CardHeader className="border-b border-border/60 px-5 py-2">
       <CardTitle className={`font-semibold ${accent === 'destructive' ? 'text-destructive' : ''}`}>{title} · {rows.length}</CardTitle>
     </CardHeader>
     <CardContent className="p-0">
-      <FlatTable rows={rows} onMarkPaid={onMarkPaid} onCancel={onCancel} markingId={markingId} />
+      <FlatTable rows={rows} onMarkPaid={onMarkPaid} onCancel={onCancel} onEdit={onEdit} onPay={onPay} markingId={markingId} />
     </CardContent>
   </Card>
 );
@@ -293,8 +362,9 @@ const Section: React.FC<{
 const FlatTable: React.FC<{
   rows: PlannedPayment[];
   onMarkPaid: (r: PlannedPayment) => void; onCancel: (r: PlannedPayment) => void;
+  onEdit: (r: PlannedPayment) => void; onPay: (r: PlannedPayment) => void;
   markingId: string | null;
-}> = ({ rows, onMarkPaid, onCancel, markingId }) => {
+}> = ({ rows, onMarkPaid, onCancel, onEdit, onPay, markingId }) => {
   // Each bucket (Overdue / Today / Next 7 …) renders its own FlatTable, so each keeps its
   // own page — paging "Later" must not move you off the overdue rows you're clearing.
   const [page, setPage] = useState(1);
@@ -329,7 +399,16 @@ const FlatTable: React.FC<{
           <td className="px-4 py-2 text-right">
             {r.status === 'planned' || r.status === 'overdue' ? (
               <div className="flex justify-end gap-1">
-                <Button size="sm" variant="ghost" disabled={markingId === r.id} onClick={() => onMarkPaid(r)} title="Mark paid">
+                <Button size="sm" variant="ghost" onClick={() => onEdit(r)} title="Edit this plan">
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                {/* Moving the money, not recording that it moved. Outgoing only. */}
+                {r.direction === 'out' && (
+                  <Button size="sm" variant="ghost" onClick={() => onPay(r)} title="Pay now — bank transfer or Revolut">
+                    <Wallet className="h-3 w-3" />
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" disabled={markingId === r.id} onClick={() => onMarkPaid(r)} title="Mark paid — it was already paid elsewhere">
                   {markingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => onCancel(r)} title="Cancel"><X className="h-3 w-3" /></Button>
