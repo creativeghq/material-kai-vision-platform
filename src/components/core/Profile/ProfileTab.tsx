@@ -960,82 +960,69 @@ export const ProfileTab: React.FC = () => {
   return (
     <div className="space-y-6">
 
-      {/* Visibility */}
+      {/* Who you are, and the page that publishes it. The avatar, the name and the switch that
+          makes them public were three separate cards with an app theme picker between them. */}
       <Card className={`rounded-2xl border-2 transition-colors ${isPublic ? 'border-primary/30' : ''}`}>
-        <CardContent className="pt-5 pb-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              {isPublic ? <Eye className="h-5 w-5 text-primary shrink-0" /> : <EyeOff className="h-5 w-5 text-muted-foreground shrink-0" />}
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="relative group shrink-0">
+                <Avatar className="h-16 w-16">
+                  {personal.avatar_url && <AvatarImage src={personal.avatar_url} alt="Profile" />}
+                  <AvatarFallback className="bg-primary/20 text-xl font-semibold text-primary">{initials}</AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  {uploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+              </button>
               <div className="min-w-0">
-                <p className="font-medium text-sm">{isPublic ? 'Public Profile' : 'Private Profile'}</p>
-                <p className="text-xs text-muted-foreground">
-                  {isPublic ? 'Anyone can discover and view your profile.' : 'Only you can see your profile.'}
-                </p>
+                <p className="truncate text-lg font-semibold">{personal.full_name || 'No name set'}</p>
+                <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
+                {personal.company && <p className="truncate text-sm text-muted-foreground">{personal.company}</p>}
+                {personal.professional_type && (
+                  <Badge className="mt-1 text-xs bg-primary/10 text-primary border-primary/20">
+                    {PROFESSIONAL_TYPE_LABELS[personal.professional_type]}
+                  </Badge>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
-              {isPublic && (
-                <>
-                  <Button size="sm" variant="outline" asChild className="gap-1.5">
-                    <Link to={`/u/${user?.id}`} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Preview
-                    </Link>
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
-                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? 'Copied!' : 'Copy link'}
-                  </Button>
-                </>
-              )}
-              <Switch id="visibility" checked={isPublic} onCheckedChange={handleVisibilityToggle} />
-              <Label htmlFor="visibility" className="text-sm cursor-pointer">{isPublic ? 'Public' : 'Private'}</Label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Public sections: show property listings on the public profile */}
-      {isPublic && realEstateEnabled && (
-        <Card className="rounded-2xl">
-          <CardContent className="flex items-center justify-between gap-3 py-4">
-            <div>
-              <p className="text-sm font-medium">Show property listings</p>
-              <p className="text-xs text-muted-foreground">Display your live real-estate listings as a “Listings” tab on your public profile.</p>
-            </div>
-            <Switch checked={showListings} onCheckedChange={async (v) => { setShowListings(v); await patch({ show_listings: v }); }} />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Appearance / theme */}
-      <AppearanceSection />
-
-      {/* Avatar + name */}
-      <Card className="rounded-2xl">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="relative group shrink-0">
-              <Avatar className="h-16 w-16">
-                {personal.avatar_url && <AvatarImage src={personal.avatar_url} alt="Profile" />}
-                <AvatarFallback className="bg-primary/20 text-xl font-semibold text-primary">{initials}</AvatarFallback>
-              </Avatar>
-              <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                {uploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
+            <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {isPublic && (
+                  <>
+                    <Button size="sm" variant="outline" asChild className="gap-1.5">
+                      <Link to={`/u/${user?.id}`} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Preview
+                      </Link>
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
+                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copied ? 'Copied!' : 'Copy link'}
+                    </Button>
+                  </>
+                )}
+                <Switch id="visibility" checked={isPublic} onCheckedChange={handleVisibilityToggle} />
+                <Label htmlFor="visibility" className="cursor-pointer text-sm">{isPublic ? 'Public' : 'Private'}</Label>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-            </button>
-            <div>
-              <p className="text-lg font-semibold">{personal.full_name || 'No name set'}</p>
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
-              {personal.company && <p className="text-sm text-muted-foreground">{personal.company}</p>}
-              {personal.professional_type && (
-                <Badge className="mt-1 text-xs bg-primary/10 text-primary border-primary/20">
-                  {PROFESSIONAL_TYPE_LABELS[personal.professional_type]}
-                </Badge>
-              )}
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {isPublic ? <Eye className="h-3.5 w-3.5 shrink-0 text-primary" /> : <EyeOff className="h-3.5 w-3.5 shrink-0" />}
+                {isPublic ? 'Anyone can discover and view your profile.' : 'Only you can see your profile.'}
+              </p>
             </div>
           </div>
+
+          {isPublic && realEstateEnabled && (
+            <div className="flex items-center justify-between gap-3 border-t border-hairline pt-4">
+              <div>
+                <p className="text-sm font-medium">Show property listings</p>
+                <p className="text-xs text-muted-foreground">Display your live real-estate listings as a “Listings” tab on your public profile.</p>
+              </div>
+              <Switch checked={showListings} onCheckedChange={async (v) => { setShowListings(v); await patch({ show_listings: v }); }} />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1194,182 +1181,182 @@ export const ProfileTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Skill Tags */}
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" />Skills & Expertise</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => setAddingSkill((v) => !v)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />Add skill
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {skillTags.map((t) => (
-              <Badge key={t} className="text-sm px-3 py-1 gap-2 bg-primary/10 text-primary border-primary/20">
-                {t}
-                <button type="button" onClick={() => removeSkill(t)} className="opacity-60 hover:opacity-100"><X className="h-3 w-3" /></button>
-              </Badge>
-            ))}
-            {skillTags.length === 0 && !addingSkill && <p className="text-sm text-muted-foreground">No skills added yet.</p>}
-          </div>
-          {addingSkill && (
-            <div className="flex gap-2 pt-1">
-              <Input value={newSkill} onChange={(e) => setNewSkill(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
-                placeholder="e.g. AutoCAD, Sustainability, Textiles…" className="flex-1" autoFocus />
-              <Button size="sm" onClick={addSkill} disabled={!newSkill.trim()}>Add</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setAddingSkill(false); setNewSkill(''); }}><X className="h-4 w-4" /></Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Brand ambassadorships moved to their OWN tab (Profile → Ambassador). What lived here
-          was a list of brand names with nowhere to say what the person promotes each brand FOR,
-          which is the only part a visitor is looking for. The pointer stays because this is the
-          card people knew it by. */}
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" />Brands you represent
-            </CardTitle>
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/profile?tab=ambassador">
-                <BadgeCheck className="h-3.5 w-3.5 mr-1.5" />Open Ambassador
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Brand ambassadorships — which brands you represent, in which categories, and whether the
-            brand has confirmed it — are managed on the Ambassador tab.
-          </p>
-        </CardContent>
-      </Card>
-
-
-      {/* Supplier Verification — gated on professional_type='supplier'. The
-          underlying column is factory_verified for historical reasons; the
-          user-facing label is "Supplier" since the merge of
-          brand/manufacturer/supplier → supplier. */}
-      {personal.professional_type === 'supplier' && (
+      {/* Short panels two-up. Eleven full-width cards for a handful of fields each is why
+          this pane scrolled; `lg:` so a phone still gets one column. */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Skill Tags */}
         <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" />Supplier Verification
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" />Skills & Expertise</CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setAddingSkill((v) => !v)}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />Add skill
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {factoryVerified ? (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-green-500/10 border border-green-500/30">
-                <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
-                  <Check className="h-4 w-4 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Verified Supplier</p>
-                  {factoryClaimedName && (
-                    <p className="text-xs text-muted-foreground">{factoryClaimedName}</p>
-                  )}
-                </div>
-                <Badge className="ml-auto bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
-                  Verified
+            <div className="flex flex-wrap gap-2">
+              {skillTags.map((t) => (
+                <Badge key={t} className="text-sm px-3 py-1 gap-2 bg-primary/10 text-primary border-primary/20">
+                  {t}
+                  <button type="button" onClick={() => removeSkill(t)} className="opacity-60 hover:opacity-100"><X className="h-3 w-3" /></button>
                 </Badge>
-              </div>
-            ) : regRequest ? (
-              <div className={`p-3 rounded-xl border ${
-                regRequest.status === 'pending'
-                  ? 'bg-amber-500/10 border-amber-500/30'
-                  : regRequest.status === 'approved'
-                  ? 'bg-green-500/10 border-green-500/30'
-                  : 'bg-destructive/10 border-destructive/30'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium capitalize">{regRequest.status}</p>
-                  <Badge variant={regRequest.status === 'pending' ? 'secondary' : regRequest.status === 'approved' ? 'default' : 'destructive'} className="text-xs">
-                    {regRequest.status}
-                  </Badge>
-                </div>
-                {regRequest.status === 'pending' && (
-                  <p className="text-xs text-muted-foreground mt-1">Your supplier verification request is under review.</p>
-                )}
-                {regRequest.status === 'rejected' && regRequest.rejection_reason && (
-                  <p className="text-xs text-muted-foreground mt-1">{regRequest.rejection_reason}</p>
-                )}
-              </div>
-            ) : showRegForm ? (
-              <form onSubmit={submitRegistration} className="rounded-xl border p-4 space-y-3 bg-muted/20">
-                <div className="space-y-1.5">
-                  <label htmlFor="profiletab-company-name" className="text-xs text-muted-foreground">Company name *</label>
-                  <Input id="profiletab-company-name"
-                    value={regForm.company_name}
-                    onChange={(e) => setRegForm({ ...regForm, company_name: e.target.value })}
-                    placeholder={personal.company || 'Your company name'}
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="profile-claim-factory" className="text-xs text-muted-foreground">Claim factory from catalog *</label>
-                  <SearchCombobox
-                    id="profile-claim-factory"
-                    options={factoryOptions.map((f) => ({ value: f.name, label: f.name }))}
-                    value={regForm.factory_claimed_name}
-                    onSelect={(v) => setRegForm({ ...regForm, factory_claimed_name: v })}
-                    placeholder="Search brand catalog…"
-                    emptyText="No brands found. Enter manually below."
-                  />
-                  {!regForm.factory_claimed_name && (
-                    <Input
-                      value={regForm.factory_claimed_name}
-                      onChange={(e) => setRegForm({ ...regForm, factory_claimed_name: e.target.value })}
-                      placeholder="Or type brand name manually"
-                      className="mt-1.5"
-                    />
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="profiletab-message-to-admin-optional" className="text-xs text-muted-foreground">Message to admin (optional)</label>
-                  <Textarea id="profiletab-message-to-admin-optional"
-                    value={regForm.message}
-                    onChange={(e) => setRegForm({ ...regForm, message: e.target.value })}
-                    placeholder="Any additional information…"
-                    rows={2}
-                    className="resize-none"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end pt-1">
-                  <Button size="sm" type="button" variant="ghost" onClick={() => setShowRegForm(false)}>Cancel</Button>
-                  <Button size="sm" type="submit" disabled={regSubmitting || !regForm.company_name.trim() || !regForm.factory_claimed_name.trim()}>
-                    {regSubmitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
-                    Submit Request
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Verify your supplier identity to get a verified badge and unlock supplier analytics.
-                </p>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setRegForm({ company_name: personal.company || '', factory_claimed_name: '', message: '' });
-                    setShowRegForm(true);
-                  }}
-                >
-                  <Building2 className="h-3.5 w-3.5 mr-1.5" />Register as verified supplier
-                </Button>
+              ))}
+              {skillTags.length === 0 && !addingSkill && <p className="text-sm text-muted-foreground">No skills added yet.</p>}
+            </div>
+            {addingSkill && (
+              <div className="flex gap-2 pt-1">
+                <Input value={newSkill} onChange={(e) => setNewSkill(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
+                  placeholder="e.g. AutoCAD, Sustainability, Textiles…" className="flex-1" autoFocus />
+                <Button size="sm" onClick={addSkill} disabled={!newSkill.trim()}>Add</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setAddingSkill(false); setNewSkill(''); }}><X className="h-4 w-4" /></Button>
               </div>
             )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Featured Moodboard + Profile Analytics — side by side */}
-      <div className="grid grid-cols-2 gap-3">
+        {/* Brand ambassadorships moved to their OWN tab (Profile → Ambassador). What lived here
+            was a list of brand names with nowhere to say what the person promotes each brand FOR,
+            which is the only part a visitor is looking for. The pointer stays because this is the
+            card people knew it by. */}
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />Brands you represent
+              </CardTitle>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/profile?tab=ambassador">
+                  <BadgeCheck className="h-3.5 w-3.5 mr-1.5" />Open Ambassador
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Brand ambassadorships — which brands you represent, in which categories, and whether the
+              brand has confirmed it — are managed on the Ambassador tab.
+            </p>
+          </CardContent>
+        </Card>
+
+
+        {/* Supplier Verification — gated on professional_type='supplier'. The
+            underlying column is factory_verified for historical reasons; the
+            user-facing label is "Supplier" since the merge of
+            brand/manufacturer/supplier → supplier. */}
+        {personal.professional_type === 'supplier' && (
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />Supplier Verification
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {factoryVerified ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-green-500/10 border border-green-500/30">
+                  <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                    <Check className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-700 dark:text-green-400">Verified Supplier</p>
+                    {factoryClaimedName && (
+                      <p className="text-xs text-muted-foreground">{factoryClaimedName}</p>
+                    )}
+                  </div>
+                  <Badge className="ml-auto bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
+                    Verified
+                  </Badge>
+                </div>
+              ) : regRequest ? (
+                <div className={`p-3 rounded-xl border ${
+                  regRequest.status === 'pending'
+                    ? 'bg-amber-500/10 border-amber-500/30'
+                    : regRequest.status === 'approved'
+                    ? 'bg-green-500/10 border-green-500/30'
+                    : 'bg-destructive/10 border-destructive/30'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium capitalize">{regRequest.status}</p>
+                    <Badge variant={regRequest.status === 'pending' ? 'secondary' : regRequest.status === 'approved' ? 'default' : 'destructive'} className="text-xs">
+                      {regRequest.status}
+                    </Badge>
+                  </div>
+                  {regRequest.status === 'pending' && (
+                    <p className="text-xs text-muted-foreground mt-1">Your supplier verification request is under review.</p>
+                  )}
+                  {regRequest.status === 'rejected' && regRequest.rejection_reason && (
+                    <p className="text-xs text-muted-foreground mt-1">{regRequest.rejection_reason}</p>
+                  )}
+                </div>
+              ) : showRegForm ? (
+                <form onSubmit={submitRegistration} className="rounded-xl border p-4 space-y-3 bg-muted/20">
+                  <div className="space-y-1.5">
+                    <label htmlFor="profiletab-company-name" className="text-xs text-muted-foreground">Company name *</label>
+                    <Input id="profiletab-company-name"
+                      value={regForm.company_name}
+                      onChange={(e) => setRegForm({ ...regForm, company_name: e.target.value })}
+                      placeholder={personal.company || 'Your company name'}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="profile-claim-factory" className="text-xs text-muted-foreground">Claim factory from catalog *</label>
+                    <SearchCombobox
+                      id="profile-claim-factory"
+                      options={factoryOptions.map((f) => ({ value: f.name, label: f.name }))}
+                      value={regForm.factory_claimed_name}
+                      onSelect={(v) => setRegForm({ ...regForm, factory_claimed_name: v })}
+                      placeholder="Search brand catalog…"
+                      emptyText="No brands found. Enter manually below."
+                    />
+                    {!regForm.factory_claimed_name && (
+                      <Input
+                        value={regForm.factory_claimed_name}
+                        onChange={(e) => setRegForm({ ...regForm, factory_claimed_name: e.target.value })}
+                        placeholder="Or type brand name manually"
+                        className="mt-1.5"
+                      />
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="profiletab-message-to-admin-optional" className="text-xs text-muted-foreground">Message to admin (optional)</label>
+                    <Textarea id="profiletab-message-to-admin-optional"
+                      value={regForm.message}
+                      onChange={(e) => setRegForm({ ...regForm, message: e.target.value })}
+                      placeholder="Any additional information…"
+                      rows={2}
+                      className="resize-none"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-1">
+                    <Button size="sm" type="button" variant="ghost" onClick={() => setShowRegForm(false)}>Cancel</Button>
+                    <Button size="sm" type="submit" disabled={regSubmitting || !regForm.company_name.trim() || !regForm.factory_claimed_name.trim()}>
+                      {regSubmitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                      Submit Request
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Verify your supplier identity to get a verified badge and unlock supplier analytics.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setRegForm({ company_name: personal.company || '', factory_claimed_name: '', message: '' });
+                      setShowRegForm(true);
+                    }}
+                  >
+                    <Building2 className="h-3.5 w-3.5 mr-1.5" />Register as verified supplier
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Featured Moodboard */}
         <Card className="rounded-2xl h-full">
@@ -1480,6 +1467,9 @@ export const ProfileTab: React.FC = () => {
         )}
 
       </div>
+
+      {/* An app-wide preference, so it sits under the profile it is not part of. */}
+      <AppearanceSection />
     </div>
   );
 };
