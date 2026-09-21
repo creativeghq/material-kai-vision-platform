@@ -697,6 +697,78 @@ export interface PnlRow {
   gross_margin_pct: number | null;
 }
 
+// The two status vocabularies and the copy that explains them live in the import-free
+// `@/modules/finance/pnlStatus`, so a card can read the verdict without pulling this service.
+export type { PnlAadeStatus, PnlBooksStatus } from '@/modules/finance/pnlStatus';
+import type { PnlAadeStatus, PnlBooksStatus } from '@/modules/finance/pnlStatus';
+
+/**
+ * The period P&L. Three facts that are never merged: what OUR documents say, what AADE holds
+ * against our VAT number, and how many received documents nobody has booked as an expense yet —
+ * which is what explains any gap between the first two.
+ */
+export interface PnlOverview {
+  period_from: string;
+  period_to: string;
+  currency: string;
+  books_status: PnlBooksStatus;
+  books_income: number | null;
+  books_expenses: number | null;
+  books_net: number | null;
+  books_vat_income: number | null;
+  books_vat_expense: number | null;
+  books_vat_payable: number | null;
+  aade_status: PnlAadeStatus;
+  aade_income_net: number | null;
+  aade_expense_net: number | null;
+  aade_net: number | null;
+  aade_income_vat: number | null;
+  aade_expense_vat: number | null;
+  aade_income_docs: number | null;
+  aade_expense_docs: number | null;
+  aade_months_total: number;
+  aade_months_with_figures: number;
+  expense_gap_net: number | null;
+  income_gap_net: number | null;
+  unbooked_docs: number;
+  unbooked_net: number;
+  unbooked_vat: number;
+  unbooked_total: number;
+  /** Covers the five settlement figures below: they share one currency or none is summable. */
+  settlement_status: PnlBooksStatus;
+  settlement_currency: string;
+  bills_issued: number;
+  billed_total: number | null;
+  paid_total: number | null;
+  still_owed: number | null;
+  ap_outstanding_now: number | null;
+  ap_overdue_now: number | null;
+  ap_bills_open: number;
+}
+
+export interface PnlMonthRow {
+  period_month: string;
+  books_status: PnlBooksStatus;
+  books_currency: string | null;
+  books_income: number | null;
+  books_expenses: number | null;
+  books_net: number | null;
+  books_vat_income: number | null;
+  books_vat_expense: number | null;
+  aade_income_net: number | null;
+  aade_expense_net: number | null;
+  aade_net: number | null;
+  aade_income_vat: number | null;
+  aade_expense_vat: number | null;
+  aade_income_docs: number | null;
+  aade_expense_docs: number | null;
+  aade_income_status: PnlAadeStatus;
+  aade_expense_status: PnlAadeStatus;
+  unbooked_docs: number;
+  unbooked_net: number;
+  unbooked_vat: number;
+}
+
 export interface CashFlowRow {
   workspace_id: string;
   expected_date: string;
@@ -2973,6 +3045,26 @@ const _financeServiceCore = {
     });
     if (error) throw error;
     return (data ?? []) as PnlRow[];
+  },
+
+  /**
+   * The P&L proper. `get_monthly_pnl` above is a different question — revenue minus COGS, i.e.
+   * gross margin on what was sold — and has no operating expense in it at all.
+   */
+  async getPnlOverview(workspaceId: string, from: string, to: string): Promise<PnlOverview | null> {
+    const { data, error } = await (supabase as any).rpc('get_finance_pnl_overview', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return ((data ?? [])[0] ?? null) as PnlOverview | null;
+  },
+
+  async getPnlMonthly(workspaceId: string, from: string, to: string): Promise<PnlMonthRow[]> {
+    const { data, error } = await (supabase as any).rpc('get_finance_pnl_monthly', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as PnlMonthRow[];
   },
 
   async getCashFlowForecast(workspaceId: string, daysAhead = 90): Promise<CashFlowRow[]> {

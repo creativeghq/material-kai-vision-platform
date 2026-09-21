@@ -204,6 +204,48 @@ export const INBOUND_LIST_LIMIT = 2000;
  * One expense supplier, from `inbound_issuers_summary`. Every figure here is DERIVED in SQL —
  * the client formats them and never re-counts a pile it can only see one page of.
  */
+/** One row of `get_inbound_booking_backlog`: a state, and what sits in it. */
+export interface InboundBacklogRow {
+  booking_state:
+    | 'bookable' | 'booked' | 'dismissed' | 'cancelled'
+    | 'payroll' | 'credit_note' | 'no_value' | 'out_of_scope';
+  docs: number;
+  net: number;
+  vat: number;
+  gross: number;
+  will_book_total: number;
+  first_issue_date: string | null;
+  last_issue_date: string | null;
+}
+
+export interface InboundBookableIssuerRow {
+  /** Nullable: a document can carry no ΑΦΜ, and booking is BY issuer. Such rows stay listed. */
+  issuer_vat: string | null;
+  issuer_name: string | null;
+  crm_company_id: string | null;
+  docs: number;
+  net: number;
+  vat: number;
+  will_book_total: number;
+  /** How many would book as Uncategorized — i.e. file this supplier before booking it. */
+  category_pending: number;
+  learned_category_id: string | null;
+  learned_category_name: string | null;
+  first_issue_date: string | null;
+  last_issue_date: string | null;
+}
+
+/** `skipped` is a document the rules would not book; `failed` is one that tried and broke. */
+export interface InboundIssuerBookingResult {
+  filed: number;
+  booked: number;
+  skipped: number;
+  failed: number;
+  booked_total: number;
+  remaining: number;
+  first_error: string | null;
+}
+
 export interface ExpenseIssuerRow {
   issuer_vat: string;
   issuer_name: string | null;
@@ -536,6 +578,46 @@ export const inboundService = {
     });
     if (error) throw error;
     return Number(data ?? 0);
+  },
+
+  /** Per state: what is waiting to become an expense, and for the rest, why it never will. */
+  async bookingBacklog(workspaceId: string): Promise<InboundBacklogRow[]> {
+    const { data, error } = await (supabase as any).rpc('get_inbound_booking_backlog', {
+      p_workspace_id: workspaceId,
+    });
+    if (error) throw error;
+    return (data ?? []) as InboundBacklogRow[];
+  },
+
+  async bookableByIssuer(workspaceId: string): Promise<InboundBookableIssuerRow[]> {
+    const { data, error } = await (supabase as any).rpc('get_inbound_bookable_by_issuer', {
+      p_workspace_id: workspaceId,
+    });
+    if (error) throw error;
+    return (data ?? []) as InboundBookableIssuerRow[];
+  },
+
+  /**
+   * File a supplier to a category AND book its waiting documents, in one server transaction.
+   * Filing alone changes no figure anyone can see; booking alone produces Uncategorized expenses.
+   * Bounded server-side — a run books a stated number rather than draining the inbox.
+   */
+  async bookIssuer(
+    workspaceId: string,
+    issuerVat: string,
+    opts: { categoryId?: string | null; limit?: number } = {},
+  ): Promise<InboundIssuerBookingResult> {
+    const { data, error } = await (supabase as any).rpc('book_inbound_issuer', {
+      p_workspace_id: workspaceId,
+      p_issuer_vat: issuerVat,
+      p_category_id: opts.categoryId ?? null,
+      p_limit: opts.limit ?? 100,
+    });
+    // Async. Un-awaited it throws a Promise, and the caller toasts "[object Promise]".
+    if (error) throw await edgeError(error);
+    return ((data ?? [])[0] ?? {
+      filed: 0, booked: 0, skipped: 0, failed: 0, booked_total: 0, remaining: 0, first_error: null,
+    }) as InboundIssuerBookingResult;
   },
 
   /**

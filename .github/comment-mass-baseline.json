@@ -1,5 +1,5 @@
 {
-  "total": 79132,
+  "total": 79226,
   "areas": {
     "api": 20,
     "cloudflare": 31,
@@ -20,8 +20,8 @@
     "src/integrations": 2,
     "src/lib": 378,
     "src/main.tsx": 53,
-    "src/modules": 16824,
-    "src/pages": 2455,
+    "src/modules": 16891,
+    "src/pages": 2466,
     "src/services": 5360,
     "src/types": 113,
     "src/utils": 917,
@@ -37,7 +37,7 @@
     "tests/integration": 423,
     "tests/security": 57,
     "tests/setup.ts": 4,
-    "tests/unit": 10566,
+    "tests/unit": 10582,
     "tests/utils": 1,
     "vite.config.ts": 44,
     "vite.embed.config.ts": 16,

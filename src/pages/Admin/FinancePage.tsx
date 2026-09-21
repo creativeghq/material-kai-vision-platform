@@ -80,7 +80,7 @@ import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 import { SourcingBoardPanel } from '@/modules/finance/components/SourcingBoardPanel';
 import { CompanyAssetsPanel } from '@/components/business/assets/CompanyAssetsPanel';
-import type { FinanceSettings } from '@/modules/finance/services/financeService';
+import type { FinanceSettings, PnlOverview, PnlMonthRow } from '@/modules/finance/services/financeService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -88,6 +88,9 @@ import SupplierPortalPage from '@/pages/SupplierPortalPage';
 import { FileText, FileMinus, Banknote, PackageCheck, ShoppingCart, Pencil, Layers, CheckCircle2 } from 'lucide-react';
 import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
+import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
+import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
+import { ExpenseBacklogCard } from '@/modules/finance/components/ExpenseBacklogCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { AssessmentPanel } from '@/components/features/assessment/AssessmentPanel';
@@ -185,6 +188,13 @@ const FinancePage: React.FC = () => {
   /** True when the settlement read FAILED — distinct from an order simply having no cash. */
   const [recentBalancesUnknown, setRecentBalancesUnknown] = useState(false);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  // The P&L proper. `pnl` above is `get_monthly_pnl` - gross margin, no operating expense in it.
+  const [pnlOverview, setPnlOverview] = useState<PnlOverview | null>(null);
+  const [pnlMonths, setPnlMonths] = useState<PnlMonthRow[]>([]);
+  // Its OWN flag: loadInsights catches to [] and settles first, so sharing its flag showed the
+  // cards as loaded - every tile "Unknown" - while these two reads were still in flight.
+  const [pnlLoading, setPnlLoading] = useState(true);
+  const [pnlError, setPnlError] = useState<string | null>(null);
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
@@ -253,6 +263,7 @@ const FinancePage: React.FC = () => {
   // Dashboard insights — re-fetch when the workspace or period changes, independent
   // of the heavy loadAll() so flipping the period is cheap.
   useEffect(() => { if (workspaceId) void loadInsights(workspaceId, dashPeriod); }, [workspaceId, dashPeriod]);
+  useEffect(() => { if (workspaceId) void loadPnl(workspaceId, dashPeriod); }, [workspaceId, dashPeriod]);
 
   // Reconcile a deposit → turn the order it was taken on into a receipt/invoice draft.
   const issueFromOrder = async (orderId: string) => {
@@ -264,6 +275,31 @@ const FinancePage: React.FC = () => {
       if (data) navigate(`${financeBase}/invoices/${data}`);
     } catch (err: any) {
       toast({ title: 'Failed', description: invoiceGenerationErrorMessage(err), variant: 'destructive' });
+    }
+  };
+
+  /**
+   * NOT part of loadInsights, whose catch treats everything in it as best-effort: a swallowed
+   * P&L renders as income and expenses of zero, which is a claim rather than a missing read.
+   */
+  const loadPnl = async (wsId: string, period: DashPeriod) => {
+    const { from, to } = dashRange(period);
+    setPnlLoading(true);
+    try {
+      const [overview, months] = await Promise.all([
+        financeService.getPnlOverview(wsId, from, to),
+        financeService.getPnlMonthly(wsId, from, to),
+      ]);
+      setPnlOverview(overview);
+      setPnlMonths(months);
+      setPnlError(null);
+    } catch (err) {
+      console.error('[finance] P&L unavailable', err);
+      setPnlOverview(null);
+      setPnlMonths([]);
+      setPnlError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPnlLoading(false);
     }
   };
 
@@ -605,6 +641,51 @@ const FinancePage: React.FC = () => {
               />
             </div>
 
+            {/* One period control for the whole dashboard. It used to sit inside Sales insights
+                and govern only that, so two blocks could describe different windows. */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <BarChart3 className="h-4 w-4" /> {DASH_PERIOD_LABEL[dashPeriod]}
+              </h3>
+              <div className="flex items-center gap-2">
+                {(insightsLoading || pnlLoading) && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                <Select value={dashPeriod} onValueChange={(v) => setDashPeriod(v as typeof dashPeriod)}>
+                  <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(['this_month', 'last_month', 'last_quarter', 'ytd'] as const).map((p) => (
+                      <SelectItem key={p} value={p}>{DASH_PERIOD_LABEL[p]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <PnlOverviewCard
+              overview={pnlOverview}
+              periodLabel={DASH_PERIOD_LABEL[dashPeriod]}
+              loading={pnlLoading}
+              error={pnlError}
+              onRetry={() => workspaceId && void loadPnl(workspaceId, dashPeriod)}
+            />
+
+            <PnlTrendCard
+              rows={pnlMonths}
+              currency={pnlOverview?.currency && pnlOverview.currency !== 'MIXED' ? pnlOverview.currency : 'EUR'}
+              loading={pnlLoading}
+            />
+
+            {workspaceId && (
+              <ExpenseBacklogCard
+                workspaceId={workspaceId}
+                categories={expenseCats}
+                canBook={!isAccountant}
+                onBooked={() => {
+                  void loadPnl(workspaceId, dashPeriod);
+                  void loadAll(workspaceId);
+                }}
+              />
+            )}
+
             {/* Where the money sits — live balance per bank/cash account. */}
             <BankBalancesCard rows={bankBalances} onManage={() => onTabChange('settings')} />
 
@@ -746,17 +827,7 @@ const FinancePage: React.FC = () => {
             {/* ─── Sales insights (period-scoped) — top customers, best sellers, orders ─── */}
             <div className="flex items-center justify-between gap-2 pt-2">
               <h3 className="text-sm font-semibold flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Sales insights</h3>
-              <div className="flex items-center gap-2">
-                {insightsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                <Select value={dashPeriod} onValueChange={(v) => setDashPeriod(v as typeof dashPeriod)}>
-                  <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(['this_month', 'last_month', 'last_quarter', 'ytd'] as const).map((p) => (
-                      <SelectItem key={p} value={p}>{DASH_PERIOD_LABEL[p]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <span className="text-[11px] text-muted-foreground">{DASH_PERIOD_LABEL[dashPeriod]}</span>
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -1634,7 +1705,9 @@ const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
 const PnlCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => (
   <Card>
     <CardHeader className="border-b border-border/60 px-5 py-3">
-      <CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" /> Monthly P&amp;L (last 12 months)</CardTitle>
+      {/* NOT a P&L - gross margin. Under the old name the dashboard appeared to have a P&L, so
+          nobody looked for the operating expenses that were never in it. */}
+      <CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" /> Gross margin (last 12 months)</CardTitle>
     </CardHeader>
     <CardContent className="p-0">
       {/*
