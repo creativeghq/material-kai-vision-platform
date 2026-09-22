@@ -252,6 +252,11 @@ describe('a cost kept out of the P&L is stated, never simply absent', () => {
     // A payment is recorded in the BILL's currency, so another account's balance would move by an
     // amount it is not denominated in.
     expect(dlg, 'accounts are filtered to the document currency').toMatch(/a\.currency === currency/);
+    // Once a document IS an expense the cost is in the P&L, and only voiding the bill or a
+    // supplier credit note takes it out. The server refuses this, so offering it was a refusal
+    // waiting to happen.
+    expect(dlg, 'excluding an already-booked cost is not offered').toMatch(/disabled=\{alreadyBooked\}/);
+    expect(dlg, 'nor submittable').toMatch(/disabled=\{busy \|\| \(outside && alreadyBooked\)\}/);
   });
 
   it('excluding is reversible, and the undo sits with the action', () => {

@@ -139,7 +139,13 @@ export const SettleExpenseDialog: React.FC<Props> = ({ workspaceId, doc, open, o
             <Select value={accountId} onValueChange={setAccountId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={NO_ACCOUNT}>No account — settled outside the books</SelectItem>
+                {/* Once a document IS an expense, taking it back out is not a settlement — the
+                    cost is in the P&L and only voiding the bill or a supplier credit note removes
+                    it. The server refuses this; offering it was a refusal waiting to happen. */}
+                <SelectItem value={NO_ACCOUNT} disabled={alreadyBooked}>
+                  No account — settled outside the books
+                  {alreadyBooked && ' (already in the books)'}
+                </SelectItem>
                 {usable.map((a) => (
                   <SelectItem key={a.bank_account_id} value={a.bank_account_id}>
                     {a.name} · {formatMoney(Number(a.current_balance), a.currency)}
@@ -165,7 +171,9 @@ export const SettleExpenseDialog: React.FC<Props> = ({ workspaceId, doc, open, o
 
             {/* The consequence before the button: these two answers mean different books. */}
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {outside
+              {outside && alreadyBooked
+                ? 'This document is already an expense in your books, so it cannot be excluded from them here. Pick the account it was paid from, or reverse the cost with a supplier credit note.'
+                : outside
                 ? 'Nothing is booked and no money moves. The cost is kept OUT of the P&L, expenses and the VAT return — for purchases already paid and accounted for elsewhere. It is counted separately and shown beside the P&L, never hidden.'
                 : alreadyBooked
                   ? 'The payment leaves this account and settles the expense that already exists for this document.'
@@ -206,9 +214,13 @@ export const SettleExpenseDialog: React.FC<Props> = ({ workspaceId, doc, open, o
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void submit()} disabled={busy}>
+          <Button
+            onClick={() => void submit()}
+            disabled={busy || (outside && alreadyBooked)}
+            title={outside && alreadyBooked ? 'Already an expense in your books — pick the account it was paid from.' : undefined}
+          >
             {busy && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-            {outside ? 'Mark settled outside' : 'Book and pay'}
+            {outside ? 'Mark settled outside' : alreadyBooked ? 'Pay' : 'Book and pay'}
           </Button>
         </DialogFooter>
       </DialogContent>
