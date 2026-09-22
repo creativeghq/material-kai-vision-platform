@@ -355,6 +355,9 @@ class AssetsService {
   async listRecurringExpenses(workspaceId: string): Promise<RecurringExpenseOption[]> {
     const { data, error } = await sb
       .from('finance_recurring_expenses')
+      // Bill templates only: a leased asset is backed by a real recurring cost, and a plan
+      // template creates none.
+      .eq('creates', 'bill')
       .select('id, description, cadence, subtotal_net, currency, is_active')
       .eq('workspace_id', workspaceId)
       .eq('is_active', true)

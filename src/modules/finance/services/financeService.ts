@@ -482,10 +482,20 @@ export type { BuyerIdentity, SalesDocumentKind } from '@/modules/finance/utils/s
 
 export type RecurringCadence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
+/**
+ * What a due run produces. `plan` writes a planned_payments reminder — no bill, no payment,
+ * nothing in the P&L until it is settled. `bill` writes a supplier bill (and with `auto_pay` a
+ * payment too) with no human in it, which is why it is never the default.
+ */
+export type RecurringCreates = 'plan' | 'bill';
+
 export interface RecurringExpense {
   id: string;
   workspace_id: string;
   category_id: string;
+  creates: RecurringCreates;
+  /** Which Planning bucket a generated plan lands in. Ignored when `creates` is 'bill'. */
+  plan_category: PlannedPaymentCategory;
   supplier_company_id: string | null;
   supplier_contact_id: string | null;
   description: string | null;
@@ -2728,9 +2738,17 @@ const _financeServiceCore = {
     orderId?: string | null;
     tripReportId?: string | null;
     propertyId?: string | null;
+    creates?: RecurringCreates;
+    planCategory?: PlannedPaymentCategory;
   }): Promise<RecurringExpense> {
-    if (!input.supplierCompanyId && !input.supplierContactId) {
+    const creates = input.creates ?? 'plan';
+    // A BILL is a document owed to somebody, so it needs a payee. A plan is a note to yourself
+    // about money leaving on a date, and "the electricity bill" needs no CRM record to be useful.
+    if (creates === 'bill' && !input.supplierCompanyId && !input.supplierContactId) {
       throw new Error('A recurring expense needs a supplier / payee.');
+    }
+    if (creates === 'plan' && input.autoPay) {
+      throw new Error('A recurring plan cannot pay itself — it is a reminder, not a payment.');
     }
     const { data, error } = await supabase.from('finance_recurring_expenses').insert({
       workspace_id: input.workspaceId,
@@ -2746,6 +2764,8 @@ const _financeServiceCore = {
       interval_count: input.intervalCount ?? 1,
       due_days: input.dueDays ?? 0,
       next_run_at: input.nextRunAt,
+      creates,
+      plan_category: input.planCategory ?? 'expense',
       auto_pay: input.autoPay ?? false,
       bank_account_id: input.bankAccountId ?? null,
       payment_method: input.paymentMethod ?? null,

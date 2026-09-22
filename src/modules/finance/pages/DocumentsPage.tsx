@@ -294,7 +294,10 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       setLoadErrors(failed);
       // Recurring templates — Expenses tab only.
       if (type === 'expenses') {
-        setRecurring(await financeService.listRecurringExpenses(activeWorkspaceId).catch(() => [] as RecurringExpense[]));
+        setRecurring((await financeService.listRecurringExpenses(activeWorkspaceId).catch(() => [] as RecurringExpense[]))
+          // Bill templates only. A plan template here would be described as generating a
+          // categorised bill each period, with an Auto-pay column it can never use.
+          .filter((r) => r.creates !== 'plan'));
       }
       setCategories(cats ?? []);
       setCategoryMap(Object.fromEntries((cats ?? []).map((c) => [c.id, c.name])));

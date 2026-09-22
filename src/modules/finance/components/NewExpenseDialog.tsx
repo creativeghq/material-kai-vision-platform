@@ -491,6 +491,8 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       if (repeat !== 'none') {
         try {
         await financeService.createRecurringExpense({
+          // This surface recurs an EXPENSE: a supplier bill, as it always has.
+          creates: 'bill',
           workspaceId,
           categoryId,
           supplierCompanyId: cpCompanyId ?? null,

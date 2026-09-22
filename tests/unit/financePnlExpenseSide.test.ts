@@ -430,6 +430,39 @@ describe('planning is two questions, and both can be acted on', () => {
   });
 });
 
+describe('a recurring template never creates a cost on its own', () => {
+  it('produces a PLAN by default, and only Expenses asks for a bill', () => {
+    const svc = strippedSource('src/modules/finance/services/financeService.ts');
+    // `bill` writes a supplier bill — and with auto_pay a PAYMENT — unattended, on a cron that is
+    // already armed. It is never what a caller gets by forgetting to say.
+    expect(svc, 'the safe default').toMatch(/const creates = input\.creates \?\? 'plan';/);
+    expect(svc, 'a plan cannot pay itself').toMatch(/A recurring plan cannot pay itself/);
+    const dlg = strippedSource('src/modules/finance/components/NewExpenseDialog.tsx');
+    expect(dlg, 'the Expenses surface says bill explicitly').toMatch(/creates: 'bill'/);
+    const card = strippedSource('src/modules/finance/components/RecurringPlansCard.tsx');
+    expect(card, 'and Planning says plan').toMatch(/creates: 'plan'/);
+    expect(card, 'Planning never offers auto-pay').not.toMatch(/autoPay/);
+  });
+
+  it('a plan template is not offered where a bill template belongs', () => {
+    // Listed on Expenses it is described as generating a categorised bill each period, with an
+    // Auto-pay column it can never use; offered as a leased asset's backing cost it creates none.
+    const docs = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
+    expect(docs, 'the Expenses recurring card filters').toMatch(/r\.creates !== 'plan'/);
+    const assets = strippedSource('src/services/assetsService.ts');
+    expect(assets, 'and so does the asset backing lookup').toMatch(/\.eq\('creates', 'bill'\)/);
+  });
+
+  it('there is ONE recurring system, not a second one beside it', () => {
+    // A second table would be a second place for cadence, catch-up and the supplier link to live.
+    const offenders = INDEX.stripped()
+      .filter(([f]) => posix(f) !== 'src/integrations/supabase/types.ts')
+      .filter(([, src]) => /recurring_plans|recurring_plan_templates/.test(src))
+      .map(([f]) => posix(f));
+    expect(offenders, `a second recurring store:\n${offenders.join('\n')}`).toEqual([]);
+  });
+});
+
 describe('customer credit is not an overpayment', () => {
   it('the word appears nowhere in the product', () => {
     const offenders = INDEX.stripped()

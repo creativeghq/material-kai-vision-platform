@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, CheckCircle2, X, Bell, Loader2, CalendarDays, Coins, ArrowLeftRight, Pencil, Wallet, AlertTriangle } from 'lucide-react';
+import { Plus, CheckCircle2, X, Bell, Loader2, CalendarDays, Coins, ArrowLeftRight, Pencil, Wallet, AlertTriangle, Repeat } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,7 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 import { HubEmptyState, HubTabNav } from '@/components/core/hub';
 import { LineWorkQueueCard } from '@/modules/finance/components/LineWorkQueueCard';
 import { RecordPaymentDialog, type PaymentSaveResult } from '@/modules/finance/components/RecordPaymentDialog';
+import { RecurringPlansCard } from '@/modules/finance/components/RecurringPlansCard';
 
 interface Props { workspaceId: string }
 
@@ -94,7 +95,7 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
   const [markingId, setMarkingId] = useState<string | null>(null);
   // Two questions: order LINES a customer waits on, and MONEY on a date. Stacked, the first
   // pushed the second below the fold and the page read as a queue with a table under it.
-  const [pane, setPane] = useState<'plan' | 'late'>('plan');
+  const [pane, setPane] = useState<'plan' | 'recurring' | 'late'>('plan');
   const [editRow, setEditRow] = useState<PlannedPayment | null>(null);
   /** Paying for real (Revolut / bank) rather than just recording it — outgoing plans only. */
   const [payRow, setPayRow] = useState<PlannedPayment | null>(null);
@@ -240,16 +241,18 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
       <HubTabNav
         aria-label="Planning sections"
         activeId={pane}
-        onSelect={(id) => setPane(id as 'plan' | 'late')}
+        onSelect={(id) => setPane(id as 'plan' | 'recurring' | 'late')}
         items={[
           { id: 'plan', label: 'Planning', icon: CalendarDays },
+          { id: 'recurring', label: 'Recurring', icon: Repeat },
           { id: 'late', label: 'What is late', icon: AlertTriangle },
         ]}
       />
 
       {/* #432 -- the other half of planning: which order LINES are late. A kitchen customer asks
           about the line, not the payment. */}
-      {pane === 'late' ? <LineWorkQueueCard workspaceId={workspaceId} /> : (
+      {pane === 'late' ? <LineWorkQueueCard workspaceId={workspaceId} />
+        : pane === 'recurring' ? <RecurringPlansCard workspaceId={workspaceId} /> : (
       <>
       <SectionHeader
         title="Planning"
