@@ -96,6 +96,15 @@ export type TriggerType =
   | 'payment_received'
   | 'payment_reversed'
   | 'payment_sent'
+  // Expenses: a received myDATA document became a cost, or was deliberately kept out of the
+  // books. Both are operator acts on money, which is why anyone watching the P&L wants them.
+  | 'expense.booked'
+  | 'expense.settled_outside'
+  | 'credit_note.received'
+  // Cash plan: a scheduled payment falls due tomorrow. Emitted by finance-reminders-cron.
+  | 'plan.due_tomorrow'
+  // The VAT return for a closed period can be filed. Emitted by finance-reminders-cron.
+  | 'vat.return_ready'
   // Sourcing / purchase orders
   | 'purchase_order.sent'
   | 'purchase_order.received'
@@ -379,6 +388,12 @@ export interface PaymentReceivedTriggerConfig {}
 /** Refund or chargeback. Emitted by stripe-webhooks. */
 export interface PaymentReversedTriggerConfig {}
 export interface PaymentSentTriggerConfig {}
+/** Payload-only. `count`/`total` describe the run, not one document. */
+export interface ExpenseBookedTriggerConfig {}
+export interface ExpenseSettledOutsideTriggerConfig {}
+export interface CreditNoteReceivedTriggerConfig {}
+export interface PlanDueTomorrowTriggerConfig {}
+export interface VatReturnReadyTriggerConfig {}
 export interface PurchaseOrderSentTriggerConfig {}
 export interface PurchaseOrderReceivedTriggerConfig {}
 export interface MaterialAlertTriggerConfig {}
@@ -580,6 +595,11 @@ export type TriggerConfigMap = {
   payment_received: PaymentReceivedTriggerConfig;
   payment_reversed: PaymentReversedTriggerConfig;
   payment_sent: PaymentSentTriggerConfig;
+  'expense.booked': ExpenseBookedTriggerConfig;
+  'expense.settled_outside': ExpenseSettledOutsideTriggerConfig;
+  'credit_note.received': CreditNoteReceivedTriggerConfig;
+  'plan.due_tomorrow': PlanDueTomorrowTriggerConfig;
+  'vat.return_ready': VatReturnReadyTriggerConfig;
   'purchase_order.sent': PurchaseOrderSentTriggerConfig;
   'purchase_order.received': PurchaseOrderReceivedTriggerConfig;
   material_alert: MaterialAlertTriggerConfig;

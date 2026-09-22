@@ -70,6 +70,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'finance-mydata-book', label: 'finance-mydata-book', sublabel: 'Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces' },
   { id: 'finance-issue-invoice', label: 'finance-issue-invoice', sublabel: 'Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note' },
   { id: 'finance-pay-invoice', label: 'finance-pay-invoice', sublabel: 'Create a Stripe Checkout session or pay-link for an invoice' },
+  { id: 'finance-reminders-cron', label: 'finance-reminders-cron', sublabel: 'Cron: emit planned-payment and VAT-return-ready flow events.' },
   // Listed for parity with the catalogue, but it needs a signed-in finance manager: called from a
   // flow it answers 401/404 rather than moving money on nobody's authority. That is the intended
   // outcome — an irreversible transfer is not a thing an automation should fire unattended.

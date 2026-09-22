@@ -9,6 +9,8 @@ export const TENANT_TRIGGERS = [
   'invoice_paid', 'payment_received', 'payment_sent', 'payment_reversed',
   'bank_payment_unmatched', 'card_spend_threshold', 'customer_credit_releasable',
   'finance_follow_up',
+  'expense.booked', 'expense.settled_outside', 'credit_note.received',
+  'plan.due_tomorrow', 'vat.return_ready',
   // Quotes, orders, purchasing
   'quote_approved', 'quote_rejected', 'quote_sent', 'order_created', 'order_status_changed',
   'purchase_order.sent', 'purchase_order.received', 'supplier_po_received',

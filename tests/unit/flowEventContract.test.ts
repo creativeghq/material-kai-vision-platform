@@ -171,6 +171,10 @@ describe('tenant flow vocabulary', () => {
     'order_dispatched', 'quote_requested', 'quote_pdf_generated',
     'moodboard_created', 'moodboard_shared', 'freight_quote_requested',
     'video_generation_completed', 'video_generation_failed',
+    // Expenses and the cash plan. Emitters: inboundService (three) and finance-reminders-cron
+    // (two) — every one stamps workspace_id, without which a forked tenant flow never matches.
+    'expense.booked', 'expense.settled_outside', 'credit_note.received',
+    'plan.due_tomorrow', 'vat.return_ready',
   ];
   const RPC_ACTIONS = [
     'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',

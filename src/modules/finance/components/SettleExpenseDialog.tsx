@@ -81,6 +81,7 @@ export const SettleExpenseDialog: React.FC<Props> = ({ workspaceId, doc, open, o
     try {
       const typed = amount.trim();
       const res = await inboundService.settleDocument(doc.id, {
+        workspaceId,
         bankAccountId: outside ? null : accountId,
         paidOn,
         // Blank means "whatever is still due", which the server derives from the bill. Prefilling

@@ -61,6 +61,18 @@ export async function emitAgentEvent(
 }
 
 /**
+ * What one workspace emit actually did. `ok` false means the recipient read or an emit FAILED —
+ * a caller that stamps "reminded" on the strength of this call must not stamp then, or the
+ * reminder is marked sent and the row never comes back.
+ */
+export interface WorkspaceEmitSummary {
+  ok: boolean;
+  recipients: number;
+  emitted: number;
+  failed: number;
+}
+
+/**
  * Emit a workspace-level flow event to every member of the workspace holding one
  * of `roles` (e.g. owner/admin). The Flows `create_notification` action targets a
  * single `user_id` and skips when it's absent, so a workspace event with no
@@ -74,9 +86,12 @@ export async function emitFlowEventToWorkspaceRoles(
   eventType: string,
   buildData: (recipientUserId: string) => Record<string, unknown>,
   opts?: { excludeUserId?: string },
-): Promise<void> {
+): Promise<WorkspaceEmitSummary> {
   const supabase = getSupabase();
-  if (!supabase || !workspaceId) return;
+  if (!supabase || !workspaceId) return { ok: false, recipients: 0, emitted: 0, failed: 0 };
+  let recipients = 0;
+  let emitted = 0;
+  let failed = 0;
   try {
     const { data: members } = await supabase
       .from('workspace_members')
@@ -86,12 +101,18 @@ export async function emitFlowEventToWorkspaceRoles(
       .eq('status', 'active');
     const ids = [...new Set((members || []).map((m: { user_id: string }) => m.user_id as string))]
       .filter((id) => id && id !== opts?.excludeUserId);
+    recipients = ids.length;
     for (const uid of ids) {
-      await emitFlowEvent(eventType, buildData(uid));
+      // `emitFlowEvent` returns null for a missing secret, a non-ok flow-engine reply or a throw,
+      // and a zero-count object when nothing is listening. Only null is a failure.
+      if (await emitFlowEvent(eventType, buildData(uid))) emitted += 1;
+      else failed += 1;
     }
   } catch (err) {
     console.error(`[flow-events] emitFlowEventToWorkspaceRoles error for ${eventType}:`, err);
+    return { ok: false, recipients, emitted, failed };
   }
+  return { ok: failed === 0, recipients, emitted, failed };
 }
 
 /** Short-lived cache of trigger types that have at least one ACTIVE flow. */

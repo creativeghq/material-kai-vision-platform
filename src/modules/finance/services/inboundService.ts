@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 // One normalised VAT key (#353 CRM-4).
 import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
 import { edgeError } from '@/utils/edgeError';
+import { flowEventService } from '@/services/flows/flowEventService';
 import type {
   InboundLineCost, InboundLineCostStatus, InboundLinkRelation, InboundLinkSource,
   InboundLinkSummary,
@@ -611,9 +612,25 @@ export const inboundService = {
       p_workspace_id: workspaceId, p_limit: limit,
     });
     if (error) throw await edgeError(error);
-    return ((data ?? [])[0] ?? {
+    const res = ((data ?? [])[0] ?? {
       created: 0, skipped: 0, failed: 0, total: 0, remaining: 0, first_error: null,
     }) as ReceivedCreditNoteFetch;
+    if (res.created > 0) {
+      void flowEventService.emitToWorkspaceRoles(
+        workspaceId, ['owner', 'admin'], 'credit_note.received', (userId) => ({
+          type: 'credit_note.received',
+          user_id: userId,
+          workspace_id: workspaceId,
+          created: res.created,
+          amount: res.total,
+          remaining: res.remaining,
+          title: `${res.created} supplier credit note${res.created === 1 ? '' : 's'} recorded`,
+          body: 'Credit a supplier issued you — it offsets what you owe them.',
+          action_url: '/finance?tab=doc_credit_notes',
+        }),
+      );
+    }
+    return res;
   },
 
   /** How many are waiting, so the list can say so instead of looking complete. */
@@ -631,7 +648,12 @@ export const inboundService = {
    */
   async settleDocument(
     docId: string,
-    opts: { bankAccountId?: string | null; paidOn?: string | null; amount?: number | null; note?: string | null } = {},
+    opts: {
+      bankAccountId?: string | null; paidOn?: string | null; amount?: number | null;
+      note?: string | null;
+      /** Only used to address the flow event — the RPC derives tenancy from the document. */
+      workspaceId?: string | null;
+    } = {},
   ): Promise<SettleOutcome> {
     const { data, error } = await (supabase as any).rpc('settle_inbound_document', {
       p_doc_id: docId,
@@ -641,7 +663,32 @@ export const inboundService = {
       p_note: opts.note ?? null,
     });
     if (error) throw await edgeError(error);
-    return ((data ?? [])[0] ?? { outcome: 'unknown', supplier_bill_id: null, payment_id: null, amount: 0 }) as SettleOutcome;
+    const res = ((data ?? [])[0] ?? { outcome: 'unknown', supplier_bill_id: null, payment_id: null, amount: 0 }) as SettleOutcome;
+    // Both outcomes are worth hearing about, and they are opposite facts: one cost entered the
+    // books, one was deliberately kept out. Booking here emits the SAME event the bulk run does —
+    // this surface books one document, and a flow that missed it would be watching two of three.
+    if (opts.workspaceId && (res.outcome === 'settled_outside' || res.outcome === 'booked_and_paid')) {
+      const ws = opts.workspaceId;
+      const excluded = res.outcome === 'settled_outside';
+      void flowEventService.emitToWorkspaceRoles(
+        ws, ['owner', 'admin'], excluded ? 'expense.settled_outside' : 'expense.booked', (userId) => ({
+          type: excluded ? 'expense.settled_outside' : 'expense.booked',
+          user_id: userId,
+          workspace_id: ws,
+          document_id: docId,
+          supplier_bill_id: res.supplier_bill_id ?? undefined,
+          booked: excluded ? 0 : 1,
+          amount: res.amount,
+          note: opts.note ?? undefined,
+          title: excluded ? 'A cost was settled outside the books' : 'An expense was booked and paid',
+          body: excluded
+            ? `It is excluded from the P&L, expenses and the VAT return, and counted apart. ${opts.note ?? ''}`.trim()
+            : 'The purchase is booked as a supplier bill and the payment has left the account.',
+          action_url: '/finance?tab=doc_expenses',
+        }),
+      );
+    }
+    return res;
   },
 
   /** Put an excluded cost back. A mis-click must not be permanent, or the P&L stays wrong. */
@@ -686,9 +733,28 @@ export const inboundService = {
     });
     // Async. Un-awaited it throws a Promise, and the caller toasts "[object Promise]".
     if (error) throw await edgeError(error);
-    return ((data ?? [])[0] ?? {
+    const res = ((data ?? [])[0] ?? {
       filed: 0, booked: 0, skipped: 0, failed: 0, booked_total: 0, remaining: 0, first_error: null,
     }) as InboundIssuerBookingResult;
+    // Emitted HERE rather than at each screen: three surfaces book, and a payload built three
+    // times drifts. Fire-and-forget by contract — a flow must never break the booking.
+    if (res.booked > 0) {
+      void flowEventService.emitToWorkspaceRoles(
+        workspaceId, ['owner', 'admin'], 'expense.booked', (userId) => ({
+          type: 'expense.booked',
+          user_id: userId,
+          workspace_id: workspaceId,
+          issuer_vat: issuerVat,
+          booked: res.booked,
+          amount: res.booked_total,
+          remaining: res.remaining,
+          title: `${res.booked} expense${res.booked === 1 ? '' : 's'} booked`,
+          body: `${res.booked} received document${res.booked === 1 ? '' : 's'} became supplier bills. They now reach Payables, the P&L and the VAT return.`,
+          action_url: '/finance?tab=doc_expenses',
+        }),
+      );
+    }
+    return res;
   },
 
   /**

@@ -3496,6 +3496,11 @@ const _financeServiceV2 = {
     for (const k of ['title','amount','scheduled_for','category','notes','status','reminder_at','counterparty_company_id','counterparty_contact_id'] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];
     }
+    // Moving the date asks a NEW question, so the old answer stops counting. Without this a plan
+    // reminded about once is silent for every date it is ever moved to.
+    if (patch.scheduled_for !== undefined || patch.reminder_at !== undefined) {
+      allowed.reminder_sent_at = null;
+    }
     const { error } = await supabase.from('planned_payments').update(allowed).eq('id', id);
     if (error) throw error;
   },
