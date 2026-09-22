@@ -752,7 +752,7 @@ export const inboundService = {
         classification_category: input.classificationCategory,
         amount: input.net,
       }],
-      created_by: auth?.user?.id ?? null,
+      recorded_by: auth?.user?.id ?? null,
     }).select('id').single();
     if (error) throw error;
     return data as { id: string };

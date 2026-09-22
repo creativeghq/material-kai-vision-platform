@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   buildExpenseEnvelope, expenseEnvelopeProblems, parseSendResponse,
   type ExpenseEnvelopeInput,
@@ -134,5 +136,37 @@ describe('reading what AADE answered', () => {
     const out = parseSendResponse(500, '');
     expect(out.ok).toBe(false);
     expect(out.errors[0]).toMatch(/500/);
+  });
+});
+
+describe('the write-back after a filing', () => {
+  const SEND = readFileSync(
+    join(__dirname, '..', '..', 'supabase/functions/finance-mydata-send/index.ts'), 'utf8',
+  );
+  const RECORD = readFileSync(
+    join(__dirname, '..', '..', 'src/modules/finance/services/inboundService.ts'), 'utf8',
+  );
+
+  it('never writes a GENERATED column, which Postgres refuses outright', () => {
+    const update = SEND.slice(SEND.indexOf("from('inbound_documents').update("), SEND.indexOf('if (!outcome.ok)'));
+    const at = update.indexOf('source_ref:');
+    expect(at, 'the MARK is no longer written through source_ref').toBeGreaterThan(-1);
+    const topLevel = update.slice(0, at) + update.slice(update.indexOf('},', at) + 2);
+    for (const col of ['mark', 'uid', 'authentication_code']) {
+      expect(topLevel, `${col} is a generated column`)
+        .not.toMatch(new RegExp(`(^|[^_.a-zA-Z])${col}\\s*:`, 'm'));
+    }
+  });
+
+  it('records the attempt whether AADE accepted it or refused it', () => {
+    const update = SEND.slice(SEND.indexOf("from('inbound_documents').update("), SEND.indexOf('if (!outcome.ok)'));
+    expect(update).toMatch(/transmit_attempted_at:/);
+    expect(update).toMatch(/transmit_error:/);
+  });
+
+  it('and the recorder writes recorded_by, not a created_by this table has never had', () => {
+    const insert = RECORD.slice(RECORD.indexOf('recordExpenseDocument'));
+    expect(insert.slice(0, 2000)).toMatch(/recorded_by:/);
+    expect(insert.slice(0, 2000), 'inbound_documents has no created_by').not.toMatch(/created_by:/);
   });
 });

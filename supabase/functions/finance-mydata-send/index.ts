@@ -162,9 +162,12 @@ Deno.serve(withApiLogging('finance-mydata-send', async (req) => {
         ...(outcome.ok
           ? {
             mydata_mark: outcome.mark,
-            mark: outcome.mark,
-            uid: outcome.uid ?? doc.uid,
-            authentication_code: outcome.authenticationCode ?? doc.authentication_code,
+            source_ref: {
+              ...(doc.source_ref ?? {}),
+              mark: outcome.mark,
+              uid: outcome.uid ?? doc.uid ?? null,
+              authentication_code: outcome.authenticationCode ?? doc.authentication_code ?? null,
+            },
           }
           : {}),
         updated_at: new Date().toISOString(),
