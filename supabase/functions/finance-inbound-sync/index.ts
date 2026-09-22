@@ -44,9 +44,8 @@ const family = (docType: string | null) => String(docType ?? '').split('.')[0];
 /** The families on RequestTransmittedDocs that are EXPENSES we self-reported. */
 const SELF_TRANSMITTED_EXPENSE_FAMILIES = new Set(['13', '14', '16', '17']);
 
-/** Hard stop on the continuation loop: 40 pages is ~4,000 documents in one run, far past any real
- *  window. Hitting it is REPORTED, never silent — a partial list is indistinguishable from a
- *  complete one, which is the whole bug this loop exists to fix. */
+/** Hard stop: ~4,000 documents in one run. Hitting it is REPORTED, never silent — a partial
+ *  list is indistinguishable from a complete one. */
 const MAX_PAGES = 40;
 
 interface DocFetch {
