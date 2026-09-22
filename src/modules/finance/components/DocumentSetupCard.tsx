@@ -49,7 +49,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
         invoicingSetupService.listSeries(workspaceId),
         invoicingSetupService.listBranches(workspaceId),
       ]);
-      setTypes(t); setIncTypes(ic); setIncCats(icc); setWithholdings(wh); setSettings(s); setSeries(ser); setBranches(br);
+      setTypes(t.filter((r) => r.direction === 'issued')); setIncTypes(ic); setIncCats(icc); setWithholdings(wh); setSettings(s); setSeries(ser); setBranches(br);
     } catch (err: any) { toast({ title: 'Failed to load', description: err?.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };

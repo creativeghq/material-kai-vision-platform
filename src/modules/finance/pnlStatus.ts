@@ -53,6 +53,7 @@ export const BOOKING_STATE_COPY: Record<string, { label: string; detail: string 
   dismissed: { label: 'Dismissed', detail: 'Set aside by hand — not ours to book.' },
   cancelled: { label: 'Cancelled at ΑΑΔΕ', detail: 'The issuer cancelled these. A void document is not an expense.' },
   payroll: { label: 'Payroll', detail: 'Recorded in HR. Booking it here would double it against payroll.' },
+  own_entity: { label: 'Your own books entries', detail: 'Depreciation and year-end regularisation you filed yourself. ΑΑΔΕ keeps these out of the expense book, so they belong in your accounts rather than this queue.' },
   credit_note: { label: 'Supplier credit notes', detail: 'These REDUCE an expense, so they are issued against the bill they correct rather than booked as one.' },
   no_value: { label: 'Delivery notes', detail: 'Goods moved, no money stated. The invoice that prices them is booked instead.' },
   out_of_scope: { label: 'Other document types', detail: 'Not a purchase document — nothing to book.' },

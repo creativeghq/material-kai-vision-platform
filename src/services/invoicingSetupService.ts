@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
  *              picker just said "(amount)", so the operator typed a figure from memory and did
  *              the × quantity in their head.
  */
-export interface RefRow { category: string; code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' | 'per_unit'; is_enabled: boolean; sort_order: number | null; }
+export interface RefRow { category: string; code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' | 'per_unit'; is_enabled: boolean; sort_order: number | null; direction: 'issued' | 'received' | 'entity' | null; }
 export interface DocTypeSetting { code: string; enabled: boolean; default_income_classification_type: string | null; default_income_classification_category: string | null; default_withholding_code: string | null; }
 export interface DocSeries { id: string; doc_code: string; series: string; next_number: number; is_active: boolean; branch_id: string | null; sales_channel: string | null; }
 export interface FinanceBranch {

@@ -139,10 +139,27 @@ describe('a P&L figure carries the verdict on itself', () => {
   });
 
   it('every booking state the view can emit has copy that names why', () => {
-    for (const s of ['bookable', 'booked', 'dismissed', 'cancelled', 'settled_outside', 'payroll', 'credit_note', 'no_value', 'out_of_scope']) {
+    for (const s of ['bookable', 'booked', 'dismissed', 'cancelled', 'settled_outside', 'payroll', 'own_entity', 'credit_note', 'no_value', 'out_of_scope']) {
       expect(bookingStateCopy(s).label, `${s} needs a label`).toBeTruthy();
       expect(bookingStateCopy(s).detail.length, `${s} needs a reason`).toBeGreaterThan(10);
     }
+  });
+});
+
+describe("AADE's document table has two halves and the platform holds both", () => {
+  it('an entity books entry is not called payroll', () => {
+    expect(bookingStateCopy('own_entity').detail).not.toEqual(bookingStateCopy('payroll').detail);
+    expect(bookingStateCopy('own_entity').detail).toMatch(/regularisation|depreciation/i);
+  });
+
+  it('the document-type picker offers only what you ISSUE', () => {
+    expect(strippedSource('src/modules/finance/components/DocumentSetupCard.tsx'))
+      .toMatch(/direction === 'issued'/);
+  });
+
+  it('and a reference row carries which half it is', () => {
+    expect(strippedSource('src/services/invoicingSetupService.ts'))
+      .toMatch(/direction: 'issued' \| 'received' \| 'entity' \| null/);
   });
 });
 
