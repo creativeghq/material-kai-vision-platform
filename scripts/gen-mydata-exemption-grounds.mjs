@@ -1,11 +1,9 @@
 /**
  * Extract §8.3 "Κατηγορία Αιτίας Εξαίρεσης ΦΠΑ", column «Αιτία Εξαίρεσης (ν. 5144/2024)», from
  * AADE's ERP spec into `src/lib/mydataExemptionGrounds.generated.json`.
- *
  * The spec PDF is gitignored (4 MB), so a guard that only reads it is inert in CI — which is
  * exactly where a wrong legal citation would otherwise ship. This commits the table; where the
  * PDF IS present, tests/unit/mydataExemptionCategories.test.ts checks this file against it.
- *
  * Run: npm run mydata:exemptions
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';

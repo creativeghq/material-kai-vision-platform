@@ -40,6 +40,7 @@
     "probe:live": "node scripts/probe-live-frontend.mjs",
     "prune:vercel": "node scripts/prune-vercel-deployments.mjs",
     "mydata:exemptions": "node scripts/gen-mydata-exemption-grounds.mjs",
+    "mydata:invoice-types": "node scripts/gen-mydata-invoice-types.mjs",
     "api:catalog": "node scripts/gen-platform-api-catalog.mjs",
     "rpc:catalog": "node scripts/gen-platform-rpc-catalog.mjs"
   },

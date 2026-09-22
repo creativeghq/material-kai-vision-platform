@@ -1,9 +1,10 @@
 /** myDATA document-family vocabulary guard. */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import { MYDATA_TYPE_FAMILY } from '@/modules/finance/mydataDocumentTypes';
+import AADE from '@/lib/mydataInvoiceTypes.generated.json';
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ['src/modules/finance', 'src/modules/myaade', 'src/components/business'];
@@ -21,15 +22,10 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** AADE's own enumeration, read out of the spec rather than restated here. */
-const AADE_FAMILIES = (() => {
-  const xsd = readFileSync(join(ROOT, 'src/modules/myaade/AadeSpec/xsd/SimpleTypes-v2.0.1.xsd'), 'utf8');
-  const at = xsd.indexOf('InvoiceType');
-  const block = xsd.slice(at, at + 12_000);
-  const codes = [...block.slice(0, block.indexOf('</xs:restriction>')).matchAll(/<xs:enumeration value="([0-9.]+)"/g)]
-    .map((m) => m[1]);
-  return { codes, families: [...new Set(codes.map((c) => c.split('.')[0]))] };
-})();
+/** AADE's own enumeration, committed by `npm run mydata:invoice-types` and re-checked below. */
+const SPEC = join(ROOT, 'src/modules/myaade/AadeSpec/xsd/SimpleTypes-v2.0.1.xsd');
+const HAVE_SPEC = existsSync(SPEC);
+const AADE_FAMILIES = { codes: AADE.codes as string[], families: AADE.families as string[] };
 
 describe('myDATA family labels', () => {
   it('finds AADE’s enumeration, and the map (guards against a vacuous pass)', () => {
@@ -56,8 +52,6 @@ describe('myDATA family labels', () => {
   });
 
   it('names every family AADE enumerates, not the income half only', () => {
-    // This was a hand-kept list of nine and AADE has seventeen, so 16.1 rent rendered as
-    // "myDATA type 16.1" and had no name anywhere in the product.
     const missing = AADE_FAMILIES.families.filter((f) => !MYDATA_TYPE_FAMILY[f]);
     expect(missing, `no label for AADE families ${missing.join(', ')}`).toEqual([]);
   });
@@ -65,6 +59,15 @@ describe('myDATA family labels', () => {
   it('and invents none AADE does not have', () => {
     const extra = Object.keys(MYDATA_TYPE_FAMILY).filter((f) => !AADE_FAMILIES.families.includes(f));
     expect(extra, `families AADE does not enumerate: ${extra.join(', ')}`).toEqual([]);
+  });
+
+  it.skipIf(!HAVE_SPEC)('and the committed copy still matches the XSD it came from', () => {
+    const xsd = readFileSync(SPEC, 'utf8');
+    const at = xsd.indexOf('InvoiceType');
+    const block = xsd.slice(at, at + 12_000);
+    const codes = [...block.slice(0, block.indexOf('</xs:restriction>'))
+      .matchAll(/<xs:enumeration value="([0-9.]+)"/g)].map((m) => m[1]);
+    expect(AADE_FAMILIES.codes, 'run npm run mydata:invoice-types').toEqual(codes);
   });
 
   it('names the expense half as expense', () => {
