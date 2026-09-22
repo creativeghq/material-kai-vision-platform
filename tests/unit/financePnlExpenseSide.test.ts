@@ -343,6 +343,44 @@ describe('planning is two questions, and both can be acted on', () => {
     expect(dlg, 'currency is fixed on edit').toMatch(/onValueChange=\{setCurrency\} disabled=\{isEdit\}/);
   });
 
+  it('an expense is payable in one click wherever it is listed', () => {
+    // The dialog was shared everywhere; the BUTTON was not. On an order, paying an attached
+    // expense meant opening its ledger first — two clicks and a dialog hop from the row that
+    // names it — while Payables and Planning paid in one.
+    const orders = strippedSource('src/modules/finance/components/OrdersPanel.tsx');
+    expect(orders, 'the expense row pays directly').toMatch(/setPayInOpen\(\{ amount: Number\(b\.amount_due\), expenseId: b\.id \}\)/);
+  });
+
+  it('settling one expense is not order-scoped, or it cannot settle anything', () => {
+    // RecordPaymentDialog gates its expense list on `payingExpense && !orderId &&
+    // !presetInvoiceId` on purpose: an order context is customer-scoped, and a supplier cost
+    // inside it attaches money to the wrong side. Passed both, it loaded NO expenses — the
+    // picker was empty and Save bounced on "Pick the expense" with nothing to pick.
+    const dlg = strippedSource('src/modules/finance/components/RecordPaymentDialog.tsx');
+    expect(dlg, 'the gate this depends on').toMatch(/allowExpense = payingExpense && !orderId && !presetInvoiceId/);
+
+    const orders = strippedSource('src/modules/finance/components/OrdersPanel.tsx');
+    // The expense branch must carry presetExpenseId and NOT orderId / presetInvoiceId.
+    const branch = orders.slice(orders.indexOf('payInOpen?.expenseId'), orders.indexOf('{connectEmailGate}'));
+    const expenseBranch = branch.slice(0, branch.indexOf(': {'));
+    expect(expenseBranch, 'the expense branch targets the bill').toMatch(/presetExpenseId: payInOpen\.expenseId/);
+    expect(expenseBranch, 'and drops the order scope').not.toMatch(/orderId:/);
+    expect(expenseBranch, 'and the invoice scope').not.toMatch(/presetInvoiceId:/);
+    // The order's party is the CUSTOMER on a sales order — the wrong payee for money going out.
+    expect(expenseBranch, 'the payee comes from the bill').toMatch(/initialCounterparty: null/);
+  });
+
+  it('sendPayment has exactly one caller — the shared payment form', () => {
+    // A second payout path is a second place for the rules about who may move money, and for the
+    // FX and allocation guards, to live.
+    const callers = INDEX.stripped()
+      .filter(([f]) => !posix(f).endsWith('services/payoutService.ts'))
+      .filter(([, src]) => /\bsendPayment\(/.test(src))
+      .map(([f]) => posix(f));
+    expect(callers, `unexpected payout callers:\n${callers.join('\n')}`)
+      .toEqual(['src/modules/finance/components/RecordPaymentDialog.tsx']);
+  });
+
   it('paying for real reuses the one payment form, not a second payout path', () => {
     const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
     expect(tab, 'the shared dialog carries the send-or-record choice').toMatch(/<RecordPaymentDialog/);

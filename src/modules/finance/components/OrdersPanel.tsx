@@ -6,7 +6,7 @@ import { FINANCE_BASE, ORDERS_FILTER_KEY } from '@/modules/finance/routes';
 import { AllocateProfitDialog } from '@/modules/finance/components/AllocateProfitDialog';
 import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent, TrendingUp } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent, TrendingUp, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -1707,7 +1707,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // open, and the Payments list showed cash that never said what it paid for.
   const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
   // Money-in modal (received / customer refund). `{ amount }` seeds it; null = closed.
-  const [payInOpen, setPayInOpen] = useState<{ amount?: number } | null>(null);
+  // `expenseId` targets ONE attached expense rather than the order: paying a supplier bill used
+  // to mean opening its ledger first, while Payables and Planning pay in one click.
+  const [payInOpen, setPayInOpen] = useState<{ amount?: number; expenseId?: string } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
   /** Which edit-row has the KB price drawer open (#347 phase 5.3). */
@@ -4111,6 +4113,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     </button>
                     <span className="flex items-center gap-2">
                       <span className="tabular-nums">{formatMoney(Number(b.total), b.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(b.amount_due), b.currency)}</span></span>
+                      {/* Nothing still due means nothing to pay: absent, not inert. */}
+                      {Number(b.amount_due) > 0.005 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                          title="Pay this expense — bank transfer, Revolut, or just record it"
+                          onClick={() => setPayInOpen({ amount: Number(b.amount_due), expenseId: b.id })}
+                        >
+                          <Wallet className="h-3 w-3" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -4681,18 +4695,34 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         workspaceId={order.workspace_id}
         open={!!payInOpen}
         onOpenChange={(o) => { if (!o) setPayInOpen(null); }}
-        orderId={order.id}
-        orderLabel={order.order_number ?? undefined}
-        side={order.order_type === 'purchase' ? 'supplier' : 'customer'}
-        initialCounterparty={order.order_type === 'purchase'
-          ? { companyId: order.supplier_company_id, contactId: order.supplier_contact_id }
-          : { companyId: order.customer_company_id, contactId: order.customer_contact_id }}
-        // The ORDER's currency. Without this the dialog reset to EUR and record_payment_fx
-        // silently refused to allocate the remainder onto a non-EUR order.
-        orderCurrency={order.currency}
-        payableBills={(fin?.supplierBills ?? []).filter((b) => Number(b.amount_due) > 0)}
-        defaultAmount={payInOpen?.amount}
-        presetInvoiceId={order.order_type === 'sales' ? (fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id : undefined}
+        {...(payInOpen?.expenseId
+          /**
+           * The expense flow refuses to be order-scoped — `allowExpense` is
+           * `payingExpense && !orderId && !presetInvoiceId` — so passing both loaded NO expenses
+           * and Save bounced on "Pick the expense" with nothing to pick. The bill keeps its own
+           * `order_id`; the party comes from it, not from this order's customer.
+           */
+          ? {
+            presetExpenseId: payInOpen.expenseId,
+            defaultAmount: payInOpen.amount,
+            initialCounterparty: null,
+          }
+          : {
+            orderId: order.id,
+            orderLabel: order.order_number ?? undefined,
+            side: order.order_type === 'purchase' ? ('supplier' as const) : ('customer' as const),
+            initialCounterparty: order.order_type === 'purchase'
+              ? { companyId: order.supplier_company_id, contactId: order.supplier_contact_id }
+              : { companyId: order.customer_company_id, contactId: order.customer_contact_id },
+            // The ORDER's currency. Without this the dialog reset to EUR and record_payment_fx
+            // silently refused to allocate the remainder onto a non-EUR order.
+            orderCurrency: order.currency,
+            payableBills: (fin?.supplierBills ?? []).filter((b) => Number(b.amount_due) > 0),
+            defaultAmount: payInOpen?.amount,
+            presetInvoiceId: order.order_type === 'sales'
+              ? (fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id
+              : undefined,
+          })}
         onSaved={() => { setPayInOpen(null); void load(order.id); onChanged(); }}
       />
     )}
