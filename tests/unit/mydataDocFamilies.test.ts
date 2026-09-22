@@ -2,12 +2,13 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
+import { stripComments } from '../helpers/stripComments';
+import { MYDATA_TYPE_FAMILY } from '@/modules/finance/mydataDocumentTypes';
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ['src/modules/finance', 'src/modules/myaade', 'src/components/business'];
 /** The one file allowed to hold the family→label map. */
-const CANONICAL = 'src/modules/finance/components/mydataTypes.ts';
+const CANONICAL = 'src/modules/finance/mydataDocumentTypes.ts';
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];
@@ -20,27 +21,20 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Strip comments so prose describing the old bug doesn't trip the scanner. */
-function stripComments(src: string): string {
-  return sharedStripComments(src);
-}
-
-/**
- * Read the map out of the source rather than importing it. `mydataTypes.ts` pulls in
- * `invoicingSetupService` → the Supabase browser client, which throws without env vars; a
- * vocabulary guard must not need a configured backend to run.
- */
-function readFamilyMap(): Record<string, string> {
-  const src = stripComments(readFileSync(join(ROOT, CANONICAL), 'utf8'));
-  const block = src.match(/export const MYDATA_TYPE_FAMILY[^{]*\{([\s\S]*?)\};/)?.[1];
-  if (!block) throw new Error('MYDATA_TYPE_FAMILY literal not found in ' + CANONICAL);
-  return Object.fromEntries([...block.matchAll(/'(\d+)'\s*:\s*'([^']*)'/g)].map((m) => [m[1], m[2]]));
-}
-
-const MYDATA_TYPE_FAMILY = readFamilyMap();
+/** AADE's own enumeration, read out of the spec rather than restated here. */
+const AADE_FAMILIES = (() => {
+  const xsd = readFileSync(join(ROOT, 'src/modules/myaade/AadeSpec/xsd/SimpleTypes-v2.0.1.xsd'), 'utf8');
+  const at = xsd.indexOf('InvoiceType');
+  const block = xsd.slice(at, at + 12_000);
+  const codes = [...block.slice(0, block.indexOf('</xs:restriction>')).matchAll(/<xs:enumeration value="([0-9.]+)"/g)]
+    .map((m) => m[1]);
+  return { codes, families: [...new Set(codes.map((c) => c.split('.')[0]))] };
+})();
 
 describe('myDATA family labels', () => {
-  it('parses the family map out of the canonical file', () => {
+  it('finds AADE’s enumeration, and the map (guards against a vacuous pass)', () => {
+    expect(AADE_FAMILIES.codes.length).toBeGreaterThan(40);
+    expect(AADE_FAMILIES.codes).toContain('16.1');
     expect(Object.keys(MYDATA_TYPE_FAMILY).length).toBeGreaterThan(5);
   });
 
@@ -61,12 +55,22 @@ describe('myDATA family labels', () => {
     expect(offenders, 'self-billing is invoices.self_pricing, not a document family').toEqual([]);
   });
 
-  it('keeps the families that mydata_reference actually carries', () => {
-    // Every family present in the reference table today. A code with no family label falls back
-    // to "Type N.x" in the picker, which is a worse but honest label — a WRONG one is the bug.
-    for (const fam of ['1', '2', '3', '5', '6', '7', '8', '9', '11']) {
-      expect(MYDATA_TYPE_FAMILY[fam], `family ${fam} lost its label`).toBeTruthy();
-    }
+  it('names every family AADE enumerates, not the income half only', () => {
+    // This was a hand-kept list of nine and AADE has seventeen, so 16.1 rent rendered as
+    // "myDATA type 16.1" and had no name anywhere in the product.
+    const missing = AADE_FAMILIES.families.filter((f) => !MYDATA_TYPE_FAMILY[f]);
+    expect(missing, `no label for AADE families ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('and invents none AADE does not have', () => {
+    const extra = Object.keys(MYDATA_TYPE_FAMILY).filter((f) => !AADE_FAMILIES.families.includes(f));
+    expect(extra, `families AADE does not enumerate: ${extra.join(', ')}`).toEqual([]);
+  });
+
+  it('names the expense half as expense', () => {
+    expect(MYDATA_TYPE_FAMILY['16']).toMatch(/rent/i);
+    expect(MYDATA_TYPE_FAMILY['15']).toMatch(/expense/i);
+    expect(MYDATA_TYPE_FAMILY['17'], '17.2-17.6 are not payroll').not.toMatch(/payroll/i);
   });
 });
 
@@ -93,6 +97,13 @@ describe('the family→label map has exactly one copy', () => {
       offenders,
       `import MYDATA_TYPE_FAMILY from ${CANONICAL} instead of re-declaring the labels`,
     ).toEqual([]);
+  });
+
+  it('and the module holding it stays import-free, so this test can load it', () => {
+    // It used to be read back out of the source with a regex, because the module that held it
+    // pulled the Supabase client and threw without env vars.
+    const src = readFileSync(join(ROOT, CANONICAL), 'utf8');
+    expect(src, `${CANONICAL} must import nothing`).not.toMatch(/^\s*import\s/m);
   });
 });
 
