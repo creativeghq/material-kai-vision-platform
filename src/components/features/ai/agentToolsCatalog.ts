@@ -1916,11 +1916,21 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'docs',
     name: 'Workspace Docs',
-    description: 'Search, write, and propose edits to your workspace\'s internal documents.',
+    description: 'Search, write, and propose edits to your workspace\'s internal documents, and fill in the audit and document templates you keep in the knowledge base.',
     icon: 'FileText',
-    tool_ids: ['search_workspace_docs', 'manage_docs'],
+    tool_ids: ['search_workspace_docs', 'manage_docs', 'document_templates'],
     quick_starts: [
       { label: 'Search docs', description: 'Find something in your docs', prompt: 'Search my workspace documents for…', icon: 'Search' },
+      {
+        label: 'Our templates', description: 'List the audit and document templates we keep', icon: 'ListChecks',
+        prompt: 'List the document templates we keep in Audits & Templates, with what each one is for.',
+        done: 'Here are the templates we keep.',
+        run: { tool: 'document_templates', fixedArgs: { action: 'list' } },
+      },
+      {
+        label: 'Fill in a template', description: 'Generate a document from one of our templates', icon: 'FileText',
+        prompt: 'Generate a document from one of our Audits & Templates templates — show me the list first, then fill the one I pick.',
+      },
       {
         label: 'Write a doc', description: 'Draft a new internal doc', icon: 'Plus',
         prompt: 'Write a workspace doc about…',

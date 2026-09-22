@@ -357,6 +357,21 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 ---
 
+## Audits & Templates — a category the agent writes FROM
+
+A doc filed in the `audits-templates` category is a blank form, not an answer. The agent reaches it
+through the `document_templates` tool (`_shared/tools/docs-tools.ts`), bound in the `docs` toolkit:
+
+- `list` — the published templates in that category. **An empty category returns `status:'no_templates'`, never an empty list**, so "we keep no template for this" cannot read as "the search missed it".
+- `read` — ONE template whole, plus `fields_to_fill` (every distinct `{{placeholder}}` in the body). `knowledge_base_search` returns ranked *excerpts*, which is the wrong shape for a form that has to be completed end to end — that is why this is a separate tool rather than a search with a category filter.
+- The tool writes nothing. The finished document is saved by `manage_docs action='create'` into `workspace_docs`, so there is still one writer for team documents.
+
+The category is addressed by slug, falling back to a name match on `audits%templates%`; when neither
+resolves, the tool returns `status:'category_missing'` naming where an admin creates it. Access is
+`access_level='agent'` with no `trigger_keyword` — agent-readable in every query, never on the public KB.
+
+---
+
 ## 📈 Metrics
 
 - **Database Tables:** 5 created

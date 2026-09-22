@@ -116,6 +116,7 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
     aliases: ['Admin → Background Agents'],
   },
   { id: 'admin-flows', breadcrumb: 'Admin → Flows', route: '/flows' },
+  { id: 'admin-knowledge-base', breadcrumb: 'Admin → Knowledge Base', route: '/admin/knowledge-base' },
 ];
 
 const BY_ID = new Map(APP_DESTINATIONS.map((d) => [d.id, d]));

@@ -563,6 +563,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'document_templates',
+    file: 'supabase/functions/_shared/tools/docs-tools.ts',
+    factory: 'createDocumentTemplatesTool',
+    description: 'The blank document templates and audit checklists this workspace keeps, in the "Audits & Templates" knowledge-base category.',
+    params: [
+      { name: 'action', type: 'enum', enum: ['list', 'read'], optional: true, description: 'list: what templates exist. read: fetch one whole to fill in.' },
+      { name: 'template_id', type: 'string', optional: true, description: 'read: the template_id from a list result.' },
+    ],
+  },
+  {
     name: 'email_validate',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createEmailValidateTool',

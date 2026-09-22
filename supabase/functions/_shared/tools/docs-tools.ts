@@ -1,4 +1,4 @@
-/** Docs module agent tool: search_workspace_docs. */
+/** Docs module agent tools: search_workspace_docs, manage_docs, document_templates. */
 
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../flow-events.ts';
 
@@ -154,6 +154,125 @@ export const createManageDocsTool = (userId: string, workspaceId: string, onChun
         doc_id: z.string().optional().describe('suggest_edit: the doc UUID to revise.'),
         proposed_content: z.string().optional().describe('suggest_edit: the full proposed markdown.'),
         reason: z.string().optional().describe('suggest_edit: why (optional).'),
+      }),
+    },
+  );
+};
+
+export const TEMPLATE_CATEGORY_SLUG = 'audits-templates';
+const TEMPLATE_BODY_LIMIT = 40000;
+
+const placeholdersIn = (body: string): string[] => {
+  const seen = new Set<string>();
+  for (const m of body.matchAll(/\{\{\s*([^}\n]+?)\s*\}\}/g)) if (m[1]) seen.add(m[1]);
+  return [...seen];
+};
+
+type TemplateCategory =
+  | { ok: true; id: string; name: string }
+  | { ok: false; payload: Record<string, unknown> };
+
+const resolveTemplateCategory = async (workspaceId: string): Promise<TemplateCategory> => {
+  const bySlug = await supabase.from('kb_categories')
+    .select('id, name').eq('workspace_id', workspaceId).eq('slug', TEMPLATE_CATEGORY_SLUG).maybeSingle();
+  if (bySlug.error) return { ok: false, payload: { found: false, status: 'lookup_failed', error: bySlug.error.message } };
+  if (bySlug.data) return { ok: true, id: bySlug.data.id, name: bySlug.data.name };
+
+  const byName = await supabase.from('kb_categories')
+    .select('id, name').eq('workspace_id', workspaceId).ilike('name', 'audits%templates%').limit(1).maybeSingle();
+  if (byName.data) return { ok: true, id: byName.data.id, name: byName.data.name };
+
+  return {
+    ok: false,
+    payload: {
+      found: false,
+      status: 'category_missing',
+      message: 'This workspace has no "Audits & Templates" knowledge-base category, so it keeps no document templates. '
+        + 'An admin creates it at /admin → Knowledge Base → Categories. Tell the user that; do not invent a template.',
+    },
+  };
+};
+
+export const createDocumentTemplatesTool = (workspaceId: string, onChunk?: (c: any) => void) => {
+  return tool(
+    async ({ action = 'list', template_id }: { action?: 'list' | 'read'; template_id?: string }) => {
+      try {
+        const cat = await resolveTemplateCategory(workspaceId);
+        if (!cat.ok) {
+          onChunk?.({ type: 'document_templates_list', templates: [], note: cat.payload.message, timestamp: Date.now() });
+          return JSON.stringify(cat.payload);
+        }
+
+        if (action === 'read') {
+          if (!template_id) {
+            return JSON.stringify({ found: false, status: 'bad_request', error: 'read needs template_id — call list first.' });
+          }
+          const { data, error } = await supabase.from('kb_docs')
+            .select('id, title, summary, content_markdown, content, updated_at')
+            .eq('id', String(template_id)).eq('workspace_id', workspaceId).eq('category_id', cat.id)
+            .maybeSingle();
+          if (error) return JSON.stringify({ found: false, status: 'lookup_failed', error: error.message });
+          if (!data) {
+            return JSON.stringify({
+              found: false, status: 'not_a_template',
+              error: `No template with that id in ${cat.name}. Call action="list" to see what is filed there.`,
+            });
+          }
+          const full = String(data.content_markdown || data.content || '');
+          const fields = placeholdersIn(full);
+          return JSON.stringify({
+            found: true,
+            status: 'ok',
+            template: { id: data.id, title: data.title, summary: data.summary || null, body: full.slice(0, TEMPLATE_BODY_LIMIT) },
+            truncated: full.length > TEMPLATE_BODY_LIMIT
+              ? `Body cut at ${TEMPLATE_BODY_LIMIT} of ${full.length} characters — say so rather than filling in the missing part.`
+              : null,
+            fields_to_fill: fields,
+            how_to_use: (fields.length
+              ? 'Fill EVERY name in fields_to_fill and leave no {{placeholder}} in the finished text. '
+              : 'This template carries no {{placeholders}} — follow its own headings and instructions. ')
+              + 'Look each value up with the tools you have; ask the user only for what nothing can answer, and never invent a figure or a date. '
+              + 'Then save the finished document with manage_docs action="create" — this tool does not write anything itself.',
+          });
+        }
+
+        const { data, error } = await supabase.from('kb_docs')
+          .select('id, title, summary, updated_at')
+          .eq('workspace_id', workspaceId).eq('category_id', cat.id).eq('status', 'published')
+          .order('title', { ascending: true });
+        if (error) {
+          onChunk?.({ type: 'document_templates_list', templates: [], note: `Could not read ${cat.name}: ${error.message}`, timestamp: Date.now() });
+          return JSON.stringify({ found: false, status: 'lookup_failed', error: error.message });
+        }
+
+        const rows = data ?? [];
+        const templates = rows.map((r) => ({ template_id: r.id, title: r.title, summary: r.summary || null, updated_at: r.updated_at }));
+        if (rows.length === 0) {
+          const message = `"${cat.name}" exists but holds no published template yet, so there is nothing to generate from. `
+            + 'Templates are filed there at Admin → Knowledge Base. Say that; do not write one from memory and call it ours.';
+          onChunk?.({ type: 'document_templates_list', category: cat.name, templates, note: message, timestamp: Date.now() });
+          return JSON.stringify({ found: false, status: 'no_templates', category: cat.name, message });
+        }
+        onChunk?.({ type: 'document_templates_list', category: cat.name, templates, timestamp: Date.now() });
+        return JSON.stringify({
+          found: true, status: 'ok', category: cat.name, templates,
+          next: 'Call action="read" with the template_id to get the full body and the list of fields to fill.',
+        });
+      } catch (e) {
+        return JSON.stringify({ found: false, status: 'failed', error: e instanceof Error ? e.message : 'document_templates failed' });
+      }
+    },
+    {
+      name: 'document_templates',
+      description:
+        'The blank document templates and audit checklists this workspace keeps, in the "Audits & Templates" knowledge-base category. '
+        + 'Use this whenever the user asks for a document we have a template for — an audit, a checklist, a report, a standard form — '
+        + 'instead of writing one from memory. list → what templates exist. read → ONE template whole, plus the fields it asks you to fill '
+        + '(knowledge_base_search returns ranked excerpts, which is the wrong shape for a form you have to complete end to end). '
+        + 'Fill it in, then save the result with manage_docs action="create". If the category is missing or empty, say so — never pass off an invented template as ours.',
+      schema: z.object({
+        action: z.enum(['list', 'read']).default('list').describe('list: what templates exist. read: fetch one whole to fill in.'),
+        template_id: z.string().optional().describe('read: the template_id from a list result.'),
       }),
     },
   );

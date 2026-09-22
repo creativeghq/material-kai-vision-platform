@@ -1008,6 +1008,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // the push site. Tenancy is safe either way: workspaceId is server-derived + the FTS is scoped.
       'search_workspace_docs',
       'manage_docs',
+      'document_templates',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
@@ -2021,7 +2022,7 @@ async function executeAgent(
   // Each module does top-level await for @langchain/core + zod.
   // Loading them at boot exceeds the 2s Supabase Edge Runtime limit.
   const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
-  const needsDocs = config.tools.includes('search_workspace_docs') || config.tools.includes('manage_docs');
+  const needsDocs = config.tools.includes('search_workspace_docs') || config.tools.includes('manage_docs') || config.tools.includes('document_templates');
   const needsRecordSearch = config.tools.includes('find_records');
   const needsPlatformApi = config.tools.some((t: string) => ['discover_platform_api', 'call_platform_api'].includes(t));
   const needsPlatformRpc = config.tools.some((t: string) => ['discover_platform_data', 'call_platform_rpc'].includes(t));
@@ -2147,6 +2148,7 @@ async function executeAgent(
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
   const createManageDocsTool = docsMod?.createManageDocsTool;
+  const createDocumentTemplatesTool = docsMod?.createDocumentTemplatesTool;
   const createSearchTool = searchMod?.createSearchTool;
   const createVisualSearchTool = searchMod?.createVisualSearchTool;
   const createKnowledgeBaseSearchTool = searchMod?.createKnowledgeBaseSearchTool;
@@ -2384,6 +2386,9 @@ async function executeAgent(
   }
   if (config.tools.includes('manage_docs') && createManageDocsTool) {
     tools.push(createManageDocsTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('document_templates') && createDocumentTemplatesTool) {
+    tools.push(createDocumentTemplatesTool(workspaceId, onChunk));
   }
 
   // CRM roster query — "which businesses have ΚΑΔ X?" (all users; workspace-scoped, free).

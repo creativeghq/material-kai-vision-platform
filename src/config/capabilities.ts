@@ -192,6 +192,7 @@ export const RESULT_SETUP_DESTINATION: Record<string, { destination: string; lab
   // Profile → Keys, so the card may as well BE the way there.
   embed_readiness_result: { destination: 'workspace-keys', label: 'Manage embed keys' },
   embed_overview_result: { destination: 'workspace-keys', label: 'Manage embed keys' },
+  document_templates_list: { destination: 'admin-knowledge-base', label: 'Add a template' },
 };
 
 /**

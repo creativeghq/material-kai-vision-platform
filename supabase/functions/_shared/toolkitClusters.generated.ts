@@ -79,7 +79,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['manage_company_assets'],
   },
   'docs': {
-    tool_ids: ['search_workspace_docs', 'manage_docs'],
+    tool_ids: ['search_workspace_docs', 'manage_docs', 'document_templates'],
   },
   'messaging': {
     tool_ids: ['manage_messaging'],
