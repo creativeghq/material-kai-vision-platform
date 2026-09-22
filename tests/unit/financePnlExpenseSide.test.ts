@@ -386,6 +386,40 @@ describe('planning is two questions, and both can be acted on', () => {
       .toEqual(['src/modules/finance/components/RecordPaymentDialog.tsx']);
   });
 
+  it('recording the money and closing the plan are one transaction', () => {
+    const svc = strippedSource('src/modules/finance/services/financeService.ts');
+    // Two client calls: the payment committed, the stamp failed, the screen said Failed, and the
+    // operator pressed the only button offered — paying the same supplier twice.
+    expect(svc, 'one RPC does both').toMatch(/rpc\('settle_planned_payment'/);
+    expect(svc, 'and the two-step is gone').not.toMatch(/markPlannedPaymentPaid/);
+    const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
+    expect(tab, 'both routes go through it').toMatch(/settlePlannedPayment\(row\.id\)/);
+    expect(tab, 'including after the shared form').toMatch(/existingPaymentId: result\.paymentId/);
+  });
+
+  it('a SENT transfer does not close a plan — there is no payment row yet', () => {
+    const dlg = strippedSource('src/modules/finance/components/RecordPaymentDialog.tsx');
+    // Revolut sends the money; the bank feed writes the payment when it lands. Reporting that as
+    // a settlement claims something the books cannot show.
+    expect(dlg, 'the send path hands back no payment id').toMatch(/sent: out\.mode !== 'draft' && !out\.duplicate/);
+    expect(dlg, 'a recorded payment hands its id back').toMatch(/onSaved\(\{ paymentId: recordedPaymentId \}\)/);
+    const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
+    expect(tab, 'and only an id closes the plan').toMatch(/if \(!result\?\.paymentId\)/);
+    // A draft has not left, and a duplicate never went. Three different facts, three sentences.
+    expect(tab, 'a draft says nothing has left').toMatch(/result\?\.draft/);
+    expect(tab, 'a duplicate says it was recognised').toMatch(/result\?\.duplicate/);
+    // Nothing reconciles the bank feed back to a plan yet, so the copy must not promise it will.
+    expect(tab, 'no promise that it closes itself').not.toMatch(/closes itself/);
+  });
+
+  it('a stale close is reported as the duplicate it is', () => {
+    const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
+    // `already_paid` after recording means the plan was closed by something else and the payment
+    // just made is attached to nothing — a duplicate, not a success.
+    expect(tab, 'the outcome is read, not ignored').toMatch(/res\.outcome === 'already_paid'/);
+    expect(tab, 'and reported destructively').toMatch(/check Payments for a duplicate/);
+  });
+
   it('paying for real reuses the one payment form, not a second payout path', () => {
     const tab = strippedSource('src/modules/finance/tabs/PlanningTab.tsx');
     expect(tab, 'the shared dialog carries the send-or-record choice').toMatch(/<RecordPaymentDialog/);

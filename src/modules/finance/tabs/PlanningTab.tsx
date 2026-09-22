@@ -18,7 +18,7 @@ import {
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { HubEmptyState, HubTabNav } from '@/components/core/hub';
 import { LineWorkQueueCard } from '@/modules/finance/components/LineWorkQueueCard';
-import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { RecordPaymentDialog, type PaymentSaveResult } from '@/modules/finance/components/RecordPaymentDialog';
 
 interface Props { workspaceId: string }
 
@@ -169,8 +169,10 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
   const markPaid = async (row: PlannedPayment) => {
     try {
       setMarkingId(row.id);
-      await financeService.markPlannedPaymentPaid(row);
-      toast({ title: 'Marked as paid', description: 'A payment record was created and allocated.' });
+      const res = await financeService.settlePlannedPayment(row.id);
+      toast(res.outcome === 'already_paid'
+        ? { title: 'Already settled', description: 'Nothing was recorded twice.' }
+        : { title: 'Marked as paid', description: 'The payment was recorded and allocated.' });
       await load();
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -180,18 +182,41 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
   };
 
   /**
-   * The payment is already recorded (possibly SENT) by the time this runs, so a failure leaves
-   * money moved and the plan open. Safe direction, but it must be said rather than swallowed.
-   *
-   * This path does not set `paid_payment_id` — the dialog does not hand the id back — so the
-   * plan↔payment link only exists on the Mark-paid route. The money and its allocation are
-   * recorded either way; it is the back-pointer that is missing.
+   * A transfer SENT through Revolut has no payment row yet — the bank feed writes one when it
+   * lands — so closing the plan now would claim a settlement the books cannot show. The plan
+   * stays open. Nothing reconciles the feed back to a plan yet, so the toast says to close it by
+   * hand rather than promising something that will not happen.
    */
-  const closePlanAfterPayment = async (row: PlannedPayment) => {
+  const closePlanAfterPayment = async (row: PlannedPayment, result?: PaymentSaveResult) => {
+    if (!result?.paymentId) {
+      const copy = result?.duplicate
+        ? { title: 'Already sent', description: `Revolut recognised this as a repeat. "${row.title}" is unchanged.` }
+        : result?.draft
+          ? { title: 'Draft created — nothing has left yet', description: `Approve it in the Revolut app. "${row.title}" stays open until then.` }
+          : result?.sent
+            ? {
+              title: 'Sent — the plan is still open',
+              description: `There is no payment record until the bank feed picks the transfer up. Close "${row.title}" with Mark paid once it lands.`,
+            }
+            : { title: 'Nothing was recorded', description: 'The plan is unchanged.' };
+      toast(copy);
+      await load();
+      return;
+    }
     try {
-      await financeService.updatePlannedPayment(row.id, { status: 'paid' } as never);
-      toast({ title: 'Paid', description: `${row.title} is settled and closed.` });
+      const res = await financeService.settlePlannedPayment(row.id, { existingPaymentId: result.paymentId });
+      // `already_paid` means the plan was closed by something else and this payment is NOT
+      // attached to it — a second payment against a stale list, which must not read as success.
+      toast(res.outcome === 'already_paid'
+        ? {
+          title: 'The plan was already settled',
+          description: `The payment you just recorded is NOT attached to "${row.title}" — check Payments for a duplicate.`,
+          variant: 'destructive' as const,
+        }
+        : { title: 'Paid', description: `${row.title} is settled and closed.` });
     } catch (err: any) {
+      // The money is already recorded, so a failure here leaves the plan open beside a real
+      // payment. Safe direction, but it must be said rather than swallowed.
       toast({
         title: 'Payment recorded — the plan is still open',
         description: `Close "${row.title}" by hand: ${err?.message ?? 'the plan could not be updated'}`,
@@ -336,7 +361,7 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
             contactId: payRow.counterparty_contact_id,
           }}
           onOpenChange={(v) => { if (!v) setPayRow(null); }}
-          onSaved={async () => { await closePlanAfterPayment(payRow); setPayRow(null); }}
+          onSaved={async (res) => { await closePlanAfterPayment(payRow, res); setPayRow(null); }}
         />
       )}
     </div>

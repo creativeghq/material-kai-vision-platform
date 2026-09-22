@@ -3506,30 +3506,29 @@ const _financeServiceV2 = {
   },
 
   /** Mark a planned_payment as paid by creating a real payment + flipping the flag. */
-  async markPlannedPaymentPaid(planned: PlannedPayment, method: PaymentMethod = 'bank_transfer'): Promise<void> {
-    const paymentId = await _financeServiceCore.recordPayment({
-      workspaceId: planned.workspace_id,
-      direction: planned.direction,
-      amount: planned.amount,
-      currency: planned.currency,
-      method,
-      counterpartyCompanyId: planned.counterparty_company_id,
-      counterpartyContactId: planned.counterparty_contact_id,
-      reference: planned.title,
-      notes: planned.notes ?? null,
-      // If linked to a supplier_bill or invoice, allocate the full amount to it
-      allocations: planned.supplier_bill_id
-        ? [{ target_id: planned.supplier_bill_id, target_type: 'supplier_bill', amount: planned.amount }]
-        : planned.invoice_id
-          ? [{ target_id: planned.invoice_id, target_type: 'invoice', amount: planned.amount }]
-          : [],
+  /**
+   * Record the money AND close the plan, in one server transaction. This was two client calls:
+   * the payment committed, the stamp failed, the screen said Failed, and the operator pressed
+   * the only button offered - paying the same supplier twice.
+   *
+   * Pass `existingPaymentId` when the money was already recorded through RecordPaymentDialog —
+   * the call is then only the stamp. Omitting it records a SECOND payment.
+   */
+  async settlePlannedPayment(
+    planId: string,
+    opts: { method?: PaymentMethod; bankAccountId?: string | null; paidOn?: string | null; existingPaymentId?: string | null } = {},
+  ): Promise<{ payment_id: string | null; outcome: string }> {
+    const { data, error } = await (supabase as any).rpc('settle_planned_payment', {
+      p_plan_id: planId,
+      p_method: opts.method ?? 'bank_transfer',
+      p_bank_account_id: opts.bankAccountId ?? null,
+      p_paid_on: opts.paidOn ?? null,
+      p_existing_payment_id: opts.existingPaymentId ?? null,
     });
-    const { error } = await supabase
-      .from('planned_payments')
-      .update({ status: 'paid', paid_payment_id: paymentId })
-      .eq('id', planned.id);
     if (error) throw error;
+    return ((data ?? [])[0] ?? { payment_id: null, outcome: 'unknown' });
   },
+
 
   // -------- Parties --------
 

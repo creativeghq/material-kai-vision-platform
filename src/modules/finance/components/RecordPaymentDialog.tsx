@@ -34,11 +34,25 @@ import { todayLocalISO } from '@/utils/datetime';
 // customer-side types are not reachable when side='supplier'.
 type Kind = 'received' | 'refund' | 'expense' | 'supplier';
 
+/**
+ * What the save actually produced. `sent` means the money left through Revolut and there is NO
+ * payment row yet — the bank feed writes one when the transfer lands — so a caller must not treat
+ * it as a settled document. Only `paymentId` is evidence that something was recorded.
+ */
+export interface PaymentSaveResult {
+  paymentId?: string | null;
+  sent?: boolean;
+  /** A Revolut DRAFT still needs approving in their app - nothing has left yet. */
+  draft?: boolean;
+  /** The provider recognised this as a repeat and did not send it again. */
+  duplicate?: boolean;
+}
+
 export const RecordPaymentDialog: React.FC<{
   workspaceId: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onSaved: () => void;
+  onSaved: (result?: PaymentSaveResult) => void;
   /** Tie the payment to a specific party when there's no allocation target
    *  (e.g. opened from a CRM party page → records as customer credit). */
   initialCounterparty?: { contactId?: string | null; companyId?: string | null } | null;
@@ -463,7 +477,12 @@ export const RecordPaymentDialog: React.FC<{
               ? 'Approve it in the Revolut app to execute it. The bank feed will record it once it does.'
               : 'The bank feed will record it — and settle what it pays — once the transfer lands.'),
         });
-        onSaved(); onOpenChange(false);
+        onSaved({
+          sent: out.mode !== 'draft' && !out.duplicate,
+          draft: out.mode === 'draft',
+          duplicate: out.duplicate,
+        });
+        onOpenChange(false);
       } catch (e) {
         toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' });
       } finally {
@@ -480,7 +499,7 @@ export const RecordPaymentDialog: React.FC<{
       // creates a second payable for the same document.
       if (kind === 'expense' && selectedOption) {
         const billId = selectedOption.expense.id;
-        await financeService.paySupplierBill({
+        const recordedPaymentId = await financeService.paySupplierBill({
           workspaceId,
           supplierBillId: billId,
           amount: amt,
@@ -496,7 +515,7 @@ export const RecordPaymentDialog: React.FC<{
           title: 'Payment recorded',
           description: amt >= selectedOption.due ? 'The expense is settled.' : 'The expense is partly paid.',
         });
-        onSaved(); onOpenChange(false);
+        onSaved({ paymentId: recordedPaymentId }); onOpenChange(false);
         return;
       }
 
@@ -562,7 +581,7 @@ export const RecordPaymentDialog: React.FC<{
         counterpartyContactId = initialCounterparty.contactId ?? null;
       }
 
-      await financeService.recordPayment({
+      const recordedPaymentId = await financeService.recordPayment({
         workspaceId,
         direction,
         amount: amt,
@@ -623,7 +642,7 @@ export const RecordPaymentDialog: React.FC<{
           description: creditNoteRef ? 'Credit note issued to myDATA and the cash-out logged.' : undefined,
         });
       }
-      onSaved(); onOpenChange(false);
+      onSaved({ paymentId: recordedPaymentId }); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
