@@ -7,7 +7,7 @@
  * actually has; option lists with no fixed enum are derived from the loaded rows so they
  * carry live counts.
  */
-import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
+import { Building2, CalendarDays, Coins, FileText, Receipt, Tags } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
 import { expenseKindCopy, vatTreatmentCopy, originLabel } from '@/modules/finance/expenseSegments';
@@ -231,10 +231,18 @@ export function buildDocumentFilters(
               accessor: (r) => r.status,
             },
             {
-              key: 'doc_type', type: 'multi', label: 'Document type',
-              options: mydataTypeOptions(rows, (r) => r.doc_type, mydataTypes),
-              accessor: (r) => r.doc_type,
+              // The actionable one. A document with no nameable lines cannot be received to
+              // warehouse or extracted into products, and 1,161 of the 1,769 rows here are in
+              // that state — thin 2.x service billing as much as foreign purchases.
+              key: 'lines_source', type: 'multi', label: 'Detail',
+              options: optionsFromRows(rows, (r) => r.lines_source ?? 'none', inboundDetailLabel),
+              accessor: (r) => r.lines_source ?? 'none',
             },
+          ],
+        },
+        {
+          key: 'kind', label: 'Kind & VAT', icon: Receipt,
+          fields: [
             {
               key: 'expense_kind', type: 'multi', label: 'Expense kind',
               options: optionsFromRows(rows, (r) => r.expense_kind, (k) => expenseKindCopy(k).label),
@@ -251,33 +259,27 @@ export function buildDocumentFilters(
               accessor: (r) => r.origin,
             },
             {
-              // The split between what suppliers filed against us and what WE typed into myAADE
-              // (every foreign purchase, plus rent and payroll). Deliberately a FILTER and not a
-              // second tab: once a 14.x has lines it is the same object as a 1.1 to everything
-              // downstream, and a provenance tab would partition the work queue by the wrong axis
-              // — the operator's question is "what still needs me", not "who transmitted this".
-              key: 'source', type: 'multi', label: 'Source',
-              options: optionsFromRows(rows, (r) => r.source ?? 'mydata', inboundSourceLabel),
-              accessor: (r) => r.source ?? 'mydata',
-            },
-            {
-              // The actionable one. A document with no nameable lines cannot be received to
-              // warehouse or extracted into products, and 1,161 of the 1,769 rows here are in
-              // that state — thin 2.x service billing as much as foreign purchases.
-              key: 'lines_source', type: 'multi', label: 'Detail',
-              options: optionsFromRows(rows, (r) => r.lines_source ?? 'none', inboundDetailLabel),
-              accessor: (r) => r.lines_source ?? 'none',
+              key: 'doc_type', type: 'multi', label: 'AADE document type',
+              options: mydataTypeOptions(rows, (r) => r.doc_type, mydataTypes),
+              accessor: (r) => r.doc_type,
             },
           ],
         },
         {
-          key: 'classification', label: 'Classification', icon: Tags,
+          key: 'classification', label: 'Supplier', icon: Building2,
           fields: [
-            { key: 'category', type: 'multi', label: 'Category', options: categoryOptions(categories), accessor: (r) => r.category_id ?? undefined },
             {
               key: 'issuer', type: 'multi', label: 'Issuer',
               options: optionsFromRows(rows, (r) => r.issuer_name),
               accessor: (r) => r.issuer_name,
+            },
+            { key: 'category', type: 'multi', label: 'Category', options: categoryOptions(categories), accessor: (r) => r.category_id ?? undefined },
+            {
+              // What suppliers filed against us, versus what WE typed into myAADE — every
+              // foreign purchase, plus rent and payroll.
+              key: 'source', type: 'multi', label: 'Source',
+              options: optionsFromRows(rows, (r) => r.source ?? 'mydata', inboundSourceLabel),
+              accessor: (r) => r.source ?? 'mydata',
             },
           ],
         },

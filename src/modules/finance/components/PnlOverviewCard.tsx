@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { formatMoney } from '@/utils/decimal';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { vatPayableLabel } from '@/modules/finance/vatReturn';
+import { byVatTreatment, type ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
 import { aadeVerdict, booksVerdict, type PnlVerdict } from '@/modules/finance/pnlStatus';
 import type { PnlOverview } from '@/modules/finance/services/financeService';
 
@@ -51,6 +52,7 @@ const Figure: React.FC<{
 
 interface Props {
   overview: PnlOverview | null;
+  segments?: ExpenseSegmentRow[] | null;
   periodLabel: string;
   loading?: boolean;
   error?: string | null;
@@ -62,7 +64,8 @@ interface Props {
  * ΑΑΔΕ book CONFIRMS our figures or contradicts them, and folding it in would produce a total no
  * document backs. Where they disagree the difference is stated, not reconciled away.
  */
-export const PnlOverviewCard: React.FC<Props> = ({ overview, periodLabel, loading, error, onRetry }) => {
+export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLabel, loading, error, onRetry }) => {
+  const expenseMix = segments ? byVatTreatment(segments) : null;
   if (error) {
     return (
       <Card>
@@ -179,6 +182,36 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, periodLabel, loadin
                   : undefined}
               />
             </div>
+            {expenseMix && expenseMix.length > 0 && (
+              <div className="border-t border-hairline px-5 py-4">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  What the expenses are made of
+                </p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {expenseMix.map((g) => (
+                    <div key={g.treatment} title={g.detail}>
+                      <p className="text-xs font-medium">{g.label}</p>
+                      <p className="mt-0.5 text-base font-semibold tabular-nums">{formatMoney(g.net, 'EUR')}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {g.docs.toLocaleString()} document{g.docs === 1 ? '' : 's'}
+                        {g.vat > 0 ? ` · ${formatMoney(g.vat, 'EUR')} VAT` : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Received documents, whether or not they are booked yet. Rent and your own
+                  entries carry no VAT at all; a reverse-charged purchase states VAT you declare
+                  and reclaim in the same return.
+                </p>
+              </div>
+            )}
+            {segments === null && (
+              <p className="border-t border-hairline px-5 py-3 text-[11px] text-amber-800 dark:text-amber-300">
+                The make-up of the expenses could not be read. That is not a statement that every
+                expense carried VAT.
+              </p>
+            )}
             <p className="flex flex-wrap items-center gap-x-2 border-t border-hairline bg-surface-sunken px-5 pb-3 text-[11px] text-muted-foreground">
               <span>Every document filed against your ΑΦΜ. It confirms your books — it is never added to them.</span>
               <Link to={financeTabUrl(FINANCE_TAB.mydataBook)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">

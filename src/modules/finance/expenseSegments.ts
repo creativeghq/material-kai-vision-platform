@@ -67,6 +67,36 @@ export function sortExpenseSegments(rows: ExpenseSegmentRow[]): ExpenseSegmentRo
   });
 }
 
+const TREATMENT_ORDER: VatTreatment[] = ['standard', 'reverse_charge', 'zero_rated', 'no_vat', 'none'];
+
+export interface VatTreatmentGroup {
+  treatment: VatTreatment;
+  label: string;
+  detail: string;
+  net: number;
+  vat: number;
+  docs: number;
+}
+
+/**
+ * The expense side by how VAT was treated. Anything that is not an expense at all is dropped,
+ * so the groups add up to the expenses and not to the inbox.
+ */
+export function byVatTreatment(rows: ExpenseSegmentRow[]): VatTreatmentGroup[] {
+  const at = new Map<VatTreatment, VatTreatmentGroup>();
+  for (const r of rows) {
+    if (!r.in_pnl) continue;
+    const copy = vatTreatmentCopy(r.vat_treatment);
+    const g = at.get(r.vat_treatment)
+      ?? { treatment: r.vat_treatment, label: copy.label, detail: copy.detail, net: 0, vat: 0, docs: 0 };
+    g.net += r.net; g.vat += r.vat; g.docs += r.docs;
+    at.set(r.vat_treatment, g);
+  }
+  return [...at.values()].sort(
+    (a, b) => TREATMENT_ORDER.indexOf(a.treatment) - TREATMENT_ORDER.indexOf(b.treatment),
+  );
+}
+
 export interface ExpenseSegmentTotals {
   docs: number; net: number;
   inPnlNet: number;

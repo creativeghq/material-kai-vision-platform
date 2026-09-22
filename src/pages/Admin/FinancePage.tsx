@@ -89,6 +89,8 @@ import SupplierPortalPage from '@/pages/SupplierPortalPage';
 import { FileText, FileMinus, Banknote, PackageCheck, ShoppingCart, Pencil, Layers, CheckCircle2 } from 'lucide-react';
 import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
+import { inboundService } from '@/modules/finance/services/inboundService';
+import type { ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
 import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -191,6 +193,7 @@ const FinancePage: React.FC = () => {
   // The P&L proper. `pnl` above is `get_monthly_pnl` - gross margin, no operating expense in it.
   const [pnlOverview, setPnlOverview] = useState<PnlOverview | null>(null);
   const [pnlMonths, setPnlMonths] = useState<PnlMonthRow[]>([]);
+  const [pnlSegments, setPnlSegments] = useState<ExpenseSegmentRow[] | null>(null);
   // Its OWN flag: loadInsights catches to [] and settles first, so sharing its flag showed the
   // cards as loaded - every tile "Unknown" - while these two reads were still in flight.
   const [pnlLoading, setPnlLoading] = useState(true);
@@ -290,17 +293,20 @@ const FinancePage: React.FC = () => {
     setPnlOverview(null);
     setPnlMonths([]);
     try {
-      const [overview, months] = await Promise.all([
+      const [overview, months, segments] = await Promise.all([
         financeService.getPnlOverview(wsId, from, to),
         financeService.getPnlMonthly(wsId, from, to),
+        inboundService.expenseSegments(wsId, from, to).catch(() => null),
       ]);
       setPnlOverview(overview);
       setPnlMonths(months);
+      setPnlSegments(segments);
       setPnlError(null);
     } catch (err) {
       console.error('[finance] P&L unavailable', err);
       setPnlOverview(null);
       setPnlMonths([]);
+      setPnlSegments(null);
       setPnlError(err instanceof Error ? err.message : String(err));
     } finally {
       setPnlLoading(false);
@@ -666,6 +672,7 @@ const FinancePage: React.FC = () => {
 
             <PnlOverviewCard
               overview={pnlOverview}
+              segments={pnlSegments}
               periodLabel={DASH_PERIOD_LABEL[dashPeriod]}
               loading={pnlLoading}
               error={pnlError}

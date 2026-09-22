@@ -52,7 +52,7 @@ describe('the dashboard P&L includes expenses', () => {
     const suppliers = strippedSource('src/modules/finance/tabs/ExpenseSuppliersTab.tsx');
     expect(suppliers, 'booking sits with filing').toMatch(/<ExpenseBacklogCard/);
     const docs = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
-    expect(docs, 'the Expenses tab states what is in the inbox').toMatch(/<ExpenseSegmentsCard/);
+    expect(docs, 'the Expenses tab states what is in the inbox').toMatch(/<ExpenseSegmentsDialog/);
     expect(strippedSource(DASHBOARD), 'and the dashboard does not repeat it')
       .not.toMatch(/<ExpenseBacklogCard/);
   });
@@ -147,7 +147,7 @@ describe('a P&L figure carries the verdict on itself', () => {
 });
 
 describe('every kind of expense is visible, and says whether the P&L has it', () => {
-  const card = strippedSource('src/modules/finance/components/ExpenseSegmentsCard.tsx');
+  const card = strippedSource('src/modules/finance/components/ExpenseSegmentsDialog.tsx');
   const filters = strippedSource('src/modules/finance/components/documentFilters.ts');
 
   it('segments come from SQL — the pane never decides what kind a document is', () => {
@@ -168,6 +168,30 @@ describe('every kind of expense is visible, and says whether the P&L has it', ()
     // not a state they can be in — showing them as outstanding work would be a queue nobody
     // can clear.
     expect(card).toMatch(/expense_kind === 'entity'/);
+  });
+
+  it('the dashboard states what the expense figure is MADE OF', () => {
+    const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
+    expect(card).toMatch(/byVatTreatment\(/);
+    expect(card).toMatch(/What the expenses are made of/);
+    expect(card, 'the card groups the segments itself instead of reading one derivation')
+      .not.toMatch(/vat_treatment ===/);
+  });
+
+  it('and a failed segments read does not read as "everything carried VAT"', () => {
+    const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
+    expect(card).toMatch(/segments === null/);
+    expect(card).toMatch(/not a statement that every/);
+  });
+
+  it('the filter dialog splits the axes instead of stacking them in General', () => {
+    // Four long option lists in one tab is the wall this replaced: document type, kind, VAT and
+    // origin all under "General", above Source and Detail.
+    const general = filters.slice(filters.indexOf("key: 'general', label: 'General'"), filters.indexOf("key: 'kind', label: 'Kind & VAT'"));
+    for (const key of ['expense_kind', 'vat_treatment', 'origin', 'doc_type']) {
+      expect(general, `${key} is back in the General tab`).not.toMatch(new RegExp(`key: '${key}'`));
+    }
+    expect(filters).toMatch(/key: 'kind', label: 'Kind & VAT'/);
   });
 
   it('a failed read is not an empty inbox', () => {
