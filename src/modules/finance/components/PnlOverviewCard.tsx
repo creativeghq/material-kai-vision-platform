@@ -6,6 +6,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { formatMoney } from '@/utils/decimal';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
+import { vatPayableLabel } from '@/modules/finance/vatReturn';
 import { aadeVerdict, booksVerdict, type PnlVerdict } from '@/modules/finance/pnlStatus';
 import type { PnlOverview } from '@/modules/finance/services/financeService';
 
@@ -19,7 +20,7 @@ const TONE_BADGE: Record<PnlVerdict['tone'], 'success' | 'warning' | 'neutral'> 
  * the difference between two floors has no reliable sign.
  */
 const vatLabel = (v: number | null, certain: boolean) =>
-  v == null || !certain ? 'VAT return' : v < 0 ? 'VAT refundable' : 'VAT payable';
+  certain ? vatPayableLabel(v) : 'VAT return';
 
 /** `hasFigures` false renders the reason where the number would be. */
 const Figure: React.FC<{
@@ -182,6 +183,9 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, periodLabel, loadin
               <span>Every document filed against your ΑΦΜ. It confirms your books — it is never added to them.</span>
               <Link to={financeTabUrl(FINANCE_TAB.mydataBook)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
                 Open the ΑΑΔΕ book <ArrowRight className="h-3 w-3" />
+              </Link>
+              <Link to={financeTabUrl(FINANCE_TAB.vatReturn)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                Open the VAT return <ArrowRight className="h-3 w-3" />
               </Link>
             </p>
 

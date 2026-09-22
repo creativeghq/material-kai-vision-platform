@@ -313,10 +313,11 @@ describe('a received document is fetched, not authored', () => {
 describe('the VAT return points the way it actually points', () => {
   it('labels the figure by its sign rather than always "payable"', () => {
     const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
-    // Output less input is ONE figure that points two ways, and which way is the answer the
-    // operator came for. Calling it payable while negative says you owe money you are owed.
+    // Calling it payable while negative says you owe money you are owed, and the sign table
+    // lives once so the tile and the return cannot name one figure two ways.
     expect(card, 'a label derived from the sign').toMatch(/const vatLabel =/);
-    expect(card).toMatch(/VAT refundable/);
+    expect(card).toMatch(/vatPayableLabel/);
+    expect(card, 'the sign logic is spelled out here again').not.toMatch(/v < 0 ? 'VAT refundable'/);
   });
 
   it('renders the ΑΑΔΕ VAT it already fetches', () => {

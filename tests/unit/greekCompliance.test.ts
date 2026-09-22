@@ -21,9 +21,9 @@ const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 
 const service = read('src/modules/finance/services/greekComplianceService.ts');
-const vatCard = read('src/modules/finance/components/VatPrefillCard.tsx');
+const vatCard = read('src/modules/finance/components/VatReturnPanel.tsx');
 const apografi = read('src/modules/stock/components/ApografiPanel.tsx');
-const settings = read('src/modules/finance/tabs/SettingsTab.tsx');
+const financePage = read('src/pages/Admin/FinancePage.tsx');
 const stockPage = read('src/modules/stock/pages/StockPage.tsx');
 
 describe('income is a floor and expenses are a ceiling', () => {
@@ -127,12 +127,12 @@ describe('both are derived in SQL and reachable', () => {
   });
 
   it('they are mounted where each belongs', () => {
-    expect(settings).toContain('VatPrefillCard');
+    expect(financePage).toContain('VatReturnPanel');
     expect(stockPage).toContain('ApografiPanel');
   });
 
   it('a failed read is unknown, not compliant', () => {
-    expect(vatCard).toMatch(/not a statement that the return is[\s\S]{0,20}inside the rules/);
+    expect(vatCard).toMatch(/not a statement that[\s\S]{0,20}nothing is due/);
     expect(apografi).toMatch(/not a statement that none exist/);
   });
 });

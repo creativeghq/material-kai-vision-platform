@@ -7,6 +7,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import type { RollForward, PrefillVerdict, MeasurementMethod } from '@/modules/finance/greekComplianceRules';
+import type { VatReturnSnapshot } from '@/modules/finance/vatReturn';
 
 export type {
   RollForwardStatus, RollForward, MeasurementMethod,
@@ -51,6 +52,7 @@ export interface VatPrefillPeriod {
   declared_income: number | null;
   declared_expenses: number | null;
   status: 'draft' | 'reconciled' | 'submitted';
+  submitted_at?: string | null;
 }
 
 export interface PrefillDeviation {
@@ -115,6 +117,30 @@ export const greekComplianceService = {
     return data as unknown as RollForward;
   },
 
+  async vatReturn(workspaceId: string, from: string, to: string): Promise<VatReturnSnapshot> {
+    const { data, error } = await supabase.rpc('get_vat_return_period' as never, {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    } as never);
+    if (error) throw error;
+    return data as unknown as VatReturnSnapshot;
+  },
+
+  async openVatReturn(workspaceId: string, from: string, to: string, refreshDeclared = true): Promise<string> {
+    const { data, error } = await supabase.rpc('open_vat_return_period' as never, {
+      p_workspace_id: workspaceId, p_from: from, p_to: to, p_refresh_declared: refreshDeclared,
+    } as never);
+    if (error) throw error;
+    return data as unknown as string;
+  },
+
+  async setVatReturnStatus(periodId: string, status: 'draft' | 'reconciled' | 'submitted') {
+    const { data, error } = await supabase.rpc('set_vat_return_status' as never, {
+      p_period: periodId, p_status: status,
+    } as never);
+    if (error) throw error;
+    return data as unknown as { outcome: string; submitted_at?: string };
+  },
+
   async vatPeriods(workspaceId: string): Promise<VatPrefillPeriod[]> {
     const { data, error } = await supabase
       .from('vat_prefill_periods')
@@ -123,13 +149,6 @@ export const greekComplianceService = {
       .order('period_start', { ascending: false });
     if (error) throw error;
     return (data ?? []) as VatPrefillPeriod[];
-  },
-
-  async saveVatPeriod(p: Partial<VatPrefillPeriod> & { workspace_id: string; period_start: string; period_end: string }) {
-    const { error } = await supabase
-      .from('vat_prefill_periods')
-      .upsert(p, { onConflict: 'workspace_id,period_start,period_end' });
-    if (error) throw error;
   },
 
   /** Floor on income, ceiling on expenses, and what a breach actually costs. */

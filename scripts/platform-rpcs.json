@@ -942,6 +942,26 @@
     ]
   },
   {
+    "name": "get_vat_return_period",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_website_ai_answers",
     "args": [
       {

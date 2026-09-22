@@ -1010,6 +1010,27 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_vat_return_period",
+    "subject": "vat return period",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_website_ai_answers",
     "subject": "website ai answers",
     "args": [

@@ -40,6 +40,11 @@ interface FeedRow {
 interface InvoiceLite { id: string; internal_number: string; amount_due: number; currency: string }
 interface BillLite { id: string; supplier_bill_number: string | null; supplier_name: string | null; amount_due: number; currency: string }
 interface OrderLite { id: string; order_number: string | null }
+interface PlanCandidate {
+  plan_id: string; title: string; amount: number; currency: string;
+  scheduled_for: string; day_gap?: number; party_matches?: boolean; score: number;
+}
+interface PlanHint extends PlanCandidate { tx_id: string; candidates: number }
 
 // One source (#391) — `Record<PaymentProviderSlug, …>`, so a fourth provider is a
 // typecheck failure here rather than a filter option nobody added.
@@ -101,10 +106,13 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [to, setTo] = React.useState('');
 
   // Pickers
-  const [picking, setPicking] = React.useState<{ row: FeedRow; kind: 'invoice' | 'bill' | 'order' } | null>(null);
+  const [picking, setPicking] = React.useState<{ row: FeedRow; kind: 'invoice' | 'bill' | 'order' | 'plan' } | null>(null);
   const [pickQuery, setPickQuery] = React.useState('');
   const [pickInvoices, setPickInvoices] = React.useState<InvoiceLite[]>([]);
   const [pickBills, setPickBills] = React.useState<BillLite[]>([]);
+  const [pickPlans, setPickPlans] = React.useState<PlanCandidate[] | null>(null);
+  const [planHints, setPlanHints] = React.useState<Map<string, PlanHint>>(new Map());
+  const [hintsFailed, setHintsFailed] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -143,6 +151,15 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         const { data: invs } = await supabase.from('invoices').select('id, internal_number, amount_due, currency').in('id', ids);
         setInvoices(new Map((invs ?? []).map((i) => [i.id, i as InvoiceLite])));
       } else setInvoices(new Map());
+
+      const openOut = feed
+        .filter((r) => r.provider === 'revolut' && r.direction === 'out' && r.match_status !== 'matched' && r.match_status !== 'ignored')
+        .map((r) => r.id);
+      if (openOut.length) {
+        const { data: hints, error: hintErr } = await supabase.rpc('bank_tx_plan_candidates_bulk', { p_tx_ids: openOut });
+        setHintsFailed(!!hintErr);
+        setPlanHints(hintErr ? new Map() : new Map(((hints ?? []) as PlanHint[]).map((h) => [h.tx_id, h])));
+      } else { setPlanHints(new Map()); setHintsFailed(false); }
     } catch (e) {
       toast({ title: 'Failed to load the bank feed', description: (e as Error).message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -179,6 +196,22 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     setPicking(null);
     toast({ title: 'Bill settled' });
   });
+  const settlePlan = (row: FeedRow, plan: PlanCandidate) => act('Close plan', async () => {
+    if (!window.confirm(
+      `Record ${Number(row.amount).toFixed(2)} ${row.currency} as the payment for "${plan.title}"? `
+      + 'This books an outgoing payment and closes the plan.',
+    )) return;
+    const out = await callRevolutApi<{ outcome?: string }>('confirm-plan-match', workspaceId, {
+      transaction_row_id: row.id, plan_id: plan.plan_id,
+    });
+    setPicking(null);
+    toast({
+      title: out?.outcome === 'already_paid' ? 'That plan was already settled' : 'Plan closed',
+      description: out?.outcome === 'already_paid'
+        ? 'Someone marked it paid before this ran — nothing was booked twice.'
+        : `"${plan.title}" is paid, and the transfer is reconciled against it.`,
+    });
+  });
   const ignore = (row: FeedRow, ig: boolean) => act('Update', async () => {
     await callRevolutApi('ignore-transaction', workspaceId, { transaction_row_id: row.id, ignore: ig });
   });
@@ -186,8 +219,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   // Pickers: invoices (open), bills (open), orders → their open invoices.
   React.useEffect(() => {
     if (!picking) return;
+    if (picking.kind === 'plan') setPickPlans(null);
     const run = async () => {
       const term = pickQuery.trim();
+      if (picking.kind === 'plan') {
+        const { data } = await supabase.rpc('bank_tx_plan_candidates', { p_tx_id: picking.row.id, p_limit: 5 });
+        setPickPlans((data ?? []) as PlanCandidate[]);
+        return;
+      }
       if (picking.kind === 'bill') {
         let bq = supabase.from('supplier_bills')
           .select('id, supplier_bill_number, supplier_name, amount_due, currency')
@@ -327,6 +366,20 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       {r.booked_at ? formatDate(r.booked_at) : '—'}{r.reference ? ` · ${r.reference}` : ''}
                     </div>
                   </div>
+                  {planHints.get(r.id) && (() => {
+                    const h = planHints.get(r.id)!;
+                    return h.candidates > 1 ? (
+                      <Button size="sm" variant="outline" className="text-xs" disabled={busy}
+                        onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>
+                        {h.candidates} plans match
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" className="text-xs" disabled={busy}
+                        onClick={() => settlePlan(r, h)}>
+                        Close “{h.title}”
+                      </Button>
+                    );
+                  })()}
                   {suggestions.slice(0, 1).map((inv) => (
                     <Button key={inv.id} size="sm" variant="outline" className="text-xs" disabled={busy}
                       onClick={() => settleInvoice(r, inv.id)}>
@@ -358,7 +411,10 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                         </>
                       )}
                       {revolut && r.direction === 'out' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
-                        <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'bill' }); setPickQuery(''); }}>Match to supplier bill…</DropdownMenuItem>
+                        <>
+                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'bill' }); setPickQuery(''); }}>Match to supplier bill…</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>Match to a planned payment…</DropdownMenuItem>
+                        </>
                       )}
                       {revolut && r.match_status !== 'matched' && (
                         r.match_status === 'ignored'
@@ -380,6 +436,12 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             })}
           </div>
         )}
+        {!loading && hintsFailed && (
+          <p className="border-t border-border/60 px-5 py-2 text-xs text-amber-800 dark:text-amber-300">
+            The open planned payments could not be read, so no line below is offering to close one.
+            That is not a statement that none of them match.
+          </p>
+        )}
         {!loading && rows.length >= 100 && (
           <p className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
             Showing the latest 100 — narrow the filters or date range to see older lines.
@@ -392,15 +454,33 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           <DialogHeader>
             <DialogTitle>
               {picking?.kind === 'bill' ? 'Match to a Supplier Bill'
+                : picking?.kind === 'plan' ? 'Close a Planned Payment'
                 : picking?.kind === 'order' ? 'Attach to an Order (Settles Its Open Invoice)'
                 : 'Match to an Invoice'}
               {picking ? ` — ${Number(picking.row.amount).toFixed(2)} ${picking.row.currency}` : ''}
             </DialogTitle>
           </DialogHeader>
-          <Input autoFocus value={pickQuery} onChange={(e) => setPickQuery(e.target.value)}
-            placeholder={picking?.kind === 'bill' ? 'Bill number or supplier…' : picking?.kind === 'order' ? 'Order number…' : 'Invoice number…'} />
+          {picking?.kind !== 'plan' && (
+            <Input autoFocus value={pickQuery} onChange={(e) => setPickQuery(e.target.value)}
+              placeholder={picking?.kind === 'bill' ? 'Bill number or supplier…' : picking?.kind === 'order' ? 'Order number…' : 'Invoice number…'} />
+          )}
           <div className="max-h-64 space-y-1 overflow-y-auto">
-            {picking?.kind === 'bill'
+            {picking?.kind === 'plan'
+              ? (pickPlans ?? []).map((p) => (
+                <button key={p.plan_id} type="button" disabled={busy}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => picking && settlePlan(picking.row, p)}>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{p.title}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      due {formatDate(p.scheduled_for)}
+                      {p.party_matches ? ' · same counterparty' : ''}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{Number(p.amount).toFixed(2)} {p.currency}</span>
+                </button>
+              ))
+              : picking?.kind === 'bill'
               ? pickBills.map((b) => (
                 <button key={b.id} type="button" disabled={busy}
                   className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
@@ -417,7 +497,17 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                   <span className="text-xs text-muted-foreground">due {Number(inv.amount_due).toFixed(2)} {inv.currency}</span>
                 </button>
               ))}
-            {((picking?.kind === 'bill' && pickBills.length === 0) || (picking?.kind !== 'bill' && pickInvoices.length === 0)) && (
+            {picking?.kind === 'plan' ? (
+              pickPlans === null
+                ? <p className="px-3 py-2 text-xs text-muted-foreground">Looking for open plans of this amount…</p>
+                : pickPlans.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    No open planned payment is for {Number(picking.row.amount).toFixed(2)} {picking.row.currency} within
+                    45 days of this transfer. A plan is offered only when the amount matches — otherwise this is a
+                    different payment, and closing a plan with it would report the wrong thing.
+                  </p>
+                )
+            ) : ((picking?.kind === 'bill' && pickBills.length === 0) || (picking?.kind !== 'bill' && pickInvoices.length === 0)) && (
               <p className="px-3 py-2 text-xs text-muted-foreground">
                 {picking?.kind === 'order' ? 'No orders with an open invoice found.' : 'Nothing open found.'}
               </p>

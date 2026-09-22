@@ -5,7 +5,7 @@
 import {
   PieChart, ArrowDownCircle, ArrowUpCircle, Landmark, Truck, ShoppingCart, FileText, Receipt,
   FileMinus, Banknote, FileSignature, Building2, CalendarClock, Plane, Boxes, Clock, Gauge,
-  BarChart3, BookOpen, Send, Users, Bell, PackageSearch, Settings,
+  BarChart3, BookOpen, Send, Users, Bell, PackageSearch, Settings, Scale,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FINANCE_TAB } from './routes';
@@ -76,6 +76,7 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
   // offered. The launcher chip is ungated for the same reason.
   { value: FINANCE_TAB.assessment, label: 'AI Assessment', icon: Gauge, group: 'tools' },
   { value: FINANCE_TAB.reports, label: 'Reports', icon: BarChart3, group: 'tools' },
+  { value: FINANCE_TAB.vatReturn, label: 'VAT Return', icon: Scale, group: 'tools' },
   // Deliberately its own entry and not a 25th line in Reports: everything in that dropdown is
   // derived from OUR tables, and this one is AADE's answer.
   { value: FINANCE_TAB.mydataBook, label: 'myDATA Book (ΑΑΔΕ)', icon: BookOpen, group: 'tools' },

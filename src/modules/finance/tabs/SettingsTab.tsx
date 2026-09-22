@@ -45,7 +45,6 @@ import { RecallsCard } from '@/modules/finance/components/RecallsCard';
 import { AccessibilityCard } from '@/modules/finance/components/AccessibilityCard';
 import { ApprovalsCard } from '@/modules/finance/components/ApprovalsCard';
 import { IslandVatTerritoriesCard } from '@/modules/finance/components/IslandVatTerritoriesCard';
-import { VatPrefillCard } from '@/modules/finance/components/VatPrefillCard';
 import { PosInterconnectionCard } from '@/modules/finance/components/PosInterconnectionCard';
 import { ErpDeclarationCard } from '@/modules/finance/components/ErpDeclarationCard';
 import { PackagingDeclarationCard } from '@/modules/finance/components/PackagingDeclarationCard';
@@ -262,9 +261,6 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <RecallsCard workspaceId={workspaceId} />
           <AccessibilityCard workspaceId={workspaceId} />
           <IslandVatTerritoriesCard />
-          {/* #445 -- income is a floor and expenses a ceiling, and breaching the ceiling
-              forfeits the deduction rather than raising a warning. */}
-          <VatPrefillCard workspaceId={workspaceId} />
           {/* #448 -- one terminal taking mixed trade must be interconnected, and the compatibility
               declaration falls on whoever BUILDS the ERP, which for an in-house one is still
               somebody. Both are invisible until an audit. */}

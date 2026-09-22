@@ -89,9 +89,13 @@ describe('#351 D1 — an internal leg cannot settle anything', () => {
   it('the server refuses it on BOTH manual match paths', () => {
     expect(revolutApi).toMatch(/async function assertNotInternalLeg/);
     const invoiceMatch = revolutApi.slice(revolutApi.indexOf("case 'confirm-match'"), revolutApi.indexOf("case 'confirm-bill-match'"));
-    const billMatch = revolutApi.slice(revolutApi.indexOf("case 'confirm-bill-match'"));
     expect(invoiceMatch).toMatch(/await assertNotInternalLeg\(service, workspaceId, tx\)/);
-    expect(billMatch.slice(0, 2000)).toMatch(/await assertNotInternalLeg\(service, workspaceId, tx\)/);
+    const loader = revolutApi.slice(revolutApi.indexOf('async function loadOutgoingFeedRow'));
+    expect(loader.slice(0, 900)).toMatch(/await assertNotInternalLeg\(service, workspaceId, tx\)/);
+    for (const name of ["case 'confirm-bill-match'", "case 'confirm-plan-match'"]) {
+      const body = revolutApi.slice(revolutApi.indexOf(name));
+      expect(body.slice(0, 800), name).toMatch(/loadOutgoingFeedRow\(service, workspaceId, rowId\)/);
+    }
   });
 
   it('an unknown shape is refused too, not assumed external', () => {

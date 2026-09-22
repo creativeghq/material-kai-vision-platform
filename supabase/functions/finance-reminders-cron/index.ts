@@ -130,7 +130,7 @@ serve(withApiLogging('finance-reminders-cron', async (req) => {
         title: `VAT return ready — ${v.period_key}`,
         body: `${money(Math.abs(Number(v.vat_return)), 'EUR')} ${refund ? 'refundable' : 'payable'} `
           + `(${money(v.output_vat, 'EUR')} collected − ${money(v.input_vat, 'EUR')} paid), from ΑΑΔΕ's own book.`,
-        action_url: '/finance?tab=mydata_book',
+        action_url: '/finance?tab=vat_return',
       }));
       if (!sent.ok) {
         // Release the claim, or a VAT deadline is silently never mentioned again. Missing one is

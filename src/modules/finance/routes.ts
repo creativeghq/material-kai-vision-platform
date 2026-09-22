@@ -34,6 +34,8 @@ export const FINANCE_TAB = {
   followUps: 'followups',
   sourcing: 'sourcing',
   reports: 'reports',
+  /** The VAT return for a period: ours per rate against AADE's book, and the difference named. */
+  vatReturn: 'vat_return',
   /** AADE's own aggregate book — a read-only mirror, deliberately not a Reports entry. */
   mydataBook: 'mydata_book',
   /** OUR transmission log — every attempt, with the MARK or the reason there is none. The Book

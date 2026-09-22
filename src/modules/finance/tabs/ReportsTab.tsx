@@ -11,6 +11,7 @@ import { AccountingExportCard } from '@/modules/finance/components/AccountingExp
 import { IntrastatObligationCard } from '@/modules/finance/components/IntrastatObligationCard';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
+import { sortVatReturnLines, vatReturnLineLabel, type VatRateRow } from '@/modules/finance/vatReturn';
 type ReportKind =
   | 'cashflow_per_day' | 'pnl_per_category' | 'profit_taken' | 'cash_out_per_category'
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
@@ -689,23 +690,10 @@ function renderReport(
     );
   }
   if (report === 'vat_return') {
-    const fmtRate = (rate: any) => rate == null ? '—' : `${Number(rate)}%`;
-    const outputs = rows.filter((r: any) => r.section === 'output').sort((a: any, b: any) => Number(b.vat_rate ?? 0) - Number(a.vat_rate ?? 0));
-    const outputCredit = rows.find((r: any) => r.section === 'output_credit');
-    const input = rows.find((r: any) => r.section === 'input');
-    const inputCredit = rows.find((r: any) => r.section === 'input_credit');
-    const rcOutput = rows.find((r: any) => r.section === 'reverse_charge_output');
-    const rcInput = rows.find((r: any) => r.section === 'reverse_charge_input');
-    const line = (label: string, r: any) => [label, formatMoney(Number(r?.net || 0)), formatMoney(Number(r?.vat || 0)), String(r?.doc_count ?? 0)];
-    const body: string[][] = [];
-    for (const o of outputs) body.push([`Sales @ ${fmtRate(o.vat_rate)}`, formatMoney(Number(o.net || 0)), formatMoney(Number(o.vat || 0)), String(o.doc_count ?? 0)]);
-    if (outputCredit) body.push(line('Less: customer credit notes', outputCredit));
-    if (input) body.push(line('Purchases (supplier bills)', input));
-    if (inputCredit) body.push(line('Less: supplier credit notes', inputCredit));
-    // Two lines, because it really is two entries. The supplier charged nothing; we declare the
-    // VAT and reclaim it in the same filing, so the pair cancels and both halves must be shown.
-    if (rcOutput) body.push(line('Intra-EU acquisitions — VAT self-assessed', rcOutput));
-    if (rcInput) body.push(line('Intra-EU acquisitions — VAT reclaimed', rcInput));
+    const body = sortVatReturnLines(rows as VatRateRow[]).map((r) => [
+      vatReturnLineLabel(r.section, r.vat_rate),
+      formatMoney(Number(r.net || 0)), formatMoney(Number(r.vat || 0)), String(r.doc_count ?? 0),
+    ]);
     return <Table headers={['Line', 'Net', 'VAT', 'Docs']} totals={totals} rows={body} />;
   }
   if (report === 'vat_by_code') {

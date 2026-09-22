@@ -72,6 +72,7 @@ import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog'
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { TransmissionsTab } from '@/modules/finance/tabs/TransmissionsTab';
+import { VatReturnPanel } from '@/modules/finance/components/VatReturnPanel';
 import { MydataBookTab } from '@/modules/finance/tabs/MydataBookTab';
 import { ExpenseSuppliersTab } from '@/modules/finance/tabs/ExpenseSuppliersTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
@@ -1285,6 +1286,10 @@ const FinancePage: React.FC = () => {
           {/* ─────────── REPORTS ─────────── */}
           <TabsContent value="reports" className="space-y-4">
             <ReportsTab workspaceId={workspaceId} />
+          </TabsContent>
+
+          <TabsContent value="vat_return" className="space-y-4">
+            {workspaceId && <VatReturnPanel workspaceId={workspaceId} />}
           </TabsContent>
 
           {/* ─────────── myDATA BOOK (read-only AADE mirror) ─────────── */}

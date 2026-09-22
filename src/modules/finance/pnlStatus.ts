@@ -4,7 +4,8 @@
  */
 
 export type PnlAadeStatus =
-  | 'ok' | 'partial' | 'no_data' | 'not_collected' | 'collector_failed' | 'not_connected';
+  | 'ok' | 'partial' | 'no_data' | 'not_collected' | 'collector_failed' | 'not_connected'
+  | 'period_not_comparable';
 
 export type PnlBooksStatus = 'ok' | 'no_data' | 'mixed_currency';
 
@@ -23,6 +24,7 @@ const AADE: Record<PnlAadeStatus, PnlVerdict> = {
   not_collected: { label: 'Not fetched', detail: 'Nobody has read this range from ΑΑΔΕ yet — unknown, not zero.', tone: 'unknown', hasFigures: false },
   collector_failed: { label: 'Could not reach ΑΑΔΕ', detail: 'The last read failed, so these figures are unknown rather than absent.', tone: 'unknown', hasFigures: false },
   not_connected: { label: 'ΑΑΔΕ not connected', detail: 'Add the ΑΑΔΕ credentials in Settings → Documents to read your book.', tone: 'unknown', hasFigures: false },
+  period_not_comparable: { label: 'Not comparable', detail: 'ΑΑΔΕ keeps the book by calendar month, so a period that starts or ends mid-month has nothing to compare against. Use whole months.', tone: 'unknown', hasFigures: false },
 };
 
 const BOOKS: Record<PnlBooksStatus, PnlVerdict> = {
