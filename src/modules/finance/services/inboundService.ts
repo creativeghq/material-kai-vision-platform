@@ -715,6 +715,69 @@ export const inboundService = {
     return (data ?? []) as ExpenseSegmentRow[];
   },
 
+  async recordExpenseDocument(workspaceId: string, input: {
+    docType: string; series: string; aa: string; issueDate: string;
+    issuerVat: string | null; issuerName: string | null; issuerCountry: string;
+    net: number; vatCategory: number; vatAmount: number; vatExemptionCategory: number | null;
+    classificationType: string | null; classificationCategory: string;
+  }): Promise<{ id: string }> {
+    const { data: auth } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from('inbound_documents').insert({
+      workspace_id: workspaceId,
+      source: 'platform',
+      lines_source: 'user',
+      status: 'new',
+      doc_type: input.docType,
+      series: input.series,
+      aa: input.aa,
+      issue_date: input.issueDate,
+      issuer_vat: input.issuerVat,
+      issuer_name: input.issuerName,
+      issuer_country: input.issuerCountry,
+      currency: 'EUR',
+      total_net: input.net,
+      total_vat: input.vatAmount,
+      total_gross: input.net + input.vatAmount,
+      lines: [{
+        line_number: 1,
+        net_value: input.net,
+        vat_category: input.vatCategory,
+        vat_amount: input.vatAmount,
+        vat_exemption_category: input.vatExemptionCategory,
+        item_description: input.issuerName,
+      }],
+      expenses_classification: [{
+        line_number: 1,
+        classification_type: input.classificationType,
+        classification_category: input.classificationCategory,
+        amount: input.net,
+      }],
+      created_by: auth?.user?.id ?? null,
+    }).select('id').single();
+    if (error) throw error;
+    return data as { id: string };
+  },
+
+  async sendToMydata(workspaceId: string, documentId: string): Promise<{
+    ok: boolean; mark?: string; uid?: string; errors?: string[];
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-mydata-send', {
+      body: { action: 'send', workspace_id: workspaceId, document_id: documentId },
+    });
+    if (error) throw await edgeError(error);
+    return data as { ok: boolean; mark?: string; uid?: string; errors?: string[] };
+  },
+
+  async checkMydataSendRights(workspaceId: string): Promise<{
+    canSend: boolean; status: number; detail: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-mydata-send', {
+      body: { action: 'check-rights', workspace_id: workspaceId },
+    });
+    if (error) throw await edgeError(error);
+    return data as { canSend: boolean; status: number; detail: string };
+  },
+
   async bookingBacklog(workspaceId: string): Promise<InboundBacklogRow[]> {
     const { data, error } = await (supabase as any).rpc('get_inbound_booking_backlog', {
       p_workspace_id: workspaceId,

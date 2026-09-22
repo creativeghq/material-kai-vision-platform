@@ -56,6 +56,7 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   // Filed with ΑΑΔΕ — a transmitted document carries a legal number and cannot be withdrawn.
   { name: 'finance-issue-invoice', reason: 'Issues and transmits a fiscal document to ΑΑΔΕ.' },
   { name: 'finance-mydata-book', reason: 'Files the myDATA aggregate book with ΑΑΔΕ.' },
+  { name: 'finance-mydata-send', reason: 'Transmits an expense document to ΑΑΔΕ. A MARK cannot be withdrawn.' },
   { name: 'novus-onboarding', reason: 'Signs a provider contract and files a Δήλωση Παρόχου with ΑΑΔΕ.' },
   // Money.
   { name: 'finance-send-payment', reason: 'Instructs a real transfer out of the bank account.' },

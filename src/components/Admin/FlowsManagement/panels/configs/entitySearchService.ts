@@ -68,6 +68,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'finance-inbound-sync', label: 'finance-inbound-sync', sublabel: 'Pull inbound documents from myDATA (RequestDocs) for configured workspaces' },
   { id: 'finance-invoice-pdf', label: 'finance-invoice-pdf', sublabel: 'Render a legal invoice, credit note, or delivery note as a PDF' },
   { id: 'finance-mydata-book', label: 'finance-mydata-book', sublabel: 'Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces' },
+  { id: 'finance-mydata-send', label: 'finance-mydata-send', sublabel: 'File an expense document you recorded here (13.x-17.x) directly with AADE' },
   { id: 'finance-issue-invoice', label: 'finance-issue-invoice', sublabel: 'Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note' },
   { id: 'finance-pay-invoice', label: 'finance-pay-invoice', sublabel: 'Create a Stripe Checkout session or pay-link for an invoice' },
   { id: 'finance-reminders-cron', label: 'finance-reminders-cron', sublabel: 'Cron: emit planned-payment and VAT-return-ready flow events.' },

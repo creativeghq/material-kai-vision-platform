@@ -1498,6 +1498,35 @@
     "response": "{ok, invoice_id, invoice, fiscal: {ok, status, mark, uid, qrUrl, ...} | null}"
   },
   {
+    "name": "finance-mydata-send",
+    "tag": "Finance",
+    "summary": "Transmits an expense document you recorded here straight to myDATA",
+    "description": "Rent, foreign purchases, contracts and your own payroll/depreciation entries are myDATA types 13.x-17.x, which an e-invoicing provider may not carry — AADE limits providers to 1.1-11.5. This files them directly under the workspace ΑΑΔΕ credentials and stores the MARK. `check-rights` probes whether the subscription can file at all without creating anything.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "description": "'send' or 'check-rights'"
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace that owns the document"
+        },
+        "document_id": {
+          "type": "string",
+          "description": "The inbound_documents row to transmit (send only)"
+        }
+      }
+    }
+  },
+  {
     "name": "finance-pay-invoice",
     "tag": "Finance",
     "summary": "Create a Stripe Checkout session or pay-link for an invoice",

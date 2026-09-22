@@ -26,6 +26,7 @@ import { PaymentReceiptActions } from '@/modules/finance/components/PaymentRecei
 import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { ExpenseSegmentsDialog } from '@/modules/finance/components/ExpenseSegmentsDialog';
+import { RecordExpenseDocumentDialog } from '@/modules/finance/components/RecordExpenseDocumentDialog';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
@@ -546,7 +547,10 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             {/* Above the list because 111 delivery notes and 45 credit notes in it are NOT work
                 outstanding, and without this they look exactly like work outstanding. */}
             {type === 'expenses' && activeWorkspaceId && (
-              <ExpenseSegmentsDialog workspaceId={activeWorkspaceId} />
+              <div className="flex flex-wrap items-center gap-2">
+                <ExpenseSegmentsDialog workspaceId={activeWorkspaceId} />
+                <RecordExpenseDocumentDialog workspaceId={activeWorkspaceId} onRecorded={() => void load()} />
+              </div>
             )}
             {type === 'dispatch' ? (
               <>
