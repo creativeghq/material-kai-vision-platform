@@ -61,7 +61,10 @@ suite('fiscal derivations · quote → invoice → receipt → settlement', () =
     await svc.from('orders').delete().eq('workspace_id', ws).then(() => {}, () => {});
     await svc.from('pos_sessions').delete().eq('workspace_id', ws).then(() => {}, () => {});
     await svc.from('crm_contacts').delete().eq('workspace_id', ws).then(() => {}, () => {});
-    if (upsellId) await svc.from('upsells').delete().eq('id', upsellId).then(() => {}, () => {});
+    if (upsellId) {
+      const { error } = await svc.from('upsells').delete().eq('id', upsellId);
+      if (error) console.warn(`[teardown] upsell ${upsellId} leaked (global table, nothing reaps it): ${error.message}`);
+    }
     await teardown(svc, { wsIds: [ws], userIds: [A.id] });
   });
 

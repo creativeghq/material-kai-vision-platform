@@ -25,9 +25,10 @@ export default defineConfig({
     // Teardown is one RPC, but it deletes workspaces and each cascades 349 FKs (2.0s EMPTY), with
     // several suites tearing down at once. At 30s the job went red with every assertion passing.
     hookTimeout: 60_000,
-    // Retry transport flakes: ~68 real network calls to live endpoints, so a single ECONNRESET
-    // is a matter of when, not if. On 2026-07-28 `hr-careers-public` died on one with 67 of 68
-    // passing and held an email-guard fix back for half an hour.
+    // Retry transport flakes: ~68 live network calls, so an ECONNRESET is a matter of when.
     retry: 2,
+    // ONE module registry per worker, not per file, so a guard test's repo scan is paid ~19x
+    // instead of 472x (414s -> 232s wall). Module state now leaks between files in a worker.
+    isolate: false,
   },
 });

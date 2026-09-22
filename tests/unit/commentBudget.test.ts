@@ -169,7 +169,7 @@ describe('comment budget', () => {
         offenders,
         `${offenders.length} comment(s) over ${MAX_PROSE_LINES} prose lines. Run \`npm run comments:trim\`.`,
       ).toEqual([]);
-    });
+    }, 180_000);
   });
 
   describe('the mass, which the per-comment budget does not cap', () => {
@@ -194,7 +194,7 @@ describe('comment budget', () => {
           'or lower another area. Do NOT regenerate the baseline upward; `--write` refuses to.',
       ).toEqual([]);
       expect(total).toBeLessThanOrEqual(base.total);
-    });
+    }, 180_000);
 
     it('has not banked headroom — a real cleanup lowers the ceiling', async () => {
       const base = JSON.parse(readFileSync(MASS_BASELINE, 'utf8')) as {
@@ -208,7 +208,7 @@ describe('comment budget', () => {
           '`npm run comments:mass -- --write`, so the deletion becomes the new ceiling rather ' +
           'than headroom for the next essay. Deleting a few is free; this is a real cleanup.',
       ).toBeLessThanOrEqual(Math.round(base.total * 0.01));
-    });
+    }, 180_000);
   });
 
   describe('the enforcement itself', () => {
