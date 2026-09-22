@@ -25,7 +25,7 @@ import { financeService, formatMoney, type Invoice, type CreditNote, type Suppli
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
-import { ExpenseBacklogSummary } from '@/modules/finance/components/ExpenseBacklogSummary';
+import { ExpenseSegmentsCard } from '@/modules/finance/components/ExpenseSegmentsCard';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
@@ -546,7 +546,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             {/* Above the list because 111 delivery notes and 45 credit notes in it are NOT work
                 outstanding, and without this they look exactly like work outstanding. */}
             {type === 'expenses' && activeWorkspaceId && (
-              <ExpenseBacklogSummary workspaceId={activeWorkspaceId} />
+              <ExpenseSegmentsCard workspaceId={activeWorkspaceId} />
             )}
             {type === 'dispatch' ? (
               <>

@@ -52,7 +52,7 @@ describe('the dashboard P&L includes expenses', () => {
     const suppliers = strippedSource('src/modules/finance/tabs/ExpenseSuppliersTab.tsx');
     expect(suppliers, 'booking sits with filing').toMatch(/<ExpenseBacklogCard/);
     const docs = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
-    expect(docs, 'the Expenses tab states what is in the inbox').toMatch(/<ExpenseBacklogSummary/);
+    expect(docs, 'the Expenses tab states what is in the inbox').toMatch(/<ExpenseSegmentsCard/);
     expect(strippedSource(DASHBOARD), 'and the dashboard does not repeat it')
       .not.toMatch(/<ExpenseBacklogCard/);
   });
@@ -143,6 +143,41 @@ describe('a P&L figure carries the verdict on itself', () => {
       expect(bookingStateCopy(s).label, `${s} needs a label`).toBeTruthy();
       expect(bookingStateCopy(s).detail.length, `${s} needs a reason`).toBeGreaterThan(10);
     }
+  });
+});
+
+describe('every kind of expense is visible, and says whether the P&L has it', () => {
+  const card = strippedSource('src/modules/finance/components/ExpenseSegmentsCard.tsx');
+  const filters = strippedSource('src/modules/finance/components/documentFilters.ts');
+
+  it('segments come from SQL — the pane never decides what kind a document is', () => {
+    expect(card).toMatch(/inboundService\.expenseSegments\(/);
+    expect(card, 'the pane re-derives a segment from the document type')
+      .not.toMatch(/doc_type/);
+  });
+
+  it('and the list can be filtered on all three axes', () => {
+    for (const key of ['expense_kind', 'vat_treatment', 'origin']) {
+      expect(filters, `no ${key} filter on the expenses list`)
+        .toMatch(new RegExp(`key: '${key}', type: 'multi'`));
+    }
+  });
+
+  it('an entity entry counts from the document, everything else once booked', () => {
+    // Payroll and depreciation can never become a supplier bill, so "waiting to be booked" is
+    // not a state they can be in — showing them as outstanding work would be a queue nobody
+    // can clear.
+    expect(card).toMatch(/expense_kind === 'entity'/);
+  });
+
+  it('a failed read is not an empty inbox', () => {
+    expect(card).toMatch(/setRows\(null\)/);
+    expect(card).toMatch(/not a statement that nothing arrived/);
+  });
+
+  it('what is NOT an expense is separated rather than mixed into the total', () => {
+    expect(card).toMatch(/Not an expense/);
+    expect(card).toMatch(/notExpenseNet/);
   });
 });
 

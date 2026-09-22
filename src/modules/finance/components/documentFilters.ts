@@ -10,6 +10,7 @@
 import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
+import { expenseKindCopy, vatTreatmentCopy, originLabel } from '@/modules/finance/expenseSegments';
 import { inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
 import { inboundDetailLabel, inboundSourceLabel, invoicedTotal } from '@/modules/finance/utils/inboundProvenance';
 import { humanizeLabel } from '@/utils/humanize';
@@ -233,6 +234,21 @@ export function buildDocumentFilters(
               key: 'doc_type', type: 'multi', label: 'Document type',
               options: mydataTypeOptions(rows, (r) => r.doc_type, mydataTypes),
               accessor: (r) => r.doc_type,
+            },
+            {
+              key: 'expense_kind', type: 'multi', label: 'Expense kind',
+              options: optionsFromRows(rows, (r) => r.expense_kind, (k) => expenseKindCopy(k).label),
+              accessor: (r) => r.expense_kind,
+            },
+            {
+              key: 'vat_treatment', type: 'multi', label: 'VAT',
+              options: optionsFromRows(rows, (r) => r.vat_treatment, (t) => vatTreatmentCopy(t).label),
+              accessor: (r) => r.vat_treatment,
+            },
+            {
+              key: 'origin', type: 'multi', label: 'From',
+              options: optionsFromRows(rows, (r) => r.origin, originLabel),
+              accessor: (r) => r.origin,
             },
             {
               // The split between what suppliers filed against us and what WE typed into myAADE

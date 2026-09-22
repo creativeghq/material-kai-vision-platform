@@ -12,6 +12,9 @@ import type {
   InboundLineCost, InboundLineCostStatus, InboundLinkRelation, InboundLinkSource,
   InboundLinkSummary,
 } from '@/modules/finance/utils/inboundCorrelation';
+import type {
+  ExpenseKind, VatTreatment, ExpenseOrigin, ExpenseSegmentRow,
+} from '@/modules/finance/expenseSegments';
 
 export type { InboundLinkSummary } from '@/modules/finance/utils/inboundCorrelation';
 
@@ -139,6 +142,9 @@ export interface InboundDocument {
   /** Plate of the vehicle that carried them (delivery notes). */
   vehicle_number: string | null;
   doc_type: string | null;
+  expense_kind: ExpenseKind | null;
+  vat_treatment: VatTreatment | null;
+  origin: ExpenseOrigin | null;
   /** Issuer's own document number, e.g. series 'ΤΔΑ' + aa '5160'. */
   series: string | null;
   aa: string | null;
@@ -211,8 +217,8 @@ export const INBOUND_LIST_LIMIT = 2000;
 /** One row of `get_inbound_booking_backlog`: a state, and what sits in it. */
 export interface InboundBacklogRow {
   booking_state:
-    | 'bookable' | 'booked' | 'dismissed' | 'cancelled'
-    | 'payroll' | 'credit_note' | 'no_value' | 'out_of_scope';
+    | 'bookable' | 'booked' | 'dismissed' | 'cancelled' | 'settled_outside'
+    | 'payroll' | 'own_entity' | 'credit_note' | 'no_value' | 'out_of_scope';
   docs: number;
   net: number;
   vat: number;
@@ -354,6 +360,8 @@ export const inboundService = {
     'total_other_taxes', 'total_deductions', 'currency', 'total_net', 'total_vat', 'total_gross',
     'status', 'created_supplier_bill_id', 'category_id', 'created_at', 'updated_at',
     'settled_outside_at', 'settled_outside_note',
+    // Derived on the row: the list and its filters read what SQL decided.
+    'expense_kind', 'vat_treatment', 'origin',
   ].join(', '),
 
   /**
@@ -699,6 +707,14 @@ export const inboundService = {
   },
 
   /** Per state: what is waiting to become an expense, and for the rest, why it never will. */
+  async expenseSegments(workspaceId: string, from: string, to: string): Promise<ExpenseSegmentRow[]> {
+    const { data, error } = await (supabase as any).rpc('get_expense_segments', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as ExpenseSegmentRow[];
+  },
+
   async bookingBacklog(workspaceId: string): Promise<InboundBacklogRow[]> {
     const { data, error } = await (supabase as any).rpc('get_inbound_booking_backlog', {
       p_workspace_id: workspaceId,
