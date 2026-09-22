@@ -77,6 +77,37 @@ describe('myDATA book mirror — the collector reads the WHOLE book', () => {
   });
 });
 
+describe('the closing line is a figure you can close a year on', () => {
+  const tab = readFileSync(join(root, 'src', 'modules', 'finance', 'tabs', 'MydataBookTab.tsx'), 'utf8');
+
+  it('reads our own entries through a SEPARATE call, never folded into the book', () => {
+    expect(tab).toMatch(/mydataBookService\.getBook\(/);
+    expect(tab).toMatch(/mydataBookService\.getEntityEntries\(/);
+    expect(tab, 'an entity figure is being summed into an AADE book row')
+      .not.toMatch(/side\[c\.key as string\] \+= [^;]*entity/);
+  });
+
+  it('and the AADE total says it is AADE\u2019s, so nobody closes on it by mistake', () => {
+    expect(tab).toMatch(/Total expenses — ΑΑΔΕ book/);
+  });
+
+  it('the last line is the sum of the lines printed above it', () => {
+    expect(tab).toMatch(/totals\.expense\.net_value \+ entityTotals\.net/);
+    expect(tab).toMatch(/totals\.expenseDocs \+ entityTotals\.docs/);
+  });
+
+  it('a failed read of our entries is said out loud, not rendered as "you have none"', () => {
+    expect(tab).toMatch(/getEntityEntries\([^)]*\)\s*\.catch\(\(\) => null\)/);
+    expect(tab).toMatch(/entity === null/);
+    expect(tab).toMatch(/payroll and depreciation are not in it/);
+  });
+
+  it('and the export carries the same last line as the screen', () => {
+    const csv = tab.slice(tab.indexOf('const exportCsv'));
+    expect(csv.slice(0, 1400)).toMatch(/entity_entry/);
+  });
+});
+
 describe('myDATA book mirror — stays unmerged from platform finance', () => {
   /** Every .ts/.tsx under src/ and supabase/functions/, excluding the mirror's own files. */
   function sourceFiles(dir: string, acc: string[] = []): string[] {

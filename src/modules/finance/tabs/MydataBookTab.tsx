@@ -19,6 +19,7 @@ import {
   type BookMonthRow,
   type BookStatus,
   type BookSyncState,
+  type EntityEntryRow,
 } from '@/modules/finance/services/mydataBookService';
 
 /** AADE's own columns, in AADE's own order. `key` is the RPC field; the label is the
@@ -44,6 +45,12 @@ const STATUS_COPY: Record<string, { text: string; tone: string }> = {
 };
 const statusCopy = (s: BookStatus | string) =>
   STATUS_COPY[s] ?? { text: 'Unknown', tone: 'text-amber-600 dark:text-amber-400' };
+
+const ENTITY_KIND_LABEL: Record<EntityEntryRow['kind'], string> = {
+  payroll: 'Payroll',
+  depreciation: 'Depreciation',
+  regularisation: 'Regularisation entries',
+};
 
 type Period = 'this_year' | 'last_year' | 'last_quarter' | 'custom';
 
@@ -84,6 +91,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
   const [customFrom, setCustomFrom] = useState(() => rangeForPeriod('this_year').from);
   const [customTo, setCustomTo] = useState(() => rangeForPeriod('this_year').to);
   const [rows, setRows] = useState<BookMonthRow[]>([]);
+  const [entity, setEntity] = useState<EntityEntryRow[] | null>(null);
   const [sync, setSync] = useState<BookSyncState | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -94,15 +102,18 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
     if (!workspaceId) return;
     setLoading(true);
     try {
-      const [book, state] = await Promise.all([
+      const [book, state, own] = await Promise.all([
         mydataBookService.getBook(workspaceId, range.from, range.to),
         mydataBookService.getSyncState(workspaceId).catch(() => null),
+        mydataBookService.getEntityEntries(workspaceId, range.from, range.to).catch(() => null),
       ]);
       setRows(book);
       setSync(state);
+      setEntity(own);
     } catch (err) {
       toast({ title: 'Could not read the myDATA book', description: (err as Error)?.message, variant: 'destructive' });
       setRows([]);
+      setEntity(null);
     } finally {
       setLoading(false);
     }
@@ -168,6 +179,18 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
     return acc;
   }, [rows]);
 
+  const entityTotals = useMemo(() => {
+    const byKind = new Map<EntityEntryRow['kind'], { net: number; docs: number }>();
+    let net = 0; let docs = 0;
+    for (const r of entity ?? []) {
+      const at = byKind.get(r.kind) ?? { net: 0, docs: 0 };
+      at.net += Number(r.net ?? 0); at.docs += Number(r.docs ?? 0);
+      byKind.set(r.kind, at);
+      net += Number(r.net ?? 0); docs += Number(r.docs ?? 0);
+    }
+    return { byKind: [...byKind.entries()], net, docs };
+  }, [entity]);
+
   const notConnected = rows.length > 0 && rows.every((r) => r.status === 'not_connected');
   const neverCollected = rows.length > 0 && rows.every((r) => r.status === 'not_collected');
 
@@ -185,6 +208,14 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
       r.balance != null ? String(r.balance) : '',
       r.status,
     ]);
+    for (const r of entity ?? []) {
+      body.push([
+        r.month, `entity_entry:${r.kind}`,
+        String(r.net ?? 0),
+        ...MONEY_COLUMNS.slice(1).map(() => ''),
+        String(r.docs ?? 0), '', r.doc_type,
+      ]);
+    }
     const csv = [head, ...body].map((line) => line.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
@@ -394,7 +425,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
                   <TableCell className="text-right tabular-nums">{totals.incomeDocs}</TableCell>
                 </TableRow>
                 <TableRow className="bg-surface-sunken font-semibold">
-                  <TableCell colSpan={2}>Total expenses</TableCell>
+                  <TableCell colSpan={2}>Total expenses — ΑΑΔΕ book</TableCell>
                   <TableCell className="text-right tabular-nums">{money(totals.expense.net_value)}</TableCell>
                   <TableCell />
                   {MONEY_COLUMNS.slice(1).map((c) => (
@@ -402,10 +433,46 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
                   ))}
                   <TableCell className="text-right tabular-nums">{totals.expenseDocs}</TableCell>
                 </TableRow>
+
+                {entityTotals.byKind.map(([kind, at]) => (
+                  <TableRow key={kind} className="text-muted-foreground">
+                    <TableCell colSpan={2} className="pl-8">{ENTITY_KIND_LABEL[kind]}</TableCell>
+                    <TableCell className="text-right tabular-nums">{money(at.net)}</TableCell>
+                    <TableCell />
+                    {MONEY_COLUMNS.slice(1).map((c) => <TableCell key={String(c.key)} />)}
+                    <TableCell className="text-right tabular-nums">{at.docs}</TableCell>
+                  </TableRow>
+                ))}
+
+                {entity !== null && entityTotals.docs > 0 && (
+                  <TableRow className="bg-surface-sunken font-semibold">
+                    <TableCell colSpan={2}>Expenses including your own entries</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {money(totals.expense.net_value + entityTotals.net)}
+                    </TableCell>
+                    <TableCell />
+                    {MONEY_COLUMNS.slice(1).map((c) => <TableCell key={String(c.key)} />)}
+                    <TableCell className="text-right tabular-nums">{totals.expenseDocs + entityTotals.docs}</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           )}
         </CardContent>
+        {entity === null && rows.length > 0 && (
+          <CardContent className="border-t border-hairline pt-3 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
+            Your own entries could not be read, so the expense total below is ΑΑΔΕ&apos;s alone —
+            payroll and depreciation are not in it.
+          </CardContent>
+        )}
+        {entity !== null && entityTotals.docs > 0 && (
+          <CardContent className="border-t border-hairline pt-3 text-xs text-muted-foreground">
+            ΑΑΔΕ keeps «Εγγραφές Οντότητας» — payroll, depreciation and the year-end
+            regularisations — out of the expense book, so their total is purchases only. The last
+            line adds the {entityTotals.docs} you have filed, and is the one to close a year on.
+          </CardContent>
+        )}
         {totals.unknown > 0 && rows.length > 0 && (
           <CardContent className="border-t border-hairline pt-3 text-xs text-amber-600 dark:text-amber-400">
             <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />

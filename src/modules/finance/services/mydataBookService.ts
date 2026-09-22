@@ -44,6 +44,16 @@ export interface BookSyncState {
   updated_at: string | null;
 }
 
+/** Filed under «Εγγραφές Οντότητας», and kept OUT of AADE's expense book. */
+export interface EntityEntryRow {
+  month: string;
+  kind: 'payroll' | 'depreciation' | 'regularisation';
+  doc_type: string;
+  docs: number;
+  net: number;
+  vat: number;
+}
+
 export const mydataBookService = {
   /** AADE's book for a date range, one row per month per direction. */
   async getBook(workspaceId: string, from: string, to: string): Promise<BookMonthRow[]> {
@@ -52,6 +62,15 @@ export const mydataBookService = {
     });
     if (error) throw error;
     return (data ?? []) as BookMonthRow[];
+  },
+
+  /** Your own entries for the same range. A SEPARATE read: the book is AADE's answer. */
+  async getEntityEntries(workspaceId: string, from: string, to: string): Promise<EntityEntryRow[]> {
+    const { data, error } = await supabase.rpc('get_entity_book_entries', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as EntityEntryRow[];
   },
 
   /**
