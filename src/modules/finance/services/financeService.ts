@@ -3310,6 +3310,17 @@ export interface PartyRow {
   credit_releasable: boolean;
 }
 
+export interface FinanceFinding {
+  check_key: string;
+  title: string;
+  severity: 'info' | 'warning' | 'critical';
+  entity_table: string | null;
+  entity_id: string | null;
+  detail: Record<string, unknown> | null;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
 export interface FinanceSettings {
   workspace_id: string;
   statements_enabled: boolean;
@@ -3714,6 +3725,15 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as SalesPerDayRow[];
   },
+  /** This workspace's OWN open finance findings. The /admin view is cross-workspace. */
+  async integrityFindings(workspaceId: string): Promise<FinanceFinding[]> {
+    const { data, error } = await supabase.rpc('get_workspace_integrity_findings' as never, {
+      p_workspace_id: workspaceId, p_domain: 'finance',
+    } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as FinanceFinding[];
+  },
+
   /** VAT analysis (ΦΠΑ): output by rate + input, each net of credit notes. */
   async getVatReport(workspaceId: string, from: string, to: string): Promise<VatReportRow[]> {
     const { data, error } = await supabase.rpc('finance_vat_report', {

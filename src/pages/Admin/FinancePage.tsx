@@ -91,6 +91,7 @@ import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { inboundService } from '@/modules/finance/services/inboundService';
 import type { ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
+import { FinanceHealthStrip } from '@/modules/finance/components/FinanceHealthStrip';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
 import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -669,6 +670,8 @@ const FinancePage: React.FC = () => {
                 </Select>
               </div>
             </div>
+
+            {workspaceId && <FinanceHealthStrip workspaceId={workspaceId} />}
 
             <PnlOverviewCard
               overview={pnlOverview}
