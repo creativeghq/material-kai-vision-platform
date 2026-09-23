@@ -16569,5 +16569,63 @@
         "desc": "The document number written alongside it."
       }
     ]
+  },
+  {
+    "name": "store-skroutz-orders",
+    "tag": "Commerce",
+    "summary": "Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document.",
+    "description": "Skroutz is not a passive feed like a webshop — it pushes an order and starts a clock. An order must be accepted or rejected, and since 30/03/2026 dispatch needs an explicit set_as_ready; an order left open expires, and an expired order is a lost sale. `pull` fetches the open queue and ingests through the same upsert_inbound_order every other channel uses. `upload_document` re-uploads the RENDERED PDF as a file, because Skroutz takes the file itself rather than a link, capped at 7MB on their side. All calls carry the Bearer token and the vnd.skroutz version header; note Skroutz allows ONE active API key per shop, so generating a new one expires the old and is a breaking event.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      "pull",
+      "accept",
+      "reject",
+      "set_as_ready",
+      "upload_document"
+    ],
+    "request": [
+      {
+        "name": "connection_id",
+        "type": "string",
+        "required": true,
+        "desc": "The Skroutz store_connections id. Membership is checked against the verified JWT."
+      },
+      {
+        "name": "action",
+        "type": "string",
+        "required": false,
+        "desc": "pull (default), accept, reject, set_as_ready, upload_document."
+      },
+      {
+        "name": "order_code",
+        "type": "string",
+        "required": false,
+        "desc": "Skroutz order code. Required for everything but pull."
+      },
+      {
+        "name": "invoice_id",
+        "type": "string",
+        "required": false,
+        "desc": "The issued invoice to upload. Required for upload_document."
+      }
+    ],
+    "response": [
+      {
+        "name": "state",
+        "type": "string",
+        "desc": "The order state Skroutz reports after the action."
+      },
+      {
+        "name": "created",
+        "type": "number",
+        "desc": "On pull: orders newly ingested."
+      }
+    ]
   }
 ]

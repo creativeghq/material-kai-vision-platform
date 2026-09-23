@@ -24,6 +24,8 @@ import {
 import {
   productFeedsService, feedUrl, FEED_FORMATS, type ProductFeed, type FeedFormat,
 } from '@/services/commerce/productFeedsService';
+import { PayoutsCard } from '@/modules/commerce-core/components/PayoutsCard';
+import { SkroutzQueueCard } from '@/modules/commerce-core/components/SkroutzQueueCard';
 
 const PLATFORM_LABEL: Record<CommercePlatform, string> = {
   skroutz: 'Skroutz',
@@ -441,6 +443,12 @@ export default function SalesChannelsPage() {
               ))}
             </CardContent>
           </Card>
+
+          {rows.filter((c) => c.platform === 'skroutz' && c.enabled).map((c) => (
+            <SkroutzQueueCard key={c.id} connection={c} />
+          ))}
+
+          <PayoutsCard workspaceId={ws} connections={rows} />
 
           <Card>
             <CardHeader>

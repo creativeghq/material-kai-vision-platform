@@ -69,6 +69,7 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   { name: 'stripe-connect', reason: 'Changes the workspace payment account.' },
   { name: 'revolut-api', reason: 'Acts directly on the business bank account.' },
   { name: 'store-document-writeback', reason: 'Writes a customer-visible note and a document link into the merchant\'s own store.' },
+  { name: 'store-skroutz-orders', reason: 'Accepts or rejects a real marketplace order on a clock, and uploads a fiscal document to Skroutz.' },
   { name: 'store-orders-sync', reason: 'Calls the merchant\'s own Shopify or WooCommerce store and creates orders in bulk from what it finds.' },
   // Reaches a customer or the public.
   { name: 'finance-send-invoice-email', reason: 'Sends an email to the customer named on the invoice.' },

@@ -4,7 +4,8 @@ import { join, relative } from 'node:path';
 
 import { normaliseMoney, MONEY_TOLERANCE } from '../../supabase/functions/_shared/commerce/money';
 import { normaliseStoreUrl, readVerifiedWebhook, WebhookRefusal } from '../../supabase/functions/_shared/commerce/verify';
-import { fromShopify, fromWooCommerce } from '../../supabase/functions/_shared/commerce/adapters';
+import { fromShopify, fromWooCommerce, ADAPTERS } from '../../supabase/functions/_shared/commerce/adapters';
+import { fromSkroutz } from '../../supabase/functions/_shared/commerce/skroutz';
 import { generateWebhookSecret, WOO_UNSAFE_SECRET } from '../../src/modules/commerce/webhookSecret';
 
 const ROOT = process.cwd();
@@ -255,5 +256,45 @@ describe('the verifier against a real signature', () => {
       req(BODY, { 'x-wc-webhook-signature': sig, 'x-wc-webhook-source': 'https://www.shop.gr/' }),
       woo, 'woocommerce');
     expect(ok.body.id).toBe(1);
+  });
+});
+
+describe('Skroutz states what the buyer asked for, so nothing is inferred', () => {
+  const base = {
+    code: 'SK-1', state: 'open', currency: 'EUR', paid: true,
+    total_price: 124, vat_amount: 24,
+    line_items: [{ product_name: 'Tile', quantity: 2, unit_price: 62, vat: 24, shop_uid: 'SKU-9' }],
+  };
+
+  it('maps each invoice_document to the document we can actually issue', () => {
+    for (const [asked, expected] of Object.entries({
+      receipt: 'receipt', invoice: 'invoice', invoice_39a: 'invoice_39a', invoice_vies: 'invoice_vies',
+    })) {
+      const o = fromSkroutz({ ...base, invoice_document: asked }, { id: 'c', platform: 'skroutz' }, null);
+      expect(o.document_request).toBe(expected);
+    }
+  });
+
+  it('withholds on a value it does not recognise, rather than guessing a receipt', () => {
+    const o = fromSkroutz({ ...base, invoice_document: 'something_new' }, { id: 'c', platform: 'skroutz' }, null);
+    expect(o.document_request).toBeNull();
+    expect(o.document_request_reason).toMatch(/not a document we can issue/i);
+  });
+
+  it('reads Skroutz prices as VAT-INCLUSIVE, which is what their spec states', () => {
+    const o = fromSkroutz({ ...base, invoice_document: 'receipt' }, { id: 'c', platform: 'skroutz' }, null);
+    expect(o.totals.net).toBe(100);
+    expect(o.totals.vat).toBe(24);
+    expect(o.reconciles).toBe(true);
+  });
+
+  it('carries the order CODE as the external id, because that is what every call takes', () => {
+    const o = fromSkroutz({ ...base, invoice_document: 'receipt' }, { id: 'c', platform: 'skroutz' }, null);
+    expect(o.external_order_id).toBe('SK-1');
+    expect(o.external_state).toBe('open');
+  });
+
+  it('is reachable from the shared adapter map, so the webhook does not fall through to generic', () => {
+    expect(ADAPTERS.skroutz).toBe(fromSkroutz);
   });
 });

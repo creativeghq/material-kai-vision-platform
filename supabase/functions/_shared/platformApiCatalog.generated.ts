@@ -2476,6 +2476,15 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "store-skroutz-orders",
+    "tag": "Commerce",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document.",
+    "description": "Skroutz is not a passive feed like a webshop — it pushes an order and starts a clock. An order must be accepted or rejected, and since 30/03/2026 dispatch needs an explicit set_as_ready; an order left open expires, and an expired order is a lost sale. `pull` fetches the open queue and ingests through the same upsert_inbound_order every other channel uses. `upload_document` re-uploads the RENDERED "
+  },
+  {
     "name": "stripe-api",
     "tag": "Payments",
     "methods": [

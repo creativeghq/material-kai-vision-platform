@@ -24,6 +24,7 @@ import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard'
 import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
 import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
 import { OrderShipmentsCard } from '@/modules/finance/components/OrderShipmentsCard';
+import { sendDocumentToStore } from '@/services/commerce/storeConnectionsService';
 import { MarginAuthorityNotice } from '@/modules/finance/components/MarginAuthorityNotice';
 import { ReceptionReportCard } from '@/modules/stock/components/ReceptionReportCard';
 import { OrderLineTimelineCard } from '@/modules/finance/components/OrderLineTimelineCard';
@@ -1697,6 +1698,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // money OUT (paying a supplier / any cost) → NewExpenseDialog (a supplier bill → Payables & P&L),
   // attached to the order + defaulted to the "Order" category. `expensePrefill` seeds it from a line/supplier.
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [sendingBack, setSendingBack] = useState<string | null>(null);
   const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; vatAmount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
   // Attaching an expense that ALREADY exists (booked before the order, or arriving separately —
   // transport, customs, an installer). `setSupplierBillOrder` on an existing bill, not a new one.
@@ -2753,6 +2755,22 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   /** The documents an order can produce, offered as a choice rather than as one derived button. */
   const invoiceBlocked = salesDocKind === 'receipt';
   const canIssueSalesDoc = order?.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
+  const sendBackToStore = async (invoiceId: string) => {
+    setSendingBack(invoiceId);
+    try {
+      const r = await sendDocumentToStore(invoiceId);
+      toast({ title: `Sent to ${r.platform}`, description: `${r.number} is now on the upstream order.` });
+    } catch (err) {
+      toast({
+        title: 'The store did not accept it',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingBack(null);
+    }
+  };
+
   const salesDocumentItems = (
     <>
       {canIssueSalesDoc && (
@@ -3924,9 +3942,20 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   )}
                 </p>
               ) : fin.invoices.map((iv) => (
-                <div key={iv.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                <div key={iv.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                   <span className="font-mono text-xs">{iv.internal_number ?? iv.id.slice(0, 8)} · {humanizeLabel(iv.status)}</span>
-                  <span className="tabular-nums">{formatMoney(Number(iv.total), iv.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(iv.amount_due), iv.currency)}</span></span>
+                  <span className="flex items-center gap-2">
+                    <span className="tabular-nums">{formatMoney(Number(iv.total), iv.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(iv.amount_due), iv.currency)}</span></span>
+                    {order.store_order_id && iv.status !== 'draft' && (
+                      <Button
+                        size="sm" variant="ghost" className="h-6 text-[11px]"
+                        disabled={sendingBack === iv.id}
+                        onClick={() => sendBackToStore(iv.id)}
+                      >
+                        {sendingBack === iv.id ? 'Sending…' : 'Send to channel'}
+                      </Button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>

@@ -41,6 +41,7 @@ export interface Order {
    * customer conversation lost every trace of it the moment it was created.
    */
   source_thread_id: string | null;
+  store_order_id: string | null;
   order_number: string | null;
   status: OrderStatus;
   payment_status: OrderPaymentStatus;

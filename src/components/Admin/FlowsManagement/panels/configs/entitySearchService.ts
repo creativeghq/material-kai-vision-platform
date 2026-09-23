@@ -176,6 +176,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'stripe-api', label: 'stripe-api', sublabel: 'Stripe Checkout and Customer Portal session creator' },
   { id: 'stripe-connect', label: 'stripe-connect', sublabel: 'Stripe Connect onboarding and status for per-workspace payouts' },
   { id: 'store-document-writeback', label: 'store-document-writeback', sublabel: 'Hands the issued fiscal document back to the store the order came from.' },
+  { id: 'store-skroutz-orders', label: 'store-skroutz-orders', sublabel: 'Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document.' },
   { id: 'store-orders-sync', label: 'store-orders-sync', sublabel: 'Pulls recent orders from a connected store to close the gap a missed webhook leaves.' },
   { id: 'store-orders-webhook', label: 'store-orders-webhook', sublabel: 'Receives orders from a connected sales channel (Shopify, WooCommerce, generic).' },
   { id: 'stripe-webhooks', label: 'stripe-webhooks', sublabel: 'Stripe webhook receiver for subscription, payment, and invoice events' },

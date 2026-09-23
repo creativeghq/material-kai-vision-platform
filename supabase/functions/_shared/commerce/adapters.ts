@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { normaliseMoney, type RawLine, type NormalisedMoney } from './money.ts';
+import { fromSkroutz } from './skroutz.ts';
 
 export interface AdapterConnection {
   id: string;
@@ -216,5 +217,8 @@ export function fromGeneric(payload: any, _conn: AdapterConnection, eventType: s
 export const ADAPTERS: Record<string, (p: any, c: AdapterConnection, e: string | null) => CanonicalOrder> = {
   shopify: fromShopify,
   woocommerce: fromWooCommerce,
+  skroutz: fromSkroutz,
   generic: fromGeneric,
 };
+
+export type { RawLine } from './money.ts';
