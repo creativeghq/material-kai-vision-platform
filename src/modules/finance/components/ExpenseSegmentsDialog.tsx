@@ -10,7 +10,7 @@ import { todayLocalISO } from '@/utils/datetime';
 import { inboundService } from '@/modules/finance/services/inboundService';
 import {
   expenseKindCopy, vatTreatmentCopy, originLabel, sortExpenseSegments, totalExpenseSegments,
-  type ExpenseSegmentRow,
+  byOrigin, type ExpenseSegmentRow,
 } from '@/modules/finance/expenseSegments';
 
 const YEARS = 4;
@@ -38,6 +38,7 @@ export const ExpenseSegmentsDialog: React.FC<{ workspaceId: string }> = ({ works
 
   const segments = rows ? sortExpenseSegments(rows) : [];
   const totals = rows ? totalExpenseSegments(rows) : null;
+  const origins = rows ? byOrigin(rows) : [];
 
   return (
     <>
@@ -111,6 +112,34 @@ export const ExpenseSegmentsDialog: React.FC<{ workspaceId: string }> = ({ works
                   <p className="text-[11px] text-muted-foreground">credit notes, delivery notes, receipts</p>
                 </div>
               </div>
+
+              {origins.length > 0 && (
+                <div className="rounded-md border border-hairline p-4">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Total expenses, by where they came from
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-3">
+                    {origins.map((o) => (
+                      <div key={o.origin}>
+                        <p className="text-xs text-muted-foreground">{o.label}</p>
+                        <p className="text-base font-semibold tabular-nums">{formatMoney(o.net, 'EUR')}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {o.docs.toLocaleString()} document{o.docs === 1 ? '' : 's'}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="border-l border-hairline pl-8">
+                      <p className="text-xs font-medium">All expenses</p>
+                      <p className="text-base font-semibold tabular-nums">
+                        {formatMoney(origins.reduce((s, o) => s + o.net, 0), 'EUR')}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {origins.reduce((s, o) => s + o.docs, 0).toLocaleString()} documents
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="table-scroll max-h-[50vh] overflow-y-auto">
                 <table className="w-full text-sm">

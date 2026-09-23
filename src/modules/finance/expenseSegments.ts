@@ -97,6 +97,30 @@ export function byVatTreatment(rows: ExpenseSegmentRow[]): VatTreatmentGroup[] {
   );
 }
 
+const ORIGIN_ORDER: ExpenseOrigin[] = ['domestic', 'intra_eu', 'third_country', 'unknown'];
+
+export interface OriginTotal {
+  origin: ExpenseOrigin;
+  label: string;
+  net: number;
+  vat: number;
+  docs: number;
+}
+
+export function byOrigin(rows: ExpenseSegmentRow[]): OriginTotal[] {
+  const at = new Map<ExpenseOrigin, OriginTotal>();
+  for (const r of rows) {
+    if (!r.in_pnl) continue;
+    const g = at.get(r.origin)
+      ?? { origin: r.origin, label: originLabel(r.origin), net: 0, vat: 0, docs: 0 };
+    g.net += r.net; g.vat += r.vat; g.docs += r.docs;
+    at.set(r.origin, g);
+  }
+  return [...at.values()].sort(
+    (a, b) => ORIGIN_ORDER.indexOf(a.origin) - ORIGIN_ORDER.indexOf(b.origin),
+  );
+}
+
 export interface ExpenseSegmentTotals {
   docs: number; net: number;
   inPnlNet: number;

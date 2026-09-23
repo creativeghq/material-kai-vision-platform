@@ -699,9 +699,10 @@ function renderReport(
   if (report === 'vat_by_code') {
     const fmtRate = (rate: any) => rate == null ? '—' : `${Number(rate)}%`;
     return (
-      <Table headers={['VAT cat', 'Rate', 'Classification type', 'Classification category', 'Net', 'VAT', 'Lines']} totals={totals} rows={rows.map((r: any) => [
+      <Table headers={['Side', 'VAT cat', 'Rate', 'Classification type', 'Classification category', 'Net', 'VAT', 'Lines']} totals={totals} rows={rows.map((r: any) => [
+        r.side === 'expense' ? 'Expense' : 'Income',
         r.vat_category == null ? '—' : String(r.vat_category), fmtRate(r.vat_rate),
-        r.income_classification_type ?? '—', r.income_classification_category ?? '—',
+        r.classification_type ?? '—', r.classification_category ?? '—',
         formatMoney(Number(r.net || 0), r.currency || 'EUR'), formatMoney(Number(r.vat || 0), r.currency || 'EUR'), String(r.line_count ?? 0),
       ])} />
     );

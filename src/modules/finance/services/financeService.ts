@@ -3404,7 +3404,7 @@ export interface VatReportRow {
     | 'reverse_charge_output' | 'reverse_charge_input';
   vat_rate: number | null; net: number; vat: number; doc_count: number;
 }
-export interface VatByCodeRow { vat_category: number | null; vat_rate: number | null; income_classification_type: string; income_classification_category: string; net: number; vat: number; line_count: number }
+export interface VatByCodeRow { side: 'income' | 'expense'; vat_category: number | null; vat_rate: number | null; classification_type: string; classification_category: string; net: number; vat: number; line_count: number }
 export interface PartyLedgerRow {
   entry_date: string | null; doc_kind: string; doc_number: string | null;
   debit: number; credit: number; currency: string | null;
