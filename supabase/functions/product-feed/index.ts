@@ -76,6 +76,24 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
   const catName = new Map((cats.data ?? []).map((c: any) => [c.id, c.name]));
   const brandName = new Map((brands.data ?? []).map((b: any) => [b.id, b.name]));
 
+  const productIds = rows.map((r: Record<string, any>) => r.product?.id).filter(Boolean);
+  const onHand = new Map<string, number>();
+  const known = new Set<string>();
+  if (productIds.length) {
+    const { data: stock } = await supabase.from('warehouse_items')
+      .select('product_id, qty_on_hand, qty_reserved, is_active')
+      .eq('workspace_id', feed.workspace_id)
+      .in('product_id', productIds);
+    for (const w of stock ?? []) {
+      const row = w as Record<string, any>;
+      if (row.is_active === false) continue;
+      const pid = String(row.product_id);
+      known.add(pid);
+      const free = Number(row.qty_on_hand ?? 0) - Number(row.qty_reserved ?? 0);
+      onHand.set(pid, (onHand.get(pid) ?? 0) + (Number.isFinite(free) ? free : 0));
+    }
+  }
+
   const storeUrl = `${publicAppUrl().replace(/\/$/, '')}/store/${ws?.slug ?? ''}`;
 
   const products: FeedProduct[] = rows.map((r: Record<string, any>) => {
@@ -96,20 +114,22 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
       price_gross: grossFromNet(net, pct),
       vat_percent: pct,
       currency: r.currency ?? feed.currency ?? 'EUR',
-      in_stock: true,
-      quantity: null,
+      in_stock: known.has(String(p.id)) && (onHand.get(String(p.id)) ?? 0) > 0,
+      quantity: known.has(String(p.id)) ? Math.max(0, Math.trunc(onHand.get(String(p.id)) ?? 0)) : null,
       weight_kg: p.net_mass_kg ?? null,
     };
   });
 
+  const listed = feed.include_out_of_stock ? products : products.filter((p) => p.in_stock);
+
   const body = feed.format === 'skroutz'
-    ? renderSkroutzFeed(products, new Date())
-    : renderGoogleFeed(products, { title: `${ws?.name ?? 'Catalogue'} — ${feed.name}`, link: storeUrl });
+    ? renderSkroutzFeed(listed, new Date())
+    : renderGoogleFeed(listed, { title: `${ws?.name ?? 'Catalogue'} — ${feed.name}`, link: storeUrl });
 
   const gzip = (req.headers.get('accept-encoding') ?? '').includes('gzip')
     && new Blob([body]).size > 512 * 1024;
 
-  await supabase.rpc('bump_product_feed_fetch', { p_feed_id: feed.id, p_item_count: products.length });
+  await supabase.rpc('bump_product_feed_fetch', { p_feed_id: feed.id, p_item_count: listed.length });
 
   return xml(body, gzip);
 }));

@@ -26,6 +26,9 @@ import {
 } from '@/services/commerce/productFeedsService';
 import { PayoutsCard } from '@/modules/commerce-core/components/PayoutsCard';
 import { SkroutzQueueCard } from '@/modules/commerce-core/components/SkroutzQueueCard';
+import { ChannelOverviewCard } from '@/modules/commerce-core/components/ChannelOverviewCard';
+import { ConnectionSettingsCard } from '@/modules/commerce-core/components/ConnectionSettingsCard';
+import { FeedSelectionEditor } from '@/modules/commerce-core/components/FeedSelectionEditor';
 
 const PLATFORM_LABEL: Record<CommercePlatform, string> = {
   skroutz: 'Skroutz',
@@ -34,7 +37,6 @@ const PLATFORM_LABEL: Record<CommercePlatform, string> = {
   generic: 'Generic',
 };
 
-/** What each platform calls its own credentials, so the form asks for the right thing by name. */
 const CREDENTIAL_FIELDS: Record<CommercePlatform, { key: string; label: string; hint?: string }[]> = {
   skroutz: [{ key: 'api_token', label: 'Smart Cart API token', hint: 'Merchants → Services → Skroutz Marketplace. Generating a new token expires the previous one.' }],
   shopify: [{ key: 'admin_token', label: 'Admin API access token', hint: 'Needs read_orders and write_orders.' }],
@@ -76,6 +78,8 @@ export default function SalesChannelsPage() {
   const [feedName, setFeedName] = useState('');
   const [feedFormat, setFeedFormat] = useState<FeedFormat>('google');
   const [rotating, setRotating] = useState<string | null>(null);
+  const [settingsFor, setSettingsFor] = useState<string | null>(null);
+  const [feedEditing, setFeedEditing] = useState<string | null>(null);
   const [rotateCreds, setRotateCreds] = useState<Record<string, string>>({});
   const [rotateSecret, setRotateSecret] = useState('');
 
@@ -218,6 +222,8 @@ export default function SalesChannelsPage() {
         </TabsList>
 
         <TabsContent value={platformFilter ?? 'all'} className="mt-4 space-y-4">
+          <ChannelOverviewCard workspaceId={ws} />
+
           {adding && (
             <Card>
               <CardHeader>
@@ -374,7 +380,13 @@ export default function SalesChannelsPage() {
                       {row.has_credentials ? 'Replace credentials' : 'Add credentials'}
                     </Button>
                   )}
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                    onClick={() => setSettingsFor(settingsFor === row.id ? null : row.id)}>
+                    {settingsFor === row.id ? 'Hide settings' : 'Settings'}
+                  </Button>
                 </div>
+
+                {settingsFor === row.id && <ConnectionSettingsCard connection={row} onSaved={load} />}
               </CardContent>
             </Card>
           ))}
@@ -434,11 +446,19 @@ export default function SalesChannelsPage() {
                     <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => copyFeed(f)}><Copy className="mr-1 h-3 w-3" /> Copy</Button>
                     <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => rotateFeed(f)}><RefreshCw className="mr-1 h-3 w-3" /> Rotate</Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {f.last_fetched_at
-                      ? `Last read ${formatDate(f.last_fetched_at, { withTime: true })} · ${f.fetch_count} reads · ${f.last_item_count ?? 0} products`
-                      : 'Never read. If the importer is configured and this stays empty, it is not reaching us.'}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      {f.last_fetched_at
+                        ? `Last read ${formatDate(f.last_fetched_at, { withTime: true })} · ${f.fetch_count} reads · ${f.last_item_count ?? 0} products`
+                        : 'Never read. If the importer is configured and this stays empty, it is not reaching us.'}
+                    </p>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs"
+                      onClick={() => setFeedEditing(feedEditing === f.id ? null : f.id)}>
+                      {feedEditing === f.id ? 'Done' : 'Choose what it lists'}
+                    </Button>
+                  </div>
+
+                  {feedEditing === f.id && <FeedSelectionEditor feed={f} onSaved={load} />}
                 </div>
               ))}
             </CardContent>

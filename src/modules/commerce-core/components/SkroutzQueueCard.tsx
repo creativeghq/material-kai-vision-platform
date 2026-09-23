@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Store, RefreshCw, Check, X, PackageCheck } from 'lucide-react';
+import { Store, RefreshCw, Check, X, PackageCheck, FileUp } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
@@ -17,6 +17,8 @@ interface QueueRow {
   external_state: string | null;
   document_request: string | null;
   synced_at: string;
+  invoice_id: string | null;
+  invoice_number: string | null;
 }
 
 const STATE_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
@@ -33,7 +35,8 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('store_orders')
-      .select('id, external_order_id, external_order_number, external_state, document_request, synced_at')
+      .select('id, external_order_id, external_order_number, external_state, document_request, synced_at, '
+        + 'orders(id, invoices(id, status, internal_number))')
       .eq('connection_id', connection.id)
       .order('synced_at', { ascending: false })
       .limit(50);
@@ -41,16 +44,31 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
       toast({ title: 'Could not load the Skroutz queue', description: error.message, variant: 'destructive' });
       return;
     }
-    setRows((data ?? []) as QueueRow[]);
+    setRows((data ?? []).map((raw) => {
+      const r = raw as Record<string, any>;
+      const issued = (r.orders ?? [])
+        .flatMap((o: Record<string, any>) => o.invoices ?? [])
+        .find((i: Record<string, any>) => i.status !== 'draft') ?? null;
+      return {
+        id: r.id,
+        external_order_id: r.external_order_id,
+        external_order_number: r.external_order_number,
+        external_state: r.external_state,
+        document_request: r.document_request,
+        synced_at: r.synced_at,
+        invoice_id: issued?.id ?? null,
+        invoice_number: issued?.internal_number ?? null,
+      } as QueueRow;
+    }));
   }, [connection.id, toast]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const call = async (action: string, orderCode?: string) => {
+  const call = async (action: string, orderCode?: string, invoiceId?: string) => {
     setBusy(orderCode ?? action);
     try {
       const { data, error } = await supabase.functions.invoke('store-skroutz-orders', {
-        body: { action, connection_id: connection.id, order_code: orderCode },
+        body: { action, connection_id: connection.id, order_code: orderCode, invoice_id: invoiceId },
       });
       if (error) throw error;
       await load();
@@ -140,6 +158,12 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
                         <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={busy === r.external_order_id}
                           onClick={() => call('set_as_ready', r.external_order_id)}>
                           <PackageCheck className="mr-1 h-3 w-3" /> Set as ready
+                        </Button>
+                      )}
+                      {r.invoice_id && (
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={busy === r.external_order_id}
+                          onClick={() => call('upload_document', r.external_order_id, r.invoice_id ?? undefined)}>
+                          <FileUp className="mr-1 h-3 w-3" /> Send {r.invoice_number}
                         </Button>
                       )}
                     </td>

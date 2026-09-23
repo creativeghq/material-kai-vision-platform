@@ -8,11 +8,19 @@ export const FEED_FORMATS: { value: FeedFormat; label: string; hint: string }[] 
   { value: 'generic', label: 'Generic', hint: 'The same RSS document, for any other importer that accepts it.' },
 ];
 
+export type FeedSelectionMode = 'all_published' | 'category' | 'products';
+
+export interface FeedSelection {
+  mode: FeedSelectionMode;
+  ids?: string[];
+}
+
 export interface ProductFeed {
   id: string;
   name: string;
   slug: string;
   format: FeedFormat;
+  selection: FeedSelection;
   currency: string;
   only_storefront_published: boolean;
   include_out_of_stock: boolean;
@@ -24,7 +32,7 @@ export interface ProductFeed {
   fetch_count: number;
 }
 
-const COLUMNS = 'id, name, slug, format, currency, only_storefront_published, include_out_of_stock, '
+const COLUMNS = 'id, name, slug, format, selection, currency, only_storefront_published, include_out_of_stock, '
   + 'public_token, enabled, last_built_at, last_item_count, last_fetched_at, fetch_count';
 
 export function feedUrl(token: string): string {
@@ -46,6 +54,24 @@ export const productFeedsService = {
       workspace_id: workspaceId, name: input.name.trim(), slug, format: input.format,
     });
     if (error) throw error;
+  },
+
+  async setSelection(id: string, selection: FeedSelection): Promise<void> {
+    const { error } = await supabase.from('product_feeds')
+      .update({ selection, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async setGates(id: string, gates: { only_storefront_published?: boolean; include_out_of_stock?: boolean }): Promise<void> {
+    const { error } = await supabase.from('product_feeds')
+      .update({ ...gates, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async categories(): Promise<{ id: string; name: string }[]> {
+    const { data, error } = await supabase.from('material_categories').select('id, name').order('name');
+    if (error) throw error;
+    return (data ?? []) as { id: string; name: string }[];
   },
 
   async setEnabled(id: string, enabled: boolean): Promise<void> {
