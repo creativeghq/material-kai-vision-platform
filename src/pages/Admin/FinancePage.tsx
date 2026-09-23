@@ -91,6 +91,9 @@ import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { inboundService } from '@/modules/finance/services/inboundService';
 import type { ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
+
+type DashView = 'position' | 'flow' | 'activity';
+import { HubTabNav } from '@/components/core/hub';
 import { FinanceHealthStrip } from '@/modules/finance/components/FinanceHealthStrip';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
 import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
@@ -195,6 +198,7 @@ const FinancePage: React.FC = () => {
   const [pnlOverview, setPnlOverview] = useState<PnlOverview | null>(null);
   const [pnlMonths, setPnlMonths] = useState<PnlMonthRow[]>([]);
   const [pnlSegments, setPnlSegments] = useState<ExpenseSegmentRow[] | null>(null);
+  const [dashView, setDashView] = useState<DashView>('position');
   // Its OWN flag: loadInsights catches to [] and settles first, so sharing its flag showed the
   // cards as loaded - every tile "Unknown" - while these two reads were still in flight.
   const [pnlLoading, setPnlLoading] = useState(true);
@@ -670,7 +674,18 @@ const FinancePage: React.FC = () => {
                 </Select>
               </div>
             </div>
+            <HubTabNav
+              aria-label="Dashboard view"
+              activeId={dashView}
+              onSelect={(id) => setDashView(id as DashView)}
+              items={[
+                { id: 'position', label: 'Position' },
+                { id: 'flow', label: 'Flow' },
+                { id: 'activity', label: 'Activity' },
+              ]}
+            />
 
+            {dashView === 'position' && (<>
             {workspaceId && <FinanceHealthStrip workspaceId={workspaceId} />}
 
             <PnlOverviewCard
@@ -687,13 +702,19 @@ const FinancePage: React.FC = () => {
               currency={pnlOverview?.currency && pnlOverview.currency !== 'MIXED' ? pnlOverview.currency : 'EUR'}
               loading={pnlLoading}
             />
+            </>)}
 
+            {dashView === 'flow' && (<>
             {/* Where the money sits — live balance per bank/cash account. */}
             <BankBalancesCard rows={bankBalances} onManage={() => onTabChange('settings')} />
+            </>)}
 
+            {dashView === 'position' && (<>
             {/* Revenue trend + period-over-period growth signal (reuses the 12-mo P&L). */}
             <RevenueTrendCard rows={pnl} />
+            </>)}
 
+            {dashView === 'flow' && (<>
             {/* AR / AP buckets side-by-side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} credit={deposits.total} money={arMoney} />
@@ -741,7 +762,9 @@ const FinancePage: React.FC = () => {
               <CashFlowCard rows={cashFlow} />
               <PnlCard rows={pnl} />
             </div>
+            </>)}
 
+            {dashView === 'activity' && (<>
             {/* Next follow-ups + Recent invoices */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <Card>
@@ -841,6 +864,7 @@ const FinancePage: React.FC = () => {
               <RecentOrdersCard rows={recentOrders} balances={recentOrderBalances} balancesUnknown={recentBalancesUnknown} onViewAll={() => onTabChange('doc_orders')} />
               <TopOutstandingCard rows={topOutstanding} onViewAll={() => onTabChange('ar')} />
             </div>
+            </>)}
           </TabsContent>
 
           {/* ─────────── RECEIVABLES ─────────── */}
