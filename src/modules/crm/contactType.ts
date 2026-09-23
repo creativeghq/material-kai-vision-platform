@@ -12,40 +12,58 @@ export interface NewContactPrefill {
   contact_type?: ContactTypeValue | null;
 }
 
-export type NewContactKindId = 'customer_private' | 'customer_business' | 'supplier' | 'other';
+export type NewPartyKindId = 'customer_private' | 'customer_business' | 'supplier' | 'other';
 
-export interface NewContactKind {
-  id: NewContactKindId;
+export interface NewPartyKind {
+  id: NewPartyKindId;
+  entity: 'contact' | 'company';
+  group: 'person' | 'business';
   label: string;
   hint: string;
-  prefill: NewContactPrefill;
+  companyRoles?: { is_customer?: boolean; is_supplier?: boolean };
+  contactPrefill: NewContactPrefill;
 }
 
 /** Asked BEFORE the form because the column DEFAULTS to 'private': a contact nobody classified
  *  is a consumer to every fiscal path, and a consumer can only be issued a retail receipt. */
-export const NEW_CONTACT_KINDS: NewContactKind[] = [
+export const NEW_PARTY_KINDS: NewPartyKind[] = [
   {
     id: 'customer_private',
-    label: 'Customer · private person',
+    entity: 'contact',
+    group: 'person',
+    label: 'Customer · Private Person',
     hint: 'Buys for themselves — retail receipt, no VAT number.',
-    prefill: { is_client: true, is_supplier: false, contact_type: 'private' },
-  },
-  {
-    id: 'customer_business',
-    label: 'Customer · business',
-    hint: 'A sole trader or business we invoice against their ΑΦΜ / VAT number.',
-    prefill: { is_client: true, is_supplier: false, contact_type: 'company' },
-  },
-  {
-    id: 'supplier',
-    label: 'Supplier',
-    hint: 'Someone we buy from — no pricing or invoicing profile.',
-    prefill: { is_client: false, is_supplier: true, contact_type: null },
+    contactPrefill: { is_client: true, is_supplier: false, contact_type: 'private' },
   },
   {
     id: 'other',
-    label: 'Other contact',
+    entity: 'contact',
+    group: 'person',
+    label: 'Other Contact',
     hint: 'A lead, partner or colleague — not trading with us yet.',
-    prefill: { is_client: false, is_supplier: false, contact_type: null },
+    contactPrefill: { is_client: false, is_supplier: false, contact_type: null },
+  },
+  {
+    id: 'customer_business',
+    entity: 'company',
+    group: 'business',
+    label: 'Customer · Business',
+    hint: 'A business we invoice against their ΑΦΜ / VAT number.',
+    companyRoles: { is_customer: true, is_supplier: false },
+    contactPrefill: { is_client: true, is_supplier: false, contact_type: 'company' },
+  },
+  {
+    id: 'supplier',
+    entity: 'company',
+    group: 'business',
+    label: 'Supplier',
+    hint: 'A business we buy from — no pricing or invoicing profile.',
+    companyRoles: { is_supplier: true, is_customer: false },
+    contactPrefill: { is_client: false, is_supplier: true, contact_type: 'company' },
   },
 ];
+
+export const PARTY_GROUP_LABEL: Record<NewPartyKind['group'], string> = {
+  person: 'A person',
+  business: 'A business',
+};

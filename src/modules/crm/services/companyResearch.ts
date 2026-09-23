@@ -78,6 +78,10 @@ const COMPANY_ONLY_FIELDS = new Set([
   'name',
 ]);
 
+/** Drop the company-only columns from a patch so it can seed a `crm_contacts` row instead. */
+export const narrowToContactFields = (fields: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(fields).filter(([k]) => !COMPANY_ONLY_FIELDS.has(k)));
+
 const KAD_SOURCE_RANK: Record<'aade' | 'gemi', number> = { aade: 0, gemi: 1 };
 
 /**
@@ -347,9 +351,7 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
 
   onProgress?.(null);
 
-  if (target === 'contact') {
-    fields = Object.fromEntries(Object.entries(fields).filter(([k]) => !COMPANY_ONLY_FIELDS.has(k)));
-  }
+  if (target === 'contact') fields = narrowToContactFields(fields);
 
   return {
     fields,

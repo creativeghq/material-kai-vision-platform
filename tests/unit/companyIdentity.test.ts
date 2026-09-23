@@ -179,7 +179,7 @@ describe('the shared control is the only way a business gets created', () => {
    * quick-add dialog (everywhere else). Adding a create-a-business surface means adding it here.
    */
   const CREATE_SURFACES: Array<{ file: string; via: string }> = [
-    { file: 'src/modules/crm/components/AddCompanyModal.tsx', via: 'CompanyIdentityLookup' },
+    { file: 'src/modules/crm/components/AddPartyModal.tsx', via: 'CompanyIdentityLookup' },
     { file: 'src/modules/finance/components/NewExpenseDialog.tsx', via: 'QuickAddCompanyDialog' },
     { file: 'src/modules/finance/components/NewInvoiceDialog.tsx', via: 'QuickAddCompanyDialog' },
   ];

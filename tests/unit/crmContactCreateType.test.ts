@@ -2,11 +2,11 @@
 import { describe, it, expect } from 'vitest';
 import { posix, strippedSource, sourceIndex } from '../helpers/sourceIndex';
 import { LAUNCHER_ACTIONS } from '@/config/launcher-sections';
-import { CONTACT_TYPE_OPTIONS, NEW_CONTACT_KINDS } from '@/modules/crm/contactType';
+import { CONTACT_TYPE_OPTIONS, NEW_PARTY_KINDS } from '@/modules/crm/contactType';
 
 const CRM_PAGE = 'src/modules/crm/pages/CRMPage.tsx';
 const CONTACT_PAGE = 'src/modules/crm/pages/ContactDetailPage.tsx';
-const MODAL = 'src/modules/crm/components/AddContactModal.tsx';
+const MODAL = 'src/modules/crm/components/AddPartyModal.tsx';
 const INDEX = sourceIndex({ roots: ['src'] });
 
 describe('launcher create actions', () => {
@@ -27,14 +27,23 @@ describe('launcher create actions', () => {
   });
 });
 
-describe('new contact asks the type first', () => {
-  it('nothing but the modal reaches the blank form', () => {
-    expect(strippedSource(CRM_PAGE)).toContain('AddContactModal');
-    const bypass = INDEX.stripped()
-      .filter(([, src]) => /['"`]\/crm\/contacts\/new['"`]/.test(src))
+describe('one picker asks what kind of party', () => {
+  it('nothing but the modal reaches either blank form', () => {
+    expect(strippedSource(CRM_PAGE)).toContain('AddPartyModal');
+    for (const route of ['/crm/contacts/new', '/crm/companies/new']) {
+      const bypass = INDEX.stripped()
+        .filter(([, src]) => new RegExp(`['"\`]${route}['"\`]`).test(src))
+        .map(([file]) => posix(file))
+        .filter((f) => f !== MODAL);
+      expect(bypass, `these skip the type question the modal exists to ask: ${bypass.join(', ')}`).toEqual([]);
+    }
+  });
+
+  it('the twin pickers are gone, not merely unused', () => {
+    const twins = INDEX.stripped()
       .map(([file]) => posix(file))
-      .filter((f) => f !== MODAL);
-    expect(bypass, `these skip the type question the modal exists to ask: ${bypass.join(', ')}`).toEqual([]);
+      .filter((f) => /components\/Add(Contact|Company)Modal\.tsx$/.test(f));
+    expect(twins, `a second party picker is back: ${twins.join(', ')}`).toEqual([]);
   });
 
   it('the form seeds itself from the choice', () => {
@@ -44,12 +53,33 @@ describe('new contact asks the type first', () => {
 
   it('every kind states both the side of the trade and the VAT treatment', () => {
     const legal = new Set<string | null>([...CONTACT_TYPE_OPTIONS.map((o) => o.value), null]);
-    for (const kind of NEW_CONTACT_KINDS) {
-      expect(kind.prefill.is_client, `${kind.id} leaves is_client unset`).toBeTypeOf('boolean');
-      expect(kind.prefill.is_supplier, `${kind.id} leaves is_supplier unset`).toBeTypeOf('boolean');
-      expect(legal.has(kind.prefill.contact_type ?? null), `${kind.id}: ${kind.prefill.contact_type}`).toBe(true);
+    for (const kind of NEW_PARTY_KINDS) {
+      expect(kind.contactPrefill.is_client, `${kind.id} leaves is_client unset`).toBeTypeOf('boolean');
+      expect(kind.contactPrefill.is_supplier, `${kind.id} leaves is_supplier unset`).toBeTypeOf('boolean');
+      expect(legal.has(kind.contactPrefill.contact_type ?? null), `${kind.id}: ${kind.contactPrefill.contact_type}`).toBe(true);
     }
-    const invoiced = NEW_CONTACT_KINDS.filter((k) => k.prefill.contact_type === 'company');
+    const invoiced = NEW_PARTY_KINDS.filter((k) => k.contactPrefill.contact_type === 'company');
     expect(invoiced.length, 'no kind produces a contact that can be invoiced as a business').toBeGreaterThan(0);
+  });
+
+  it('every business kind runs the registry lookup and names both roles', () => {
+    const business = NEW_PARTY_KINDS.filter((k) => k.group === 'business');
+    expect(business.length, 'no kind creates a business').toBeGreaterThan(0);
+    for (const kind of business) {
+      expect(kind.entity, `${kind.id} is a business that writes a contact row`).toBe('company');
+      expect(kind.companyRoles?.is_customer, `${kind.id} leaves is_customer unset`).toBeTypeOf('boolean');
+      expect(kind.companyRoles?.is_supplier, `${kind.id} leaves is_supplier unset`).toBeTypeOf('boolean');
+    }
+    const body = strippedSource(MODAL);
+    expect(body).toContain('CompanyIdentityLookup');
+    expect(body, 'a company is created without the identity payload derivation').toContain('companyIdentityPayload');
+  });
+
+  it('the sole-trader route keeps the resolved identity', () => {
+    const body = strippedSource(MODAL);
+    const route = body.slice(body.indexOf('createSoleTrader'));
+    expect(route).toContain('/crm/contacts/new');
+    expect(route).toContain('vat_number');
+    expect(route, 'company-only columns would be sprayed onto a contact insert').toContain('narrowToContactFields');
   });
 });

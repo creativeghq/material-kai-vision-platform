@@ -148,7 +148,7 @@ export const ContactDetailPage: React.FC = () => {
   const { enabled: realEstateEnabled } = useModule('real-estate'); // Property tab when module on
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
-  // What AddContactModal picked. Absent is legitimate — a bookmark on /crm/contacts/new.
+  // What AddPartyModal picked. Absent is legitimate — a bookmark on /crm/contacts/new.
   const location = useLocation();
   const prefill = (location.state as { prefill?: Partial<Contact> } | null)?.prefill;
   const [loading, setLoading] = useState(false);
