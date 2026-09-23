@@ -2700,3 +2700,23 @@ were accidentally safe — `documentation` and `quote-templates` use `FOR ALL` p
 - **Proven to fire:** 2026-09-19 — the new SELECT policy was dropped inside an aborting `DO` block; the lint went 0 → 1, naming `profile-avatars` and the two write policies that had nothing to read them back.
 - **The second half, which the first fix would have hidden:** `_extract_storage_path_from_url` stripped a query string on its `sign` branch only. `ProfileTab` stores `…/avatar.jpg?t=<now>` to bust the CDN cache, so `build_storage_reference_set()` claimed a path no object has and `storage-orphan-cleanup-cron` would have deleted every avatar on its first run after uploads started working — the fix would have looked correct for one day. Both branches strip it now.
 - **Recipe:** the failing statement is the one the API runs, not the one that looks equivalent. `INSERT` and `INSERT ... RETURNING` are different questions to RLS, and only the second is what storage, PostgREST and every `.select()`-chained write actually send.
+
+### One cost, two records — the P&L expense side grew a second feed — 2026-09-23
+
+The expense side of `_finance_pnl_parts` had one feed for its whole life: supplier bills. It now
+has two. `17.x` entity entries — payroll, depreciation, the accounting-base regularisations — are
+counted **straight from the document**, because `_inbound_doc_to_supplier_bill_core` refuses them
+and they can therefore never become bills. Without that term they were in no P&L figure the
+platform produces: 2024 read EUR 0.00 expenses against EUR 71,833.96 of them.
+
+Two feeds that do not know about each other is the double-count shape, and it is latent rather
+than live. Both halves are zero today — `hr_payroll_runs` is empty and there are no recurring
+expense templates — so nothing is wrong right now. Both go live the moment either feature is used,
+and the recurring-plan feature shipped the same week.
+
+- **Shape A — payroll twice.** HR gains a path that posts payroll as a cost, while the 17.1 document ΑΑΔΕ already holds keeps counting from itself.
+- **Shape B — rent twice.** A recurring template writes a monthly bill, and the landlord's 16.1 document is booked into a second one. 16.1 became bookable on 2026-09-22, which is what made this reachable.
+- **Guarded by:** `finance.expense_counted_twice` (`dic_detect__finance_expense_counted_twice`), registered in the nightly sweep at `warning`. It catches both: an entity entry beside a supplier bill of the same money within five days, and two bills for one supplier/amount/week where **only one** traces back to a received document — two genuine identical invoices both have a document, or both have none, so the asymmetry is the signal and not the duplication.
+- **`autoheal_enabled = false`, and `heal_fn` is null on purpose.** Deciding which of two records is the real cost is a judgement about the business, not a number to re-derive. A heal that deleted one would be a heal that moves money.
+- **Proven to fire:** 2026-09-23 — both shapes built inside an aborting `DO` block (a 17.1 for 4,000 beside a 4,000 bill two days later; two 250 bills three days apart with a 16.1 attached to one). Found 1 and 1, total 2. Zero findings against the live tree, which is the answer a detector returning zero has to earn.
+- **The grant was the real bug in the guard.** It came out `EXECUTE`-able by `authenticated` — **1 of 142 detectors**, the other 141 service_role only. A detector scans every workspace with no tenancy filter by design, so that handed any signed-in user every workspace's supplier bills. `REVOKE ... FROM anon` does not remove the DEFAULT grant to `PUBLIC`; it has to be `FROM public, anon`, and the count against the other 141 is what made the outlier visible at all.
