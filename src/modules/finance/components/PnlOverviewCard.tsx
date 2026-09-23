@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { formatMoney } from '@/utils/decimal';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { vatPayableLabel } from '@/modules/finance/vatReturn';
-import { byVatTreatment, type ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
+import { byOrigin, byVatTreatment, type ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
 import { aadeVerdict, booksVerdict, type PnlVerdict } from '@/modules/finance/pnlStatus';
 import type { PnlOverview } from '@/modules/finance/services/financeService';
 
@@ -66,6 +66,7 @@ interface Props {
  */
 export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLabel, loading, error, onRetry }) => {
   const expenseMix = segments ? byVatTreatment(segments) : null;
+  const expenseOrigins = segments ? byOrigin(segments) : null;
   if (error) {
     return (
       <Card>
@@ -199,6 +200,22 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
                     </div>
                   ))}
                 </div>
+                {expenseOrigins && expenseOrigins.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-end gap-x-8 gap-y-3 border-t border-hairline pt-3">
+                    {expenseOrigins.map((o) => (
+                      <div key={o.origin}>
+                        <p className="text-xs text-muted-foreground">{o.label}</p>
+                        <p className="text-base font-semibold tabular-nums">{formatMoney(o.net, 'EUR')}</p>
+                      </div>
+                    ))}
+                    <div className="border-l border-hairline pl-8">
+                      <p className="text-xs font-medium">All expenses</p>
+                      <p className="text-base font-semibold tabular-nums">
+                        {formatMoney(expenseOrigins.reduce((s, o) => s + o.net, 0), 'EUR')}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   Received documents, whether or not they are booked yet. Rent and your own
                   entries carry no VAT at all; a reverse-charged purchase states VAT you declare
