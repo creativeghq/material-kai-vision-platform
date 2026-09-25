@@ -15,6 +15,12 @@ import { getRunnerGated, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.t
 import { DelegateToMivaaError, CancelledError } from '../_shared/agents/types.ts';
 import type { BackgroundAgentRecord, AgentRunRecord, AgentRunContext } from '../_shared/agents/types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { captureMessage } from '../_shared/sentry.ts';
+
+/** An agent that RETURNED `success:false` failed as surely as one that threw. */
+class AgentReportedFailure extends Error {
+  constructor(message: string, readonly output: Record<string, unknown>) { super(message); }
+}
 
 const { createClient } = await import('@supabase/supabase-js');
 
@@ -272,6 +278,13 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
     await log('info', `Agent "${agentConfig.name}" started`, { triggered_by, input_data });
 
     const result = await runner.run(ctx);
+    if (result.success === false) {
+      const reason = (result.output as { error?: unknown })?.error;
+      throw new AgentReportedFailure(
+        typeof reason === 'string' && reason ? reason : 'Agent reported failure',
+        result.output,
+      );
+    }
 
     const duration = Date.now() - startTime;
 
@@ -429,10 +442,20 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
       .update({
         status:        'failed',
         error_message: errMsg,
+        ...(err instanceof AgentReportedFailure ? { output_data: err.output } : {}),
         completed_at:  new Date().toISOString(),
         duration_ms:   duration,
       })
       .eq('id', run.id);
+
+    // A platform agent has no workspace to notify, so the operator hears through Sentry.
+    if (!agentConfig.workspace_id) {
+      await captureMessage(`Background agent failed: ${agentConfig.name} — ${errMsg}`, 'error', {
+        tags: { area: 'background-agents', agent_type: String(agentConfig.agent_type ?? '') },
+        extra: { agent_id, run_id: run.id },
+        fingerprint: ['background-agent-failed', String(agent_id)],
+      });
+    }
 
     await supabase
       .from('background_agents')

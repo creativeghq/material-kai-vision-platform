@@ -30,4 +30,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           MIVAA_CRON_SECRET: ${{ secrets.MIVAA_CRON_SECRET }}
+          SMOKE_CONTEXT: monitor
         run: node scripts/smoke/smoke.mjs

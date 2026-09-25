@@ -1,12 +1,14 @@
 /** Health Check Edge Function */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecrets } from '../_shared/secrets.ts';
 import { VOYAGE_QUERY_MODEL } from '../_shared/embedding-utils.ts';
+import { isCronAuthorized } from '../_shared/auth.ts';
+import { captureMessage } from '../_shared/sentry.ts';
 
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const SLIG_MODAL_URL = () => Deno.env.get('SLIG_MODAL_URL') || 'https://basilakis--slig-sligservice-web.modal.run';
@@ -442,6 +444,52 @@ async function checkExternalService(url: string): Promise<ExternalResult> {
   }
 }
 
+interface HealthRow {
+  service: string;
+  status: string;
+  latency_ms?: number;
+  error?: string;
+  message?: string;
+  detail?: unknown;
+  http_status?: number;
+  /** Third-party reachability is recorded but never pages — their outage is not ours to fix. */
+  paged: boolean;
+}
+
+/** Cron path: persist state, then page Sentry on a sustained failure and note the recovery. */
+async function recordAndPage(
+  supabase: SupabaseClient,
+  rows: HealthRow[],
+): Promise<void> {
+  const payload = rows.map((r) => ({
+    service: r.service,
+    status: r.status,
+    latency_ms: r.latency_ms ?? null,
+    error: r.error ?? null,
+    detail: { message: r.message ?? null, http_status: r.http_status ?? null, ...(r.detail as object ?? {}) },
+  }));
+  const { data, error } = await supabase.rpc('record_platform_health', { p_results: payload });
+  if (error) throw new Error(`record_platform_health failed: ${error.message}`);
+
+  const paged = new Map(rows.map((r) => [r.service, r]));
+  for (const t of (data ?? []) as Array<{ service: string; consecutive_failures: number; should_alert: boolean; recovered: boolean }>) {
+    const row = paged.get(t.service);
+    if (!row?.paged) continue;
+    if (t.should_alert) {
+      await captureMessage(`Platform health: ${t.service} is DOWN — ${row.error ?? 'unhealthy'}`, 'error', {
+        tags: { area: 'platform-health', service: t.service },
+        extra: { consecutive_failures: t.consecutive_failures, latency_ms: row.latency_ms, detail: row.detail ?? null },
+        fingerprint: ['platform-health', t.service],
+      });
+    } else if (t.recovered) {
+      await captureMessage(`Platform health: ${t.service} recovered`, 'info', {
+        tags: { area: 'platform-health', service: t.service },
+        fingerprint: ['platform-health', t.service, 'recovered'],
+      });
+    }
+  }
+}
+
 // ── Handler ────────────────────────────────────────────────────────────────
 
 serve(withApiLogging('health-check', async (req) => {
@@ -450,25 +498,33 @@ serve(withApiLogging('health-check', async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const cronMode = isCronAuthorized(req);
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
+  if (!cronMode && !authHeader) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  const supabase = cronMode
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY(), { auth: { persistSession: false } })
+    : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader! } } });
+  if (!cronMode) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    // Error text, account ids and worker names are operator detail, not a member's business.
+    const { data: isAdmin } = await supabase.rpc('is_platform_admin');
+    if (isAdmin !== true) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
-  // Resolve which module-gated services are live (e.g. Skroutz/Bestprice/Shopflix
-  // only appear when `greek-marketplaces` is enabled).
   let enabledModuleSlugs: string[] = [];
   try {
     const { data: moduleRows } = await supabase
@@ -485,11 +541,8 @@ serve(withApiLogging('health-check', async (req) => {
     ...enabledModuleSlugs.flatMap((slug) => MODULE_SERVICES[slug] || []),
   ];
 
-  // Resolved once, before the fan-out, so the three Cloudflare checks share one read of
-  // platform_secrets rather than three.
   const cfConfig = await loadCloudflareConfig();
 
-  // Run every check in parallel
   const externalChecks = activeServices.map(svc => checkExternalService(svc.url));
 
   const [
@@ -511,6 +564,7 @@ serve(withApiLogging('health-check', async (req) => {
     // Delivery OUTCOMES for the Email Routing → Worker → email-webhooks path. Read through the
     // caller's own client so the RPC's is_platform_admin() self-guard applies.
     (async () => {
+      if (cronMode) return null;
       try {
         const { data, error } = await supabase.rpc('get_inbound_email_health', { p_days: 7 });
         return error ? null : data;
@@ -538,6 +592,18 @@ serve(withApiLogging('health-check', async (req) => {
     icon: svc.icon,
     ...externalResults[i],
   }));
+
+  if (cronMode) {
+    const core: Array<[string, { status: string; latency_ms: number; error?: string; message?: string; detail?: unknown }]> = [
+      ['claude', claude], ['slig', slig], ['paddleocr', paddleocr], ['voyage_ai', voyage_ai],
+      ['mivaa.embeddings', embeddings], ['mivaa.ai_services', ai_services], ['vercel', vercel],
+      ['cloudflare.turnstile', turnstile], ['cloudflare.email_routing', emailRoutingMx], ['cloudflare.workers', workers],
+    ];
+    await recordAndPage(supabase, [
+      ...core.map(([service, r]) => ({ service, paged: true, ...r })),
+      ...external.map((e) => ({ service: `external.${e.category}.${e.name.toLowerCase()}`, paged: false, ...e })),
+    ]);
+  }
 
   return new Response(JSON.stringify({
     claude, slig, paddleocr, voyage_ai,

@@ -81,7 +81,6 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
 // ── Checks ────────────────────────────────────────────────────────────────
 
-// 1. MIVAA is up.
 await check('mivaa.health', ['MIVAA_BASE_URL'], async () => {
   const { res } = await http(`${MIVAA}/health`);
   assert(res.ok, `GET /health → ${res.status}`);
@@ -342,6 +341,25 @@ await check('db.expense-tool.schema', ['DB_KEY'], async () => {
   const row = json[0];
   assert('amount_due' in row && 'total' in row, 'expense columns missing from returned row');
   return 'expense-tool schema live';
+});
+
+// 9. Watcher on the platform-health-check cron; an upstream outage fails only the scheduled monitor.
+await check('ops.platform-health', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/platform_health_freshness`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert(res.ok, `rpc platform_health_freshness → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  const row = Array.isArray(json) ? json[0] : json;
+  assert(row?.last_checked_at, 'platform_service_health is empty — the platform-health-check cron has never run');
+  const ageMin = Math.round((Date.now() - Date.parse(row.last_checked_at)) / 60000);
+  assert(ageMin <= 30, `platform-health-check last ran ${ageMin} min ago — the cron has stopped`);
+  const down = (row.unhealthy || []).filter((s) => !s.startsWith('external.'));
+  if (down.length && process.env.SMOKE_CONTEXT === 'monitor') {
+    throw new Error(`down: ${down.join(' | ')}`);
+  }
+  return `${row.services} services, checked ${ageMin} min ago${down.length ? ` (down, not gating deploy: ${down.join(' | ')})` : ''}`;
 });
 
 // ── Report ──────────────────────────────────────────────────────────────────
