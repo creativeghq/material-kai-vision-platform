@@ -437,12 +437,13 @@ async function checkExternalService(url: string): Promise<ExternalResult> {
   try {
     const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
     const latency_ms = Date.now() - start;
-    // Any HTTP response means the service is reachable (401/403/429 are expected without auth)
     return { status: 'healthy', latency_ms, http_status: res.status };
   } catch (e) {
     return { status: 'unhealthy', latency_ms: Date.now() - start, error: 'Unreachable' };
   }
 }
+
+const NOT_PROBED_ON_SCHEDULE: ServiceResult = { status: 'unhealthy', latency_ms: 0, error: 'not probed on schedule' };
 
 interface HealthRow {
   service: string;
@@ -552,8 +553,9 @@ serve(withApiLogging('health-check', async (req) => {
     ...externalResults
   ] = await Promise.all([
     checkClaude(),
-    checkSlig(),
-    checkPaddleOcr(),
+    // Scale-to-zero GPU containers: a scheduled ping would boot one every run.
+    cronMode ? NOT_PROBED_ON_SCHEDULE : checkSlig(),
+    cronMode ? NOT_PROBED_ON_SCHEDULE : checkPaddleOcr(),
     checkVoyageAI(),
     checkPythonEndpoint('/api/embeddings/health'),
     checkPythonEndpoint('/api/v1/ai-services/health'),
@@ -595,7 +597,7 @@ serve(withApiLogging('health-check', async (req) => {
 
   if (cronMode) {
     const core: Array<[string, { status: string; latency_ms: number; error?: string; message?: string; detail?: unknown }]> = [
-      ['claude', claude], ['slig', slig], ['paddleocr', paddleocr], ['voyage_ai', voyage_ai],
+      ['claude', claude], ['voyage_ai', voyage_ai],
       ['mivaa.embeddings', embeddings], ['mivaa.ai_services', ai_services], ['vercel', vercel],
       ['cloudflare.turnstile', turnstile], ['cloudflare.email_routing', emailRoutingMx], ['cloudflare.workers', workers],
     ];
