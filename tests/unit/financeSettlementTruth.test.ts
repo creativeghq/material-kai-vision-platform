@@ -47,8 +47,9 @@ describe('#351 D2 — every control on the settings screen is saved', () => {
     const edited = new Set<string>();
     for (const m of settingsTab.matchAll(/\bset\('([a-z_]+)'/g)) edited.add(m[1]);
     for (const m of settingsTab.matchAll(/onPatch\(\{\s*([a-z_]+):/g)) edited.add(m[1]);
-    // `section` is the tab router's own URL state, not a finance setting.
+    // `section` / `pane` are the tab router's own URL state, not finance settings.
     edited.delete('section');
+    edited.delete('pane');
     expect(edited.size).toBeGreaterThan(20);
     const missing = [...edited].filter((k) => !(EDITABLE_SETTING_KEYS as readonly string[]).includes(k));
     expect(missing, `edited but never saved: ${missing.join(', ')}`).toEqual([]);
