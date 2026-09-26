@@ -532,7 +532,6 @@ export const OrdersPanel: React.FC<{
   );
 };
 
-// ---------------------------------------------------------------------------
 
 export type Line = {
   product_id?: string | null; description: string; quantity: number; unit_price: number;
@@ -1638,7 +1637,6 @@ export const NewOrderModal: React.FC<{
   );
 };
 
-// ---------------------------------------------------------------------------
 
 // 3-way match verdict → badge label + tone. Shared by the PO list row and detail panel.
 const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = {

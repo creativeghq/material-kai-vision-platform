@@ -533,9 +533,7 @@ export async function resolveWorkspaceProfile(
   return profileId;
 }
 
-// =====================================================
 // WhatsApp helpers (Zernio Cloud-API wrapper)
-// =====================================================
 
 /**
  * Normalise a phone number to WhatsApp's expected form: digits only, country

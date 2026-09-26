@@ -323,9 +323,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
   );
 };
 
-// =====================================================
 // TaskRow (parent task with optional expanded subtask list)
-// =====================================================
 
 interface TaskRowProps {
   task: ProjectTaskWithSubtasks;

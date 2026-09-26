@@ -423,7 +423,6 @@ export const ScheduleTab: React.FC<{
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const ScheduleEditDialog: React.FC<{
   task: ProjectTask;

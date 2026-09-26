@@ -28,9 +28,7 @@ import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// =====================================================
 // TYPES
-// =====================================================
 
 interface FlowNode {
   id: string;
@@ -144,9 +142,7 @@ function resolveFlowDebit(
   return null;
 }
 
-// =====================================================
 // TEMPLATE RESOLVER
-// =====================================================
 
 function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   return path.split('.').reduce<unknown>((current, key) => {
@@ -204,9 +200,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 600): P
   }
 }
 
-// =====================================================
 // CONDITION EVALUATOR
-// =====================================================
 
 function evaluateComparison(
   fieldValue: unknown,
@@ -314,9 +308,7 @@ async function executeCondition(
   }
 }
 
-// =====================================================
 // ACTION EXECUTORS
-// =====================================================
 
 // Allowlisted columns for the update_contact / update_product actions — identity/trust/tenancy fields
 // (id, workspace_id, user_id, created_by, embeddings, cost provenance, …) are NEVER writable via a flow.
@@ -1525,9 +1517,7 @@ async function executeAction(
   }
 }
 
-// =====================================================
 // GRAPH WALKER (BFS)
-// =====================================================
 
 async function executeFlowGraph(
   supabase: DbClient,
@@ -1745,9 +1735,7 @@ async function executeFlowGraph(
   }
 }
 
-// =====================================================
 // REQUEST HANDLERS
-// =====================================================
 
 // Max runs/minute for one flow before we treat it as a runaway loop and refuse (backstop only —
 // a legit high-volume flow should stay far below this).
@@ -2221,9 +2209,7 @@ async function handleTriggerEvent(
   });
 }
 
-// =====================================================
 // MAIN HANDLER
-// =====================================================
 
 
 Deno.serve(withApiLogging('flow-engine', async (req) => {

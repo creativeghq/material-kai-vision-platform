@@ -360,7 +360,6 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
   );
 };
 
-// ---------------------------------------------------------------------------
 
 interface DetailProps {
   party: PartyRow | null;

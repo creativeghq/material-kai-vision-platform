@@ -237,7 +237,6 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const AddProductDialog: React.FC<{
   open: boolean;

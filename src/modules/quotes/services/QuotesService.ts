@@ -5,9 +5,7 @@ import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { productDetailService } from '@/services/productDetailService';
 import { variantKey } from '@/services/lineIdentityRules';
 
-// =====================================================
 // INTERFACES
-// =====================================================
 
 export interface Quote {
   id: string;
@@ -163,9 +161,7 @@ export interface UnquotedRequest {
   generated_image_url: string | null;
 }
 
-// =====================================================
 // STATUS TAGS
-// =====================================================
 
 export interface StatusTag {
   id: string;
@@ -178,9 +174,7 @@ export interface StatusTag {
   updated_at: string;
 }
 
-// =====================================================
 // UPSELLS/EXTRAS
-// =====================================================
 
 export interface Upsell {
   id: string;
@@ -209,9 +203,7 @@ export interface QuoteUpsell {
   upsell?: Upsell;
 }
 
-// =====================================================
 // PROJECT TIMELINE
-// =====================================================
 
 export interface TimelineStep {
   id: string;
@@ -237,9 +229,7 @@ export interface QuoteTimeline {
   quote_item?: { id: string; product_id?: string; custom_product_name?: string; product?: { name: string } | null } | null;
 }
 
-// =====================================================
 // QUOTES SERVICE
-// =====================================================
 
 /**
  * What a quote line needs to know about its product (#368 follow-up).
@@ -1166,9 +1156,7 @@ export class QuotesService {
     });
   }
 
-  // =====================================================
   // STATUS TAGS METHODS
-  // =====================================================
 
   /**
    * Get all status tags
@@ -1223,9 +1211,7 @@ export class QuotesService {
     return quote;
   }
 
-  // =====================================================
   // PUBLIC SHARE LINK
-  // =====================================================
 
   /**
    * Enable or disable the public share link for a quote.
@@ -1247,9 +1233,7 @@ export class QuotesService {
     return data as Quote;
   }
 
-  // =====================================================
   // UPSELLS/EXTRAS METHODS
-  // =====================================================
 
   /**
    * Get all upsells
@@ -1411,9 +1395,7 @@ export class QuotesService {
     if (error) throw error;
   }
 
-  // =====================================================
   // PROJECT TIMELINE METHODS
-  // =====================================================
 
   /**
    * Get all timeline steps (active only by default)
@@ -1566,9 +1548,7 @@ export class QuotesService {
     return count || 0;
   }
 
-  // =====================================================
   // PRODUCT SEARCH FOR QUOTES
-  // =====================================================
 
   /**
    * Search products with their primary images for the add products sheet
@@ -1757,9 +1737,7 @@ export class QuotesService {
     }));
   }
 
-  // =====================================================
   // QUOTE ACCEPTANCE
-  // =====================================================
 
   /**
    * Accept a quote with validation
@@ -1925,9 +1903,7 @@ export class QuotesService {
     return data;
   }
 
-  // =====================================================
   // QUOTE REVISIONS (Phase 2)
-  // =====================================================
 
   /**
    * Issue a new revision of an existing quote.

@@ -6,9 +6,7 @@
  * @see https://docs.zernio.com
  */
 
-// =====================================================
 // Channel Types
-// =====================================================
 
 export type MessagingChannelType = 'whatsapp';
 export type MessageStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'rejected' | 'expired';
@@ -17,9 +15,7 @@ export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'not_required
 export type MediaType = 'image' | 'video' | 'document' | 'audio';
 export type ConversationStatus = 'open' | 'snoozed' | 'closed';
 
-// =====================================================
 // Database Models
-// =====================================================
 
 export interface MessagingChannel {
   id: string;
@@ -138,9 +134,7 @@ export interface MessagingOptout {
 // Inbound WhatsApp replies live in the unified inbox — inbox_threads /
 // inbox_participants / inbox_messages, read via src/services/inboxApi.ts.
 
-// =====================================================
 // Message Buttons (for interactive messages)
-// =====================================================
 
 export interface MessageButton {
   type: 'url' | 'call' | 'quick_reply';
@@ -150,9 +144,7 @@ export interface MessageButton {
   payload?: string;
 }
 
-// =====================================================
 // Service Options
-// =====================================================
 
 export interface SendMessageOptions {
   to: string | string[];
@@ -285,9 +277,7 @@ export interface MessageLogFilters {
   offset?: number;
 }
 
-// =====================================================
 // Analytics Response Types
-// =====================================================
 
 export interface MessagingAnalyticsResponse {
   totalSent: number;
@@ -301,9 +291,7 @@ export interface MessagingAnalyticsResponse {
   dailyData: MessagingAnalytics[];
 }
 
-// =====================================================
 // Campaign Stats
-// =====================================================
 
 export interface MessagingCampaignStats {
   total: number;

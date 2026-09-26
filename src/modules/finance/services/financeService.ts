@@ -53,9 +53,7 @@ async function emitDocumentIssuedEvent(invoiceId: string): Promise<void> {
   } catch { /* flow emit is best-effort */ }
 }
 
-// =============================================================================
 // Types
-// =============================================================================
 
 export type InvoiceStatus =
   | 'draft'
@@ -790,9 +788,7 @@ export interface CashFlowRow {
   amount: number;
 }
 
-// =============================================================================
 // Invoices
-// =============================================================================
 
 /**
  * Every `invoice_items` column the browser may select. `unit_cost_snapshot`, `line_cost` and
@@ -3241,9 +3237,7 @@ const _financeServiceCore = {
   },
 };
 
-// =============================================================================
 // Planned payments + reports + parties + settings (v2)
-// =============================================================================
 
 export type PlannedPaymentDirection = 'in' | 'out';
 export type PlannedPaymentStatus = 'planned' | 'paid' | 'cancelled' | 'overdue';
@@ -3317,6 +3311,45 @@ export interface ExpenseAnalysis {
   suppliers: Array<{ name: string; docs: number; net: number; origin: string; expense_kind: string }>;
   kinds: Array<{ kind: string; docs: number; net: number; abroad_net: number }>;
   catchall: { name: string | null; docs: number; net: number; share: number };
+}
+
+export interface ExpenseCategoryProposal {
+  issuer_key: string;
+  scope_doc_type: string | null;
+  issuer_name: string | null;
+  category_key: string;
+  category_name: string;
+  confidence: number;
+  rationale: string;
+  decided_by: 'ai' | 'fiscal_code';
+  docs: number;
+  net: number;
+  low_confidence: boolean;
+}
+
+export interface ExpenseCategoryDecision {
+  issuer_key: string;
+  scope_doc_type: string | null;
+  issuer_name: string | null;
+  category_name: string;
+  decided_by: 'ai' | 'manual' | 'fiscal_code';
+  confidence: number | null;
+  rationale: string | null;
+  docs: number;
+  net: number;
+}
+
+export interface ExpenseCategorySuggestions {
+  proposals: ExpenseCategoryProposal[];
+  /** Rules already in force, so a wrong one can be corrected instead of being invisible. */
+  decided: ExpenseCategoryDecision[];
+  /** Suppliers with no verdict — reported, never defaulted. */
+  unresolved: Array<{ issuer_key: string; issuer_name: string | null; reason: string }>;
+  pending_issuers: number;
+  pending_docs: number;
+  pending_net: number;
+  decided_issuers: number;
+  examined: number;
 }
 
 export interface FinanceFinding {
@@ -3741,6 +3774,41 @@ const _financeServiceV2 = {
     } as never);
     if (error) throw error;
     return data as unknown as ExpenseAnalysis;
+  },
+
+  /** Propose a category per supplier in the myAADE inlet. Writes NOTHING; apply commits. */
+  async suggestExpenseCategories(workspaceId: string, limit = 60): Promise<ExpenseCategorySuggestions> {
+    const { data, error } = await supabase.functions.invoke('finance-categorize-expenses', {
+      body: { action: 'suggest', workspace_id: workspaceId, limit },
+    });
+    if (error) throw await edgeError(error);
+    if (data && data.ok === false) throw new Error(data.error || 'Suggesting categories failed');
+    return data as ExpenseCategorySuggestions;
+  },
+
+  /** Commit the reviewed decisions as durable supplier rules and re-file the inlet documents. */
+  async applyExpenseCategoryRules(
+    workspaceId: string,
+    rules: Array<{
+      issuer_key: string;
+      scope_doc_type?: string | null;
+      issuer_name?: string | null;
+      category_key: string;
+      decided_by?: 'ai' | 'manual' | 'fiscal_code';
+      confidence?: number | null;
+      rationale?: string | null;
+    }>,
+  ): Promise<{ rules_written: number; categories_created: number; docs_recategorised: number }> {
+    const { data, error } = await supabase.functions.invoke('finance-categorize-expenses', {
+      body: { action: 'apply', workspace_id: workspaceId, rules },
+    });
+    if (error) throw await edgeError(error);
+    if (data && data.ok === false) throw new Error(data.error || 'Applying categories failed');
+    return {
+      rules_written: data?.rules_written ?? 0,
+      categories_created: data?.categories_created ?? 0,
+      docs_recategorised: data?.docs_recategorised ?? 0,
+    };
   },
 
   async integrityFindings(workspaceId: string): Promise<FinanceFinding[]> {
@@ -4210,9 +4278,7 @@ const _financeServiceV2 = {
 export const financeService: typeof _financeServiceCore & typeof _financeServiceV2 =
   Object.assign(_financeServiceCore, _financeServiceV2);
 
-// =============================================================================
 // Formatters (shared)
-// =============================================================================
 
 // Canonical money formatter lives in `@/utils/decimal` (money is printed well outside finance).
 // Re-exported here because most of the app imports it from this service.
@@ -4236,9 +4302,7 @@ export function ageBucketLabel(b: AgeBucket): string {
   }
 }
 
-// =============================================================================
 // myDATA VAT categories + money/VAT math (canonical — single source of truth)
-// =============================================================================
 // The cat↔percent table lives in the import-free `@/modules/finance/vatVocabulary` so it can
 // be byte-mirrored to Deno (`npm run vocab:mirror`) — the edge needs the same lookup when it
 // builds a line server-side. Re-exported here so every existing importer keeps its path.

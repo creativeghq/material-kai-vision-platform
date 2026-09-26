@@ -304,7 +304,6 @@ export const TenderPackageWorkspace: React.FC<Props> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
 
 /**
  * The comparison, ranked on the figure that can be compared.

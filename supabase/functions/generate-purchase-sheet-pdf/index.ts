@@ -166,12 +166,10 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
   });
 }));
 
-// =====================================================================
 // Architectural elevation schedule (A3 landscape) — "SCHEDULE OF DOORS" /
 // "SCHEDULE OF WINDOWS": a grid of dimensioned elevation line-drawings, each
 // with a tag (D-1 / W-1), set count + location, type, material and glass.
 // This is the construction/supplier sheet — deterministic CAD line-art, no AI.
-// =====================================================================
 const A3W = 1190.55, A3H = 841.89, SM = 30;
 const SCOLS = 6;                       // cells per row, like a real schedule strip
 const CELL_W = (A3W - 2 * SM) / SCOLS;
@@ -414,12 +412,10 @@ function captionLines(it: PurchaseItem): string[] {
   return lines;
 }
 
-// =====================================================================
 // Single-item ORDER / shop-drawing sheet (A4 landscape) — one window or door:
 // a large dimensioned architectural elevation on the left + a full spec/order
 // table on the right + a drawing-number block. This is what you'd send a
 // fabricator to ORDER one item.
-// =====================================================================
 async function drawOrderSheet(pdf: PDFDocument, font: any, bold: any, it: PurchaseItem, projectName: string, tag: string, includeCosts: boolean) {
   const W = 841.89, H = 595.28, M = 40;
   const page = pdf.addPage([W, H]);
@@ -476,9 +472,7 @@ async function drawOrderSheet(pdf: PDFDocument, font: any, bold: any, it: Purcha
   page.drawText(code, { x: W - M - 120, y: M + 10, size: 12, font: bold, color: INK });
 }
 
-// =====================================================================
 // Per-item spec page (A4 portrait)
-// =====================================================================
 async function drawItemPage(
   pdf: PDFDocument,
   font: any,
@@ -674,9 +668,7 @@ function finishColor(s: string): any {
   return rgb(0.7, 0.68, 0.64);
 }
 
-// =====================================================================
 // shared utils
-// =====================================================================
 function hr(page: any, x1: number, y: number, x2: number, thickness = 1, color: any = HAIR) {
   page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, color, thickness });
 }
@@ -705,10 +697,8 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-// =====================================================================
 // Purchase-order mode — render a purchase ORDER + optionally
 // email it to the supplier and mark the order placed.
-// =====================================================================
 async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise<Response> {
   // Load the order under the caller's RLS (enforces workspace access).
   const { data: order, error: oErr } = await reader

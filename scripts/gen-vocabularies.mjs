@@ -155,6 +155,10 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/tripExpenseVocabulary.generated.ts',
   ],
   [
+    'src/modules/finance/expenseCategoryVocabulary.ts',
+    'supabase/functions/_shared/finance/expenseCategoryVocabulary.generated.ts',
+  ],
+  [
     // #391 — payment method (a union + two label maps) and the payment-provider slug
     // (a union, a display-order Record and four hand-written <SelectItem>s).
     'src/modules/finance/paymentVocabulary.ts',

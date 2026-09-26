@@ -64,9 +64,7 @@ export async function resolveRevolutConfig(
   return data as RevolutConfigRow;
 }
 
-// ---------------------------------------------------------------------------
 // Keypair + PEM
-// ---------------------------------------------------------------------------
 
 function toPem(buf: ArrayBuffer, label: string): string {
   const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -109,9 +107,7 @@ export async function generateRevolutKeypair(cnDomain: string): Promise<{ public
   return { publicKey: cert.toString('pem'), privateKey: toPem(priv, 'PRIVATE KEY') };
 }
 
-// ---------------------------------------------------------------------------
 // JWT client assertion
-// ---------------------------------------------------------------------------
 
 function b64url(input: Uint8Array | string): string {
   const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
@@ -160,9 +156,7 @@ export function issuerDomainFrom(originOrUri: string): string {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Token lifecycle
-// ---------------------------------------------------------------------------
 
 interface TokenResponse {
   access_token: string;
@@ -269,9 +263,7 @@ export async function getRevolutAccessToken(
   return out.access_token;
 }
 
-// ---------------------------------------------------------------------------
 // REST helpers
-// ---------------------------------------------------------------------------
 
 /** Authenticated GET/POST/DELETE against the Business API, one 401-retry via refresh. */
 export async function revolutFetch(
@@ -378,10 +370,8 @@ export function getTransaction(supabase: any, cfg: RevolutConfigRow, issuerDomai
   return revolutJson<RevolutTransaction>(supabase, cfg, issuerDomain, `/transaction/${id}`);
 }
 
-// ---------------------------------------------------------------------------
 // Money-out (PAY/WRITE scopes) — thin wrappers; auditing lives in payout_instructions,
 // which Viva writes to as well (see _shared/payments/payout.ts).
-// ---------------------------------------------------------------------------
 
 export interface RevolutCounterparty {
   id: string;
@@ -476,9 +466,7 @@ export function getExchangeRate(
   return revolutJson<Record<string, unknown>>(supabase, cfg, issuerDomain, `/rate?${q.toString()}`);
 }
 
-// ---------------------------------------------------------------------------
 // Cards + expenses (#315 phase 4)
-// ---------------------------------------------------------------------------
 
 export interface RevolutTeamMember {
   id: string;

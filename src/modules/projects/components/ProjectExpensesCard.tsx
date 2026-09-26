@@ -131,7 +131,6 @@ export const ProjectExpensesCard: React.FC<{
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const AddProjectExpenseDialog: React.FC<{
   projectId: string; projectName: string; workspaceId: string;

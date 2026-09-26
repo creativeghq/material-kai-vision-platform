@@ -267,7 +267,6 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const DOOR_FIELDS: Array<{ key: keyof PurchaseItemDetails; label: string; type?: 'number'; options?: string[] }> = [
   { key: 'width_mm', label: 'Width (mm)', type: 'number' },

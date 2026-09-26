@@ -20,9 +20,7 @@ import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
-// =====================================================
 // TYPES
-// =====================================================
 interface PushSubscription {
   endpoint: string;
   p256dh_key: string;
@@ -40,9 +38,7 @@ interface WebhookEndpoint {
   };
 }
 
-// =====================================================
 // PUSH NOTIFICATION HANDLER
-// =====================================================
 
 /**
  * The platform stores the VAPID keys the way `web-push generate-vapid-keys` /
@@ -205,9 +201,7 @@ async function sendPushNotifications(
   };
 }
 
-// =====================================================
 // WEBHOOK HANDLER
-// =====================================================
 async function sendWebhooks(
   webhooks: WebhookEndpoint[],
   payload: any
@@ -333,9 +327,7 @@ async function sendWebhooks(
   };
 }
 
-// =====================================================
 // MAIN HANDLER
-// =====================================================
 serve(withApiLogging('notification-dispatcher', async (req) => {
   await bootstrapForFunction();
   // Handle CORS preflight

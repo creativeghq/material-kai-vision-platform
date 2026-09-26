@@ -1,5 +1,6 @@
 /** Global finance categories for classifying income/expense docs + payments. */
 import { supabase } from '@/integrations/supabase/client';
+import { EXPENSE_CATEGORY_CHART } from '@/modules/finance/expenseCategoryVocabulary';
 
 export interface FinanceCategory {
   id: string;
@@ -76,31 +77,17 @@ export const financeCategoriesService = {
   },
 };
 
-/** Standard chart-of-categories seed. Workspaces can edit/remove after importing. */
+const DEFAULT_INCOME_CATEGORIES = [
+  'Product sales', 'Service revenue', 'Consulting', 'Shipping income', 'Other income',
+] as const;
+
+/**
+ * Standard chart-of-categories seed. Workspaces can edit/remove after importing.
+ *
+ * The expense half IS `EXPENSE_CATEGORY_CHART` — the same closed set the categoriser proposes
+ * from. Two hand-kept lists would let the importer seed a name the classifier cannot choose.
+ */
 export const DEFAULT_CATEGORIES: { name: string; kind: FinanceCategory['kind'] }[] = [
-  // Income
-  { name: 'Product sales', kind: 'income' },
-  { name: 'Service revenue', kind: 'income' },
-  { name: 'Consulting', kind: 'income' },
-  { name: 'Shipping income', kind: 'income' },
-  { name: 'Other income', kind: 'income' },
-  // Expense — cost of goods
-  { name: 'Materials & supplies', kind: 'expense' },
-  { name: 'Inventory purchases', kind: 'expense' },
-  { name: 'Subcontractors', kind: 'expense' },
-  { name: 'Shipping & freight', kind: 'expense' },
-  // Expense — operating
-  { name: 'Rent', kind: 'expense' },
-  { name: 'Utilities', kind: 'expense' },
-  { name: 'Salaries & wages', kind: 'expense' },
-  { name: 'Insurance', kind: 'expense' },
-  { name: 'Marketing & advertising', kind: 'expense' },
-  { name: 'Software & subscriptions', kind: 'expense' },
-  { name: 'Professional fees', kind: 'expense' },
-  { name: 'Bank & payment fees', kind: 'expense' },
-  { name: 'Travel', kind: 'expense' },
-  { name: 'Office supplies', kind: 'expense' },
-  { name: 'Equipment', kind: 'expense' },
-  { name: 'Taxes & duties', kind: 'expense' },
-  { name: 'Other expense', kind: 'expense' },
+  ...DEFAULT_INCOME_CATEGORIES.map((name) => ({ name, kind: 'income' as const })),
+  ...EXPENSE_CATEGORY_CHART.map((c) => ({ name: c.name, kind: 'expense' as const })),
 ];

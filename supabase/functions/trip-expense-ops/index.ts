@@ -59,7 +59,6 @@ Deno.serve(withApiLogging('trip-expense-ops', async (req: Request) => {
   }
 }));
 
-// ---------------------------------------------------------------------------
 
 async function uploadReceipt(body: Body, reader: any, admin: any, uid: string): Promise<Response> {
   if (!body.item_id || !body.data_base64) throw new HttpError(400, 'item_id and data_base64 required');
@@ -140,9 +139,7 @@ async function generatePdf(body: Body, reader: any, admin: any): Promise<Respons
   return json({ success: true, pdf_url: signed?.signedUrl ?? null, pdf_storage_path: path, page_count: pdf.getPageCount() });
 }
 
-// ---------------------------------------------------------------------------
 // PDF layout (A4 portrait)
-// ---------------------------------------------------------------------------
 async function drawReport(
   pdf: PDFDocument, font: any, bold: any, r: any, items: any[],
   company?: { name: string | null; logo: Uint8Array | null },

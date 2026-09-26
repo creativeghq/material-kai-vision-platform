@@ -128,7 +128,6 @@ export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ pro
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
   const { toast } = useToast();
@@ -386,7 +385,6 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const AddSnagDialog: React.FC<{
   projectId: string; rooms: ProjectRoom[]; onClose: () => void; onSaved: () => void;
@@ -488,7 +486,6 @@ const AddSnagDialog: React.FC<{
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
   const { toast } = useToast();

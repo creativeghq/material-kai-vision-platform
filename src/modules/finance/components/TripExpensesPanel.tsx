@@ -181,7 +181,6 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const TripCardDetail: React.FC<{
   reportId: string;
@@ -666,7 +665,6 @@ const Totals: React.FC<{ label: string; value: number; currency: string; tone?: 
   </div>
 );
 
-// ---------------------------------------------------------------------------
 
 const NewTripCardDialog: React.FC<{
   workspaceId: string;

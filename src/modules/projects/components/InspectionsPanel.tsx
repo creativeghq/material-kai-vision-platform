@@ -157,7 +157,6 @@ export const InspectionsPanel: React.FC<{ projectId: string; isOwner: boolean }>
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const RESULT_BUTTONS: Array<{ value: InspectionResult; label: string; icon: React.ReactNode }> = [
   { value: 'pass', label: 'Pass', icon: <Check className="h-3.5 w-3.5" /> },
@@ -291,7 +290,6 @@ const InspectionChecklist: React.FC<{
   );
 };
 
-// ---------------------------------------------------------------------------
 
 interface DraftItem { title: string; guidance: string; costCodeId: string | null }
 

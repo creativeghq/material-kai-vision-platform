@@ -61,6 +61,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'email-unsubscribe', label: 'email-unsubscribe', sublabel: 'Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe).' },
   { id: 'email-webhooks', label: 'email-webhooks', sublabel: 'Receives Resend delivery event webhooks and updates email_logs.' },
   { id: 'facets-recanonicalize', label: 'facets-recanonicalize', sublabel: 'Bulk facet re-canonicalization sweep — replays attributes_raw to repair degraded products (#316).' },
+  { id: 'finance-categorize-expenses', label: 'finance-categorize-expenses', sublabel: 'Propose an expense category per supplier, and apply the ones you confirm' },
   { id: 'finance-customer-documents', label: 'finance-customer-documents', sublabel: 'Customer self-service view of their own invoices, receipts and orders' },
   { id: 'finance-document-link', label: 'finance-document-link', sublabel: 'Redirects a document token to a freshly signed link to the PDF.' },
   { id: 'finance-digest-aggregate', label: 'finance-digest-aggregate', sublabel: 'Send finance digest emails and dispatch quote follow-up bell notifications' },

@@ -93,9 +93,7 @@ export class MessagingService {
     }
   }
 
-  // =====================================================
   // Channel Management
-  // =====================================================
 
   /**
    * Get all messaging channels
@@ -193,9 +191,7 @@ export class MessagingService {
     }
   }
 
-  // =====================================================
   // Template Management
-  // =====================================================
 
   /**
    * Get all messaging templates
@@ -316,9 +312,7 @@ export class MessagingService {
     }
   }
 
-  // =====================================================
   // Message Logs
-  // =====================================================
 
   /**
    * Get message logs with filtering
@@ -364,9 +358,7 @@ export class MessagingService {
     return data || [];
   }
 
-  // =====================================================
   // Analytics
-  // =====================================================
 
   /**
    * Get messaging analytics
@@ -769,9 +761,7 @@ export class MessagingService {
   // through inboxApi + the /inbox UI. The former messaging_conversations holding pen was
   // dropped — no separate conversation methods live here anymore.
 
-  // =====================================================
   // Opt-out Management (Compliance)
-  // =====================================================
 
   /** Has this number opted out of this channel, for this workspace? (#359 CM-1) */
   async checkOptOut(
@@ -856,9 +846,7 @@ export class MessagingService {
     return data || [];
   }
 
-  // =====================================================
   // Utility Methods
-  // =====================================================
 
   /**
    * Render template with variables

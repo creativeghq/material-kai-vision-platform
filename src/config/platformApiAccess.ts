@@ -26,6 +26,11 @@ export const PLATFORM_API_BLOCKED: readonly BlockedEndpoint[] = [
       + 'un-actioned deliveries and is worked by a person.',
   },
   { name: 'background-agent-runner', reason: 'Spawns background agent runs; scheduled by the operator.' },
+  {
+    name: 'finance-categorize-expenses',
+    reason: 'Re-files hundreds of received documents in one call. The whole design is that a person '
+      + 'reviews each proposal in Finance → Spend; an agent call is that review skipped.',
+  },
   { name: 'xml-import-orchestrator', reason: 'Bulk supplier import — creates and updates products at scale.' },
   { name: 'crm-company-embedding-backfill', reason: 'Bulk embedding backfill over every company in the CRM.' },
   { name: 'kb-embedding-backfill', reason: 'Bulk backfill over the whole knowledge base.' },

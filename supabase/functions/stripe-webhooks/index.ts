@@ -108,9 +108,7 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
   // withApiLogging returns 500 AND reports it to Sentry (4xx are never reported).
   try {
     switch (event.type) {
-      // ============================================
       // Customer Events
-      // ============================================
       case 'customer.created':
         await handleCustomerCreated(event.data.object as Stripe.Customer);
         break;
@@ -119,18 +117,14 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
         await handleCustomerUpdated(event.data.object as Stripe.Customer);
         break;
 
-      // ============================================
       // Connect account lifecycle (audit F3): without this, charges_enabled only
       // refreshed when a human revisited the settings page — until then charges
       // silently ran platform-collect and the settlement account never provisioned.
-      // ============================================
       case 'account.updated':
         await handleConnectAccountUpdated(event.data.object as Stripe.Account);
         break;
 
-      // ============================================
       // Subscription Events
-      // ============================================
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
@@ -140,9 +134,7 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
 
-      // ============================================
       // Payment Events
-      // ============================================
       case 'payment_intent.succeeded':
         await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
@@ -221,9 +213,7 @@ function signatureFailure(primaryErr: unknown, billingErr?: unknown): Response {
   );
 }
 
-// ============================================
 // Handler Functions
-// ============================================
 
 async function handleCustomerCreated(customer: Stripe.Customer) {
   const email = customer.email;

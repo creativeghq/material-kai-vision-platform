@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { formatMoney } from '@/utils/decimal';
 import { financeService, type ExpenseAnalysis } from '@/modules/finance/services/financeService';
 import { expenseKindCopy, originLabel } from '@/modules/finance/expenseSegments';
+import { CategoriseExpensesDialog } from '@/modules/finance/components/CategoriseExpensesDialog';
 
 const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 1000) / 10 : 0);
 
@@ -21,6 +22,7 @@ export const ExpenseAnalysisTab: React.FC<{
 }> = ({ workspaceId, from, to, periodLabel }) => {
   const [data, setData] = React.useState<ExpenseAnalysis | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [reloadKey, setReloadKey] = React.useState(0);
 
   React.useEffect(() => {
     if (!workspaceId) return;
@@ -29,7 +31,7 @@ export const ExpenseAnalysisTab: React.FC<{
       .then((d) => { if (live) { setData(d); setError(null); } })
       .catch((e) => { if (live) { setData(null); setError(e instanceof Error ? e.message : String(e)); } });
     return () => { live = false; };
-  }, [workspaceId, from, to]);
+  }, [workspaceId, from, to, reloadKey]);
 
   if (error) {
     return (
@@ -50,13 +52,21 @@ export const ExpenseAnalysisTab: React.FC<{
     <div className="space-y-4">
       <Card>
         <CardHeader className="border-b border-hairline px-5 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Tags className="h-4 w-4 text-muted-foreground" /> Spend — {periodLabel}
-          </CardTitle>
-          <p className="pt-1 text-[11px] text-muted-foreground">
-            {formatMoney(total, 'EUR')} across {data.total_docs.toLocaleString()} documents, whether
-            or not they are booked yet.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Tags className="h-4 w-4 text-muted-foreground" /> Spend — {periodLabel}
+              </CardTitle>
+              <p className="pt-1 text-[11px] text-muted-foreground">
+                {formatMoney(total, 'EUR')} across {data.total_docs.toLocaleString()} documents,
+                whether or not they are booked yet.
+              </p>
+            </div>
+            <CategoriseExpensesDialog
+              workspaceId={workspaceId}
+              onApplied={() => setReloadKey((n) => n + 1)}
+            />
+          </div>
         </CardHeader>
 
         {catchallDominates && (
@@ -68,6 +78,8 @@ export const ExpenseAnalysisTab: React.FC<{
                 {' '}— {data.catchall.docs.toLocaleString()} documents. That category is named after
                 the inlet the documents arrived through, not after what the money bought, so the
                 category split below cannot tell you anything yet. Suppliers and kinds can.
+                <em className="not-italic"> Suggest categories</em> proposes one per supplier,
+                which fixes the history and everything that arrives afterwards.
               </span>
             </p>
           </CardContent>

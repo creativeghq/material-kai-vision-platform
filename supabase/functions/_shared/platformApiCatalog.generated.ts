@@ -489,6 +489,33 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "finance-categorize-expenses",
+    "tag": "Finance",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Proposes an expense category per supplier, and applies the ones you confirm",
+    "description": "Received myDATA documents arrive under one category named after the inlet they came through, which tells you nothing about what the money bought. This proposes a category from a closed chart for each SUPPLIER — the durable unit, since a decision about a supplier also files everything that arrives from them afterwards. `suggest` writes nothing and returns proposals with a confidence and a reason; `",
+    "fields": {
+      "action": {
+        "type": "string",
+        "description": "'suggest' or 'apply'"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace whose documents to categorise"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Suppliers to examine in one suggest call (max 250)"
+      },
+      "rules": {
+        "type": "array",
+        "description": "apply only — {issuer_key, scope_doc_type, category_key, decided_by, confidence, rationale}"
+      }
+    }
+  },
+  {
     "name": "finance-customer-documents",
     "tag": "Finance",
     "methods": [

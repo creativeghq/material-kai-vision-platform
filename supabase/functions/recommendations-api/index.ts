@@ -55,9 +55,7 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
       return null;
     };
 
-    // ========================================================================
     // POST /track-interaction - Track user interaction with material
-    // ========================================================================
     if (method === 'POST' && path[0] === 'track-interaction') {
       const body = await req.json();
       const {
@@ -129,9 +127,7 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
     }
 
 
-    // ========================================================================
     // 404 - Route not found
-    // ========================================================================
     return new Response(
       JSON.stringify({ error: 'Route not found' }),
       { status: 404, headers: corsHeaders },

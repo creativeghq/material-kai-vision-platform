@@ -368,7 +368,6 @@ export const RequestsTab: React.FC<{
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const NewRequestDialog: React.FC<{
   projectId: string; isOwner: boolean;

@@ -18,9 +18,7 @@ import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 import { parseProjectLabor, type ProjectLabor } from '@/modules/finance/services/timeTrackingService';
 
-// =====================================================
 // TYPES
-// =====================================================
 
 export type ProjectStatus = 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'archived';
 export type RoomType =
@@ -474,9 +472,7 @@ export interface UpdateTaskInput {
   is_milestone?: boolean;
 }
 
-// =====================================================
 // SERVICE
-// =====================================================
 
 /** Raise a project lifecycle flow event (#378 Phase 4). */
 export async function emitProjectLifecycle(

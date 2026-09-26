@@ -482,7 +482,6 @@ export const DrawingMarkupDialog: React.FC<Props> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const MarkupShape: React.FC<{
   markup: DrawingMarkup; width: number; height: number; selected: boolean; onSelect: () => void;

@@ -63,10 +63,8 @@ async function b2bAffordabilityGate(userId: string, ceiling: number, opType: str
   return null;
 }
 
-// ============================================================================
 // B2B RESEARCH TOOLS FOR INSIGHTS AGENT
 // These tools enable manufacturer discovery, verification, and CRM integration
-// ============================================================================
 
 /**
  * ZeroBounce Email Validation Helper

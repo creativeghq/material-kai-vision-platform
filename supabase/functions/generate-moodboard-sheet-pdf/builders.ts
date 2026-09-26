@@ -58,9 +58,7 @@ export function sheetLabel(t: string): string {
   return SHEET_LABELS[t] || t.toUpperCase();
 }
 
-// ============================================================
 // 1. MATERIAL BOARD — chips grid, capped at 8.
-// ============================================================
 export async function buildMaterialBoard(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -172,9 +170,7 @@ async function drawProductChip(
   }
 }
 
-// ============================================================
 // 2. COLOR PALETTE — swatch row(s) with hex + name.
-// ============================================================
 export function buildColorPalette(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -226,9 +222,7 @@ export function buildColorPalette(
   drawTitleBlock(page, fonts, td);
 }
 
-// ============================================================
 // 3. CONCEPT BOARD — image collage with optional captions.
-// ============================================================
 export async function buildConceptBoard(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -292,11 +286,9 @@ export async function buildConceptBoard(
   drawTitleBlock(page, fonts, td);
 }
 
-// ============================================================
 // 4. LIGHTING PLAN — backdrop + fixture symbols + legend.
 //    PLUMBING PLAN reuses the exact same layout via buildSymbolPlan;
 //    only the symbol glyphs (drawSymbol) and subtitle differ.
-// ============================================================
 type SymbolPlanPayload = {
   backdrop?: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
   symbols: FixtureSymbolData[];
@@ -796,9 +788,7 @@ function drawElectricalSymbol(
   }
 }
 
-// ============================================================
 // 5. ANNOTATED RENDER — image + callout lines + side legend.
-// ============================================================
 export async function buildAnnotatedRender(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -921,9 +911,7 @@ async function drawLegendChip(
   }
 }
 
-// ============================================================
 // 6. ELEVATION + RENDER PAIR — uploaded elevation w/ user dims, render below.
-// ============================================================
 export async function buildElevationRenderPair(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -1034,13 +1022,11 @@ async function drawAnnotatedImageBlock(
   }
 }
 
-// ============================================================
 // 12. SCOPE OF WORKS — the phases and the works inside them.
 //
 // The one sheet that says what will HAPPEN rather than what will be supplied. Deliberately
 // money-free: the FF&E schedule and the quote carry price, and a second surface that totals money
 // is a second derivation of it.
-// ============================================================
 export function buildScopeOfWorks(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -1153,9 +1139,7 @@ function drawTick(page: PDFPage, x: number, y: number) {
   });
 }
 
-// ============================================================
 // 7. FF&E SCHEDULE — table of items.
-// ============================================================
 export function buildFfeSchedule(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -1244,11 +1228,9 @@ export function buildFfeSchedule(
   drawTitleBlock(page, fonts, td);
 }
 
-// ============================================================
 // 7b. AREA BREAKDOWN — single composited design board.
 //     Hero render + dimensioned plan + elevation + finishes column +
 //     fitting/accessory columns + notes + color palette strip.
-// ============================================================
 export async function buildAreaBreakdown(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -1446,9 +1428,7 @@ function drawColumnHeader(
   return topY - 26;
 }
 
-// ============================================================
 // 8. FULL DECK — cover page + included sheets in order.
-// ============================================================
 export async function buildFullDeckCover(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,

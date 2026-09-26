@@ -307,7 +307,6 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSaved: () => void }> = ({
   projectId, onClose, onSaved,

@@ -128,10 +128,8 @@ async function getAgentSystemPrompt(agentType: string): Promise<string> {
   }
 }
 
-// ============================================================================
 // SUB-AGENT TOOLS FOR INSIGHTS AGENT
 // These tools allow the Insights Agent to delegate to specialized analysis
-// ============================================================================
 
 /**
  * Sub-Agent Tool: Research Analysis

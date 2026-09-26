@@ -254,7 +254,6 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
   );
 };
 
-// ---------------------------------------------------------------------------
 
 const AttachDialog: React.FC<{
   projectId: string;
