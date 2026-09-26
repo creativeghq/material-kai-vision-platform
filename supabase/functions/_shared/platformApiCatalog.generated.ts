@@ -4297,7 +4297,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       },
       "return_url": {
         "type": "string",
-        "description": "URL to redirect after onboarding; defaults to /admin/finance."
+        "description": "URL to redirect after onboarding; defaults to the app's /finance page."
       }
     }
   },

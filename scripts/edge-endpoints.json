@@ -6780,7 +6780,7 @@
             "name": "return_url",
             "type": "string",
             "required": false,
-            "desc": "URL to redirect after onboarding; defaults to /admin/finance."
+            "desc": "URL to redirect after onboarding; defaults to the app's /finance page."
           }
         ],
         "response": "{url, account_id}"

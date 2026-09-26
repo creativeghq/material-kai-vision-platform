@@ -14227,7 +14227,7 @@
                       },
                       "return_url": {
                         "type": "string",
-                        "description": "URL to redirect after onboarding; defaults to /admin/finance."
+                        "description": "URL to redirect after onboarding; defaults to the app's /finance page."
                       }
                     },
                     "description": "Returns: {url, account_id}"
