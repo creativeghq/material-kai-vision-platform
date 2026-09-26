@@ -92,8 +92,9 @@ import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplie
 import { inboundService } from '@/modules/finance/services/inboundService';
 import type { ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
 
-type DashView = 'position' | 'flow' | 'activity';
+type DashView = 'position' | 'flow' | 'spend' | 'activity';
 import { HubTabNav } from '@/components/core/hub';
+import { ExpenseAnalysisTab } from '@/modules/finance/components/ExpenseAnalysisTab';
 import { FinanceHealthStrip } from '@/modules/finance/components/FinanceHealthStrip';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
 import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
@@ -681,6 +682,7 @@ const FinancePage: React.FC = () => {
               items={[
                 { id: 'position', label: 'Position' },
                 { id: 'flow', label: 'Flow' },
+                { id: 'spend', label: 'Spend' },
                 { id: 'activity', label: 'Activity' },
               ]}
             />
@@ -763,6 +765,15 @@ const FinancePage: React.FC = () => {
               <PnlCard rows={pnl} />
             </div>
             </>)}
+
+            {dashView === 'spend' && workspaceId && (
+              <ExpenseAnalysisTab
+                workspaceId={workspaceId}
+                from={dashRange(dashPeriod).from}
+                to={dashRange(dashPeriod).to}
+                periodLabel={DASH_PERIOD_LABEL[dashPeriod]}
+              />
+            )}
 
             {dashView === 'activity' && (<>
             {/* Next follow-ups + Recent invoices */}

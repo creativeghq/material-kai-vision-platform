@@ -3310,6 +3310,15 @@ export interface PartyRow {
   credit_releasable: boolean;
 }
 
+export interface ExpenseAnalysis {
+  total_net: number;
+  total_docs: number;
+  categories: Array<{ name: string; is_catchall: boolean; docs: number; net: number; vat: number; abroad_net: number; booked_docs: number }>;
+  suppliers: Array<{ name: string; docs: number; net: number; origin: string; expense_kind: string }>;
+  kinds: Array<{ kind: string; docs: number; net: number; abroad_net: number }>;
+  catchall: { name: string | null; docs: number; net: number; share: number };
+}
+
 export interface FinanceFinding {
   check_key: string;
   title: string;
@@ -3726,6 +3735,14 @@ const _financeServiceV2 = {
     return (data ?? []) as SalesPerDayRow[];
   },
   /** This workspace's OWN open finance findings. The /admin view is cross-workspace. */
+  async expenseAnalysis(workspaceId: string, from: string, to: string): Promise<ExpenseAnalysis> {
+    const { data, error } = await supabase.rpc('get_expense_analysis' as never, {
+      p_workspace_id: workspaceId, p_from: from, p_to: to, p_limit: 25,
+    } as never);
+    if (error) throw error;
+    return data as unknown as ExpenseAnalysis;
+  },
+
   async integrityFindings(workspaceId: string): Promise<FinanceFinding[]> {
     const { data, error } = await supabase.rpc('get_workspace_integrity_findings' as never, {
       p_workspace_id: workspaceId, p_domain: 'finance',
