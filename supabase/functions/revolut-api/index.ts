@@ -65,6 +65,7 @@ async function paymentFromFeedRow(
   tx: any,
   party: { companyId: string | null; contactId: string | null },
   notes: string,
+  categoryId: string | null = null,
 ): Promise<string> {
   const ccy = String(tx.currency ?? 'EUR').toUpperCase();
   const { data: pay, error: payErr } = await service.from('payments').insert({
@@ -76,6 +77,7 @@ async function paymentFromFeedRow(
     paid_at: tx.booked_at ?? new Date().toISOString(),
     counterparty_company_id: party.companyId,
     counterparty_contact_id: party.contactId,
+    category_id: categoryId,
     bank_account_id: tx.bank_account_id ?? null,
     reference: `Bank transfer (Revolut) ${tx.provider_ref}`,
     notes,
@@ -431,7 +433,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
 
       const { data: bill } = await service
         .from('supplier_bills')
-        .select('id, supplier_bill_number, supplier_company_id, supplier_contact_id, amount_due, currency')
+        .select('id, supplier_bill_number, supplier_company_id, supplier_contact_id, amount_due, currency, category_id')
         .eq('id', billId)
         .eq('workspace_id', workspaceId)
         .maybeSingle();
@@ -445,6 +447,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         service, workspaceId, tx,
         { companyId: bill.supplier_company_id, contactId: bill.supplier_contact_id },
         `Manually matched to bill ${bill.supplier_bill_number ?? bill.id}`,
+        bill.category_id ?? null,
       );
 
       const applied = Math.min(Number(tx.amount), Number(bill.amount_due));

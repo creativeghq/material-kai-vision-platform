@@ -297,7 +297,7 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
 
   const { data: billRows } = await service
     .from('supplier_bills')
-    .select('id, supplier_bill_number, supplier_name, supplier_company_id, supplier_contact_id, amount_due, currency')
+    .select('id, supplier_bill_number, supplier_name, supplier_company_id, supplier_contact_id, amount_due, currency, category_id')
     .eq('workspace_id', workspaceId)
     .gt('amount_due', 0);
   const bills = (billRows ?? []).map((b: any) => ({
@@ -415,6 +415,7 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
         paid_at: tx.booked_at ?? new Date().toISOString(),
         counterparty_company_id: bill.supplier_company_id,
         counterparty_contact_id: bill.supplier_contact_id,
+        category_id: bill.category_id ?? null,
         bank_account_id: tx.bank_account_id ?? null,
         reference: `Bank transfer (Revolut) ${tx.provider_ref}`,
         notes: `Auto-matched to bill ${bill.supplier_bill_number ?? bill.id}`,
