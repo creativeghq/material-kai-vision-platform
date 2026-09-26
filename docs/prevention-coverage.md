@@ -2720,3 +2720,18 @@ and the recurring-plan feature shipped the same week.
 - **`autoheal_enabled = false`, and `heal_fn` is null on purpose.** Deciding which of two records is the real cost is a judgement about the business, not a number to re-derive. A heal that deleted one would be a heal that moves money.
 - **Proven to fire:** 2026-09-23 — both shapes built inside an aborting `DO` block (a 17.1 for 4,000 beside a 4,000 bill two days later; two 250 bills three days apart with a 16.1 attached to one). Found 1 and 1, total 2. Zero findings against the live tree, which is the answer a detector returning zero has to earn.
 - **The grant was the real bug in the guard.** It came out `EXECUTE`-able by `authenticated` — **1 of 142 detectors**, the other 141 service_role only. A detector scans every workspace with no tenancy filter by design, so that handed any signed-in user every workspace's supplier bills. `REVOKE ... FROM anon` does not remove the DEFAULT grant to `PUBLIC`; it has to be `FROM public, anon`, and the count against the other 141 is what made the outlier visible at all.
+
+### A guard whose window was shorter than the process it watched — 2026-09-26
+
+`finance.inbound_extraction_silent_zero` asked whether documents that arrived in the last **7 days**
+had produced warehouse items. Extraction takes a **median of 20 days** (p90 27, max 42, over the
+last 644 extracted documents). The question could therefore almost never be answered yes, and the
+finding sat open continuously from 2026-07-29 to 2026-09-26 while 2,050 items were in fact
+extracted, the newest eight days before it was read.
+
+Extraction by document age tells the whole story: 0–7 days **0 of 19**, 8–14 days **12 of 26**,
+15–30 days **23 of 34**. The newest cohort reads as total failure and is simply the lag.
+
+- **Fixed by** widening the window to 45 days — past the observed maximum of 42 — and excluding the youngest 2 days. The hint now states the lag, so the next reader does not re-derive it.
+- **Proven to fire:** 2026-09-26 — quiet against the live tree, and 1 finding inside an aborting block that severed every `inbound_document_id` in the 45-day cohort.
+- **Recipe:** a silent-zero probe measures a cohort. If the cohort is younger than the process's own latency, the probe reports the latency as a failure, permanently — and the alert is worth nothing because it is always on. Measure the lag before choosing the window.
