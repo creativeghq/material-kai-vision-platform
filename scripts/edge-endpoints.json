@@ -14921,6 +14921,14 @@
   },
   {
     "name": "bank-statement-import",
+    "tag": "Finance",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "docs": "docs/banking-revolut.md",
     "summary": "Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces.",
     "params": [
       {
@@ -14959,8 +14967,8 @@
   {
     "name": "revolut-api",
     "tag": "Finance",
-    "summary": "Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync",
-    "description": "#315. Actions on one POST surface: init (mint RSA keypair server-side; private key never leaves the server), authorize-url (Revolut consent URL), oauth-complete (exchange the auth code via JWT client assertion), register-webhook (webhooks v2 subscription + signing secret), accounts (live Revolut accounts + finance_bank_accounts mapping), map-account (link a Revolut currency pocket to a bank account row), sync-now (shared sync core for this workspace), disconnect. Caller must be a finance manager of the target workspace (RLS-checked; 404 on mismatch) and the workspace must be entitled to banking-revolut (402 otherwise). validate-account-name proxies Revolut CoP/VoP so the CRM bank area can confirm an IBAN belongs to the named counterparty; map-account auto-fills the finance row IBAN/BIC from /accounts/{id}/bank-details when empty. Phase 2 adds reconciliation: reconcile re-runs the invoice matcher; confirm-match settles a statement line against an invoice through record-payment; ignore-transaction parks a line. Phase 3 adds money-out: create-counterparty mirrors a CRM bank row as a Revolut counterparty (VoP-gated; not_matched blocks unless force=true); send-payment creates a draft (human approves in-app) or a direct transfer; create-payout-link pays without an IBAN; fx-rate/exchange convert between pockets. Every instruction is audited in revolut_payouts with an idempotent request_id before Revolut is called. Phase 4 adds team cards (issue virtual, freeze/unfreeze) and card-expense browsing with on-demand receipt passthrough (never persisted). import-expenses attributes card expenses to employees (card→holder email→HR roster) into monthly expense reports with receipts; also runs with the cron sweep, which additionally freezes cards of offboarded employees. pay-due-bills drafts ONE multi-payment run over due supplier_bills (suppliers without a VoP-linked counterparty are skipped and reported); set-card-limit patches weekly/monthly spending caps; create-card-invitation invites a new member by email. sync-labels pushes platform finance categories into a \"Platform categories\" Revolut label group (names only, never deletes). reconcile also settles OUTGOING transfers against supplier_bills (reference-quotes-bill-number or exact-amount+supplier-name; payments direction out + payment_allocations.supplier_bill_id). confirm-bill-match manually settles an OUTGOING revolut feed line against a supplier bill. The feed table is now multi-provider (revolut|stripe|viva); stripe/viva rows are informational mirrors of webhook-settled money and are guarded against re-matching.",
+    "summary": "Revolut Business — live accounts & balances, connection, reconciliation, payments, cards",
+    "description": "One POST surface; the body's `action` picks the operation. Every call needs `workspace_id`; the caller must be a finance manager of that workspace (404 otherwise, never 403) and the workspace must be entitled to the banking-revolut module (402). Actions that reach Revolut need a completed connection (init → authorize-url → oauth-complete); without one they answer 400 \"Revolut is not set up\". Every money-out instruction is recorded in payout_instructions with an idempotent request_id before Revolut is called. For the platform's own derived balances use GET /rest/v1/vw_bank_account_balances (Banking (database) section).",
     "security": [
       "supabaseJwt"
     ],
@@ -14968,63 +14976,557 @@
     "methods": [
       "POST"
     ],
-    "request": [
-      {
-        "name": "action",
-        "type": "string",
-        "required": true,
-        "desc": "init | authorize-url | oauth-complete | register-webhook | accounts | map-account | validate-account-name | reconcile | confirm-match | ignore-transaction | create-counterparty | send-payment | create-payout-link | fx-rate | exchange | sync-now | disconnect | team-members | cards | create-card | freeze-card | unfreeze-card | expenses | expense-receipt | import-expenses | pay-due-bills | set-card-limit | create-card-invitation | sync-labels | confirm-bill-match"
-      },
+    "common": [
       {
         "name": "workspace_id",
         "type": "uuid",
         "required": true,
-        "desc": "Target workspace; caller must be its finance manager."
-      },
-      {
-        "name": "redirect_uri",
-        "type": "string (https URL)",
-        "required": false,
-        "desc": "init only. The OAuth redirect URI registered in the Revolut dashboard; its domain becomes the JWT assertion issuer."
-      },
-      {
-        "name": "force",
-        "type": "boolean",
-        "required": false,
-        "desc": "init only. Regenerate over an existing keypair (invalidates the current connection)."
-      },
-      {
-        "name": "code",
-        "type": "string",
-        "required": false,
-        "desc": "oauth-complete only. Authorisation code from the consent redirect."
-      },
-      {
-        "name": "revolut_account_id",
-        "type": "string",
-        "required": false,
-        "desc": "map-account only. Revolut account (currency pocket) id."
-      },
-      {
-        "name": "bank_account_id",
-        "type": "uuid | null",
-        "required": false,
-        "desc": "map-account only. finance_bank_accounts row to link, or null to unlink."
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "required": false,
-        "desc": "validate-account-name only. The holder name to check (company by default; company=false splits into first/last)."
-      },
-      {
-        "name": "iban",
-        "type": "string",
-        "required": false,
-        "desc": "validate-account-name only. IBAN to check (or account_no + sort_code)."
+        "desc": "Target workspace; the caller must be its finance manager"
       }
     ],
-    "response": "{ok: true, ...action-specific fields (public_key, url, accounts, fetched/upserted)}"
+    "actions": [
+      {
+        "name": "accounts",
+        "summary": "LIVE Revolut accounts with the balance the bank reports, plus how each maps to a finance_bank_accounts row.",
+        "params": [],
+        "response": "{ok, accounts: [{id, name, balance, currency, state, public, created_at, updated_at}], bank_accounts: [{id, name, currency, revolut_account_id}]} — `balance` is Revolut's figure for that currency pocket right now; the platform's book balance is GET /rest/v1/vw_bank_account_balances"
+      },
+      {
+        "name": "map-account",
+        "summary": "Link a Revolut currency pocket to a finance_bank_accounts row (or unlink with bank_account_id=null). Fills the row's empty IBAN/BIC from Revolut.",
+        "params": [
+          {
+            "name": "revolut_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "Revolut account (pocket) id from `accounts`"
+          },
+          {
+            "name": "bank_account_id",
+            "type": "uuid | null",
+            "required": false,
+            "desc": "Row to link; null or omitted unlinks the pocket"
+          }
+        ],
+        "response": "{ok}"
+      },
+      {
+        "name": "fx-rate",
+        "summary": "Revolut's current exchange rate between two currencies.",
+        "params": [
+          {
+            "name": "from",
+            "type": "string",
+            "required": true,
+            "desc": "ISO currency, e.g. EUR"
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "required": true,
+            "desc": "ISO currency"
+          },
+          {
+            "name": "amount",
+            "type": "number",
+            "required": false,
+            "desc": "Default 1"
+          }
+        ],
+        "response": "{ok, rate}"
+      },
+      {
+        "name": "exchange",
+        "summary": "Convert money between two of the business's own pockets. Audited in payout_instructions (kind=exchange) before Revolut is called.",
+        "params": [
+          {
+            "name": "from_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "Revolut pocket the money leaves"
+          },
+          {
+            "name": "to_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "Revolut pocket it arrives in"
+          },
+          {
+            "name": "from_currency",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "to_currency",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "amount",
+            "type": "number",
+            "required": true,
+            "desc": "In from_currency; must be > 0"
+          }
+        ],
+        "response": "{ok, exchange_id, state}"
+      },
+      {
+        "name": "init",
+        "summary": "Mint the RSA keypair server-side (the private key never leaves the server). Upload `public_key` to the Revolut dashboard.",
+        "params": [
+          {
+            "name": "redirect_uri",
+            "type": "string",
+            "required": true,
+            "desc": "https OAuth redirect URI registered in Revolut; its domain becomes the JWT-assertion issuer"
+          },
+          {
+            "name": "force",
+            "type": "boolean",
+            "required": false,
+            "desc": "Regenerate over an existing keypair — invalidates the current connection"
+          }
+        ],
+        "response": "{ok, public_key, redirect_uri}"
+      },
+      {
+        "name": "authorize-url",
+        "summary": "The Revolut consent URL (scopes READ, WRITE, PAY). Requires the client_id saved via save_workspace_revolut_config.",
+        "params": [],
+        "response": "{ok, url}"
+      },
+      {
+        "name": "oauth-complete",
+        "summary": "Exchange the consent code for tokens and create finance_bank_accounts rows for each pocket. Idempotent against a double-fired callback.",
+        "params": [
+          {
+            "name": "code",
+            "type": "string",
+            "required": true,
+            "desc": "Authorisation code from the consent redirect"
+          }
+        ],
+        "response": "{ok} | {ok, already: true}"
+      },
+      {
+        "name": "register-webhook",
+        "summary": "Subscribe Revolut webhooks v2 (transactions + payout links); replaces an earlier subscription.",
+        "params": [],
+        "response": "{ok, webhook_url}"
+      },
+      {
+        "name": "sync-now",
+        "summary": "Pull transactions since the watermark into revolut_bank_transactions now. 409 if OAuth was never completed.",
+        "params": [],
+        "response": "{ok, fetched, upserted}"
+      },
+      {
+        "name": "disconnect",
+        "summary": "Drop the tokens and the webhook. The keypair and synced history are kept.",
+        "params": [],
+        "response": "{ok}"
+      },
+      {
+        "name": "reconcile",
+        "summary": "Re-run both matchers: incoming lines → invoices, outgoing transfers → supplier bills. Runs automatically after every sync too.",
+        "params": [],
+        "response": "{ok, …incoming matcher counts, billsSettled, outgoingUnmatched, outgoingErrors}"
+      },
+      {
+        "name": "confirm-match",
+        "summary": "Settle an INCOMING bank line against an invoice. Refuses stripe/viva mirror rows, already-matched lines, and transfers between your own pockets.",
+        "params": [
+          {
+            "name": "transaction_row_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "revolut_bank_transactions.id"
+          },
+          {
+            "name": "invoice_id",
+            "type": "uuid",
+            "required": true
+          }
+        ],
+        "response": "{ok}"
+      },
+      {
+        "name": "confirm-bill-match",
+        "summary": "Settle an OUTGOING bank line against a supplier bill (applies min(line, amount due); currencies must match).",
+        "params": [
+          {
+            "name": "transaction_row_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "revolut_bank_transactions.id"
+          },
+          {
+            "name": "bill_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "supplier_bills.id"
+          }
+        ],
+        "response": "{ok, applied}"
+      },
+      {
+        "name": "plan-candidates",
+        "summary": "Planned payments an OUTGOING line could close (same data as the bank_tx_plan_candidates RPC, top 5).",
+        "params": [
+          {
+            "name": "transaction_row_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "revolut_bank_transactions.id"
+          }
+        ],
+        "response": "{ok, candidates: [{plan_id, title, amount, currency, scheduled_for, category, counterparty_company_id, day_gap, party_matches, score}]}"
+      },
+      {
+        "name": "confirm-plan-match",
+        "summary": "Close an open planned payment (rent, utilities…) with an OUTGOING line. Amount must match to the cent; currency and direction must agree.",
+        "params": [
+          {
+            "name": "transaction_row_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "revolut_bank_transactions.id"
+          },
+          {
+            "name": "plan_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "planned_payments.id"
+          }
+        ],
+        "response": "{ok, outcome}"
+      },
+      {
+        "name": "ignore-transaction",
+        "summary": "Park a line (or un-park it with ignore=false). A matched line cannot be ignored.",
+        "params": [
+          {
+            "name": "transaction_row_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "revolut_bank_transactions.id"
+          },
+          {
+            "name": "ignore",
+            "type": "boolean",
+            "required": false,
+            "desc": "Default true"
+          }
+        ],
+        "response": "{ok}"
+      },
+      {
+        "name": "validate-account-name",
+        "summary": "Confirmation-of-Payee / VoP: does this IBAN belong to the named holder? Stores the verdict on the CRM bank row when one is named.",
+        "params": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Holder name"
+          },
+          {
+            "name": "iban",
+            "type": "string",
+            "required": false,
+            "desc": "IBAN (or account_no + sort_code)"
+          },
+          {
+            "name": "account_no",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "sort_code",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "company",
+            "type": "boolean",
+            "required": false,
+            "desc": "Default true; false checks a person (name split into first/last)"
+          },
+          {
+            "name": "crm_bank_account_id",
+            "type": "uuid",
+            "required": false,
+            "desc": "crm_bank_accounts row to stamp vop_result on"
+          }
+        ],
+        "response": "{ok, result_code: matched | close_match | not_matched | cannot_be_checked, …Revolut's verdict fields}"
+      },
+      {
+        "name": "create-counterparty",
+        "summary": "Register a CRM bank account as a Revolut counterparty — the prerequisite for paying it. VoP-gated: not_matched is refused unless force=true.",
+        "params": [
+          {
+            "name": "crm_bank_account_id",
+            "type": "uuid",
+            "required": true
+          },
+          {
+            "name": "force",
+            "type": "boolean",
+            "required": false,
+            "desc": "Proceed despite a not_matched VoP verdict"
+          }
+        ],
+        "response": "{ok, counterparty_id, vop_result} | {ok, counterparty_id, already: true}"
+      },
+      {
+        "name": "send-payment",
+        "summary": "Pay a counterparty from a Revolut pocket — as a draft a human approves in the Revolut app (default) or a direct transfer. Audited before Revolut is called.",
+        "params": [
+          {
+            "name": "crm_bank_account_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "Who is paid (must have a revolut_counterparty_id)"
+          },
+          {
+            "name": "source_revolut_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "Pocket the money leaves"
+          },
+          {
+            "name": "amount",
+            "type": "number",
+            "required": true,
+            "desc": "> 0"
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "required": false,
+            "desc": "Default EUR"
+          },
+          {
+            "name": "reference",
+            "type": "string",
+            "required": false,
+            "desc": "On the statement; max 140 chars"
+          },
+          {
+            "name": "mode",
+            "type": "'draft' | 'payment'",
+            "required": false,
+            "desc": "Default draft"
+          },
+          {
+            "name": "supplier_bill_id",
+            "type": "uuid",
+            "required": false,
+            "desc": "The bill this pays"
+          },
+          {
+            "name": "request_id",
+            "type": "uuid",
+            "required": false,
+            "desc": "Idempotency key — a retry with the same key returns the first result (duplicate: true)"
+          }
+        ],
+        "response": "{ok, mode: \"draft\", draft_id} | {ok, mode: \"payment\", payment_id, state} (+ duplicate, note)"
+      },
+      {
+        "name": "pay-due-bills",
+        "summary": "Draft ONE multi-payment run over due supplier bills (max 25); one approval in Revolut pays them all. Suppliers with no VoP-linked counterparty, and bills already out for payment, are skipped and reported.",
+        "params": [
+          {
+            "name": "source_revolut_account_id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "bill_ids",
+            "type": "uuid[]",
+            "required": false,
+            "desc": "Specific bills; default = every bill due today or earlier"
+          }
+        ],
+        "response": "{ok, drafted, draft_id?, skipped: [{bill, reason}], note?}"
+      },
+      {
+        "name": "create-payout-link",
+        "summary": "Pay someone without knowing their IBAN — they claim the money through the link.",
+        "params": [
+          {
+            "name": "counterparty_name",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "source_revolut_account_id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "amount",
+            "type": "number",
+            "required": true,
+            "desc": "> 0"
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "required": false,
+            "desc": "Default EUR"
+          },
+          {
+            "name": "reference",
+            "type": "string",
+            "required": false,
+            "desc": "Max 140 chars"
+          }
+        ],
+        "response": "{ok, link_id, url}"
+      },
+      {
+        "name": "team-members",
+        "summary": "Revolut Business team members (card holders).",
+        "params": [],
+        "response": "{ok, members: [...]}"
+      },
+      {
+        "name": "cards",
+        "summary": "All cards on the account.",
+        "params": [],
+        "response": "{ok, cards: [...]}"
+      },
+      {
+        "name": "create-card",
+        "summary": "Issue a VIRTUAL card to a team member.",
+        "params": [
+          {
+            "name": "holder_id",
+            "type": "string",
+            "required": true,
+            "desc": "Revolut team-member id"
+          },
+          {
+            "name": "label",
+            "type": "string",
+            "required": false,
+            "desc": "Max 30 chars"
+          }
+        ],
+        "response": "{ok, card}"
+      },
+      {
+        "name": "freeze-card",
+        "summary": "Freeze a card.",
+        "params": [
+          {
+            "name": "card_id",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{ok}"
+      },
+      {
+        "name": "unfreeze-card",
+        "summary": "Unfreeze a card.",
+        "params": [
+          {
+            "name": "card_id",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{ok}"
+      },
+      {
+        "name": "set-card-limit",
+        "summary": "Set a weekly or monthly spending cap on a card.",
+        "params": [
+          {
+            "name": "card_id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "amount",
+            "type": "number",
+            "required": true,
+            "desc": "> 0"
+          },
+          {
+            "name": "period",
+            "type": "'week' | 'month'",
+            "required": false,
+            "desc": "Default month"
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "required": false,
+            "desc": "Default EUR"
+          }
+        ],
+        "response": "{ok}"
+      },
+      {
+        "name": "create-card-invitation",
+        "summary": "Invite someone (e.g. a new hire) to Revolut so a card can be issued to them.",
+        "params": [
+          {
+            "name": "email",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{ok, invitation}"
+      },
+      {
+        "name": "expenses",
+        "summary": "Card expenses from Revolut (latest 100).",
+        "params": [
+          {
+            "name": "from",
+            "type": "string (ISO datetime)",
+            "required": false,
+            "desc": "Default 90 days ago"
+          }
+        ],
+        "response": "{ok, expenses: [...]}"
+      },
+      {
+        "name": "expense-receipt",
+        "summary": "One receipt file, fetched on demand and never stored.",
+        "params": [
+          {
+            "name": "expense_id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "receipt_id",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{ok, content_type, base64}"
+      },
+      {
+        "name": "import-expenses",
+        "summary": "Attribute card expenses to employees (card → holder email → HR roster) as monthly expense reports with receipts. Also runs in the cron sweep.",
+        "params": [],
+        "response": "{ok, …import counts}"
+      },
+      {
+        "name": "sync-labels",
+        "summary": "Push platform finance categories into a \"Platform categories\" Revolut label group. Names only; never deletes.",
+        "params": [],
+        "response": "{ok, group_id, created, total} | {ok, created: 0, note}"
+      }
+    ]
   },
   {
     "name": "revolut-sync",
@@ -15797,6 +16299,13 @@
   },
   {
     "name": "inbox-draft-cron",
+    "tag": "Crons",
+    "security": [
+      "cronSecret"
+    ],
+    "methods": [
+      "POST"
+    ],
     "summary": "Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send.",
     "params": [],
     "response": "{success:true, claimed:number, drafted:number, empty:number, failed:number}"

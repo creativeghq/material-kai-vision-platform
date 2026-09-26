@@ -122,7 +122,67 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Execute a registered background agent by agent_id",
-    "description": "Universal executor for all background agent types. Accepts service-role or user JWT auth. GET ?catalog=1 returns the registered agent type catalog; POST runs or resumes an agent run."
+    "description": "Universal executor for all background agent types. Accepts service-role or user JWT auth. GET ?catalog=1 returns the registered agent type catalog; POST runs or resumes an agent run.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "run_agent",
+          "get_catalog"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "agent_id": {
+        "type": "string",
+        "description": "ID from background_agents table"
+      },
+      "run_id": {
+        "type": "string",
+        "description": "Resume or update an existing pending run"
+      },
+      "input_data": {
+        "type": "object",
+        "description": "Override or augment agent config input"
+      },
+      "triggered_by": {
+        "type": "string",
+        "description": "cron | event | manual | chain | api"
+      }
+    }
+  },
+  {
+    "name": "bank-statement-import",
+    "tag": "Finance",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappi",
+    "fields": {
+      "action": {
+        "type": "string",
+        "required": true,
+        "description": "columns = the file's headers plus five sample rows, so the mapping is built against real names; preview = what WOULD imp"
+      },
+      "bank_account_id": {
+        "type": "string",
+        "required": true,
+        "description": "A finance_bank_accounts row in a workspace the caller belongs to (string (uuid))"
+      },
+      "csv": {
+        "type": "string",
+        "required": true,
+        "description": "The statement export as text. 8MB / 20,000 rows max. Delimiter is sniffed (comma, semicolon, tab, pipe); quoted fields, "
+      },
+      "mapping_id": {
+        "type": "string",
+        "description": "A saved bank_statement_mappings row for this account (string (uuid))"
+      },
+      "mapping": {
+        "type": "object",
+        "description": "An inline mapping while the operator is still building one: date_column, date_format, decimal_mark, and EITHER amount_co"
+      }
+    }
   },
   {
     "name": "catalog-export",
@@ -234,7 +294,40 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Admin sends a published catalog to CRM-category recipients via email",
-    "description": "Resolves recipients from CRM categories, optionally writes catalog_email_grants for each, then dispatches emails via email-api using the catalog_send.recipient template. Preview mode returns recipient list without sending."
+    "description": "Resolves recipients from CRM categories, optionally writes catalog_email_grants for each, then dispatches emails via email-api using the catalog_send.recipient template. Preview mode returns recipient list without sending.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "preview",
+          "send"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "catalog_id": {
+        "type": "string",
+        "required": true,
+        "description": "Published catalog ID"
+      },
+      "category_ids": {
+        "type": "array",
+        "required": true,
+        "description": "CRM category IDs to resolve recipients from"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Override email subject line"
+      },
+      "message_body": {
+        "type": "string",
+        "description": "Optional personal message included in template"
+      },
+      "ensure_grants": {
+        "type": "boolean",
+        "description": "Write catalog_email_grants for every recipient before sending"
+      }
+    }
   },
   {
     "name": "catalog-translate-pdf",
@@ -317,7 +410,39 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Contracts & e-signature - manage contracts and the public signer page",
-    "description": "Contracts & e-signature. One entity, three contexts (hr | finance | project). verify_jwt is disabled so the PUBLIC token sign path works; management actions call authenticate() plus the module/entitlement gates and then write through a USER-context client, so the context-branched RLS (hr->admin, finance->finance-manager, project->member) is the real enforcement - no service-role body-trust (#250 i"
+    "description": "Contracts & e-signature. One entity, three contexts (hr | finance | project). verify_jwt is disabled so the PUBLIC token sign path works; management actions call authenticate() plus the module/entitlement gates and then write through a USER-context client, so the context-branched RLS (hr->admin, finance->finance-manager, project->member) is the real enforcement - no service-role body-trust (#250 i",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "resolve_token",
+          "sign",
+          "create",
+          "list",
+          "get",
+          "update",
+          "send",
+          "void"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "token": {
+        "type": "string",
+        "description": "Signer token from the emailed link"
+      },
+      "signer_name": {
+        "type": "string",
+        "description": "Full name typed by the signer"
+      },
+      "signer_email": {
+        "type": "string"
+      },
+      "signature_image": {
+        "type": "string",
+        "description": "Data URL of the drawn signature"
+      }
+    }
   },
   {
     "name": "crawl-user-website",
@@ -449,7 +574,42 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Run the platform data-integrity check battery + manage checks/findings",
-    "description": "Auth boundary + thin dispatcher over the run_data_integrity_checks / heal_data_integrity_check Postgres RPCs. Cron path (x-cron-secret / service-role via isCronAuthorized) runs the full battery with auto-heal, no body. Admin path (session JWT; admin/super_admin/owner) runs on demand and manages checks/findings."
+    "description": "Auth boundary + thin dispatcher over the run_data_integrity_checks / heal_data_integrity_check Postgres RPCs. Cron path (x-cron-secret / service-role via isCronAuthorized) runs the full battery with auto-heal, no body. Admin path (session JWT; admin/super_admin/owner) runs on demand and manages checks/findings.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "run",
+          "heal_check",
+          "ignore_finding",
+          "reopen_finding",
+          "set_autoheal",
+          "toggle_check"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "autoheal": {
+        "type": "boolean",
+        "description": "Also run heal fns"
+      },
+      "domains": {
+        "type": "array",
+        "description": "Limit to these domains"
+      },
+      "key": {
+        "type": "string",
+        "description": "Check key"
+      },
+      "findingId": {
+        "type": "string",
+        "description": "Finding id"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "New value"
+      }
+    }
   },
   {
     "name": "email-api",
@@ -459,7 +619,112 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "GET"
     ],
     "summary": "Action-discriminated email sending, domain management, logs, and analytics via Resend.",
-    "description": "Accepts a JSON body with an `action` field (or path suffix) to select the operation. Requires `RESEND_API_KEY`; returns 503 with `provider_not_configured` when absent. Supports optional React Email templates resolved by slug from `email_templates`."
+    "description": "Accepts a JSON body with an `action` field (or path suffix) to select the operation. Requires `RESEND_API_KEY`; returns 503 with `provider_not_configured` when absent. Supports optional React Email templates resolved by slug from `email_templates`.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "send",
+          "sync-campaign-stats",
+          "resend-contacts",
+          "sync-resend-contacts",
+          "set-resend-contact-sync",
+          "domains",
+          "add-domain",
+          "verify-domain",
+          "analytics",
+          "sync-domains",
+          "layout",
+          "domain-tracking"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "to": {
+        "type": "array",
+        "description": "Recipient address(es)"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Email subject (may be overridden by template)"
+      },
+      "html": {
+        "type": "string",
+        "description": "HTML body (required if no templateSlug and no text)"
+      },
+      "text": {
+        "type": "string",
+        "description": "Plain-text body"
+      },
+      "templateSlug": {
+        "type": "string",
+        "description": "Slug of an active email_templates row"
+      },
+      "variables": {
+        "type": "object",
+        "description": "Template variable substitutions"
+      },
+      "from": {
+        "type": "string",
+        "description": "Sender address (defaults to email_settings.default_from_email)"
+      },
+      "fromName": {
+        "type": "string",
+        "description": "Sender display name"
+      },
+      "cc": {
+        "type": "array",
+        "description": "CC addresses"
+      },
+      "bcc": {
+        "type": "array",
+        "description": "BCC addresses"
+      },
+      "replyTo": {
+        "type": "string",
+        "description": "Reply-To address"
+      },
+      "emailType": {
+        "type": "string",
+        "description": "Email category tag (one of: 'transactional'|'marketing'|'notification')"
+      },
+      "attachments": {
+        "type": "string",
+        "description": "Base64-encoded attachments (no data: prefix) (Array<{filename:string,content:string}>)"
+      },
+      "campaign_id": {
+        "type": "string",
+        "description": "Campaign to refresh (string (uuid))"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace (string (uuid))"
+      },
+      "auto_sync": {
+        "type": "boolean",
+        "description": "Enable automatic syncing"
+      },
+      "domain": {
+        "type": "string",
+        "description": "Domain name to add"
+      },
+      "dateRange": {
+        "type": "string",
+        "description": "ISO date range (POST body) or fromDate/toDate query params (GET) ({start:string,end:string})"
+      },
+      "layoutHtml": {
+        "type": "string",
+        "description": "Layout to preview instead of the stored one. Must contain {{content}}; empty previews the built-in default."
+      },
+      "sampleHtml": {
+        "type": "string",
+        "description": "Body to render inside the shell. Defaults to the built-in specimen."
+      },
+      "set": {
+        "type": "object",
+        "description": "{open_tracking?:boolean, click_tracking?:boolean} — applied before the values are read back."
+      }
+    }
   },
   {
     "name": "finance-assessment",
@@ -861,7 +1126,35 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Execute, test, or event-trigger workflow automations by walking the xyflow graph.",
-    "description": "Requires Supabase JWT. Routes on body.action to execute-flow (run a saved flow with trigger data), test-flow (dry-run, no side effects), or trigger-event (auto-dispatch from DB triggers or server-to-server)."
+    "description": "Requires Supabase JWT. Routes on body.action to execute-flow (run a saved flow with trigger data), test-flow (dry-run, no side effects), or trigger-event (auto-dispatch from DB triggers or server-to-server).",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "execute-flow",
+          "test-flow",
+          "trigger-event"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "flow_id": {
+        "type": "string",
+        "description": "UUID of the flow to execute."
+      },
+      "trigger_data": {
+        "type": "object",
+        "description": "Arbitrary payload passed as trigger context into the graph."
+      },
+      "event_type": {
+        "type": "string",
+        "description": "TriggerType enum value (e.g. 'new_product', 'price_alert')."
+      },
+      "event_data": {
+        "type": "object",
+        "description": "Event payload merged into trigger context."
+      }
+    }
   },
   {
     "name": "generate-catalog-pdf",
@@ -1440,7 +1733,440 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "HR module API — employees, absences, recruitment, onboarding, payroll, attendance, Ergani, accounting",
-    "description": "Action-based HR backbone (#252). Session JWT; authenticate() yields a service-role client, so every action re-derives the workspace from body.workspace_id and calls userCanAccessWorkspace, plus isModuleEnabled('hr') and per-workspace assertEntitled('hr') (402 upsell). RBAC: reads need hr.view, writes/approvals need hr.manage (owner/admin/global-admin only); self-* actions are open to a linked empl"
+    "description": "Action-based HR backbone (#252). Session JWT; authenticate() yields a service-role client, so every action re-derives the workspace from body.workspace_id and calls userCanAccessWorkspace, plus isModuleEnabled('hr') and per-workspace assertEntitled('hr') (402 upsell). RBAC: reads need hr.view, writes/approvals need hr.manage (owner/admin/global-admin only); self-* actions are open to a linked empl",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "list-accounting-docs",
+          "upload-accounting-doc",
+          "sign-accounting-doc",
+          "delete-accounting-doc",
+          "analyze-accounting-doc",
+          "prepare-accounting-period",
+          "ergani-submission-types",
+          "ergani-document-schema",
+          "ergani-employer-info",
+          "ergani-submit-leave",
+          "ergani-submit-hire",
+          "ergani-submit-separation",
+          "ergani-submit-overtime",
+          "ergani-submit-schedule",
+          "ergani-submit",
+          "ergani-download-pdf",
+          "ergani-retry",
+          "ergani-submissions-log",
+          "list-departments",
+          "create-department",
+          "update-department",
+          "delete-department",
+          "list-job-postings",
+          "create-job-posting",
+          "update-job-posting",
+          "delete-job-posting",
+          "generate-job-description",
+          "list-applications",
+          "create-application",
+          "update-application",
+          "upload-application-cv",
+          "application-cv-url",
+          "screen-application",
+          "hire-application",
+          "list-onboarding",
+          "add-onboarding-task",
+          "toggle-onboarding-task",
+          "delete-onboarding-task",
+          "list-documents",
+          "upload-document",
+          "sign-document",
+          "delete-document",
+          "list-payroll-runs",
+          "create-payroll-run",
+          "get-payroll-run",
+          "update-payroll-item",
+          "generate-payslips",
+          "get-payroll-settings",
+          "update-payroll-settings",
+          "set-payroll-status",
+          "post-payroll-to-finance",
+          "invite-employee",
+          "clock-employee",
+          "set-employee-pin",
+          "attendance-today",
+          "list-notify-candidates",
+          "get-hr-settings",
+          "save-hr-settings",
+          "list-punches",
+          "add-manual-punch",
+          "update-punch",
+          "delete-punch",
+          "timesheet",
+          "self-profile",
+          "self-onboarding",
+          "self-toggle-onboarding",
+          "self-timeoff",
+          "self-request-timeoff",
+          "self-documents",
+          "self-clock",
+          "self-punches",
+          "self-sign-document",
+          "list-employees",
+          "create-employee",
+          "update-employee",
+          "list-absences",
+          "record-absence",
+          "approve-absence",
+          "reject-absence",
+          "list-separations",
+          "create-separation",
+          "update-separation",
+          "delete-separation",
+          "list-overtime",
+          "create-overtime",
+          "update-overtime",
+          "delete-overtime",
+          "list-schedules",
+          "create-schedule",
+          "update-schedule",
+          "delete-schedule",
+          "ergani-cancel"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "period": {
+        "type": "string",
+        "description": "YYYY-MM"
+      },
+      "name": {
+        "type": "string",
+        "description": "Document name"
+      },
+      "content_base64": {
+        "type": "string",
+        "description": "Base64 bytes (max 20MB)"
+      },
+      "payroll_run_id": {
+        "type": "string",
+        "description": "Linked run"
+      },
+      "content_type": {
+        "type": "string",
+        "description": "MIME type"
+      },
+      "document_id": {
+        "type": "string",
+        "description": "Document"
+      },
+      "code": {
+        "type": "string",
+        "description": "Ergani submission code"
+      },
+      "absence_id": {
+        "type": "string",
+        "description": "Absence to declare"
+      },
+      "ergani_leave_code": {
+        "type": "string",
+        "description": "Ergani leave type code"
+      },
+      "document": {
+        "type": "object",
+        "description": "Fully-built override payload"
+      },
+      "employee_id": {
+        "type": "string",
+        "description": "Employee to declare"
+      },
+      "comments": {
+        "type": "string",
+        "description": "Free-text comments on the declaration"
+      },
+      "preview": {
+        "type": "boolean",
+        "description": "Return the built document + unfilled keys without submitting"
+      },
+      "separation_id": {
+        "type": "string",
+        "description": "hr_separations row to file"
+      },
+      "overtime_ids": {
+        "type": "array",
+        "description": "hr_overtime ids to file (max 100); or pass overtime_id for one"
+      },
+      "schedule_id": {
+        "type": "string",
+        "description": "hr_work_schedules row to file"
+      },
+      "kind": {
+        "type": "string",
+        "description": "schedule_weekly | schedule_daily | change (defaults from schedule_type)"
+      },
+      "protocol": {
+        "type": "string",
+        "description": "Protocol number"
+      },
+      "submitted_date": {
+        "type": "string",
+        "description": "yyyymmdd"
+      },
+      "submission_id": {
+        "type": "string",
+        "description": "Failed hr_ergani_submissions row"
+      },
+      "submission_type": {
+        "type": "string",
+        "description": "Filter by code"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Max rows (<=500)"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "head_contact_id": {
+        "type": "string",
+        "description": "Department head contact"
+      },
+      "department_id": {
+        "type": "string",
+        "description": "Department to update"
+      },
+      "title": {
+        "type": "string",
+        "description": "Job title"
+      },
+      "employment_type": {
+        "type": "string",
+        "description": "full_time | part_time | contractor"
+      },
+      "status": {
+        "type": "string",
+        "description": "draft | open | closed"
+      },
+      "job_posting_id": {
+        "type": "string",
+        "description": "Posting to update"
+      },
+      "seniority": {
+        "type": "string",
+        "description": "Seniority hint"
+      },
+      "department": {
+        "type": "string",
+        "description": "Department hint"
+      },
+      "keywords": {
+        "type": "string",
+        "description": "Must-haves"
+      },
+      "stage": {
+        "type": "string",
+        "description": "Filter by stage"
+      },
+      "candidate_id": {
+        "type": "string",
+        "description": "Existing candidate"
+      },
+      "candidate": {
+        "type": "object",
+        "description": "New candidate (name required)"
+      },
+      "notes": {
+        "type": "string",
+        "description": "Notes"
+      },
+      "application_id": {
+        "type": "string",
+        "description": "Application to update"
+      },
+      "rating": {
+        "type": "number",
+        "description": "Rating"
+      },
+      "filename": {
+        "type": "string",
+        "description": "File name"
+      },
+      "start_date": {
+        "type": "string",
+        "description": "Start date"
+      },
+      "pending_only": {
+        "type": "boolean",
+        "description": "Only pending tasks"
+      },
+      "task_id": {
+        "type": "string",
+        "description": "Task"
+      },
+      "doc_type": {
+        "type": "string",
+        "description": "contract|id|certificate|payslip|review|other"
+      },
+      "currency": {
+        "type": "string",
+        "description": "Run currency (default EUR)"
+      },
+      "run_id": {
+        "type": "string",
+        "description": "Run"
+      },
+      "item_id": {
+        "type": "string",
+        "description": "Payroll item"
+      },
+      "gross": {
+        "type": "number",
+        "description": "New gross"
+      },
+      "note": {
+        "type": "string",
+        "description": "Note"
+      },
+      "country_code": {
+        "type": "string",
+        "description": "e.g. GR"
+      },
+      "income_tax_brackets": {
+        "type": "object",
+        "description": "Bracket array"
+      },
+      "email": {
+        "type": "string",
+        "description": "Invite email"
+      },
+      "punch_type": {
+        "type": "string",
+        "description": "arrival | departure"
+      },
+      "pin": {
+        "type": "string",
+        "description": "4-8 digit PIN; empty clears"
+      },
+      "timezone": {
+        "type": "string",
+        "description": "IANA tz"
+      },
+      "kiosk_enabled": {
+        "type": "boolean",
+        "description": "Enable clock-in kiosk"
+      },
+      "late_grace_minutes": {
+        "type": "number",
+        "description": "Late grace window"
+      },
+      "from": {
+        "type": "string",
+        "description": "reference_date >="
+      },
+      "to": {
+        "type": "string",
+        "description": "reference_date <="
+      },
+      "at": {
+        "type": "string",
+        "description": "Timestamp (defaults now)"
+      },
+      "punch_id": {
+        "type": "string",
+        "description": "Punch"
+      },
+      "punched_at": {
+        "type": "string",
+        "description": "New timestamp"
+      },
+      "is_late": {
+        "type": "boolean",
+        "description": "Late flag"
+      },
+      "end_date": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "absence_type": {
+        "type": "string",
+        "description": "vacation|sick|unpaid|other"
+      },
+      "days": {
+        "type": "number",
+        "description": "Lookback days (1-90, default 14)"
+      },
+      "crm_contact_id": {
+        "type": "string",
+        "description": "Existing in-workspace contact to attach"
+      },
+      "contact": {
+        "type": "object",
+        "description": "New contact fields (name required) when no crm_contact_id"
+      },
+      "manager_contact_id": {
+        "type": "string",
+        "description": "Manager (must be in workspace)"
+      },
+      "ergani_e3": {
+        "type": "object",
+        "description": "Exact Ergani template-key to value map for codes we cannot derive (specialty, contract type); prefills later filings"
+      },
+      "working_days": {
+        "type": "number",
+        "description": "Override computed working days"
+      },
+      "separation_type": {
+        "type": "string",
+        "description": "voluntary | termination | expiry"
+      },
+      "effective_date": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "notice_date": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "reason": {
+        "type": "string",
+        "description": "Reason shown on the declaration"
+      },
+      "severance_amount": {
+        "type": "number",
+        "description": "Severance / compensation"
+      },
+      "id": {
+        "type": "string",
+        "description": "Separation id"
+      },
+      "work_date": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "start_time": {
+        "type": "string",
+        "description": "HH:MM"
+      },
+      "end_time": {
+        "type": "string",
+        "description": "HH:MM"
+      },
+      "schedule_type": {
+        "type": "string",
+        "description": "weekly | daily"
+      },
+      "effective_from": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "details": {
+        "type": "array",
+        "description": "Shift rows (max 62)"
+      },
+      "effective_to": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      }
+    }
   },
   {
     "name": "inbox-api",
@@ -1449,7 +2175,369 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Multi-tenant unified inbox: threads, participants, messages, agent takeover",
-    "description": "Action-based handler for the multi-tenant Inbox (#209). Three auth surfaces: JWT actions (authenticated member/operator/customer-account flows), token actions (token_*, service-role + scoped customer share token), and internal_agent_reply (service-role, called by the agent runtime). Threads are workspace-scoped with directional ACLs (internal/customer/upstream); the AI agent can auto-respond and b"
+    "description": "Action-based handler for the multi-tenant Inbox (#209). Three auth surfaces: JWT actions (authenticated member/operator/customer-account flows), token actions (token_*, service-role + scoped customer share token), and internal_agent_reply (service-role, called by the agent runtime). Threads are workspace-scoped with directional ACLs (internal/customer/upstream); the AI agent can auto-respond and b",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "create_thread",
+          "add_participant",
+          "remove_participant",
+          "react_message",
+          "send_message",
+          "mark_read",
+          "comment_private_reply",
+          "set_comment_hidden",
+          "create_contact_from_thread",
+          "link_company_to_thread",
+          "promote_thread",
+          "set_status",
+          "set_agent",
+          "get_agent_settings",
+          "set_agent_settings",
+          "list_threads",
+          "get_thread",
+          "create_marketplace_inquiry",
+          "accept_marketplace_inquiry",
+          "analyze_sentiment",
+          "get_thread_context",
+          "list_labels",
+          "create_label",
+          "update_label",
+          "delete_label",
+          "set_thread_labels",
+          "create_customer_thread",
+          "create_share_link",
+          "suggest_reply",
+          "get_my_email_address",
+          "set_email_address_settings",
+          "get_thread_intake",
+          "update_intake",
+          "update_intake_items",
+          "search_intake_products",
+          "search_catalog",
+          "approve_intake",
+          "reject_intake",
+          "archive_thread",
+          "restore_thread",
+          "token_get_thread",
+          "token_request_code",
+          "token_verify_code",
+          "token_send_message",
+          "token_claim",
+          "internal_agent_reply",
+          "profile_contact",
+          "link_preview",
+          "enrich_attachments",
+          "ask_spreadsheet",
+          "pin_message",
+          "star_message",
+          "forward_message",
+          "delete_message",
+          "set_follow_up",
+          "clear_follow_up",
+          "internal_send_follow_up",
+          "internal_draft_reply"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Owning workspace (string (uuid))"
+      },
+      "thread_type": {
+        "type": "string",
+        "description": "Defaults to 'internal' (one of: string ('internal'|'customer'|'upstream'))"
+      },
+      "channel": {
+        "type": "string",
+        "description": "Defaults to 'internal'"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Thread subject"
+      },
+      "participants": {
+        "type": "array",
+        "description": "Initial participants to add"
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "thread_id": {
+        "type": "string",
+        "description": "string (uuid)"
+      },
+      "user_id": {
+        "type": "string",
+        "description": "string (uuid)"
+      },
+      "contact_id": {
+        "type": "string",
+        "description": "string (uuid)"
+      },
+      "thread_role": {
+        "type": "string"
+      },
+      "participant_id": {
+        "type": "string",
+        "description": "string (uuid)"
+      },
+      "message_id": {
+        "type": "string",
+        "description": "Message to react to (string (uuid))"
+      },
+      "emoji": {
+        "type": "string",
+        "description": "Reaction emoji"
+      },
+      "body": {
+        "type": "string",
+        "description": "Message text"
+      },
+      "message_type": {
+        "type": "string"
+      },
+      "attachments": {
+        "type": "array"
+      },
+      "cards": {
+        "type": "array",
+        "description": "Catalog cards to send: [{kind: product|service, product_id}]. Members only, customer-facing only, ids only — name, image"
+      },
+      "client_token": {
+        "type": "string",
+        "description": "Minted by the composer once per send and kept across a failure. A retry carrying the token of a message that was stored "
+      },
+      "hidden": {
+        "type": "boolean",
+        "description": "Hide when true"
+      },
+      "name": {
+        "type": "string",
+        "description": "Override the derived name"
+      },
+      "email": {
+        "type": "string",
+        "description": "Override the derived email"
+      },
+      "company": {
+        "type": "string",
+        "description": "Company name"
+      },
+      "company_id": {
+        "type": "string",
+        "description": "An existing crm_companies row in the thread's workspace (string (uuid))"
+      },
+      "deal_type": {
+        "type": "string",
+        "description": "A `crm_deal_types.key` (default `general`). Stages are per type; the starting stage is chosen server-side."
+      },
+      "title": {
+        "type": "string",
+        "description": "Deal title. Defaults to “Enquiry from <thread subject>”."
+      },
+      "value": {
+        "type": "number",
+        "description": "Deal value. Omit when it is not known yet — null, never 0."
+      },
+      "currency": {
+        "type": "string",
+        "description": "ISO code, default EUR"
+      },
+      "contact_name": {
+        "type": "string",
+        "description": "Name for a contact that has to be created. Ignored when one is already linked."
+      },
+      "status": {
+        "type": "string"
+      },
+      "agent_id": {
+        "type": "string"
+      },
+      "auto_respond": {
+        "type": "boolean"
+      },
+      "allow_account_data": {
+        "type": "boolean"
+      },
+      "peek": {
+        "type": "boolean",
+        "description": "Members only. A pure read for the assistant: no last_read_at stamp, no read receipt to the customer, the newest 40 messa"
+      },
+      "listing_id": {
+        "type": "string",
+        "description": "string (uuid)"
+      },
+      "buyer_workspace_id": {
+        "type": "string",
+        "description": "string (uuid)"
+      },
+      "qty_wanted": {
+        "type": "number"
+      },
+      "message": {
+        "type": "string"
+      },
+      "demand_type": {
+        "type": "string",
+        "description": "Carries the sourcing demand so an accepted inquiry can materialize an allocation (one of: string ('order_item'|'quote_it"
+      },
+      "demand_id": {
+        "type": "string",
+        "description": "FK of the order_item / quote_item that needs sourcing (string (uuid))"
+      },
+      "inquiry_id": {
+        "type": "string",
+        "description": "string (uuid)"
+      },
+      "accepted_qty": {
+        "type": "number"
+      },
+      "unit_price": {
+        "type": "number"
+      },
+      "force": {
+        "type": "boolean",
+        "description": "Re-analyse even when a recent verdict exists"
+      },
+      "color": {
+        "type": "string",
+        "description": "Label colour token"
+      },
+      "label_id": {
+        "type": "string",
+        "description": "Label to update (string (uuid))"
+      },
+      "label_ids": {
+        "type": "array",
+        "description": "Complete replacement set"
+      },
+      "instruction": {
+        "type": "string",
+        "description": "What the reply should do (e.g. offer a product, state a delivery date). Max 1000 chars; passed to the assistant outside "
+      },
+      "local_part": {
+        "type": "string",
+        "description": "Requested local part"
+      },
+      "auto_reply_enabled": {
+        "type": "boolean",
+        "description": "Agent answers inbound mail"
+      },
+      "is_active": {
+        "type": "boolean",
+        "description": "Address accepts mail"
+      },
+      "agent_ref": {
+        "type": "string",
+        "description": "Agent id that answers"
+      },
+      "customer_contact_id": {
+        "type": "string",
+        "description": "CRM contact (string (uuid))"
+      },
+      "customer_company_id": {
+        "type": "string",
+        "description": "CRM company (string (uuid))"
+      },
+      "notes": {
+        "type": "string",
+        "description": "Free-text notes"
+      },
+      "requested_delivery_date": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "items": {
+        "type": "array",
+        "description": "Complete replacement set of intake lines"
+      },
+      "query": {
+        "type": "string",
+        "description": "Search text"
+      },
+      "kind": {
+        "type": "string",
+        "description": "product (default) or service"
+      },
+      "reason": {
+        "type": "string",
+        "description": "Why it was rejected"
+      },
+      "token": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "sender_proof": {
+        "type": "string"
+      },
+      "agent_state": {
+        "type": "object"
+      },
+      "to_user_id": {
+        "type": "string",
+        "description": "Profile owner being contacted (string (uuid))"
+      },
+      "from_name": {
+        "type": "string",
+        "description": "Sender name"
+      },
+      "from_email": {
+        "type": "string",
+        "description": "Sender email — the reply address"
+      },
+      "services_requested": {
+        "type": "array",
+        "description": "Services ticked on the form"
+      },
+      "turnstile_token": {
+        "type": "string",
+        "description": "Cloudflare Turnstile token"
+      },
+      "url": {
+        "type": "string",
+        "description": "Max 2048 characters. https only; redirects are followed but every hop is re-validated (string (https url))"
+      },
+      "question": {
+        "type": "string"
+      },
+      "attachment_index": {
+        "type": "integer",
+        "description": "Which attachment on that message (0-based). Default: the first spreadsheet"
+      },
+      "pinned": {
+        "type": "boolean",
+        "description": "Defaults to true. Members only"
+      },
+      "starred": {
+        "type": "boolean",
+        "description": "Defaults to true"
+      },
+      "to_thread_id": {
+        "type": "string",
+        "description": "Where it goes. Subject to the WhatsApp 24h service window like any send (string (uuid))"
+      },
+      "at": {
+        "type": "string",
+        "description": "When it fires. Prefer this over `days` from a browser — the client knows the operator’s timezone and can offset a calend"
+      },
+      "days": {
+        "type": "string",
+        "description": "Alternative to `at`, resolved server-side as now + N × 24h (integer (1–365))"
+      },
+      "note": {
+        "type": "string",
+        "description": "What to chase, shown on the reminder (string (≤500))"
+      },
+      "sender_user_id": {
+        "type": "string",
+        "description": "Must still be a member of the thread’s workspace, or 403 (string (uuid))"
+      }
+    }
   },
   {
     "name": "intake-enrich-products",
@@ -1539,7 +2627,273 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "WhatsApp messaging via Zernio — send, bulk send, channel management, and analytics.",
-    "description": "Action-discriminated API for WhatsApp via Zernio (Meta Cloud API). Requires `ZERNIO_API_KEY`; returns 503 with `provider_not_configured` when absent. Channels are `messaging_channels` rows linked to Zernio WhatsApp accounts. Cold/marketing sends require a Meta-approved template; freeform content is only valid inside the 24h customer-care window."
+    "description": "Action-discriminated API for WhatsApp via Zernio (Meta Cloud API). Requires `ZERNIO_API_KEY`; returns 503 with `provider_not_configured` when absent. Channels are `messaging_channels` rows linked to Zernio WhatsApp accounts. Cold/marketing sends require a Meta-approved template; freeform content is only valid inside the 24h customer-care window.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "open-whatsapp-thread",
+          "send",
+          "send-bulk",
+          "connect-whatsapp",
+          "connect-whatsapp-oauth",
+          "connect-whatsapp-callback",
+          "reconcile-phone-numbers",
+          "set-channel-read-receipts",
+          "retry-failed-charges",
+          "bill-channels-monthly",
+          "set-channel-seats",
+          "set-whatsapp-rate",
+          "reconcile-whatsapp-costs",
+          "search-phone-numbers",
+          "list-phone-numbers",
+          "purchase-phone-number",
+          "release-phone-number",
+          "plan-status",
+          "repair-attachments",
+          "zernio-probe",
+          "generate-avatar-cast",
+          "sync-avatars",
+          "backfill-inbox",
+          "channel-health",
+          "inbox-analytics",
+          "webhook-status",
+          "register-webhook",
+          "create-whatsapp-template",
+          "sync-channels",
+          "whatsapp-templates",
+          "channels",
+          "templates",
+          "logs",
+          "analytics",
+          "account-info",
+          "get-settings",
+          "update-settings"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "phone": {
+        "type": "string",
+        "description": "Phone number in international format"
+      },
+      "workspaceId": {
+        "type": "string",
+        "description": "Required when you belong to more than one workspace"
+      },
+      "name": {
+        "type": "string",
+        "description": "Display name for a newly created thread"
+      },
+      "to": {
+        "type": "array",
+        "description": "Recipient phone number(s) in E.164 or local format"
+      },
+      "content": {
+        "type": "string",
+        "description": "Freeform message body (24h window only)"
+      },
+      "templateId": {
+        "type": "string",
+        "description": "messaging_templates.id for an approved template"
+      },
+      "templateVariables": {
+        "type": "object",
+        "description": "Variable substitutions for the template"
+      },
+      "from": {
+        "type": "string",
+        "description": "Channel sender_id; defaults to default active WhatsApp channel"
+      },
+      "messageType": {
+        "type": "string",
+        "description": "transactional | marketing | otp | notification"
+      },
+      "recipients": {
+        "type": "string",
+        "description": "List of recipients with optional per-recipient template variables (Array<{to:string,variables?:object}>)"
+      },
+      "accessToken": {
+        "type": "string",
+        "description": "Meta Business Suite access token"
+      },
+      "wabaId": {
+        "type": "string",
+        "description": "WhatsApp Business Account ID"
+      },
+      "phoneNumberId": {
+        "type": "string",
+        "description": "Meta phone number ID"
+      },
+      "displayName": {
+        "type": "string",
+        "description": "Display name for the channel"
+      },
+      "redirectUrl": {
+        "type": "string",
+        "description": "Where Meta returns the browser"
+      },
+      "onboarding": {
+        "type": "boolean",
+        "description": "Signup-flow variant"
+      },
+      "zernioAccountId": {
+        "type": "string",
+        "description": "Account id from the ?accountId= callback param"
+      },
+      "channelId": {
+        "type": "string",
+        "description": "messaging_channels.id — verified against the caller's workspace"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Defaults to true"
+      },
+      "seats": {
+        "type": "integer",
+        "description": "0–500"
+      },
+      "country": {
+        "type": "string",
+        "description": "ISO country code"
+      },
+      "category": {
+        "type": "string",
+        "description": "Meta template category"
+      },
+      "cost_per_message_usd": {
+        "type": "number",
+        "description": "Rate from the invoice"
+      },
+      "source_note": {
+        "type": "string",
+        "description": "Where the figure came from"
+      },
+      "days": {
+        "type": "integer",
+        "description": "Look-back window"
+      },
+      "numberType": {
+        "type": "string",
+        "description": "local | mobile | toll_free"
+      },
+      "prefix": {
+        "type": "string",
+        "description": "Dialling prefix"
+      },
+      "locality": {
+        "type": "string",
+        "description": "City / region"
+      },
+      "contains": {
+        "type": "string",
+        "description": "Digits the number must contain"
+      },
+      "sms": {
+        "type": "boolean",
+        "description": "Require SMS capability"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Max results"
+      },
+      "status": {
+        "type": "string",
+        "description": "Filter by lifecycle status"
+      },
+      "areaCode": {
+        "type": "string",
+        "description": "Area code"
+      },
+      "wantsSms": {
+        "type": "boolean",
+        "description": "Require SMS capability"
+      },
+      "purchaseIntentId": {
+        "type": "string",
+        "description": "Idempotency key"
+      },
+      "threadId": {
+        "type": "string",
+        "description": "Limit to one thread"
+      },
+      "messageId": {
+        "type": "string",
+        "description": "Limit to one message"
+      },
+      "path": {
+        "type": "string",
+        "description": "Zernio API path to probe"
+      },
+      "keys_only": {
+        "type": "boolean",
+        "description": "Return key names only, no values"
+      },
+      "count": {
+        "type": "integer",
+        "description": "How many to render"
+      },
+      "startIndex": {
+        "type": "integer",
+        "description": "Offset into the cast"
+      },
+      "prompt": {
+        "type": "string",
+        "description": "Override the render prompt"
+      },
+      "variations": {
+        "type": "integer",
+        "description": "Variations per slot"
+      },
+      "force": {
+        "type": "boolean",
+        "description": "Re-assign even where one exists"
+      },
+      "debug": {
+        "type": "boolean",
+        "description": "Verbose per-thread reporting"
+      },
+      "conversationId": {
+        "type": "string",
+        "description": "Only this Zernio conversation"
+      },
+      "fromDate": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "toDate": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "language": {
+        "type": "string",
+        "description": "BCP-47 language tag"
+      },
+      "components": {
+        "type": "array",
+        "description": "Meta template components"
+      },
+      "libraryTemplateName": {
+        "type": "string",
+        "description": "Pre-approved library template to instantiate"
+      },
+      "offset": {
+        "type": "number",
+        "description": "Pagination offset"
+      },
+      "startDate": {
+        "type": "string",
+        "description": "ISO start date (default 30 days ago)"
+      },
+      "endDate": {
+        "type": "string",
+        "description": "ISO end date (default now)"
+      },
+      "settings": {
+        "type": "object",
+        "description": "Settings fields to upsert"
+      }
+    }
   },
   {
     "name": "mivaa-gateway",
@@ -1618,7 +2972,35 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry.",
-    "description": "Action-discriminated handler for two notification channels. `send-push`: sends Web Push notifications to browser subscriptions using VAPID keys (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`). `send-webhook`: delivers a JSON payload to configured webhook endpoints with optional HMAC-SHA256 signing, up to 3 retries with configurable delay, and updates `webhook_endpoints` success/failure timestamps. `get-v"
+    "description": "Action-discriminated handler for two notification channels. `send-push`: sends Web Push notifications to browser subscriptions using VAPID keys (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`). `send-webhook`: delivers a JSON payload to configured webhook endpoints with optional HMAC-SHA256 signing, up to 3 retries with configurable delay, and updates `webhook_endpoints` success/failure timestamps. `get-v",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "send-push",
+          "send-webhook",
+          "get-vapid-key"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "subscriptions": {
+        "type": "string",
+        "description": "Web Push subscription objects (Array<{endpoint:string,p256dh_key:string,auth_key:string}>)"
+      },
+      "notification": {
+        "type": "string",
+        "description": "Notification payload ({title:string,body:string,data?,icon?,badge?})"
+      },
+      "webhooks": {
+        "type": "string",
+        "description": "Webhook endpoint definitions from webhook_endpoints table (Array<{id,url,secret?,headers,retry_config}>)"
+      },
+      "payload": {
+        "type": "object",
+        "description": "JSON payload to POST to each webhook"
+      }
+    }
   },
   {
     "name": "novus-onboarding",
@@ -1770,7 +3152,35 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Import Pinterest pins into the catalogue by URL",
-    "description": "Pinterest pin IMPORT only. The OAuth half (get_auth_url / callback / get_boards / get_board_pins / disconnect) was removed — board browsing needed a connected account and nothing used it. Extract a pin's image + metadata by URL, then import one or many into the catalogue."
+    "description": "Pinterest pin IMPORT only. The OAuth half (get_auth_url / callback / get_boards / get_board_pins / disconnect) was removed — board browsing needed a connected account and nothing used it. Extract a pin's image + metadata by URL, then import one or many into the catalogue.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "extract_pin",
+          "import_pin",
+          "import_pins_bulk"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "pin_url": {
+        "type": "string",
+        "description": "Full Pinterest pin URL"
+      },
+      "moodboard_id": {
+        "type": "string",
+        "description": "Target moodboard ID"
+      },
+      "find_matching_products": {
+        "type": "boolean",
+        "description": "Run MIVAA visual search to suggest matching products"
+      },
+      "pin_urls": {
+        "type": "array",
+        "description": "List of Pinterest pin URLs"
+      }
+    }
   },
   {
     "name": "platform-secrets-admin",
@@ -1779,7 +3189,38 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "CRUD for the platform_secrets key store (admin/super_admin only)",
-    "description": "Action-discriminated endpoint for listing, saving, and deleting platform secret values. Sensitive values are masked in list responses. Saves invalidate the in-worker secret cache. ENV values always take precedence over DB values; editing here only affects the DB fallback."
+    "description": "Action-discriminated endpoint for listing, saving, and deleting platform secret values. Sensitive values are masked in list responses. Saves invalidate the in-worker secret cache. ENV values always take precedence over DB values; editing here only affects the DB fallback.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "list",
+          "list_platform",
+          "list_for_module",
+          "save",
+          "save_many",
+          "delete_value"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "module_slug": {
+        "type": "string",
+        "description": "Module slug to filter by"
+      },
+      "key": {
+        "type": "string",
+        "description": "Secret key name"
+      },
+      "value": {
+        "type": "string",
+        "description": "New value; null or '' clears it (one of: string|null)"
+      },
+      "entries": {
+        "type": "string",
+        "description": "Key-value pairs to upsert (one of: Array<{ key: string, value: string|null }>)"
+      }
+    }
   },
   {
     "name": "product-datasheet-pdf",
@@ -2161,46 +3602,195 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync",
-    "description": "#315. Actions on one POST surface: init (mint RSA keypair server-side; private key never leaves the server), authorize-url (Revolut consent URL), oauth-complete (exchange the auth code via JWT client assertion), register-webhook (webhooks v2 subscription + signing secret), accounts (live Revolut accounts + finance_bank_accounts mapping), map-account (link a Revolut currency pocket to a bank accoun",
+    "summary": "Revolut Business — live accounts & balances, connection, reconciliation, payments, cards",
+    "description": "One POST surface; the body's `action` picks the operation. Every call needs `workspace_id`; the caller must be a finance manager of that workspace (404 otherwise, never 403) and the workspace must be entitled to the banking-revolut module (402). Actions that reach Revolut need a completed connection (init → authorize-url → oauth-complete); without one they answer 400 \"Revolut is not set up\". Every",
     "fields": {
       "action": {
         "type": "string",
+        "enum": [
+          "accounts",
+          "map-account",
+          "fx-rate",
+          "exchange",
+          "init",
+          "authorize-url",
+          "oauth-complete",
+          "register-webhook",
+          "sync-now",
+          "disconnect",
+          "reconcile",
+          "confirm-match",
+          "confirm-bill-match",
+          "plan-candidates",
+          "confirm-plan-match",
+          "ignore-transaction",
+          "validate-account-name",
+          "create-counterparty",
+          "send-payment",
+          "pay-due-bills",
+          "create-payout-link",
+          "team-members",
+          "cards",
+          "create-card",
+          "freeze-card",
+          "unfreeze-card",
+          "set-card-limit",
+          "create-card-invitation",
+          "expenses",
+          "expense-receipt",
+          "import-expenses",
+          "sync-labels"
+        ],
         "required": true,
-        "description": "init | authorize-url | oauth-complete | register-webhook | accounts | map-account | validate-account-name | reconcile | "
+        "description": "Which operation to run"
       },
       "workspace_id": {
         "type": "string",
         "required": true,
-        "description": "Target workspace; caller must be its finance manager. (uuid)"
-      },
-      "redirect_uri": {
-        "type": "string",
-        "description": "init only. The OAuth redirect URI registered in the Revolut dashboard; its domain becomes the JWT assertion issuer. (str"
-      },
-      "force": {
-        "type": "boolean",
-        "description": "init only. Regenerate over an existing keypair (invalidates the current connection)."
-      },
-      "code": {
-        "type": "string",
-        "description": "oauth-complete only. Authorisation code from the consent redirect."
+        "description": "Target workspace; the caller must be its finance manager (uuid)"
       },
       "revolut_account_id": {
         "type": "string",
-        "description": "map-account only. Revolut account (currency pocket) id."
+        "description": "Revolut account (pocket) id from `accounts`"
       },
       "bank_account_id": {
         "type": "string",
-        "description": "map-account only. finance_bank_accounts row to link, or null to unlink. (one of: uuid | null)"
+        "description": "Row to link; null or omitted unlinks the pocket (one of: uuid | null)"
+      },
+      "from": {
+        "type": "string",
+        "description": "ISO currency, e.g. EUR"
+      },
+      "to": {
+        "type": "string",
+        "description": "ISO currency"
+      },
+      "amount": {
+        "type": "number",
+        "description": "Default 1"
+      },
+      "from_account_id": {
+        "type": "string",
+        "description": "Revolut pocket the money leaves"
+      },
+      "to_account_id": {
+        "type": "string",
+        "description": "Revolut pocket it arrives in"
+      },
+      "from_currency": {
+        "type": "string"
+      },
+      "to_currency": {
+        "type": "string"
+      },
+      "redirect_uri": {
+        "type": "string",
+        "description": "https OAuth redirect URI registered in Revolut; its domain becomes the JWT-assertion issuer"
+      },
+      "force": {
+        "type": "boolean",
+        "description": "Regenerate over an existing keypair — invalidates the current connection"
+      },
+      "code": {
+        "type": "string",
+        "description": "Authorisation code from the consent redirect"
+      },
+      "transaction_row_id": {
+        "type": "string",
+        "description": "revolut_bank_transactions.id (uuid)"
+      },
+      "invoice_id": {
+        "type": "string",
+        "description": "uuid"
+      },
+      "bill_id": {
+        "type": "string",
+        "description": "supplier_bills.id (uuid)"
+      },
+      "plan_id": {
+        "type": "string",
+        "description": "planned_payments.id (uuid)"
+      },
+      "ignore": {
+        "type": "boolean",
+        "description": "Default true"
       },
       "name": {
         "type": "string",
-        "description": "validate-account-name only. The holder name to check (company by default; company=false splits into first/last)."
+        "description": "Holder name"
       },
       "iban": {
         "type": "string",
-        "description": "validate-account-name only. IBAN to check (or account_no + sort_code)."
+        "description": "IBAN (or account_no + sort_code)"
+      },
+      "account_no": {
+        "type": "string"
+      },
+      "sort_code": {
+        "type": "string"
+      },
+      "company": {
+        "type": "boolean",
+        "description": "Default true; false checks a person (name split into first/last)"
+      },
+      "crm_bank_account_id": {
+        "type": "string",
+        "description": "crm_bank_accounts row to stamp vop_result on (uuid)"
+      },
+      "source_revolut_account_id": {
+        "type": "string",
+        "description": "Pocket the money leaves"
+      },
+      "currency": {
+        "type": "string",
+        "description": "Default EUR"
+      },
+      "reference": {
+        "type": "string",
+        "description": "On the statement; max 140 chars"
+      },
+      "mode": {
+        "type": "string",
+        "description": "Default draft (one of: 'draft' | 'payment')"
+      },
+      "supplier_bill_id": {
+        "type": "string",
+        "description": "The bill this pays (uuid)"
+      },
+      "request_id": {
+        "type": "string",
+        "description": "Idempotency key — a retry with the same key returns the first result (duplicate: true) (uuid)"
+      },
+      "bill_ids": {
+        "type": "array",
+        "description": "Specific bills; default = every bill due today or earlier"
+      },
+      "counterparty_name": {
+        "type": "string"
+      },
+      "holder_id": {
+        "type": "string",
+        "description": "Revolut team-member id"
+      },
+      "label": {
+        "type": "string",
+        "description": "Max 30 chars"
+      },
+      "card_id": {
+        "type": "string"
+      },
+      "period": {
+        "type": "string",
+        "description": "Default month (one of: 'week' | 'month')"
+      },
+      "email": {
+        "type": "string"
+      },
+      "expense_id": {
+        "type": "string"
+      },
+      "receipt_id": {
+        "type": "string"
       }
     }
   },
@@ -2239,7 +3829,35 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Dealer/factory role promotion workflow — submit, approve, and reject requests.",
-    "description": "Three actions gated by the `action` field. `submit` (any authenticated business user): validates entity_type='business', re-validates VAT via VIES, inserts `role_upgrade_requests`, fans out bell notifications and emails to all admins. `approve` and `reject` (admin only): flip request status, promote or leave user role, and email the applicant. Emits Flows events for each transition."
+    "description": "Three actions gated by the `action` field. `submit` (any authenticated business user): validates entity_type='business', re-validates VAT via VIES, inserts `role_upgrade_requests`, fans out bell notifications and emails to all admins. `approve` and `reject` (admin only): flip request status, promote or leave user role, and email the applicant. Emits Flows events for each transition.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "submit",
+          "approve",
+          "reject"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "requested_role": {
+        "type": "string",
+        "description": "Target role being applied for (one of: 'dealer'|'factory')"
+      },
+      "justification": {
+        "type": "string",
+        "description": "Optional freeform justification text"
+      },
+      "request_id": {
+        "type": "string",
+        "description": "role_upgrade_requests.id"
+      },
+      "admin_note": {
+        "type": "string",
+        "description": "Optional admin note sent to the applicant"
+      }
+    }
   },
   {
     "name": "scan-drawing-title-block",
@@ -2362,7 +3980,17 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Content decay — raise generated articles that are past their own refresh cadence",
-    "description": "Weekly sweep over seo_article_freshness (the derived content-decay view). Emits a seo.article_refresh_due flow event per overdue article and stamps refresh_notified_at so one nudge lands per refresh cycle rather than per cron tick. Due-ness is derived in SQL by seo_article_refresh_due_at(); this function never re-adds an interval to a date. verify_jwt is disabled at the gateway and the only action"
+    "description": "Weekly sweep over seo_article_freshness (the derived content-decay view). Emits a seo.article_refresh_due flow event per overdue article and stamps refresh_notified_at so one nudge lands per refresh cycle rather than per cron tick. Due-ness is derived in SQL by seo_article_refresh_due_at(); this function never re-adds an interval to a date. verify_jwt is disabled at the gateway and the only action",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "cron-sweep"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      }
+    }
   },
   {
     "name": "seo-domain-tracker",
@@ -2371,7 +3999,21 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Weekly Rankings + Backlinks snapshots for a connected website",
-    "description": "Snapshots DataForSEO domain rank overview (ranking keywords, organic traffic, position buckets, up/down/new/lost) + backlinks summary (backlinks, referring domains, spam score) + top ranked keywords for the site's MARKET (resolved from its GSC top country, else TLD, else US) into seo_domain_snapshots + seo_domain_keywords. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run a"
+    "description": "Snapshots DataForSEO domain rank overview (ranking keywords, organic traffic, position buckets, up/down/new/lost) + backlinks summary (backlinks, referring domains, spam score) + top ranked keywords for the site's MARKET (resolved from its GSC top country, else TLD, else US) into seo_domain_snapshots + seo_domain_keywords. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run a",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "run",
+          "cron-run"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "website_id": {
+        "type": "string"
+      }
+    }
   },
   {
     "name": "seo-rank-tracker",
@@ -2380,7 +4022,21 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Daily positions for the keywords a workspace chose to track",
-    "description": "Checks each active row in seo_tracked_keywords against the live Google SERP and writes one seo_keyword_positions row per keyword per day. Distinct from seo-domain-tracker, which DISCOVERS what a domain happens to rank for and replaces that set weekly; this follows a fixed, user-picked set as a time series. Outside the top 100 stores position NULL with found=false — never a sentinel rank, which wou"
+    "description": "Checks each active row in seo_tracked_keywords against the live Google SERP and writes one seo_keyword_positions row per keyword per day. Distinct from seo-domain-tracker, which DISCOVERS what a domain happens to rank for and replaces that set weekly; this follows a fixed, user-picked set as a time series. Outside the top 100 stores position NULL with found=false — never a sentinel rank, which wou",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "run",
+          "cron-run"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "website_id": {
+        "type": "string"
+      }
+    }
   },
   {
     "name": "seo-reports",
@@ -2389,7 +4045,21 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Build a scheduled SEO report and hand it to Flows to deliver",
-    "description": "Composes the report from build_website_seo_report, which calls the same derivations the dashboard reads — it computes no figure itself, so a number in the report and the same number on screen cannot drift. Each run is stored as a FROZEN snapshot in seo_report_runs and read back verbatim; re-deriving on open would show today's numbers under an old date. A run that fails to build is still stored, be"
+    "description": "Composes the report from build_website_seo_report, which calls the same derivations the dashboard reads — it computes no figure itself, so a number in the report and the same number on screen cannot drift. Each run is stored as a FROZEN snapshot in seo_report_runs and read back verbatim; re-deriving on open would show today's numbers under an old date. A run that fails to build is still stored, be",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "run",
+          "cron-run"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "report_id": {
+        "type": "string"
+      }
+    }
   },
   {
     "name": "seo-site-audit",
@@ -2518,7 +4188,89 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Stripe Checkout and Customer Portal session creator",
-    "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured."
+    "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "activate-module",
+          "deactivate-module",
+          "request-module",
+          "request-self-hosting",
+          "list-stripe-products",
+          "verify-catalogue-prices",
+          "create-addon-product",
+          "checkout",
+          "customer_portal"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace (string (uuid))"
+      },
+      "module_slug": {
+        "type": "string",
+        "description": "Module to activate"
+      },
+      "successUrl": {
+        "type": "string",
+        "description": "Defaults to /profile?tab=modules&activated=<slug>"
+      },
+      "cancelUrl": {
+        "type": "string",
+        "description": "Defaults to /profile?tab=modules"
+      },
+      "contact_email": {
+        "type": "string",
+        "description": "Defaults to the caller’s account email"
+      },
+      "contact_name": {
+        "type": "string",
+        "description": "Contact name"
+      },
+      "company": {
+        "type": "string",
+        "description": "Company"
+      },
+      "team_size": {
+        "type": "string",
+        "description": "Rough team size"
+      },
+      "message": {
+        "type": "string",
+        "description": "Free text (max 4000 chars)"
+      },
+      "amount_cents": {
+        "type": "integer",
+        "description": "Price in minor units"
+      },
+      "currency": {
+        "type": "string",
+        "description": "Defaults to 'eur'"
+      },
+      "interval": {
+        "type": "string",
+        "description": "'month' (default) | 'year'"
+      },
+      "type": {
+        "type": "string",
+        "description": "Checkout type. (one of: string ('credit_purchase'|'subscription'))"
+      },
+      "price": {
+        "type": "number",
+        "description": "EUR amount for credit_purchase; server derives credit quantity (1 EUR = 100 credits)."
+      },
+      "priceId": {
+        "type": "string",
+        "description": "Stripe price ID for subscription type."
+      },
+      "returnUrl": {
+        "type": "string",
+        "description": "URL to return to after portal session."
+      }
+    }
   },
   {
     "name": "stripe-connect",
@@ -2527,7 +4279,27 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Stripe Connect onboarding and status for per-workspace payouts",
-    "description": "Manages Stripe Express accounts for per-workspace destination charges. 'onboard' gets or creates an Express account and returns an onboarding link; 'status' refreshes charges_enabled and details_submitted flags. Caller must be workspace owner or admin."
+    "description": "Manages Stripe Express accounts for per-workspace destination charges. 'onboard' gets or creates an Express account and returns an onboarding link; 'status' refreshes charges_enabled and details_submitted flags. Caller must be workspace owner or admin.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "onboard",
+          "status"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "workspace_id": {
+        "type": "string",
+        "required": true,
+        "description": "Workspace to onboard. (string (uuid))"
+      },
+      "return_url": {
+        "type": "string",
+        "description": "URL to redirect after onboarding; defaults to /admin/finance."
+      }
+    }
   },
   {
     "name": "structure-site-note",
@@ -2601,7 +4373,18 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Import the EU TARIC goods nomenclature (Greek extract) into the reference table",
-    "description": "Loads a CSV/TSV export of the TARIC goods nomenclature into public.taric_codes, which backs the commodity-code picker, code validation and the classifier shortlist. Column headers are matched against an alias table so the EU export, the Greek national export and an admin re-export all load unconfigured. Admin JWT for the import; the monthly refresh cron authenticates with x-cron-secret and fetches"
+    "description": "Loads a CSV/TSV export of the TARIC goods nomenclature into public.taric_codes, which backs the commodity-code picker, code validation and the classifier shortlist. Column headers are matched against an alias table so the EU export, the Greek national export and an admin re-export all load unconfigured. Admin JWT for the import; the monthly refresh cron authenticates with x-cron-secret and fetches",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "import",
+          "stats"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      }
+    }
   },
   {
     "name": "tender-bid-portal",
@@ -2610,7 +4393,35 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Issue a trade package to a subcontractor and take their priced return",
-    "description": "Makes a tender sendable. `send` (authenticated) mints a private link for one bid, emails it to the subcontractor's CRM address and returns the link either way, since a company with no email on file is ordinary. `resolve_token` and `submit` are PUBLIC and token-authenticated: the subcontractor never needs an account. THE TOKEN IS PER BID, which is the security model — it resolves to one subcontract"
+    "description": "Makes a tender sendable. `send` (authenticated) mints a private link for one bid, emails it to the subcontractor's CRM address and returns the link either way, since a company with no email on file is ordinary. `resolve_token` and `submit` are PUBLIC and token-authenticated: the subcontractor never needs an account. THE TOKEN IS PER BID, which is the security model — it resolves to one subcontract",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "resolve_token",
+          "submit",
+          "send"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "token": {
+        "type": "string",
+        "description": "The per-bid access token from the emailed link"
+      },
+      "rates": {
+        "type": "array",
+        "description": "[{bid_item_id, rate}] — a null or omitted rate means NOT priced, never zero"
+      },
+      "notes": {
+        "type": "string",
+        "description": "Exclusions and qualifications, read alongside the figures"
+      },
+      "bid_id": {
+        "type": "string",
+        "description": "Checked against the caller's workspace membership via the bid's row (string (uuid))"
+      }
+    }
   },
   {
     "name": "trade-portal",
@@ -2619,7 +4430,56 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin",
-    "description": "THE TOKEN IS THE IDENTITY. Every read and write is scoped by what the link resolves to, and a company id in the request body is never trusted. The access pattern is a link unique to the recipient with no account for them to create and forget — which is what pastes into a WhatsApp thread.\n\nThe piece bespoke portals miss is DELEGATED ADMINISTRATION: `admin` on a portal account is the customer's own "
+    "description": "THE TOKEN IS THE IDENTITY. Every read and write is scoped by what the link resolves to, and a company id in the request body is never trusted. The access pattern is a link unique to the recipient with no account for them to create and forget — which is what pastes into a WhatsApp thread.\n\nThe piece bespoke portals miss is DELEGATED ADMINISTRATION: `admin` on a portal account is the customer's own ",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "resolve",
+          "statement",
+          "stock",
+          "history",
+          "approvals",
+          "place_order",
+          "decide",
+          "mint_link"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "token": {
+        "type": "string",
+        "description": "The per-recipient access token"
+      },
+      "product_id": {
+        "type": "string",
+        "description": "The product to report on (string (uuid))"
+      },
+      "lines": {
+        "type": "array",
+        "description": "[{product_id, description, quantity, unit_price}] — a zero quantity is dropped"
+      },
+      "notes": {
+        "type": "string",
+        "description": "Anything they want us to know"
+      },
+      "approval_id": {
+        "type": "string",
+        "description": "The pending request (string (uuid))"
+      },
+      "decision": {
+        "type": "string",
+        "description": "approved | declined"
+      },
+      "reason": {
+        "type": "string",
+        "description": "Why, in their words"
+      },
+      "portal_user_id": {
+        "type": "string",
+        "description": "Checked against the caller's workspace through the account; a mismatch 404s (string (uuid))"
+      }
+    }
   },
   {
     "name": "trigger-factory-enrichment",
@@ -2795,6 +4655,95 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "GET"
     ],
     "summary": "Social media publishing, OAuth account management, and analytics via Zernio.",
-    "description": "Action-discriminated API routing POST requests to three handlers: analytics (get_best_time, get_post_analytics, get_account_insights), OAuth (connect, callback, disconnect; GET returns account list), and publish (publish_now, schedule). All actions require supabase JWT auth."
+    "description": "Action-discriminated API routing POST requests to three handlers: analytics (get_best_time, get_post_analytics, get_account_insights), OAuth (connect, callback, disconnect; GET returns account list), and publish (publish_now, schedule). All actions require supabase JWT auth.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "connect",
+          "callback",
+          "disconnect",
+          "publish_now",
+          "schedule",
+          "get_post_analytics",
+          "get_best_time",
+          "get_account_insights",
+          "config_status",
+          "import_external_posts",
+          "get_daily_metrics",
+          "get_content_decay",
+          "get_posting_frequency",
+          "get_follower_stats",
+          "get_post_timeline",
+          "get_linkedin_aggregate",
+          "get_linkedin_organizations",
+          "get_account_metrics",
+          "sync_reviews",
+          "reply_review"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "platform": {
+        "type": "string",
+        "description": "Social platform slug (instagram, facebook, linkedin, tiktok, pinterest, youtube, twitter, threads)"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace to attach the account"
+      },
+      "redirect_url": {
+        "type": "string",
+        "description": "Post-OAuth redirect URL"
+      },
+      "zernio_account_id": {
+        "type": "string",
+        "description": "Zernio account ID returned after OAuth"
+      },
+      "social_account_id": {
+        "type": "string",
+        "description": "social_accounts.id to disconnect"
+      },
+      "post_id": {
+        "type": "string",
+        "description": "social_posts.id"
+      },
+      "scheduled_at": {
+        "type": "string",
+        "description": "ISO datetime to publish"
+      },
+      "account_id": {
+        "type": "string",
+        "description": "social_accounts.id"
+      },
+      "post_urls": {
+        "type": "array",
+        "description": "Up to 25 public post URLs"
+      },
+      "from_date": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "to_date": {
+        "type": "string",
+        "description": "YYYY-MM-DD"
+      },
+      "granularity": {
+        "type": "string",
+        "description": "Series granularity"
+      },
+      "aggregation": {
+        "type": "string",
+        "description": "TOTAL (default) | DAILY"
+      },
+      "review_id": {
+        "type": "string",
+        "description": "social_reviews.id (string (uuid))"
+      },
+      "reply": {
+        "type": "string",
+        "description": "Reply text"
+      }
+    }
   }
 ] as const;

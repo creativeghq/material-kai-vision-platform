@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (163)
+## 1. Supabase Edge Functions (167)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -96,8 +96,10 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `bank-statement-import` | JWT | Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces. |
 | `contracts-api` | JWT / public | Contracts & e-signature - manage contracts and the public signer page |
 | `finance-assessment` | JWT | Derive the workspace's finance health signals, and optionally write the AI assessment of them |
+| `finance-categorize-expenses` | JWT | Proposes an expense category per supplier, and applies the ones you confirm |
 | `finance-customer-documents` _(GET + POST)_ | JWT | Customer self-service view of their own invoices, receipts and orders |
 | `finance-digest-aggregate` | JWT | Send finance digest emails and dispatch quote follow-up bell notifications |
 | `finance-document-link` _(GET)_ | token | Redirects a document token to a freshly signed link to the PDF. |
@@ -106,7 +108,9 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `finance-invoice-pdf` | JWT | Render a legal invoice, credit note, or delivery note as a PDF |
 | `finance-issue-invoice` | JWT | Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note |
 | `finance-mydata-book` | JWT / cron | Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces |
+| `finance-mydata-send` | JWT | Transmits an expense document you recorded here straight to myDATA |
 | `finance-pay-invoice` | JWT / token / public | Create a Stripe Checkout session or pay-link for an invoice |
+| `finance-reminders-cron` | cron | Cron: emit planned-payment and VAT-return-ready flow events. |
 | `finance-send-invoice-email` | JWT | Email an invoice to its customer with optional PDF attachment |
 | `finance-send-payment` | JWT | Instruct a real bank transfer from a workspace account to a counterparty |
 | `finance-send-statement` | JWT / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |
@@ -115,7 +119,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-purchase-sheet-pdf` | JWT / secret | Render a project purchase sheet (doors/windows + other purchase items) to PDF |
 | `novus-onboarding` | JWT | Register a workspace's VAT with Novus so it can transmit to myDATA |
 | `parse-supplier-cost-list` | JWT | Parse a KB doc supplier cost list and apply costs to matching products |
-| `revolut-api` | JWT | Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync |
+| `revolut-api` | JWT | Revolut Business — live accounts & balances, connection, reconciliation, payments, cards |
 | `revolut-sync` | JWT / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
 | `revolut-webhooks` | revolutSignature | Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret |
 | `scan-receipt` | JWT | Read a photographed receipt into expense fields, and keep the image on the bill |
@@ -299,6 +303,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `auto-recovery-cron` | cron | Every-5-minute cron: detect and recover stuck PDF, XML, scraping, and agent runs |
 | `campaign-processor` | secret | Every-minute cron: start scheduled campaigns and drip-send emails to recipients |
 | `email-contacts-sync-cron` | cron | Daily cron: push CRM contacts to each workspace's Resend audience |
+| `inbox-draft-cron` | cron | Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send. |
 | `job-cleanup-cron` | cron | Weekly cron (Sunday 03:00 UTC): purge old completed/failed jobs and logs |
 | `moodboard-dormancy-cron` | cron | Daily cron — notify-then-delete lifecycle for idle moodboards |
 | `storage-orphan-cleanup-cron` | cron | Nightly cron (04:00 UTC): delete storage objects with no live DB reference |
@@ -320,13 +325,6 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `canonicalize-attributes` | public | Proxy product attribute canonicalization to MIVAA facet service |
 | `facets-recanonicalize` | service_role | Bulk facet re-canonicalization sweep (proxy to MIVAA) |
 
-**Misc**
-
-| Function | Auth | Summary |
-|---|---|---|
-| `bank-statement-import` | public | Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces. |
-| `inbox-draft-cron` | public | Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send. |
-
 **Commerce**
 
 | Function | Auth | Summary |
@@ -335,6 +333,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `store-document-writeback` | JWT | Hands the issued fiscal document back to the store the order came from. |
 | `store-orders-sync` | JWT | Pulls recent orders from a connected store to close the gap a missed webhook leaves. |
 | `store-orders-webhook` | storeWebhookSignature | Receives orders from a connected sales channel (Shopify, WooCommerce, generic). |
+| `store-skroutz-orders` | JWT | Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document. |
 
 **Customs**
 

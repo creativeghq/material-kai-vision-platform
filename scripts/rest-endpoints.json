@@ -1,0 +1,1691 @@
+{
+  "tag": "Banking (database)",
+  "resources": [
+    {
+      "name": "vw_bank_account_balances",
+      "kind": "view",
+      "summary": "Business bank accounts with their current balance",
+      "description": "One row per finance_bank_accounts row, with the balance DERIVED from the ledger: current_balance = opening_balance + Σ payments in − Σ payments out booked to that account. `security_invoker` view, so RLS on the underlying tables decides what you see — only accounts in workspaces you are a member of. This is the platform's BOOK balance; the balance the bank itself reports comes from POST /revolut-api {action:\"accounts\"} (Revolut-connected workspaces only).",
+      "docs": "docs/banking-revolut.md",
+      "methods": [
+        "GET"
+      ],
+      "example": "/rest/v1/vw_bank_account_balances?workspace_id=eq.<uuid>&is_active=eq.true&order=sort_order",
+      "filters": [
+        "workspace_id",
+        "bank_account_id",
+        "is_active",
+        "currency",
+        "kind"
+      ],
+      "columns": [
+        {
+          "name": "bank_account_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "finance_bank_accounts.id"
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": true,
+          "enum": [
+            "bank",
+            "cash",
+            "card",
+            "online",
+            "other"
+          ]
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "iban",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "account_ref",
+          "type": "text",
+          "nullable": true,
+          "description": "BIC / SWIFT or a free account reference"
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "is_default",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "opening_balance",
+          "type": "numeric",
+          "nullable": true,
+          "description": "The balance the account held before the first payment the platform recorded against it"
+        },
+        {
+          "name": "total_in",
+          "type": "numeric",
+          "nullable": true,
+          "description": "Sum of payments with direction=in booked to this account"
+        },
+        {
+          "name": "total_out",
+          "type": "numeric",
+          "nullable": true,
+          "description": "Sum of payments with direction=out booked to this account"
+        },
+        {
+          "name": "current_balance",
+          "type": "numeric",
+          "nullable": true,
+          "description": "opening_balance + total_in − total_out. The BOOK balance — what the ledger says, not what the bank reports (for that, POST /revolut-api {action:\"accounts\"})"
+        },
+        {
+          "name": "payment_count",
+          "type": "bigint",
+          "nullable": true,
+          "description": "Payments booked to this account"
+        },
+        {
+          "name": "show_on_invoice",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "payout_provider",
+          "type": "text",
+          "nullable": true,
+          "enum": [
+            "revolut",
+            "viva"
+          ],
+          "description": "The rail this account can SEND money on: revolut (revolut_account_id set), viva (viva_wallet_id set), or null"
+        }
+      ]
+    },
+    {
+      "name": "finance_bank_accounts",
+      "kind": "table",
+      "summary": "The workspace's own bank, cash and card accounts (no balance — see vw_bank_account_balances)",
+      "description": "The accounts money moves through: bank accounts, cash boxes, cards, online wallets. Holds identity and settings only; the balance is derived in vw_bank_account_balances. Only one row per workspace should have is_default=true — clear the old default before setting a new one. Linking a row to a Revolut pocket is done by POST /revolut-api {action:\"map-account\"}, not by writing revolut_account_id here.",
+      "docs": "docs/banking-revolut.md",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "filters": [
+        "workspace_id",
+        "id",
+        "is_active",
+        "is_default",
+        "currency",
+        "kind",
+        "revolut_account_id"
+      ],
+      "writable": [
+        "workspace_id",
+        "name",
+        "kind",
+        "currency",
+        "iban",
+        "account_ref",
+        "opening_balance",
+        "is_default",
+        "is_active",
+        "sort_order",
+        "notes",
+        "show_on_invoice",
+        "feed_kind"
+      ],
+      "required": [
+        "workspace_id",
+        "name"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "bank",
+            "cash",
+            "card",
+            "online",
+            "other"
+          ]
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "iban",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "account_ref",
+          "type": "text",
+          "nullable": true,
+          "description": "BIC / SWIFT or a free account reference"
+        },
+        {
+          "name": "opening_balance",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "is_default",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "show_on_invoice",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "revolut_account_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Revolut account (currency pocket) this row is linked to; set by POST /revolut-api {action:\"map-account\"}"
+        },
+        {
+          "name": "provider_slug",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "viva_wallet_id",
+          "type": "bigint",
+          "nullable": true,
+          "description": "Viva walletId this books account maps to (GET /merchants/v1/wallets). Required before money can be sent FROM it, the same way revolut_account_id is for Revolut."
+        },
+        {
+          "name": "feed_kind",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "bank_account",
+            "merchant_settlement",
+            "none"
+          ],
+          "description": "What arriving feed rows for this account MEAN. bank_account = unattributed money to reconcile against open invoices. merchant_settlement = a mirror of payments a provider webhook already settled; matching one would double-book. none = no feed."
+        }
+      ]
+    },
+    {
+      "name": "revolut_bank_transactions",
+      "kind": "table",
+      "summary": "The bank feed — one row per transaction LEG, with its reconciliation status",
+      "description": "Written by revolut-sync / revolut-webhooks (and informational stripe / viva mirrors). The feed is per-LEG: an internal move between two of your own pockets is two legs, and neither is money from a customer. Read-only through this API — match, ignore and settle lines with the /revolut-api actions reconcile, confirm-match, confirm-bill-match, confirm-plan-match and ignore-transaction.",
+      "docs": "docs/banking-revolut.md",
+      "methods": [
+        "GET"
+      ],
+      "example": "/rest/v1/revolut_bank_transactions?workspace_id=eq.<uuid>&match_status=eq.unmatched&order=booked_at.desc&limit=50",
+      "filters": [
+        "workspace_id",
+        "bank_account_id",
+        "direction",
+        "match_status",
+        "provider",
+        "booked_at"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "bank_account_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "finance_bank_accounts row the pocket is mapped to"
+        },
+        {
+          "name": "revolut_account_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_ref",
+          "type": "text",
+          "nullable": false,
+          "description": "'<transaction_id>:<leg_id>' — unique per workspace + provider"
+        },
+        {
+          "name": "transaction_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "leg_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false,
+          "description": "Provider state (pending, completed, declined, reverted…)"
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "direction",
+          "type": "text",
+          "nullable": true,
+          "enum": [
+            "in",
+            "out"
+          ]
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "description": "Always positive; direction carries the sign"
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "booked_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "reconciled_payment_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "payments.id created when the line was settled"
+        },
+        {
+          "name": "raw",
+          "type": "jsonb",
+          "nullable": true,
+          "description": "The provider payload as received"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "match_status",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "unmatched",
+            "suggested",
+            "matched",
+            "ignored"
+          ]
+        },
+        {
+          "name": "matched_invoice_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "suggested_invoice_ids",
+          "type": "jsonb",
+          "nullable": true
+        },
+        {
+          "name": "match_method",
+          "type": "text",
+          "nullable": true,
+          "enum": [
+            "reference",
+            "amount_name",
+            "manual",
+            "already_recorded"
+          ],
+          "description": "How the line was matched: reference (bill/invoice number quoted) · amount_name · manual (a human picked the document) · already_recorded (the payment was on our books before the line arrived — bound, never re-allocated)."
+        },
+        {
+          "name": "matched_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "unmatched_notified_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "spend_notified_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "revolut",
+            "stripe",
+            "viva"
+          ],
+          "description": "revolut rows are the bank feed; stripe / viva rows are informational mirrors of money their own webhooks already settled and cannot be matched"
+        },
+        {
+          "name": "legs_total",
+          "type": "integer",
+          "nullable": true,
+          "description": "How many legs the parent Revolut transaction had. Fewer rows than this means the picture is incomplete — never auto-match. NULL on rows written before this column existed."
+        }
+      ]
+    },
+    {
+      "name": "bank_statement_mappings",
+      "kind": "table",
+      "summary": "Saved column mappings for importing CSV statements from banks with no API",
+      "description": "One per account and export format. Used by POST /bank-statement-import (mapping_id). Either amount_column (signed) or BOTH credit_column and debit_column must be set.",
+      "docs": "docs/banking-revolut.md",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "filters": [
+        "workspace_id",
+        "bank_account_id",
+        "id"
+      ],
+      "writable": [
+        "workspace_id",
+        "bank_account_id",
+        "name",
+        "date_column",
+        "reference_column",
+        "counterparty_column",
+        "amount_column",
+        "credit_column",
+        "debit_column",
+        "external_id_column",
+        "date_format",
+        "decimal_mark"
+      ],
+      "required": [
+        "workspace_id",
+        "bank_account_id",
+        "name",
+        "date_column"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "bank_account_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "date_column",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "reference_column",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_column",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "amount_column",
+          "type": "text",
+          "nullable": true,
+          "description": "A signed amount column. Set this OR both credit_column and debit_column"
+        },
+        {
+          "name": "credit_column",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "debit_column",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "external_id_column",
+          "type": "text",
+          "nullable": true,
+          "description": "The bank's own transaction id, when the export carries one — makes re-imports idempotent"
+        },
+        {
+          "name": "date_format",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "decimal_mark",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            ".",
+            ","
+          ]
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "crm_bank_accounts",
+      "kind": "table",
+      "summary": "Counterparty (customer / supplier) bank accounts",
+      "description": "The OTHER side's accounts — who you pay and who pays you. Belongs to exactly one CRM company or contact. Verify the holder name with POST /revolut-api {action:\"validate-account-name\"} and register it for payment with {action:\"create-counterparty\"}.",
+      "docs": "docs/banking-revolut.md",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "filters": [
+        "workspace_id",
+        "company_id",
+        "contact_id",
+        "id",
+        "is_primary"
+      ],
+      "writable": [
+        "workspace_id",
+        "company_id",
+        "contact_id",
+        "bank_name",
+        "account_holder",
+        "iban",
+        "account_ref",
+        "currency",
+        "is_primary",
+        "notes"
+      ],
+      "required": [
+        "workspace_id",
+        "bank_name"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "company_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Exactly one of company_id / contact_id is set"
+        },
+        {
+          "name": "contact_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "bank_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "account_holder",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "iban",
+          "type": "text",
+          "nullable": true,
+          "description": "Validated by iban_is_valid() on write"
+        },
+        {
+          "name": "account_ref",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "is_primary",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "revolut_counterparty_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Set by POST /revolut-api {action:\"create-counterparty\"}; required before paying this account through Revolut"
+        },
+        {
+          "name": "vop_result",
+          "type": "text",
+          "nullable": true,
+          "description": "Verification-of-Payee verdict: matched | close_match | not_matched | cannot_be_checked"
+        },
+        {
+          "name": "vop_checked_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "viva_bank_account_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Viva linked-bank-account id (POST /banktransfers/v1/bankaccounts). The Viva twin of revolut_counterparty_id: minted from this IBAN, reused for every later transfer."
+        }
+      ]
+    },
+    {
+      "name": "payments",
+      "kind": "table",
+      "summary": "Money that moved — in or out, per account",
+      "description": "The ledger vw_bank_account_balances sums. Read-only through this API: a payment is recorded with its allocation in one step (the finance UI / record-payment path / the /revolut-api match actions), never inserted bare — a payment with no allocation settles nothing.",
+      "docs": "docs/finance-system.md",
+      "methods": [
+        "GET"
+      ],
+      "filters": [
+        "workspace_id",
+        "bank_account_id",
+        "direction",
+        "paid_at",
+        "counterparty_company_id",
+        "provider"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "direction",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "in",
+            "out"
+          ]
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "description": "Always positive; direction carries the sign"
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "method",
+          "type": "text",
+          "nullable": true,
+          "enum": [
+            "bank_transfer",
+            "cash",
+            "card",
+            "iris",
+            "check",
+            "other"
+          ]
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "counterparty_contact_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_company_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "stripe_payment_intent_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Set when this payment was collected via Stripe. Used by the webhook to dedupe."
+        },
+        {
+          "name": "stripe_checkout_session_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "fx_rate_to_base",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "category_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "receipt_number",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "pdf_storage_path",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "pdf_generation_status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "pdf_generated_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "bank_account_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "finance_bank_accounts row the money moved through — what vw_bank_account_balances sums"
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "nullable": true,
+          "description": "Payment provider slug that produced this row: stripe | viva | revolut | manual (NULL = legacy/manual). Pairs with provider_ref for cross-provider idempotency."
+        },
+        {
+          "name": "provider_ref",
+          "type": "text",
+          "nullable": true,
+          "description": "Provider-side immutable id for this payment. Unique per provider."
+        },
+        {
+          "name": "credit_number",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_bank_account_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_name",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "payment_allocations",
+      "kind": "table",
+      "summary": "Which document(s) each payment settled",
+      "description": "Links a source (payment, credit note, supplier credit note) to a target (invoice, supplier bill, order, credit release). Read-only through this API. For \"how much is still owed on an order\", call get_order_settlements rather than summing these rows.",
+      "docs": "docs/finance-system.md",
+      "methods": [
+        "GET"
+      ],
+      "filters": [
+        "payment_id",
+        "invoice_id",
+        "supplier_bill_id",
+        "order_id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Exactly one of payment_id / credit_note_id / supplier_credit_note_id is the SOURCE"
+        },
+        {
+          "name": "invoice_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Exactly one of invoice_id / supplier_bill_id / order_id / credit_release_id is the TARGET"
+        },
+        {
+          "name": "supplier_bill_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "credit_note_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "amount_doc_currency",
+          "type": "numeric",
+          "nullable": true
+        },
+        {
+          "name": "fx_rate",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "realized_fx_gain_loss",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "supplier_credit_note_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "SOURCE (not target): the supplier credit note relieving the supplier_bill_id on this row. Mirrors credit_note_id relieving an invoice."
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "credit_release_id",
+          "type": "uuid",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "payout_instructions",
+      "kind": "table",
+      "summary": "Audit trail of every money-out instruction sent to a bank",
+      "description": "One row per payment, draft, payout link or FX exchange the platform instructed, written with its idempotent request_id BEFORE the provider is called. Read-only; created by /revolut-api send-payment, pay-due-bills, create-payout-link and exchange.",
+      "docs": "docs/banking-revolut.md",
+      "methods": [
+        "GET"
+      ],
+      "filters": [
+        "workspace_id",
+        "kind",
+        "state",
+        "provider",
+        "supplier_bill_id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "request_id",
+          "type": "text",
+          "nullable": false,
+          "description": "Idempotency key, written BEFORE the provider is called"
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "draft",
+            "payment",
+            "payout_link",
+            "exchange"
+          ]
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source_account_ref",
+          "type": "text",
+          "nullable": true,
+          "description": "Provider-side id of the account the money leaves: a Revolut pocket id, or a Viva source-account IBAN/id. Provider-opaque on purpose."
+        },
+        {
+          "name": "crm_bank_account_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "provider_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "provider_url",
+          "type": "text",
+          "nullable": true,
+          "description": "Payout-link URL, for kind=payout_link"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "supplier_bill_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "The bill this payout pays. Set at instruction time from the dialog that knew it; the reference text is a convenience for the human, never the link."
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "revolut",
+            "viva"
+          ],
+          "description": "Which rail moved the money. Matches finance_bank_accounts.provider_slug."
+        },
+        {
+          "name": "source_bank_account_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "The account in OUR books the money left, so the instruction and the eventual payment row agree on where it came from."
+        }
+      ]
+    },
+    {
+      "name": "planned_payments",
+      "kind": "table",
+      "summary": "Scheduled payments in and out (rent, tax, salaries, expected receipts)",
+      "description": "The cash-flow plan. A bank line can close a plan with POST /revolut-api {action:\"confirm-plan-match\"}; candidates come from the bank_tx_plan_candidates RPC.",
+      "docs": "docs/finance-system.md",
+      "methods": [
+        "GET"
+      ],
+      "filters": [
+        "workspace_id",
+        "direction",
+        "status",
+        "scheduled_for",
+        "category"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "direction",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "in",
+            "out"
+          ]
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "scheduled_for",
+          "type": "date",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "supplier_bill",
+            "rent",
+            "utility",
+            "tax",
+            "salary",
+            "social_security",
+            "expected_receipt",
+            "loan",
+            "expense",
+            "other"
+          ]
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_company_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "counterparty_contact_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "supplier_bill_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "invoice_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "enum": [
+            "planned",
+            "paid",
+            "cancelled",
+            "overdue"
+          ]
+        },
+        {
+          "name": "paid_payment_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "reminder_at",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "reminder_sent_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "payroll_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "The payroll run that created this payment (net wages, income tax or EFKA)."
+        }
+      ]
+    },
+    {
+      "name": "vw_cash_flow_forecast",
+      "kind": "view",
+      "summary": "Expected money in / out by date",
+      "description": "Forecast rows (expected_date, direction, amount) per workspace, for projecting the balance forward from vw_bank_account_balances.current_balance.",
+      "docs": "docs/finance-system.md",
+      "methods": [
+        "GET"
+      ],
+      "filters": [
+        "workspace_id",
+        "expected_date",
+        "direction"
+      ],
+      "columns": [
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "expected_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "direction",
+          "type": "text",
+          "nullable": true,
+          "enum": [
+            "in",
+            "out"
+          ]
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "get_workspace_revolut_config_status",
+      "kind": "rpc",
+      "summary": "Is Revolut Business connected, and when did it last sync?",
+      "description": "The only read of the Revolut connection. workspace_revolut_config itself has no SELECT policy — it holds the private key and OAuth tokens — so this returns flags and non-secret fields instead. Finance managers of the workspace only.",
+      "docs": "docs/banking-revolut.md",
+      "args": [
+        {
+          "name": "p_workspace_id",
+          "type": "uuid",
+          "required": true
+        }
+      ],
+      "returns": [
+        {
+          "name": "configured",
+          "type": "boolean"
+        },
+        {
+          "name": "enabled",
+          "type": "boolean"
+        },
+        {
+          "name": "environment",
+          "type": "text"
+        },
+        {
+          "name": "has_client_id",
+          "type": "boolean"
+        },
+        {
+          "name": "has_keypair",
+          "type": "boolean"
+        },
+        {
+          "name": "public_key",
+          "type": "text"
+        },
+        {
+          "name": "oauth_redirect_uri",
+          "type": "text"
+        },
+        {
+          "name": "revtag",
+          "type": "text"
+        },
+        {
+          "name": "connected",
+          "type": "boolean"
+        },
+        {
+          "name": "webhook_ready",
+          "type": "boolean"
+        },
+        {
+          "name": "client_id_hint",
+          "type": "text"
+        },
+        {
+          "name": "connected_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "sync_watermark",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "last_sync_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "last_sync_error",
+          "type": "text",
+          "description": "Set when the last sync failed — an explicit failure marker, never a silent zero"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ]
+    },
+    {
+      "name": "save_workspace_revolut_config",
+      "kind": "rpc",
+      "summary": "Save the Revolut client id / environment / enabled flag / Revtag",
+      "description": "Omitted (null) arguments keep their current value. Keys and tokens are never written here — the keypair is minted server-side by /revolut-api {action:\"init\"}.",
+      "docs": "docs/banking-revolut.md",
+      "args": [
+        {
+          "name": "p_workspace_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "p_client_id",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "p_environment",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "p_enabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "p_revtag",
+          "type": "text",
+          "required": false
+        }
+      ],
+      "returns": null
+    },
+    {
+      "name": "bank_tx_plan_candidates",
+      "kind": "rpc",
+      "summary": "Planned payments an outgoing bank line could settle, best first",
+      "description": "Scored by amount, date gap and counterparty. Pass the chosen plan_id to POST /revolut-api {action:\"confirm-plan-match\"}.",
+      "docs": "docs/banking-revolut.md",
+      "args": [
+        {
+          "name": "p_tx_id",
+          "type": "uuid",
+          "required": true,
+          "description": "revolut_bank_transactions.id"
+        },
+        {
+          "name": "p_limit",
+          "type": "integer",
+          "required": false,
+          "description": "Default 5"
+        }
+      ],
+      "returns": [
+        {
+          "name": "plan_id",
+          "type": "uuid"
+        },
+        {
+          "name": "title",
+          "type": "text"
+        },
+        {
+          "name": "amount",
+          "type": "numeric"
+        },
+        {
+          "name": "currency",
+          "type": "text"
+        },
+        {
+          "name": "scheduled_for",
+          "type": "date"
+        },
+        {
+          "name": "category",
+          "type": "text"
+        },
+        {
+          "name": "counterparty_company_id",
+          "type": "uuid"
+        },
+        {
+          "name": "day_gap",
+          "type": "integer"
+        },
+        {
+          "name": "party_matches",
+          "type": "boolean"
+        },
+        {
+          "name": "score",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "name": "bank_tx_plan_candidates_bulk",
+      "kind": "rpc",
+      "summary": "The best planned-payment candidate for each of many bank lines",
+      "description": "One row per transaction that has a candidate, with how many candidates it had.",
+      "docs": "docs/banking-revolut.md",
+      "args": [
+        {
+          "name": "p_tx_ids",
+          "type": "uuid[]",
+          "required": true
+        }
+      ],
+      "returns": [
+        {
+          "name": "tx_id",
+          "type": "uuid"
+        },
+        {
+          "name": "plan_id",
+          "type": "uuid"
+        },
+        {
+          "name": "title",
+          "type": "text"
+        },
+        {
+          "name": "amount",
+          "type": "numeric"
+        },
+        {
+          "name": "currency",
+          "type": "text"
+        },
+        {
+          "name": "scheduled_for",
+          "type": "date"
+        },
+        {
+          "name": "score",
+          "type": "integer"
+        },
+        {
+          "name": "candidates",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "name": "report_cashflow_per_day",
+      "kind": "rpc",
+      "summary": "Receipts vs payments per day, per currency",
+      "description": "Dates are the operator's calendar days (YYYY-MM-DD).",
+      "docs": "docs/finance-system.md",
+      "args": [
+        {
+          "name": "p_workspace_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "p_from",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "p_to",
+          "type": "date",
+          "required": true
+        }
+      ],
+      "returns": [
+        {
+          "name": "period",
+          "type": "date"
+        },
+        {
+          "name": "receipts",
+          "type": "numeric"
+        },
+        {
+          "name": "payments",
+          "type": "numeric"
+        },
+        {
+          "name": "difference",
+          "type": "numeric"
+        },
+        {
+          "name": "payment_count",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "report_cash_out_per_category",
+      "kind": "rpc",
+      "summary": "Money out per finance category over a period",
+      "docs": "docs/finance-system.md",
+      "args": [
+        {
+          "name": "p_workspace_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "p_from",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "p_to",
+          "type": "date",
+          "required": true
+        }
+      ],
+      "returns": [
+        {
+          "name": "category_id",
+          "type": "uuid"
+        },
+        {
+          "name": "category_name",
+          "type": "text"
+        },
+        {
+          "name": "system_key",
+          "type": "text"
+        },
+        {
+          "name": "currency",
+          "type": "text"
+        },
+        {
+          "name": "payment_count",
+          "type": "bigint"
+        },
+        {
+          "name": "total_paid",
+          "type": "numeric"
+        }
+      ]
+    },
+    {
+      "name": "get_order_settlements",
+      "kind": "rpc",
+      "summary": "How much is settled and still owed on each order — the single derivation",
+      "description": "A sales order settles on money IN, a purchase order on money OUT; this is the one place that rule is applied. Use it rather than summing payment_allocations.",
+      "docs": "docs/orders-system.md",
+      "args": [
+        {
+          "name": "p_order_ids",
+          "type": "uuid[]",
+          "required": true
+        }
+      ],
+      "returns": [
+        {
+          "name": "order_id",
+          "type": "uuid"
+        },
+        {
+          "name": "order_type",
+          "type": "text"
+        },
+        {
+          "name": "currency",
+          "type": "text"
+        },
+        {
+          "name": "total",
+          "type": "numeric"
+        },
+        {
+          "name": "settled_in",
+          "type": "numeric"
+        },
+        {
+          "name": "settled_out",
+          "type": "numeric"
+        },
+        {
+          "name": "settled",
+          "type": "numeric"
+        },
+        {
+          "name": "outstanding",
+          "type": "numeric"
+        },
+        {
+          "name": "payment_status",
+          "type": "text"
+        },
+        {
+          "name": "withheld",
+          "type": "numeric"
+        }
+      ]
+    }
+  ]
+}

@@ -35,11 +35,29 @@ function fieldsFromEndpoints(entry) {
   return Object.keys(out).length ? out : null;
 }
 
+/** One flat view of an action-discriminated body: every action in the enum, a field required only if every action requires it. */
+function mergeBranches(branches) {
+  const properties = {};
+  const actions = [];
+  let required = null;
+  for (const b of branches) {
+    for (const [prop, spec] of Object.entries(b.properties ?? {})) {
+      if (prop === 'action') actions.push(...(spec.enum ?? []));
+      else properties[prop] ??= spec;
+    }
+    const req = new Set(b.required ?? []);
+    required = required ? required.filter((r) => req.has(r)) : [...req];
+  }
+  const action = actions.length ? { action: { type: 'string', enum: actions, description: 'Which operation to run' } } : {};
+  return { properties: { ...action, ...properties }, required: required ?? [] };
+}
+
 function fieldsFromOpenapi(openapi, name) {
   const path = openapi.paths?.[`/${name}`];
   if (!path) return null;
   for (const method of Object.keys(path)) {
-    const schema = path[method]?.requestBody?.content?.['application/json']?.schema;
+    const body = path[method]?.requestBody?.content?.['application/json']?.schema;
+    const schema = body?.oneOf ? mergeBranches(body.oneOf) : body;
     const props = schema?.properties;
     if (!props || !Object.keys(props).length) continue;
     const required = new Set(schema.required ?? []);

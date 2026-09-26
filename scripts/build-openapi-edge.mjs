@@ -7,10 +7,7 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const SRC = join(__dirname, 'edge-endpoints.json');
-// Single home: public/api (committed to git AND bundled by Vite → dist/api →
-// https://<frontend>/api/openapi-edge.json, where the live Swagger UI + the admin
-// dashboard link load it). Docs reference this one file via relative links — no
-// second copy under docs/api to keep in sync.
+// Committed AND bundled by Vite to /api/openapi-edge.json, which the Swagger UI and admin dashboard load.
 const OUTS = [join(ROOT, 'public', 'api', 'openapi-edge.json')];
 
 const fns = JSON.parse(readFileSync(SRC, 'utf8'));
@@ -23,6 +20,7 @@ const securitySchemes = {
   supabaseJwt: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'Supabase user session JWT — `Authorization: Bearer <token>`.' },
   apiKeyPartner: { type: 'http', scheme: 'bearer', description: 'Partner API key `kai_*` (external integrations) — `Authorization: Bearer kai_…`.' },
   apiKeySecret: { type: 'apiKey', in: 'header', name: 'apikey', description: 'Platform admin secret key `sb_secret_*` (full access).' },
+  supabaseAnonKey: { type: 'apiKey', in: 'header', name: 'apikey', description: 'The project\'s public (anon / publishable) key. Database (`/rest/v1`) calls need it AND the user JWT — the key alone reads nothing.' },
   cronSecret: { type: 'apiKey', in: 'header', name: 'x-cron-secret', description: 'Shared cron secret (`CRON_SECRET`). pg_cron / scheduled invocations only.' },
   stripeSignature: { type: 'apiKey', in: 'header', name: 'stripe-signature', description: 'Stripe webhook signature.' },
   zernioSignature: { type: 'apiKey', in: 'header', name: 'X-Zernio-Signature', description: 'Zernio webhook HMAC-SHA256 signature.' },
@@ -46,6 +44,26 @@ function mapType(raw) {
 // Agents emitted action objects with either {name,summary} or {action,description}.
 const actName = (a) => a && (a.name || a.action || a.method || '');
 const actSummary = (a) => (a && (a.summary || a.description)) || '';
+
+/** `request` is a param list, or `{content_type, fields, required}`; older entries say `params`. */
+const requestParams = (fn) => (Array.isArray(fn.request) ? fn.request : Array.isArray(fn.params) ? fn.params : []);
+
+function schemaFromFields(req) {
+  const properties = {};
+  const required = new Set(Array.isArray(req.required) ? req.required : []);
+  for (const [name, spec] of Object.entries(req.fields || {})) {
+    if (!spec || typeof spec !== 'object') continue;
+    const { required: isRequired, ...rest } = spec;
+    if (isRequired === true) required.add(name);
+    const typed = mapType(rest.type);
+    properties[name] = /^(string|number|integer|boolean|object|array)$/.test(rest.type)
+      ? rest
+      : { ...rest, ...typed, ...(rest.description && typed.description ? { description: `${rest.description} (${typed.description})` } : {}) };
+  }
+  const schema = { type: 'object', properties };
+  if (required.size) schema.required = [...required];
+  return schema;
+}
 
 function propsFromParams(params = []) {
   const props = {};
@@ -80,8 +98,14 @@ function descriptionFor(fn) {
   if (isRestStyle(fn) && fn.actions) {
     d += '\n\n**Routes / actions:**\n' + fn.actions.map((a) => `- \`${actName(a)}\` — ${actSummary(a)}`).join('\n');
   }
-  if (Array.isArray(fn.actions) && !isRestStyle(fn) && fn.actions.some((a) => a.response)) {
-    // responses documented per-action in the oneOf branches' descriptions
+  if (Array.isArray(fn.routes) && fn.routes.length) {
+    d += `\n\n**Sub-paths:** ${fn.routes.map((r) => `\`/${fn.name}/${r}\``).join(', ')}`;
+  }
+  if (Array.isArray(fn.actions) && !isRestStyle(fn) && fn.actions.some((a) => actSummary(a) || a.response)) {
+    d += '\n\n**Actions** (`action` in the body):\n' + fn.actions.filter(actName).map((a) => {
+      const ret = a.response ? ` → \`${String(a.response).replace(/`/g, "'")}\`` : '';
+      return `- \`${actName(a)}\` — ${actSummary(a)}${ret}`;
+    }).join('\n');
   }
   // `response` is either a shape string or a {content_type, description} object. Interpolating the
   // object rendered `[object Object]` into the published spec for 20 functions.
@@ -91,10 +115,7 @@ function descriptionFor(fn) {
       : [fn.response.description, fn.response.content_type ? `(\`${fn.response.content_type}\`)` : ''].filter(Boolean).join(' ');
     if (r) d += `\n\n**Response:** ${r}`;
   }
-  // Absolute, because this description is read from the hosted Swagger UI at
-  // app.materialshub.gr/api/edge-swagger.html — a repo-relative link resolves against /api/ and 404s.
-  // `fn.docs` is repo-root-relative (`docs/x.md`); it used to be a mix of `docs/…` and `api/…`, which
-  // is how every link came out as `docs/docs/api/…`.
+  // Absolute: the hosted Swagger UI resolves a repo-relative link against /api/ and 404s.
   if (fn.docs) d += `\n\n📖 [${fn.docs}](${DOCS_BASE}/${fn.docs})`;
   return d.trim();
 }
@@ -102,9 +123,12 @@ function descriptionFor(fn) {
 function requestBodyFor(fn) {
   // action-discriminated with clean action names → oneOf on `action`
   if (Array.isArray(fn.actions) && fn.actions.length && !isRestStyle(fn)) {
+    // `common` holds fields every action takes (e.g. workspace_id), stated once in the source.
+    const common = Array.isArray(fn.common) ? fn.common : [];
     const oneOf = fn.actions.filter((a) => actName(a)).map((a) => {
-      const props = { action: { type: 'string', enum: [actName(a)], description: actSummary(a) }, ...propsFromParams(a.params) };
-      const required = ['action', ...requiredNames(a.params)];
+      const params = [...common, ...(a.params || [])];
+      const props = { action: { type: 'string', enum: [actName(a)], description: actSummary(a) }, ...propsFromParams(params) };
+      const required = ['action', ...requiredNames(params)];
       const schema = { type: 'object', required, properties: props };
       if (a.response) schema.description = `Returns: ${a.response}`;
       return schema;
@@ -115,11 +139,17 @@ function requestBodyFor(fn) {
     };
   }
   // flat request body (flags / typed fields)
-  if (Array.isArray(fn.request) && fn.request.length) {
-    const required = requiredNames(fn.request);
-    const schema = { type: 'object', properties: propsFromParams(fn.request) };
+  const flat = requestParams(fn);
+  if (flat.length) {
+    const required = requiredNames(flat);
+    const schema = { type: 'object', properties: propsFromParams(flat) };
     if (required.length) schema.required = required;
     return { required: required.length > 0, content: { 'application/json': { schema } } };
+  }
+  if (fn.request && !Array.isArray(fn.request) && fn.request.fields) {
+    const schema = schemaFromFields(fn.request);
+    const type = fn.request.content_type || 'application/json';
+    return { required: Boolean(schema.required), content: { [type]: { schema } } };
   }
   // REST-style (method+path actions) → free-form object, routes listed in description
   if (isRestStyle(fn)) {
@@ -186,9 +216,155 @@ for (const fn of fns) {
   }
 }
 
+// ---- PostgREST resources: columns are a live-schema capture, checked by tests/integration/restEndpointsSchema.test.ts ----
+const rest = JSON.parse(readFileSync(join(__dirname, 'rest-endpoints.json'), 'utf8'));
+const PROJECT_ORIGIN = 'https://bgbavxtjlbvgplozizxu.supabase.co';
+const restSchemas = {};
+
+function pgSchema(pgType) {
+  const t = pgType.trim();
+  if (t.endsWith('[]')) return { type: 'array', items: pgSchema(t.slice(0, -2)) };
+  if (t === 'uuid') return { type: 'string', format: 'uuid' };
+  if (t === 'text' || t.startsWith('character')) return { type: 'string' };
+  if (t === 'integer' || t === 'smallint') return { type: 'integer' };
+  if (t === 'bigint') return { type: 'integer', format: 'int64' };
+  if (t === 'numeric' || t === 'real' || t === 'double precision') return { type: 'number' };
+  if (t === 'boolean') return { type: 'boolean' };
+  if (t === 'date') return { type: 'string', format: 'date' };
+  if (t.startsWith('timestamp')) return { type: 'string', format: 'date-time' };
+  if (t === 'jsonb' || t === 'json') return {};
+  throw new Error(`rest-endpoints.json: no OpenAPI mapping for Postgres type "${pgType}"`);
+}
+
+function columnSchema(c) {
+  const s = pgSchema(c.type);
+  if (c.enum) s.enum = c.nullable ? [...c.enum, null] : c.enum;
+  if (c.nullable) s.nullable = true;
+  const desc = [c.description, `Postgres \`${c.type}\``].filter(Boolean).join(' · ');
+  return { ...s, description: desc };
+}
+
+function rowSchema(columns, only) {
+  const properties = {};
+  for (const c of columns) if (!only || only.includes(c.name)) properties[c.name] = columnSchema(c);
+  return { type: 'object', properties };
+}
+
+const refName = (name, suffix = '') => `db_${name}${suffix}`;
+const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
+const errorBody = { 'application/json': { schema: ref('PostgrestError') } };
+const restResponses = (ok) => ({
+  ...ok,
+  '400': { description: 'Bad filter, unknown column, or a CHECK / NOT NULL violation', content: errorBody },
+  '401': { description: 'Missing or expired JWT', content: errorBody },
+  '403': { description: 'Row-level security refused the write, or the role lacks the privilege (42501)', content: errorBody },
+});
+const REST_SECURITY = [{ supabaseAnonKey: [], supabaseJwt: [] }];
+const REST_SERVERS = [{ url: PROJECT_ORIGIN, description: 'Production (PostgREST)' }];
+const docsLink = (r) => (r.docs ? `\n\n📖 [${r.docs}](${DOCS_BASE}/${r.docs})` : '');
+
+const P = {
+  select: { name: 'select', in: 'query', required: false, description: 'Columns to return, comma-separated (default `*`). Embeds follow PostgREST syntax.', schema: { type: 'string' } },
+  order: { name: 'order', in: 'query', required: false, description: '`column.asc` / `column.desc`, comma-separated; `.nullslast` allowed.', schema: { type: 'string' } },
+  limit: { name: 'limit', in: 'query', required: false, schema: { type: 'integer' } },
+  offset: { name: 'offset', in: 'query', required: false, schema: { type: 'integer' } },
+  preferCount: { name: 'Prefer', in: 'header', required: false, description: '`count=exact` returns the total in the `Content-Range` header.', schema: { type: 'string', enum: ['count=exact', 'count=planned', 'count=estimated'] } },
+  preferReturn: { name: 'Prefer', in: 'header', required: false, description: '`return=representation` returns the written rows; the default returns no body.', schema: { type: 'string', enum: ['return=representation', 'return=minimal'] } },
+};
+const filterParam = (c) => ({
+  name: c.name,
+  in: 'query',
+  required: false,
+  description: `Filter: \`<op>.<value>\` — e.g. \`eq.${c.type === 'uuid' ? '<uuid>' : 'x'}\`, \`neq.\`, \`gt.\`, \`gte.\`, \`lt.\`, \`lte.\`, \`in.(a,b)\`, \`is.null\`.`
+    + (c.enum ? ` Values: ${c.enum.join(', ')}.` : ''),
+  schema: { type: 'string' },
+});
+
+for (const r of rest.resources) {
+  tagSet.add(rest.tag);
+  const base = { tags: [rest.tag], security: REST_SECURITY };
+  if (r.kind === 'rpc') {
+    const props = {};
+    for (const a of r.args) props[a.name] = { ...pgSchema(a.type), ...(a.description ? { description: a.description } : {}) };
+    const required = r.args.filter((a) => a.required).map((a) => a.name);
+    const args = { type: 'object', properties: props, ...(required.length ? { required } : {}) };
+    const ok = r.returns
+      ? (restSchemas[refName(r.name, '_row')] = rowSchema(r.returns.map((c) => ({ ...c, nullable: true }))),
+        { '200': { description: 'One object per result row', content: { 'application/json': { schema: { type: 'array', items: ref(refName(r.name, '_row')) } } } } })
+      : { '204': { description: 'Done — no body' }, '200': { description: 'Done' } };
+    paths[`/rest/v1/rpc/${r.name}`] = {
+      servers: REST_SERVERS,
+      post: {
+        ...base,
+        summary: r.summary,
+        operationId: `rpc_${r.name}`,
+        description: `Database function, called as \`POST /rest/v1/rpc/${r.name}\` with its arguments as the JSON body.${r.description ? `\n\n${r.description}` : ''}${docsLink(r)}`,
+        requestBody: { required: required.length > 0, content: { 'application/json': { schema: args } } },
+        responses: restResponses(ok),
+      },
+    };
+    continue;
+  }
+
+  const rowRef = refName(r.name);
+  restSchemas[rowRef] = rowSchema(r.columns);
+  const byName = Object.fromEntries(r.columns.map((c) => [c.name, c]));
+  for (const f of [...r.filters, ...(r.writable || []), ...(r.required || [])]) {
+    if (!byName[f]) throw new Error(`rest-endpoints.json: ${r.name} names unknown column "${f}"`);
+  }
+  const filters = r.filters.map((f) => filterParam(byName[f]));
+  const what = r.kind === 'view' ? 'View' : 'Table';
+  const intro = `${what} \`${r.name}\`, read through PostgREST as the signed-in user: row-level security returns only rows in workspaces you belong to.`
+    + (r.example ? `\n\nExample: \`GET ${r.example}\`` : '');
+  const desc = `${intro}${r.description ? `\n\n${r.description}` : ''}${docsLink(r)}`;
+  const rows = { description: 'Matching rows', content: { 'application/json': { schema: { type: 'array', items: ref(rowRef) } } } };
+  const item = {};
+
+  item.get = {
+    ...base, summary: r.summary, operationId: `get_${r.name}`, description: desc,
+    parameters: [P.select, ...filters, P.order, P.limit, P.offset, P.preferCount],
+    responses: restResponses({ '200': rows }),
+  };
+  if (r.writable) {
+    const writeRef = refName(r.name, '_write');
+    restSchemas[writeRef] = { ...rowSchema(r.columns, r.writable), required: r.required };
+    const patchRef = refName(r.name, '_patch');
+    restSchemas[patchRef] = rowSchema(r.columns, r.writable.filter((c) => c !== 'workspace_id'));
+    const written = { '201': rows, '204': { description: 'Written (Prefer: return=minimal)' } };
+    const rowFilter = 'Always target the rows with a filter, e.g. `?id=eq.<uuid>`.';
+    if (r.methods.includes('POST')) {
+      item.post = {
+        ...base, summary: `Create — ${r.name}`, operationId: `post_${r.name}`,
+        description: `Insert one row (or an array of rows). \`workspace_id\` must be a workspace you belong to; row-level security rejects anything else.${docsLink(r)}`,
+        parameters: [P.preferReturn],
+        requestBody: { required: true, content: { 'application/json': { schema: ref(writeRef) } } },
+        responses: restResponses(written),
+      };
+    }
+    if (r.methods.includes('PATCH')) {
+      item.patch = {
+        ...base, summary: `Update — ${r.name}`, operationId: `patch_${r.name}`,
+        description: `${rowFilter}${docsLink(r)}`,
+        parameters: [...filters, P.preferReturn],
+        requestBody: { required: true, content: { 'application/json': { schema: ref(patchRef) } } },
+        responses: restResponses({ '200': rows, '204': { description: 'Updated (Prefer: return=minimal)' } }),
+      };
+    }
+    if (r.methods.includes('DELETE')) {
+      item.delete = {
+        ...base, summary: `Delete — ${r.name}`, operationId: `delete_${r.name}`,
+        description: `${rowFilter}${docsLink(r)}`,
+        parameters: [...filters, P.preferReturn],
+        responses: restResponses({ '200': rows, '204': { description: 'Deleted' } }),
+      };
+    }
+  }
+  paths[`/rest/v1/${r.name}`] = { servers: REST_SERVERS, ...item };
+}
+
 const TAG_ORDER = [
   'AI Agents', 'AI Generation', 'Social', 'Search', 'MIVAA Gateway', 'Knowledge Base',
-  'Finance', 'Payments', 'Quotes', 'CRM', 'Business Profile', 'Real Estate',
+  'Finance', 'Banking (database)', 'Payments', 'Quotes', 'CRM', 'Business Profile', 'Real Estate',
   'Catalogs', 'Moodboard & Sheets', 'PDF Processing', 'Data Import', 'Scraping',
   'Email', 'Messaging', 'Pinterest', 'Notifications', 'Recommendations',
   'SEO', 'Flows', 'Alerts', 'Monitoring Crons', 'Background Agents', 'Crons', 'Admin', 'Internal', 'Misc',
@@ -201,6 +377,7 @@ const TAG_DESCRIPTIONS = {
   'MIVAA Gateway': 'Proxy to the MIVAA Python backend (RAG, search, AI services).',
   'Knowledge Base': 'KB document embeddings.',
   'Finance': 'Greek e-invoicing (AADE/myDATA via Novus), AR/AP, POS, storefront, statements.',
+  'Banking (database)': 'Bank accounts and their balances, the bank feed, payments and payouts — read straight from the database (PostgREST, `/rest/v1/…`). Send BOTH the project `apikey` and the user\'s `Authorization: Bearer <JWT>`; row-level security scopes every result to your workspaces.',
   'Payments': 'Stripe checkout, Connect onboarding, and webhooks.',
   'Quotes': 'Quote documents, public white-label share, email, PDF.',
   'CRM': 'Companies, contacts, users, Stripe state (consolidated crm-api router).',
@@ -236,11 +413,13 @@ const tags = [...tagSet]
 const spec = {
   openapi: '3.0.3',
   info: {
-    title: 'Material KAI — Supabase Edge Functions',
+    title: 'Material KAI — Supabase Edge Functions & Database',
     version: '1.0.0',
     license: { name: 'Proprietary' },
     description:
-      'OpenAPI for the **Supabase Edge Functions** (Deno/TypeScript) of the Material KAI Vision Platform.\n\n' +
+      'OpenAPI for the **Supabase Edge Functions** (Deno/TypeScript) of the Material KAI Vision Platform, plus the ' +
+      'database resources under **Banking (database)** — tables, views and functions read through PostgREST at ' +
+      '`/rest/v1/…` (source: `scripts/rest-endpoints.json`).\n\n' +
       'This is the companion to the FastAPI-generated `openapi.json` at `https://v1api.materialshub.gr/openapi.json`, ' +
       'which covers the **MIVAA Python** backend only. Edge functions are a separate runtime with no auto-generated ' +
       'schema, so this spec is **hand-maintained** from the source code (`scripts/edge-endpoints.json` → ' +
@@ -249,7 +428,7 @@ const spec = {
       'discriminated `oneOf` branch. Finance/REST-style functions use typed bodies or path/method routing (see each ' +
       "operation's description). Auth varies per function — see `security` and the scheme descriptions.",
   },
-  servers: [{ url: 'https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1', description: 'Production' }],
+  servers: [{ url: `${PROJECT_ORIGIN}/functions/v1`, description: 'Production' }],
   tags,
   paths,
   components: {
@@ -263,24 +442,38 @@ const spec = {
           code: { type: 'string' },
         },
       },
+      PostgrestError: {
+        type: 'object',
+        properties: {
+          code: { type: 'string', example: '42501', description: 'Postgres SQLSTATE or PostgREST PGRSTxxx code' },
+          message: { type: 'string' },
+          details: { type: 'string', nullable: true },
+          hint: { type: 'string', nullable: true },
+        },
+      },
+      ...restSchemas,
     },
   },
 };
 
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
+// `--check` writes nothing and exits 1 when a committed output differs from what this would write.
+const CHECK = process.argv.includes('--check');
+const stale = [];
+const emit = (file, content) => {
+  if (CHECK) {
+    if (!existsSync(file) || readFileSync(file, 'utf8') !== content) stale.push(file);
+    return;
+  }
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, content);
+  console.log(`Wrote ${file}`);
+};
 const json = JSON.stringify(spec, null, 2) + '\n';
-for (const out of OUTS) {
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, json);
-  console.log(`Wrote ${out}`);
-}
-console.log(`  functions: ${fns.length}  paths: ${Object.keys(paths).length}  tags: ${tags.length}`);
+for (const out of OUTS) emit(out, json);
+console.log(`  functions: ${fns.length}  database resources: ${rest.resources.length}  paths: ${Object.keys(paths).length}  tags: ${tags.length}`);
 
-// ── Also regenerate the human index in docs/api-master-reference.md ──────────
-// That section was labelled "AUTO-DERIVED from edge-endpoints.json" but was actually
-// hand-maintained, so it drifted 19 functions behind. Now it really is generated:
-// everything between the two markers is rewritten from the same single source, and the
-// "## 1. Supabase Edge Functions (N)" count is kept honest.
+// The index in docs/api-master-reference.md is generated from the same source, between two markers.
 const AUTH_LABEL = {
   supabaseJwt: 'JWT', apiKeyPartner: 'kai_*', apiKeySecret: 'secret', cronSecret: 'cron',
   queryToken: 'token', stripeSignature: 'sig', zernioSignature: 'sig', svixSignature: 'sig', snsSignature: 'sig',
@@ -324,11 +517,15 @@ try {
   if (b !== -1 && e !== -1 && e > b) {
     doc = doc.slice(0, b) + `${BEGIN}\n\n${md}${END}` + doc.slice(e + END.length);
     doc = doc.replace(/^## 1\. Supabase Edge Functions \(\d+\)/m, `## 1. Supabase Edge Functions (${fns.length})`);
-    writeFileSync(REF, doc);
-    console.log(`Wrote ${REF} (index section + count)`);
+    emit(REF, doc);
   } else {
     console.warn(`  ! ${REF}: AUTO-INDEX markers not found — index NOT regenerated.`);
   }
 } catch (err) {
   console.warn(`  ! could not update ${REF}: ${err.message}`);
+}
+
+if (CHECK && stale.length) {
+  console.error(`Stale — run \`npm run openapi:edge\` and commit:\n  ${stale.join('\n  ')}`);
+  process.exit(1);
 }
