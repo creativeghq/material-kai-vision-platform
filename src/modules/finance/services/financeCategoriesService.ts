@@ -13,12 +13,11 @@ export interface FinanceCategory {
   is_system: boolean;
   /**
    * Which built-in this is, when is_system: 'orders' (auto-attached to order costs), 'myaade'
-   * (default landing category for myDATA-synced expenses), or 'profit_allocation' (the money-out
-   * that draws claimed margin out of the bank — an appropriation, deliberately excluded from the
-   * P&L by `report_pnl_per_category`, because the margin it draws is already in there).
-   * Null for user categories.
+   * (default landing category for myDATA-synced expenses), 'owner_pay' (an owner's fee — a real
+   * expense), or the two that pay profit OUT and stay out of the P&L: 'profit_allocation'
+   * (Profit split) and 'partner_withdrawal'. Null for user categories.
    */
-  system_key: 'orders' | 'myaade' | 'profit_allocation' | string | null;
+  system_key: 'orders' | 'myaade' | 'profit_allocation' | 'partner_withdrawal' | 'owner_pay' | string | null;
 }
 
 export const financeCategoriesService = {

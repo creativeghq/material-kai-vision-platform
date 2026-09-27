@@ -126,7 +126,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
    *
    * The report itself lists what was CLAIMED. On its own that reads as money taken out of the
    * business, and it is not: allocating moves nothing, the cash leaves only on a money-out payment
-   * in the "Profit allocation" category. The two figures belong next to each other or the report
+   * in an owner-distribution category. The two figures belong next to each other or the report
    * answers a question nobody asked.
    */
   const [drawdown, setDrawdown] = useState<Awaited<ReturnType<typeof financeService.getProfitDrawdown>> | null>(null);
@@ -231,7 +231,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
   /**
    * "Profit taken" lists what was CLAIMED, which on its own reads as money that has left the
    * business. It has not: allocating margin moves nothing, and the cash goes only when a money-out
-   * payment is recorded in the "Profit allocation" category. These two lines are the difference,
+   * payment is recorded in an owner-distribution category. These two lines are the difference,
    * and they belong beside the total rather than on a screen of their own.
    */
   const totalsShown = useMemo(() => {
@@ -621,10 +621,9 @@ function renderReport(
   if (report === 'cash_out_per_category') {
     return (
       <Table headers={['Category', 'Payments', 'Money out']} totals={totals} rows={rows.map((r: any) => [
-        // The built-in that is deliberately outside the P&L says so here, where somebody reading
-        // "money out" would otherwise expect to find it in the profit figure too.
-        r.system_key === 'profit_allocation'
-          ? <span key="n">{r.category_name} <span className="text-[10px] text-muted-foreground">· not a P&amp;L expense</span></span>
+        // Money paid out to owners is deliberately outside the P&L; say so where it would be expected.
+        r.is_owner_distribution
+          ? <span key="n">{r.category_name} <span className="text-[10px] text-muted-foreground">· paid to owners, not a P&amp;L expense</span></span>
           : r.category_name,
         String(r.payment_count ?? 0),
         formatMoney(Number(r.total_paid || 0), r.currency || 'EUR'),

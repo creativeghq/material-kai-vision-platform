@@ -262,6 +262,23 @@ the margin. Two rules for consumers adding themselves:
 - **Then exclude those bills from the expense side.** `report_pnl_per_category` drops any `supplier_bills` row sitting on a counted sales order, or on the purchase order raised to cover one — its cost has already arrived with the sale. The exclusion is deliberately *not* period-scoped, because the bill and the sale routinely fall in different months.
 - **Never add order VAT to a VAT figure.** An order declares nothing to AADE; `vat_income` feeds the VAT return and stays document-only.
 
+### Paying the owners — three built-in categories
+Money that goes to the owners is either a COST of running the business or a DISTRIBUTION of its
+profit, and only the first belongs in the P&L. Every workspace has three protected categories:
+
+| Category (`system_key`) | What it is | In the P&L? |
+|---|---|---|
+| **Owner & partner pay** (`owner_pay`) | A fee or salary for working in the business, and the ΕΦΚΑ the business pays for them | Yes, an expense |
+| **Profit split** (`profit_allocation`) | A formal distribution of profit (διανομή κερδών / dividend) | No |
+| **Partner withdrawals** (`partner_withdrawal`) | Money taken on account (ανάληψη εταίρου), settled against profit later | No |
+
+`finance_categories.is_owner_distribution` is GENERATED from `system_key` and is the one test:
+`_finance_pnl_parts` excludes those bills, `get_profit_drawdown` counts their payments as drawn, and
+`get_finance_pnl_overview` returns `owner_distributions` (payments out, by `paid_at`) and
+`retained_net` (net less distributions) — the P&L card's "Paid to owners" and "Retained in the
+business". A withdrawal is recorded as an expense in the category with the partner as payee, then
+paid or matched to its bank line; never by ignoring the bank line, which records nothing.
+
 ### Additional reports
 All backed by `assert_workspace_member`-guarded RPCs: sales per day/customer/product/category/factory/designer; purchases per product; receipts per product; spend per supplier; payments in/out per counterparty; top customer/supplier outstanding; open tasks/follow-ups; customer top products. Plus views `vw_ar_aging`, `vw_ap_aging`, `vw_cash_flow_forecast`, `vw_monthly_pnl` (used by the digest + dashboard).
 

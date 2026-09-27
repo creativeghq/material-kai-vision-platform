@@ -756,6 +756,11 @@ export interface PnlOverview {
   ap_outstanding_now: number | null;
   ap_overdue_now: number | null;
   ap_bills_open: number;
+  /** Paid out in Profit split / Partner withdrawals — outside the P&L, below the net line. */
+  owner_distributions: number | null;
+  /** Net less owner distributions: what the business kept. */
+  retained_net: number | null;
+  distributions_status: PnlBooksStatus;
 }
 
 export interface PnlMonthRow {
@@ -1861,7 +1866,7 @@ const _financeServiceCore = {
    * Both facts existed and nothing compared them, so the one question an operator has at this point
    * — how much of what I have claimed is still sitting in the bank — had no answer anywhere.
    *
-   * `drawn` counts money-out payments in the system "Profit allocation" category. A bill in that
+   * `drawn` counts money-out payments in the owner-distribution categories. A bill in one
    * category with no payment against it is an intention, not a drawing.
    */
   async getProfitDrawdown(workspaceId: string, from?: string | null, to?: string | null): Promise<{
@@ -3496,11 +3501,12 @@ export interface CashOutPerCategoryRow {
   category_id: string | null;
   /** 'Uncategorised' when the payment named none — a row, never an omission. */
   category_name: string;
-  /** Set for the built-ins, so the reader can mark 'Profit allocation' as what it is. */
+  /** Set for the built-ins, so the reader can tell the built-ins apart. */
   system_key: string | null;
   currency: string;
   payment_count: number;
   total_paid: number;
+  is_owner_distribution: boolean;
 }
 
 export interface PaymentsPerCounterpartyOutRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_paid: number; currency: string }

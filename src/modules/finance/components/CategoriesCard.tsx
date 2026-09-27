@@ -19,7 +19,9 @@ import { HubEmptyState } from '@/components/core/hub';
 const SYSTEM_CATEGORY_HELP: Record<string, string> = {
   orders: 'Built-in "Orders" category — every workspace has one; auto-attached to order costs. Cannot be renamed or deleted.',
   myaade: 'Built-in "myAADE" category — every workspace has one; the default landing category for expenses synced from myDATA. Cannot be renamed or deleted.',
-  profit_allocation: 'Built-in "Profit allocation" category — put it on the money-out payment that takes claimed profit out of the bank. Deliberately left OUT of the P&L: the margin it draws is already in there as revenue less cost, so counting it as an expense would subtract the same money twice. Cannot be renamed or deleted.',
+  profit_allocation: 'Built-in "Profit split" category — a formal distribution of profit to the owners (dividend / διανομή κερδών). Left OUT of the P&L: the profit it pays out is already in there, so counting it as an expense would subtract the same money twice. Shown on the P&L as "Paid to owners". Cannot be renamed or deleted.',
+  partner_withdrawal: 'Built-in "Partner withdrawals" category — money a partner or owner takes from the business on account (ανάληψη εταίρου), settled against their share of profit later. Left OUT of the P&L and shown as "Paid to owners"; the payee is the partner, so each one\'s total is visible. Cannot be renamed or deleted.',
+  owner_pay: 'Built-in "Owner & partner pay" category — what a partner or owner is PAID for working in the business: a fee or salary and the ΕΦΚΑ contributions the business pays for them. A real expense, so it IS in the P&L. Employees go under Salaries & wages. Cannot be renamed or deleted.',
 };
 
 export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
