@@ -4270,6 +4270,7 @@ const _financeServiceV2 = {
     currency?: string;
     customer_display?: string;
     already_paid?: boolean;
+    fiscal?: PublicFiscalRecord | null;
     error?: string;
   }> {
     const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
@@ -4352,3 +4353,15 @@ export {
 // module (guarded by tests/unit/vatMath.test.ts). Re-exported here so the components that
 // import them from this service keep working unchanged.
 export { round2, extractNet, vatCategory };
+
+export interface PublicFiscalRecord {
+  legal_number: string | null;
+  mark: string;
+  uid: string | null;
+  authentication_code: string | null;
+  issued_at: string | null;
+  provider_url: string | null;
+  aade_url: string | null;
+  provider_name: string | null;
+  provider_website: string | null;
+}

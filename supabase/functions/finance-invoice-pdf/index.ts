@@ -107,7 +107,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     paymentMethod: 'Τρόπος Πληρωμής', bank: 'Τραπεζικός Λογαριασμός', registry: 'ΓΕΜΗ', website: 'Ιστότοπος',
     empa: 'ΑΜΠ (ΕΜΠΑ)',
     rfCode: 'Κωδικός πληρωμής (RF)', rfNote: 'Πληρώστε με τραπεζικό έμβασμα χρησιμοποιώντας αυτόν τον κωδικό ως αιτιολογία — δεν χρειάζεται IBAN.',
-    mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για επαλήθευση στο myDATA',
+    mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για το διαβιβασμένο παραστατικό',
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
     vehicle: 'Όχημα', purpose: 'Σκοπός', notes: 'Σημειώσεις', page: 'Σελίδα', of: 'από',
     paymentReceipt: 'ΑΠΟΔΕΙΞΗ ΕΙΣΠΡΑΞΗΣ', received: 'Εισπράχθηκε', method: 'Τρόπος πληρωμής',
@@ -152,7 +152,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
     empa: 'EPR reg. (AMP)',
     rfCode: 'Bank transfer code (RF)', rfNote: 'Pay by bank transfer using this code as the payment reference — no IBAN needed.',
-    mark: 'MARK', uid: 'UID', verify: 'Scan to verify on myDATA',
+    mark: 'MARK', uid: 'UID', verify: 'Scan for the filed document',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
     paymentReceipt: 'PAYMENT RECEIPT', received: 'Received', method: 'Payment method',
@@ -709,6 +709,9 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
 
 async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: any; customer: any; selfBillSupplier?: any; addressUnit?: any; authCode?: string | null; transmissionFailure?: 1 | 2 | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
   const { inv, items, fs, customer, selfBillSupplier, addressUnit, authCode, transmissionFailure, providerAttribution, posPayments, tz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
+  // The provider's registered copy (Α.1128/2025 downloadingInvoiceUrl) — the provider requires its
+  // invoiceUrl as the QR on a self-printed document. AADE's link only for a document from before it.
+  const fiscalQr = String(inv.fiscal_qr_url || inv.fiscal_aade_qr_url || '') || null;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
 
@@ -896,11 +899,9 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     if (logoImg) { page.drawImage(logoImg, { x: M, y: topY - logoH, width: logoW, height: logoH }); leftBottom = topY - logoH; }
     textR(title, right, topY - 11, 12, bold, colors.accent);
     let qrBottom = topY - 18;
-    // AADE's URL, never the provider's: their rendering is never shown to a customer. A queued
-    // document has no AADE URL (and no MARK) and prints no QR.
-    if (inv.fiscal_aade_qr_url && inv.print_online_code !== false) {
+    if (fiscalQr && inv.print_online_code !== false) {
       const qs = 68;
-      drawQr(page, String(inv.fiscal_aade_qr_url), right - qs, topY - 22 - qs, qs);
+      drawQr(page, fiscalQr, right - qs, topY - 22 - qs, qs);
       textR(L.verify, right, topY - 22 - qs - 9, 6.5, font, MUTED);
       qrBottom = topY - 22 - qs - 12;
     }
@@ -1590,8 +1591,8 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     if (providerAttribution) {
       text(`${L.transmittedVia}: ${providerAttribution}`, M, fy, 8, font, MUTED);
     }
-    if (inv.fiscal_aade_qr_url && inv.print_online_code !== false && !isCommercial) {
-      drawQr(page, String(inv.fiscal_aade_qr_url), right - 90, qy - 10, 86);
+    if (fiscalQr && inv.print_online_code !== false && !isCommercial) {
+      drawQr(page, fiscalQr, right - 90, qy - 10, 86);
       textR(L.verify, right, qy - 22, 7, font, MUTED);
     }
   }

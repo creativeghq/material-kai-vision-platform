@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy, ShieldCheck, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { MoneyInput } from '@/components/core/ui/money-input';
-import { financeService, formatMoney } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, type PublicFiscalRecord } from '@/modules/finance/services/financeService';
+import { formatDate } from '@/utils/datetime';
 
 // Public, no-auth payment page reached from email links, "Pay now" buttons and the
 // public quote page. It VIEWS the document first (number, who it's for, what's due,
@@ -65,6 +66,48 @@ function buildOptions(providers: ProviderOption[]): PayOption[] {
   return out;
 }
 
+const FiscalRecordPanel: React.FC<{ fiscal: PublicFiscalRecord }> = ({ fiscal }) => {
+  const rows: [string, string | null][] = [
+    ['Number', fiscal.legal_number],
+    ['MARK', fiscal.mark],
+    ['UID', fiscal.uid],
+    ['Authentication code', fiscal.authentication_code],
+    ['Issued', fiscal.issued_at ? formatDate(fiscal.issued_at, { withTime: true }) : null],
+  ];
+  return (
+    <div className="rounded-lg border border-hairline text-sm">
+      <div className="flex items-center gap-2 border-b border-hairline bg-surface-sunken px-3 py-2 text-xs font-semibold">
+        <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Filed with ΑΑΔΕ (myDATA)
+      </div>
+      <dl className="divide-y divide-hairline">
+        {rows.filter(([, v]) => v).map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3 px-3 py-1.5">
+            <dt className="text-muted-foreground shrink-0">{k}</dt>
+            <dd className="font-mono text-xs break-all text-right">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex flex-wrap gap-2 border-t border-hairline px-3 py-2">
+        {fiscal.provider_url && (
+          <a href={fiscal.provider_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+            <ExternalLink className="h-3 w-3" /> Filed copy{fiscal.provider_name ? ` (${fiscal.provider_name})` : ''}
+          </a>
+        )}
+        {fiscal.aade_url && (
+          <a href={fiscal.aade_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+            <ExternalLink className="h-3 w-3" /> Verify at ΑΑΔΕ
+          </a>
+        )}
+      </div>
+      {fiscal.provider_name && (
+        <p className="border-t border-hairline px-3 py-1.5 text-[11px] text-muted-foreground">
+          Transmitted via {fiscal.provider_name}{fiscal.provider_website ? ` | ${fiscal.provider_website}` : ''}
+        </p>
+      )}
+    </div>
+  );
+};
+
 const PayInvoicePage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [search] = useSearchParams();
@@ -73,6 +116,7 @@ const PayInvoicePage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<PayInfo | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
+  const [fiscal, setFiscal] = useState<PublicFiscalRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [choice, setChoice] = useState<'deposit' | 'full' | 'custom'>('full');
   const [custom, setCustom] = useState<number | null>(null);
@@ -91,6 +135,7 @@ const PayInvoicePage: React.FC = () => {
       try {
         const res = await financeService.resolvePayToken(token, { infoOnly: true });
         if (res.error) { setError(res.error); return; }
+        setFiscal(res.fiscal ?? null);
         if (res.already_paid) { setAlreadyPaid(true); return; }
         const next: PayInfo = {
           invoice_id: res.invoice_id!,
@@ -281,6 +326,7 @@ const PayInvoicePage: React.FC = () => {
         <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
         <h1 className="mt-4 text-xl font-semibold">Already paid</h1>
         <p className="mt-2 text-sm text-muted-foreground">This document has no outstanding balance.</p>
+        {fiscal && <div className="mt-6 text-left"><FiscalRecordPanel fiscal={fiscal} /></div>}
       </div>,
     );
   }
@@ -332,6 +378,8 @@ const PayInvoicePage: React.FC = () => {
           <span className="tabular-nums">{formatMoney(info.amount_due, info.currency)}</span>
         </div>
       </div>
+
+      {fiscal && <FiscalRecordPanel fiscal={fiscal} />}
 
       <div className="space-y-2">
         <span id="pay-amount-label" className="text-xs font-medium">How much would you like to pay?</span>

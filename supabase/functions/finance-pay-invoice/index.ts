@@ -18,6 +18,38 @@ import { recordPageEvent } from '../_shared/document-events.ts';
 //      Mints (or rotates) a pay_token first if missing; returns checkout URL + pay link.
 //   2.
 
+/**
+ * What the document IS at ΑΑΔΕ, shown on the public page next to what is owed. Read by the
+ * token-resolved invoice id only; null until the document has a MARK.
+ */
+async function fiscalRecord(supabase: any, invoiceId: string) {
+  const { data: inv } = await supabase.from('invoices')
+    .select('fiscal_mark, fiscal_uid, fiscal_qr_url, fiscal_aade_qr_url, fiscal_connector_slug, issued_at, legal_number')
+    .eq('id', invoiceId).maybeSingle();
+  if (!inv?.fiscal_mark) return null;
+  const [{ data: sub }, { data: conn }] = await Promise.all([
+    supabase.from('fiscal_submissions').select('authentication_code')
+      .eq('document_table', 'invoices').eq('document_id', invoiceId)
+      .not('authentication_code', 'is', null)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    inv.fiscal_connector_slug
+      ? supabase.from('fiscal_connectors').select('legal_display_name, legal_website')
+        .eq('slug', inv.fiscal_connector_slug).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  return {
+    legal_number: inv.legal_number ?? null,
+    mark: String(inv.fiscal_mark),
+    uid: inv.fiscal_uid ?? null,
+    authentication_code: (sub as any)?.authentication_code ?? null,
+    issued_at: inv.issued_at ?? null,
+    provider_url: inv.fiscal_qr_url ?? null,
+    aade_url: inv.fiscal_aade_qr_url ?? null,
+    provider_name: (conn as any)?.legal_display_name ?? null,
+    provider_website: (conn as any)?.legal_website ?? null,
+  };
+}
+
 interface AdminBody {
   invoice_id: string;
   success_url?: string;
@@ -275,7 +307,11 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       return json({ error: `invoice is ${row.status}` }, 409);
     }
     if (Number(row.amount_due) <= 0) {
-      return json({ ok: true, already_paid: true, invoice_id: row.invoice_id }, 200);
+      return json({
+        ok: true, already_paid: true, invoice_id: row.invoice_id,
+        internal_number: row.internal_number, currency: row.currency,
+        fiscal: await fiscalRecord(supabase, row.invoice_id),
+      }, 200);
     }
 
     // ── Payable options (gateway-agnostic policy) ────────────────────────
@@ -326,6 +362,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         currency: row.currency,
         status: row.status,
         is_pre_invoice: isPreInvoice,
+        fiscal: await fiscalRecord(supabase, row.invoice_id),
         total: totalAmt,
         amount_due: amountDue,
         deposit_pct: depositPct,
