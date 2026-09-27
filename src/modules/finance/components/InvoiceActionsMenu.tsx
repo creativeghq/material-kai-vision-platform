@@ -32,6 +32,7 @@ import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { formatDate } from '@/utils/datetime';
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
+import { CardTerminalPaymentDialog } from '@/modules/finance/components/CardTerminalPaymentDialog';
 import { type OrderLinkTarget } from '@/modules/finance/services/ordersService';
 
 interface Props {
@@ -246,6 +247,16 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     } finally { setSubmitting(false); }
   };
 
+  const [cardPay, setCardPay] = useState<{ amount: number; currency: string; label: string } | null>(null);
+  const openCardPay = async () => {
+    const { data } = await supabase.from('invoices')
+      .select('amount_due, total, currency, legal_number, internal_number').eq('id', invoiceId).maybeSingle();
+    if (!data) return;
+    const due = Number(data.amount_due ?? data.total ?? 0);
+    if (!(due > 0)) { toast({ title: 'Nothing left to pay on this invoice' }); return; }
+    setCardPay({ amount: due, currency: data.currency ?? 'EUR', label: data.legal_number ?? data.internal_number ?? 'Invoice' });
+  };
+
   const accepted = fStatus === 'accepted' || fStatus === 'offline';
   const canSubmit = status !== 'draft' && status !== 'void' && !accepted;
 
@@ -270,6 +281,9 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">myDATA</DropdownMenuLabel>
         {canSubmit && canOperateFinance && <DropdownMenuItem onClick={submitFiscal}><Send className="h-4 w-4 mr-2" /> Submit to myDATA</DropdownMenuItem>}
+        {mark && canOperateFinance && activeWorkspaceId && (
+          <DropdownMenuItem onClick={() => void openCardPay()}><CreditCard className="h-4 w-4 mr-2" /> Card payment on terminal</DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={openDetails}><Info className="h-4 w-4 mr-2" /> myDATA details</DropdownMenuItem>
         <DropdownMenuItem onClick={copyMark}><Hash className="h-4 w-4 mr-2" /> Copy MARK</DropdownMenuItem>
 
@@ -288,6 +302,19 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         {!isAccountant && <DropdownMenuItem onClick={sendEmail}><Mail className="h-4 w-4 mr-2" /> Send email</DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>
+
+    {cardPay && activeWorkspaceId && (
+      <CardTerminalPaymentDialog
+        open={!!cardPay}
+        onOpenChange={(o) => { if (!o) setCardPay(null); }}
+        workspaceId={activeWorkspaceId}
+        target={{ kind: 'invoice_payment', invoiceId }}
+        amount={cardPay.amount}
+        currency={cardPay.currency}
+        label={cardPay.label}
+        onDone={onChanged}
+      />
+    )}
 
     {/* Save as template (#322) — stores the reusable shape, not another invoice. */}
     <SaveAsTemplateDialog

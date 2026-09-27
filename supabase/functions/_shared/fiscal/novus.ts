@@ -21,6 +21,7 @@ import { normalizeTaricInput } from './taric.generated.ts';
 import type { MydataRestrictedCode } from './fiscalVocabulary.generated.ts';
 import {
   MYDATA_ENTITY_TYPE_OTHER,
+  MYDATA_INFORMATIONAL_INCOME_TYPES,
   MYDATA_INVOICE_VARIATION_TYPES,
   MYDATA_PACKAGING_TYPE_OTHER,
   MYDATA_RECEIVING_NOTE_PURPOSE_OTHER,
@@ -39,12 +40,26 @@ import {
 
 export const NOVUS_SANDBOX_BASE = 'https://provider-dev.timologisi.online';
 export const NOVUS_PRODUCTION_BASE = 'https://provider.timologisi.online';
+const SEND_TIMEOUT_MS = 75_000;
+const LOOKUP_TIMEOUT_MS = 20_000;
 
 /** "1,00" → 1.0 (Novus reports credits with a comma decimal separator). */
 function parseCredits(v: unknown): number | undefined {
   if (typeof v !== 'string') return typeof v === 'number' ? v : undefined;
   const n = Number(v.replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(n) ? n : undefined;
+}
+
+/** UN/ECE Rec. 20 code for a B2G line (BR-CL-23), from the same unit resolution AADE's code uses. */
+function ublUnitCode(label: string | undefined): string {
+  switch (mydataUnitCode(label)) {
+    case 2: return 'KGM';
+    case 3: return 'LTR';
+    case 4: return 'MTR';
+    case 5: return 'MTK';
+    case 6: return 'MTQ';
+    default: return 'H87';
+  }
 }
 
 /** Map our normalized invoice into the Novus `{ invoice: [ … ] }` request body. */
@@ -151,13 +166,30 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     );
   }
 
-  // AADE restricts §8.19 and §8.18 per document type, and marks the two ΦΗΜ special categories
-  // read-only. A code this type refuses is a rejection we can see coming — named here rather
-  // than dropped, because a document that transmits saying less than the one the operator
+  // §8.18 is an ERP-channel fact: AADE answers 205 "InvoiceVariationType is forbidden … for invoice
+  // sent by provider channel" whatever the type (sandbox, 2026-09-27).
+  if (header.invoiceVariationType != null) {
+    const row = MYDATA_INVOICE_VARIATION_TYPES.find((r) => r.code === header.invoiceVariationType);
+    throw new Error(
+      `Refusing to transmit invoice variation type ${header.invoiceVariationType}` +
+        `${row ? ` (${row.en})` : ''}: myDATA accepts it only from the ERP channel, never from a provider. ` +
+        `File the omission or variance directly with AADE, or clear the field to issue an ordinary document.`,
+    );
+  }
+
+  if (header.multipleConnectedMarks?.length) {
+    throw new Error(
+      'Refusing to transmit multipleConnectedMarks: the provider currently serialises it where AADE\'s ' +
+        'schema does not accept it (XML error 101 on every document type). Link a card receipt to its ' +
+        'invoice with correlatedInvoices instead, and ask Novus about the fix.',
+    );
+  }
+
+  // AADE restricts §8.19 per document type, and marks the two ΦΗΜ special categories read-only.
+  // Refused rather than dropped: a document that transmits saying less than the one the operator
   // approved is the worse of the two failures.
   const restricted: [number | undefined, readonly MydataRestrictedCode[], string][] = [
     [header.specialInvoiceCategory, MYDATA_SPECIAL_INVOICE_CATEGORIES, 'special invoice category'],
-    [header.invoiceVariationType, MYDATA_INVOICE_VARIATION_TYPES, 'invoice variation type'],
   ];
   for (const [code, table, what] of restricted) {
     if (code == null) continue;
@@ -195,6 +227,9 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // be transmitted: a self-billed invoice (231), a Τίτλος Κτήσης (231) and a self-delivery (331)
   // are all refused by AADE for declaring the wrong ledger. See `mydataClassificationLedger`.
   const ledger = isMovementDoc ? 'income' : mydataClassificationLedger(header.invoiceType, { selfPricing: header.selfPricing });
+  // An 8.4/8.5/8.6 restates income another document already declared, so it classifies as
+  // category1_95 (informational) with no type — a real income pair would count the sale twice.
+  const informational = MYDATA_INFORMATIONAL_INCOME_TYPES.includes(header.invoiceType);
 
   // An expense document has to SAY what kind of expense it was — `category2_1` (goods bought)
   // and `category2_3` (a service received) are different tax facts about the same money, and
@@ -242,6 +277,22 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     );
   }
 
+  if (input.b2g) {
+    const noCpv = lines.filter((l) => !l.cpvCode).map((l) => l.lineNumber);
+    if (noCpv.length) {
+      throw new Error(
+        `Refusing to transmit a B2G invoice: line(s) ${noCpv.join(', ')} have no CPV code. The public-sector ` +
+          `platform requires one per line (BT-158) — set it on the product, or on the invoice's B2G details.`,
+      );
+    }
+    if (!input.b2g.credits?.length) {
+      throw new Error(
+        'Refusing to transmit a B2G invoice with no payment account: the public body pays into the IBAN ' +
+          'stated on the invoice. Add the bank IBAN in Finance → Settings.',
+      );
+    }
+  }
+
   const invoiceDetails = lines.map((l) => ({
     lineNumber: l.lineNumber,
     // Movement-only, both mandatory there and absent from every other type's template.
@@ -287,11 +338,24 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     ...(l.otherTaxesAmount ? { otherTaxesAmount: l.otherTaxesAmount, ...(l.otherTaxesCategory ? { otherTaxesPercentCategory: l.otherTaxesCategory } : {}) } : {}),
     ...(l.deductionsAmount ? { deductionsAmount: l.deductionsAmount } : {}),
     ...(l.lineComments ? { lineComments: l.lineComments } : {}),
+    ...(input.b2g
+      ? {
+          QuantityUnitsUblCode: ublUnitCode(l.measurementUnitLabel),
+          itemCodification: l.cpvCode,
+          itemClassificationIdentifiers: [{
+            classificationIdentifier: l.cpvCode,
+            classificationIdentifierScheme: 'STI',
+            classificationIdentifierSchemeVersion: '2008',
+          }],
+        }
+      : {}),
     lineDescription: l.description,
     // A movement classifies as Transport (`category3`) and carries NO classificationType —
     // an income type on a zero-valued transport line is error 331.
     incomeClassification: isMovementDoc
       ? [{ classificationCategory: 'category3', amount: 0 }]
+      : informational
+      ? [{ classificationCategory: 'category1_95', amount: l.netValue }]
       : ledger === 'income' && l.incomeClassificationType
         ? [
             {
@@ -328,7 +392,8 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // has to name the method that is really on the envelope. The fallback is 5 (on credit), so a
   // document with no recorded payment says "On credit" rather than naming a method nobody chose.
   const paymentMethods = input.paymentMethods?.length
-    ? input.paymentMethods
+    ? input.paymentMethods.map((pm) => (input.paymentMethods!.length === 1 && !pm.amount
+      ? { ...pm, amount: summary.totalGrossValue } : pm))
     : [{ type: 5, amount: summary.totalGrossValue }];
   // SendPaymentsMethod reconciles to the cent. A document whose methods sum to something other
   // than its gross total is rejected as a whole, so the refusal belongs HERE, where the figure is
@@ -361,6 +426,8 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   }
   const summaryClassification = isMovementDoc
     ? [{ classificationCategory: 'category3', amount: 0 }]
+    : informational
+    ? [{ classificationCategory: 'category1_95', amount: Math.round(summary.totalNetValue * 100) / 100 }]
     // A self-billed document declares NEITHER ledger — see `mydataClassificationLedger`.
     : ledger !== 'income'
     ? undefined
@@ -446,7 +513,11 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           ...(header.exchangeRate ? { exchangeRate: header.exchangeRate } : {}),
           // 5.1 credit note: reference the original invoice MARK(s) being corrected.
           ...(input.correlatedInvoices?.length
-            ? { correlatedInvoices: input.correlatedInvoices }
+            ? {
+                correlatedInvoices: input.correlatedInvoices,
+                correlatedInvoicesLabel: input.correlatedInvoicesLabel
+                  ?? input.correlatedInvoices.map((m) => `MARK ${m}`).join(', '),
+              }
             : {}),
           // The transport block belongs to EVERY movement document, not only one that states a
           // `movePurpose` — a Δελτίο Ποσοτικής Παραλαβής states `receivingNotePurpose` instead,
@@ -562,12 +633,9 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           // Law 5155 — card(7)/IRIS(8) carry the EFT-POS terminal + NSP for the signature.
           ...(pm.terminalId ? { terminalId: pm.terminalId } : {}),
           ...(pm.posNspId != null ? { posNspId: pm.posNspId } : {}),
-          // Α.1155 — the terminal as its provider knows it, and the token the ΦΗΜ signed. Without
-          // these a type-7 detail is a claim that a card was used, with nothing behind it.
+          // TID_NSP — the terminal as its provider knows it. ECRToken, transactionId, tipAmount and
+          // ProvidersSignature are refused by the provider (HTTP 400, sandbox 2026-09-27).
           ...(pm.tid ? { tid: pm.tid } : {}),
-          ...(pm.ecrToken
-            ? { ECRToken: { SigningAuthor: pm.ecrToken.signingAuthor, Signature: pm.ecrToken.signature } }
-            : {}),
         })) }),
         invoiceDetails,
         // ── Document-level taxes (myDATA `taxesTotals`) ───────────────────────────────
@@ -609,30 +677,17 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             taxoffice: counterpart.taxOffice ?? '',
             ...addr(counterpart),
             phone: counterpart.phone ?? '',
-            // NO `email`. Deliberate: handing Novus the CUSTOMER's address inside the block
-            // whose job is producing and delivering Novus's document is what would let the
-            // provider auto-email them. We own the customer-facing channel (our PDF, our
-            // template, sent through Flows so admins can pause/edit/retarget it), so the
-            // customer must never receive a second invoice from a second sender. Omitting it
-            // costs a display field on a PDF nobody is served; sending it risks a duplicate.
+            // No `email`: the provider mails whatever address it is given, and the customer must
+            // not receive a second copy from a second sender.
           },
           additionalDetails: {
             // Greek legal document-type names — correct for a Greek fiscal document, and
             // overridable per call.
             documentLabel: input.documentLabel ?? 'Τιμολόγιο Πώλησης',
-            // Was hardcoded 'EL'. Inert while we serve our own PDF, but a buried Greek
-            // language pin is exactly the thing that gets copied into somewhere that DOES
-            // render — so it is explicit now, and defaults to English per the platform rule
-            // that no language field defaults to 'el'.
             documentLanguageCode: docLang,
             documentSizeCode: 0,
             documentComments: input.documentComments ?? '',
-            // MANDATORY. Novus rejects the whole request with HTTP 400 + a problem+json
-            // `errors` map when this is absent — "The PaymentMethodInvoiceLabel field is
-            // required." It is the PRINTED name of the payment method, so it is derived from
-            // the transmitted code through `MYDATA_PAYMENT_CODE`'s own label table rather than
-            // being written out here: a second hand-kept map of those eight names is exactly
-            // the drift that filed "On credit" as Cash (see `paymentVocabulary.ts`).
+            // Mandatory (HTTP 400 without it); derived from the transmitted code, never restated.
             paymentMethodInvoiceLabel: paymentLabel,
           },
         },
@@ -643,16 +698,21 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
               providerB2gAdditionalInvoiceDetails: {
                 ...(input.b2g.contractReference ? { contractReference: input.b2g.contractReference } : {}),
                 ...(input.b2g.buyerReference ? { buyerReference: input.b2g.buyerReference } : {}),
-                ...(input.b2g.buyerLegalRegistrationIdentifier ? { buyerLegalRegistrationidentifier: input.b2g.buyerLegalRegistrationIdentifier } : {}),
+                ...(input.b2g.buyerLegalRegistrationIdentifier ? { buyerLegalRegistrationIdentifier: input.b2g.buyerLegalRegistrationIdentifier } : {}),
                 ...(input.b2g.partyName ? { partyName: input.b2g.partyName } : {}),
                 ...(input.b2g.dueDate ? { dueDate: input.b2g.dueDate } : {}),
                 ...(input.b2g.budget?.identifier
                   ? { budget: { type: input.b2g.budget.type ?? 1, identifier: input.b2g.budget.identifier } }
                   : {}),
                 ...(input.b2g.buyerIdentifiers?.length ? { buyerIdentifiers: input.b2g.buyerIdentifiers } : {}),
-                ...(input.b2g.deliveryDetails && (input.b2g.deliveryDetails.street || input.b2g.deliveryDetails.city)
-                  ? { deliveryDetails: input.b2g.deliveryDetails }
-                  : {}),
+                ...(input.b2g.purchaseOrderReference ? { purchaseOrderReference: input.b2g.purchaseOrderReference } : {}),
+                // Both required by the route's binder (HTTP 400 when absent), so always present.
+                deliveryDetails: {
+                  street: input.b2g.deliveryDetails?.street ?? '',
+                  city: input.b2g.deliveryDetails?.city ?? '',
+                  postalCode: input.b2g.deliveryDetails?.postalCode ?? '',
+                },
+                credits: input.b2g.credits ?? [],
               },
             }
           : {}),
@@ -721,27 +781,19 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
         uid: entry?.invoiceUid ?? undefined,
         authenticationCode: entry?.authenticationCode ?? undefined,
         qrUrl: entry?.qrUrl ?? undefined,
-        // AADE's OWN validation URL. From v2.3 `qrUrl` and `invoiceUrl` are the same thing —
-        // the provider's rendering — so this is the only link that belongs on a document we
-        // hand to a customer. Kept separate rather than overwriting `qrUrl`, because the
-        // provider's copy is still worth having in the submission record for support.
+        // Since v2.3 qrUrl and invoiceUrl are both the provider's document link; aadeQrUrl is AADE's.
         aadeQrUrl: entry?.aadeQrUrl ?? undefined,
         invoiceUrl: entry?.invoiceUrl ?? undefined,
         providerCredits: parseCredits(entry?.credits),
         raw: entry,
       };
     case 'Offline':
-      // AADE was down; provider will transmit later. No final MARK yet — poll
-      // RequestTransmittedDocs by invoiceUid/aa to backfill it.
+      // AADE was down; the provider transmits later and RequestTransmittedDocs backfills the MARK.
       return {
         status: 'offline',
         isOffline: true,
         uid: entry?.invoiceUid ?? undefined,
         qrUrl: entry?.qrUrl ?? undefined,
-        // AADE's OWN validation URL. From v2.3 `qrUrl` and `invoiceUrl` are the same thing —
-        // the provider's rendering — so this is the only link that belongs on a document we
-        // hand to a customer. Kept separate rather than overwriting `qrUrl`, because the
-        // provider's copy is still worth having in the submission record for support.
         aadeQrUrl: entry?.aadeQrUrl ?? undefined,
         invoiceUrl: entry?.invoiceUrl ?? undefined,
         providerCredits: parseCredits(entry?.credits),
@@ -772,6 +824,33 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
       return { status: 'rejected', isOffline: false, errorCode: ec ?? code, errorMessage: detail ?? code, raw: entry };
     }
   }
+}
+
+/**
+ * SendInvoicesB2G answers `InvoiceCreationResponse` (live Swagger), not the SendInvoices envelope:
+ * `{ invoiceMarking: { mark, qrCode, providerUrl, invoiceIdentifier }, errors: [{ code, defaultMessage, aadeMessage }] }`.
+ */
+function interpretB2g(body: any): FiscalSubmissionResult {
+  const m = body?.invoiceMarking;
+  const mark = m?.mark && String(m.mark) !== '0' ? String(m.mark) : undefined;
+  const errs: any[] = Array.isArray(body?.errors) ? body.errors : [];
+  if (mark && !errs.some((e) => e?.fatal)) {
+    return {
+      status: 'accepted', isOffline: false, mark,
+      uid: m?.invoiceIdentifier ?? m?.invoiceId ?? undefined,
+      authenticationCode: m?.verificationHash ?? undefined,
+      qrUrl: m?.qrCode ?? undefined,
+      invoiceUrl: m?.providerUrl ?? undefined,
+      raw: body,
+    };
+  }
+  const e = errs[0] ?? {};
+  return {
+    status: 'rejected', isOffline: false,
+    errorCode: e.code != null ? String(e.code) : 'B2GError',
+    errorMessage: e.aadeMessage || e.defaultMessage || (m?.aadePreviouslySubmittedError ?? 'B2G transmission refused'),
+    raw: body,
+  };
 }
 
 /**
@@ -819,25 +898,30 @@ export const novusConnector: FiscalConnector = {
     // for a card/IRIS payment on a connected POS, the caller must explicitly request signing
     // (opts.skipSignature === false). Send the value explicitly either way.
     const skip = opts?.skipSignature === false ? 'false' : 'true';
-    // A B2G (public-sector) invoice has ITS OWN ROUTE. The plain `/SendInvoices` envelope
-    // (`ProviderInvoice`) has no `providerB2gAdditionalInvoiceDetails` property at all, and
-    // ASP.NET's JSON binder DROPS members it does not know — so posting the B2G block there
-    // transmitted a perfectly ordinary invoice with the contract reference, buyer reference,
-    // budget and due date silently removed. No error, no warning, a valid MARK on a document
-    // missing everything that made it B2G.
+    // B2G has its own route and key: the plain route's binder silently drops the B2G block.
     const route = input.b2g ? 'SendInvoicesB2G' : 'SendInvoices';
-    const url = `${ctx.baseUrl}/api/v1/Provider/${route}?skipSignature=${skip}`;
+    const apiKey = input.b2g ? ctx.b2gApiKey : ctx.apiKey;
+    if (!apiKey) {
+      return {
+        status: 'rejected', isOffline: false, errorCode: 'b2g_not_enabled',
+        errorMessage: 'B2G invoicing needs its own provider key, activated per client by Novus. '
+          + 'Set NOVUS_B2G_API_KEY once B2G is enabled for this account.',
+      };
+    }
+    const url = `${ctx.baseUrl}/api/v1/Provider/${route}${input.b2g ? '' : `?skipSignature=${skip}`}`;
     const payload = buildNovusPayload(input) as any;
     if (opts?.transmissionFailure) {
-      // resend marker for the 5XX recovery path
+      // The only value a provider may send: "issued while the provider was unreachable".
       (payload.invoice[0] as any).transmissionFailure = 1;
     }
     let res: Response;
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+        headers: { 'API-KEY': apiKey, 'content-type': 'application/json' },
         body: JSON.stringify(payload),
+        // The provider asks for at least 60 s; the edge runtime kills a request at 150 s.
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
     } catch (e) {
       return { status: 'error', isOffline: false, transmissionFailure: true, errorMessage: String(e) };
@@ -847,6 +931,9 @@ export const novusConnector: FiscalConnector = {
       body = await res.json();
     } catch {
       return { status: 'error', isOffline: false, transmissionFailure: res.status >= 500, errorMessage: `Non-JSON response (${res.status})` };
+    }
+    if (input.b2g && res.status < 500 && (body?.invoiceMarking || (Array.isArray(body?.errors) && typeof body.errors[0] === 'object'))) {
+      return interpretB2g(body);
     }
     const entry = body?.response?.[0] ?? body;
 
@@ -872,6 +959,7 @@ export const novusConnector: FiscalConnector = {
     const qs = new URLSearchParams();
     if (query.invoiceMark) qs.set('invoiceMark', query.invoiceMark);
     if (query.aa) qs.set('aa', query.aa);
+    if (query.series) qs.set('series', query.series);
     if (query.uid) qs.set('uid', query.uid);
     if (query.issuerVatNumber) qs.set('issuerVatNumber', query.issuerVatNumber);
     // Required by the provider. Default to a window wide enough to cover any document still in
@@ -884,7 +972,10 @@ export const novusConnector: FiscalConnector = {
     qs.set('issuedTo', query.issuedTo ?? isoDay(now + dayMs));
     const url = `${ctx.baseUrl}/api/v1/Provider/RequestTransmittedDocs?${qs.toString()}`;
     try {
-      const res = await fetch(url, { method: 'GET', headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' } });
+      const res = await fetch(url, {
+        method: 'GET', headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+        signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+      });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
         // A malformed query is OUR bug, not a verdict on the document — report it as an error
@@ -893,16 +984,13 @@ export const novusConnector: FiscalConnector = {
       }
       const docs = Array.isArray(body?.providerTransmittedDocs) ? body.providerTransmittedDocs : [];
 
-      // THE ANSWER MUST BE ABOUT THE DOCUMENT WE ASKED ABOUT.
-      // `issuerVatNumber` + a date window is a legitimate query on its own, and it returns
-      // EVERYTHING that workspace transmitted in the window. Taking the first row with a MARK
-      // would hand the recovery cron an unrelated invoice's legal number to stamp onto this one
-      // — the same hazard the 228 branch above refuses to take, and worse because it is silent.
-      // So a row only counts when it matches an identifier we actually sent.
+      // A row counts only when it matches an identifier we sent: issuer + window alone returns
+      // everything the workspace filed, and its first MARK would belong to another document.
       const wanted = (d: any) => (
         (query.uid && String(d?.uid ?? '') === query.uid) ||
         (query.invoiceMark && String(d?.mark ?? '') === query.invoiceMark) ||
-        (query.aa && String(d?.invoiceHeader?.aa ?? '') === query.aa)
+        (query.aa && String(d?.invoiceHeader?.aa ?? '') === query.aa
+          && (!query.series || String(d?.invoiceHeader?.series ?? '') === query.series))
       );
       const discriminated = Boolean(query.uid || query.invoiceMark || query.aa);
       if (!discriminated) {
@@ -922,7 +1010,9 @@ export const novusConnector: FiscalConnector = {
         mark,
         uid: doc?.uid ?? undefined,
         authenticationCode: doc?.authenticationCode ?? undefined,
-        invoiceUrl: doc?.pdfUrl ?? undefined,
+        invoiceUrl: doc?.invoiceUrl ?? doc?.pdfUrl ?? undefined,
+        qrUrl: doc?.invoiceUrl ?? undefined,
+        aadeQrUrl: doc?.aadeQrUrl ?? undefined,
         providerCredits: typeof doc?.cost === 'number' ? doc.cost : parseCredits(doc?.cost),
         raw: body,
       };
@@ -931,11 +1021,7 @@ export const novusConnector: FiscalConnector = {
     }
   },
 
-  // GET /GetCreditsBalance — what the workspace's provider pool actually holds.
-  //
-  // `FISCAL_PROVIDER_CREDIT_TIERS` alerts on crossing a tier, and until now the only reading
-  // available was the per-document `credits` cost on a transmission response — i.e. the monitor
-  // could only ever learn the balance by spending some. This is the direct read.
+  // GET /GetCreditsBalance returns { userId, creditsBalance }, shared by every client VAT on the key.
   async getCreditsBalance(ctx) {
     try {
       const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/GetCreditsBalance`, {
@@ -946,10 +1032,7 @@ export const novusConnector: FiscalConnector = {
       if (!res.ok) {
         return { ok: false, errorMessage: problemDetail(body) ?? `HTTP ${res.status}`, raw: body };
       }
-      // The provider reports credits with a comma decimal separator, as it does on a submission.
-      const raw = typeof body === 'object' && body !== null
-        ? (body.credits ?? body.balance ?? body.creditsBalance ?? body.availableCredits)
-        : body;
+      const raw = typeof body === 'object' && body !== null ? body.creditsBalance : body;
       const balance = typeof raw === 'number' ? raw : parseCredits(raw);
       return { ok: balance != null, balance, raw: body };
     } catch (e) {
@@ -979,12 +1062,7 @@ export const novusConnector: FiscalConnector = {
       const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CompletionPosInvoices`, {
         method: 'POST',
         headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
-        // AN ARRAY, NOT AN OBJECT. The endpoint binds `List<SendInvoicesAfterPosPaymentRequest>`
-        // and answers HTTP 400 for a bare object — "The JSON value could not be converted to
-        // System.Collections.Generic.List`1[…]". This was sending the object, so the POS
-        // completion had NEVER succeeded: the customer's card is charged, the held receipt stays
-        // at `awaiting_payment`, and no legal document is ever filed for money that was taken.
-        // Verified against the sandbox 2026-09-06 (#319) — object → 400, array → MARK.
+        // An ARRAY: the route binds a List and answers HTTP 400 for a bare object.
         body: JSON.stringify([{
           signatureToken: input.signatureToken,
           transactionId: input.transactionId,
@@ -1009,24 +1087,28 @@ export const novusConnector: FiscalConnector = {
     }
   },
 
-  // Deferred flow — request a signature for an already-issued (on-credit) invoice.
-  //
-  // THE BODY IS A BARE int64 — the MARK — and the terminal is passed as QUERY parameters. This
-  // used to POST `{ invoiceMark, invoiceUid }` as JSON with no query at all, which the endpoint
-  // cannot bind. Same family of mistake as CompletionPosInvoices below it, and the same
-  // consequence: the deferred card payment on an on-credit invoice could never be started.
+  // Deferred flow on an issued invoice: the body is the bare int64 MARK, the terminal is QUERY.
   async askSignatureForOldInvoice(input, ctx) {
     const qs = new URLSearchParams();
     if (input.terminalId) qs.set('terminalId', input.terminalId);
     if (input.posNspId != null) qs.set('posNspId', String(input.posNspId));
-    const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/AskSignatureForOldInvoice?${qs.toString()}`, {
-      method: 'POST',
-      headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
-      body: JSON.stringify(Number(input.invoiceMark)),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${ctx.baseUrl}/api/v1/Provider/AskSignatureForOldInvoice?${qs.toString()}`, {
+        method: 'POST',
+        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify(Number(input.invoiceMark)),
+      });
+    } catch (e) {
+      return { ok: false, errorMessage: String(e), invoiceUid: input.invoiceUid ?? '', token: '', data: '' };
+    }
     const body = await res.json().catch(() => ({}));
+    // The live route answers the signature FLAT (sandbox 2026-09-27); the wrapped shape is kept too.
     const s = body?.providerSignature?.[0]?.signatures?.[0] ?? body;
+    const ok = res.ok && !!s?.token;
     return {
+      ok,
+      errorMessage: ok ? undefined : (problemDetail(body) ?? `HTTP ${res.status}`),
       invoiceUid: input.invoiceUid ?? body?.providerSignature?.[0]?.invoiceUid ?? '',
       token: s?.token, data: s?.data, createdDate: s?.createdDate, expiryDate: s?.expiryDate,
       isExpired: s?.isExpired, paymentBalance: s?.paymentBalance, issuerVatNumber: s?.issuerVatNumber,

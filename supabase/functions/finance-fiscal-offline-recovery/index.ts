@@ -18,6 +18,9 @@ const REJECT_GRACE_HOURS = 6;
 const STUCK_ALERT_HOURS = 24;
 /** Re-alert cadence for a document that stays stuck after the first alert. */
 const REALERT_HOURS = 24;
+/** An unreachable-provider failure is retried this many times, spaced by RETRY_SPACING_MIN × attempt. */
+const MAX_OUTAGE_RETRIES = 8;
+const RETRY_SPACING_MIN = 10;
 /** Our own synthetic codes from `interpret()` — these mean "we couldn't tell", NOT "AADE said no". */
 const INDETERMINATE_ERROR_CODES = new Set(['Unknown', 'HttpError', 'TechnicalError']);
 
@@ -44,6 +47,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
     credit_notes_checked: 0, credit_notes_recovered: 0,
     delivery_notes_checked: 0, delivery_notes_recovered: 0,
     rejected_late: 0, stuck_alerted: 0, credits_refunded: 0,
+    outage_retried: 0, outage_alerted: 0,
   };
   // Cache one connector per workspace across the batch.
   const connByWs = new Map<string, any>();
@@ -193,9 +197,39 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
           // instead of throwing, so the old `await update(); results.recovered++` incremented
           // even when the update failed — the cron reported N documents recovered while N rows
           // were still sitting at fiscal_status='offline', and the next tick re-fetched them.
+          // The MARKed copy also carries the auth code and both links; a recovered document without
+          // them prints no QR and no authentication code.
           const { error: markError } = await supabase.from(table)
-            .update({ fiscal_status: 'accepted', fiscal_mark: res.mark, fiscal_error: null, updated_at: new Date().toISOString() })
+            .update({
+              fiscal_status: 'accepted', fiscal_mark: res.mark, fiscal_error: null,
+              ...(res.uid ? { fiscal_uid: res.uid } : {}),
+              ...(res.qrUrl ? { fiscal_qr_url: res.qrUrl } : {}),
+              ...(res.aadeQrUrl ? { fiscal_aade_qr_url: res.aadeQrUrl } : {}),
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', r.id);
+          if (!markError) {
+            const { error: subErr } = await supabase.from('fiscal_submissions').insert({
+              workspace_id: r.workspace_id,
+              invoice_id: table === 'invoices' ? r.id : null,
+              document_table: table,
+              document_id: r.id,
+              connector_slug: conn.slug ?? 'novus',
+              capability: 'legal_invoice',
+              status: 'accepted',
+              mark: res.mark,
+              uid: res.uid ?? null,
+              authentication_code: res.authenticationCode ?? null,
+              qr_url: res.qrUrl ?? null,
+              aade_qr_url: res.aadeQrUrl ?? null,
+              invoice_url: res.invoiceUrl ?? null,
+              aa: aaOf(r),
+              is_offline: false,
+              transmission_failure: false,
+              response_payload: res.raw ?? null,
+            });
+            if (subErr) console.error(`[fiscal-offline-recovery] ${table} ${r.id} recovered, but its auth code was not recorded:`, subErr.message);
+          }
           if (markError) {
             console.error(`[fiscal-offline-recovery] ${table} ${r.id} accepted upstream but NOT marked locally:`, markError.message);
           } else if (table === 'invoices') results.invoices_recovered++;
@@ -340,58 +374,106 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   }
 
   // ── Platform provider-credit pool (#193) ──────────────────────────────────────
-  // Every submission records the provider's remaining credit balance and, until now, nothing
-  // read it back. This pool is the OPERATOR's single master key: when it empties, every tenant
-  // stops invoicing simultaneously — the tenant-side out-of-credits block does nothing for it.
+  // The OPERATOR's single master key: when it empties, every tenant stops invoicing at once.
+  // GetCreditsBalance is the balance; the per-document `credits` on a submission is a COST.
   {
     results.credits_alerted = 0;
-    const { data: readings } = await supabase.from('fiscal_submissions')
-      .select('id, provider_credits, credits_alerted_at, connector_slug')
-      .not('provider_credits', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(2);
-    const latest = readings?.[0];
-    const previous = readings?.[1];
-
-    if (latest && !latest.credits_alerted_at) {
+    const { data: root } = await supabase.from('workspaces').select('id').eq('is_root', true).limit(1).maybeSingle();
+    const conn = root?.id ? await getConn(root.id) : null;
+    const reading = conn?.connector?.getCreditsBalance ? await conn.connector.getCreditsBalance(conn.ctx) : null;
+    if (reading?.ok && reading.balance != null) {
+      const slug = conn.slug ?? 'novus';
+      const balance = Number(reading.balance);
+      const { data: prev } = await supabase.from('fiscal_provider_balance')
+        .select('balance, alerted_tier').eq('connector_slug', slug).maybeSingle();
       const configured = (await resolveSecret(supabase, 'FISCAL_PROVIDER_CREDIT_TIERS')).value;
       const tiers = (configured ?? '100,50,20,5')
         .split(',').map((t: string) => Number(t.trim()))
         .filter((n: number) => Number.isFinite(n) && n > 0)
-        .sort((a: number, b: number) => b - a);
+        .sort((a: number, b: number) => a - b);
+      // The LOWEST tier the balance is at or under: the most urgent line crossed.
+      const tier = tiers.find((t: number) => balance <= t) ?? null;
+      // A top-up past the last alerted tier re-arms it; only a FALL can alert.
+      const prevTier = (prev as any)?.alerted_tier;
+      const alertedTier = tier == null || (prevTier != null && tier > Number(prevTier)) ? null : prevTier ?? null;
+      const falling = (prev as any)?.balance == null || balance < Number((prev as any).balance);
+      const crossed = tier != null && falling && (alertedTier == null || tier < Number(alertedTier));
+      const { error: balErr } = await supabase.from('fiscal_provider_balance').upsert({
+        connector_slug: slug, balance, read_at: new Date().toISOString(),
+        alerted_tier: crossed ? tier : alertedTier,
+        ...(crossed ? { alerted_at: new Date().toISOString() } : {}),
+      }, { onConflict: 'connector_slug' });
+      if (balErr) console.error('[fiscal-offline-recovery] could not record the provider balance — not alerting:', balErr.message);
+      if (crossed && root?.id && !balErr) {
+        results.credits_alerted = 1;
+        await emitFlowEventToWorkspaceRoles(
+          root.id, ['owner', 'admin'], 'fiscal_credits_low',
+          (uid) => ({
+            type: 'fiscal_credits_low',
+            user_id: uid,
+            title: `myDATA provider credits low — ${balance} left`,
+            body: `The platform's ${slug} provider pool has fallen to ${balance} credits (alert tier ${tier}). Every tenant's e-invoicing stops when it reaches zero. Top up the provider account.`,
+            action_url: '/finance?tab=settings',
+            workspace_id: root.id,
+            connector_slug: slug,
+            balance,
+            tier,
+          }),
+        );
+      }
+    } else if (reading && !reading.ok) {
+      console.error('[fiscal-offline-recovery] provider balance unreadable:', reading.errorMessage);
+    }
+  }
 
-      const balance = Number(latest.provider_credits);
-      // Highest tier this reading has fallen to or below.
-      const tier = tiers.find((t: number) => balance <= t);
-      // A downward CROSSING — the previous reading was still above this tier. No previous
-      // reading at all (the very first transmission) counts as a crossing so a pool that is
-      // already low on day one is not silently accepted.
-      const crossed = tier != null && (previous?.provider_credits == null || Number(previous.provider_credits) > tier);
-
-      if (crossed) {
-        const { data: root } = await supabase.from('workspaces').select('id').eq('is_root', true).limit(1).maybeSingle();
-        const { error: stampError } = await supabase.from('fiscal_submissions')
-          .update({ credits_alerted_at: new Date().toISOString() }).eq('id', latest.id);
-        if (stampError) {
-          console.error('[fiscal-offline-recovery] could not stamp the credit alert — not notifying:', stampError.message);
-        } else if (root?.id) {
-          results.credits_alerted = 1;
-          await emitFlowEventToWorkspaceRoles(
-            root.id, ['owner', 'admin'], 'fiscal_credits_low',
-            (uid) => ({
-              type: 'fiscal_credits_low',
-              user_id: uid,
-              title: `myDATA provider credits low — ${balance} left`,
-              body: `The platform's ${latest.connector_slug ?? 'fiscal'} provider pool has fallen to ${balance} credits (alert tier ${tier}). Every tenant's e-invoicing stops when it reaches zero. Top up the provider account.`,
-              action_url: '/finance?tab=settings',
-              workspace_id: root.id,
-              connector_slug: latest.connector_slug ?? 'novus',
-              balance,
-              tier,
-            }),
-          );
-        } else {
-          console.error('[fiscal-offline-recovery] provider credits low but no root workspace to notify');
+  // ── Provider unreachable at issue time: resend through the one transmission path ─────────
+  // finance-issue-invoice looks the document up before resending, adopts a filed copy, adds
+  // transmissionFailure=1 once the issue date has passed, and refuses past myDATA's one-day window.
+  {
+    const since = new Date(Date.now() - 3 * 24 * 3_600_000).toISOString();
+    const bodyFor: Record<DocTable, (id: string) => Record<string, unknown>> = {
+      invoices: (id) => ({ invoice_id: id, submit_fiscal: true }),
+      credit_notes: (id) => ({ credit_note_id: id, submit_fiscal: true }),
+      delivery_notes: (id) => ({ delivery_note_id: id, submit_fiscal: true }),
+    };
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    // A resend can take the provider's full timeout, so one per tick keeps the cron inside 150 s.
+    let budget = 1;
+    for (const table of ['invoices', 'credit_notes', 'delivery_notes'] as DocTable[]) {
+      const { data: failed } = await supabase.from(table)
+        .select('id, workspace_id, fiscal_alerted_at')
+        .eq('fiscal_status', 'error').gte('updated_at', since).limit(25);
+      for (const d of failed ?? []) {
+        const { data: attempts } = await supabase.from('fiscal_submissions')
+          .select('transmission_failure, created_at')
+          .eq('document_table', table).eq('document_id', (d as any).id)
+          .order('created_at', { ascending: false }).limit(MAX_OUTAGE_RETRIES + 1);
+        const rows = (attempts ?? []) as { transmission_failure: boolean; created_at: string }[];
+        if (!rows[0]?.transmission_failure) continue;
+        const transient = rows.filter((a) => a.transmission_failure).length;
+        const label = `${table === 'invoices' ? 'Invoice' : table === 'credit_notes' ? 'Credit note' : 'Delivery note'} ${(d as any).id}`;
+        if (transient > MAX_OUTAGE_RETRIES) {
+          if (hoursSince((d as any).fiscal_alerted_at) >= REALERT_HOURS) {
+            results.outage_alerted++;
+            await alertDocument(table, d, label, `${label} could not reach myDATA`,
+              `The provider was unreachable on ${transient} attempts. The document holds a legal number but no MARK. Check the provider portal, then retransmit it from Finance → myDATA Transmissions.`,
+              'stuck_offline', 'Provider unreachable on every retry.');
+          }
+          continue;
+        }
+        if ((Date.now() - new Date(rows[0].created_at).getTime()) / 60_000 < RETRY_SPACING_MIN * transient) continue;
+        if (budget-- <= 0) continue;
+        try {
+          const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/finance-issue-invoice`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+            body: JSON.stringify(bodyFor[table]((d as any).id)),
+            signal: AbortSignal.timeout(110_000),
+          });
+          if (res.ok) results.outage_retried++;
+          else console.error(`[fiscal-offline-recovery] outage retry ${table} ${(d as any).id} → ${res.status}`);
+        } catch (e) {
+          console.error('[fiscal-offline-recovery] outage retry threw', table, (d as any).id, e);
         }
       }
     }

@@ -523,6 +523,19 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     // AADE authentication code — issued alongside the MARK and stored on the submission row.
     // It belongs on the printed document: it is what verifies the document off-line.
     let authCode: string | null = null;
+    // Novus prints "Transmission Failure_1" on a document issued while it was unreachable, and
+    // "_2" on one it queued because AADE was.
+    let transmissionFailure: 1 | 2 | null = inv.fiscal_status === 'offline' ? 2 : null;
+    if (!transmissionFailure && inv.fiscal_mark) {
+      const { data: tf } = await supabase.from('fiscal_submissions')
+        .select('sent_transmission_failure')
+        .eq('document_table', kind === 'credit_note' ? 'credit_notes' : kind === 'delivery_note' ? 'delivery_notes' : 'invoices')
+        .eq('document_id', docId)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false })
+        .limit(1).maybeSingle();
+      if ((tf as any)?.sent_transmission_failure === 1) transmissionFailure = 1;
+    }
     let transmittedBy: string | null = null;
     let providerAttribution: string | null = null;
     let posPayments: any[] = [];
@@ -676,7 +689,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* RF is best-effort — never block the PDF */ }
     }
 
-    const pdfBytes = await buildPdf({ inv, items, documentTaxes, fs, customer, selfBillSupplier, addressUnit, authCode, providerAttribution, posPayments, tz: workspaceTz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
+    const pdfBytes = await buildPdf({ inv, items, documentTaxes, fs, customer, selfBillSupplier, addressUnit, authCode, transmissionFailure, providerAttribution, posPayments, tz: workspaceTz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -694,8 +707,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: any; customer: any; selfBillSupplier?: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, selfBillSupplier, addressUnit, authCode, providerAttribution, posPayments, tz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
+async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: any; customer: any; selfBillSupplier?: any; addressUnit?: any; authCode?: string | null; transmissionFailure?: 1 | 2 | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, selfBillSupplier, addressUnit, authCode, transmissionFailure, providerAttribution, posPayments, tz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
 
@@ -883,9 +896,8 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     if (logoImg) { page.drawImage(logoImg, { x: M, y: topY - logoH, width: logoW, height: logoH }); leftBottom = topY - logoH; }
     textR(title, right, topY - 11, 12, bold, colors.accent);
     let qrBottom = topY - 18;
-    // AADE's URL, never the provider's — `fiscal_qr_url` opens NOVUS'S rendering of this
-    // document, and their copy is not shown to a customer anywhere. A document with no AADE URL
-    // (one still queued offline, which has no MARK either) simply carries no QR.
+    // AADE's URL, never the provider's: their rendering is never shown to a customer. A queued
+    // document has no AADE URL (and no MARK) and prints no QR.
     if (inv.fiscal_aade_qr_url && inv.print_online_code !== false) {
       const qs = 68;
       drawQr(page, String(inv.fiscal_aade_qr_url), right - qs, topY - 22 - qs, qs);
@@ -1558,6 +1570,10 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   }
 
   // ── MARK + auth code + QR (bottom of the last page; QR gated by print_online_code) ──
+  if (transmissionFailure) {
+    const ty = Math.max(M + 90, 120) + 42;
+    text(`Transmission Failure_${transmissionFailure}`, M, ty, 8, bold, MUTED);
+  }
   if (inv.fiscal_mark) {
     const qy = Math.max(M + 90, 120);
     text(L.mark, M, qy + 28, 8, bold, MUTED);

@@ -946,6 +946,35 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "finance-mydata-delivery",
+    "tag": "Finance",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Files a recorded movement lifecycle leg (ΨΔΑ Phase Β1) with myDATA and reads a movement's AADE status",
+    "description": "Each leg of a delivery note's movement (start/tranship, delivery outcome, rejection, return) is its own AADE filing with its own MARK. This sends a leg recorded in delivery_note_events to the matching AADE ERP method (RegisterTransfer, ConfirmDeliveryOutcome, RejectDeliveryNote, ConfirmDeliveryReturn) under the workspace's OWN ΑΑΔΕ credentials, and stamps the MARK. A leg is claimed before the call",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "transmit",
+          "status",
+          "reconcile"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "event_id": {
+        "type": "string",
+        "description": "The delivery_note_events row to file. The workspace is read from it."
+      },
+      "delivery_note_id": {
+        "type": "string",
+        "description": "The delivery note whose MARK is looked up."
+      }
+    }
+  },
+  {
     "name": "finance-mydata-send",
     "tag": "Finance",
     "methods": [

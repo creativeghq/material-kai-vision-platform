@@ -180,6 +180,8 @@ export interface FiscalLine {
   movePurposeLine?: number;
   /** Required by AADE when `movePurposeLine` is 19 (Λοιπές Διακινήσεις). Max 150 chars. */
   otherMovePurposeLineTitle?: string;
+  /** B2G only: the line's CPV code (e.g. 44111000-4). The B2G route refuses a line without one. */
+  cpvCode?: string;
 }
 
 /**
@@ -305,6 +307,8 @@ export interface FiscalInvoiceInput {
   packingsDeclarations?: FiscalPackaging[];
   /** myDATA MARK(s) of the invoice(s) this document corrects — required for a 5.1 credit note. */
   correlatedInvoices?: number[];
+  /** Printed reference to the corrected document; the provider requires it beside correlatedInvoices. */
+  correlatedInvoicesLabel?: string;
   /** B2G (public-sector) extras — emitted as `providerB2gAdditionalInvoiceDetails`
    *  on the same SendInvoices envelope. Present only when the invoice is_b2g. */
   b2g?: {
@@ -316,6 +320,9 @@ export interface FiscalInvoiceInput {
     budget?: { type?: number; identifier?: string };
     buyerIdentifiers?: { buyerIdentifier: string }[];
     deliveryDetails?: { street?: string; city?: string; postalCode?: string };
+    purchaseOrderReference?: string;
+    /** The account the public body pays into (BT-84/85/86). Required by the B2G route. */
+    credits?: { accountIdentifier: string; accountName?: string; serviceProviderIdentifier?: string }[];
   };
   lines: FiscalLine[];
   /**
@@ -331,8 +338,6 @@ export interface FiscalInvoiceInput {
     type: number; amount: number; info?: string; terminalId?: string; posNspId?: number;
     /** TID_NSP — the terminal as the payment-service provider knows it. */
     tid?: string;
-    /** Α.1155 ECR Token. SigningAuthor is the ΦΗΜ registry number; Signature is what it signed. */
-    ecrToken?: { signingAuthor: string; signature: string };
   }[];
   summary: {
     totalNetValue: number;
@@ -395,7 +400,7 @@ export interface FiscalSubmissionResult {
   invoiceUrl?: string;
   providerCredits?: number;
   isOffline: boolean;
-  /** 5XX/transient — the caller should resend with transmissionFailure=1 */
+  /** Provider unreachable (timeout, network, 5xx): look the document up before resending it. */
   transmissionFailure?: boolean;
   errorCode?: string;
   errorMessage?: string;
@@ -427,6 +432,8 @@ export interface FiscalConnectorContext {
   baseUrl: string;
   apiKey: string;
   isSandbox: boolean;
+  /** The B2G route takes its OWN key (activated per client by the provider); absent = B2G not enabled. */
+  b2gApiKey?: string;
 }
 
 export interface FiscalConnector {
@@ -436,6 +443,7 @@ export interface FiscalConnector {
   submitInvoice(
     input: FiscalInvoiceInput,
     ctx: FiscalConnectorContext,
+    /** transmissionFailure: this is a resend of a document issued while the provider was unreachable. */
     opts?: { skipSignature?: boolean; transmissionFailure?: boolean },
   ): Promise<FiscalSubmissionResult>;
   /** Resolve the final MARK for an invoice that came back Offline (AADE was down). */
@@ -448,6 +456,7 @@ export interface FiscalConnector {
     query: {
       invoiceMark?: string;
       aa?: string;
+      series?: string;
       uid?: string;
       issuerVatNumber?: string;
       issuedFrom?: string; // YYYY-MM-DD
@@ -492,7 +501,7 @@ export interface FiscalConnector {
   askSignatureForOldInvoice?(
     input: { invoiceMark: string; invoiceUid?: string; terminalId?: string; posNspId?: number },
     ctx: FiscalConnectorContext,
-  ): Promise<ProviderSignature>;
+  ): Promise<ProviderSignature & { ok: boolean; errorMessage?: string }>;
   /** Completing a deferred payment needs the MARK as well as the signature: the provider
    *  addresses the completion to the document, not to the token alone. */
   completeOldInvoicePosPayment?(

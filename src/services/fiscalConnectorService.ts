@@ -57,15 +57,7 @@ export interface FiscalSubmission {
 export type TransmissionStatusFilter = 'all' | 'accepted' | 'offline' | 'rejected' | 'error' | 'cancelled';
 
 export const fiscalConnectorService = {
-  /**
-   * Every transmission ATTEMPT for a workspace, newest first.
-   *
-   * One row per attempt is the point: the accepted row and the three rejections before it are
-   * all the record, and a list that showed only the current state of each document would hide
-   * exactly what an operator needs when something is not landing. The payload columns
-   * (`request_payload` / `response_payload`) are deliberately NOT selected — they are the whole
-   * envelope, they are large, and nothing on this surface reads them.
-   */
+  /** Every transmission ATTEMPT for a workspace, newest first; the large payload columns are not selected. */
   async listTransmissions(
     workspaceId: string,
     opts: { status?: TransmissionStatusFilter; limit?: number } = {},
@@ -209,6 +201,40 @@ export const fiscalConnectorService = {
     });
     if (error) throw await edgeError(error);
     return data;
+  },
+
+  /** Card/IRIS payment against an invoice already on myDATA: signs it for the terminal; completePos() finishes. */
+  async startCardPaymentOnIssuedInvoice(input: {
+    invoice_id: string; terminal_id: string; pos_nsp_id: number; payment_type?: number; payment_amount?: number;
+  }): Promise<{ pos_signature_id: string; payment_amount: number }> {
+    const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
+      body: { pos_old_invoice: input },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.ok) throw new Error(data?.error ?? 'The provider did not sign the payment.');
+    return { pos_signature_id: data.pos_signature_id, payment_amount: Number(data.fiscal?.payment_amount) };
+  },
+
+  /** Transmit a credit note; with `posPayment` it is a refund to the card, held for the terminal like a sale. */
+  async submitCreditNote(
+    creditNoteId: string,
+    opts?: { posPayment?: { terminal_id: string; pos_nsp_id: number; payment_type?: number } },
+  ): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
+      body: { credit_note_id: creditNoteId, submit_fiscal: true, pos_payment: opts?.posPayment },
+    });
+    if (error) throw await edgeError(error);
+    if (data && data.ok === false) throw new Error(data.error || 'Credit note transmission failed');
+    return data;
+  },
+
+  /** Create the 8.4 card receipt (ΠΟΛ.1220 355) that settles already-transmitted invoices. Idempotent by clientToken. */
+  async issueEftposReceipt(invoiceIds: string[], paymentType: 7 | 8, clientToken: string): Promise<string> {
+    const { data, error } = await supabase.rpc('issue_eftpos_receipt' as never, {
+      p_invoice_ids: invoiceIds, p_payment_method_code: paymentType, p_client_token: clientToken,
+    } as never);
+    if (error) throw error;
+    return data as unknown as string;
   },
 };
 

@@ -7,7 +7,8 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, Send, Building2 } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, Send, Building2, CreditCard } from 'lucide-react';
+import { CardTerminalPaymentDialog } from '@/modules/finance/components/CardTerminalPaymentDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -1148,7 +1149,9 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
 
 const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onChanged?: () => void }> = ({ rows, financeBase, onChanged }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [refund, setRefund] = React.useState<CreditNote | null>(null);
   const genPdf = async (id: string) => {
     setBusy(id);
     try { const { pdf_url } = await financeService.generateCreditNotePdf(id, true); if (pdf_url) window.open(pdf_url, '_blank'); }
@@ -1208,6 +1211,11 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
                 <Send className={`h-3.5 w-3.5 ${fiscalRejected(cn.fiscal_status) ? 'text-destructive' : ''}`} />
               </Button>
             )}
+            {!transmitted(cn.fiscal_status) && activeWorkspaceId && (
+              <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => setRefund(cn)} title="Refund to the card on a terminal">
+                <CreditCard className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => genPdf(cn.id)} title="Download PDF">
               {busy === cn.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
             </Button>
@@ -1216,6 +1224,18 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
       ))}
     </tbody>
   </table>
+  {refund && activeWorkspaceId && (
+    <CardTerminalPaymentDialog
+      open={!!refund}
+      onOpenChange={(o) => { if (!o) setRefund(null); }}
+      workspaceId={activeWorkspaceId}
+      target={{ kind: 'refund', creditNoteId: refund.id }}
+      amount={Number((refund as any).total ?? (refund as any).amount ?? 0)}
+      currency={(refund as any).currency ?? 'EUR'}
+      label={String((refund as any).credit_note_number ?? 'Credit note')}
+      onDone={onChanged}
+    />
+  )}
   </div>
   );
 };

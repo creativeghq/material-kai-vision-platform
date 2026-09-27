@@ -188,10 +188,10 @@ describe('wholesale on a terminal takes its own document', () => {
 });
 
 describe('the envelope carries the terminal and the token, and the amounts reconcile', () => {
-  it('type 7/8 carries tid and the ECRToken', () => {
-    expect(novus).toMatch(/ECRToken:\s*\{\s*SigningAuthor/);
+  it('type 7/8 carries tid, and never the ECRToken the provider refuses with a 400', () => {
     expect(novus).toMatch(/pm\.tid/);
-    expect(builder).toMatch(/ecrToken/);
+    expect(novus).not.toMatch(/ECRToken/);
+    expect(builder).not.toMatch(/ecrToken/);
   });
 
   it('the payment methods must sum exactly to the gross total', () => {

@@ -10,6 +10,7 @@ import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
 import { emitDocumentIssued } from '../_shared/fiscal/document-issued.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import type { FiscalConnector, FiscalConnectorContext, FiscalInvoiceInput, FiscalSubmissionResult } from '../_shared/fiscal/types.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 // Flow:
@@ -42,6 +43,8 @@ interface RequestBody {
    *  terminal. Forces skipSignature=false; the response carries the provider signature and the
    *  doc is held (fiscal_status='awaiting_payment') until pos_complete finalizes it. */
   pos_payment?: { terminal_id: string; pos_nsp_id: number; payment_type?: number };
+  /** Card(7)/IRIS(8) payment on an invoice ALREADY on myDATA: AskSignatureForOldInvoice, then pos_complete. */
+  pos_old_invoice?: { invoice_id: string; terminal_id: string; pos_nsp_id: number; payment_type?: number; payment_amount?: number };
   /** Law 5155 — finalize a held POS/IRIS receipt after the terminal charge succeeded.
    *  Calls Novus CompletionPosInvoices → transmits to AADE → returns MARK. */
   pos_complete?: { pos_signature_id?: string; invoice_id?: string; transaction_id: string; payment_amount?: number; tip_amount?: number };
@@ -61,18 +64,8 @@ type Reservation =
   | { ok: true; refund: () => Promise<void> }
   | { ok: false; code: 'insufficient_credits'; error: string; balance: number };
 
-/**
- * Atomically RESERVE (debit up-front) the transmission cost before we hand the document to
- *  the connector. `debit_credits` (workspace pool → personal) takes a row lock and returns success=false on
- *  insufficient balance — the previous flow only pre-checked the balance then debited AFTER a
- *  successful (paid) submit while swallowing failures, so a debit that lost the race gave away
- *  a free myDATA transmission. Reserving first closes that race; the returned `refund()` gives
- *  the credits back if the submit fails or the document is not accepted.
- */
+/** Debit the transmission cost BEFORE the connector call; `refund()` returns it if the document does not land. */
 async function reserveTransmission(
-  // `string | null`, because that is what `auth.userId` IS at every call site — null at
-  // 'secret'/'anon' level. The `!userId` check below treats null and undefined identically, so
-  // this widening is the signature catching up with the callers, not a behaviour change.
   supabase: any, workspaceId: string, userId: string | null | undefined, description: string,
   /** Which document this debit is for. Stamped onto the credit_transactions row so
    *  finance-fiscal-offline-recovery can find and reverse it when a document that went
@@ -147,12 +140,6 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     block_inactive: s?.risk_block_inactive_vat ?? true,
     block_unvalidated: s?.risk_block_unvalidated_vat ?? false,
     block_over: s?.risk_block_over_credit_limit ?? false,
-    // These two are offered in Finance → Settings → "Buyer risk
-    // rules" as **Block** switches (and persisted fine) but NOTHING read them — this
-    // select listed only the four columns above, so an operator could enable
-    // "Block issuance while the buyer has an unpaid / overdue invoice" and every
-    // invoice issued regardless. A financial control that reported active while
-    // being absent.
     block_min_order: s?.risk_block_min_order ?? false,
     block_unpaid: s?.risk_block_unpaid_invoice ?? false,
   };
@@ -196,11 +183,7 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     if (rules.block_unvalidated && (buyer.vat_validated === null || buyer.vat_validated === undefined)) blocks.push('the buyer VAT has never been validated');
   }
 
-  // Both the credit-limit and the unpaid-invoice rule need the buyer's OPEN documents.
-  // Fetch once and share rather than querying twice when both are enabled.
-  // `['issued','partially_paid','overdue']` is this function's existing definition of
-  // "outstanding" (it backed the credit-limit rule); reused verbatim so "unpaid /
-  // overdue" in the settings copy means exactly the same thing everywhere.
+  // Both rules read the buyer's open documents, fetched once.
   const needsOpenDocs =
     (rules.block_over && buyer.credit_limit != null && Number(buyer.credit_limit) > 0) ||
     rules.block_unpaid;
@@ -278,9 +261,11 @@ async function autoReceiptForConsumerQuote(supabase: any, invoiceId: string): Pr
  * owner. Null only when the workspace has neither, in which case the caller's existing rule
  * (no user → no debit) applies and is logged as such.
  */
-async function resolveBillingUser(supabase: any, workspaceId: string, invoiceId: string): Promise<string | null> {
-  const { data: inv } = await supabase.from('invoices').select('created_by').eq('id', invoiceId).maybeSingle();
-  if (inv?.created_by) return inv.created_by as string;
+async function resolveBillingUser(
+  supabase: any, workspaceId: string, documentId: string, table: DocumentTable = 'invoices',
+): Promise<string | null> {
+  const { data: doc } = await supabase.from(table).select('created_by').eq('id', documentId).maybeSingle();
+  if (doc?.created_by) return doc.created_by as string;
   const { data: owner } = await supabase
     .from('workspace_members')
     .select('user_id')
@@ -371,6 +356,107 @@ async function stampInvoiceFromSubmission(
     .eq('id', invoiceId);
 }
 
+/** Fiscal "today" — the operator's calendar day, never UTC (CLAUDE.md rule 1b). */
+const fiscalToday = (): string => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Athens' });
+
+/** The provider's filed copy of THIS document — same series, number and gross — or null. */
+async function findFiledCopy(
+  connector: FiscalConnector, ctx: FiscalConnectorContext, input: FiscalInvoiceInput,
+  query: { invoiceMark?: string; aa?: string; series?: string },
+): Promise<FiscalSubmissionResult | 'mismatch' | null> {
+  if (!connector.fetchTransmitted) return null;
+  const filed = await connector.fetchTransmitted(
+    { ...query, issuerVatNumber: input.issuer.vatNumber, issuedFrom: input.header.issueDate },
+    ctx,
+  );
+  if (filed.status === 'offline' && filed.uid && !query.invoiceMark) return filed;
+  if (filed.status !== 'accepted') return null;
+  const doc = ((filed.raw as any)?.providerTransmittedDocs ?? []).find((d: any) => String(d?.mark ?? '') === filed.mark);
+  const sameDocument = !!doc
+    && String(doc.invoiceHeader?.series ?? '') === String(input.header.series)
+    && String(doc.invoiceHeader?.aa ?? '') === String(input.header.aa)
+    && Math.abs(Number(doc.invoiceSummary?.totalGrossValue ?? NaN) - Number(input.summary.totalGrossValue)) < 0.01;
+  return sameDocument ? filed : (doc ? 'mismatch' : null);
+}
+
+/**
+ * The two answers that do not mean "not filed": AADE 228 (already filed, here is its MARK) and a
+ * lost response (timeout / network / 5xx). Either way the provider is asked before anyone resends,
+ * and the filed copy is adopted only when it is provably this document.
+ */
+async function reconcileWithProvider(
+  connector: FiscalConnector, ctx: FiscalConnectorContext, input: FiscalInvoiceInput, result: FiscalSubmissionResult,
+): Promise<FiscalSubmissionResult> {
+  const adopt = (filed: FiscalSubmissionResult): FiscalSubmissionResult => ({
+    ...result,
+    status: filed.status,
+    isOffline: filed.status === 'offline',
+    mark: filed.mark,
+    uid: filed.uid ?? result.uid,
+    authenticationCode: filed.authenticationCode ?? result.duplicateOf?.authenticationCode,
+    qrUrl: filed.qrUrl,
+    aadeQrUrl: filed.aadeQrUrl,
+    invoiceUrl: filed.invoiceUrl,
+    transmissionFailure: false,
+    errorCode: undefined,
+    errorMessage: undefined,
+    recoveredFromDuplicate: true,
+  });
+  if (result.status === 'rejected' && result.duplicateOf?.mark) {
+    const filed = await findFiledCopy(connector, ctx, input, { invoiceMark: result.duplicateOf.mark })
+      .catch(() => null);
+    if (filed && filed !== 'mismatch') return adopt(filed);
+    if (!filed) {
+      return {
+        ...result,
+        errorMessage:
+          `myDATA already holds a document under series ${input.header.series} / ${input.header.aa} ` +
+          `(MARK ${result.duplicateOf.mark}), but its filed copy could not be read to confirm it is this one. ` +
+          'Do NOT renumber: retry, or check the MARK in the provider portal first.',
+      };
+    }
+    return {
+      ...result,
+      errorMessage:
+        `myDATA already holds a document under series ${input.header.series} / ${input.header.aa} ` +
+        `(MARK ${result.duplicateOf.mark}) and it is NOT this one — the totals do not match. ` +
+        `This is a numbering collision: give this document a new number before re-sending.`,
+    };
+  }
+  if (result.status === 'error' && result.transmissionFailure) {
+    const filed = await findFiledCopy(connector, ctx, input, { aa: input.header.aa, series: input.header.series })
+      .catch(() => null);
+    if (filed && filed !== 'mismatch') return adopt(filed);
+  }
+  return result;
+}
+
+/**
+ * myDATA takes a document dated before today only as transmissionFailure=1: issued while the
+ * provider was unreachable, and sent within one day. So a resend after a transient failure carries
+ * the flag, and one past the window is refused here rather than burning credits on AADE 238.
+ */
+async function outageResend(
+  supabase: DbClient, table: DocumentTable, documentId: string, issueDate: string,
+): Promise<{ flag: boolean; refuse?: string }> {
+  const today = fiscalToday();
+  if (issueDate >= today) return { flag: false };
+  const { data } = await supabase.from('fiscal_submissions')
+    .select('transmission_failure')
+    .eq('document_table', table).eq('document_id', documentId)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (!(data as any)?.transmission_failure) return { flag: false };
+  if ((Date.parse(today) - Date.parse(issueDate)) / 86_400_000 > 1) {
+    return {
+      flag: false,
+      refuse: `This document is dated ${issueDate} and the provider could not be reached when it was issued. `
+        + 'myDATA accepts such a document only within one day of its issue date, so it can no longer be '
+        + 'transmitted as it stands. Contact the provider (Novus) before doing anything else with it.',
+    };
+  }
+  return { flag: true };
+}
+
 Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -386,8 +472,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
-    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.cancel_delivery_note && !body.pos_complete && !body.fiscal_status && !body.emit_issued) {
-      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id, cancel_delivery_note, pos_complete, fiscal_status or emit_issued is required' }, 400);
+    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.cancel_delivery_note && !body.pos_complete && !body.pos_old_invoice && !body.fiscal_status && !body.emit_issued) {
+      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id, cancel_delivery_note, pos_complete, pos_old_invoice, fiscal_status or emit_issued is required' }, 400);
     }
 
     const supabase = createClient(
@@ -453,7 +539,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       if (!pc.pos_signature_id && !pc.invoice_id) return json({ error: 'pos_complete needs pos_signature_id or invoice_id' }, 400);
 
       let sigQuery = supabase.from('pos_signatures').select('*').eq('status', 'awaiting_payment');
-      sigQuery = pc.pos_signature_id ? sigQuery.eq('id', pc.pos_signature_id) : sigQuery.eq('invoice_id', pc.invoice_id!);
+      sigQuery = pc.pos_signature_id ? sigQuery.eq('id', pc.pos_signature_id) : sigQuery.eq('invoice_id', pc.invoice_id!).is('credit_note_id', null);
       const { data: sig } = await sigQuery.order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (!sig) return json({ error: 'No awaiting-payment signature found for this receipt' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, (sig as any).workspace_id))) {
@@ -470,11 +556,42 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         return json({ ok: false, error: 'Connector does not support POS completion' }, 400);
       }
 
+      // Deferred: the invoice is already filed, so this registers a payment against its MARK and
+      // files no new document — no submission row, no transmission charge.
+      if ((sig as any).is_deferred) {
+        const { data: oldInv } = await supabase.from('invoices').select('fiscal_mark').eq('id', (sig as any).invoice_id).maybeSingle();
+        if (!resolved.resolved.connector.completeOldInvoicePosPayment || !(oldInv as any)?.fiscal_mark) {
+          return json({ ok: false, error: 'This payment cannot be completed: the invoice has no MARK or the connector cannot register it.' }, 400);
+        }
+        const done = await resolved.resolved.connector.completeOldInvoicePosPayment({
+          invoiceMark: String((oldInv as any).fiscal_mark),
+          signatureToken: (sig as any).signature_token,
+          transactionId: pc.transaction_id,
+          paymentAmount: pc.payment_amount ?? Number((sig as any).payment_amount),
+          paymentType: (sig as any).payment_type ?? undefined,
+          tipAmount: pc.tip_amount ?? 0,
+        }, resolved.resolved.ctx);
+        if (!done.ok) {
+          return json({ ok: false, code: 'pos_completion_failed', error: done.errorMessage ?? 'The provider did not register the payment.' }, 502);
+        }
+        const { error: closeErr } = await supabase.from('pos_signatures').update({
+          status: 'completed', transaction_id: pc.transaction_id,
+          final_payment_type: done.finalPaymentType ?? null,
+          completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }).eq('id', (sig as any).id);
+        if (closeErr) console.error('deferred POS payment registered but the signature was NOT closed', { sig: (sig as any).id, closeErr });
+        return json({ ok: true, pos_signature_id: (sig as any).id, invoice_id: (sig as any).invoice_id, deferred: true,
+          ...(closeErr ? { warning: 'The payment is registered with the provider, but the signature row could not be closed.' } : {}),
+          fiscal: { ok: true, status: 'accepted', mark: (oldInv as any).fiscal_mark, finalPaymentType: done.finalPaymentType } });
+      }
+      const sigCreditNoteId: string | null = (sig as any).credit_note_id ?? null;
+
       // CompletionPosInvoices transmits synchronously and returns the MARK, so this path never
       // lands in the offline sweep — stamped anyway so every transmission debit is traceable to
       // its document by the same key.
-      const reserve = await reserveTransmission(supabase, (sig as any).workspace_id, auth.userId, `myDATA POS completion for receipt ${(sig as any).invoice_id ?? (sig as any).id}`,
-        (sig as any).invoice_id ? { table: 'invoices', id: (sig as any).invoice_id } : undefined);
+      const reserve = await reserveTransmission(supabase, (sig as any).workspace_id, auth.userId, `myDATA POS completion for ${sigCreditNoteId ? 'credit note ' + sigCreditNoteId : 'receipt ' + ((sig as any).invoice_id ?? (sig as any).id)}`,
+        sigCreditNoteId ? { table: 'credit_notes', id: sigCreditNoteId }
+          : (sig as any).invoice_id ? { table: 'invoices', id: (sig as any).invoice_id } : undefined);
       if (!reserve.ok) return json({ ok: false, code: reserve.code, balance: reserve.balance, error: reserve.error }, 402);
 
       try {
@@ -486,15 +603,32 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           tipAmount: pc.tip_amount ?? Number((sig as any).tip_amount ?? 0),
         }, resolved.resolved.ctx);
 
+        // Completion answers only the MARK; the filed copy carries the UID, links and auth code.
+        let filed: FiscalSubmissionResult | null = null;
+        if (completion.ok && completion.mark && resolved.resolved.connector.fetchTransmitted) {
+          const { data: fsRow } = await supabase.from('finance_settings').select('business_vat')
+            .eq('workspace_id', (sig as any).workspace_id).maybeSingle();
+          filed = await resolved.resolved.connector.fetchTransmitted(
+            { invoiceMark: completion.mark, issuerVatNumber: normalizeVat((fsRow as any)?.business_vat) ?? undefined },
+            resolved.resolved.ctx,
+          ).catch(() => null);
+          if (filed?.mark !== completion.mark) filed = null;
+        }
+
         await supabase.from('fiscal_submissions').insert({
           workspace_id: (sig as any).workspace_id,
           invoice_id: (sig as any).invoice_id,
-          document_table: 'invoices',
-          document_id: (sig as any).invoice_id,
+          document_table: sigCreditNoteId ? 'credit_notes' : 'invoices',
+          document_id: sigCreditNoteId ?? (sig as any).invoice_id,
           connector_slug: resolved.resolved.slug,
           capability: 'legal_invoice',
           status: completion.ok ? 'accepted' : 'error',
           mark: completion.mark ?? null,
+          uid: filed?.uid ?? null,
+          authentication_code: filed?.authenticationCode ?? null,
+          qr_url: filed?.qrUrl ?? null,
+          aade_qr_url: filed?.aadeQrUrl ?? null,
+          invoice_url: filed?.invoiceUrl ?? null,
           is_offline: false,
           response_payload: completion.raw ?? null,
           error_message: completion.errorMessage ?? null,
@@ -511,18 +645,78 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         }).eq('id', (sig as any).id);
 
-        if ((sig as any).invoice_id) {
+        if (sigCreditNoteId) {
+          const { error: cnStampErr } = await supabase.from('credit_notes').update({
+            fiscal_status: 'accepted', fiscal_mark: completion.mark ?? null, fiscal_error: null,
+            fiscal_uid: filed?.uid ?? null, fiscal_qr_url: filed?.qrUrl ?? null, fiscal_aade_qr_url: filed?.aadeQrUrl ?? null,
+            fiscal_submitted_at: new Date().toISOString(), status: 'submitted', updated_at: new Date().toISOString(),
+          }).eq('id', sigCreditNoteId);
+          // The submission row above holds the MARK, so a retransmit repairs this stamp.
+          if (cnStampErr) console.error('card refund filed but the credit note was NOT stamped', { sigCreditNoteId, mark: completion.mark, cnStampErr });
+        } else if ((sig as any).invoice_id) {
           await supabase.from('invoices').update({
             fiscal_status: 'accepted', fiscal_mark: completion.mark ?? null,
+            fiscal_uid: filed?.uid ?? null, fiscal_qr_url: filed?.qrUrl ?? null, fiscal_aade_qr_url: filed?.aadeQrUrl ?? null,
             fiscal_connector_slug: resolved.resolved.slug, fiscal_submitted_at: new Date().toISOString(),
           }).eq('id', (sig as any).invoice_id);
         }
 
-        return json({ ok: true, pos_signature_id: (sig as any).id, invoice_id: (sig as any).invoice_id, fiscal: { ok: true, status: 'accepted', mark: completion.mark, finalPaymentType: completion.finalPaymentType } });
+        return json({ ok: true, pos_signature_id: (sig as any).id, invoice_id: (sig as any).invoice_id, credit_note_id: sigCreditNoteId,
+          fiscal: { ok: true, status: 'accepted', mark: completion.mark, finalPaymentType: completion.finalPaymentType } });
       } catch (err: any) {
         await reserve.refund();
         return json({ ok: false, error: err?.message ?? 'POS completion failed' }, 500);
       }
+    }
+
+    // ── Card payment on an invoice already on myDATA (Law 5155 deferred flow) ──
+    if (body.pos_old_invoice) {
+      const po = body.pos_old_invoice;
+      if (!po.invoice_id || !po.terminal_id || po.pos_nsp_id == null) {
+        return json({ error: 'pos_old_invoice needs invoice_id, terminal_id and pos_nsp_id' }, 400);
+      }
+      const { data: oi } = await supabase.from('invoices')
+        .select('id, workspace_id, fiscal_mark, fiscal_uid, amount_due, total').eq('id', po.invoice_id).maybeSingle();
+      if (!oi || !(await userCanAccessWorkspace(supabase, auth.userId, (oi as any).workspace_id))) {
+        return json({ error: 'invoice not found' }, 404);
+      }
+      if (!(oi as any).fiscal_mark) {
+        return json({ ok: false, code: 'not_transmitted', error: 'The invoice is not on myDATA yet, so there is no MARK to pay against. Transmit it first.' }, 409);
+      }
+      const { data: term } = await supabase.from('pos_terminals').select('id')
+        .eq('workspace_id', (oi as any).workspace_id).eq('terminal_id', po.terminal_id).eq('is_active', true).maybeSingle();
+      if (!term) return json({ ok: false, error: 'That terminal is not registered and active for this workspace.' }, 400);
+      const r: any = await resolveWorkspaceConnector(supabase, (oi as any).workspace_id, 'legal_invoice');
+      if (!r.ok) return json({ ok: false, code: r.code, error: r.error }, 400);
+      if (!r.resolved.connector.askSignatureForOldInvoice) {
+        return json({ ok: false, error: 'Connector does not support card payment on an issued invoice' }, 400);
+      }
+      const sig = await r.resolved.connector.askSignatureForOldInvoice({
+        invoiceMark: String((oi as any).fiscal_mark), invoiceUid: (oi as any).fiscal_uid ?? undefined,
+        terminalId: po.terminal_id, posNspId: po.pos_nsp_id,
+      }, r.resolved.ctx);
+      if (!sig.ok) return json({ ok: false, code: 'signature_refused', error: sig.errorMessage ?? 'The provider did not sign the payment.' }, 502);
+      const due = Number((oi as any).amount_due ?? (oi as any).total);
+      const amount = Math.min(Number(po.payment_amount ?? due), Number(sig.paymentBalance ?? due));
+      const { data: row, error: sigErr } = await supabase.from('pos_signatures').insert({
+        workspace_id: (oi as any).workspace_id,
+        invoice_id: (oi as any).id,
+        terminal_id: po.terminal_id,
+        pos_nsp_id: po.pos_nsp_id,
+        payment_type: po.payment_type ?? 7,
+        signature_token: sig.token,
+        signature_data: sig.data ?? null,
+        invoice_uid: sig.invoiceUid || (oi as any).fiscal_uid || null,
+        payment_amount: amount,
+        payment_balance: sig.paymentBalance ?? null,
+        expiry_date: sig.expiryDate ?? null,
+        is_expired: sig.isExpired ?? false,
+        is_deferred: true,
+        created_by: auth.userId ?? null,
+      }).select('id').single();
+      if (sigErr) return json({ ok: false, error: `The signature was issued but could not be stored: ${sigErr.message}` }, 500);
+      return json({ ok: true, pos_signature_id: (row as any).id, invoice_id: (oi as any).id,
+        fiscal: { ok: true, status: 'awaiting_payment', providerSignature: [sig], payment_amount: amount } });
     }
 
     // ── Credit-note submission path (myDATA 5.1) ──────────────────────────────
@@ -533,7 +727,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         .from('credit_notes').select('id, workspace_id, fiscal_status, invoice_id')
         .eq('id', body.credit_note_id).maybeSingle();
       if (!cnRow) return json({ error: 'credit note not found' }, 404);
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, cnRow.workspace_id))) {
+      if (auth.level !== 'secret' && !(await userCanAccessWorkspace(supabase, auth.userId, cnRow.workspace_id))) {
         return json({ error: 'Not authorized for this document' }, 403);
       }
 
@@ -570,15 +764,35 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
 
       // Reserve the transmission credits atomically before handing off to the connector.
-      const cnReserve = await reserveTransmission(supabase, cnRow.workspace_id, auth.userId, `myDATA credit note ${body.credit_note_id}`,
+      const cnBilling = auth.level === 'secret'
+        ? await resolveBillingUser(supabase, cnRow.workspace_id, cnRow.id, 'credit_notes') : auth.userId;
+      const cnReserve = await reserveTransmission(supabase, cnRow.workspace_id, cnBilling, `myDATA credit note ${body.credit_note_id}`,
         { table: 'credit_notes', id: body.credit_note_id });
       if (!cnReserve.ok) return json({ ok: false, code: cnReserve.code, balance: cnReserve.balance, error: cnReserve.error }, 402);
 
       try {
-        const input = await buildCreditNoteInputFromDb(supabase, body.credit_note_id, body.fiscal_overrides ?? {});
-        const result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
-          skipSignature: body.skip_signature,
-        });
+        const cnOverrides: FiscalOverrides = { ...(body.fiscal_overrides ?? {}) };
+        if (body.pos_payment) {
+          const { data: tok } = await supabase.from('pos_ecr_tokens').select('tid_nsp')
+            .eq('invoice_id', cnRow.invoice_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+          cnOverrides.posPayment = {
+            type: body.pos_payment.payment_type ?? 7,
+            terminalId: body.pos_payment.terminal_id,
+            posNspId: body.pos_payment.pos_nsp_id,
+            ...(tok?.tid_nsp ? { tid: tok.tid_nsp } : {}),
+          };
+        }
+        const input = await buildCreditNoteInputFromDb(supabase, body.credit_note_id, cnOverrides);
+        const cnOutage = await outageResend(supabase, 'credit_notes', cnRow.id, input.header.issueDate);
+        if (cnOutage.refuse) {
+          await cnReserve.refund();
+          return json({ ok: false, code: 'outage_window_passed', error: cnOutage.refuse }, 409);
+        }
+        const result = await reconcileWithProvider(resolved.resolved.connector, resolved.resolved.ctx, input,
+          await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
+            skipSignature: body.pos_payment ? false : body.skip_signature,
+            transmissionFailure: cnOutage.flag,
+          }));
 
         await supabase.from('fiscal_submissions').insert({
           workspace_id: cnRow.workspace_id,
@@ -603,12 +817,43 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           aa: input.header.aa,
           is_offline: result.isOffline,
           transmission_failure: result.transmissionFailure ?? false,
+          sent_transmission_failure: cnOutage.flag ? 1 : null,
           provider_credits: result.providerCredits ?? null,
           request_payload: input,
           response_payload: result.raw ?? null,
           error_code: result.errorCode ?? null,
           error_message: result.errorMessage ?? null,
         });
+
+        // Refund to card: held for the terminal like a sale; pos_complete files it.
+        if (result.status === 'awaiting_payment') {
+          const firstSig = result.providerSignature?.[0];
+          const { error: holdErr } = await supabase.from('pos_signatures').insert({
+            workspace_id: cnRow.workspace_id,
+            invoice_id: cnRow.invoice_id,
+            credit_note_id: cnRow.id,
+            terminal_id: body.pos_payment?.terminal_id ?? null,
+            pos_nsp_id: body.pos_payment?.pos_nsp_id ?? null,
+            payment_type: body.pos_payment?.payment_type ?? 7,
+            signature_token: firstSig?.token ?? '',
+            signature_data: firstSig?.data ?? null,
+            invoice_uid: firstSig?.invoiceUid ?? result.uid ?? null,
+            payment_amount: input.summary.totalGrossValue,
+            payment_balance: firstSig?.paymentBalance ?? null,
+            expiry_date: firstSig?.expiryDate ?? null,
+            is_expired: firstSig?.isExpired ?? false,
+            created_by: auth.userId ?? null,
+          });
+          await cnReserve.refund();
+          if (holdErr) {
+            return json({ ok: false, code: 'signature_not_stored',
+              error: `The provider signed the refund but it could not be stored (${holdErr.message}). Nothing was charged; start the refund again.` }, 500);
+          }
+          const { error: holdStampErr } = await supabase.from('credit_notes')
+            .update({ fiscal_status: 'awaiting_payment', updated_at: new Date().toISOString() }).eq('id', cnRow.id);
+          if (holdStampErr) console.error('refund held for the terminal but the credit note status was not updated', { cn: cnRow.id, holdStampErr });
+          return json({ ok: true, credit_note_id: cnRow.id, fiscal: { ok: true, ...result } });
+        }
 
         const accepted = result.status === 'accepted' || result.status === 'offline';
         await supabase.from('credit_notes').update({
@@ -651,10 +896,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       if (!(await userCanAccessWorkspace(supabase, auth.userId, (note as any).workspace_id))) {
         return json({ error: 'Not authorized for this document' }, 404); // 404, not 403 — no id enumeration
       }
-      // Everything below writes the id from the LOADED, AUTHORIZED row rather than the one the
-      // caller sent. Same value, different provenance — and provenance is the whole point: a
-      // workspace-scoped foreign key must be one we proved belongs to this caller, not one they
-      // named. (Pinned by tests/unit/sameWorkspaceFkSweep.test.ts.)
+      // Writes use the LOADED, authorized row's id, never the caller's (sameWorkspaceFkSweep).
       const noteId = String((note as any).id);
       if ((note as any).fiscal_cancellation_mark) {
         return json({ ok: true, delivery_note_id: noteId, skipped: true, reason: 'already_cancelled',
@@ -774,9 +1016,6 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         await supabase.from('delivery_notes')
           .update({ fiscal_error: `Cancellation failed mid-flight: ${err?.message ?? err}`, updated_at: new Date().toISOString() })
           .eq('id', noteId);
-        // The claim stays, so every retry from here answers 'already_in_progress' — a
-        // success-shaped response for a permanently stuck document. Nothing else would ever
-        // surface it, so say so out loud: a person has to check AADE and clear it.
         await emitFlowEventToWorkspaceRoles(
           (note as any).workspace_id, ['owner', 'admin', 'accountant'], 'fiscal_document_rejected',
           (uid) => ({
@@ -801,7 +1040,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         .from('delivery_notes').select('id, workspace_id, fiscal_status')
         .eq('id', body.delivery_note_id).maybeSingle();
       if (!dnRow) return json({ error: 'delivery note not found' }, 404);
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, dnRow.workspace_id))) {
+      if (auth.level !== 'secret' && !(await userCanAccessWorkspace(supabase, auth.userId, dnRow.workspace_id))) {
         return json({ error: 'Not authorized for this document' }, 403);
       }
 
@@ -836,15 +1075,24 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
 
       // Reserve the transmission credits atomically before handing off to the connector.
-      const dnReserve = await reserveTransmission(supabase, dnRow.workspace_id, auth.userId, `myDATA delivery note ${body.delivery_note_id}`,
+      const dnBilling = auth.level === 'secret'
+        ? await resolveBillingUser(supabase, dnRow.workspace_id, dnRow.id, 'delivery_notes') : auth.userId;
+      const dnReserve = await reserveTransmission(supabase, dnRow.workspace_id, dnBilling, `myDATA delivery note ${body.delivery_note_id}`,
         { table: 'delivery_notes', id: body.delivery_note_id });
       if (!dnReserve.ok) return json({ ok: false, code: dnReserve.code, balance: dnReserve.balance, error: dnReserve.error }, 402);
 
       try {
         const input = await buildDeliveryNoteInputFromDb(supabase, body.delivery_note_id, body.fiscal_overrides ?? {});
-        const result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
-          skipSignature: body.skip_signature,
-        });
+        const dnOutage = await outageResend(supabase, 'delivery_notes', dnRow.id, input.header.issueDate);
+        if (dnOutage.refuse) {
+          await dnReserve.refund();
+          return json({ ok: false, code: 'outage_window_passed', error: dnOutage.refuse }, 409);
+        }
+        const result = await reconcileWithProvider(resolved.resolved.connector, resolved.resolved.ctx, input,
+          await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
+            skipSignature: body.skip_signature,
+            transmissionFailure: dnOutage.flag,
+          }));
 
         await supabase.from('fiscal_submissions').insert({
           workspace_id: dnRow.workspace_id,
@@ -864,6 +1112,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           aa: input.header.aa,
           is_offline: result.isOffline,
           transmission_failure: result.transmissionFailure ?? false,
+          sent_transmission_failure: dnOutage.flag ? 1 : null,
           provider_credits: result.providerCredits ?? null,
           request_payload: input,
           response_payload: result.raw ?? null,
@@ -1047,18 +1296,11 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             // signing so Novus returns a provider signature instead of transmitting to AADE.
             const effOverrides: FiscalOverrides = { ...(body.fiscal_overrides ?? {}) };
             if (body.pos_payment) {
-              // The TID and the ECR Token come from the DB, never from the request body: the token
-              // is what the ΦΗΜ signed, and a caller-supplied one is a claim about a signature
-              // rather than the signature (invariant 8).
-              const { data: term } = await supabase
-                .from('pos_terminals')
-                .select('acquirer_id, fim_registry_number, interconnection_route')
-                .eq('workspace_id', invRow!.workspace_id)
-                .eq('terminal_id', body.pos_payment.terminal_id)
-                .maybeSingle();
+              // The TID comes from the DB, never from the request body (invariant 8). The ECR token
+              // is not sent at all: the provider refuses it with HTTP 400.
               const { data: tok } = await supabase
                 .from('pos_ecr_tokens')
-                .select('token, fim_registry_number, tid_nsp')
+                .select('tid_nsp')
                 .eq('invoice_id', invoiceId)
                 .order('created_at', { ascending: false })
                 .limit(1)
@@ -1068,59 +1310,17 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                 terminalId: body.pos_payment.terminal_id,
                 posNspId: body.pos_payment.pos_nsp_id,
                 ...(tok?.tid_nsp ? { tid: tok.tid_nsp } : {}),
-                ...(tok?.token && (tok.fim_registry_number ?? term?.fim_registry_number)
-                  ? {
-                      ecrToken: {
-                        signingAuthor: String(tok.fim_registry_number ?? term!.fim_registry_number),
-                        signature: tok.token,
-                      },
-                    }
-                  : {}),
               };
             }
             const input = await buildInvoiceInputFromDb(supabase, invoiceId, effOverrides);
-            let result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
-              // POS receipts must be signed (skipSignature=false) to obtain the Law-5155 token.
-              skipSignature: body.pos_payment ? false : body.skip_signature,
-            });
-
-            // ── ERROR 228: THE DOCUMENT IS ALREADY FILED, AND THE PROVIDER JUST TOLD US ITS MARK
-            if (result.status === 'rejected' && result.duplicateOf?.mark && resolved.resolved.connector.fetchTransmitted) {
-              const filed = await resolved.resolved.connector.fetchTransmitted(
-                { invoiceMark: result.duplicateOf.mark, issuerVatNumber: input.issuer.vatNumber },
-                resolved.resolved.ctx,
-              );
-              const doc = (filed.raw as any)?.providerTransmittedDocs?.[0];
-              const sameDocument =
-                filed.status === 'accepted'
-                && String(doc?.invoiceHeader?.series ?? '') === String(input.header.series)
-                && String(doc?.invoiceHeader?.aa ?? '') === String(input.header.aa)
-                && Math.abs(Number(doc?.invoiceSummary?.totalGrossValue ?? NaN) - Number(input.summary.totalGrossValue)) < 0.01;
-
-              if (sameDocument) {
-                result = {
-                  ...result,
-                  status: 'accepted',
-                  mark: filed.mark,
-                  uid: filed.uid ?? result.uid,
-                  authenticationCode: filed.authenticationCode,
-                  invoiceUrl: filed.invoiceUrl,
-                  errorCode: undefined,
-                  errorMessage: undefined,
-                  recoveredFromDuplicate: true,
-                };
-              } else {
-                // Same series+AA, different document. Naming it is the whole point: silently
-                // failing here leaves two documents fighting over one legal number.
-                result = {
-                  ...result,
-                  errorMessage:
-                    `myDATA already holds a document under series ${input.header.series} / ${input.header.aa} ` +
-                    `(MARK ${result.duplicateOf.mark}) and it is NOT this one — the totals do not match. ` +
-                    `This is a numbering collision: give this document a new number before re-sending.`,
-                };
-              }
-            }
+            const invOutage = await outageResend(supabase, 'invoices', invoiceId, input.header.issueDate);
+            if (invOutage.refuse) throw new Error(invOutage.refuse);
+            const result = await reconcileWithProvider(resolved.resolved.connector, resolved.resolved.ctx, input,
+              await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
+                // POS receipts must be signed (skipSignature=false) to obtain the Law-5155 token.
+                skipSignature: body.pos_payment ? false : body.skip_signature,
+                transmissionFailure: invOutage.flag,
+              }));
 
             await supabase.from('fiscal_submissions').insert({
               workspace_id: invRow!.workspace_id,
@@ -1141,6 +1341,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
               aa: input.header.aa,
               is_offline: result.isOffline,
               transmission_failure: result.transmissionFailure ?? false,
+              sent_transmission_failure: invOutage.flag ? 1 : null,
               provider_credits: result.providerCredits ?? null,
               request_payload: input,
               response_payload: result.raw ?? null,

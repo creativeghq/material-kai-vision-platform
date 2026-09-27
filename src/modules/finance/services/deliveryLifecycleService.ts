@@ -9,14 +9,13 @@
  * Penalty is €5.000/€10.000 **ανά φορολογικό έλεγχο** — per audit, not per document.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import {
   MYDATA_DELIVERY_STATUSES, MYDATA_DELIVERY_EVENT_TYPES, MYDATA_DELIVERY_OUTCOMES,
 } from '@/services/fiscal/fiscalVocabulary';
-// The state RULES are import-free so the UI, this service and the guard test read one answer
-// without needing a database client.
 export {
-  nextEventsFor, movementIsFiled,
-  type DeliveryLifecycleState, type DeliveryEventTypeName,
+  nextEventsFor, movementIsFiled, deliveryFilingState,
+  type DeliveryLifecycleState, type DeliveryEventTypeName, type DeliveryFilingState,
 } from '@/modules/finance/deliveryLifecycleRules';
 
 export type DeliveryEventType = (typeof MYDATA_DELIVERY_EVENT_TYPES)[number];
@@ -78,7 +77,28 @@ export interface DeliveryEventRow {
   packaging: MovementPackaging[];
   transmitted_at: string | null;
   transmission_error: string | null;
+  transmission_claim_token: string | null;
+  transmission_claimed_at: string | null;
+  transmission_indeterminate_at: string | null;
+  transmission_status_code: string | null;
   issued_offline: boolean;
+}
+
+export interface DeliveryTransmitResult {
+  ok: boolean;
+  outcome?: 'accepted' | 'refused' | 'indeterminate';
+  already?: boolean;
+  mark?: string;
+  errors?: string[];
+  error?: string;
+}
+
+export interface AadeDeliveryStatus {
+  invoiceMark: string | null;
+  statusCode: number | null;
+  statusRaw: string | null;
+  dispatchTimestamp: string | null;
+  history: { eventType: string; eventTimestamp: string; actorVat: string; mark: string | null }[];
 }
 
 export const deliveryLifecycleService = {
@@ -131,6 +151,30 @@ export const deliveryLifecycleService = {
     } as never);
     if (error) throw error;
     return data as unknown as { event_id: string; lifecycle: DeliveryLifecycle };
+  },
+
+  async transmit(eventId: string): Promise<DeliveryTransmitResult> {
+    const { data, error } = await supabase.functions.invoke('finance-mydata-delivery', {
+      body: { action: 'transmit', event_id: eventId },
+    });
+    if (error) throw await edgeError(error);
+    return data as DeliveryTransmitResult;
+  },
+
+  async aadeStatus(deliveryNoteId: string): Promise<AadeDeliveryStatus> {
+    const { data, error } = await supabase.functions.invoke('finance-mydata-delivery', {
+      body: { action: 'status', delivery_note_id: deliveryNoteId },
+    });
+    if (error) throw await edgeError(error);
+    return (data as { status: AadeDeliveryStatus }).status;
+  },
+
+  async reconcile(deliveryNoteId: string): Promise<{ resolved: { event_id: string; mark: string }[]; released: string[] }> {
+    const { data, error } = await supabase.functions.invoke('finance-mydata-delivery', {
+      body: { action: 'reconcile', delivery_note_id: deliveryNoteId },
+    });
+    if (error) throw await edgeError(error);
+    return data as { resolved: { event_id: string; mark: string }[]; released: string[] };
   },
 
   /** The five Phase Β parties on a movement, carriers in transhipment order. */

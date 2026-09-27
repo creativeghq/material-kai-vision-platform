@@ -7,7 +7,7 @@
  * and on a phone at a site gate that is worse than offering nothing.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, Truck, PackageCheck, Ban, Undo2, WifiOff, AlertTriangle } from 'lucide-react';
+import { Loader2, Truck, PackageCheck, Ban, Undo2, WifiOff, AlertTriangle, Send, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -16,12 +16,15 @@ import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
+import { supabase } from '@/integrations/supabase/client';
+import { normalizeVat } from '@/services/crm/vatNormalize';
 import {
   MYDATA_TRANSPORT_TYPES, MYDATA_DELIVERY_STATUSES, transportTypeLabel,
 } from '@/services/fiscal/fiscalVocabulary';
 import {
-  deliveryLifecycleService, movementStatusLabel,
-  type DeliveryLifecycle, type DeliveryEventRow, type MovementPartyRole,
+  deliveryLifecycleService, movementStatusLabel, deliveryFilingState,
+  type DeliveryLifecycle, type DeliveryEventRow, type MovementPartyRole, type DeliveryFilingState,
+  type DeliveryTransmitResult,
 } from '@/modules/finance/services/deliveryLifecycleService';
 import { nextEventsFor, type DeliveryEventTypeName } from '@/modules/finance/deliveryLifecycleRules';
 
@@ -41,6 +44,14 @@ const EVENT_ICON: Record<DeliveryEventTypeName, React.ElementType> = {
   ConfirmReturn: Undo2,
 };
 
+const FILING_BADGE: Record<DeliveryFilingState, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
+  filed: { label: 'filed', variant: 'success' },
+  sending: { label: 'sending', variant: 'info' },
+  unknown: { label: 'outcome unknown', variant: 'warning' },
+  refused: { label: 'refused by AADE', variant: 'error' },
+  not_sent: { label: 'not filed', variant: 'neutral' },
+};
+
 const ROLES: { key: MovementPartyRole; label: string }[] = [
   { key: 'sender', label: 'Sender (us)' },
   { key: 'sender_third', label: 'Third-party sender' },
@@ -57,6 +68,7 @@ export const MovementLifecycleDialog: React.FC<{
   const { toast } = useToast();
   const [life, setLife] = useState<DeliveryLifecycle | null>(null);
   const [events, setEvents] = useState<DeliveryEventRow[]>([]);
+  const [ourVat, setOurVat] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -68,15 +80,24 @@ export const MovementLifecycleDialog: React.FC<{
   const [transportType, setTransportType] = useState('2');
   const [carrierVat, setCarrierVat] = useState('');
   const [reason, setReason] = useState('');
+  const [filing, setFiling] = useState<string | null>(null);
+  const [aadeState, setAadeState] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [l, e] = await Promise.all([
+      const [l, e, vat] = await Promise.all([
         deliveryLifecycleService.lifecycle(deliveryNoteId),
         deliveryLifecycleService.events(deliveryNoteId),
+        supabase.from('delivery_notes').select('workspace_id').eq('id', deliveryNoteId).maybeSingle()
+          .then(async ({ data }) => {
+            if (!data?.workspace_id) return null;
+            const { data: fs } = await supabase.from('finance_settings')
+              .select('business_vat').eq('workspace_id', data.workspace_id).maybeSingle();
+            return normalizeVat(fs?.business_vat) ?? null;
+          }),
       ]);
-      setLife(l); setEvents(e); setFailed(false);
+      setLife(l); setEvents(e); setOurVat(vat); setFailed(false);
     } catch {
       // A failed read is UNKNOWN. Rendering "no legs recorded" out of an error would say this
       // movement has no obligations outstanding, which is the one reading that must not be wrong.
@@ -86,11 +107,60 @@ export const MovementLifecycleDialog: React.FC<{
 
   useEffect(() => { void load(); }, [load]);
 
+  const reportFiling = (r: DeliveryTransmitResult) => {
+    if (r.ok) {
+      toast({ title: 'Filed with AADE', description: r.mark ? `MARK ${r.mark}` : undefined });
+    } else if (r.outcome === 'refused') {
+      toast({ title: 'AADE refused the leg', description: (r.errors ?? []).join(' · '), variant: 'destructive' });
+    } else {
+      toast({ title: 'Outcome unknown', description: `${r.error ?? ''} Check it with AADE before sending again.`, variant: 'destructive' });
+    }
+  };
+
+  const transmit = async (eventId: string) => {
+    setFiling(eventId);
+    try {
+      reportFiling(await deliveryLifecycleService.transmit(eventId));
+    } catch (e) {
+      toast({ title: 'Not filed', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setFiling(null);
+      await load();
+    }
+  };
+
+  const reconcile = async () => {
+    setFiling('reconcile');
+    try {
+      const r = await deliveryLifecycleService.reconcile(deliveryNoteId);
+      toast({
+        title: 'Checked with AADE',
+        description: `${r.resolved.length} found filed, ${r.released.length} not on record (can be sent again).`,
+      });
+    } catch (e) {
+      toast({ title: 'Could not check with AADE', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setFiling(null);
+      await load();
+    }
+  };
+
+  const readAadeStatus = async () => {
+    setFiling('status');
+    try {
+      const st = await deliveryLifecycleService.aadeStatus(deliveryNoteId);
+      setAadeState(st.statusCode != null ? movementStatusLabel(st.statusCode) : (st.statusRaw ?? '—'));
+    } catch (e) {
+      toast({ title: 'Could not read the AADE status', description: (e as Error).message, variant: 'destructive' });
+    } finally { setFiling(null); }
+  };
+
   const record = async () => {
     if (!adding) return;
     setBusy(true);
+    let recorded: string | null = null;
     try {
-      await deliveryLifecycleService.record({
+      const { event_id } = await deliveryLifecycleService.record({
         deliveryNoteId,
         eventType: adding,
         actorRole: role,
@@ -102,6 +172,7 @@ export const MovementLifecycleDialog: React.FC<{
           rejection_reason: adding === 'Rejection' ? (reason.trim() || null) : null,
         },
       });
+      recorded = event_id;
       setAdding(null); setVehicle(''); setCarrierVat(''); setReason('');
       await load();
     } catch (e) {
@@ -109,10 +180,19 @@ export const MovementLifecycleDialog: React.FC<{
       // reduced to "could not save", because the operator has to know which rule they hit.
       toast({ title: 'Could not record it', description: (e as Error).message, variant: 'destructive' });
     } finally { setBusy(false); }
+    if (recorded) await transmit(recorded);
   };
 
   const offered = nextEventsFor(life);
   const pending = life?.events_pending_transmission ?? 0;
+  const states = events.map((e) => deliveryFilingState(e));
+  // Only a leg WE declared can be filed from here; another party's is theirs to file.
+  const ours = (e: (typeof events)[number]) => {
+    const actor = (e as { actor_vat?: string | null }).actor_vat;
+    return !actor || normalizeVat(actor) === ourVat;
+  };
+  const nextToFile = events.find((e, i) => ours(e) && (states[i] === 'not_sent' || states[i] === 'refused'))?.id ?? null;
+  const hasUnknown = states.includes('unknown');
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
@@ -146,7 +226,24 @@ export const MovementLifecycleDialog: React.FC<{
                   {pending} leg{pending === 1 ? '' : 's'} not filed
                 </Badge>
               )}
+              <span className="ml-auto flex items-center gap-2">
+                {aadeState && <span className="text-xs text-muted-foreground">AADE says <strong>{aadeState}</strong></span>}
+                <Button size="sm" variant="ghost" disabled={filing !== null} onClick={() => void readAadeStatus()}>
+                  {filing === 'status' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
+                  AADE status
+                </Button>
+              </span>
             </div>
+
+            {hasUnknown && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-hairline bg-surface-sunken p-3 text-xs text-muted-foreground">
+                <AlertTriangle className="h-4 w-4" />
+                A filing did not come back with an answer, so AADE may already hold it. It is not sent again until AADE&apos;s own record is checked.
+                <Button size="sm" variant="outline" className="ml-auto" disabled={filing !== null} onClick={() => void reconcile()}>
+                  {filing === 'reconcile' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Check with AADE'}
+                </Button>
+              </div>
+            )}
 
             {pending > 0 && (
               <p className="text-[11px] text-muted-foreground">
@@ -166,8 +263,10 @@ export const MovementLifecycleDialog: React.FC<{
               />
             ) : (
               <div className="divide-y divide-hairline rounded-md border border-hairline">
-                {events.map((e) => {
+                {events.map((e, i) => {
                   const Icon = EVENT_ICON[e.event_type] ?? Truck;
+                  const state = states[i];
+                  const badge = FILING_BADGE[state];
                   return (
                     <div key={e.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                       <Icon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -183,11 +282,18 @@ export const MovementLifecycleDialog: React.FC<{
                       <span className="ml-auto text-xs text-muted-foreground">
                         {formatDate(e.event_timestamp, { withTime: true })}
                       </span>
-                      {e.mark
-                        ? <Badge variant="success" title={`MARK ${e.mark}`}>filed</Badge>
-                        : <Badge variant={e.issued_offline ? 'warning' : 'neutral'}>
-                            {e.issued_offline ? 'offline' : 'not filed'}
-                          </Badge>}
+                      {e.issued_offline && state !== 'filed' && <Badge variant="warning">offline</Badge>}
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                      {e.id === nextToFile && (
+                        <Button size="sm" variant="outline" disabled={filing !== null} onClick={() => void transmit(e.id)}>
+                          {filing === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1 h-3.5 w-3.5" />}
+                          {state === 'refused' ? 'File again' : 'File with AADE'}
+                        </Button>
+                      )}
+                      {e.mark && <span className="basis-full text-xs tabular-nums text-muted-foreground">MARK {e.mark}</span>}
+                      {(state === 'refused' || state === 'unknown') && e.transmission_error && (
+                        <span className="basis-full text-xs text-muted-foreground">{e.transmission_error}</span>
+                      )}
                     </div>
                   );
                 })}
@@ -253,7 +359,7 @@ export const MovementLifecycleDialog: React.FC<{
                 <div className="flex justify-end gap-2">
                   <Button size="sm" variant="ghost" onClick={() => setAdding(null)}>Cancel</Button>
                   <Button size="sm" onClick={() => void record()} disabled={busy}>
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Record'}
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Record & file with AADE'}
                   </Button>
                 </div>
               </div>

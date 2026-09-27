@@ -71,6 +71,35 @@ function composeLineDescription(
   return composed.length > 300 ? composed.slice(0, 297) + '…' : composed;
 }
 
+/**
+ * MARKs for myDATA multipleConnectedMarks: the invoices an 8.4 card receipt settles, or the 8.4
+ * deposits a final invoice absorbs. Read off the connected documents at build time, and refused
+ * when one has not reached myDATA yet, since a connection to a document with no MARK is filed as none.
+ */
+async function connectedInvoiceMarks(supabase: any, inv: any): Promise<number[]> {
+  const ids = [...new Set([
+    ...(Array.isArray(inv.connected_invoice_ids) ? inv.connected_invoice_ids : []),
+    ...(inv.eftpos_receipt_for_invoice_id ? [inv.eftpos_receipt_for_invoice_id] : []),
+  ].filter(Boolean))];
+  if (!ids.length) return [];
+  const { data, error } = await supabase.from('invoices')
+    .select('id, fiscal_mark, legal_number, internal_number, workspace_id').in('id', ids);
+  if (error) throw new Error(`could not read the connected documents (${error.message ?? error})`);
+  const rows = (data ?? []).filter((r: any) => r.workspace_id === inv.workspace_id);
+  const unmarked = ids.filter((id) => !rows.find((r: any) => r.id === id && r.fiscal_mark));
+  if (unmarked.length) {
+    const names = unmarked.map((id) => {
+      const r = rows.find((x: any) => x.id === id);
+      return r ? (r.legal_number ?? r.internal_number ?? id) : id;
+    });
+    throw new Error(
+      `Refusing to transmit: connected document(s) ${names.join(', ')} have no myDATA MARK yet. ` +
+        'Transmit them first — the connection is filed by MARK.',
+    );
+  }
+  return ids.map((id) => Number(rows.find((r: any) => r.id === id).fiscal_mark));
+}
+
 export interface FiscalOverrides {
   invoiceType?: string;
   series?: string;
@@ -84,7 +113,6 @@ export interface FiscalOverrides {
   posPayment?: {
     type: number; terminalId: string; posNspId: number;
     tid?: string;
-    ecrToken?: { signingAuthor: string; signature: string };
   };
 }
 
@@ -409,7 +437,7 @@ export async function buildInvoiceInputFromDb(
   if (productIds.length) {
     const { data: prods } = await supabase
       .from('products')
-      .select('id, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category, mydata_income_classification_type_retail, mydata_income_classification_category_retail')
+      .select('id, cpv_code, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category, mydata_income_classification_type_retail, mydata_income_classification_category_retail')
       .in('id', productIds);
     for (const p of prods ?? []) prodMap[p.id] = p;
   }
@@ -514,6 +542,7 @@ export async function buildInvoiceInputFromDb(
       recType: Number(it.rec_type ?? 0) || undefined,
       incomeClassificationType: it.income_classification_type ?? productIncomeType(prod) ?? incType,
       incomeClassificationCategory: it.income_classification_category ?? productIncomeCategory(prod) ?? incCat,
+      ...(inv.is_b2g ? { cpvCode: prod?.cpv_code || inv.b2g_details?.cpvCode || undefined } : {}),
     };
   });
 
@@ -612,8 +641,20 @@ export async function buildInvoiceInputFromDb(
           city: b2gRaw.deliveryCity || counterpart.address?.city || '',
           postalCode: b2gRaw.deliveryPostalCode || counterpart.address?.postalCode || '',
         },
+        ...(b2gRaw.purchaseOrderReference ? { purchaseOrderReference: String(b2gRaw.purchaseOrderReference) } : {}),
+        ...(fs?.bank_iban
+          ? {
+              credits: [{
+                accountIdentifier: String(fs.bank_iban).replace(/\s+/g, ''),
+                accountName: issuer.name ?? undefined,
+                ...(fs.bank_bic ? { serviceProviderIdentifier: String(fs.bank_bic) } : {}),
+              }],
+            }
+          : {}),
       }
     : undefined;
+
+  const connectedMarks = await connectedInvoiceMarks(supabase, inv);
 
   return {
     issuer,
@@ -634,7 +675,13 @@ export async function buildInvoiceInputFromDb(
         ? { invoiceVariationType: Number(inv.invoice_variation_type) }
         : {}),
       ...(inv.third_party_collection ? { thirdPartyCollection: true } : {}),
+      // An 8.4 names the invoices it settles as correlatedInvoices; multipleConnectedMarks is
+      // refused by the provider on every type (XML 101, sandbox 2026-09-27).
+      ...(connectedMarks.length && invoiceType !== '8.4' ? { multipleConnectedMarks: connectedMarks } : {}),
     },
+    ...(connectedMarks.length && invoiceType === '8.4'
+      ? { correlatedInvoices: connectedMarks, correlatedInvoicesLabel: connectedMarks.map((m) => `MARK ${m}`).join(', ') }
+      : {}),
     // The packages the goods travel in — only ever set on a document that carries them.
     ...(movement && packagingsFrom(inv.packagings).length
       ? { packingsDeclarations: packagingsFrom(inv.packagings) }
@@ -647,7 +694,6 @@ export async function buildInvoiceInputFromDb(
           type: overrides.posPayment.type, amount: grossTotal,
           terminalId: overrides.posPayment.terminalId, posNspId: overrides.posPayment.posNspId,
           ...(overrides.posPayment.tid ? { tid: overrides.posPayment.tid } : {}),
-          ...(overrides.posPayment.ecrToken ? { ecrToken: overrides.posPayment.ecrToken } : {}),
         } as any]
       : inv.payment_method_code
       ? [{ type: Number(inv.payment_method_code), amount: grossTotal, ...(inv.payment_method_info ? { info: inv.payment_method_info } : {}) } as any]
@@ -828,7 +874,9 @@ export async function buildCreditNoteInputFromDb(
       ? round2((taxesTotals ?? []).reduce((acc, t) => acc + (t.taxType === taxType ? t.taxAmount : 0), 0))
       : sumLines(pick));
   const correlatedMark = cn.correlated_mark ?? inv.fiscal_mark ?? null;
-  const isCorrelated = !!correlatedMark;
+  // AADE refuses correlatedInvoices on an 11.4 with 205, even though the provider docs call it
+  // optional (sandbox 2026-09-27); a retail credit stands on its own.
+  const isCorrelated = !!correlatedMark && !isRetailCredit;
 
   return {
     issuer,
@@ -844,6 +892,9 @@ export async function buildCreditNoteInputFromDb(
       ...(cnSelfBilledSupplierId ? { selfPricing: true } : {}),
     },
     correlatedInvoices: isCorrelated ? [Number(correlatedMark)] : undefined,
+    ...(isCorrelated
+      ? { correlatedInvoicesLabel: `${inv.legal_number ?? inv.internal_number ?? ''} (MARK ${correlatedMark})`.trim() }
+      : {}),
     lines,
     ...(taxesTotals ? { taxesTotals } : {}),
     summary: {
@@ -878,6 +929,18 @@ export async function buildCreditNoteInputFromDb(
     },
     // A retail credit note is not a "Πιστωτικό Τιμολόγιο" — AADE names 11.4 differently, and
     // the label is what the customer's copy prints.
+    // A refund to the card goes out as the card payment it reverses, signed like a sale.
+    ...(overrides.posPayment
+      ? {
+          paymentMethods: [{
+            type: overrides.posPayment.type,
+            amount: 0,
+            terminalId: overrides.posPayment.terminalId,
+            posNspId: overrides.posPayment.posNspId,
+            ...(overrides.posPayment.tid ? { tid: overrides.posPayment.tid } : {}),
+          }],
+        }
+      : {}),
     documentLabel: overrides.documentLabel
       ?? (isRetailCredit ? 'Πιστωτικό Στοιχείο Λιανικής' : 'Πιστωτικό Τιμολόγιο'),
     documentComments: cn.reason ?? undefined,

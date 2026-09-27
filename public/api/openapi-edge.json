@@ -3589,6 +3589,150 @@
         }
       }
     },
+    "/finance-mydata-delivery": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Files a recorded movement lifecycle leg (ΨΔΑ Phase Β1) with myDATA and reads a movement's AADE status",
+        "operationId": "post_finance_mydata_delivery",
+        "description": "Each leg of a delivery note's movement (start/tranship, delivery outcome, rejection, return) is its own AADE filing with its own MARK. This sends a leg recorded in delivery_note_events to the matching AADE ERP method (RegisterTransfer, ConfirmDeliveryOutcome, RejectDeliveryNote, ConfirmDeliveryReturn) under the workspace's OWN ΑΑΔΕ credentials, and stamps the MARK. A leg is claimed before the call and never sent twice; a call that dies mid-flight is recorded as indeterminate and resolved by the reconcile action, which matches it against AADE's GetDeliveryNoteStatus history.\n\n**Actions** (`action` in the body):\n- `transmit` — File one recorded lifecycle leg with AADE → `{ok, outcome: accepted|refused|indeterminate, mark?, errors?, error?}`\n- `status` — Read the movement's current status and history from AADE (GetDeliveryNoteStatus) → `{ok, status: {invoiceMark, statusCode, statusRaw, dispatchTimestamp, history: [{eventType, eventTimestamp, actorVat, mark}]}}`\n- `reconcile` — Resolve legs whose filing outcome was lost, against AADE's history → `{ok, resolved: [{event_id, mark}], released: [event_id], aade_status?}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "event_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "transmit"
+                        ],
+                        "description": "File one recorded lifecycle leg with AADE"
+                      },
+                      "event_id": {
+                        "type": "string",
+                        "description": "The delivery_note_events row to file. The workspace is read from it."
+                      }
+                    },
+                    "description": "Returns: {ok, outcome: accepted|refused|indeterminate, mark?, errors?, error?}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "delivery_note_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "status"
+                        ],
+                        "description": "Read the movement's current status and history from AADE (GetDeliveryNoteStatus)"
+                      },
+                      "delivery_note_id": {
+                        "type": "string",
+                        "description": "The delivery note whose MARK is looked up."
+                      }
+                    },
+                    "description": "Returns: {ok, status: {invoiceMark, statusCode, statusRaw, dispatchTimestamp, history: [{eventType, eventTimestamp, actorVat, mark}]}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "delivery_note_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "reconcile"
+                        ],
+                        "description": "Resolve legs whose filing outcome was lost, against AADE's history"
+                      },
+                      "delivery_note_id": {
+                        "type": "string",
+                        "description": "The delivery note whose unresolved legs are checked."
+                      }
+                    },
+                    "description": "Returns: {ok, resolved: [{event_id, mark}], released: [event_id], aade_status?}"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/finance-pay-invoice": {
       "post": {
         "tags": [

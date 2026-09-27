@@ -412,6 +412,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [b2gBuyerIdentifier, setB2gBuyerIdentifier] = useState('');
   const [b2gBudgetIdentifier, setB2gBudgetIdentifier] = useState('');
   const [b2gDueDate, setB2gDueDate] = useState('');
+  const [b2gCpv, setB2gCpv] = useState('');
+  const [b2gPoRef, setB2gPoRef] = useState('');
 
   // ── Reset on open ──
   useEffect(() => {
@@ -432,7 +434,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
     setVehicleNumber(''); setResponsible(''); setMovePurpose('1');
     setIsB2g(false); setB2gContractRef(''); setB2gBuyerRef(''); setB2gBuyerReg('');
-    setB2gBuyerIdentifier(''); setB2gBudgetIdentifier(''); setB2gDueDate('');
+    setB2gBuyerIdentifier(''); setB2gBudgetIdentifier(''); setB2gDueDate(''); setB2gCpv(''); setB2gPoRef('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialCustomer?.id, initialCustomer?.type]);
 
@@ -1076,6 +1078,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           buyerIdentifier: b2gBuyerIdentifier || null,
           budgetIdentifier: b2gBudgetIdentifier || null,
           dueDate: b2gDueDate || null,
+          cpvCode: b2gCpv || null,
+          purchaseOrderReference: b2gPoRef || null,
         } : null,
         issued_at: null,
         due_at: null,
@@ -2156,6 +2160,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer identifier (ΚΗΜΔΗΣ/KAE)</Label><Input className="h-8 text-xs" value={b2gBuyerIdentifier} onChange={(e) => setB2gBuyerIdentifier(e.target.value)} placeholder="e.g. 1007.909.0001" /></div>
                       <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Budget identifier</Label><Input className="h-8 text-xs" value={b2gBudgetIdentifier} onChange={(e) => setB2gBudgetIdentifier(e.target.value)} placeholder="ΚΑΕ / budget code" /></div>
                       <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Payment due date</Label><Input type="date" className="h-8 text-xs" value={b2gDueDate} onChange={(e) => setB2gDueDate(e.target.value)} /></div>
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">CPV code (lines whose product has none)</Label><Input className="h-8 text-xs" value={b2gCpv} onChange={(e) => setB2gCpv(e.target.value)} placeholder="e.g. 44111000-4" /></div>
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Purchase order reference</Label><Input className="h-8 text-xs" value={b2gPoRef} onChange={(e) => setB2gPoRef(e.target.value)} placeholder="optional" /></div>
                     </div>
                   </>
                 )}

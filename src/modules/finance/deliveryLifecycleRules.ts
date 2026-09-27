@@ -69,3 +69,22 @@ export function movementIsFiled(life: DeliveryLifecycleState | null): boolean {
     || life.status_code === DELIVERY_STATUS_CANCELLED;
   return closed && life.events_pending_transmission === 0;
 }
+
+export type DeliveryFilingState = 'filed' | 'unknown' | 'sending' | 'refused' | 'not_sent';
+
+/** A claim with no MARK is never "not sent": AADE may hold it until reconciliation says otherwise. */
+export function deliveryFilingState(e: {
+  mark: string | null;
+  transmitted_at: string | null;
+  transmission_claim_token: string | null;
+  transmission_claimed_at: string | null;
+  transmission_indeterminate_at: string | null;
+  transmission_error: string | null;
+}, now = Date.now()): DeliveryFilingState {
+  if (e.transmitted_at && e.mark) return 'filed';
+  if (e.transmission_claim_token) {
+    const stale = !!e.transmission_claimed_at && now - new Date(e.transmission_claimed_at).getTime() > 120_000;
+    return e.transmission_indeterminate_at || stale ? 'unknown' : 'sending';
+  }
+  return e.transmission_error ? 'refused' : 'not_sent';
+}

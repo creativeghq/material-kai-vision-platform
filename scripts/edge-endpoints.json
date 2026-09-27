@@ -1527,6 +1527,60 @@
     }
   },
   {
+    "name": "finance-mydata-delivery",
+    "tag": "Finance",
+    "summary": "Files a recorded movement lifecycle leg (ΨΔΑ Phase Β1) with myDATA and reads a movement's AADE status",
+    "description": "Each leg of a delivery note's movement (start/tranship, delivery outcome, rejection, return) is its own AADE filing with its own MARK. This sends a leg recorded in delivery_note_events to the matching AADE ERP method (RegisterTransfer, ConfirmDeliveryOutcome, RejectDeliveryNote, ConfirmDeliveryReturn) under the workspace's OWN ΑΑΔΕ credentials, and stamps the MARK. A leg is claimed before the call and never sent twice; a call that dies mid-flight is recorded as indeterminate and resolved by the reconcile action, which matches it against AADE's GetDeliveryNoteStatus history.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "transmit",
+        "summary": "File one recorded lifecycle leg with AADE",
+        "params": [
+          {
+            "name": "event_id",
+            "type": "string",
+            "required": true,
+            "desc": "The delivery_note_events row to file. The workspace is read from it."
+          }
+        ],
+        "response": "{ok, outcome: accepted|refused|indeterminate, mark?, errors?, error?}"
+      },
+      {
+        "name": "status",
+        "summary": "Read the movement's current status and history from AADE (GetDeliveryNoteStatus)",
+        "params": [
+          {
+            "name": "delivery_note_id",
+            "type": "string",
+            "required": true,
+            "desc": "The delivery note whose MARK is looked up."
+          }
+        ],
+        "response": "{ok, status: {invoiceMark, statusCode, statusRaw, dispatchTimestamp, history: [{eventType, eventTimestamp, actorVat, mark}]}}"
+      },
+      {
+        "name": "reconcile",
+        "summary": "Resolve legs whose filing outcome was lost, against AADE's history",
+        "params": [
+          {
+            "name": "delivery_note_id",
+            "type": "string",
+            "required": true,
+            "desc": "The delivery note whose unresolved legs are checked."
+          }
+        ],
+        "response": "{ok, resolved: [{event_id, mark}], released: [event_id], aade_status?}"
+      }
+    ]
+  },
+  {
     "name": "finance-pay-invoice",
     "tag": "Finance",
     "summary": "Create a Stripe Checkout session or pay-link for an invoice",

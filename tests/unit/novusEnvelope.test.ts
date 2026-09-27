@@ -1,6 +1,6 @@
 /** What the myDATA envelope has to say for the provider to accept it at all. */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
@@ -362,5 +362,98 @@ describe('income classification is derived from the document type, not defaulted
     // category1_1 (331).
     expect(mydataIncomeClassificationType('11.1')).not.toBe('E3_561_001');
     expect(mydataIncomeClassificationCategory('2.1')).not.toBe('category1_1');
+  });
+});
+
+describe('what the provider refuses is never sent (#465, sandbox 2026-09-27)', () => {
+  it('drops an ECR token on a card line — the provider answers HTTP 400 for it', () => {
+    const d = doc(invoice({ paymentMethods: [{ type: 7, amount: 124, terminalId: 'T1', posNspId: 1, tid: 'X9', ecrToken: { signingAuthor: 'A', signature: 'B' } }] } as any));
+    expect(d.paymentMethods[0]).toMatchObject({ type: 7, terminalId: 'T1', posNspId: 1, tid: 'X9' });
+    expect(JSON.stringify(d)).not.toMatch(/ECRToken/i);
+  });
+
+  it('refuses invoiceVariationType — AADE forbids it on the provider channel (205)', () => {
+    expect(() => doc(invoice({ header: { invoiceVariationType: 1 } } as any))).toThrow(/ERP channel/);
+  });
+
+  it('labels the correlated invoices whenever it correlates any', () => {
+    const d = doc(invoice({ header: { invoiceType: '5.1' }, correlatedInvoices: [400001971580767] } as any));
+    expect(d.invoiceHeader.correlatedInvoices).toEqual([400001971580767]);
+    expect(d.invoiceHeader.correlatedInvoicesLabel).toBeTruthy();
+  });
+});
+
+describe('a B2G invoice carries what the public-sector route requires', () => {
+  const b2g = { contractReference: '0', buyerReference: 'x', credits: [{ accountIdentifier: 'GR1601101250000000012300695' }] };
+
+  it('refuses a line with no CPV code, and a document with no payment account', () => {
+    expect(() => doc(invoice({ b2g } as any))).toThrow(/CPV/);
+    expect(() => doc(invoice({ b2g: { ...b2g, credits: [] }, lines: [line({ cpvCode: '44111000-4' })] } as any)))
+      .toThrow(/IBAN/);
+  });
+
+  it('emits the CPV twice over, the UN/ECE unit, the IBAN and a delivery block', () => {
+    const d = doc(invoice({ b2g, lines: [line({ cpvCode: '44111000-4', measurementUnitLabel: 'm2' })] } as any));
+    expect(d.invoiceDetails[0]).toMatchObject({
+      itemCodification: '44111000-4',
+      QuantityUnitsUblCode: 'MTK',
+      itemClassificationIdentifiers: [{ classificationIdentifier: '44111000-4', classificationIdentifierScheme: 'STI' }],
+    });
+    expect(d.providerB2gAdditionalInvoiceDetails.credits[0].accountIdentifier).toMatch(/^GR/);
+    expect(d.providerB2gAdditionalInvoiceDetails.deliveryDetails).toBeDefined();
+  });
+
+  it('leaves an ordinary invoice without any B2G line field', () => {
+    const d = doc(invoice());
+    expect(d.invoiceDetails[0].itemCodification).toBeUndefined();
+    expect(d.providerB2gAdditionalInvoiceDetails).toBeUndefined();
+  });
+});
+
+describe('an 8.4 card receipt restates income, so it classifies as informational', () => {
+  it('uses category1_95 with no type on the line and the summary, and names the settled MARKs as correlated', () => {
+    const d = doc(invoice({
+      header: { invoiceType: '8.4' },
+      correlatedInvoices: [400001971580791],
+      paymentMethods: [{ type: 7, amount: 124, terminalId: 'T1', posNspId: 1 }],
+    } as any));
+    expect(d.invoiceDetails[0].incomeClassification).toEqual([{ classificationCategory: 'category1_95', amount: 100 }]);
+    expect(d.invoiceSummary.incomeClassification).toEqual([{ classificationCategory: 'category1_95', amount: 100 }]);
+    expect(d.invoiceHeader.correlatedInvoices).toEqual([400001971580791]);
+  });
+
+  it('refuses multipleConnectedMarks, which the provider breaks on every type (XML 101)', () => {
+    expect(() => doc(invoice({ header: { multipleConnectedMarks: [1] } } as any))).toThrow(/correlatedInvoices instead/);
+  });
+});
+
+describe('a lost answer is reconciled with the provider before anything is resent', () => {
+  const edge = stripComments(readFileSync(
+    join(__dirname, '..', '..', 'supabase', 'functions', 'finance-issue-invoice', 'index.ts'), 'utf8'));
+
+  it('every transmitting path — invoice, credit note, delivery note — goes through the one reconciler', () => {
+    expect((edge.match(/reconcileWithProvider\(resolved\.resolved\.connector/g) ?? []).length).toBe(3);
+  });
+
+  it('a resend after an outage carries transmissionFailure and is recorded as having done so', () => {
+    expect((edge.match(/transmissionFailure: (inv|cn|dn)Outage\.flag/g) ?? []).length).toBe(3);
+    expect((edge.match(/sent_transmission_failure: (inv|cn|dn)Outage\.flag \? 1 : null/g) ?? []).length).toBe(3);
+  });
+});
+
+describe('the finance-manager check is called with the argument the function declares', () => {
+  it('passes p_workspace_id at every edge call site — a wrong name makes PostgREST miss the function and refuse everyone', () => {
+    const root = join(__dirname, '..', '..', 'supabase', 'functions');
+    const offenders: string[] = [];
+    for (const dir of readdirSync(root, { withFileTypes: true })) {
+      if (!dir.isDirectory()) continue;
+      const file = join(root, dir.name, 'index.ts');
+      if (!existsSync(file)) continue;
+      const src = stripComments(readFileSync(file, 'utf8'));
+      for (const m of src.matchAll(/rpc\(\s*'is_workspace_finance_manager'\s*,\s*\{\s*(\w+)\s*:/g)) {
+        if (m[1] !== 'p_workspace_id') offenders.push(`${dir.name}: ${m[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

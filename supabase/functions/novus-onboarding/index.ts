@@ -16,7 +16,7 @@ const ACK_COLUMNS: Record<string, string> = {
 };
 
 const WEBHOOK_EVENTS = [
-  'request.status_changed', 'request.provisioned', 'request.provisioning_failed',
+  'request.created', 'request.status_changed', 'request.provisioned', 'request.provisioning_failed',
   'client.statement_recalled',
 ];
 
@@ -83,6 +83,10 @@ function novusError(status: number, body: any, retryAfter?: string): string {
     ? ` (${err.details.map((d: any) => `${d.field}: ${d.message}`).join('; ')})`
     : '';
   const ctx = err?.context?.existingRequestId ? ` [request ${err.context.existingRequestId}]` : '';
+  if (err?.code === 'CLIENT_ALREADY_LINKED' || err?.code === 'CLIENT_ALREADY_ACTIVE') {
+    return 'This ΑΦΜ is already a Novus client under the platform account, so there is nothing to onboard — '
+      + 'it can transmit now. If invoices are still refused, ask Novus to confirm the link.';
+  }
   return `${err?.message ?? `Novus returned HTTP ${status}`}${detail}${ctx}`;
 }
 
@@ -278,11 +282,20 @@ Deno.serve(withApiLogging('novus-onboarding', async (req: Request) => {
     if (status !== 200 || !b?.success) {
       throw new HttpError(status === 404 || status === 429 ? status : 502, novusError(status, b, retryAfter));
     }
-    return json({ success: true, history: b.data ?? [] });
+    // The live API answers {fromStatus,toStatus,actorType,createdAt}; the published spec
+    // {occurredAt,status,previousStatus,actor}. The card reads the second, so both map to it.
+    const history = (Array.isArray(b.data) ? b.data : []).map((h: any) => ({
+      occurredAt: h?.occurredAt ?? h?.createdAt ?? null,
+      status: h?.status ?? h?.toStatus ?? null,
+      previousStatus: h?.previousStatus ?? h?.fromStatus ?? null,
+      message: h?.message ?? null,
+      actor: h?.actor ?? h?.actorType ?? null,
+    }));
+    return json({ success: true, history });
   }
 
   const { data: canManage } = await (auth.supabaseAsUser ?? supabase)
-    .rpc('is_workspace_finance_manager', { workspace_id: workspaceId });
+    .rpc('is_workspace_finance_manager', { p_workspace_id: workspaceId });
   if (!canManage) throw new HttpError(403, 'Only a workspace finance manager can run e-invoicing onboarding.');
 
   if (action === 'save_application') {

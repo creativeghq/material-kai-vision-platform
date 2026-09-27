@@ -92,6 +92,9 @@ export function mydataIncomeClassificationCategory(documentType: string | null |
   return t.startsWith('2.') || t === '11.2' ? 'category1_3' : 'category1_1';
 }
 
+/** Types that restate income another document declared (POS receipt, POS refund, food-service order): category1_95 only. */
+export const MYDATA_INFORMATIONAL_INCOME_TYPES: readonly string[] = ['8.4', '8.5', '8.6'];
+
 /** WHICH LEDGER A DOCUMENT TYPE CLASSIFIES INTO — or neither. */
 export type MydataClassificationLedger = 'income' | 'expenses' | 'none';
 
