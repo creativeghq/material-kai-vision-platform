@@ -13,7 +13,7 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { sortVatReturnLines, vatReturnLineLabel, type VatRateRow } from '@/modules/finance/vatReturn';
 type ReportKind =
-  | 'cashflow_per_day' | 'pnl_per_category' | 'profit_taken' | 'cash_out_per_category'
+  | 'cashflow_per_day' | 'pnl_per_category' | 'profit_taken' | 'owner_payments' | 'cash_out_per_category'
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
   | 'sales_per_factory' | 'sales_per_designer'
   | 'purchases_per_product' | 'receipts_per_product'
@@ -33,6 +33,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'cashflow_per_day', label: 'Daily cash flow',   group: 'overview', period: 'range' },
   { value: 'pnl_per_category', label: 'P&L by category',   group: 'overview', period: 'range' },
   { value: 'profit_taken',     label: 'Profit taken',      group: 'overview', period: 'range' },
+  { value: 'owner_payments',   label: 'Paid to owners (per partner)', group: 'overview', period: 'range' },
   // Sales
   { value: 'sales_per_day',       label: 'Sales per day',           group: 'sales',       period: 'range' },
   { value: 'sales_per_customer',  label: 'Sales per customer',      group: 'sales',       period: 'range' },
@@ -145,6 +146,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportPnlPerCategory(workspaceId, range.from, range.to); break;
         case 'cash_out_per_category':
           data = await financeService.reportCashOutPerCategory(workspaceId, range.from, range.to); break;
+        case 'owner_payments':
+          data = await financeService.reportOwnerPayments(workspaceId, range.from, range.to); break;
         case 'profit_taken':
           data = await financeService.reportProfitTaken(workspaceId, range.from, range.to);
           // A failed read leaves it null, which renders no drawdown line at all — never a
@@ -407,6 +410,7 @@ function primarySortKey(report: ReportKind): string {
     case 'profit_taken':
       return 'amount';
     case 'cash_out_per_category':
+    case 'owner_payments':
       return 'total_paid';
     case 'sales_per_day':
     case 'sales_per_customer':
@@ -475,6 +479,14 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       return [
         { label: 'Payments', value: String(payments) },
         ...moneyTotals(rows, 'total_paid', 'Money out'),
+      ];
+    }
+    case 'owner_payments': {
+      let payments = 0;
+      for (const r of rows) payments += Number(r.payment_count || 0);
+      return [
+        { label: 'Payments', value: String(payments) },
+        ...moneyTotals(rows, 'total_paid', 'Paid to owners'),
       ];
     }
     case 'profit_taken': {
@@ -621,10 +633,19 @@ function renderReport(
   if (report === 'cash_out_per_category') {
     return (
       <Table headers={['Category', 'Payments', 'Money out']} totals={totals} rows={rows.map((r: any) => [
-        // Money paid out to owners is deliberately outside the P&L; say so where it would be expected.
-        r.is_owner_distribution
-          ? <span key="n">{r.category_name} <span className="text-[10px] text-muted-foreground">· paid to owners, not a P&amp;L expense</span></span>
+        r.is_owner_payment
+          ? <span key="n">{r.category_name} <span className="text-[10px] text-muted-foreground">· paid to owners</span></span>
           : r.category_name,
+        String(r.payment_count ?? 0),
+        formatMoney(Number(r.total_paid || 0), r.currency || 'EUR'),
+      ])} />
+    );
+  }
+  if (report === 'owner_payments') {
+    return (
+      <Table headers={['Partner', 'Category', 'Payments', 'Paid']} totals={totals} rows={rows.map((r: any) => [
+        r.display_name,
+        r.category_name,
         String(r.payment_count ?? 0),
         formatMoney(Number(r.total_paid || 0), r.currency || 'EUR'),
       ])} />

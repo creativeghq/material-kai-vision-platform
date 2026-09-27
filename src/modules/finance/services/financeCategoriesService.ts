@@ -13,9 +13,8 @@ export interface FinanceCategory {
   is_system: boolean;
   /**
    * Which built-in this is, when is_system: 'orders' (auto-attached to order costs), 'myaade'
-   * (default landing category for myDATA-synced expenses), 'owner_pay' (an owner's fee — a real
-   * expense), or the two that pay profit OUT and stay out of the P&L: 'profit_allocation'
-   * (Profit split) and 'partner_withdrawal'. Null for user categories.
+   * (default landing category for myDATA-synced expenses), or one of the three that pay a partner:
+   * 'owner_pay', 'profit_allocation' (Profit split), 'partner_withdrawal'. Null for user categories.
    */
   system_key: 'orders' | 'myaade' | 'profit_allocation' | 'partner_withdrawal' | 'owner_pay' | string | null;
 }

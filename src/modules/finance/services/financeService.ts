@@ -756,11 +756,10 @@ export interface PnlOverview {
   ap_outstanding_now: number | null;
   ap_overdue_now: number | null;
   ap_bills_open: number;
-  /** Paid out in Profit split / Partner withdrawals — outside the P&L, below the net line. */
-  owner_distributions: number | null;
-  /** Net less owner distributions: what the business kept. */
-  retained_net: number | null;
-  distributions_status: PnlBooksStatus;
+  /** The owner categories' share of `books_expenses` — already inside it, never added again. */
+  owner_payments: number | null;
+  /** `books_net` with the owner payments added back: profit before anything was paid to owners. */
+  net_before_owner_payments: number | null;
 }
 
 export interface PnlMonthRow {
@@ -3506,7 +3505,17 @@ export interface CashOutPerCategoryRow {
   currency: string;
   payment_count: number;
   total_paid: number;
-  is_owner_distribution: boolean;
+  is_owner_payment: boolean;
+}
+export interface OwnerPaymentRow {
+  party_type: 'company' | 'contact' | null;
+  party_id: string | null;
+  display_name: string;
+  category_name: string;
+  system_key: string;
+  currency: string;
+  payment_count: number;
+  total_paid: number;
 }
 
 export interface PaymentsPerCounterpartyOutRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_paid: number; currency: string }
@@ -4007,6 +4016,12 @@ const _financeServiceV2 = {
     const { data, error } = await (supabase as any).rpc('workspace_money_currencies', { p_workspace_id: workspaceId });
     if (error) throw error;
     return ((data ?? []) as string[]).filter(Boolean);
+  },
+
+  async reportOwnerPayments(workspaceId: string, from: string, to: string): Promise<OwnerPaymentRow[]> {
+    const { data, error } = await (supabase as any).rpc('report_owner_payments', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as OwnerPaymentRow[];
   },
 
   async reportCashOutPerCategory(workspaceId: string, from: string, to: string): Promise<CashOutPerCategoryRow[]> {

@@ -88,7 +88,6 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
   }
 
   const books = booksVerdict(overview?.books_status);
-  const distributions = booksVerdict(overview?.distributions_status);
   const aade = aadeVerdict(overview?.aade_status);
   const ccy = overview?.currency && overview.currency !== 'MIXED' ? overview.currency : 'EUR';
   const gap = overview?.expense_gap_net ?? null;
@@ -152,18 +151,18 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
             <div className="grid grid-cols-2 gap-4 border-t border-hairline px-5 py-4 sm:grid-cols-4">
               <Figure
                 label="Paid to owners"
-                value={overview?.owner_distributions ?? null}
+                value={overview?.owner_payments ?? null}
                 currency={ccy}
-                verdict={distributions}
-                sub="Profit split + partner withdrawals — not an expense"
+                verdict={books}
+                sub="Pay, profit split and withdrawals — included in Expenses"
               />
               <Figure
-                label="Retained in the business"
-                value={overview?.retained_net ?? null}
+                label="Profit before owner payments"
+                value={overview?.net_before_owner_payments ?? null}
                 currency={ccy}
-                verdict={books.hasFigures ? distributions : books}
+                verdict={books}
                 signed
-                sub="Net less what was paid to owners"
+                sub="Net with owner payments added back"
               />
             </div>
 
