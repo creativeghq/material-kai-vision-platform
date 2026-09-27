@@ -7,7 +7,7 @@ import { novusBaseUrl } from '../_shared/fiscal/novus.ts';
 import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
-// Novus Onboarding API v1.0. Spec: src/modules/myaade/NovusProvider/Onboarding API/.
+// Novus Onboarding API v1.0. Spec: https://developers.novusconceptus.com/el/
 
 const ACK_COLUMNS: Record<string, string> = {
   contract_delivered: 'ack_contract_delivered',

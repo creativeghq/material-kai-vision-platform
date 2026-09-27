@@ -1,5 +1,5 @@
 // Novus Provider (myDATA/AADE) connector — REST API v2.3.
-// Docs: src/modules/myaade/NovusProvider/. Base URLs:
+// Docs: https://developers.novusconceptus.com/el/. Base URLs:
 //   sandbox    https://provider-dev.timologisi.online
 //   production https://provider.timologisi.online
 // Auth header: `API-KEY: {key}`.
