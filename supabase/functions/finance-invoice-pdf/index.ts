@@ -19,7 +19,7 @@ import * as fontkitNs from '@pdf-lib/fontkit';
 const fontkit = (fontkitNs as unknown as { default?: unknown }).default ?? fontkitNs;
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace, isCronAuthorized, isServiceRoleRequest } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
@@ -282,12 +282,12 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     return json({ error: 'invalid body' }, 400);
   }
 
-  // Service-to-service: the Stripe webhook has no user, so it can't mint the payment
-  // receipt the way the finance UI does. A trusted internal caller (service-role or a
-  // valid x-cron-secret) may generate a PAYMENT RECEIPT — and nothing else. Every other
-  // document kind still requires a finance user, and the payment_id fully determines the
-  // workspace server-side, so no caller-supplied tenancy is ever trusted.
-  const internal = kind === 'payment_receipt' && isCronAuthorized(req);
+  // Internal callers carry no user, and the document id alone decides the workspace. A payment
+  // receipt for the Stripe webhook (service key or cron secret), or an INVOICE for
+  // finance-pay-invoice after it resolved the customer's pay token (service key only). Never a
+  // credit note or delivery note; every other call needs a finance user.
+  const internal = (kind === 'payment_receipt' && isCronAuthorized(req))
+    || (kind === 'invoice' && isServiceRoleRequest(req));
   let authUserId: string | null = null;
   if (!internal) {
     const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });

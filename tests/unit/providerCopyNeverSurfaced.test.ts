@@ -62,13 +62,23 @@ describe('what the provider is given and what it keeps', () => {
 });
 
 describe('the public pay page states the filed facts', () => {
-  it('returns them for a payable AND an already-paid document, by the token-resolved id', () => {
+  it('returns them for a payable, a paid AND a cancelled/credited document, by the token-resolved id', () => {
     const fn = read('supabase/functions/finance-pay-invoice/index.ts');
-    expect((fn.match(/fiscal: await fiscalRecord\(supabase, row\.invoice_id\)/g) ?? []).length).toBe(2);
+    expect((fn.match(/fiscal: await fiscalRecord\(supabase, row\.invoice_id\)/g) ?? []).length).toBe(3);
+    expect(fn).not.toMatch(/return json\(\{ error: `invoice is \$\{row\.status\}` \}/);
   });
 
-  it('renders them in both states', () => {
+  it('renders them in all three states, each with our own PDF', () => {
     const page = read('src/pages/PayInvoicePage.tsx');
-    expect((page.match(/<FiscalRecordPanel fiscal=\{fiscal\} \/>/g) ?? []).length).toBe(2);
+    expect((page.match(/<FiscalRecordPanel fiscal=\{fiscal\} \/>/g) ?? []).length).toBe(3);
+    expect((page.match(/\{downloadButton\}/g) ?? []).length).toBe(3);
+  });
+
+  it('the PDF download renders ONLY the token-resolved invoice, through the service key alone', () => {
+    const fn = read('supabase/functions/finance-pay-invoice/index.ts');
+    expect(fn).toMatch(/JSON\.stringify\(\{ invoice_id: row\.invoice_id \}\)/);
+    const pdf = read('supabase/functions/finance-invoice-pdf/index.ts');
+    expect(pdf).toMatch(/\(kind === 'invoice' && isServiceRoleRequest\(req\)\)/);
+    expect(pdf).not.toMatch(/kind === 'invoice' && isCronAuthorized/);
   });
 });

@@ -4270,6 +4270,7 @@ const _financeServiceV2 = {
     currency?: string;
     customer_display?: string;
     already_paid?: boolean;
+    closed?: boolean;
     fiscal?: PublicFiscalRecord | null;
     error?: string;
   }> {
@@ -4286,6 +4287,15 @@ const _financeServiceV2 = {
     });
     if (error) throw await edgeError(error);
     return data as any;
+  },
+
+  async payTokenPdf(payToken: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
+      body: { pay_token: payToken, pdf: true },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.pdf_url) throw new Error(data?.error ?? 'The PDF could not be produced right now.');
+    return data.pdf_url as string;
   },
 
   /**

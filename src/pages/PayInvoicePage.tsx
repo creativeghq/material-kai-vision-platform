@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy, ShieldCheck, ExternalLink, Download, Ban } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { MoneyInput } from '@/components/core/ui/money-input';
@@ -117,6 +117,21 @@ const PayInvoicePage: React.FC = () => {
   const [info, setInfo] = useState<PayInfo | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [fiscal, setFiscal] = useState<PublicFiscalRecord | null>(null);
+  const [closed, setClosed] = useState<{ status: string; number: string } | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const downloadPdf = async () => {
+    if (!token) return;
+    setDownloading(true);
+    try { window.open(await financeService.payTokenPdf(token), '_blank', 'noopener'); }
+    catch (err) { setError((err as Error).message); }
+    finally { setDownloading(false); }
+  };
+  const downloadButton = (
+    <Button variant="outline" size="sm" onClick={() => void downloadPdf()} disabled={downloading}>
+      {downloading ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-2" />}
+      Download PDF
+    </Button>
+  );
   const [error, setError] = useState<string | null>(null);
   const [choice, setChoice] = useState<'deposit' | 'full' | 'custom'>('full');
   const [custom, setCustom] = useState<number | null>(null);
@@ -136,6 +151,7 @@ const PayInvoicePage: React.FC = () => {
         const res = await financeService.resolvePayToken(token, { infoOnly: true });
         if (res.error) { setError(res.error); return; }
         setFiscal(res.fiscal ?? null);
+        if (res.closed) { setClosed({ status: res.status ?? '', number: res.internal_number ?? '' }); return; }
         if (res.already_paid) { setAlreadyPaid(true); return; }
         const next: PayInfo = {
           invoice_id: res.invoice_id!,
@@ -326,6 +342,25 @@ const PayInvoicePage: React.FC = () => {
         <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
         <h1 className="mt-4 text-xl font-semibold">Already paid</h1>
         <p className="mt-2 text-sm text-muted-foreground">This document has no outstanding balance.</p>
+        <div className="mt-4">{downloadButton}</div>
+        {fiscal && <div className="mt-6 text-left"><FiscalRecordPanel fiscal={fiscal} /></div>}
+      </div>,
+    );
+  }
+
+  if (closed) {
+    return shell(
+      <div className="text-center">
+        <Ban className="mx-auto h-12 w-12 text-muted-foreground" />
+        <h1 className="mt-4 text-xl font-semibold">
+          {closed.status === 'credit_noted' ? 'Credited' : 'Cancelled'} — {closed.number}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {closed.status === 'credit_noted'
+            ? 'This document has been reversed by a credit note, so there is nothing to pay on it.'
+            : 'This document has been cancelled, so there is nothing to pay on it.'}
+        </p>
+        <div className="mt-4">{downloadButton}</div>
         {fiscal && <div className="mt-6 text-left"><FiscalRecordPanel fiscal={fiscal} /></div>}
       </div>,
     );
@@ -380,6 +415,7 @@ const PayInvoicePage: React.FC = () => {
       </div>
 
       {fiscal && <FiscalRecordPanel fiscal={fiscal} />}
+      <div>{downloadButton}</div>
 
       <div className="space-y-2">
         <span id="pay-amount-label" className="text-xs font-medium">How much would you like to pay?</span>

@@ -64,6 +64,8 @@ interface PublicBody {
   cancel_url?: string;
   /** Return the document + payable options only. No checkout session, no side effects. */
   info_only?: boolean;
+  /** Return a short-lived link to OUR PDF of the document. */
+  pdf?: boolean;
   /** Requested amount (deposit / part payment). Clamped server-side to [min, amount_due]. */
   amount?: number;
   /**
@@ -303,8 +305,31 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     const row = (rows as any[])?.[0];
     if (!row) return json({ error: 'invalid pay link' }, 404);
     if (row.expired) return json({ error: 'pay link expired — ask the seller for a fresh one' }, 410);
+    if (pb.pdf) {
+      // The token decided WHICH invoice; nothing else from the caller reaches the renderer.
+      const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/finance-invoice-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({ invoice_id: row.invoice_id }),
+      });
+      const out = await res.json().catch(() => null) as { pdf_url?: string; error?: string } | null;
+      if (!res.ok || !out?.pdf_url) return json({ error: out?.error ?? 'The PDF could not be produced right now.' }, 502);
+      recordPageEvent(supabase, req, 'downloaded', {
+        entityType: 'invoice', entityId: row.invoice_id, workspaceId: row.workspace_id,
+        metadata: { internal_number: row.internal_number ?? null, surface: 'pay_link' },
+      }).catch(() => {});
+      return json({ ok: true, pdf_url: out.pdf_url });
+    }
+    // Cancelled or credited: nothing to pay, but the customer still holds a filed document.
     if (row.status === 'void' || row.status === 'credit_noted') {
-      return json({ error: `invoice is ${row.status}` }, 409);
+      return json({
+        ok: true, closed: true, status: row.status, invoice_id: row.invoice_id,
+        internal_number: row.internal_number, currency: row.currency,
+        fiscal: await fiscalRecord(supabase, row.invoice_id),
+      }, 200);
     }
     if (Number(row.amount_due) <= 0) {
       return json({
