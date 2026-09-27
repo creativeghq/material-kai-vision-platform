@@ -235,6 +235,20 @@ await check('db.column-grants', ['DB_KEY'], async () => {
   return 'every ungranted column is declared';
 });
 
+await check('db.kb-access-polarity', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_kb_access_polarity`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert(res.ok, `rpc lint_kb_access_polarity → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'lint did not return an array');
+  assert(json.length === 0,
+    `${json.length} function(s) let an uncategorised row bypass the access-level gate: `
+    + json.map((r) => String(r.fn || '').split('(')[0]).join(', '));
+  return 'every access-level gate uses the restrictive default';
+});
+
 await check('db.storage-write-policies', ['DB_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_storage_write_policies`, {
     method: 'POST',

@@ -357,6 +357,19 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 ---
 
+## Who may read a section — one gate, one spelling
+
+`kb_hybrid_doc_chunks` is the reference implementation, and its `eligible` CTE is `materialized` on
+purpose: **every access predicate is applied before either ranking channel runs**, so the vector and
+lexical passes can only ever rank rows the caller may already read. `kb_match_doc_chunks` delegates
+to it rather than restating it.
+
+- **A doc with no category takes the MOST restrictive access level**: `coalesce(c.access_level, 'admin') = any(allowed_access_levels)`. The form `d.category_id is null or c.access_level = any(…)` says the opposite — no category, no check — and four of the five functions carried it until 2026-09-27. It matters for the callers whose level list is narrowed server-side (an agent gets `['agent','public']`), and because deleting a category detaches its docs (`CategoryManager` nulls `category_id`), deleting a category used to make its docs *more* visible. Pinned by `lint_kb_access_polarity()` → the `db.kb-access-polarity` smoke check, strict zero.
+- **`visibility='private'` is not "hidden from the workspace".** The `kb_docs_select` policy lets any ACTIVE member read every doc in their workspace; `private` narrows only `kb_docs_public_read` (anon + the public KB site). 230 of 231 docs are private, so a status/visibility gate added to a member-facing search hides the entire corpus. A `SECURITY DEFINER` function here should answer what the caller would get through RLS — no wider, and no narrower.
+- **Greek queries need folding, not a second corpus.** `kb_hybrid_doc_chunks` runs a Greek lexical channel beside the English one (`websearch_to_tsquery('greek', …)` over the query's Greek letters only). `kb_keyword_search` collapses instead, and its collapse was `[^a-z0-9]`, which emptied every Greek query — the `collapsed <> ''` guard then returned zero rows with no error and no stated reason. It now folds with `crm_fold` (lowercase, strip accents, normalise final sigma), collapses on `[^[:alnum:]]`, then transliterates with `crm_translit`, so `ΜΠΑΤΑΡΙΕΣ` and `bataries` reach one key and Latin text transliterates to itself. Transliteration is canonical, not phonetic: `ει → i`, so `Ενεργειακής` is keyed `energiakis` and a user typing `energeiakis` still misses.
+
+---
+
 ## Audits & Templates — a category the agent writes FROM
 
 A doc filed in the `audits-templates` category is a blank form, not an answer. The agent reaches it

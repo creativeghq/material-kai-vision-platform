@@ -38036,37 +38036,6 @@ export type Database = {
         | {
             Args: {
               allowed_access_levels?: string[]
-              match_category_id?: string
-              match_category_slug?: string
-              match_price_doc_type?: string
-              result_limit?: number
-              search_query: string
-              search_type?: string
-              search_workspace_id: string
-            }
-            Returns: {
-              category_id: string
-              category_name: string
-              category_slug: string
-              content: string
-              created_at: string
-              created_by: string
-              embedding_generated_at: string
-              embedding_status: string
-              id: string
-              price_doc_type: string
-              status: string
-              summary: string
-              title: string
-              updated_at: string
-              view_count: number
-              visibility: string
-              workspace_id: string
-            }[]
-          }
-        | {
-            Args: {
-              allowed_access_levels?: string[]
               include_private?: boolean
               match_category_id?: string
               match_category_slug?: string
