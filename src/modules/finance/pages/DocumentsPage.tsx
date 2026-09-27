@@ -25,7 +25,7 @@ import { financeService, formatMoney, type Invoice, type CreditNote, type Suppli
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
-import { ExpenseSegmentsDialog } from '@/modules/finance/components/ExpenseSegmentsDialog';
+import { Layers } from 'lucide-react';
 import { RecordExpenseDocumentDialog } from '@/modules/finance/components/RecordExpenseDocumentDialog';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
@@ -548,7 +548,11 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 outstanding, and without this they look exactly like work outstanding. */}
             {type === 'expenses' && activeWorkspaceId && (
               <div className="flex flex-wrap items-center gap-2">
-                <ExpenseSegmentsDialog workspaceId={activeWorkspaceId} />
+                <Button asChild variant="outline" size="sm" className="h-9">
+                  <Link to={`/finance?tab=${FINANCE_TAB.expenseKinds}`}>
+                    <Layers className="mr-1.5 h-3.5 w-3.5" /> Every expense, by kind
+                  </Link>
+                </Button>
                 <RecordExpenseDocumentDialog workspaceId={activeWorkspaceId} onRecorded={() => void load()} />
               </div>
             )}

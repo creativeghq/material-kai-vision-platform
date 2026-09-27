@@ -5,7 +5,7 @@
 import {
   PieChart, ArrowDownCircle, ArrowUpCircle, Landmark, Truck, ShoppingCart, FileText, Receipt,
   FileMinus, Banknote, FileSignature, Building2, CalendarClock, Plane, Boxes, Clock, Gauge,
-  BarChart3, BookOpen, Send, Users, Bell, PackageSearch, Settings, Scale,
+  BarChart3, BookOpen, Send, Users, Bell, PackageSearch, Settings, Scale, Layers,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FINANCE_TAB } from './routes';
@@ -61,6 +61,9 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
   // Sits next to Expenses because it is the same inbox read the other way round — by issuer
   // rather than by document. Not a `docType`: it has its own panel.
   { value: FINANCE_TAB.expenseSuppliers, label: 'By Supplier', icon: Building2, group: 'documents' },
+  // An 8-column table that used to live in a modal, where four of the columns were unreadable
+  // and none of it fitted a phone. A breakdown you read across is a page.
+  { value: FINANCE_TAB.expenseKinds, label: 'By Kind & VAT', icon: Layers, group: 'documents' },
   // The dispatch board lives in the Warehouse module (a fulfilment surface, not a finance
   // document); this is the delivery-note LIST. Reachable from the WH jump-off too.
   { value: FINANCE_TAB.deliveryNotes, label: 'Delivery Notes', icon: Truck, group: 'documents', docType: 'delivery_notes' },

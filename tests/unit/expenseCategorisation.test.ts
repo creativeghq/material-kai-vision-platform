@@ -6,12 +6,13 @@ import {
   expenseCategoryByKey,
   expenseCategoryByName,
   fiscalCategoryForDocType,
+  categoryForKad,
   issuerKeyOf,
   CATEGORY_CONFIDENCE_FLOOR,
 } from '../../src/modules/finance/expenseCategoryVocabulary';
 
 const EDGE = 'supabase/functions/finance-categorize-expenses/index.ts';
-const DIALOG = 'src/modules/finance/components/CategoriseExpensesDialog.tsx';
+const PANEL = 'src/modules/finance/components/CategoriseExpensesPanel.tsx';
 const src = (p: string) => blankedSource(p);
 
 describe('the expense chart is a closed set', () => {
@@ -52,6 +53,55 @@ describe('the fiscal code decides what the fiscal code decides, and nothing more
       expect(fiscalCategoryForDocType(t), `${t} must not be auto-filed`).toBeNull();
     }
     expect(fiscalCategoryForDocType(null)).toBeNull();
+  });
+});
+
+describe('a registered ΚΑΔ decides before a model is asked', () => {
+  it('reads the real codes on this book onto real categories', () => {
+    // The ΚΑΔ actually present on the suppliers of 1,943 received documents, so this is coverage
+    // of the book rather than of a list somebody invented.
+    const cases: Array<[string, string]> = [
+      ['46830200', 'materials_supplies'], // χονδρικό εμπόριο ξύλου
+      ['46830300', 'materials_supplies'], // είδη υγιεινής
+      ['46830622', 'materials_supplies'], // κεραμικά πλακάκια
+      ['46840203', 'materials_supplies'], // εξοπλισμός κεντρικής θέρμανσης
+      ['46471113', 'materials_supplies'], // ξύλινα έπιπλα
+      ['27402000', 'materials_supplies'], // λαμπτήρες και φωτιστικά
+      ['31000000', 'materials_supplies'], // κατασκευή επίπλων
+      ['23641000', 'materials_supplies'], // κονιάματα
+      ['46500000', 'equipment'],          // εξοπλισμός πληροφορικής
+      ['47400000', 'equipment'],
+      ['52311902', 'shipping_freight'],   // διαμεταφορά εμπορευμάτων
+      ['49411000', 'shipping_freight'],   // οδικές μεταφορές
+      ['35150200', 'utilities'],
+    ];
+    for (const [kad, key] of cases) {
+      expect(categoryForKad(kad), `ΚΑΔ ${kad}`).toBe(key);
+    }
+  });
+
+  it('does not read a passenger flight as freight', () => {
+    // 51.10 is air PASSENGER transport and 51.21 is air freight. The division alone gets it wrong.
+    expect(categoryForKad('51100000')).toBe('travel');
+    expect(categoryForKad('51210000')).toBe('shipping_freight');
+    // Same trap one division down: 49 is road freight, 49.32 is a taxi.
+    expect(categoryForKad('49320000')).toBe('travel');
+  });
+
+  it('refuses a code it cannot settle instead of guessing', () => {
+    // 46.18 is an agent "specialising in particular products" — which products is not stated,
+    // so the code genuinely does not answer and the supplier goes to the classifier.
+    expect(categoryForKad('46180000')).toBeNull();
+    expect(categoryForKad('')).toBeNull();
+    expect(categoryForKad(null)).toBeNull();
+    expect(categoryForKad('9')).toBeNull();
+  });
+
+  it('matches the longest prefix, not the first one that fits', () => {
+    expect(categoryForKad('77110000')).toBe('travel');     // car hire
+    expect(categoryForKad('77330000')).toBe('equipment');  // machinery hire
+    expect(categoryForKad('66220000')).toBe('insurance');  // insurance broker
+    expect(categoryForKad('66190000')).toBe('bank_payment_fees');
   });
 });
 
@@ -119,7 +169,7 @@ describe('proposing is not applying', () => {
 
 describe('a supplier nobody could read stays undecided', () => {
   const edge = src(EDGE);
-  const dialog = src(DIALOG);
+  const dialog = src(PANEL);
 
   it('the edge reports the unverdicted rather than defaulting them', () => {
     expect(edge).toMatch(/unresolved\.push\(/);

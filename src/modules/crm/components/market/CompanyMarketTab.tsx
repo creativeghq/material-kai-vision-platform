@@ -73,9 +73,7 @@ export const CompanyMarketTab: React.FC<CompanyMarketTabProps> = ({ workspaceId,
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Competitors
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface CrmMatch {
   id: string;
@@ -252,9 +250,7 @@ const CompetitorsCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, company
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Lookalikes — "who else in our CRM does what this company does" (#289)
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface Lookalike {
   id: string;
@@ -369,9 +365,7 @@ const LookalikesPanel: React.FC<{ companyId: string }> = ({ companyId }) => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Financial snapshot + unbooked myDATA
-// ─────────────────────────────────────────────────────────────────────────────
 
 const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, companyId, company }) => {
   const [loading, setLoading] = useState(true);
@@ -502,9 +496,7 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Market position analytics (re-scoped Factory Analytics via brand_company_id)
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface EngagedProduct { product_id: string; saves: number; quotes: number }
 
@@ -710,9 +702,7 @@ const MarketPositionCard: React.FC<{ stats: MarketStatsResult }> = ({ stats }) =
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Attribute explorer — engagement rolled up by any metadata key on the catalog
-// ─────────────────────────────────────────────────────────────────────────────
 
 /** Keys that describe the row rather than the material, so they make useless rollup buckets. */
 const SKIP_ATTRIBUTE_KEYS = new Set([
@@ -855,9 +845,7 @@ const AttributeExplorerCard: React.FC<CompanyMarketTabProps & { stats: MarketSta
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Product price intelligence — our cost vs live market spread + monitor toggle
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface ProductRow {
   id: string;

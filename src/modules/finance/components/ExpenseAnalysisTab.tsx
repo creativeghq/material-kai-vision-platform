@@ -1,18 +1,40 @@
+/** Spend as an OVERVIEW. Which supplier, one by one, is the By-supplier tab — not this. */
 import React from 'react';
-import { AlertTriangle, Tags } from 'lucide-react';
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, Minus, Sparkles, Tags } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { formatMoney } from '@/utils/decimal';
-import { financeService, type ExpenseAnalysis } from '@/modules/finance/services/financeService';
+import { financeService, type ExpenseOverview } from '@/modules/finance/services/financeService';
 import { expenseKindCopy, originLabel } from '@/modules/finance/expenseSegments';
-import { CategoriseExpensesDialog } from '@/modules/finance/components/CategoriseExpensesDialog';
 
-const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 1000) / 10 : 0);
-
-const Bar: React.FC<{ share: number }> = ({ share }) => (
+const Bar: React.FC<{ share: number; muted?: boolean }> = ({ share, muted }) => (
   <div className="mt-1 h-1.5 w-full rounded-sm bg-surface-sunken">
-    <div className="h-1.5 rounded-sm bg-primary" style={{ width: `${Math.max(share, 1)}%` }} />
+    <div
+      className={`h-1.5 rounded-sm ${muted ? 'bg-muted-foreground/40' : 'bg-primary'}`}
+      style={{ width: `${Math.min(Math.max(share, 1), 100)}%` }}
+    />
   </div>
 );
+
+/** A movement is a direction and a size, or the honest absence of a comparison. */
+const Delta: React.FC<{ pct: number | null; inverse?: boolean }> = ({ pct, inverse }) => {
+  if (pct === null || pct === undefined) {
+    return <span className="text-[11px] text-muted-foreground">no earlier period to compare</span>;
+  }
+  const up = pct > 0;
+  const flat = Math.abs(pct) < 0.05;
+  // Spending MORE is the unwelcome direction, so up is amber and down is green.
+  const tone = flat ? 'text-muted-foreground'
+    : (up !== !!inverse) ? 'text-amber-800 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-400';
+  const Icon = flat ? Minus : up ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${tone}`}>
+      <Icon className="h-3 w-3" />
+      {flat ? 'flat' : `${up ? '+' : ''}${pct}%`}
+    </span>
+  );
+};
 
 export const ExpenseAnalysisTab: React.FC<{
   workspaceId: string;
@@ -20,164 +42,187 @@ export const ExpenseAnalysisTab: React.FC<{
   to: string;
   periodLabel: string;
 }> = ({ workspaceId, from, to, periodLabel }) => {
-  const [data, setData] = React.useState<ExpenseAnalysis | null>(null);
+  const [data, setData] = React.useState<ExpenseOverview | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [reloadKey, setReloadKey] = React.useState(0);
 
   React.useEffect(() => {
     if (!workspaceId) return;
     let live = true;
-    financeService.expenseAnalysis(workspaceId, from, to)
+    financeService.expenseOverview(workspaceId, from, to)
       .then((d) => { if (live) { setData(d); setError(null); } })
       .catch((e) => { if (live) { setData(null); setError(e instanceof Error ? e.message : String(e)); } });
     return () => { live = false; };
-  }, [workspaceId, from, to, reloadKey]);
+  }, [workspaceId, from, to]);
 
   if (error) {
     return (
       <Card>
         <CardContent className="flex items-start gap-2 p-4 text-xs text-amber-800 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          The spend breakdown could not be read — {error}. That is not a statement that nothing was spent.
+          The spend overview could not be read — {error}. That is not a statement that nothing was spent.
         </CardContent>
       </Card>
     );
   }
   if (!data) return null;
 
-  const total = data.total_net;
-  const catchallDominates = data.catchall.share >= 80 && data.catchall.docs > 0;
+  const { total, previous, filed, concentration } = data;
+  const readable = data.categories.filter((c) => !c.is_inlet);
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="border-b border-hairline px-5 py-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Tags className="h-4 w-4 text-muted-foreground" /> Spend — {periodLabel}
-              </CardTitle>
-              <p className="pt-1 text-[11px] text-muted-foreground">
-                {formatMoney(total, 'EUR')} across {data.total_docs.toLocaleString()} documents,
-                whether or not they are booked yet.
-              </p>
-            </div>
-            <CategoriseExpensesDialog
-              workspaceId={workspaceId}
-              onApplied={() => setReloadKey((n) => n + 1)}
-            />
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Tags className="h-4 w-4 text-muted-foreground" /> Spend — {periodLabel}
+            </CardTitle>
+            <Button asChild variant="secondary" size="sm">
+              <Link to="/finance?tab=expense_suppliers">
+                <Sparkles className="mr-2 h-3.5 w-3.5" /> Suggest categories
+              </Link>
+            </Button>
           </div>
         </CardHeader>
 
-        {catchallDominates && (
-          <CardContent className="border-b border-hairline pt-4">
-            <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                <strong>{data.catchall.share}% of this sits in one category, “{data.catchall.name}”</strong>
-                {' '}— {data.catchall.docs.toLocaleString()} documents. That category is named after
-                the inlet the documents arrived through, not after what the money bought, so the
-                category split below cannot tell you anything yet. Suppliers and kinds can.
-                <em className="not-italic"> Suggest categories</em> proposes one per supplier,
-                which fixes the history and everything that arrives afterwards.
-              </span>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
+            <div>
+              <p className="text-[11px] text-muted-foreground">Total spend</p>
+              <p className="text-2xl font-semibold tabular-nums">{formatMoney(total.net, 'EUR')}</p>
+              <p className="mt-0.5 flex items-center gap-2">
+                <Delta pct={data.delta_pct} />
+                <span className="text-[11px] text-muted-foreground">
+                  vs {formatMoney(previous.net, 'EUR')} in the {data.period.prev_from} → {data.period.prev_to} period
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">VAT on it</p>
+              <p className="text-base font-semibold tabular-nums">{formatMoney(total.vat, 'EUR')}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Documents</p>
+              <p className="text-base font-semibold tabular-nums">{total.docs.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Suppliers</p>
+              <p className="text-base font-semibold tabular-nums">{total.suppliers.toLocaleString()}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* What share of the money can actually be read by category. Stated as a figure, because a
+          category chart built on 0% filed looks complete and answers nothing. */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <p className="text-sm font-medium">
+              {filed.share}% of this is filed under a real category
             </p>
+            <p className="text-[11px] tabular-nums text-muted-foreground">
+              {formatMoney(filed.net, 'EUR')} of {formatMoney(total.net, 'EUR')} ·{' '}
+              {filed.docs.toLocaleString()} of {total.docs.toLocaleString()} documents
+            </p>
+          </div>
+          <Bar share={filed.share} muted={filed.share < 50} />
+          {filed.share < 100 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              The rest is still under the inlet it arrived through, which says nothing about what
+              the money bought. <strong>Suggest categories</strong> proposes one per supplier —
+              from their registered ΚΑΔ where we hold it, and from the trade name where we do not.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {readable.length > 0 && (
+        <Card>
+          <CardHeader className="border-b border-hairline px-5 py-3">
+            <CardTitle className="text-sm">Where it goes</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-4">
+            {readable.map((c) => (
+              <div key={c.name}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-medium">{c.name}</span>
+                  <span className="flex shrink-0 items-baseline gap-3 tabular-nums">
+                    <Delta pct={c.delta_pct} />
+                    <span>{formatMoney(c.net, 'EUR')}</span>
+                    <span className="w-10 text-right text-xs text-muted-foreground">{c.share}%</span>
+                  </span>
+                </div>
+                <Bar share={c.share} />
+              </div>
+            ))}
           </CardContent>
-        )}
+        </Card>
+      )}
 
-        <CardContent className="space-y-6 pt-4">
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              By kind
-            </h3>
-            <div className="mt-2 space-y-2">
-              {data.kinds.map((k) => (
-                <div key={k.kind}>
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="font-medium">{expenseKindCopy(k.kind).label}</span>
-                    <span className="shrink-0 tabular-nums">
-                      {formatMoney(k.net, 'EUR')}
-                      <span className="ml-2 text-xs text-muted-foreground">{pct(k.net, total)}%</span>
-                    </span>
-                  </div>
-                  <Bar share={pct(k.net, total)} />
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {k.docs.toLocaleString()} document{k.docs === 1 ? '' : 's'}
-                    {k.abroad_net > 0 ? ` · ${formatMoney(k.abroad_net, 'EUR')} from outside Greece` : ''}
-                  </p>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="border-b border-hairline px-5 py-3">
+            <CardTitle className="text-sm">What kind of spend</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-4">
+            {data.kinds.map((k) => (
+              <div key={k.kind}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-medium">{expenseKindCopy(k.kind).label}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {formatMoney(k.net, 'EUR')}
+                    <span className="ml-2 text-xs text-muted-foreground">{k.share}%</span>
+                  </span>
                 </div>
-              ))}
-            </div>
-          </section>
+                <Bar share={k.share} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Top suppliers
-            </h3>
-            <div className="table-scroll mt-2">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-sunken">
-                  <tr className="text-left text-[11px] font-semibold text-muted-foreground">
-                    <th className="px-3 py-2">Supplier</th>
-                    <th className="px-3 py-2">Kind</th>
-                    <th className="px-3 py-2">From</th>
-                    <th className="px-3 py-2 text-right">Docs</th>
-                    <th className="px-3 py-2 text-right">Net</th>
-                    <th className="px-3 py-2 text-right">Share</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {data.suppliers.map((s) => (
-                    <tr key={s.name}>
-                      <td className="max-w-xs truncate px-3 py-2 font-medium" title={s.name}>{s.name}</td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {s.expense_kind === 'mixed' ? 'Mixed' : expenseKindCopy(s.expense_kind).label}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {s.origin === 'mixed' ? 'Mixed' : originLabel(s.origin)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{s.docs}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatMoney(s.net, 'EUR')}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        {pct(s.net, total)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              By category
-            </h3>
-            <div className="mt-2 space-y-2">
-              {data.categories.map((c) => (
-                <div key={c.name}>
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="font-medium">
-                      {c.name}
-                      {c.is_catchall && (
-                        <span className="ml-2 text-[11px] font-normal text-muted-foreground">
-                          (not a real category — the inlet)
-                        </span>
-                      )}
-                    </span>
-                    <span className="shrink-0 tabular-nums">
-                      {formatMoney(c.net, 'EUR')}
-                      <span className="ml-2 text-xs text-muted-foreground">{pct(c.net, total)}%</span>
-                    </span>
-                  </div>
-                  <Bar share={pct(c.net, total)} />
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {c.docs.toLocaleString()} document{c.docs === 1 ? '' : 's'} · {c.booked_docs} booked
-                    {c.abroad_net > 0 ? ` · ${formatMoney(c.abroad_net, 'EUR')} from outside Greece` : ''}
-                  </p>
+        <Card>
+          <CardHeader className="border-b border-hairline px-5 py-3">
+            <CardTitle className="text-sm">Where it comes from</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-4">
+            {data.origins.map((o) => (
+              <div key={o.origin}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-medium">
+                    {o.origin === 'unknown' ? 'Not stated on the document' : originLabel(o.origin)}
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {formatMoney(o.net, 'EUR')}
+                    <span className="ml-2 text-xs text-muted-foreground">{o.share}%</span>
+                  </span>
                 </div>
-              ))}
-            </div>
-          </section>
+                <Bar share={o.share} muted={o.origin === 'unknown'} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="pt-4 text-sm">
+          <p>
+            The five largest suppliers are{' '}
+            <strong className="tabular-nums">{concentration.top5_share}%</strong> of this
+            {concentration.largest_name && concentration.largest_share !== null && (
+              <>
+                , and {concentration.largest_name} alone is{' '}
+                <strong className="tabular-nums">{concentration.largest_share}%</strong>
+              </>
+            )}
+            {' '}— out of {concentration.supplier_count.toLocaleString()} suppliers in the period.
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Supplier by supplier, with their whole history, is{' '}
+            <Link to="/finance?tab=expense_suppliers" className="underline underline-offset-2 hover:text-foreground">
+              By supplier
+            </Link>.
+          </p>
         </CardContent>
       </Card>
     </div>

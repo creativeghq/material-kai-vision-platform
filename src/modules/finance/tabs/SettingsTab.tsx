@@ -665,9 +665,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   );
 };
 
-// ─────────────────────────────────────────────────────────────────
 // Digest panel — toggle, frequency, day/hour, recipient list, send-now.
-// ─────────────────────────────────────────────────────────────────
 
 const DAY_OPTIONS = [
   { v: 0, label: 'Sunday' }, { v: 1, label: 'Monday' }, { v: 2, label: 'Tuesday' },

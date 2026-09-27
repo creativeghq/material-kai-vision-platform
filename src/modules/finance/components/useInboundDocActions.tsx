@@ -53,6 +53,7 @@ export function useInboundDocActions({
   /** Value-only lines being completed (issue #377, Phase 1b). */
   const [detailDoc, setDetailDoc] = useState<InboundDocument | null>(null);
   /** Being paid before it is an expense — the conversion happens when that form saves. */
+  const [payIntent, setPayIntent] = useState<'record' | 'send'>('record');
   const [payDoc, setPayDoc] = useState<InboundDocument | null>(null);
   /** Being turned into the purchase order it was always for. */
   const [orderDoc, setOrderDoc] = useState<InboundDocument | null>(null);
@@ -122,7 +123,8 @@ export function useInboundDocActions({
       // Recording a payment is ONE act with ONE form, preset to this document. Whether an expense
       // exists yet is our bookkeeping, not the operator's question: if it does the payment settles
       // it, if it doesn't the document is converted on save. Opening never writes either way.
-      onRecordPayment={() => setPayDoc(doc)}
+      onRecordPayment={() => { setPayIntent('record'); setPayDoc(doc); }}
+      onSendPayment={() => { setPayIntent('send'); setPayDoc(doc); }}
       onCreateOrder={() => setOrderDoc(doc)}
       hasOrder={ordered.has(doc.id)}
       onBillExistingOrder={() => setBillOrderDoc(doc)}
@@ -206,6 +208,7 @@ export function useInboundDocActions({
         <RecordPaymentDialog
           workspaceId={workspaceId}
           presetExpenseId={payDoc.created_supplier_bill_id ?? undefined}
+          initialIntent={payIntent}
           open
           onOpenChange={(v) => { if (!v) setPayDoc(null); }}
           onSaved={() => { setPayDoc(null); onChanged(); }}

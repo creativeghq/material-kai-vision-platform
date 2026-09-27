@@ -17,6 +17,7 @@
     "lint:tenancy": "node scripts/check-tenancy-parity.mjs",
     "comments:check": "node scripts/trim-comments.mjs --list",
     "comments:trim": "node scripts/trim-comments.mjs",
+    "modals:audit": "node scripts/check-modal-as-page.mjs",
     "comments:mass": "node scripts/check-comment-mass.mjs",
     "comments:verify": "node scripts/verify-comment-only.mjs",
     "verify": "node scripts/verify.mjs",

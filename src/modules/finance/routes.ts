@@ -24,6 +24,8 @@ export const FINANCE_TAB = {
   expenses: 'doc_expenses',
   /** The same inbox seen by ISSUER — filing, the CRM link, and one supplier's whole history. */
   expenseSuppliers: 'expense_suppliers',
+  /** The same inbox by KIND x VAT x origin, and what each segment does to the P&L. */
+  expenseKinds: 'expense_kinds',
   deliveryNotes: 'doc_delivery',
   cheques: 'doc_cheques',
   parties: 'parties',

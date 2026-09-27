@@ -69,7 +69,84 @@ export function issuerKeyOf(issuerVat: string | null | undefined, issuerName: st
   return name ? `name:${name}` : null;
 }
 
-export type CategoryDecidedBy = 'ai' | 'manual' | 'fiscal_code';
+/**
+ * ΚΑΔ prefix → category: the activity the supplier registered with ΑΑΔΕ, which beats anything
+ * inferred from a name. LONGEST PREFIX FIRST, so 77.11 (car hire) does not fall into 77. Partial
+ * on purpose — 47.x retail could be office supplies or materials, so it goes to the classifier.
+ */
+const KAD_CATEGORY_PREFIXES: ReadonlyArray<readonly [string, string]> = [
+  // Goods we buy to sell or to fit.
+  ['16', 'materials_supplies'],
+  ['22', 'materials_supplies'],
+  ['23', 'materials_supplies'],
+  ['25', 'materials_supplies'],
+  ['27', 'materials_supplies'],
+  ['31', 'materials_supplies'],
+  ['4647', 'materials_supplies'],
+  ['4643', 'materials_supplies'],
+  ['4650', 'equipment'],          // wholesale of IT and communications equipment
+  ['4669', 'materials_supplies'],
+  ['4673', 'materials_supplies'],
+  ['4674', 'materials_supplies'],
+  ['4683', 'materials_supplies'],
+  ['4684', 'materials_supplies'],
+  ['4740', 'equipment'],          // retail of IT equipment
+  ['4752', 'materials_supplies'], // retail of hardware, paint and glass
+  ['28', 'equipment'],
+  // Labour on site.
+  ['41', 'subcontractors'],
+  ['42', 'subcontractors'],
+  ['43', 'subcontractors'],
+  ['78', 'subcontractors'],
+  // Getting things there.
+  ['49', 'shipping_freight'],
+  ['4932', 'travel'],             // taxi
+  ['50', 'shipping_freight'],
+  ['51', 'shipping_freight'],
+  ['5110', 'travel'],             // air PASSENGER transport — a flight, not freight
+  ['52', 'shipping_freight'],
+  ['53', 'shipping_freight'],
+  // Running the business.
+  ['35', 'utilities'],
+  ['36', 'utilities'],
+  ['37', 'utilities'],
+  ['61', 'utilities'],
+  ['582', 'software_subscriptions'],
+  ['62', 'software_subscriptions'],
+  ['631', 'software_subscriptions'],
+  ['69', 'professional_fees'],
+  ['702', 'professional_fees'],
+  ['71', 'professional_fees'],
+  ['74', 'professional_fees'],
+  ['731', 'marketing_advertising'],
+  ['64', 'bank_payment_fees'],
+  ['65', 'insurance'],
+  ['6622', 'insurance'],          // insurance agents and brokers
+  ['66', 'bank_payment_fees'],
+  ['682', 'rent'],
+  ['771', 'travel'],              // motor vehicle rental
+  ['773', 'equipment'],           // machinery and equipment rental
+  ['55', 'travel'],
+  ['56', 'travel'],
+  ['79', 'travel'],
+  ['33', 'maintenance_repairs'],
+  ['452', 'maintenance_repairs'],
+  ['95', 'maintenance_repairs'],
+];
+
+const KAD_SORTED = [...KAD_CATEGORY_PREFIXES].sort((a, b) => b[0].length - a[0].length);
+
+/** The category a ΚΑΔ decides on its own, or null where the code does not settle it. */
+export function categoryForKad(kad: string | null | undefined): string | null {
+  const digits = (kad ?? '').replace(/\D/g, '');
+  if (digits.length < 2) return null;
+  for (const [prefix, key] of KAD_SORTED) {
+    if (digits.startsWith(prefix)) return key;
+  }
+  return null;
+}
+
+export type CategoryDecidedBy = 'ai' | 'manual' | 'fiscal_code' | 'kad';
 
 /** A proposal is only actionable above this; below it the reviewer is being asked, not told. */
 export const CATEGORY_CONFIDENCE_FLOOR = 0.5;

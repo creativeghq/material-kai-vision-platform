@@ -33,8 +33,8 @@ export interface SendOrRecordState {
   forceVop: boolean;
 }
 
-export const emptySendState = (): SendOrRecordState => ({
-  intent: 'record',
+export const emptySendState = (intent: SendOrRecordState['intent'] = 'record'): SendOrRecordState => ({
+  intent,
   crmBankAccountId: '',
   sendMode: 'draft',
   forceVop: false,

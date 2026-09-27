@@ -1,10 +1,13 @@
-/** Review screen: every row editable, nothing written until Apply, no default for the unread. */
+/**
+ * Review surface for the categoriser: every row editable, nothing written until Apply, and an
+ * unread supplier left undecided. A panel, because 246 rows is a table you read across.
+ */
 import React from 'react';
 import { AlertTriangle, Check, Sparkles, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { formatMoney } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +25,7 @@ interface Row {
   categoryKey: string | null;
   categoryLabel: string;
   note: string;
-  decidedBy: 'ai' | 'manual' | 'fiscal_code';
+  decidedBy: 'ai' | 'manual' | 'fiscal_code' | 'kad';
   confidence: number | null;
   rationale: string | null;
   lowConfidence: boolean;
@@ -37,12 +40,11 @@ interface RowState {
   edited: boolean;
 }
 
-export const CategoriseExpensesDialog: React.FC<{
+export const CategoriseExpensesPanel: React.FC<{
   workspaceId: string;
   onApplied?: () => void;
 }> = ({ workspaceId, onApplied }) => {
   const { toast } = useToast();
-  const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [applying, setApplying] = React.useState(false);
   const [data, setData] = React.useState<ExpenseCategorySuggestions | null>(null);
@@ -62,9 +64,11 @@ export const CategoriseExpensesDialog: React.FC<{
       categoryLabel: p.category_name,
       note: p.decided_by === 'fiscal_code'
         ? 'the document type decides this'
-        : p.low_confidence
-          ? `low confidence (${Math.round(p.confidence * 100)}%) — check this one`
-          : `${Math.round(p.confidence * 100)}% confident`,
+        : p.decided_by === 'kad'
+          ? 'their registered activity decides this'
+          : p.low_confidence
+            ? `low confidence (${Math.round(p.confidence * 100)}%) — check this one`
+            : `${Math.round(p.confidence * 100)}% confident`,
       decidedBy: p.decided_by,
       confidence: p.confidence,
       rationale: p.rationale,
@@ -81,7 +85,8 @@ export const CategoriseExpensesDialog: React.FC<{
       categoryKey: expenseCategoryByName(d.category_name)?.key ?? null,
       categoryLabel: d.category_name,
       note: d.decided_by === 'fiscal_code' ? 'filed by document type'
-        : d.decided_by === 'manual' ? 'your decision' : 'filed by the classifier',
+        : d.decided_by === 'kad' ? 'filed by registered activity'
+          : d.decided_by === 'manual' ? 'your decision' : 'filed by the classifier',
       decidedBy: d.decided_by,
       confidence: d.confidence,
       rationale: d.rationale,
@@ -91,6 +96,7 @@ export const CategoriseExpensesDialog: React.FC<{
     return [...proposals, ...decided];
   }, [data]);
 
+  // Never on mount: a visit to this tab must not fire a paid classification nobody asked for.
   const suggest = React.useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -161,7 +167,6 @@ export const CategoriseExpensesDialog: React.FC<{
 
   const selectedNet = selected.reduce((s, r) => s + r.net, 0);
   const selectedDocs = selected.reduce((s, r) => s + r.docs, 0);
-  const pendingRows = rows.filter((r) => !r.inForce);
 
   const renderRows = (list: Row[]) => list.map((r) => {
     const st = state[r.key];
@@ -175,7 +180,7 @@ export const CategoriseExpensesDialog: React.FC<{
             aria-label={`Include ${r.issuerName ?? r.issuerKey}`}
           />
         </td>
-        <td className="max-w-[18rem] px-3 py-2 align-top">
+        <td className="max-w-[22rem] px-3 py-2 align-top">
           <p className="truncate font-medium" title={r.issuerName ?? undefined}>
             {r.issuerName ?? 'Unnamed supplier'}
           </p>
@@ -191,7 +196,7 @@ export const CategoriseExpensesDialog: React.FC<{
             value={st.categoryKey ?? ''}
             onValueChange={(v) => setRow(r.key, { categoryKey: v, edited: v !== r.categoryKey, on: true })}
           >
-            <SelectTrigger className="h-8 w-[13rem]">
+            <SelectTrigger className="h-8 w-[14rem]">
               <SelectValue placeholder={r.categoryLabel} />
             </SelectTrigger>
             <SelectContent>
@@ -206,7 +211,7 @@ export const CategoriseExpensesDialog: React.FC<{
             </p>
           )}
         </td>
-        <td className="max-w-[16rem] px-3 py-2 align-top text-[11px] text-muted-foreground">
+        <td className="px-3 py-2 align-top text-[11px] text-muted-foreground">
           {st.edited ? 'Your choice.' : r.rationale ?? '—'}
         </td>
         <td className="px-3 py-2 text-right align-top tabular-nums">{r.docs}</td>
@@ -216,129 +221,141 @@ export const CategoriseExpensesDialog: React.FC<{
   });
 
   return (
-    <>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => { setOpen(true); if (!data) void suggest(); }}
-      >
-        <Sparkles className="mr-2 h-3.5 w-3.5" /> Suggest categories
-      </Button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Categorise the inlet</DialogTitle>
-            <DialogDescription>
+    <Card>
+      <CardHeader className="border-b border-hairline px-5 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm">Categorise the inlet</CardTitle>
+            <p className="pt-1 text-[11px] text-muted-foreground">
               One decision per supplier, not per document — and it sticks, so everything that
-              arrives from them later is filed the same way without being asked again.
-            </DialogDescription>
-          </DialogHeader>
-
-          {error && (
-            <p className="flex items-start gap-2 rounded-sm bg-surface-sunken p-3 text-xs text-amber-800 dark:text-amber-300">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {error}
+              arrives from them later is filed the same way without being asked again. Their
+              registered ΚΑΔ decides it where we hold one; the trade name is read only where we
+              do not.
             </p>
-          )}
-
-          {loading && !data && (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Reading the suppliers and proposing a category for each…
-            </p>
-          )}
-
-          {data && (
-            <>
-              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-3">
-                <div className="flex flex-wrap gap-x-8 gap-y-2">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground">Waiting on a category</p>
-                    <p className="text-sm font-semibold tabular-nums">
-                      {data.pending_issuers.toLocaleString()} suppliers ·{' '}
-                      {data.pending_docs.toLocaleString()} documents
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground">Value in the inlet</p>
-                    <p className="text-sm font-semibold tabular-nums">
-                      {formatMoney(data.pending_net, 'EUR')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground">Already decided</p>
-                    <p className="text-sm font-semibold tabular-nums">
-                      {data.decided_issuers.toLocaleString()} suppliers
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => void suggest()} disabled={loading}>
-                  <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Re-run
-                </Button>
-              </div>
-
-              <div className="table-scroll max-h-[50vh] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-surface-sunken">
-                    <tr className="text-left text-[11px] font-semibold text-muted-foreground">
-                      <th className="w-8 px-3 py-2"><span className="sr-only">Include</span></th>
-                      <th className="px-3 py-2">Supplier</th>
-                      <th className="px-3 py-2">Category</th>
-                      <th className="px-3 py-2">Why</th>
-                      <th className="px-3 py-2 text-right">Docs</th>
-                      <th className="px-3 py-2 text-right">Net</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {renderRows(pendingRows)}
-                    {(data.decided ?? []).length > 0 && (
-                      <tr className="bg-surface-sunken">
-                        <td colSpan={6} className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground">
-                          Already in force — change one to correct it, including the documents it filed
-                        </td>
-                      </tr>
-                    )}
-                    {renderRows(rows.filter((r) => r.inForce))}
-                  </tbody>
-                </table>
-              </div>
-
-              {data.unresolved.length > 0 && (
-                <p className="flex items-start gap-2 text-[11px] text-muted-foreground">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  {data.unresolved.length} supplier{data.unresolved.length === 1 ? '' : 's'} came back
-                  with no verdict and {data.unresolved.length === 1 ? 'is' : 'are'} left undecided
-                  rather than filed somewhere plausible:{' '}
-                  {data.unresolved.slice(0, 5).map((u) => u.issuer_name ?? u.issuer_key).join(', ')}
-                  {data.unresolved.length > 5 ? ' …' : ''}
-                </p>
-              )}
-
-              {rows.length === 0 && !loading && (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Nothing is waiting on a category.
-                </p>
-              )}
-            </>
-          )}
-
-          <DialogFooter className="items-center justify-between gap-3 sm:justify-between">
-            <p className="text-[11px] text-muted-foreground">
-              {selected.length > 0
-                ? `${selected.length} supplier${selected.length === 1 ? '' : 's'} · `
-                  + `${selectedDocs.toLocaleString()} documents · ${formatMoney(selectedNet, 'EUR')}`
-                : 'Nothing selected.'}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>Close</Button>
+          </div>
+          <div className="flex items-center gap-2">
+            {data && (
               <Button onClick={() => void apply()} disabled={applying || selected.length === 0}>
                 <Check className="mr-2 h-3.5 w-3.5" />
                 {applying ? 'Applying…' : `Apply ${selected.length || ''}`.trim()}
               </Button>
+            )}
+            <Button variant={data ? 'outline' : 'secondary'} size="sm" onClick={() => void suggest()} disabled={loading}>
+              {data
+                ? <><RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Re-run</>
+                : <><Sparkles className="mr-2 h-3.5 w-3.5" /> Suggest categories</>}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+
+      {error && (
+        <CardContent className="pt-4">
+          <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {error}
+          </p>
+        </CardContent>
+      )}
+
+      {loading && !data && (
+        <CardContent className="pt-4">
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Reading the suppliers and proposing a category for each…
+          </p>
+        </CardContent>
+      )}
+
+      {!data && !loading && !error && (
+        <CardContent className="pt-4">
+          <p className="text-sm text-muted-foreground">
+            Received documents arrive under the inlet they came through, which says nothing about
+            what the money bought. This proposes a category per supplier and shows you each one
+            with its reason before anything is written.
+          </p>
+        </CardContent>
+      )}
+
+      {data && (
+        <CardContent className="space-y-4 pt-4">
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-3 border-b border-hairline pb-3">
+            <div>
+              <p className="text-[11px] text-muted-foreground">Waiting on a category</p>
+              <p className="text-sm font-semibold tabular-nums">
+                {data.pending_issuers.toLocaleString()} suppliers ·{' '}
+                {data.pending_docs.toLocaleString()} documents
+              </p>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Value in the inlet</p>
+              <p className="text-sm font-semibold tabular-nums">{formatMoney(data.pending_net, 'EUR')}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">With a registered ΚΑΔ</p>
+              <p className="text-sm font-semibold tabular-nums">
+                {data.pending_with_kad.toLocaleString()} of {data.pending_issuers.toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Already decided</p>
+              <p className="text-sm font-semibold tabular-nums">
+                {data.decided_issuers.toLocaleString()} suppliers
+              </p>
+            </div>
+            {selected.length > 0 && (
+              <div className="border-l border-hairline pl-8">
+                <p className="text-[11px] text-muted-foreground">Selected</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {selectedDocs.toLocaleString()} documents · {formatMoney(selectedNet, 'EUR')}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="table-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-sunken">
+                <tr className="text-left text-[11px] font-semibold text-muted-foreground">
+                  <th className="w-8 px-3 py-2"><span className="sr-only">Include</span></th>
+                  <th className="px-3 py-2">Supplier</th>
+                  <th className="px-3 py-2">Category</th>
+                  <th className="px-3 py-2">Why</th>
+                  <th className="px-3 py-2 text-right">Docs</th>
+                  <th className="px-3 py-2 text-right">Net</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {renderRows(rows.filter((r) => !r.inForce))}
+                {(data.decided ?? []).length > 0 && (
+                  <tr className="bg-surface-sunken">
+                    <td colSpan={6} className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground">
+                      Already in force — change one to correct it, including the documents it filed
+                    </td>
+                  </tr>
+                )}
+                {renderRows(rows.filter((r) => r.inForce))}
+              </tbody>
+            </table>
+          </div>
+
+          {data.unresolved.length > 0 && (
+            <p className="flex items-start gap-2 text-[11px] text-muted-foreground">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {data.unresolved.length} supplier{data.unresolved.length === 1 ? '' : 's'} came back
+              with no verdict and {data.unresolved.length === 1 ? 'is' : 'are'} left undecided
+              rather than filed somewhere plausible:{' '}
+              {data.unresolved.slice(0, 5).map((u) => u.issuer_name ?? u.issuer_key).join(', ')}
+              {data.unresolved.length > 5 ? ' …' : ''}
+            </p>
+          )}
+
+          {rows.length === 0 && !loading && (
+            <p className="py-4 text-sm text-muted-foreground">
+              Nothing is waiting on a category.
+            </p>
+          )}
+        </CardContent>
+      )}
+    </Card>
   );
 };

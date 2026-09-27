@@ -67,6 +67,8 @@ export const RecordPaymentDialog: React.FC<{
   /** Settle THIS expense (a `supplier_bills` id): opens on the money-out branch with the expense
    *  already selected in the picker. Prefill, not a lock — it can be changed like any other. */
   presetExpenseId?: string;
+  /** Open on "send it" rather than "record it". The screen still offers both. */
+  initialIntent?: 'record' | 'send';
   /** Which side of the trade this payment is. 'supplier' = money OUT to the party we're buying
    *  from (a purchase order). Defaults to 'customer' — money in from whoever we sold to. */
   side?: 'customer' | 'supplier';
@@ -75,7 +77,7 @@ export const RecordPaymentDialog: React.FC<{
   payableBills?: Array<{ id: string; supplier_bill_number: string | null; amount_due: number; currency: string }>;
   /** Currency of the ORDER this payment is being recorded against. */
   orderCurrency?: string;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, side = 'customer', payableBills = [], orderCurrency }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, initialIntent = 'record', side = 'customer', payableBills = [], orderCurrency }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -367,9 +369,9 @@ export const RecordPaymentDialog: React.FC<{
   // idempotency key would attach this payment to the last one.
   useEffect(() => {
     if (!open) return;
-    setSendState(emptySendState());
+    setSendState(emptySendState(initialIntent));
     sendRequestId.current = crypto.randomUUID();
-  }, [open]);
+  }, [open, initialIntent]);
 
   // Preset selection prefills the amount once its row has loaded — same value `pickExpense`
   // would set, without duplicating the rule or overwriting anything already typed.

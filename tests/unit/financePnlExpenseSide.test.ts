@@ -52,7 +52,8 @@ describe('the dashboard P&L includes expenses', () => {
     const suppliers = strippedSource('src/modules/finance/tabs/ExpenseSuppliersTab.tsx');
     expect(suppliers, 'booking sits with filing').toMatch(/<ExpenseBacklogCard/);
     const docs = strippedSource('src/modules/finance/pages/DocumentsPage.tsx');
-    expect(docs, 'the Expenses tab states what is in the inbox').toMatch(/<ExpenseSegmentsDialog/);
+    expect(docs, 'the Expenses tab links to the breakdown')
+      .toMatch(/FINANCE_TAB.expenseKinds/);
     expect(strippedSource(DASHBOARD), 'and the dashboard does not repeat it')
       .not.toMatch(/<ExpenseBacklogCard/);
   });
@@ -147,7 +148,7 @@ describe('a P&L figure carries the verdict on itself', () => {
 });
 
 describe('every kind of expense is visible, and says whether the P&L has it', () => {
-  const card = strippedSource('src/modules/finance/components/ExpenseSegmentsDialog.tsx');
+  const card = strippedSource('src/modules/finance/tabs/ExpenseKindsTab.tsx');
   const filters = strippedSource('src/modules/finance/components/documentFilters.ts');
 
   it('segments come from SQL — the pane never decides what kind a document is', () => {

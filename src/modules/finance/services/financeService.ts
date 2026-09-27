@@ -3304,13 +3304,24 @@ export interface PartyRow {
   credit_releasable: boolean;
 }
 
-export interface ExpenseAnalysis {
-  total_net: number;
-  total_docs: number;
-  categories: Array<{ name: string; is_catchall: boolean; docs: number; net: number; vat: number; abroad_net: number; booked_docs: number }>;
-  suppliers: Array<{ name: string; docs: number; net: number; origin: string; expense_kind: string }>;
-  kinds: Array<{ kind: string; docs: number; net: number; abroad_net: number }>;
-  catchall: { name: string | null; docs: number; net: number; share: number };
+export interface ExpenseOverview {
+  period: { from: string; to: string; prev_from: string; prev_to: string };
+  total: { net: number; vat: number; docs: number; suppliers: number };
+  previous: { net: number; docs: number };
+  /** Null when there is no earlier period to compare against — never rendered as 0%. */
+  delta_pct: number | null;
+  /** The share of the money under a real category rather than the inlet it arrived through. */
+  filed: { net: number; docs: number; share: number };
+  categories: Array<{
+    name: string; is_inlet: boolean; net: number; docs: number;
+    prev_net: number; share: number; delta_pct: number | null;
+  }>;
+  kinds: Array<{ kind: string; net: number; docs: number; share: number }>;
+  origins: Array<{ origin: string; net: number; docs: number; share: number }>;
+  concentration: {
+    supplier_count: number; top5_net: number; top5_share: number;
+    largest_name: string | null; largest_share: number | null;
+  };
 }
 
 export interface ExpenseCategoryProposal {
@@ -3321,7 +3332,7 @@ export interface ExpenseCategoryProposal {
   category_name: string;
   confidence: number;
   rationale: string;
-  decided_by: 'ai' | 'fiscal_code';
+  decided_by: 'ai' | 'fiscal_code' | 'kad';
   docs: number;
   net: number;
   low_confidence: boolean;
@@ -3332,7 +3343,7 @@ export interface ExpenseCategoryDecision {
   scope_doc_type: string | null;
   issuer_name: string | null;
   category_name: string;
-  decided_by: 'ai' | 'manual' | 'fiscal_code';
+  decided_by: 'ai' | 'manual' | 'fiscal_code' | 'kad';
   confidence: number | null;
   rationale: string | null;
   docs: number;
@@ -3348,6 +3359,8 @@ export interface ExpenseCategorySuggestions {
   pending_issuers: number;
   pending_docs: number;
   pending_net: number;
+  /** How many of the pending suppliers carry a registered ΚΑΔ we could read. */
+  pending_with_kad: number;
   decided_issuers: number;
   examined: number;
 }
@@ -3767,13 +3780,13 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as SalesPerDayRow[];
   },
-  /** This workspace's OWN open finance findings. The /admin view is cross-workspace. */
-  async expenseAnalysis(workspaceId: string, from: string, to: string): Promise<ExpenseAnalysis> {
-    const { data, error } = await supabase.rpc('get_expense_analysis' as never, {
-      p_workspace_id: workspaceId, p_from: from, p_to: to, p_limit: 25,
+  /** Spend for one period against the one before it. Shares and movements are derived in SQL. */
+  async expenseOverview(workspaceId: string, from: string, to: string): Promise<ExpenseOverview> {
+    const { data, error } = await supabase.rpc('get_expense_overview' as never, {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
     } as never);
     if (error) throw error;
-    return data as unknown as ExpenseAnalysis;
+    return data as unknown as ExpenseOverview;
   },
 
   /** Propose a category per supplier in the myAADE inlet. Writes NOTHING; apply commits. */
@@ -3794,7 +3807,7 @@ const _financeServiceV2 = {
       scope_doc_type?: string | null;
       issuer_name?: string | null;
       category_key: string;
-      decided_by?: 'ai' | 'manual' | 'fiscal_code';
+      decided_by?: 'ai' | 'manual' | 'fiscal_code' | 'kad';
       confidence?: number | null;
       rationale?: string | null;
     }>,
@@ -3811,6 +3824,7 @@ const _financeServiceV2 = {
     };
   },
 
+  /** This workspace's OWN open finance findings. The /admin view is cross-workspace. */
   async integrityFindings(workspaceId: string): Promise<FinanceFinding[]> {
     const { data, error } = await supabase.rpc('get_workspace_integrity_findings' as never, {
       p_workspace_id: workspaceId, p_domain: 'finance',

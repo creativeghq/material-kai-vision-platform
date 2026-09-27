@@ -95,6 +95,8 @@ import type { ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
 type DashView = 'position' | 'flow' | 'spend' | 'activity';
 import { HubTabNav } from '@/components/core/hub';
 import { ExpenseAnalysisTab } from '@/modules/finance/components/ExpenseAnalysisTab';
+import { ExpenseKindsTab } from '@/modules/finance/tabs/ExpenseKindsTab';
+import { CategoriseExpensesPanel } from '@/modules/finance/components/CategoriseExpensesPanel';
 import { FinanceHealthStrip } from '@/modules/finance/components/FinanceHealthStrip';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
 import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
@@ -1307,7 +1309,17 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── EXPENSES BY SUPPLIER (the same inbox, grouped by issuer) ─────────── */}
           <TabsContent value={FINANCE_TAB.expenseSuppliers} className="space-y-4">
+            {workspaceId && (
+              <CategoriseExpensesPanel
+                workspaceId={workspaceId}
+                onApplied={() => loadAll(workspaceId)}
+              />
+            )}
             <ExpenseSuppliersTab workspaceId={workspaceId} categories={categories} onFiled={() => loadAll(workspaceId)} />
+          </TabsContent>
+
+          <TabsContent value={FINANCE_TAB.expenseKinds} className="space-y-4">
+            {workspaceId && <ExpenseKindsTab workspaceId={workspaceId} />}
           </TabsContent>
 
           {/* ─────────── PLANNING ─────────── */}

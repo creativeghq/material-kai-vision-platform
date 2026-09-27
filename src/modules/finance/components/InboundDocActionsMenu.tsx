@@ -8,7 +8,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2 } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2, Send } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -31,6 +31,8 @@ interface Props {
    * saves. (For the read-only "what has been paid" view, see `onOpenPayments`.)
    */
   onRecordPayment: () => void;
+  /** Instruct the transfer on Revolut/Viva. Same dialog, opened on the send half. */
+  onSendPayment?: () => void;
   /** Open the order form seeded from this document's lines — where "what is this for?" decides
    *  between raising the purchase and booking it onto one that already exists (freight, customs,
    *  an installer). Absent → the entry isn't offered. */
@@ -60,7 +62,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onSettle, onUnsettle, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onSendPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onSettle, onUnsettle, onChanged }) => {
   const settledOutside = !!(doc as { settled_outside_at?: string | null }).settled_outside_at;
   const navigate = useNavigate();
 
@@ -190,8 +192,17 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           >
             <Link2 className="h-4 w-4 mr-2" /> Bill an existing order&hellip;
           </DropdownMenuItem>
+          {/* Both need a bill to pay AGAINST, so the title says why rather than greying out
+              two rows with no explanation. */}
+          <DropdownMenuItem
+            onClick={onSendPayment}
+            disabled={!onSendPayment || !canPay}
+            title={!canPay && !doc.created_supplier_bill_id ? 'Add it to Expenses first — a payment needs a bill to settle.' : undefined}
+          >
+            <Send className="h-4 w-4 mr-2" /> Pay it now&hellip;
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
-            <Wallet className="h-4 w-4 mr-2" /> Record payment
+            <Wallet className="h-4 w-4 mr-2" /> Record a payment already made
           </DropdownMenuItem>
           {/* Viewing is read-only, so it stays available even for a dismissed document — the
               money that moved is still a fact worth reading back. */}
