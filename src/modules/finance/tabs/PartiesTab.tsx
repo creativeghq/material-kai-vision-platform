@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users, Banknote,
-  ChevronDown, Mail, Download, Copy, RotateCcw, ExternalLink, RefreshCw, ShoppingCart,
+  ChevronDown, Mail, Download, Copy, RotateCcw, ExternalLink, RefreshCw, ShoppingCart, ArrowLeft,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { escapeHtml } from '@/utils/escapeHtml';
@@ -14,9 +14,6 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/core/ui/dialog';
 import {
   financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill,
   type PaymentWithAllocation, type PartyLedgerRow, type CustomerAgingBuckets,
@@ -212,6 +209,18 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
     return { rcv, pay, due_0_30, due_31_90, due_90_plus };
   }, [filtered, agingMap]);
 
+  if (selected) {
+    return (
+      <PartyAccount
+        party={selected}
+        aging={agingMap[`${selected.party_type}:${selected.party_id}`] ?? null}
+        onClose={() => setSelected(null)}
+        statementsEnabled={statementsEnabled}
+        financeBase={financeBase ?? '/finance'}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -348,23 +357,14 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
         </CardContent>
       </Card>
 
-      <PartyDetailDialog
-        party={selected}
-        aging={selected ? agingMap[`${selected.party_type}:${selected.party_id}`] ?? null : null}
-        open={selected !== null}
-        onClose={() => setSelected(null)}
-        statementsEnabled={statementsEnabled}
-        financeBase={financeBase ?? '/finance'}
-      />
     </div>
   );
 };
 
 
 interface DetailProps {
-  party: PartyRow | null;
+  party: PartyRow;
   aging: CustomerAgingBuckets | null;
-  open: boolean;
   onClose: () => void;
   statementsEnabled: boolean;
   /** Always `FINANCE_BASE` — every in-app document link is built off it. */
@@ -372,11 +372,10 @@ interface DetailProps {
 }
 
 /**
- * One party's whole finance position, as a document with TABS rather than a scroll of stacked
- * tables: with real data those lists are hundreds of rows each and the ledger below them is
- * unreachable.
+ * One party's whole finance position. A pane and not a dialog: five tabs of hundreds of rows each
+ * inside `max-w-5xl` at 90vh is a record page read through a window.
  */
-const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose, statementsEnabled, financeBase }) => {
+const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statementsEnabled, financeBase }) => {
   const { toast } = useToast();
   // `/crm/companies/:id` — the one CRM address, reachable by anyone with crm.view. The branch
   // that used to pick an `/admin/crm` twin here keyed off a finance base that never existed, and
@@ -673,15 +672,19 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const researchHere = researchParty === party?.party_id;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="space-y-1">
-          <div className="flex items-start justify-between gap-4 pr-8">
+    <div className="space-y-4">
+      <div>
+        <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={onClose}>
+          <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> All parties
+        </Button>
+        <div className="space-y-1">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <DialogTitle className="text-xl">
-                {party ? <Link to={crmHref} className="hover:underline" title="Open the CRM record">{party.display_name}</Link> : ''}
-              </DialogTitle>
-              <DialogDescription className="flex flex-wrap items-center gap-x-2 text-xs">
+              {/* Sans: Aleo has no Greek, so a record name would draw in two faces. */}
+              <h2 className="truncate font-sans text-xl font-semibold">
+                <Link to={crmHref} className="hover:underline" title="Open the CRM record">{party.display_name}</Link>
+              </h2>
+              <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                 {party?.is_customer && <span className="text-emerald-600 dark:text-emerald-400">Customer</span>}
                 {party?.is_customer && party?.is_supplier && <span>·</span>}
                 {party?.is_supplier && <span className="text-sky-600 dark:text-sky-400">Supplier</span>}
@@ -690,7 +693,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                   ? <a href={`mailto:${party.email}`} className="text-primary hover:underline">{party.email}</a>
                   : <span>No email on file</span>}
                 {party?.contact_group && <><span>·</span><span>{SEGMENT_LABELS[party.contact_group] ?? party.contact_group}</span></>}
-              </DialogDescription>
+              </p>
             </div>
 
             {party && (
@@ -765,7 +768,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               {research.busy ? (research.status ?? 'Researching…') : research.summary}
             </p>
           )}
-        </DialogHeader>
+        </div>
+      </div>
 
         {!party ? null : (
           <div className="space-y-4">
@@ -806,26 +810,26 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
             />
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="space-y-4">
-              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+              <TabsList className="w-full h-auto flex-wrap justify-start gap-4 bg-transparent p-0">
                 {showCustomer && (
-                  <TabsTrigger value="invoices" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <TabsTrigger value="invoices" className="flex items-center gap-2">
                     <FileText className="h-4 w-4" /> Invoices{loading ? '' : ` (${invoices.length})`}
                   </TabsTrigger>
                 )}
                 {showSupplier && (
-                  <TabsTrigger value="bills" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <TabsTrigger value="bills" className="flex items-center gap-2">
                     <Receipt className="h-4 w-4" /> Bills{loading ? '' : ` (${bills.length})`}
                   </TabsTrigger>
                 )}
                 {/* Not gated on role: orders run in BOTH directions, and this is the only tab that
                     can account for money taken before anyone issued a document. */}
-                <TabsTrigger value="orders" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="orders" className="flex items-center gap-2">
                   <ShoppingCart className="h-4 w-4" /> Orders{loading ? '' : ` (${orderPos?.rows.length ?? 0})`}
                 </TabsTrigger>
-                <TabsTrigger value="payments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="payments" className="flex items-center gap-2">
                   <Banknote className="h-4 w-4" /> Payments{loading ? '' : ` (${payments.length})`}
                 </TabsTrigger>
-                <TabsTrigger value="ledger" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="ledger" className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4" /> Ledger
                 </TabsTrigger>
               </TabsList>
@@ -1218,8 +1222,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         )}
 
         {statement.connectEmailGate}
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 };
 
