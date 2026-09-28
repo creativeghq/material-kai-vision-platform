@@ -6,12 +6,20 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError, edgeErrorMessage } from '@/utils/edgeError';
+import { MIVAA_API_URL } from '@/config/mivaa';
 
 /** A single authored FAQ entry, rendered at the bottom of an article and
  *  emitted as schema.org FAQPage structured data. Stored on metadata.faq. */
 export interface KBFaqItem {
   question: string;
   answer: string;
+}
+
+export interface KBPdfExtraction {
+  markdown: string;
+  page_count: number;
+  pages_read: number;
+  truncated: boolean;
 }
 
 export interface KBDocument {
@@ -177,46 +185,6 @@ export class KnowledgeBaseService {
   }
 
   /**
-   * Call MIVAA Gateway with FormData (for file uploads)
-   * FormData must be sent directly to a dedicated file upload endpoint,
-   * not wrapped in JSON.
-   */
-  private async callGatewayWithFile(
-    file: File,
-    metadata: Record<string, string>,
-  ): Promise<any> {
-    // Path convention (post-2026-05-23 bucket consolidation): KB raw PDFs live
-    // under `{user_id}/...` in `pdf-documents`. The orphan-cleanup cron's grace
-    // logic is user-scoped, so the path matters.
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      throw new Error('User not authenticated');
-    }
-    const fileName = `${user.id}/${Date.now()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage
-      .from('pdf-documents')
-      .upload(fileName, file);
-
-    if (uploadError) {
-      throw new Error(`File upload failed: ${uploadError.message}`);
-    }
-
-    // pdf-documents is private — mint a signed URL for MIVAA to download from.
-    const { data: signed, error: signError } = await supabase.storage
-      .from('pdf-documents')
-      .createSignedUrl(fileName, 3600);
-    if (signError || !signed?.signedUrl) {
-      throw new Error(`Failed to sign upload URL: ${signError?.message ?? 'unknown error'}`);
-    }
-
-    // Now call gateway with file_url instead of FormData
-    return this.callGateway('kb_create_from_pdf', {
-      file_url: signed.signedUrl,
-      ...metadata,
-    });
-  }
-
-  /**
    * Create a new document
    */
   async createDocument(doc: Partial<KBDocument>): Promise<KBDocument> {
@@ -244,25 +212,22 @@ export class KnowledgeBaseService {
     return this.callGateway('kb_delete_document', { doc_id: docId, workspace_id: workspaceId });
   }
 
-  /**
-   * Create document from PDF
-   * Uploads file to Supabase storage first, then sends file_url to gateway
-   */
-  async createFromPDF(
-    file: File,
-    workspaceId: string,
-    title: string,
-    categoryId?: string,
-  ): Promise<KBDocument> {
-    const metadata: Record<string, string> = {
-      workspace_id: workspaceId,
-      title: title,
-    };
-    if (categoryId) {
-      metadata.category_id = categoryId;
+  /** PDF text as markdown (tables kept as tables) for the editor to review. Writes nothing. */
+  async extractPdfText(file: File, workspaceId: string): Promise<KBPdfExtraction> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated. Please sign in.');
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(`${MIVAA_API_URL}/api/kb/documents/extract-pdf`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}`, 'X-Workspace-Id': workspaceId },
+      body: form,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(typeof body.detail === 'string' ? body.detail : `PDF extraction failed (${response.status})`);
     }
-
-    return this.callGatewayWithFile(file, metadata);
+    return response.json();
   }
 
   /**

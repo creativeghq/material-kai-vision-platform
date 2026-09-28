@@ -46,6 +46,7 @@ import {
   PRICE_DOC_TYPE_LABELS,
   PriceDocType,
   parseSupplierCostListDoc,
+  KnowledgeBaseService,
 } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 import { slugifyKbTitle } from '@/utils/kbSlug';
@@ -83,6 +84,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [categories, setCategories] = useState<KBCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExtractingPdf, setIsExtractingPdf] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('edit');
@@ -242,6 +244,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         !!selectedCat &&
         (selectedCat.slug === 'pricing' || selectedCat.name.toLowerCase() === 'pricing');
       const priceDocTypeToSave = isPricingCategory ? (document.price_doc_type ?? null) : null;
+      const visibilityToSave = isPricingCategory ? 'private' : document.visibility;
 
       if (isPricingCategory && !priceDocTypeToSave) {
         toast({
@@ -269,7 +272,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             category_id: document.category_id,
             seo_keywords: document.seo_keywords,
             status: document.status,
-            visibility: document.visibility,
+            visibility: visibilityToSave,
             metadata: document.metadata,
             price_doc_type: priceDocTypeToSave,
             is_locked: document.is_locked ?? null,
@@ -299,7 +302,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             category_id: document.category_id,
             seo_keywords: document.seo_keywords,
             status: document.status,
-            visibility: document.visibility,
+            visibility: visibilityToSave,
             metadata: document.metadata,
             price_doc_type: priceDocTypeToSave,
             is_locked: document.is_locked ?? null,
@@ -349,12 +352,36 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       return;
     }
 
-    // PDF upload feature requires MIVAA API backend
-    toast({
-      title: 'Feature Not Available',
-      description: 'PDF upload feature requires backend API configuration',
-      variant: 'destructive',
-    });
+    if (document.content?.trim() && !confirm('Replace the current content with the text of this PDF?')) {
+      event.target.value = '';
+      return;
+    }
+
+    setIsExtractingPdf(true);
+    try {
+      const result = await KnowledgeBaseService.getInstance().extractPdfText(file, workspaceId);
+      setDocument((prev) => ({
+        ...prev,
+        title: prev.title?.trim() ? prev.title : file.name.replace(/\.pdf$/i, ''),
+        content: result.markdown,
+        content_markdown: result.markdown,
+      }));
+      toast({
+        title: 'PDF text extracted',
+        description: result.truncated
+          ? `Read the first ${result.pages_read} of ${result.page_count} pages. Split the rest into another page.`
+          : `Read ${result.page_count} page${result.page_count === 1 ? '' : 's'}. Check the prices, then save.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Could not read PDF',
+        description: error instanceof Error ? error.message : 'PDF extraction failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExtractingPdf(false);
+      event.target.value = '';
+    }
   };
 
   return (
@@ -468,21 +495,22 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               })()}
 
               {/* PDF Upload */}
-              {!documentId && (
-                <div className="space-y-2">
-                  <Label htmlFor="pdf">Upload PDF</Label>
-                  <Input
-                    id="pdf"
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileUpload}
-                    className="cursor-pointer"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Auto-extract text from PDF
-                  </p>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="pdf">Upload PDF</Label>
+                <Input
+                  id="pdf"
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  disabled={isExtractingPdf || !workspaceId}
+                  className="cursor-pointer"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {isExtractingPdf
+                    ? 'Reading PDF…'
+                    : 'Fills the content with the PDF text; tables stay tables. Scanned PDFs have no text to read.'}
+                </p>
+              </div>
 
               {/* Status */}
               <div className="space-y-2">
