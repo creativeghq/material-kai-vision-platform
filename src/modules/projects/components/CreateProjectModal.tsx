@@ -46,6 +46,7 @@ interface CreateProjectModalProps {
   initialClient?: ClientPickerValue & { name?: string | null };
   /** Hide the client picker entirely (implied by `initialClient`). */
   lockClient?: boolean;
+  initialCategoryId?: string;
 }
 
 interface RoomDraft {
@@ -71,6 +72,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onSuccess,
   initialClient,
   lockClient,
+  initialCategoryId,
 }) => {
   const { toast } = useToast();
   const { isAdmin } = useUserRole();
@@ -107,7 +109,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   // Chosen sub-unit address of the client (null = main address).
   const [addrUnitId, setAddrUnitId] = useState<string | null>(null);
   const [categories, setCategories] = useState<ProjectCategory[]>([]);
-  const [categoryId, setCategoryId] = useState<string>('');
+  const [categoryId, setCategoryId] = useState<string>(initialCategoryId ?? '');
   const [managingCategories, setManagingCategories] = useState(false);
   const [rooms, setRooms] = useState<RoomDraft[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
@@ -124,7 +126,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       client_contact_id: initialClient?.client_contact_id ?? null,
     });
     setAddrUnitId(null);
-    setCategoryId('');
+    setCategoryId(initialCategoryId ?? '');
     setRooms([]);
     setNewRoomName('');
     setNewRoomType('');

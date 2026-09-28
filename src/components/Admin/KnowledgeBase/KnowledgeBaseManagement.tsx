@@ -26,6 +26,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [newDocCategoryId, setNewDocCategoryId] = useState<string | undefined>(undefined);
   const [docRefreshKey, setDocRefreshKey] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<{ id: string; nonce: number } | null>(null);
   const [stats, setStats] = useState({
@@ -85,8 +86,9 @@ export const KnowledgeBaseManagement: React.FC = () => {
     }
   };
 
-  const handleCreateDocument = () => {
+  const handleCreateDocument = ({ categoryId }: { categoryId?: string }) => {
     setSelectedDocId(null);
+    setNewDocCategoryId(categoryId);
     setShowEditor(true);
   };
 
@@ -238,6 +240,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
       {showEditor && (
         <DocumentEditor
           documentId={selectedDocId}
+          initialCategoryId={newDocCategoryId}
           onClose={handleCloseEditor}
         />
       )}

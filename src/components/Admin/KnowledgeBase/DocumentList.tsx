@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError, edgeErrorMessage } from '@/utils/edgeError';
-import { FilterBar, applyFiltersToQuery, countActive, type FilterValues } from '@/components/core/filters';
+import { FilterBar, applyFiltersToQuery, countActive, scopedFilterValue, type FilterValues } from '@/components/core/filters';
 import { statusTone } from '@/utils/statusTone';
 import { buildKbDocFilters, type KbFilterCategory } from './kbDocFilters';
 import { formatDate } from '@/utils/datetime';
@@ -40,7 +40,7 @@ import { HubEmptyState } from '@/components/core/hub';
 
 interface DocumentListProps {
   onEdit: (docId: string) => void;
-  onCreate: () => void;
+  onCreate: (defaults: { categoryId?: string }) => void;
   refreshTrigger?: number;
   /**
    * When set (with a changing `nonce`), seed the filters to show only this
@@ -569,7 +569,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                 {backfilling ? 'Embedding…' : `Backfill embeddings (${embedBacklog})`}
               </Button>
             )}
-            <Button onClick={onCreate}>
+            <Button onClick={() => onCreate({ categoryId: scopedFilterValue(values, 'category_id') })}>
               <Plus className="h-4 w-4 mr-2" />
               New document
             </Button>
@@ -640,7 +640,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             icon={FileText}
             title="No documents yet"
             description="Knowledge-base documents are what the assistant reads before it answers, and what a customer sees on the public help pages."
-            action={<Button size="sm" onClick={onCreate}><Plus /> New document</Button>}
+            action={<Button size="sm" onClick={() => onCreate({ categoryId: scopedFilterValue(values, 'category_id') })}><Plus /> New document</Button>}
           />
         ) : (
           <Table>

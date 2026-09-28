@@ -40,7 +40,8 @@ const GROUPS: Array<NewPartyKind['group']> = ['person', 'business'];
 export const AddPartyModal: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}> = ({ open, onOpenChange }) => {
+  categoryId?: string;
+}> = ({ open, onOpenChange, categoryId }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [step, setStep] = useState<'kind' | 'identity'>('kind');
@@ -71,7 +72,7 @@ export const AddPartyModal: React.FC<{
     onOpenChange(false);
     clearDraft();
     reset();
-    navigate(to, { state: { prefill } });
+    navigate(to, { state: { prefill, categoryId } });
   };
 
   const pick = (k: NewPartyKind) => {

@@ -32,7 +32,7 @@ import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/servi
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
 import { chequeJob, deliveryNoteJob, type DocumentJob } from '@/modules/finance/utils/documentJob';
-import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { categoryScopeFor, financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
@@ -60,7 +60,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildDocumentFilters, type DocFilterType } from '@/modules/finance/components/documentFilters';
 import { formatDate } from '@/utils/datetime';
 import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
@@ -361,6 +361,11 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   );
   const { values: filterValues, setValues: setFilterValues, filtered: activeRows, previewCount, activeCount, reset: resetFilters } =
     useFilters<any>(baseRows, filterGroups);
+  const scopedCategoryId = scopedFilterValue(filterValues, 'category');
+  const expenseCategoryPrefill = useMemo(() => {
+    const categoryId = categoryScopeFor(categories, scopedCategoryId, 'expense');
+    return categoryId ? { categoryId } : undefined;
+  }, [categories, scopedCategoryId]);
 
   /*
     Every table below renders a PAGE of `activeRows`, which is the FILTERED list. So an empty
@@ -705,6 +710,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           workspaceId={activeWorkspaceId}
           open={newInvoiceOpen}
           onOpenChange={setNewInvoiceOpen}
+          initialCategoryId={categoryScopeFor(categories, scopedCategoryId, 'income')}
           onCreated={(invoiceId) => { setNewInvoiceOpen(false); navigate(`${financeBase}/invoices/${invoiceId}`); }}
         />
       )}
@@ -729,6 +735,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           workspaceId={activeWorkspaceId}
           open={recordPaymentOpen}
           onOpenChange={setRecordPaymentOpen}
+          initialCategoryId={categoryScopeFor(categories, scopedCategoryId)}
           onSaved={() => { setRecordPaymentOpen(false); load(); }}
         />
       )}
@@ -763,6 +770,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           workspaceId={activeWorkspaceId}
           open={newExpenseOpen}
           onOpenChange={setNewExpenseOpen}
+          prefill={expenseCategoryPrefill}
           onCreated={() => { setNewExpenseOpen(false); load(); }}
         />
       )}

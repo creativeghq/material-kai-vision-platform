@@ -26,7 +26,7 @@ import {
 } from '@/services/crmCategoriesService';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { CRM_CATEGORY_FILTERS } from './crmCategoryFilters';
 import { formatNumber } from '@/utils/decimal';
 
@@ -81,7 +81,8 @@ export const CategoriesPanel: React.FC = () => {
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
   const [createColor, setCreateColor] = useState('#22c55e');
-  const [createKind, setCreateKind] = useState<'manual' | 'industry' | 'lead_status' | 'lead_source'>('manual');
+  type CreatableKind = 'manual' | 'industry' | 'lead_status' | 'lead_source';
+  const [createKind, setCreateKind] = useState<CreatableKind>('manual');
 
   const [materialCats, setMaterialCats] = useState<Array<{ id: string; name: string; category_key: string }>>([]);
 
@@ -248,7 +249,14 @@ export const CategoriesPanel: React.FC = () => {
             {busyAction === 'supply' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
             Match product categories
           </Button>
-          <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              const kind = scopedFilterValue(values, 'kind');
+              setCreateKind((['manual', 'industry', 'lead_status', 'lead_source'] as CreatableKind[]).find((k) => k === kind) ?? 'manual');
+              setShowCreate(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" /> New category
           </Button>
         </div>

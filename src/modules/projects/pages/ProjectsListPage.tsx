@@ -26,7 +26,7 @@ import {
   type HubSegment,
   type HubSort,
 } from '@/components/core/hub';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { cn } from '@/lib/utils';
@@ -406,6 +406,7 @@ export const ProjectsListPage: React.FC = () => {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           onSuccess={(id) => navigate(`/projects/${id}`)}
+          initialCategoryId={scopedFilterValue(filterValues, 'category')}
         />
       )}
 

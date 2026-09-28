@@ -32,9 +32,9 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, useFilters, optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
+import { FilterBar, useFilters, optionsFromRows, scopedFilterValue, type FilterGroupDef } from '@/components/core/filters';
 import { buildAgingFilters, AGE_BUCKET_KEY } from '@/modules/finance/components/agingFilters';
-import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { categoryScopeFor, financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
@@ -218,6 +218,7 @@ const FinancePage: React.FC = () => {
   const [invoicePrefill, setInvoicePrefill] = useState<InvoicePrefill | null>(null);
   const [invoiceTemplatePickerOpen, setInvoiceTemplatePickerOpen] = useState(false);
   const [expensePrefill, setExpensePrefill] = useState<ExpensePrefill | null>(null);
+  const [newDocCategoryId, setNewDocCategoryId] = useState<string | undefined>(undefined);
   const [expenseTemplatePickerOpen, setExpenseTemplatePickerOpen] = useState(false);
   const [saveExpenseTemplateFor, setSaveExpenseTemplateFor] = useState<{ id: string; name: string | null } | null>(null);
 
@@ -947,7 +948,7 @@ const FinancePage: React.FC = () => {
                       <Button variant="outline" size="sm" onClick={() => setInvoiceTemplatePickerOpen(true)}>
                         <Layers className="h-4 w-4 mr-1" /> From template
                       </Button>
-                      <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+                      <Button size="sm" onClick={() => { setNewDocCategoryId(categoryScopeFor(categories, scopedFilterValue(arValues, 'category'), 'income')); setNewInvoiceOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
                     </>
                   )}
                 </div>
@@ -1154,7 +1155,7 @@ const FinancePage: React.FC = () => {
                       <Button variant="outline" size="sm" onClick={() => setExpenseTemplatePickerOpen(true)}>
                         <Layers className="h-4 w-4 mr-1" /> From template
                       </Button>
-                      <Button size="sm" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>
+                      <Button size="sm" onClick={() => { setNewDocCategoryId(categoryScopeFor(categories, scopedFilterValue(apValues, 'category'), 'expense')); setNewExpenseOpen(true); }}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>
                     </>
                   )}
                 </div>
@@ -1475,11 +1476,12 @@ const FinancePage: React.FC = () => {
       <NewInvoiceDialog
         workspaceId={workspaceId}
         open={newInvoiceOpen}
-        onOpenChange={(v) => { setNewInvoiceOpen(v); if (!v) setInvoicePrefill(null); }}
+        onOpenChange={(v) => { setNewInvoiceOpen(v); if (!v) { setInvoicePrefill(null); setNewDocCategoryId(undefined); } }}
         initialItems={invoicePrefill?.items ?? null}
+        initialCategoryId={newDocCategoryId}
         initialDocType={invoicePrefill?.documentType}
         initialNotes={invoicePrefill?.notes}
-        onCreated={(invoiceId) => { setNewInvoiceOpen(false); setInvoicePrefill(null); navigate(`${financeBase}/invoices/${invoiceId}`); }}
+        onCreated={(invoiceId) => { setNewInvoiceOpen(false); setInvoicePrefill(null); setNewDocCategoryId(undefined); navigate(`${financeBase}/invoices/${invoiceId}`); }}
       />
       {saveExpenseTemplateFor && (
         <SaveAsTemplateDialog
@@ -1507,9 +1509,9 @@ const FinancePage: React.FC = () => {
       <NewExpenseDialog
         workspaceId={workspaceId}
         open={newExpenseOpen}
-        onOpenChange={(v) => { setNewExpenseOpen(v); if (!v) setExpensePrefill(null); }}
-        prefill={expensePrefill ?? undefined}
-        onCreated={async () => { setNewExpenseOpen(false); setExpensePrefill(null); if (workspaceId) await loadAll(workspaceId); }}
+        onOpenChange={(v) => { setNewExpenseOpen(v); if (!v) { setExpensePrefill(null); setNewDocCategoryId(undefined); } }}
+        prefill={expensePrefill ?? (newDocCategoryId ? { categoryId: newDocCategoryId } : undefined)}
+        onCreated={async () => { setNewExpenseOpen(false); setExpensePrefill(null); setNewDocCategoryId(undefined); if (workspaceId) await loadAll(workspaceId); }}
       />
       <NewSupplierCreditNoteDialog
         workspaceId={workspaceId}

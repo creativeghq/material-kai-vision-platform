@@ -77,7 +77,8 @@ export const RecordPaymentDialog: React.FC<{
   payableBills?: Array<{ id: string; supplier_bill_number: string | null; amount_due: number; currency: string }>;
   /** Currency of the ORDER this payment is being recorded against. */
   orderCurrency?: string;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, initialIntent = 'record', side = 'customer', payableBills = [], orderCurrency }) => {
+  initialCategoryId?: string;
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, initialIntent = 'record', side = 'customer', payableBills = [], orderCurrency, initialCategoryId }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -188,7 +189,7 @@ export const RecordPaymentDialog: React.FC<{
     // Paying a bill is a bank transfer far more often than cash; the general flow starts on cash
     // because it is a counter-side collection.
     setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod(payingExpense ? 'bank_transfer' : 'cash'); setPaidAt(todayLocalISO());
-    setCategoryId(''); setReference(''); setNotes('');
+    setCategoryId(initialCategoryId ?? ''); setReference(''); setNotes('');
     setCurrency(orderCurrency || 'EUR'); setFxRate('1'); setFxRateToBase('1');
     setTargetInvoiceId(presetInvoiceId ?? '');
     setInvoiceId('');

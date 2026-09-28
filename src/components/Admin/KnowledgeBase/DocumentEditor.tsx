@@ -63,18 +63,21 @@ const KB_AGENTS: { id: string; label: string }[] = [
 
 interface DocumentEditorProps {
   documentId: string | null;
+  initialCategoryId?: string;
   onClose: () => void;
 }
 
 
 export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   documentId,
+  initialCategoryId,
   onClose,
 }) => {
   const [document, setDocument] = useState<Partial<KBDocument>>({
     title: '',
     content: '',
     content_markdown: '',
+    category_id: documentId ? undefined : initialCategoryId,
     summary: '',
     status: 'draft',
     visibility: 'public',

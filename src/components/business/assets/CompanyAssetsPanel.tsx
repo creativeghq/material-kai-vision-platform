@@ -127,7 +127,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
   const pageRows = useMemo(() => paginate(filtered, page, 15), [filtered, page]);
   useEffect(() => { setPage((p) => clampPage(p, filtered.length, 15)); }, [filtered.length]);
 
-  const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setCostText(''); setSalvageText(''); setFormOpen(true); };
+  const openAdd = () => { setEditing(null); setForm(categoryFilter === 'all' ? EMPTY_FORM : { ...EMPTY_FORM, category: categoryFilter }); setCostText(''); setSalvageText(''); setFormOpen(true); };
   const openEdit = (a: CompanyAsset) => {
     setEditing(a);
     setForm({

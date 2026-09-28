@@ -9,7 +9,7 @@ import { Plus, Edit, Eye, Trash2, Mail } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -318,6 +318,7 @@ export const EmailTemplatesTab: React.FC = () => {
       {showCreateModal && (
         <CreateTemplateModal
           onClose={() => setShowCreateModal(false)}
+          initialCategory={scopedFilterValue(filterValues, 'category')}
           onSuccess={() => {
             setShowCreateModal(false);
             loadTemplates();

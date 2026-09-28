@@ -99,6 +99,13 @@ export type FilterValues = Record<string, FilterValue>;
 /** Sentinel for "value is null/empty" in a select — e.g. "Uncategorized". */
 export const NONE_VALUE = '__none';
 
+/** The one concrete value a filter pins (a single select, or a multi with one pick) — what a "New" button pre-fills. */
+export function scopedFilterValue(values: FilterValues, key: string): string | undefined {
+  const v = values[key];
+  const single = Array.isArray(v) ? (v.length === 1 ? v[0] : undefined) : typeof v === 'string' ? v : undefined;
+  return single && single !== NONE_VALUE ? single : undefined;
+}
+
 /** True when the field is carrying a user-set constraint (drives badges + chips). */
 export function isFieldActive(field: FilterField, value: FilterValue): boolean {
   if (value === undefined || value === null || value === '') return false;

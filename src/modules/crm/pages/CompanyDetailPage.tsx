@@ -23,6 +23,8 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { crmCategoriesService } from '@/services/crmCategoriesService';
+import { getErrorMessage } from '@/core/errors/utils';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI, type CreateCompanyError } from '@/services/crm.service';
@@ -169,6 +171,7 @@ export const CompanyDetailPage: React.FC = () => {
   // The role-first Add Company modal hands off a prefill (chosen role + any VIES/ΑΑΔΕ lookup)
   // via router state so the create form opens pre-populated for review before saving.
   const prefill = (location.state as { prefill?: Partial<Company> } | null)?.prefill;
+  const scopedCategoryId = (location.state as { categoryId?: string } | null)?.categoryId;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
@@ -270,6 +273,11 @@ export const CompanyDetailPage: React.FC = () => {
       // Name the workspace. crm-api used to default to `scope.workspaceIds[0]` when a create
       // omitted it, which filed the company in whichever workspace sorted first (#366 BU-10).
       const response = await companiesAPI.createCompany({ ...company, workspace_id: activeWorkspaceId });
+      if (scopedCategoryId) {
+        await crmCategoriesService.setCompanyMembershipsWithinScope(response.data.id, [scopedCategoryId], [scopedCategoryId]).catch((e) => {
+          toast({ title: 'Saved, but not added to the category', description: getErrorMessage(e), variant: 'destructive' });
+        });
+      }
       toast({ title: 'Success', description: 'Company created successfully' });
       navigate(`/crm/companies/${response.data.id}`, { replace: true });
     } catch (error) {

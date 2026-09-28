@@ -34,7 +34,7 @@ import { CategoriesPanel } from './CategoriesPage';
 import { AddPartyModal } from '../components/AddPartyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
-import { FilterBar, optionsFromRows, useFilters, useFilterValues, type FilterOption, type FilterValues } from '@/components/core/filters';
+import { FilterBar, optionsFromRows, scopedFilterValue, useFilters, useFilterValues, type FilterOption, type FilterValues } from '@/components/core/filters';
 import { CRM_TAB, CRM_COMPANY_FILTER_KEY, CRM_CONTACT_FILTER_KEY, CRM_USER_FILTER_KEY } from '@/modules/crm/routes';
 import { buildCompanyFilters, buildContactFilters, buildUserFilters, categoryFacetOptions } from './crmFilters';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -602,7 +602,11 @@ export const CRMManagement: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader title="CRM Management" description="Manage users and customer contacts" badge="Admin" />
-      <AddPartyModal open={showAddParty} onOpenChange={setShowAddParty} />
+      <AddPartyModal
+        open={showAddParty}
+        onOpenChange={setShowAddParty}
+        categoryId={scopedFilterValue(activeTab === CRM_TAB.companies ? companyValues : contactValues, 'category')}
+      />
 
       <div className="p-3 sm:p-6 space-y-6">
         <div className="flex justify-end">

@@ -9,6 +9,8 @@ import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { crmCategoriesService } from '@/services/crmCategoriesService';
+import { getErrorMessage } from '@/core/errors/utils';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
@@ -151,6 +153,7 @@ export const ContactDetailPage: React.FC = () => {
   // What AddPartyModal picked. Absent is legitimate — a bookmark on /crm/contacts/new.
   const location = useLocation();
   const prefill = (location.state as { prefill?: Partial<Contact> } | null)?.prefill;
+  const scopedCategoryId = (location.state as { categoryId?: string } | null)?.categoryId;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [contact, setContact] = useState<Contact | null>(isNew ? {
@@ -281,6 +284,11 @@ export const ContactDetailPage: React.FC = () => {
       // item 5 — attach the company picked during creation, now that we have an id.
       if (pendingCompanyId) {
         await companiesAPI.attachContact(pendingCompanyId, response.data.id, undefined, true, '').catch(() => {});
+      }
+      if (scopedCategoryId) {
+        await crmCategoriesService.setContactMembershipsWithinScope(response.data.id, [scopedCategoryId], [scopedCategoryId]).catch((e) => {
+          toast({ title: 'Saved, but not added to the category', description: getErrorMessage(e), variant: 'destructive' });
+        });
       }
       toast({ title: 'Success', description: 'Contact created successfully' });
       navigate(`/crm/contacts/${response.data.id}`, { replace: true });

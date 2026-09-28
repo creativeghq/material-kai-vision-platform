@@ -32,7 +32,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildDocsFilters } from './docsFilters';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -95,9 +95,9 @@ const DocsPage: React.FC = () => {
     setCategory((d as any).category ?? '');
     setStatus(d.status);
   };
-  const openNew = useCallback(() => {
+  const openNew = useCallback((initialCategory = '') => {
     setSelectedId(NEW);
-    setTitle(''); setBody(''); setTags(''); setCategory(''); setStatus('published');
+    setTitle(''); setBody(''); setTags(''); setCategory(initialCategory); setStatus('published');
   }, []);
 
   // App Launcher deep-link: /docs?new=doc opens the blank editor. The param is consumed on arrival
@@ -216,7 +216,7 @@ const DocsPage: React.FC = () => {
         icon={BookText}
         title="Docs"
         subtitle="Internal team documentation — searchable by the KAI agent"
-        actions={<Button size="sm" onClick={openNew} className="gap-1"><Plus className="h-4 w-4" /> New doc</Button>}
+        actions={<Button size="sm" onClick={() => openNew(scopedFilterValue(filterValues, 'category'))} className="gap-1"><Plus className="h-4 w-4" /> New doc</Button>}
       />
       <div className="px-3 sm:px-6 py-4 sm:py-6">
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -242,7 +242,7 @@ const DocsPage: React.FC = () => {
                     icon={BookText}
                     title="No docs yet"
                     description="Working notes, specs and briefs that live with the workspace rather than in someone's drive."
-                    action={<Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1" /> New doc</Button>}
+                    action={<Button size="sm" onClick={() => openNew(scopedFilterValue(filterValues, 'category'))}><Plus className="h-4 w-4 mr-1" /> New doc</Button>}
                   />
                 ) : (
                   <HubEmptyState

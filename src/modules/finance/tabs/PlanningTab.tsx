@@ -12,7 +12,7 @@ import { NewPlannedPaymentDialog } from '@/modules/finance/components/NewPlanned
 import { humanizeLabel } from '@/utils/humanize';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
-  FilterBar, optionsFromRows, useFilters,
+  FilterBar, optionsFromRows, scopedFilterValue, useFilters,
   type DateRangeValue, type FilterGroupDef,
 } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -106,6 +106,7 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
 
   // The three server-side dimensions, read straight out of the values bag.
   const statusSel = (filterValues.status as PlannedPaymentStatus[] | undefined) ?? [];
+  const scopedCategory = scopedFilterValue(filterValues, 'category');
   const directionSel = (filterValues.direction as PlannedPaymentDirection[] | undefined) ?? [];
   const scheduled = (filterValues.scheduled_for as DateRangeValue | undefined) ?? {};
   // Serialized so the fetch effect re-runs on a real change, not on every values-object identity.
@@ -339,6 +340,8 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
       <NewPlannedPaymentDialog
         workspaceId={workspaceId} open={newOpen}
         onOpenChange={setNewOpen}
+        defaultCategory={scopedCategory}
+        defaultDirection={scopedCategory === 'expected_receipt' ? 'in' : 'out'}
         onCreated={async () => { setNewOpen(false); await load(); }}
       />
       {editRow && (

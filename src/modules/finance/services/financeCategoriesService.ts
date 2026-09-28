@@ -19,6 +19,16 @@ export interface FinanceCategory {
   system_key: 'orders' | 'myaade' | 'profit_allocation' | 'partner_withdrawal' | 'owner_pay' | string | null;
 }
 
+export function categoryScopeFor(
+  categories: FinanceCategory[],
+  categoryId: string | undefined,
+  side?: 'income' | 'expense',
+): string | undefined {
+  const cat = categoryId ? categories.find((c) => c.id === categoryId) : undefined;
+  if (!cat || !cat.is_active) return undefined;
+  return !side || cat.kind === side || cat.kind === 'both' ? cat.id : undefined;
+}
+
 export const financeCategoriesService = {
   async list(workspaceId: string): Promise<FinanceCategory[]> {
     const { data, error } = await supabase

@@ -124,6 +124,7 @@ interface Props {
   initialDocType?: string;
   /** Pre-fill the invoice notes. */
   initialNotes?: string;
+  initialCategoryId?: string;
 }
 
 function groupDocTypes(types: { code: string; description: string }[]) {
@@ -237,7 +238,7 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
   return { unit: meta.unit, color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
 }
 
-export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes }) => {
+export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes, initialCategoryId }) => {
   const { toast } = useToast();
   /** Out of credits is an offer, not a wall — see CreditTopUpDialog. */
   const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
@@ -425,7 +426,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setClientDialogOpen(false);
     setDocumentType(initialDocType || '1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(todayLocalISO()); setNotes(initialNotes ?? ''); setIssueNow(true);
-    setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
+    setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setNextNumber(null);

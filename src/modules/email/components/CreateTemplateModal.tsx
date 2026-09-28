@@ -13,21 +13,25 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+const TEMPLATE_CATEGORIES = ['transactional', 'marketing', 'notification'];
+
 interface CreateTemplateModalProps {
   onClose: () => void;
   onSuccess: () => void;
+  initialCategory?: string;
 }
 
 export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
   onClose,
   onSuccess,
+  initialCategory,
 }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
     description: '',
-    category: 'transactional',
+    category: initialCategory && TEMPLATE_CATEGORIES.includes(initialCategory) ? initialCategory : 'transactional',
   });
   const { toast } = useToast();
 

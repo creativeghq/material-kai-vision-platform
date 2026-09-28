@@ -26,6 +26,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
   defaultDirection?: PlannedPaymentDirection;
+  defaultCategory?: string;
   /** Editing. Direction and currency are read-only: `updatePlannedPayment` carries neither. */
   editing?: PlannedPayment | null;
 }
@@ -43,7 +44,7 @@ const CATEGORIES: { value: PlannedPaymentCategory; label: string }[] = [
 ];
 
 export const NewPlannedPaymentDialog: React.FC<Props> = ({
-  workspaceId, open, onOpenChange, onCreated, defaultDirection = 'out', editing = null,
+  workspaceId, open, onOpenChange, onCreated, defaultDirection = 'out', defaultCategory, editing = null,
 }) => {
   const { toast } = useToast();
   const isEdit = !!editing;
@@ -73,7 +74,8 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
       setAmount(d?.amount ?? '0');
       setCurrency(d?.currency ?? 'EUR');
       setScheduledFor(d?.scheduledFor ?? todayLocalISO());
-      setCategory(d?.category ?? (defaultDirection === 'in' ? 'expected_receipt' : 'supplier_bill'));
+      const scoped = CATEGORIES.find((c) => c.value === defaultCategory)?.value;
+      setCategory(d?.category ?? scoped ?? (defaultDirection === 'in' ? 'expected_receipt' : 'supplier_bill'));
       setReminderAt(d?.reminderAt ?? '');
       setNotes(d?.notes ?? '');
       setParty(d?.party ?? null);

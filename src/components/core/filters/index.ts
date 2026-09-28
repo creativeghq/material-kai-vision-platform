@@ -11,6 +11,7 @@ export { applyFiltersToQuery, sanitizeIlikeTerm } from './serverFilters';
 export {
   NONE_VALUE,
   applyFilters,
+  scopedFilterValue,
   countActive,
   describeValue,
   foldForSearch,
