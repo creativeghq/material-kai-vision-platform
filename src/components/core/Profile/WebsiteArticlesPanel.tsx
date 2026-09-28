@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarClock, Check, Loader2, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, Check, Loader2, Plus, SearchX, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -10,7 +10,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/core/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { HubEmptyState } from '@/components/core/hub';
+import { TableColumnHeader } from '@/components/core/ui/table-column-header';
+import { HubEmptyState, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import SEOArticleViewer from '@/components/features/ai/SEOArticleViewer';
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
@@ -22,6 +23,11 @@ import {
   type UserWebsite,
 } from '@/services/userWebsitesService';
 import { Loading, STATUS_COLOR, useLaunchQuickStart } from './seo/dashboardPrimitives';
+import { AGE_WINDOW_LABELS, AGE_WINDOW_ORDER, ageWindowOf, timeOf, useTableSegments } from './seo/useTableSegments';
+
+const ARTICLE_LIMIT = 500;
+type SortKey = 'title' | 'keyword' | 'seo' | 'words' | 'status' | 'created' | 'age';
+const FRESHNESS_LABELS: Record<string, string> = { due: 'Due for refresh', fresh: 'Fresh', unpublished: 'Not published' };
 
 /** Websites → Content → Articles. */
 export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
@@ -41,8 +47,8 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
     (async () => {
       try {
         const [ar, fr] = await Promise.all([
-          userWebsitesService.articles(website.id),
-          userWebsitesService.freshness(website.id),
+          userWebsitesService.articles(website.id, ARTICLE_LIMIT),
+          userWebsitesService.freshness(website.id, ARTICLE_LIMIT),
         ]);
         if (cancelled) return;
         setArticles(ar);
@@ -62,11 +68,40 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
   const dueForRefresh = freshness.filter((f) => f.is_due);
   const freshnessById = new Map(freshness.map((f) => [f.article_id, f]));
 
+  const t = useTableSegments<SeoArticleRow, SortKey, 'status' | 'created' | 'freshness'>({
+    rows: articles,
+    searchText: (a) => [a.title, a.target_keyword, a.slug],
+    sorters: {
+      title: (a) => a.title || a.target_keyword,
+      keyword: (a) => a.target_keyword,
+      seo: (a) => a.seo_score,
+      words: (a) => a.word_count,
+      status: (a) => a.status,
+      created: (a) => timeOf(a.created_at),
+      age: (a) => freshnessById.get(a.id)?.age_days,
+    },
+    initialSort: { key: 'created', dir: 'desc' },
+    textKeys: ['title', 'keyword', 'status'],
+    facets: {
+      status: { label: 'status', valueOf: (a) => a.status },
+      created: { label: 'created', valueOf: (a) => ageWindowOf(a.created_at), labels: AGE_WINDOW_LABELS, order: AGE_WINDOW_ORDER },
+      freshness: {
+        label: 'content age',
+        valueOf: (a) => {
+          const f = freshnessById.get(a.id);
+          return f ? (f.is_due ? 'due' : 'fresh') : 'unpublished';
+        },
+        labels: FRESHNESS_LABELS,
+        order: ['due', 'fresh', 'unpublished'],
+      },
+    },
+  });
+
   const markReviewed = async (articleId: string) => {
     setReviewing(articleId);
     try {
       await userWebsitesService.markArticleReviewed(articleId);
-      setFreshness(await userWebsitesService.freshness(website.id));
+      setFreshness(await userWebsitesService.freshness(website.id, ARTICLE_LIMIT));
       toast({ title: 'Marked reviewed', description: 'The refresh clock starts again from today.' });
     } catch (e: any) {
       toast({ title: 'Could not mark reviewed', description: e.message, variant: 'destructive' });
@@ -192,21 +227,38 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
               }
             />
           ) : (
+            <>
+            <HubToolbar
+              search={t.query}
+              onSearchChange={t.setQuery}
+              searchPlaceholder="Search title, keyword or slug"
+              actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
+            />
+            {t.visible.length === 0 ? (
+              <HubEmptyState
+                variant="filtered"
+                icon={SearchX}
+                title="No articles match these filters"
+                description={`All ${articles.length} articles are still here; the search or a column filter is hiding them.`}
+                action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+              />
+            ) : (
+            <div className="table-scroll">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Keyword</TableHead>
-                  <TableHead className="text-right">SEO</TableHead>
-                  <TableHead className="text-right">Words</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Content age</TableHead>
+                  <TableColumnHeader sortKey="title" sort={t.sort} onSort={t.onSort}>Title</TableColumnHeader>
+                  <TableColumnHeader sortKey="keyword" sort={t.sort} onSort={t.onSort}>Keyword</TableColumnHeader>
+                  <TableColumnHeader sortKey="seo" sort={t.sort} onSort={t.onSort} align="right">SEO</TableColumnHeader>
+                  <TableColumnHeader sortKey="words" sort={t.sort} onSort={t.onSort} align="right">Words</TableColumnHeader>
+                  <TableColumnHeader sortKey="status" sort={t.sort} onSort={t.onSort} segment={t.segment('status')}>Status</TableColumnHeader>
+                  <TableColumnHeader sortKey="created" sort={t.sort} onSort={t.onSort} segment={t.segment('created')}>Created</TableColumnHeader>
+                  <TableColumnHeader sortKey="age" sort={t.sort} onSort={t.onSort} segment={t.segment('freshness')}>Content age</TableColumnHeader>
                   <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {articles.map((a) => (
+                {t.visible.map((a) => (
                   <TableRow
                     key={a.id}
                     className="cursor-pointer"
@@ -219,8 +271,8 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
                       <button type="button" onClick={(e) => { e.stopPropagation(); setOpenArticleId(a.id); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{a.title || a.target_keyword}</button>
                     </TableCell>
                     <TableCell className="text-muted-foreground max-w-[180px] truncate">{a.target_keyword}</TableCell>
-                    <TableCell className="text-right">{a.seo_score ?? '—'}</TableCell>
-                    <TableCell className="text-right">{formatNumber(a.word_count)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{a.seo_score ?? '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(a.word_count)}</TableCell>
                     <TableCell className={STATUS_COLOR[a.status] || 'text-muted-foreground'}>{a.status}</TableCell>
                     <TableCell className="text-muted-foreground">{timeAgo(a.created_at)}</TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">
@@ -251,6 +303,14 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
                 ))}
               </TableBody>
             </Table>
+            </div>
+            )}
+            {articles.length >= ARTICLE_LIMIT && (
+              <p className="border-t border-hairline px-3 py-2 text-xs text-muted-foreground">
+                Showing the newest {ARTICLE_LIMIT} articles; filters and sorting apply to those only.
+              </p>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

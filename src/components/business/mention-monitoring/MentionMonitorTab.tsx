@@ -33,7 +33,7 @@ import {
   getSubjectMonitoring, getSubjectFeed, getSubjectLlmVisibility,
   getSubjectLlmVisibilityTrend, probeSubjectLlm, refreshSubject,
   getSubjectOpportunities, Opportunity, OpportunitiesResponse,
-  getSubjectAiOverviewHistory, AiOverviewHistory, MentionProbeTier,
+  getSubjectAiOverviewHistory, AiOverviewHistory, MentionProbeTier, PROBE_TIERS, PROBE_TIER_LABEL,
   shareOfVoice, submitMentionClassifierCorrection,
   listExclusions, excludeMentionUrl, includeMentionUrl, promoteMentionUrl,
 } from '@/services/mentionMonitoringApi';
@@ -326,7 +326,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
       const updated = await updateTrackedMention(tracked.id, { probe_tier: tier });
       if (updated) setTracked(updated);
       toast({
-        title: tier === 'frontier' ? 'Switched to the frontier tier' : 'Switched to the cheap tier',
+        title: `Switched to ${PROBE_TIER_LABEL[tier]}`,
         description:
           'Runs before and after this change were measured with different models, so the '
           + 'trend will not compare across it.',
@@ -753,8 +753,9 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                     >
                       <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cheap">Cheap tier · ~$0.008/run</SelectItem>
-                        <SelectItem value="frontier">Frontier tier · ~25x</SelectItem>
+                        {PROBE_TIERS.map((t) => (
+                          <SelectItem key={t} value={t}>{PROBE_TIER_LABEL[t]}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <Button size="sm" onClick={handleProbeLlm} disabled={probing}>

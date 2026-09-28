@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { GitMerge, Loader2 } from 'lucide-react';
+import { GitMerge, Loader2, SearchX } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { HubEmptyState, HubFilterSelect, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
   userWebsitesService,
@@ -10,6 +12,22 @@ import {
   type UserWebsite,
 } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
+import { useTableSegments } from './seo/useTableSegments';
+
+type SortKey = 'impressions' | 'pages' | 'position' | 'severity' | 'query';
+const SORT_OPTIONS: { value: SortKey; label: string; dir: 'asc' | 'desc' }[] = [
+  { value: 'impressions', label: 'Most impressions', dir: 'desc' },
+  { value: 'severity', label: 'Most severe', dir: 'desc' },
+  { value: 'pages', label: 'Most competing pages', dir: 'desc' },
+  { value: 'position', label: 'Best position', dir: 'asc' },
+  { value: 'query', label: 'Query A–Z', dir: 'asc' },
+];
+const SEVERITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
+const SEVERITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+const SPLIT_LABELS: Record<string, string> = {
+  misdirected: 'Sending clicks to the weaker page',
+  aligned: 'Leader is the best converter',
+};
 
 /** Websites → Search Performance → Competing pages. */
 
@@ -87,6 +105,29 @@ export const WebsiteCannibalisationPanel: React.FC<{ website: UserWebsite }> = (
 
   useEffect(() => { void load(); }, [load]);
 
+  const items = report?.items ?? [];
+  const t = useTableSegments<CannibalItem, SortKey, 'severity' | 'split'>({
+    rows: items,
+    searchText: (it) => [it.query, ...it.pages.map((p) => p.page)],
+    sorters: {
+      impressions: (it) => it.impressions,
+      pages: (it) => it.page_count,
+      position: (it) => it.best_position,
+      severity: (it) => SEVERITY_RANK[it.severity] ?? 0,
+      query: (it) => it.query,
+    },
+    initialSort: { key: 'impressions', dir: 'desc' },
+    facets: {
+      severity: { label: 'Severity', valueOf: (it) => it.severity, labels: SEVERITY_LABELS, order: ['high', 'medium', 'low'] },
+      split: {
+        label: 'Click split',
+        valueOf: (it) => (it.leader_is_best_converter ? 'aligned' : 'misdirected'),
+        labels: SPLIT_LABELS,
+        order: ['misdirected', 'aligned'],
+      },
+    },
+  });
+
   if (loading) {
     return (
       <Card className="dashboard-card">
@@ -94,8 +135,6 @@ export const WebsiteCannibalisationPanel: React.FC<{ website: UserWebsite }> = (
       </Card>
     );
   }
-
-  const items = report?.items ?? [];
 
   return (
     <Card className="dashboard-card">
@@ -116,7 +155,41 @@ export const WebsiteCannibalisationPanel: React.FC<{ website: UserWebsite }> = (
             {report.note}
           </p>
         )}
-        {items.map((it) => <Row key={it.query} item={it} />)}
+        {items.length > 0 && (
+          <HubToolbar
+            className="rounded-sm border"
+            search={t.query}
+            onSearchChange={t.setQuery}
+            searchPlaceholder="Search query or page"
+            filters={
+              <>
+                <HubFilterSelect {...t.filterSelect('severity', 'Any severity')} />
+                <HubFilterSelect {...t.filterSelect('split', 'Any click split')} />
+                <HubFilterSelect
+                  label="Sort"
+                  allValue="impressions"
+                  value={t.sort.key}
+                  options={SORT_OPTIONS}
+                  onChange={(v) => {
+                    const opt = SORT_OPTIONS.find((o) => o.value === v);
+                    if (opt) t.setSort({ key: opt.value, dir: opt.dir });
+                  }}
+                />
+              </>
+            }
+            actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
+          />
+        )}
+        {items.length > 0 && t.visible.length === 0 && (
+          <HubEmptyState
+            variant="filtered"
+            icon={SearchX}
+            title="No competing queries match these filters"
+            description={`All ${items.length} queries are still here; the search or a filter is hiding them.`}
+            action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+          />
+        )}
+        {t.visible.map((it) => <Row key={it.query} item={it} />)}
       </CardContent>
     </Card>
   );

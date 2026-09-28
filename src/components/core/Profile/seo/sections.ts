@@ -1,7 +1,7 @@
 /** The per-website SEO rail — ONE declaration, read by the dashboard that renders it. */
 import {
   Bot, FileBarChart, FileStack, FileText, Filter, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard,
-  LineChart, MonitorSmartphone, Radar, Repeat, Scissors, Search, ShieldCheck, ShoppingBag, Sparkles,
+  LayoutList, LineChart, MonitorSmartphone, Radar, Repeat, Scissors, Search, ShieldCheck, ShoppingBag, Sparkles,
   Spline, Swords,
   Target, TrendingUp,
 } from 'lucide-react';
@@ -9,7 +9,7 @@ import type { LucideIcon } from 'lucide-react';
 
 export type SeoSectionId =
   | 'overview'
-  | 'gsc' | 'cannibalisation' | 'ranks'
+  | 'gsc' | 'cannibalisation' | 'ranks' | 'serp-features'
   | 'analytics' | 'analytics-pages' | 'analytics-geo' | 'analytics-tech' | 'analytics-commerce'
   | 'analytics-funnel' | 'analytics-retention'
   | 'ai' | 'rankings' | 'competitors' | 'domains'
@@ -48,6 +48,7 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'gsc', label: 'Search Console', icon: LineChart, group: 'search' },
   { value: 'cannibalisation', label: 'Cannibalisation', icon: Scissors, group: 'search' },
   { value: 'ranks', label: 'Rank Tracker', icon: Target, group: 'search' },
+  { value: 'serp-features', label: 'SERP Features', icon: LayoutList, group: 'search' },
 
   { value: 'analytics', label: 'Overview', icon: Spline, group: 'audience' },
   { value: 'analytics-pages', label: 'Pages', icon: FileStack, group: 'audience' },

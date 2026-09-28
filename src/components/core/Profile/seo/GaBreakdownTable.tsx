@@ -1,70 +1,58 @@
-import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { AlertTriangle, SearchX } from 'lucide-react';
 
+import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { compact } from './seoMetrics';
+import { HubToolbar } from '@/components/core/hub/HubToolbar';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { statusPresentation } from './seoMetrics';
-import { shareOf, type GaBreakdown, type GaBreakdownRow } from './gaBreakdowns';
-import { Sparkline } from './Sparkline';
+import {
+  GA_NAME_SORT, GA_STORED_WINDOW, searchGaRows, sortGaRows,
+  type GaBreakdown, type GaBreakdownRow, type GaSort, type GaWindow,
+} from './gaBreakdowns';
+import { GA_BREAKDOWNS, type GaBreakdownKey } from './gaVocabulary';
+import { GaRowsTable, GaWindowControl, TREND_KEY, type GaColumn } from './gaColumns';
+import { GaDrillSheet } from './GaDrillSheet';
+import { useDebounced, useGaSlice, useGaWindow } from './useGaBreakdowns';
 
-export interface GaColumn {
-  key: string;
-  label: string;
-  align?: 'left' | 'right';
-  render: (row: GaBreakdownRow, b: GaBreakdown) => React.ReactNode;
+export { num, sessionsColumn, trendColumn, type GaColumn } from './gaColumns';
+
+const LIVE_LIMIT = 50;
+
+const segmentable = (b: GaBreakdown) => b.status !== 'not_supported' && b.status !== 'not_collected';
+
+export function useWindowedBreakdown(
+  websiteId: string, dimension: GaBreakdownKey, stored: GaBreakdown, days: GaWindow,
+  opts: { search?: string; sort?: GaSort | null; limit?: number } = {},
+): { breakdown: GaBreakdown | null; live: boolean; loading: boolean } {
+  const metricCols = useMemo(
+    () => new Set((GA_BREAKDOWNS.find((b) => b.key === dimension)?.metrics ?? []).map((m) => m.col)),
+    [dimension],
+  );
+  const storedWindow = stored.window_days ?? GA_STORED_WINDOW;
+  const truncated = stored.row_count > stored.rows.length;
+  const serverSort = opts.sort && metricCols.has(opts.sort.key) ? opts.sort : null;
+  const wantLive = segmentable(stored) && (
+    days !== storedWindow || (truncated && (!!opts.search || !!serverSort))
+  );
+  const { data, loading } = useGaSlice(websiteId, wantLive ? {
+    dimension,
+    days,
+    search: opts.search || undefined,
+    orderBy: serverSort?.key,
+    desc: serverSort ? serverSort.desc : true,
+    limit: Math.max(opts.limit ?? 0, LIVE_LIMIT),
+  } : null);
+  return wantLive ? { breakdown: data, live: true, loading: loading || !data } : { breakdown: stored, live: false, loading: false };
 }
-
-/** The column every breakdown is ranked by. */
-export const sessionsColumn: GaColumn = {
-  key: 'sessions',
-  label: 'Sessions',
-  render: (row, b) => {
-    const pct = shareOf(row, b);
-    return (
-      <div className="flex items-center justify-end gap-2">
-        {pct != null && (
-          <span className="hidden h-1.5 w-16 overflow-hidden rounded-sm bg-surface-sunken sm:block" aria-hidden="true">
-            <span className="block h-full bg-primary" style={{ width: `${Math.max(2, Math.min(100, pct))}%` }} />
-          </span>
-        )}
-        <span className="tabular-nums">{row.sessions?.toLocaleString() ?? '—'}</span>
-        {pct != null && <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">{pct.toFixed(1)}%</span>}
-      </div>
-    );
-  },
-};
-
-export const num = (key: keyof GaBreakdownRow, label: string, fmt: (n: number) => string = compact): GaColumn => ({
-  key: String(key),
-  label,
-  render: (row) => {
-    const v = row[key] as number | null;
-    return <span className="tabular-nums">{v == null ? '—' : fmt(v)}</span>;
-  },
-});
-
-export const trendColumn: GaColumn = {
-  key: 'series',
-  label: 'Trend',
-  render: (row) => {
-    const pts = (row.series ?? []).map((p) => p.v).filter((v): v is number => v != null);
-    if (pts.length < 2) return <span className="text-muted-foreground">—</span>;
-    return (
-      <Sparkline
-        points={pts}
-        className="ml-auto h-6 w-24"
-        ariaLabel={`${row.value} sessions over the period`}
-      />
-    );
-  },
-};
 
 /**
  * One breakdown, with its own verdict. A collector that FAILED renders as an explanation, never as
  * an empty table — emptiness reads as "nobody visited", which is a different claim entirely.
  */
 export const GaBreakdownTable: React.FC<{
+  websiteId: string;
+  dimension: GaBreakdownKey;
   title: string;
   description?: string;
   breakdown: GaBreakdown;
@@ -74,10 +62,31 @@ export const GaBreakdownTable: React.FC<{
   columns: GaColumn[];
   limit?: number;
   children?: React.ReactNode;
-}> = ({ title, description, breakdown, head, renderName, columns, limit = 25, children }) => {
-  const rows = breakdown.rows.slice(0, limit);
-  const failed = breakdown.status === 'collector_failed';
-  const present = statusPresentation(breakdown.status);
+}> = ({ websiteId, dimension, title, description, breakdown, head, renderName, columns, limit = 25, children }) => {
+  const [days, setDays] = useGaWindow();
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<GaSort | null>(null);
+  const [drill, setDrill] = useState<GaBreakdownRow | null>(null);
+  const debounced = useDebounced(search.trim());
+
+  const { breakdown: shown, live, loading } = useWindowedBreakdown(
+    websiteId, dimension, breakdown, days, { search: debounced, sort, limit },
+  );
+
+  const rows = useMemo(
+    () => sortGaRows(dimension, searchGaRows(dimension, shown?.rows ?? [], search), sort).slice(0, limit),
+    [dimension, shown, search, sort, limit],
+  );
+
+  const status = shown?.status ?? 'ok';
+  const failed = status === 'collector_failed';
+  const present = statusPresentation(status);
+  const searchedEmpty = !!debounced && status === 'no_data';
+  const showBand = !loading && status !== 'ok' && !searchedEmpty;
+  const cols = live ? columns.filter((c) => c.key !== TREND_KEY) : columns;
+  const truncated = !!shown && shown.row_count > shown.rows.length;
+  const clientOnlySort = !!sort && sort.key !== GA_NAME_SORT && truncated
+    && !(GA_BREAKDOWNS.find((b) => b.key === dimension)?.metrics ?? []).some((m) => m.col === sort.key);
 
   return (
     <Card className="dashboard-card">
@@ -86,7 +95,19 @@ export const GaBreakdownTable: React.FC<{
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-3">
-        {breakdown.status !== 'ok' && (
+        {segmentable(breakdown) && (
+          <div className="overflow-hidden rounded-md border border-hairline">
+            <HubToolbar
+              search={search}
+              onSearchChange={setSearch}
+              searchPlaceholder={`Search ${head.toLowerCase()}`}
+              actions={<GaWindowControl value={days} onChange={setDays} />}
+              className="border-b-0"
+            />
+          </div>
+        )}
+
+        {showBand && (
           <div className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-xs leading-snug ${
             failed
               ? 'border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] text-amber-800 dark:text-amber-300'
@@ -96,46 +117,58 @@ export const GaBreakdownTable: React.FC<{
             <span>
               <span className="font-medium">{present.placeholder}</span>
               {' — '}
-              {breakdown.note || present.explain}
+              {shown?.note || present.explain}
             </span>
           </div>
         )}
 
         {children}
 
-        {breakdown.status === 'ok' && (
-          <div className="table-scroll">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{head}</TableHead>
-                  {columns.map((c) => (
-                    <TableHead key={c.key} className={c.align === 'left' ? undefined : 'text-right'}>{c.label}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.value}>
-                    <TableCell className="max-w-[320px]">{renderName(row)}</TableCell>
-                    {columns.map((c) => (
-                      <TableCell key={c.key} className={c.align === 'left' ? undefined : 'text-right'}>
-                        {c.render(row, breakdown)}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        {breakdown.status === 'ok' && breakdown.row_count > rows.length && (
-          <p className="text-xs text-muted-foreground">
-            Showing the top {rows.length} of {breakdown.row_count.toLocaleString()}. Shares are of the rows shown.
-          </p>
+        {!showBand && (
+          <GaRowsTable
+            rows={rows}
+            breakdown={shown ?? breakdown}
+            head={head}
+            renderName={renderName}
+            columns={cols}
+            sort={sort}
+            onSort={setSort}
+            onRowClick={setDrill}
+            loading={loading}
+            empty={
+              <HubEmptyState
+                variant="filtered"
+                icon={SearchX}
+                title={`Nothing matches “${search}”`}
+                action={<Button size="sm" variant="outline" onClick={() => setSearch('')}>Clear search</Button>}
+              />
+            }
+            footer={shown && !loading ? (
+              <span>
+                Last {shown.window_days ?? days} days{live ? ', asked of Google live' : ''}.
+                {' '}
+                {shown.row_count > rows.length
+                  ? `Showing ${rows.length} of ${shown.row_count.toLocaleString()}. `
+                  : ''}
+                Shares are of the {shown.rows.length} rows loaded.
+                {clientOnlySort ? ' Sorted within those rows.' : ''}
+                {' '}Click a row to break it down further.
+              </span>
+            ) : undefined}
+          />
         )}
       </CardContent>
+
+      {drill && (
+        <GaDrillSheet
+          key={`${drill.value}\u0000${drill.label ?? ''}`}
+          websiteId={websiteId}
+          root={{ dimension, row: drill }}
+          days={days}
+          onDaysChange={setDays}
+          onClose={() => setDrill(null)}
+        />
+      )}
     </Card>
   );
 };

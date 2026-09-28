@@ -144,21 +144,38 @@ describe('the corpus is a separate sample, not a second opinion', () => {
   it('a refused upstream is collector_failed, never no_data', () => {
     const code = blankComments(src(MENTIONS));
     expect(code).toContain("snap.status = 'collector_failed'");
-    expect(code).toContain("snap.status = 'no_data'");
-    expect(code).toMatch(/failures\.length === results\.length/);
+    expect(code).toContain("ours.status = 'no_data'");
+    expect(code).toMatch(/failed\.length === calls\.length/);
   });
 
   it('a partial failure is named rather than silently averaged in', () => {
     const code = blankComments(src(MENTIONS));
-    expect(code).toMatch(/failures\.length > 0/);
-    expect(code).toContain('mentions calls failed');
+    expect(code).toMatch(/failed\.length > 0/);
+    expect(code).toContain('Every corpus call failed');
   });
 
   it('the write is checked and tenancy comes from the verified JWT', () => {
     const code = blankComments(src(MENTIONS));
     expect(code).toContain('userCanAccessWorkspace(db, auth.userId, site.workspace_id)');
-    expect(code).toMatch(/error: saveErr/);
+    expect(code).toMatch(/const \{ error \} = await db\.from\('website_llm_mentions'\)\.insert/);
+    expect(code).toMatch(/if \(error\) throw new Error/);
     expect(code).toMatch(/error: 'Not found' \}, 404/);
+  });
+
+  it('the market is the site own, never a silent US default', () => {
+    const code = blankComments(src(MENTIONS));
+    expect(code).toContain("db.rpc('website_ai_market'");
+    expect(code).toContain("db.rpc('llm_mentions_platform_coverage'");
+    expect(code).not.toMatch(/\|\|\s*'US'/);
+    expect(code).not.toMatch(/\|\|\s*'en'/);
+    expect(code).toContain("status: 'not_collected', note: cov.note");
+  });
+
+  it('the weekly run is cron-gated and billed to the site owner through the spend gate', () => {
+    const code = blankComments(src(MENTIONS));
+    expect(code).toContain('isCronAuthorized(req)');
+    expect(code).toContain('runFor(db, site, {}, site.user_id)');
+    expect(code).toContain('callDataForSEO(kind, params, attribution)');
   });
 
   it('it reaches DataForSEO only through the one dispatcher', () => {

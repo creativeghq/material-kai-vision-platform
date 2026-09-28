@@ -70,7 +70,7 @@ question: a fixed, user-picked set followed as a **time series**.
 
 | Piece | What it is |
 |---|---|
-| `seo_tracked_keywords` | The chosen set — unique on `(website_id, keyword, country_code, device)`. Up to 200 added per paste, de-duplicated and lower-cased client-side so a pasted list with blanks and repeats is not N−1 unique-violation round trips. |
+| `seo_tracked_keywords` | The chosen set — unique (NULLS NOT DISTINCT) on `(website_id, keyword, country_code, device, location_code)`; `location_code` NULL = country level, else a DataForSEO city/region code. `device` and `location_code` are sent on every SERP call. Up to 200 added per paste, de-duplicated and lower-cased client-side so a pasted list with blanks and repeats is not N−1 unique-violation round trips. |
 | `seo_keyword_positions` | One row per keyword per day. Retained ~760 days (the summary RPC's own ceiling is 730). |
 | `get_website_rank_summary(p_website_id, p_days)` | **SQL derives the number AND the verdict.** Returns the series, the averages and the movement already inverted. |
 | `WebsiteRankTrackerPanel` | The Rank tracking tab — formats what the RPC returns, derives nothing. |

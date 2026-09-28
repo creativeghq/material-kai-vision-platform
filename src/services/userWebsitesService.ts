@@ -10,7 +10,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { AiCitationReport, AiKeywordVolumes, CitabilityReport, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import type { GaBreakdowns, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
+import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
 export interface UserWebsite {
   id: string;
@@ -339,6 +339,9 @@ export interface AiMonitoringState {
   own_brand_subject_id: string | null;
   own_brand_label: string | null;
   own_brand_inactive: boolean;
+  own_brand_probe_tier?: string | null;
+  own_brand_country_codes?: string[];
+  own_brand_language_codes?: string[];
   diagnosis: string | null;
 }
 
@@ -414,11 +417,62 @@ export interface CannibalReport {
 /** Who decided to track it. Only `gsc_auto` rows are in reach of automatic retirement. */
 export type TrackedKeywordSource = 'manual' | 'gsc_auto';
 
+export type SerpDevice = 'desktop' | 'mobile';
+
+/** A DataForSEO location inside one country (a city, region or municipality). */
+export interface SerpLocation {
+  location_code: number;
+  location_name: string;
+  location_type: string;
+}
+
+/** Where and on what a keyword is checked. `location` null = the whole country. */
+export interface KeywordTarget {
+  device: SerpDevice;
+  location: Pick<SerpLocation, 'location_code' | 'location_name'> | null;
+}
+
+export interface SerpFeatureMissingKeyword {
+  id: string;
+  keyword: string;
+  position: number | null;
+  device: string;
+  country_code: string;
+  location_name: string | null;
+  captured_at: string;
+}
+
+export interface SerpFeatureRow {
+  key: string;
+  /** Null when no keyword's latest check answered — unknown, never zero. */
+  present: number | null;
+  owned: number | null;
+  missing: number | null;
+  missing_keywords: SerpFeatureMissingKeyword[];
+  series: { date: string; answered: number; unknown: number; present: number; owned: number }[];
+}
+
+export interface SerpFeaturesReport {
+  status: 'ok' | 'collector_failed' | 'not_collected' | string;
+  note: string | null;
+  tracked: number;
+  answered: number;
+  unknown: number;
+  never_checked: number;
+  unknown_reason: string | null;
+  latest_capture: string | null;
+  features: SerpFeatureRow[];
+}
+
 export interface TrackedKeywordRow {
   id: string;
   keyword: string;
   country_code: string;
   device: string;
+  language_code?: string;
+  /** DataForSEO location for a city target; null = country level. */
+  location_code?: number | null;
+  location_name?: string | null;
   tags: string[];
   source: TrackedKeywordSource | string;
   /** The Search Console evidence that promoted it, frozen at that moment. */
@@ -741,6 +795,35 @@ export interface GscSummary {
   devices: GscRow[];
   countries: GscRow[];
   appearances: GscRow[];
+}
+
+export interface GscQueryPageRows {
+  days: number;
+  from: string;
+  to: string;
+  group_by: 'query' | 'page';
+  page: string | null;
+  query: string | null;
+  search: string | null;
+  country?: string | null;
+  device?: string | null;
+  status: 'ok' | 'no_data' | 'not_collected' | 'unsupported' | string;
+  note?: string | null;
+  total: number;
+  truncated: boolean;
+  rows: GscRow[];
+  countries?: { value: string; impressions: number }[];
+  devices?: { value: string; impressions: number }[];
+}
+
+export interface GscQueryPageFilter {
+  groupBy: 'query' | 'page';
+  page?: string | null;
+  query?: string | null;
+  search?: string | null;
+  country?: string | null;
+  device?: string | null;
+  limit?: number;
 }
 
 function normalizeUrl(raw: string): string {
@@ -1096,6 +1179,22 @@ export const userWebsitesService = {
     return (data as GscSummary) ?? null;
   },
 
+  async gscQueryPageRows(websiteId: string, days: number, f: GscQueryPageFilter): Promise<GscQueryPageRows | null> {
+    const { data, error } = await supabase.rpc('get_gsc_query_page_rows' as any, {
+      p_website_id: websiteId,
+      p_days: days,
+      p_group_by: f.groupBy,
+      p_page: f.page ?? null,
+      p_query: f.query ?? null,
+      p_search: f.search ?? null,
+      p_limit: f.limit ?? 200,
+      p_country: f.country ?? null,
+      p_device: f.device ?? null,
+    });
+    if (error) throw error;
+    return (data as GscQueryPageRows) ?? null;
+  },
+
   /** Returns the Google consent URL to redirect the browser to. */
   async gscAuthorize(websiteId: string): Promise<string> {
     const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'authorize', website_id: websiteId } });
@@ -1201,6 +1300,19 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as GaJourney) ?? null;
+  },
+
+  async gaDrill(websiteId: string, q: GaDrillQuery): Promise<GaDrillResult> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', {
+      body: {
+        action: 'ga_drill', website_id: websiteId, dimension: q.dimension,
+        filters: q.filters ?? [], search: q.search || undefined,
+        order_by: q.orderBy, desc: q.desc, days: q.days, limit: q.limit,
+      },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not query Analytics'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not query Analytics');
+    return data as GaDrillResult;
   },
 
   async gaBreakdowns(websiteId: string, limit = 50): Promise<GaBreakdowns | null> {
@@ -1314,6 +1426,7 @@ export const userWebsitesService = {
   async addTrackedKeywords(
     websiteId: string, workspaceId: string, keywords: string[],
     countryCode: string, languageCode: string,
+    target: KeywordTarget = { device: 'desktop', location: null },
   ): Promise<number> {
     // De-duplicated and trimmed here so a pasted list with blank lines and repeats
     // does not become N-1 unique-violation round trips.
@@ -1325,9 +1438,12 @@ export const userWebsitesService = {
       clean.map((keyword) => ({
         website_id: websiteId, workspace_id: workspaceId, keyword,
         country_code: countryCode, language_code: languageCode,
-        device: 'desktop', is_active: true,
+        device: target.device,
+        location_code: target.location?.location_code ?? null,
+        location_name: target.location?.location_name ?? null,
+        is_active: true,
       })) as any,
-      { onConflict: 'website_id,keyword,country_code,device', ignoreDuplicates: true },
+      { onConflict: 'website_id,keyword,country_code,device,location_code', ignoreDuplicates: true },
     );
     if (error) throw error;
     return clean.length;
@@ -1434,6 +1550,38 @@ export const userWebsitesService = {
     if (error) throw new Error(await edgeErrorMessage(error, 'Rank check failed'));
     if (!data?.ok) throw new Error(data?.error || 'Rank check failed');
     return data;
+  },
+
+  async updateTrackedKeywordTarget(id: string, target: KeywordTarget): Promise<void> {
+    const { data, error } = await supabase.from('seo_tracked_keywords' as any)
+      .update({
+        device: target.device,
+        location_code: target.location?.location_code ?? null,
+        location_name: target.location?.location_name ?? null,
+      } as any)
+      .eq('id', id).select('id');
+    if (error) {
+      if (error.code === '23505') throw new Error('This keyword is already tracked on that device and location.');
+      throw error;
+    }
+    if (!data?.length) throw new Error('That keyword is no longer tracked.');
+  },
+
+  async serpLocations(websiteId: string, countryCode: string): Promise<SerpLocation[]> {
+    const { data, error } = await supabase.functions.invoke('seo-rank-tracker', {
+      body: { action: 'locations', website_id: websiteId, country_code: countryCode },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not load locations'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not load locations');
+    return (data.locations as SerpLocation[]) ?? [];
+  },
+
+  async serpFeatures(websiteId: string, captures = 8): Promise<SerpFeaturesReport | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_serp_features' as any, { p_website_id: websiteId, p_captures: captures } as any,
+    );
+    if (error) throw error;
+    return (data as SerpFeaturesReport) ?? null;
   },
 
   async crawlReport(websiteId: string): Promise<CrawlReport | null> {

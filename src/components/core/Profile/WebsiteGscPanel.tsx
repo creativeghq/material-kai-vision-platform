@@ -5,8 +5,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
-import { HubSegmented, HubToolbar, HubEmptyState } from '@/components/core/hub';
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
+import {
+  HubSegmented, HubToolbar, HubEmptyState, HubFilterSelect, HubResetFilters,
+} from '@/components/core/hub';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/core/ui/dialog';
 import { TablePagination, clampPage, paginate } from '@/components/core/ui/table-pagination';
 import {
   TableColumnHeader, nextSort, type TableSort,
@@ -15,11 +20,13 @@ import { useToast } from '@/hooks/use-toast';
 import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import { formatNumber } from '@/utils/decimal';
 import {
-  userWebsitesService, type UserWebsite, type GscStatus, type GscSummary,
+  userWebsitesService, type UserWebsite, type GscStatus, type GscSummary, type GscQueryPageRows,
 } from '@/services/userWebsitesService';
 
 
 const fmt = (n: number) => formatNumber((n ?? 0));
+const pathOf = (url: string) => url.replace(/^https?:\/\/[^/]+/, '') || url;
+const ALL_PAGES = '__all';
 
 /**
  * The windows, in days INCLUDING the anchor day.
@@ -77,6 +84,43 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   type SortKey = 'label' | 'clicks' | 'impressions' | 'ctr' | 'position';
   const [sort, setSort] = useState<TableSort<SortKey>>({ key: 'clicks', dir: 'desc' });
   const toggleSort = (key: SortKey) => setSort((s) => nextSort(s, key, ['label']));
+  const [pageFilter, setPageFilter] = useState<string>(ALL_PAGES);
+  const [segment, setSegment] = useState<string>(ALL_PAGES);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [server, setServer] = useState<GscQueryPageRows | null>(null);
+  const [serverLoading, setServerLoading] = useState(false);
+  const [drill, setDrill] = useState<{ kind: 'page' | 'query'; value: string } | null>(null);
+
+  useEffect(() => {
+    const h = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(h);
+  }, [search]);
+
+  const listView = view === 'queries' || view === 'pages';
+  const activePage = view === 'queries' && pageFilter !== ALL_PAGES ? pageFilter : null;
+  const activeSegment = view === 'queries' && segment !== ALL_PAGES ? segment : null;
+  const segCountry = activeSegment?.startsWith('country:') ? activeSegment.slice(8) : null;
+  const segDevice = activeSegment?.startsWith('device:') ? activeSegment.slice(7) : null;
+  const serverMode = listView && (!!activePage || !!debouncedSearch || !!activeSegment);
+
+  useEffect(() => {
+    if (!serverMode || !status?.property) { setServer(null); return; }
+    let cancelled = false;
+    setServerLoading(true);
+    userWebsitesService.gscQueryPageRows(website.id, days, {
+      groupBy: view === 'pages' ? 'page' : 'query',
+      page: activePage,
+      search: debouncedSearch || null,
+      country: segCountry,
+      device: segDevice,
+    })
+      .then((r) => { if (!cancelled) setServer(r); })
+      .catch((e: any) => {
+        if (!cancelled) toast({ title: 'Could not filter Search Console rows', description: e.message, variant: 'destructive' });
+      })
+      .finally(() => { if (!cancelled) setServerLoading(false); });
+    return () => { cancelled = true; };
+  }, [serverMode, website.id, days, view, activePage, segCountry, segDevice, debouncedSearch, status?.property, toast]);
 
   const load = async () => {
     setLoading(true);
@@ -231,7 +275,24 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   const labelOf = (r: any): string => String(view === 'queries' ? r.query : view === 'pages' ? r.page : r.value) ?? '';
   const q = search.trim().toLowerCase();
   const allRows = VIEW_ROWS[view]();
-  const rows = allRows
+  const sourceRows = serverMode && server ? server.rows : allRows;
+  const filterCount = (q ? 1 : 0) + (activePage ? 1 : 0) + (activeSegment ? 1 : 0);
+  const clearFilters = () => { setSearch(''); setPageFilter(ALL_PAGES); setSegment(ALL_PAGES); setPage(1); };
+  const segmentOptions = [
+    { value: ALL_PAGES, label: 'All countries & devices' },
+    ...(summary?.devices || []).filter((d) => d.value)
+      .map((d) => ({ value: `device:${String(d.value).toLowerCase()}`, label: `Device · ${String(d.value).toLowerCase()}` })),
+    ...(summary?.countries || []).filter((c) => c.value)
+      .map((c) => ({ value: `country:${String(c.value).toLowerCase()}`, label: `Country · ${String(c.value).toUpperCase()}` })),
+  ];
+  const pageOptions = [
+    { value: ALL_PAGES, label: 'All pages' },
+    ...(summary?.top_pages || []).filter((p) => p.page).map((p) => ({ value: p.page as string, label: pathOf(p.page as string) })),
+  ];
+  if (activePage && !pageOptions.some((o) => o.value === activePage)) {
+    pageOptions.push({ value: activePage, label: pathOf(activePage) });
+  }
+  const rows = sourceRows
     .filter((r) => !q || labelOf(r).toLowerCase().includes(q))
     .sort((a, b) => {
       const dir = sort.dir === 'asc' ? 1 : -1;
@@ -328,7 +389,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             value={view}
             // A search typed against queries means nothing against countries, and a
             // carried-over one leaves the new dimension looking empty.
-            onChange={(v) => { setView(v); setSearch(''); setPage(1); }}
+            onChange={(v) => { setView(v); setSearch(''); setDebouncedSearch(''); setPage(1); }}
             className="flex-wrap"
             options={[
               { value: 'queries', label: 'Queries' },
@@ -347,7 +408,37 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                 search={search}
                 onSearchChange={(v) => { setSearch(v); setPage(1); }}
                 searchPlaceholder={`Search ${firstColLabel.toLowerCase()}s…`}
+                filters={view === 'queries' ? (
+                  <>
+                    <HubFilterSelect
+                      label="Page"
+                      value={pageFilter}
+                      allValue={ALL_PAGES}
+                      options={pageOptions}
+                      onChange={(v) => { setPageFilter(v); if (v !== ALL_PAGES) setSegment(ALL_PAGES); setPage(1); }}
+                      className="max-w-[260px] [&>span]:truncate"
+                    />
+                    <HubFilterSelect
+                      label="Segment"
+                      value={segment}
+                      allValue={ALL_PAGES}
+                      options={segmentOptions}
+                      onChange={(v) => { setSegment(v); if (v !== ALL_PAGES) setPageFilter(ALL_PAGES); setPage(1); }}
+                      className="max-w-[220px] [&>span]:truncate"
+                    />
+                    <HubResetFilters count={filterCount} onReset={clearFilters} />
+                  </>
+                ) : listView ? <HubResetFilters count={filterCount} onReset={clearFilters} /> : undefined}
+                actions={serverLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : undefined}
               />
+              {serverMode && server?.note && (
+                <p className="px-3 py-1.5 text-xs text-muted-foreground border-b border-hairline">{server.note}</p>
+              )}
+              {serverMode && server?.truncated && (
+                <p className="px-3 py-1.5 text-xs text-muted-foreground border-b border-hairline">
+                  Showing the top {server.rows.length} of {fmt(server.total)} {firstColLabel.toLowerCase()}s by clicks.
+                </p>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -363,27 +454,50 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                     <TableRow key={i}>
                       <TableCell className="max-w-[340px] truncate font-medium">
                         {view === 'pages' && r.page ? (
-                          <a href={r.page} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
-                            <span className="truncate">{r.page.replace(/^https?:\/\/[^/]+/, '') || r.page}</span><ExternalLink className="w-3 h-3 shrink-0" />
-                          </a>
-                        ) : view === 'queries' ? (r.query || '—')
+                          <span className="inline-flex items-center gap-1 max-w-full">
+                            <button
+                              type="button"
+                              onClick={() => setDrill({ kind: 'page', value: r.page })}
+                              title="Show the queries that bring traffic to this page"
+                              className="truncate text-left hover:text-primary hover:underline"
+                            >
+                              {pathOf(r.page)}
+                            </button>
+                            <a href={r.page} target="_blank" rel="noopener noreferrer" aria-label="Open page" className="text-muted-foreground hover:text-primary">
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          </span>
+                        ) : view === 'queries' && r.query ? (
+                          <button
+                            type="button"
+                            onClick={() => setDrill({ kind: 'query', value: r.query })}
+                            title="Show the pages ranking for this query"
+                            className="max-w-full truncate text-left hover:text-primary hover:underline"
+                          >
+                            {r.query}
+                          </button>
+                        ) : view === 'queries' ? '—'
                           : view === 'countries' ? <span className="uppercase">{r.value || '—'}</span>
                           : (r.value || '—')}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{fmt(r.clicks)}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmt(r.impressions)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.ctr.toFixed(1)}%</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.position.toFixed(1)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{Number(r.ctr ?? 0).toFixed(1)}%</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.position == null ? '—' : Number(r.position).toFixed(1)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              {rows.length === 0 && (
+              {rows.length === 0 && !serverLoading && (
                 <HubEmptyState
                   variant="filtered"
-                  title={`No ${firstColLabel.toLowerCase()} matches “${search.trim()}”`}
-                  description={`Search Console reported ${allRows.length} in this window — the search box is excluding them.`}
-                  action={<Button size="sm" variant="outline" onClick={() => setSearch('')}>Clear search</Button>}
+                  title={activePage
+                    ? `No queries${q ? ` matching “${search.trim()}”` : ''} for ${pathOf(activePage)}`
+                    : `No ${firstColLabel.toLowerCase()} matches “${search.trim()}”`}
+                  description={activePage
+                    ? 'Search Console reported no query traffic to this page in this window, or the search excludes it.'
+                    : 'Search Console has rows in this window — the filters are excluding them.'}
+                  action={<Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>}
                 />
               )}
               <TablePagination
@@ -394,9 +508,125 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
           )}
         </CardContent>
       </Card>
+      <GscDrillDialog
+        websiteId={website.id}
+        days={days}
+        drill={drill}
+        onClose={() => setDrill(null)}
+        onFilterQueriesByPage={(p) => {
+          setDrill(null); setView('queries'); setSearch(''); setDebouncedSearch(''); setPageFilter(p); setPage(1);
+        }}
+      />
     </div>
   );
 };
+
+function GscDrillDialog({
+  websiteId, days, drill, onClose, onFilterQueriesByPage,
+}: {
+  websiteId: string;
+  days: number;
+  drill: { kind: 'page' | 'query'; value: string } | null;
+  onClose: () => void;
+  onFilterQueriesByPage: (page: string) => void;
+}) {
+  const [data, setData] = useState<GscQueryPageRows | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!drill) { setData(null); setError(null); return; }
+    let cancelled = false;
+    setLoading(true); setError(null); setData(null);
+    userWebsitesService.gscQueryPageRows(websiteId, days, drill.kind === 'page'
+      ? { groupBy: 'query', page: drill.value }
+      : { groupBy: 'page', query: drill.value })
+      .then((r) => { if (!cancelled) setData(r); })
+      .catch((e: any) => { if (!cancelled) setError(e.message || 'Request failed'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [websiteId, days, drill]);
+
+  const byPage = drill?.kind === 'page';
+  const rows = data?.rows ?? [];
+  const competing = !byPage ? rows.filter((r) => r.impressions > 0).length : 0;
+
+  return (
+    <Dialog open={!!drill} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="break-all">{drill ? (byPage ? pathOf(drill.value) : `“${drill.value}”`) : ''}</DialogTitle>
+          <DialogDescription>
+            {byPage ? 'Queries that brought this page impressions' : 'Pages Google showed for this query'}
+            {data ? <> · {data.from} → {data.to}</> : null}
+          </DialogDescription>
+        </DialogHeader>
+        {!byPage && competing > 1 && (
+          <p className="text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1">
+            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+            {competing} pages split the impressions for this query — a cannibalisation signal. Consider consolidating or differentiating them.
+          </p>
+        )}
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : error ? (
+          <p className="text-sm text-[hsl(var(--error))] py-6">Could not load: {error}</p>
+        ) : rows.length === 0 ? (
+          <HubEmptyState
+            title={byPage ? 'No query data for this page' : 'No page data for this query'}
+            description={data?.status === 'ok'
+              ? 'Search Console reported no rows for it in this window.'
+              : 'Nothing has been synced from Search Console for this window yet.'}
+          />
+        ) : (
+          <div className="max-h-[55vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{byPage ? 'Query' : 'Page'}</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">Impr.</TableHead>
+                  <TableHead className="text-right">CTR</TableHead>
+                  <TableHead className="text-right">Pos.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const label = (byPage ? r.query : r.page) ?? '';
+                  return (
+                    <TableRow key={label}>
+                      <TableCell className="max-w-[320px] truncate font-medium" title={label}>
+                        {byPage ? label : (
+                          <a href={label} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary max-w-full">
+                            <span className="truncate">{pathOf(label)}</span><ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{fmt(r.clicks)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmt(r.impressions)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{Number(r.ctr ?? 0).toFixed(1)}%</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.position == null ? '—' : Number(r.position).toFixed(1)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {data?.truncated && (
+              <p className="px-3 py-2 text-xs text-muted-foreground">Showing the top {rows.length} of {fmt(data.total)} by clicks.</p>
+            )}
+          </div>
+        )}
+        {byPage && drill && (
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => onFilterQueriesByPage(drill.value)}>
+              Filter Queries by this page
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /** Minimal inline SVG sparkline — no chart dependency. */
 function Sparkline({ points }: { points: number[] }) {

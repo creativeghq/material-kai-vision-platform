@@ -1,12 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, RefreshCw, TrendingUp, ExternalLink, ArrowUp, ArrowDown, Sparkles, Link2 } from 'lucide-react';
+import { Loader2, RefreshCw, TrendingUp, ExternalLink, ArrowUp, ArrowDown, Sparkles, Link2, SearchX } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
+import { TableColumnHeader } from '@/components/core/ui/table-column-header';
+import { HubEmptyState, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
-import { userWebsitesService, type UserWebsite, type DomainIntel } from '@/services/userWebsitesService';
+import { userWebsitesService, type UserWebsite, type DomainIntel, type DomainKeyword } from '@/services/userWebsitesService';
 import { formatNumber } from '@/utils/decimal';
 import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
+import { useTableSegments } from './seo/useTableSegments';
+
+type KwSortKey = 'keyword' | 'position' | 'volume' | 'etv' | 'page';
+const POSITION_BANDS: { key: string; label: string; max: number }[] = [
+  { key: '1', label: '#1', max: 1 },
+  { key: '2_3', label: '2–3', max: 3 },
+  { key: '4_10', label: '4–10', max: 10 },
+  { key: '11_20', label: '11–20', max: 20 },
+  { key: '21_50', label: '21–50', max: 50 },
+  { key: '51_100', label: '51–100', max: 100 },
+];
+const POSITION_LABELS = Object.fromEntries(POSITION_BANDS.map((b) => [b.key, b.label]));
+const POSITION_ORDER = POSITION_BANDS.map((b) => b.key);
+const positionBandOf = (k: DomainKeyword): string | null =>
+  k.position == null ? null : (POSITION_BANDS.find((b) => k.position! <= b.max)?.key ?? null);
 
 function timeAgo(iso: string | null | undefined): string {
   if (!iso) return 'never';
@@ -101,12 +118,30 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
     finally { setRunning(false); }
   };
 
+  const kws = intel?.top_keywords || [];
+  const t = useTableSegments<DomainKeyword, KwSortKey, 'position' | 'page'>({
+    rows: kws,
+    searchText: (k) => [k.keyword, k.url],
+    sorters: {
+      keyword: (k) => k.keyword,
+      position: (k) => k.position,
+      volume: (k) => k.search_volume,
+      etv: (k) => k.etv,
+      page: (k) => k.url,
+    },
+    initialSort: { key: 'position', dir: 'asc' },
+    textKeys: ['keyword', 'page'],
+    facets: {
+      position: { label: 'position', valueOf: positionBandOf, labels: POSITION_LABELS, order: POSITION_ORDER },
+      page: { label: 'page', valueOf: (k) => k.url },
+    },
+  });
+
   if (loading) {
     return <Card className="dashboard-card"><CardContent className="flex items-center justify-center py-14"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></CardContent></Card>;
   }
 
   const s = intel?.latest;
-  const kws = intel?.top_keywords || [];
 
   return (
     <div className="space-y-4">
@@ -178,23 +213,38 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
         <Card className="dashboard-card">
           <CardHeader>
             <CardTitle className="text-base">Top Ranking Keywords</CardTitle>
-            <CardDescription>What the domain ranks for right now, best position first.</CardDescription>
+            <CardDescription>What the domain ranks for right now: the {kws.length} best-positioned keywords. Search and filters apply to these only.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <HubToolbar
+              search={t.query}
+              onSearchChange={t.setQuery}
+              searchPlaceholder="Search keyword or page"
+              actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
+            />
+            {t.visible.length === 0 ? (
+              <HubEmptyState
+                variant="filtered"
+                icon={SearchX}
+                title="No keywords match these filters"
+                description={`All ${kws.length} keywords are still here; the search or a column filter is hiding them.`}
+                action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+              />
+            ) : (
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Keyword</TableHead>
-                    <TableHead className="text-right">Pos.</TableHead>
-                    <TableHead className="text-right">Volume</TableHead>
-                    <TableHead className="text-right">Est. traffic</TableHead>
-                    <TableHead>Page</TableHead>
+                    <TableColumnHeader sortKey="keyword" sort={t.sort} onSort={t.onSort}>Keyword</TableColumnHeader>
+                    <TableColumnHeader sortKey="position" sort={t.sort} onSort={t.onSort} segment={t.segment('position')} align="right">Pos.</TableColumnHeader>
+                    <TableColumnHeader sortKey="volume" sort={t.sort} onSort={t.onSort} align="right">Volume</TableColumnHeader>
+                    <TableColumnHeader sortKey="etv" sort={t.sort} onSort={t.onSort} align="right">Est. traffic</TableColumnHeader>
+                    <TableColumnHeader sortKey="page" sort={t.sort} onSort={t.onSort} segment={t.segment('page')}>Page</TableColumnHeader>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {kws.map((k, i) => (
-                    <TableRow key={i}>
+                  {t.visible.map((k) => (
+                    <TableRow key={`${k.keyword}|${k.url ?? ''}`}>
                       <TableCell className="font-medium max-w-[240px] truncate">{k.keyword}</TableCell>
                       <TableCell className="text-right tabular-nums">{k.position ?? '—'}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmt(k.search_volume)}</TableCell>
@@ -211,6 +261,7 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
                 </TableBody>
               </Table>
             </div>
+            )}
           </CardContent>
         </Card>
       )}

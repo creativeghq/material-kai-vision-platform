@@ -18,6 +18,8 @@ export const WebsiteAnalyticsCommercePanel: React.FC<{ website: UserWebsite }> =
       <GaBreakdownTable
         title="Products"
         description="Views, carts and purchases per item. Empty unless the store sends GA4 ecommerce events."
+        websiteId={website.id}
+        dimension="item"
         breakdown={breakdownOf(b, 'item')}
         head="Product"
         renderName={(row) => (
@@ -38,6 +40,8 @@ export const WebsiteAnalyticsCommercePanel: React.FC<{ website: UserWebsite }> =
       <GaBreakdownTable
         title="Ad campaigns"
         description="What each campaign cost and what it returned. Needs a linked Google Ads account — cost is never inferred from sessions."
+        websiteId={website.id}
+        dimension="ads_campaign"
         breakdown={breakdownOf(b, 'ads_campaign')}
         head="Campaign"
         renderName={(row) => (

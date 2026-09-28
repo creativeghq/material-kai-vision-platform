@@ -20,6 +20,8 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
       <GaBreakdownTable
         title="Devices"
         description="A site that converts on desktop and not on mobile is a layout problem, not a traffic problem."
+        websiteId={website.id}
+        dimension="device"
         breakdown={breakdownOf(b, 'device')}
         head="Device"
         renderName={plain}
@@ -29,6 +31,8 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
       <GaBreakdownTable
         title="New vs returning"
         description="Returning visitors are the ones the site earned. New ones are the ones it reached."
+        websiteId={website.id}
+        dimension="returning"
         breakdown={breakdownOf(b, 'returning')}
         head="Visitor"
         renderName={plain}
@@ -38,6 +42,8 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
       <GaBreakdownTable
         title="Events"
         description="What people did. Counted rather than sessionised — one session can fire an event many times."
+        websiteId={website.id}
+        dimension="event"
         breakdown={breakdownOf(b, 'event')}
         head="Event"
         renderName={(row) => <span className="truncate font-mono text-xs">{row.value}</span>}
@@ -47,6 +53,8 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
 
       <GaBreakdownTable
         title="Browsers"
+        websiteId={website.id}
+        dimension="browser"
         breakdown={breakdownOf(b, 'browser')}
         head="Browser"
         renderName={plain}
@@ -56,6 +64,8 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
 
       <GaBreakdownTable
         title="Operating systems"
+        websiteId={website.id}
+        dimension="os"
         breakdown={breakdownOf(b, 'os')}
         head="Operating system"
         renderName={plain}
@@ -66,6 +76,8 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
       <GaBreakdownTable
         title="Languages"
         description="The browser language people arrive with — which is not the language they read the site in."
+        websiteId={website.id}
+        dimension="language"
         breakdown={breakdownOf(b, 'language')}
         head="Language"
         renderName={plain}
@@ -76,6 +88,8 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
       <GaBreakdownTable
         title="Hostnames"
         description="A hostname you do not recognise is a staging copy or someone else reporting into your property."
+        websiteId={website.id}
+        dimension="hostname"
         breakdown={breakdownOf(b, 'hostname')}
         head="Hostname"
         renderName={(row) => <span className="truncate font-mono text-xs">{row.value}</span>}

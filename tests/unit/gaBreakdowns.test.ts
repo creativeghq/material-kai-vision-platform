@@ -8,7 +8,10 @@ import {
 } from '@/components/core/Profile/seo/gaVocabulary';
 import { COUNTRY_TOPO_ID } from '@/components/core/Profile/seo/countryTopoIds.generated';
 import { SEO_SECTIONS } from '@/components/core/Profile/seo/sections';
-import { countryFlag, formatDuration, prettyPath, shareOf } from '@/components/core/Profile/seo/gaBreakdowns';
+import {
+  GA_DRILL_TARGETS, countryFlag, drillAsBreakdown, drillTargets, formatDuration, prettyPath,
+  searchGaRows, shareOf, sortGaRows,
+} from '@/components/core/Profile/seo/gaBreakdowns';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -140,6 +143,43 @@ describe('breakdown formatting', () => {
   it('turns an alpha-2 code into its flag, and refuses anything else', () => {
     expect(countryFlag('GR')).toBe('🇬🇷');
     expect(countryFlag('(not set)')).toBe('');
+  });
+});
+
+describe('drilling and segmenting a breakdown', () => {
+  const row = (value: string, sessions: number | null, label: string | null = null) =>
+    ({ value, label, sessions, series: [] }) as any;
+
+  it('every breakdown can be drilled, never into itself, and only into real breakdowns', () => {
+    const keys = new Set(GA_BREAKDOWN_KEYS);
+    for (const key of GA_BREAKDOWN_KEYS) {
+      const targets = GA_DRILL_TARGETS[key];
+      expect(targets.length, `${key} offers nothing to drill into`).toBeGreaterThan(0);
+      expect(targets).not.toContain(key);
+      for (const t of targets) expect(keys.has(t), `${key} → ${t}`).toBe(true);
+    }
+  });
+
+  it('a dimension already filtered on is not offered again', () => {
+    expect(drillTargets('country', ['country', 'city'])).not.toContain('city');
+  });
+
+  it('an unknown figure sorts last in both directions — it is not the smallest', () => {
+    const rows = [row('a', 5), row('b', null), row('c', 9)];
+    expect(sortGaRows('device', rows, { key: 'sessions', desc: true }).map((r) => r.value)).toEqual(['c', 'a', 'b']);
+    expect(sortGaRows('device', rows, { key: 'sessions', desc: false }).map((r) => r.value)).toEqual(['a', 'c', 'b']);
+  });
+
+  it('search matches what the reader SEES, not only the stored code', () => {
+    const rows = [row('GR', 5, 'Greece'), row('DE', 3, 'Germany')];
+    expect(searchGaRows('country', rows, 'gree').map((r) => r.value)).toEqual(['GR']);
+    expect(searchGaRows('source', [row('google', 1, 'organic')], 'organic')).toHaveLength(1);
+  });
+
+  it('an empty live answer is no_data, never an ok table of nothing', () => {
+    const b = drillAsBreakdown({ rows: [], row_count: 0, period_start: '', period_end: '', days: 7, metrics: [] });
+    expect(b.status).toBe('no_data');
+    expect(b.window_days).toBe(7);
   });
 });
 

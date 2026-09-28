@@ -24,6 +24,7 @@ export const WebsiteAnalyticsPagesPanel: React.FC<{ website: UserWebsite }> = ({
         href={`${origin}${clean.startsWith('/') ? clean : `/${clean}`}`}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
         className="group block min-w-0"
       >
         <span className="flex items-center gap-1 truncate font-medium group-hover:text-primary">
@@ -40,6 +41,8 @@ export const WebsiteAnalyticsPagesPanel: React.FC<{ website: UserWebsite }> = ({
       <GaBreakdownTable
         title="Pages"
         description="Every page Analytics recorded a view for, busiest first."
+        websiteId={website.id}
+        dimension="page"
         breakdown={pages}
         head="Page"
         renderName={(row) => pathLink(row.value, row.label)}
@@ -56,6 +59,8 @@ export const WebsiteAnalyticsPagesPanel: React.FC<{ website: UserWebsite }> = ({
       <GaBreakdownTable
         title="Landing pages"
         description="Where sessions STARTED. A page high here and low in the table above is a doorway people leave from."
+        websiteId={website.id}
+        dimension="landing_page"
         breakdown={landing}
         head="Landing page"
         renderName={(row) => pathLink(row.value)}

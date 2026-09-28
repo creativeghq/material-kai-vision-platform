@@ -1736,6 +1736,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "ga_list_properties",
           "ga_set_property",
           "ga_sync",
+          "ga_drill",
           "inspect_urls",
           "sync",
           "disconnect"
@@ -4057,6 +4058,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "enum": [
           "run",
+          "locations",
           "cron-run"
         ],
         "required": true,
@@ -4064,6 +4066,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       },
       "website_id": {
         "type": "string"
+      },
+      "country_code": {
+        "type": "string",
+        "description": "Two-letter ISO country code."
       }
     }
   },

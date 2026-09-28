@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, Loader2, Minus, Plus, RefreshCw, Target, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle, ArrowDown, ArrowUp, Loader2, MapPin, Minus, Pencil, Plus, RefreshCw, Target, Trash2,
+} from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -8,7 +10,10 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TablePagination, clampPage, paginate } from '@/components/core/ui/table-pagination';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
-import { HubToolbar } from '@/components/core/hub';
+import { HubFilterSelect, HubToolbar } from '@/components/core/hub';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/core/ui/dialog';
 import {
   TableColumnHeader, nextSort, segmentOptions, type TableSort,
 } from '@/components/core/ui/table-column-header';
@@ -16,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
 import {
   userWebsitesService,
+  type KeywordTarget,
   type RankSummary,
   type TrackedKeywordRow,
   type UserWebsite,
@@ -23,6 +29,36 @@ import {
 import { Sparkline } from './seo/Sparkline';
 import { compact } from './seo/seoMetrics';
 import { KeywordDiscoveryCard } from './seo/KeywordDiscoveryCard';
+import { SerpTargetPicker, shortLocationName } from './seo/SerpTargetPicker';
+
+const COUNTRY = 'GR';
+const LANGUAGE = 'el';
+const DEFAULT_TARGET: KeywordTarget = { device: 'desktop', location: null };
+const ALL = 'all';
+const COUNTRY_LEVEL = 'country';
+
+function targetOf(r: TrackedKeywordRow): KeywordTarget {
+  return {
+    device: r.device === 'mobile' ? 'mobile' : 'desktop',
+    location: r.location_code && r.location_name
+      ? { location_code: r.location_code, location_name: r.location_name }
+      : null,
+  };
+}
+
+function filterOptions(
+  rows: TrackedKeywordRow[], valueOf: (r: TrackedKeywordRow) => string,
+  labelOf: (v: string) => string, allLabel: string,
+) {
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(valueOf(r), (counts.get(valueOf(r)) ?? 0) + 1);
+  return [
+    { value: ALL, label: allLabel },
+    ...[...counts.entries()]
+      .sort((a, b) => labelOf(a[0]).localeCompare(labelOf(b[0])))
+      .map(([v, n]) => ({ value: v, label: `${labelOf(v)} (${n})` })),
+  ];
+}
 
 /** Websites → Rankings. */
 
@@ -173,6 +209,11 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const [moves, setMoves] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   const [features, setFeatures] = useState<string[]>([]);
+  const [countryFilter, setCountryFilter] = useState(ALL);
+  const [deviceFilter, setDeviceFilter] = useState(ALL);
+  const [locationFilter, setLocationFilter] = useState(ALL);
+  const [addTarget, setAddTarget] = useState<KeywordTarget>(DEFAULT_TARGET);
+  const [editing, setEditing] = useState<{ row: TrackedKeywordRow; target: KeywordTarget } | null>(null);
   const [sort, setSort] = useState<TableSort<SortKey>>({ key: 'position', dir: 'asc' });
 
   const load = useCallback(async () => {
@@ -196,7 +237,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
       // is a pointless argument with the clipboard.
       const list = adding.split(/[\n,]/);
       const n = await userWebsitesService.addTrackedKeywords(
-        website.id, website.workspace_id, list, 'GR', 'el',
+        website.id, website.workspace_id, list, COUNTRY, LANGUAGE, addTarget,
       );
       setAdding('');
       setShowAdd(false);
@@ -232,6 +273,21 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
     }
   };
 
+  const saveTarget = async () => {
+    if (!editing) return;
+    setBusy('edit');
+    try {
+      await userWebsitesService.updateTrackedKeywordTarget(editing.row.id, editing.target);
+      setEditing(null);
+      toast({ title: 'Target updated', description: 'The next check reads the results page for the new device and location.' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Could not update it', description: e?.message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const remove = async (id: string) => {
     try {
       await userWebsitesService.removeTrackedKeyword(id);
@@ -260,6 +316,9 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
     if (moves.length && !moves.includes(movementOf(r))) return false;
     if (sources.length && !sources.includes(r.source || 'manual')) return false;
     if (features.length && !features.some((f) => (r.serp_features ?? []).includes(f))) return false;
+    if (countryFilter !== ALL && r.country_code !== countryFilter) return false;
+    if (deviceFilter !== ALL && r.device !== deviceFilter) return false;
+    if (locationFilter !== ALL && (r.location_code ? String(r.location_code) : COUNTRY_LEVEL) !== locationFilter) return false;
     if (!q) return true;
     return r.keyword.toLowerCase().includes(q) || (r.url ?? '').toLowerCase().includes(q);
   });
@@ -288,8 +347,22 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   });
 
   const filtering = q.length > 0 || bands.length > 0 || moves.length > 0
-    || sources.length > 0 || features.length > 0;
-  const clearFilters = () => { setSearch(''); setBands([]); setMoves([]); setSources([]); setFeatures([]); };
+    || sources.length > 0 || features.length > 0
+    || countryFilter !== ALL || deviceFilter !== ALL || locationFilter !== ALL;
+  const clearFilters = () => {
+    setSearch(''); setBands([]); setMoves([]); setSources([]); setFeatures([]);
+    setCountryFilter(ALL); setDeviceFilter(ALL); setLocationFilter(ALL);
+  };
+
+  const locationNames = new Map(
+    rows.filter((r) => r.location_code).map((r) => [String(r.location_code), shortLocationName(r.location_name)]),
+  );
+  const countryOptions = filterOptions(rows, (r) => r.country_code, (v) => v, 'All countries');
+  const deviceOptions = filterOptions(rows, (r) => r.device, (v) => (v === 'mobile' ? 'Mobile' : 'Desktop'), 'All devices');
+  const locationOptions = filterOptions(
+    rows, (r) => (r.location_code ? String(r.location_code) : COUNTRY_LEVEL),
+    (v) => (v === COUNTRY_LEVEL ? 'Country level' : locationNames.get(v) ?? v), 'All locations',
+  );
 
   // Counted over the WHOLE set, not the page: a filter menu that only lists what
   // survives the current filter cannot be used to widen one.
@@ -304,6 +377,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const bandTotal = s ? BANDS.reduce((t, b) => t + (s.distribution[b.key] ?? 0), 0) || 1 : 1;
   const addForm = (
     <div className="space-y-2">
+      <SerpTargetPicker websiteId={website.id} countryCode={COUNTRY} value={addTarget} onChange={setAddTarget} />
       <Textarea
         value={adding}
         onChange={(e) => setAdding(e.target.value)}
@@ -316,9 +390,13 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
           {busy === 'add' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
           Track these
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => { setShowAdd(false); setAdding(''); }}>Cancel</Button>
+        <Button size="sm" variant="ghost" onClick={() => { setShowAdd(false); setAdding(''); setAddTarget(DEFAULT_TARGET); }}>
+          Cancel
+        </Button>
       </div>
-      <p className="text-[11px] text-muted-foreground">One per line or comma-separated. Checked daily in Greek results.</p>
+      <p className="text-[11px] text-muted-foreground">
+        One per line or comma-separated. Checked daily in Greek results on the device above, for all of Greece or one city.
+      </p>
     </div>
   );
 
@@ -496,6 +574,18 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
               search={search}
               onSearchChange={(v) => { setSearch(v); setPage(1); }}
               searchPlaceholder="Search keywords and ranking pages…"
+              filters={
+                <>
+                  {countryOptions.length > 2 || countryFilter !== ALL ? (
+                    <HubFilterSelect label="Country" value={countryFilter} options={countryOptions}
+                      onChange={(v) => { setCountryFilter(v); setPage(1); }} />
+                  ) : null}
+                  <HubFilterSelect label="Device" value={deviceFilter} options={deviceOptions}
+                    onChange={(v) => { setDeviceFilter(v); setPage(1); }} />
+                  <HubFilterSelect label="Location" value={locationFilter} options={locationOptions}
+                    onChange={(v) => { setLocationFilter(v); setPage(1); }} />
+                </>
+              }
               actions={
                 filtering ? (
                   <span className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -573,7 +663,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                     >
                       Ranking page
                     </TableColumnHeader>
-                    <TableColumnHeader className="w-10"><span className="sr-only">Stop tracking</span></TableColumnHeader>
+                    <TableColumnHeader className="w-20"><span className="sr-only">Actions</span></TableColumnHeader>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -599,6 +689,11 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                         </div>
                         <div className="text-[11px] text-muted-foreground">
                           {r.country_code} · {r.device}
+                          {r.location_name ? (
+                            <span className="inline-flex items-center gap-0.5">
+                              {' · '}<MapPin className="h-3 w-3" aria-hidden="true" />{shortLocationName(r.location_name)}
+                            </span>
+                          ) : null}
                           {r.search_volume != null ? ` · ${compact(r.search_volume)}/mo` : ''}
                           {/* A capped run leaves part of the set on an older day; say so per
                               row rather than let yesterday's position pass as today's. */}
@@ -630,7 +725,13 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                           ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="block truncate text-xs text-primary hover:underline">{r.url}</a>
                           : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Button size="icon" variant="ghost" className="h-7 w-7"
+                          onClick={() => setEditing({ row: r, target: targetOf(r) })}
+                          aria-label={`Change device or location for ${r.keyword}`}
+                          title="Change device or location">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
                         <Button size="icon" variant="ghost" className="h-7 w-7"
                           onClick={() => remove(r.id)} aria-label={`Stop tracking ${r.keyword}`}
                           title="Stop tracking this — and stop the discovery engine offering it back">
@@ -659,6 +760,34 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
       )}
 
       <KeywordDiscoveryCard website={website} onTracked={() => { void load(); }} />
+
+      <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Where to check “{editing?.row.keyword}”</DialogTitle>
+            <DialogDescription>
+              Rankings differ between phone and desktop, and between cities. Positions already captured were read for
+              the old target, so the first change after switching compares the two. To follow both, add the keyword
+              again with the new target instead.
+            </DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <SerpTargetPicker
+              websiteId={website.id}
+              countryCode={editing.row.country_code}
+              value={editing.target}
+              onChange={(t) => setEditing({ ...editing, target: t })}
+            />
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button onClick={saveTarget} disabled={busy === 'edit'}>
+              {busy === 'edit' && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

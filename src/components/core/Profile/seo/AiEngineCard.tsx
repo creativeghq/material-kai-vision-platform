@@ -83,10 +83,24 @@ const VerdictBar: React.FC<{ engine: AiEngine }> = ({ engine }) => {
         ))}
       </div>
       <p className="mt-1.5 text-[11px] text-muted-foreground">
-        {engine.answered} answered{engine.failed > 0 ? ` · ${engine.failed} failed` : ''}
+        {engine.probes === 0
+          ? 'Not asked in this window'
+          : `${engine.answered} of ${engine.probes} answered`}
+        {engine.failed > 0 ? ` · ${engine.failed} failed` : ''}
+        {engine.answered > 0 ? ` · ${engine.sourced} with sources` : ''}
+        {engine.cited_unnamed > 0 ? ` · ${engine.cited_unnamed} cited without naming you` : ''}
         {engine.avg_position != null ? ` · avg rank #${engine.avg_position}` : ''}
+        {engine.avg_latency_ms != null ? ` · ${(engine.avg_latency_ms / 1000).toFixed(1)}s` : ''}
         {engine.cost_usd ? ` · ${formatUsd(engine.cost_usd)}` : ''}
       </p>
+      {engine.answered > 0 && engine.failed > 0 && engine.sample_error && (
+        <p className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground" title={engine.sample_error}>
+          <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+          <span className="line-clamp-2">
+            Last error{engine.last_error_at ? ` ${timeAgo(engine.last_error_at)}` : ''}: {engine.sample_error}
+          </span>
+        </p>
+      )}
     </div>
   );
 };

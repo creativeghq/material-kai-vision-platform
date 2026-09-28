@@ -1,14 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, SearchX } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { HubEmptyState } from '@/components/core/hub';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
+import { TableColumnHeader } from '@/components/core/ui/table-column-header';
+import { HubEmptyState, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
 import { userWebsitesService, type SeoResearchRunRow, type UserWebsite } from '@/services/userWebsitesService';
 import { Loading, useLaunchQuickStart } from './seo/dashboardPrimitives';
+import { AGE_WINDOW_LABELS, AGE_WINDOW_ORDER, ageWindowOf, timeOf, useTableSegments } from './seo/useTableSegments';
+
+const RUN_LIMIT = 500;
+type SortKey = 'subject' | 'kind' | 'country' | 'result' | 'ran';
+const RESULT_LABELS: Record<string, string> = { success: 'Success', failed: 'Failed' };
 
 /** Websites -> Activity -> Toolkit Runs. */
 export const WebsiteToolkitRunsPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
@@ -22,7 +28,7 @@ export const WebsiteToolkitRunsPanel: React.FC<{ website: UserWebsite }> = ({ we
     setLoading(true);
     (async () => {
       try {
-        const r = await userWebsitesService.toolkitRuns(website.id);
+        const r = await userWebsitesService.toolkitRuns(website.id, RUN_LIMIT);
         if (!cancelled) setRuns(r);
       } catch (e: any) {
         if (!cancelled) toast({ title: 'Could not load runs', description: e?.message, variant: 'destructive' });
@@ -33,6 +39,26 @@ export const WebsiteToolkitRunsPanel: React.FC<{ website: UserWebsite }> = ({ we
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [website.id]);
+
+  const t = useTableSegments<SeoResearchRunRow, SortKey, 'kind' | 'country' | 'result' | 'ran'>({
+    rows: runs,
+    searchText: (r) => [r.label, r.subject, r.kind],
+    sorters: {
+      subject: (r) => r.label || r.subject,
+      kind: (r) => r.kind,
+      country: (r) => r.country_code,
+      result: (r) => (r.success ? 1 : 0),
+      ran: (r) => timeOf(r.created_at),
+    },
+    initialSort: { key: 'ran', dir: 'desc' },
+    textKeys: ['subject', 'kind', 'country'],
+    facets: {
+      kind: { label: 'kind', valueOf: (r) => r.kind },
+      country: { label: 'country', valueOf: (r) => r.country_code },
+      result: { label: 'result', valueOf: (r) => (r.success ? 'success' : 'failed'), labels: RESULT_LABELS, order: ['success', 'failed'] },
+      ran: { label: 'ran', valueOf: (r) => ageWindowOf(r.created_at), labels: AGE_WINDOW_LABELS, order: AGE_WINDOW_ORDER },
+    },
+  });
 
   return (
       <Card className="dashboard-card">
@@ -61,30 +87,55 @@ export const WebsiteToolkitRunsPanel: React.FC<{ website: UserWebsite }> = ({ we
               }
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Result</TableHead>
-                  <TableHead>Ran</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {runs.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium max-w-[240px] truncate">{r.label || r.subject}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.kind}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.country_code || '—'}</TableCell>
-                    <TableCell className={r.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-[hsl(var(--error))]'}>
-                      {r.success ? 'success' : 'failed'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <HubToolbar
+                search={t.query}
+                onSearchChange={t.setQuery}
+                searchPlaceholder="Search runs"
+                actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
+              />
+              {t.visible.length === 0 ? (
+                <HubEmptyState
+                  variant="filtered"
+                  icon={SearchX}
+                  title="No runs match these filters"
+                  description={`All ${runs.length} runs are still here; the search or a column filter is hiding them.`}
+                  action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+                />
+              ) : (
+                <div className="table-scroll">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableColumnHeader sortKey="subject" sort={t.sort} onSort={t.onSort}>Subject</TableColumnHeader>
+                        <TableColumnHeader sortKey="kind" sort={t.sort} onSort={t.onSort} segment={t.segment('kind')}>Kind</TableColumnHeader>
+                        <TableColumnHeader sortKey="country" sort={t.sort} onSort={t.onSort} segment={t.segment('country')}>Country</TableColumnHeader>
+                        <TableColumnHeader sortKey="result" sort={t.sort} onSort={t.onSort} segment={t.segment('result')}>Result</TableColumnHeader>
+                        <TableColumnHeader sortKey="ran" sort={t.sort} onSort={t.onSort} segment={t.segment('ran')}>Ran</TableColumnHeader>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {t.visible.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium max-w-[240px] truncate">{r.label || r.subject}</TableCell>
+                          <TableCell className="text-muted-foreground">{r.kind}</TableCell>
+                          <TableCell className="text-muted-foreground">{r.country_code || '—'}</TableCell>
+                          <TableCell className={r.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-[hsl(var(--error))]'}>
+                            {r.success ? 'success' : 'failed'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {runs.length >= RUN_LIMIT && (
+                <p className="border-t border-hairline px-3 py-2 text-xs text-muted-foreground">
+                  Showing the newest {RUN_LIMIT} runs; filters and sorting apply to those only.
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -137,6 +137,11 @@
       "reason": "todo: manage_flows could offer the suggested automations for the workspace"
     },
     {
+      "rpc": "get_gsc_query_page_rows",
+      "scope_arg": "p_website_id",
+      "reason": "todo: the panel's query x page drill-down; the agent reads get_gsc_summary, get_page_gsc_queries and get_website_cannibalisation, but cannot filter queries by page within a window"
+    },
+    {
       "rpc": "get_import_job_stats",
       "scope_arg": "p_workspace_id",
       "reason": "import dashboard aggregate; the import agent reports per job"

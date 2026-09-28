@@ -319,6 +319,126 @@ async function gaBreakdownReport(
   });
 }
 
+const GA_DRILL_MAX_FILTERS = 6;
+const GA_DRILL_MAX_VALUE = 500;
+
+interface GaDrillFilter { spec: GaBreakdownSpec; value: string; label: string | null }
+
+function gaSpecByKey(key: unknown): GaBreakdownSpec | null {
+  return GA_BREAKDOWNS.find((b) => b.key === key) ?? null;
+}
+
+function gaExact(fieldName: string, value: string) {
+  return { filter: { fieldName, stringFilter: { matchType: 'EXACT', value, caseSensitive: true } } };
+}
+
+/** Dimension names come from GA_BREAKDOWNS only — a caller names a breakdown KEY, never a GA field. */
+function parseGaDrill(body: any):
+  { target: GaBreakdownSpec; filters: GaDrillFilter[]; search: string; orderCol: string | null; desc: boolean; days: number; limit: number }
+  | { error: string } {
+  const target = gaSpecByKey(body?.dimension);
+  if (!target) return { error: 'dimension must be one of the Analytics breakdowns.' };
+  const raw = Array.isArray(body?.filters) ? body.filters : [];
+  if (raw.length > GA_DRILL_MAX_FILTERS) return { error: `At most ${GA_DRILL_MAX_FILTERS} filters.` };
+  const filters: GaDrillFilter[] = [];
+  for (const f of raw) {
+    const spec = gaSpecByKey(f?.dimension);
+    if (!spec) return { error: 'Every filter must name one of the Analytics breakdowns.' };
+    if (typeof f?.value !== 'string' || f.value.length > GA_DRILL_MAX_VALUE) return { error: 'A filter value must be a string.' };
+    const label = typeof f?.label === 'string' && spec.dimensions.length > 1 ? f.label.slice(0, GA_DRILL_MAX_VALUE) : null;
+    filters.push({ spec, value: f.value, label });
+  }
+  const search = typeof body?.search === 'string' ? body.search.trim().slice(0, 200) : '';
+  const orderCol = typeof body?.order_by === 'string' ? body.order_by : null;
+  return {
+    target, filters, search, orderCol,
+    desc: body?.desc !== false,
+    days: Math.min(Math.max(Math.trunc(Number(body?.days)) || 28, 1), 365),
+    limit: Math.min(Math.max(Math.trunc(Number(body?.limit)) || 50, 1), 250),
+  };
+}
+
+async function gaDrillReport(
+  token: string, property: string,
+  q: { target: GaBreakdownSpec; filters: GaDrillFilter[]; search: string; orderCol: string | null; desc: boolean; days: number; limit: number },
+) {
+  const caps = await gaCapabilities(token, property);
+  const resolved = resolveSpec(q.target, caps);
+  if (resolved.dimensions.length < q.target.dimensions.length || !resolved.metrics.length) {
+    throw new Error(`This property does not report ${resolved.missing.join(', ')}`
+      + (q.target.requires ? ` — it needs ${q.target.requires}.` : '.'));
+  }
+  if (caps) {
+    for (const f of q.filters) {
+      const lacking = f.spec.dimensions.filter((d) => !caps.dimensions.has(d));
+      if (lacking.length) throw new Error(`This property does not report ${lacking.join(', ')}.`);
+    }
+  }
+
+  const expressions: unknown[] = [];
+  for (const f of q.filters) {
+    expressions.push(gaExact(f.spec.dimensions[0], f.value));
+    if (f.label != null) expressions.push(gaExact(f.spec.dimensions[1], f.label));
+  }
+  if (q.search) {
+    expressions.push({
+      orGroup: {
+        expressions: resolved.dimensions.map((fieldName) => ({
+          filter: { fieldName, stringFilter: { matchType: 'CONTAINS', value: q.search, caseSensitive: false } },
+        })),
+      },
+    });
+  }
+
+  const gaNames = [...new Set(resolved.metrics.map((m) => m.ga))];
+  const orderMetric = resolved.metrics.find((m) => m.col === q.orderCol)?.ga ?? resolved.metrics[0].ga;
+  const end = ymd(new Date(Date.now() - 86400000));
+  const start = ymd(new Date(Date.now() - q.days * 86400000));
+
+  const resp = await fetch(GA_DATA_URL(property), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate: start, endDate: end }],
+      dimensions: resolved.dimensions.map((name) => ({ name })),
+      metrics: gaNames.map((name) => ({ name })),
+      ...(expressions.length
+        ? { dimensionFilter: expressions.length === 1 ? expressions[0] : { andGroup: { expressions } } }
+        : {}),
+      orderBys: [{ desc: q.desc, metric: { metricName: orderMetric } }],
+      limit: q.limit,
+    }),
+  });
+  const body = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(body?.error?.message || `Analytics report failed: HTTP ${resp.status}`);
+  if (!body) throw new Error('Analytics returned 200 with an unreadable body.');
+
+  const rows = (body.rows || []).map((r: any) => {
+    const d = r.dimensionValues || [];
+    const m = r.metricValues || [];
+    const out: Record<string, unknown> = {
+      value: d[0]?.value ?? '',
+      label: resolved.dimensions.length > 1 ? (d[1]?.value ?? null) : null,
+      series: [],
+    };
+    for (const bind of resolved.metrics) out[bind.col] = gaNum(m[gaNames.indexOf(bind.ga)]?.value);
+    const sessions = out.sessions as number | null | undefined;
+    const secs = out.engagement_secs as number | null | undefined;
+    // Same derivation as seo_website_ga_breakdowns, so a live row and a stored row agree.
+    out.secs_per_session = sessions && sessions > 0 && secs != null ? Math.round((secs / sessions) * 10) / 10 : null;
+    return out;
+  });
+  return {
+    rows,
+    row_count: Number(body.rowCount ?? rows.length) || 0,
+    period_start: start,
+    period_end: end,
+    days: q.days,
+    metrics: resolved.metrics.map((m) => m.col),
+    missing: resolved.missing,
+  };
+}
+
 /**
  * One report per breakdown, each recording its own outcome. A dimension GA rejects must not take
  * the others down, and "we could not fetch this" has to reach the panel as a stated reason.
@@ -666,6 +786,24 @@ async function syncConnection(supabase: any, conn: any, startDate: string, endDa
       console.warn(`[gsc-api] breakdown '${dim}' failed for ${conn.property}:`, e instanceof Error ? e.message : e);
     }
   }
+
+  // 3. Query × country / device. A site with none yet gets a 90-day backfill.
+  const { count: haveQueryBreakdown } = await supabase.from('gsc_query_breakdown')
+    .select('id', { count: 'exact', head: true }).eq('website_id', conn.website_id);
+  const qbStart = haveQueryBreakdown ? startDate : ymd(new Date(Date.now() - 90 * 86400000));
+  for (const dim of ['country', 'device']) {
+    try {
+      const rows = await gscQuery(token, conn.property, { startDate: qbStart, endDate, dimensions: ['date', 'query', dim] });
+      const payload = rows.map((row) => {
+        const [date, query, value] = row.keys || [];
+        return { ...base, date, query: query ?? '', dimension: dim, value: String(value ?? '').toLowerCase(),
+          clicks: Math.round(row.clicks || 0), impressions: Math.round(row.impressions || 0), ctr: row.ctr || 0, position: row.position || 0 };
+      });
+      if (payload.length) await upsertChunked(supabase, 'gsc_query_breakdown', payload, 'website_id,date,query,dimension,value');
+    } catch (e) {
+      console.warn(`[gsc-api] query×${dim} failed for ${conn.property}:`, e instanceof Error ? e.message : e);
+    }
+  }
   return corePayload.length;
 }
 
@@ -848,6 +986,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
     const cutoff = ymd(new Date(Date.now() - 180 * 86400000));
     await supabase.from('gsc_performance').delete().lt('date', cutoff);
     await supabase.from('gsc_breakdown').delete().lt('date', cutoff);
+    await supabase.from('gsc_query_breakdown').delete().lt('date', cutoff);
 
     // The day's rows have landed, so this is the moment the keyword engine has
     // something new to judge: promote the queries that now clear the bar, retire the
@@ -973,6 +1112,22 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         } catch (e) {
           // Never zero: nobody on the site and we could not ask are different answers.
           return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 400) }, 502);
+        }
+      }
+
+      case 'ga_drill': {
+        const q = parseGaDrill(body);
+        if ('error' in q) return json({ error: q.error }, 400);
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, ga_property_id, access_token, refresh_token, token_expires_at')
+          .eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_token) return json({ ok: false, error: 'Connect Google first.' }, 400);
+        if (!conn.ga_property_id) return json({ ok: false, error: 'No Analytics property selected for this site yet.' }, 400);
+        try {
+          const token = await validAccessToken(supabase, conn);
+          return json({ ok: true, ...(await gaDrillReport(token, conn.ga_property_id, q)) });
+        } catch (e) {
+          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, 502);
         }
       }
 

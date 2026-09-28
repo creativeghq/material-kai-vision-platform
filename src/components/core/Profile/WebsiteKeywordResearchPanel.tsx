@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, Search, Target, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Search, SearchX, Target, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { HubEmptyState } from '@/components/core/hub';
+import { TableColumnHeader } from '@/components/core/ui/table-column-header';
+import { HubEmptyState, HubFilterSelect, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearchDetail';
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
@@ -21,6 +22,12 @@ import {
   type UserWebsite,
 } from '@/services/userWebsitesService';
 import { Loading, useLaunchQuickStart } from './seo/dashboardPrimitives';
+import { AGE_WINDOW_LABELS, AGE_WINDOW_ORDER, ageWindowOf, timeOf, useTableSegments } from './seo/useTableSegments';
+
+const RESEARCH_LIMIT = 500;
+type SortKey = 'keyword' | 'topic' | 'volume' | 'difficulty' | 'cpc' | 'competition' | 'opportunity' | 'trend' | 'related' | 'addressable' | 'created';
+const TREND_LABELS: Record<string, string> = { up: 'Up', down: 'Down', stable: 'Stable' };
+const TRACKED_LABELS: Record<string, string> = { tracked: 'In rank tracker', untracked: 'Not tracked' };
 
 /** Websites -> Content -> Keyword Research. */
 export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
@@ -45,7 +52,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
     setLoading(true);
     (async () => {
       const [kr, titles, trackedSet] = await Promise.allSettled([
-        userWebsitesService.keywordResearch(website.id),
+        userWebsitesService.keywordResearch(website.id, RESEARCH_LIMIT),
         userWebsitesService.pageTitles(website.id),
         userWebsitesService.trackedKeywordStrings(website.id),
       ]);
@@ -75,6 +82,37 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
       setTrackingKeywords(null);
     }
   };
+
+  const t = useTableSegments<SeoKeywordResearchRow, SortKey, 'language' | 'trend' | 'tracked' | 'created'>({
+    rows: research,
+    searchText: (r) => [r.target_keyword, r.topic],
+    sorters: {
+      keyword: (r) => r.target_keyword,
+      topic: (r) => r.topic,
+      volume: (r) => r.primary?.search_volume,
+      difficulty: (r) => r.primary?.difficulty,
+      cpc: (r) => r.primary?.cpc,
+      competition: (r) => r.primary?.competition,
+      opportunity: (r) => r.primary?.opportunity,
+      trend: (r) => r.primary?.trend_delta,
+      related: (r) => r.total_keywords_found,
+      addressable: (r) => r.total_addressable_volume,
+      created: (r) => timeOf(r.created_at),
+    },
+    initialSort: { key: 'created', dir: 'desc' },
+    textKeys: ['keyword', 'topic'],
+    facets: {
+      language: { label: 'language', valueOf: (r) => r.language_code },
+      trend: { label: 'trend', valueOf: (r) => r.primary?.trend, labels: TREND_LABELS, order: ['up', 'stable', 'down'] },
+      tracked: {
+        label: 'Rank tracker',
+        valueOf: (r) => (tracked.has(r.target_keyword.trim().toLowerCase()) ? 'tracked' : 'untracked'),
+        labels: TRACKED_LABELS,
+        order: ['tracked', 'untracked'],
+      },
+      created: { label: 'created', valueOf: (r) => ageWindowOf(r.created_at), labels: AGE_WINDOW_LABELS, order: AGE_WINDOW_ORDER },
+    },
+  });
 
   const researched = new Set(research.map((r) => r.target_keyword.trim().toLowerCase()));
   const suggestions = (() => {
@@ -183,22 +221,39 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
               }
             />
           ) : (
+            <>
+            <HubToolbar
+              search={t.query}
+              onSearchChange={t.setQuery}
+              searchPlaceholder="Search keyword or topic"
+              filters={<HubFilterSelect {...t.filterSelect('tracked', 'Tracked or not')} />}
+              actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
+            />
+            {t.visible.length === 0 ? (
+              <HubEmptyState
+                variant="filtered"
+                icon={SearchX}
+                title="No research matches these filters"
+                description={`All ${research.length} runs are still here; the search or a column filter is hiding them.`}
+                action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+              />
+            ) : (
             <div className="table-scroll">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Target keyword</TableHead>
-                  <TableHead>Topic</TableHead>
-                  <TableHead className="text-right">Volume</TableHead>
-                  <TableHead className="text-right">Difficulty</TableHead>
-                  <TableHead className="text-right">CPC</TableHead>
-                  <TableHead className="text-right">Competition</TableHead>
-                  <TableHead className="text-right">Opportunity</TableHead>
-                  <TableHead>Trend</TableHead>
-                  <TableHead className="text-right">Related</TableHead>
-                  <TableHead className="text-right">Addressable</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-10" />
+                  <TableColumnHeader sortKey="keyword" sort={t.sort} onSort={t.onSort} segment={t.segment('language')}>Target keyword</TableColumnHeader>
+                  <TableColumnHeader sortKey="topic" sort={t.sort} onSort={t.onSort}>Topic</TableColumnHeader>
+                  <TableColumnHeader sortKey="volume" sort={t.sort} onSort={t.onSort} align="right">Volume</TableColumnHeader>
+                  <TableColumnHeader sortKey="difficulty" sort={t.sort} onSort={t.onSort} align="right">Difficulty</TableColumnHeader>
+                  <TableColumnHeader sortKey="cpc" sort={t.sort} onSort={t.onSort} align="right">CPC</TableColumnHeader>
+                  <TableColumnHeader sortKey="competition" sort={t.sort} onSort={t.onSort} align="right">Competition</TableColumnHeader>
+                  <TableColumnHeader sortKey="opportunity" sort={t.sort} onSort={t.onSort} align="right">Opportunity</TableColumnHeader>
+                  <TableColumnHeader sortKey="trend" sort={t.sort} onSort={t.onSort} segment={t.segment('trend')}>Trend</TableColumnHeader>
+                  <TableColumnHeader sortKey="related" sort={t.sort} onSort={t.onSort} align="right">Related</TableColumnHeader>
+                  <TableColumnHeader sortKey="addressable" sort={t.sort} onSort={t.onSort} align="right">Addressable</TableColumnHeader>
+                  <TableColumnHeader sortKey="created" sort={t.sort} onSort={t.onSort} segment={t.segment('created')}>Created</TableColumnHeader>
+                  <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,7 +261,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
                     "Addressable" describe the expanded set the run found around it. A dash is
                     "the source did not return it" — difficulty is unscored for many Greek terms —
                     never a zero. */}
-                {research.map((r) => (
+                {t.visible.map((r) => (
                   <TableRow
                     key={r.id}
                     onClick={() => setOpenResearchId(r.id)}
@@ -264,6 +319,13 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
               </TableBody>
             </Table>
             </div>
+            )}
+            {research.length >= RESEARCH_LIMIT && (
+              <p className="border-t border-hairline px-3 py-2 text-xs text-muted-foreground">
+                Showing the newest {RESEARCH_LIMIT} runs; filters and sorting apply to those only.
+              </p>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

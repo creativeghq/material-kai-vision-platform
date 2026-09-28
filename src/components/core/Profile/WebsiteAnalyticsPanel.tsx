@@ -73,14 +73,6 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
     }
   };
 
-  /**
-   * Widen the Google grant to include Analytics.
-   *
-   * The existing token was authorized before Analytics was supported, so it carries
-   * `webmasters.readonly` and not `analytics.readonly`. Because the consent URL sets
-   * `include_granted_scopes`, re-consenting MERGES the new scope in — Search Console
-   * is not disturbed and no data is lost.
-   */
   const reconnect = async () => {
     setBusy('reauth');
     try {
@@ -250,6 +242,8 @@ const AcquisitionSources: React.FC<{ websiteId: string }> = ({ websiteId }) => {
     <GaBreakdownTable
       title="Sources"
       description="The referrer and medium behind each session."
+      websiteId={websiteId}
+      dimension="source"
       breakdown={sources}
       head="Source / medium"
       renderName={(row) => (

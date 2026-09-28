@@ -24,21 +24,25 @@ import {
   getProbeProviders,
   probeSubjectLlm,
   updateTrackedMention,
+  PROBE_TIERS,
+  PROBE_TIER_LABEL,
+  type MentionProbeTier,
   type ProbeProviderRoster,
 } from '@/services/mentionMonitoringApi';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { timeAgo } from '@/utils/datetime';
+import { formatDate, timeAgo } from '@/utils/datetime';
 import { AiEngineCard, engineGridCols } from './seo/AiEngineCard';
 import { CitabilityPanel } from './seo/CitabilityPanel';
 import { LlmMentionsPanel } from './seo/LlmMentionsPanel';
+import { Sparkline } from './seo/Sparkline';
 import {
   VERDICT_BADGE, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
   withRosterEngines,
 } from './seo/aiCitations';
-import { compact } from './seo/seoMetrics';
+import { compact, statusPresentation } from './seo/seoMetrics';
 
 /** The feed's own health, above its numbers. */
 function MonitoringBanner({
@@ -95,6 +99,22 @@ function MonitoringBanner({
     </div>
   );
 }
+
+const Stat: React.FC<{ label: string; value: string | null; reason?: string | null; help: string }> = ({
+  label, value, reason, help,
+}) => (
+  <div className="min-w-0" title={help}>
+    <p className="text-[11px] text-muted-foreground">{label}</p>
+    {value != null ? (
+      <p className="text-lg font-semibold tabular-nums text-foreground">{value}</p>
+    ) : (
+      <>
+        <p className="text-lg font-semibold text-amber-800 dark:text-amber-300">Unknown</p>
+        {reason && <p className="text-[11px] leading-snug text-muted-foreground">{reason}</p>}
+      </>
+    )}
+  </div>
+);
 
 const RivalList: React.FC<{ rivals: AiRival[]; empty: string }> = ({ rivals, empty }) => {
   if (rivals.length === 0) {
@@ -183,6 +203,10 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         // Switched ON at creation. Every existing subject in this workspace was
         // created inactive and silently never probed.
         sources_enabled: { llm: true, news: true, blogs: true, rss: true, youtube: false },
+        probe_tier: 'dataforseo',
+        ...(corpus?.market?.country_code && corpus.market.language_code
+          ? { country_codes: [corpus.market.country_code], language_codes: [corpus.market.language_code] }
+          : {}),
         run_first_refresh: false,
       });
       // Attach it to THIS site. Without the link the subject is workspace-level and
@@ -243,15 +267,15 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   // the measurement; they have to be editable where the answers are read.
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<{ prompts: string; aliases: string; languages: string; countries: string; includeDefaults: boolean }>({
-    prompts: '', aliases: '', languages: '', countries: '', includeDefaults: true,
+  const [form, setForm] = useState<{ prompts: string; aliases: string; languages: string; countries: string; includeDefaults: boolean; tier: MentionProbeTier }>({
+    prompts: '', aliases: '', languages: '', countries: '', includeDefaults: true, tier: 'dataforseo',
   });
   const openEditor = async () => {
     const id = state?.own_brand_subject_id;
     if (!id) return;
     const { data } = await supabase
       .from('tracked_mentions')
-      .select('aliases, language_codes, country_codes, source_config')
+      .select('aliases, language_codes, country_codes, source_config, probe_tier')
       .eq('id', id)
       .maybeSingle();
     const cfg = (data as any)?.source_config ?? {};
@@ -263,6 +287,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       countries: ((data as any)?.country_codes ?? []).join(', '),
       // Absent means ON; only an explicit false is off.
       includeDefaults: cfg.include_default_probes !== false,
+      tier: ((data as any)?.probe_tier ?? 'cheap') as MentionProbeTier,
     });
     setEditing(true);
   };
@@ -281,9 +306,11 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           custom_probes: prompts.map((prompt, i) => ({ key: `custom_${i + 1}`, prompt })),
           include_default_probes: form.includeDefaults,
         },
+        probe_tier: form.tier,
       });
       toast({ title: 'Questions saved', description: 'The next probe run asks these. Run probes now to see the change today.' });
       setEditing(false);
+      await load();
     } catch (e: any) {
       toast({ title: 'Could not save', description: e?.message, variant: 'destructive' });
     } finally {
@@ -323,6 +350,22 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                 onChange={(e) => setForm((f) => ({ ...f, countries: e.target.value }))} />
             </div>
           </div>
+          <div>
+            <label htmlFor="ai-vis-tier" className="text-xs text-muted-foreground">Who answers</label>
+            <select
+              id="ai-vis-tier"
+              value={form.tier}
+              onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as MentionProbeTier }))}
+              className="mt-1 h-9 w-full rounded-sm border border-hairline bg-background px-2 text-sm"
+            >
+              {PROBE_TIERS.map((t) => <option key={t} value={t}>{PROBE_TIER_LABEL[t]}</option>)}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              DataForSEO asks ChatGPT, Claude, Gemini and Perplexity through one account and searches from the first
+              country above. The cheap tier calls each vendor directly and needs four funded keys. Switching breaks the
+              trend: runs before and after were answered by different models.
+            </p>
+          </div>
           <label className="flex items-start gap-2 text-[11px] text-muted-foreground">
             <input
               type="checkbox"
@@ -345,6 +388,20 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     </Dialog>
   );
 
+  const corpusPanel = (
+    <LlmMentionsPanel
+      report={corpus}
+      onRefresh={async () => {
+        try {
+          await userWebsitesService.refreshLlmMentions(website.id);
+          setCorpus(await userWebsitesService.llmMentions(website.id, 90));
+        } catch (e: any) {
+          toast({ title: 'Could not read the corpus', description: e?.message, variant: 'destructive' });
+        }
+      }}
+    />
+  );
+
   if (loading) {
     return (
       <Card className="dashboard-card">
@@ -357,6 +414,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
 
   if (!data || data.status === 'not_collected') {
     return (
+      <div className="space-y-4">
       <Card className="dashboard-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -392,13 +450,17 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           />
         </CardContent>
       </Card>
+      {corpusPanel}
+      </div>
     );
   }
 
   const t = data.totals;
   const failedShare = t.probes > 0 ? Math.round((t.failed / t.probes) * 100) : 0;
   const sentimentTotal = Object.values(data.sentiment).reduce((s, n) => s + n, 0);
-  const engines = withRosterEngines(report?.engines ?? [], roster?.tiers?.cheap);
+  const tier = state?.own_brand_probe_tier ?? 'cheap';
+  const tierRoster = roster?.tiers?.[tier] ?? [];
+  const engines = withRosterEngines(report?.engines ?? [], tierRoster);
   const citedInstead = report?.cited_instead ?? [];
   const namedInstead = report?.named_instead ?? [];
   // Nobody browsed, so "cited" has no denominator. Say it once, at the top.
@@ -455,8 +517,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             </div>
           )}
           {(() => {
-            // The "cheap" tier is what every subject runs unless switched to frontier.
-            const wanted = roster?.tiers?.cheap ?? [];
+            const wanted = tierRoster;
             const missing = wanted.filter((m) => !m.enabled);
             if (!roster || wanted.length === 0) return null;
             return (
@@ -470,6 +531,62 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                   <span className="self-center text-[11px] text-muted-foreground">
                     A missing key drops the assistant from the run entirely. Add it under Admin → Platform Secrets.
                   </span>
+                )}
+              </div>
+            );
+          })()}
+          {(tier === 'dataforseo' || tier === 'scraper') && (state?.own_brand_country_codes ?? []).length === 0 && (
+            <p className="flex items-start gap-1 text-[11px] leading-snug text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+              <span>
+                No country is set on the tracked subject, so DataForSEO searches from the United States. Set one under
+                Edit questions.
+              </span>
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-4 border-t border-hairline pt-3 sm:grid-cols-3 lg:grid-cols-6">
+            <Stat
+              label="Named rate"
+              value={t.share_of_voice != null ? `${t.share_of_voice}%` : null}
+              reason={t.answered === 0 ? 'Nothing answered, so this is unknown.' : null}
+              help="Answers that named you divided by answers that came back. Failed calls are excluded."
+            />
+            <Stat
+              label="Cited rate"
+              value={report?.totals.citation_rate != null ? `${report.totals.citation_rate}%` : null}
+              reason={noSources ? 'No answer carried a source.' : t.answered === 0 ? 'Nothing answered.' : null}
+              help="Answers that linked your site divided by answers that came back."
+            />
+            <Stat label="Answered" value={`${t.answered} of ${t.probes}`} help="Questions that got an answer, of those asked." />
+            <Stat label="Carried sources" value={String(t.with_citations)} help="Answers that linked any source at all." />
+            <Stat
+              label="Avg rank when named"
+              value={t.avg_position != null ? `#${t.avg_position}` : null}
+              reason={t.mentioned === 0 ? 'Never named, so no rank.' : null}
+              help="Where you appeared in a ranked answer that named you."
+            />
+            <Stat
+              label="Subjects asked about"
+              value={String(t.subjects_probed)}
+              help={`Since ${t.first_run_at ? formatDate(t.first_run_at) : '—'} · answered by ${PROBE_TIER_LABEL[tier as MentionProbeTier] ?? tier}.`}
+            />
+          </div>
+          {(() => {
+            const pts = data.trend.filter((w) => w.v != null);
+            return (
+              <div>
+                <p className="mb-1 text-[11px] text-muted-foreground">
+                  Named rate, week by week{pts.length > 0 ? ` · ${pts[0].date} → ${pts[pts.length - 1].date}` : ''}
+                </p>
+                {pts.length >= 2 ? (
+                  <Sparkline points={pts.map((w) => Number(w.v))} className="h-10 w-full" ariaLabel="Weekly named rate" />
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    {data.trend.length > pts.length
+                      ? `${data.trend.length - pts.length} week(s) had questions but no answer, so they have no rate. `
+                      : ''}
+                    A trend needs two weeks with answers; there {pts.length === 1 ? 'is one' : 'are none'}.
+                  </p>
                 )}
               </div>
             );
@@ -501,9 +618,13 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             <RivalList
               rivals={citedInstead}
               empty={
-                noSources
-                  ? 'No assistant returned a single source in this window, so there is nothing to compare against — this is unknown, not "nobody beat you".'
-                  : 'Every sourced answer in this window linked you.'
+                !report
+                  ? 'The citation report could not be loaded, so this is unknown.'
+                  : report.status === 'not_collected' || report.status === 'collector_failed'
+                    ? (report.note ?? statusPresentation(report.status).explain)
+                    : noSources
+                      ? 'No assistant returned a single source in this window, so there is nothing to compare against — this is unknown, not "nobody beat you".'
+                      : 'Every sourced answer in this window linked you.'
               }
             />
           </CardContent>
@@ -521,22 +642,27 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <RivalList rivals={namedInstead} empty="No competing brand was named in an answer that left you out." />
+            <RivalList
+              rivals={namedInstead}
+              empty={
+                !report
+                  ? 'The citation report could not be loaded, so this is unknown.'
+                  : report.status === 'not_collected' || report.status === 'collector_failed'
+                    ? (report.note ?? statusPresentation(report.status).explain)
+                    : 'No competing brand was named in an answer that left you out.'
+              }
+            />
+            {data.competitors.length > 0 && (
+              <p className="mt-3 border-t border-hairline pt-2 text-[11px] text-muted-foreground">
+                Named in any answer, including ones that named you:{' '}
+                {data.competitors.slice(0, 10).map((c) => `${c.name} (${c.mentions})`).join(', ')}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <LlmMentionsPanel
-        report={corpus}
-        onRefresh={async () => {
-          try {
-            await userWebsitesService.refreshLlmMentions(website.id);
-            setCorpus(await userWebsitesService.llmMentions(website.id, 90));
-          } catch (e: any) {
-            toast({ title: 'Could not read the corpus', description: e?.message, variant: 'destructive' });
-          }
-        }}
-      />
+      {corpusPanel}
 
       <CitabilityPanel
         report={citability}
@@ -574,11 +700,17 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           {(() => {
             const questions = answers?.questions ?? [];
             if (questions.length === 0) {
-              return <p className="py-6 text-center text-sm text-muted-foreground">No questions recorded.</p>;
+              return (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {answers
+                    ? `No question was asked about this site in the last ${answers.window_days} days.`
+                    : 'The answers could not be loaded, so this is unknown.'}
+                </p>
+              );
             }
             // Every assistant the tier asks for gets a chip, so one that never ran is
             // a visible gap rather than a column that quietly does not exist.
-            const rosterModels = (roster?.tiers?.cheap ?? []).map((m) => m.model);
+            const rosterModels = tierRoster.map((m) => m.model);
             const seenModels = Array.from(new Set(questions.flatMap((q) => q.answers.map((a) => a.model))));
             const allModels = Array.from(new Set([...rosterModels, ...seenModels]));
             return (
@@ -594,7 +726,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                     <div className="divide-y divide-hairline">
                       {allModels.map((model) => {
                         const a = q.answers.find((x) => x.model === model);
-                        const rosterEntry = roster?.tiers?.cheap?.find((m) => m.model === model);
+                        const rosterEntry = tierRoster.find((m) => m.model === model);
                         const verdict = answerVerdict(a);
                         const key = `${q.subject}:${q.template_key}:${model}`;
                         const open = !!openAnswer[key];
@@ -661,7 +793,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         </CardContent>
       </Card>
 
-      {data.subjects.length > 1 && (
+      {data.subjects.length > 0 && (
         <Card className="dashboard-card">
           <CardHeader>
             <CardTitle className="text-base">By subject</CardTitle>
@@ -702,13 +834,66 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         </Card>
       )}
 
-      {sentimentTotal > 0 && (
-        <Card className="dashboard-card">
-          <CardHeader>
-            <CardTitle className="text-base">How they talk about you</CardTitle>
-            <CardDescription>Tone of the answers that named you, across {sentimentTotal} mentions.</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card className="dashboard-card">
+        <CardHeader>
+          <CardTitle className="text-base">Named rate by question</CardTitle>
+          <CardDescription>Every question over the whole window, not only its latest answers.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {data.prompts.length === 0 ? (
+            <p className="px-6 py-6 text-center text-sm text-muted-foreground">No question was asked in this window.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Question</TableHead>
+                  <TableHead className="text-right">Answered</TableHead>
+                  <TableHead className="text-right">Named</TableHead>
+                  <TableHead className="text-right">Named rate</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.prompts.map((q) => (
+                  <TableRow key={q.template_key}>
+                    <TableCell className="max-w-[420px] truncate" title={q.prompt_text ?? q.template_key}>
+                      {q.prompt_text ?? q.template_key}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{q.answered} of {q.probes}</TableCell>
+                    <TableCell className="text-right tabular-nums">{q.mentioned}</TableCell>
+                    <TableCell className="text-right">
+                      {q.share_of_voice == null ? (
+                        <span className="text-xs font-medium text-amber-800 dark:text-amber-300" title="Every call for this question failed">
+                          Unknown
+                        </span>
+                      ) : (
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{q.share_of_voice}%</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="dashboard-card">
+        <CardHeader>
+          <CardTitle className="text-base">How they talk about you</CardTitle>
+          <CardDescription>
+            {sentimentTotal > 0
+              ? `Tone of the answers that named you, across ${sentimentTotal} mentions.`
+              : 'Tone of the answers that named you.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {sentimentTotal === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t.mentioned === 0
+                ? 'No answer in this window named you, so there is no tone to read.'
+                : `${t.mentioned} answers named you, but no tone was extracted from any of them.`}
+            </p>
+          ) : (
             <div className="flex flex-wrap gap-6">
               {Object.entries(data.sentiment).map(([k, n]) => (
                 <div key={k}>
@@ -721,9 +906,9 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -11,6 +11,7 @@ import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOve
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
+import { WebsiteSerpFeaturesPanel } from '@/components/core/Profile/WebsiteSerpFeaturesPanel';
 import { WebsiteReportsPanel } from '@/components/core/Profile/WebsiteReportsPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
@@ -180,6 +181,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
         {/* The keywords the operator CHOSE. Every other pane here is discovery. */}
         <TabsContent value="ranks">
           <WebsiteRankTrackerPanel website={website} />
+        </TabsContent>
+
+        <TabsContent value="serp-features">
+          <WebsiteSerpFeaturesPanel website={website} onOpenRanks={() => setTab('ranks')} />
         </TabsContent>
 
         {/* The same derivations, frozen per build so an old report keeps its own period. */}

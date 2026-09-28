@@ -7,6 +7,7 @@ import { assertEntitled, isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
+import { callDataForSEO } from '../_shared/tools/dataforseo-dispatch.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -73,6 +74,7 @@ type DueKeyword = {
   country_code: string;
   language_code: string;
   device: string;
+  location_code: number | null;
   last_checked_at: string | null;
   /** Last ANSWERED position, or null. A shallow read cannot contradict it. */
   last_position: number | null;
@@ -116,8 +118,11 @@ async function fetchSerp(budget: number, init: RequestInit): Promise<Response> {
   }
 }
 
+/** Who the SERP is fetched for. A city `location_code` replaces the country. */
+type SerpTarget = Pick<DueKeyword, 'keyword' | 'country_code' | 'language_code' | 'device' | 'location_code'>;
+
 async function serp(
-  keyword: string, country: string, language: string, userId: string | null,
+  kw: SerpTarget, userId: string | null,
   acceptPartial = false, depth = 100, deadline = Number.POSITIVE_INFINITY,
 ): Promise<any> {
   // Whichever comes first: a hung call, or the end of the run. Without the second
@@ -130,10 +135,13 @@ async function serp(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
     signal: AbortSignal.timeout(budget),
-    // `country_code`, NOT `location_code` — the client maps the former to the latter
-    // itself, and passing the mapped name is a hard 400 on an unexpected kwarg.
+    // `location_code` only for a city: the client maps `country_code` itself.
     body: JSON.stringify({
-      params: { keyword, country_code: country, language_code: language, depth },
+      params: {
+        keyword: kw.keyword, country_code: kw.country_code, language_code: kw.language_code, depth,
+        device: kw.device === 'mobile' ? 'mobile' : 'desktop',
+        ...(kw.location_code ? { location_code: kw.location_code } : {}),
+      },
       attribution: { user_id: userId },
     }),
   });
@@ -175,9 +183,7 @@ const SERP_BACKOFF_MS = [1500, 4000];
  *  nothing and, once funded, turns one charge per keyword into three. */
 const TERMINAL_UPSTREAM = /\b(402|401|403)\b|payment required|unauthor|forbidden|quota|credit|insufficient|balance/i;
 
-async function serpWithRetry(
-  keyword: string, country: string, language: string, userId: string | null, deadline: number,
-): Promise<any> {
+async function serpWithRetry(kw: SerpTarget, userId: string | null, deadline: number): Promise<any> {
   let last: unknown;
   for (let attempt = 0; attempt < SERP_ATTEMPTS; attempt++) {
     // A retry that cannot finish inside the run is not started. What the caller records
@@ -188,19 +194,47 @@ async function serpWithRetry(
       break;
     }
     try {
-      return await serp(keyword, country, language, userId, attempt === SERP_ATTEMPTS - 1, 100, deadline);
+      return await serp(kw, userId, attempt === SERP_ATTEMPTS - 1, 100, deadline);
     } catch (e) {
       last = e;
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[seo-rank-tracker] attempt ${attempt + 1} failed for "${keyword}":`, msg);
+      console.warn(`[seo-rank-tracker] attempt ${attempt + 1} failed for "${kw.keyword}":`, msg);
       if (TERMINAL_UPSTREAM.test(msg)) {
-        console.warn(`[seo-rank-tracker] not retrying "${keyword}" — the account refused, not the request`);
+        console.warn(`[seo-rank-tracker] not retrying "${kw.keyword}" — the account refused, not the request`);
         break;
       }
       if (attempt < SERP_ATTEMPTS - 1) await new Promise((r) => setTimeout(r, SERP_BACKOFF_MS[attempt] ?? 4000));
     }
   }
   throw last ?? new OutOfTime();
+}
+
+type SerpLocation = { location_code: number; location_name: string; location_type: string };
+
+/** Location lists change a few times a year; one fetch per country per warm instance. */
+const LOCATION_CACHE = new Map<string, { at: number; locations: SerpLocation[] }>();
+const LOCATION_TTL_MS = 12 * 3600_000;
+/** Postal codes run to thousands per country and nobody targets a rank check at one. */
+const LOCATION_TYPES_SKIPPED = new Set(['Postal Code', 'Country']);
+
+async function listLocations(country: string): Promise<{ ok: true; locations: SerpLocation[] } | { ok: false; error: string }> {
+  const hit = LOCATION_CACHE.get(country);
+  if (hit && Date.now() - hit.at < LOCATION_TTL_MS) return { ok: true, locations: hit.locations };
+  // No payer on the attribution: the endpoint is free upstream, so nothing is debited.
+  const r = await callDataForSEO('serp_google_locations', { country_code: country });
+  if (!r.ok) return { ok: false, error: r.error || 'the location list could not be fetched' };
+  const locations = ((r.data?.items ?? []) as Record<string, unknown>[])
+    .map((it) => ({
+      location_code: Number(it?.location_code),
+      location_name: String(it?.location_name ?? ''),
+      location_type: String(it?.location_type ?? ''),
+    }))
+    .filter((l) => Number.isInteger(l.location_code) && l.location_code > 0 && l.location_name
+      && !LOCATION_TYPES_SKIPPED.has(l.location_type))
+    .sort((a, b) => a.location_name.localeCompare(b.location_name));
+  if (locations.length === 0) return { ok: false, error: 'the location source answered with no locations' };
+  LOCATION_CACHE.set(country, { at: Date.now(), locations });
+  return { ok: true, locations };
 }
 
 /** Find our best organic position on one SERP. */
@@ -305,7 +339,7 @@ async function trackKeywords(
     let row: Record<string, unknown>;
     let triedShallow = false;
     try {
-      let r = await serpWithRetry(kw.keyword, kw.country_code, kw.language_code, userId, deadline);
+      let r = await serpWithRetry(kw, userId, deadline);
       let items: any[] = r.items || [];
       // A partial page set that does not contain us says nothing about the pages that
       // did not load. Before giving up as unknown, read the top 50 — half the pages,
@@ -319,7 +353,7 @@ async function trackKeywords(
           throw new Error(String(r.partial_error || 'partial results'));
         }
         try {
-          r = await serp(kw.keyword, kw.country_code, kw.language_code, userId, false, 50, deadline);
+          r = await serp(kw, userId, false, 50, deadline);
           items = r.items || [];
         } catch (fallbackErr) {
           throw new Error(String(r.partial_error || (fallbackErr instanceof Error ? fallbackErr.message : 'partial results')));
@@ -336,7 +370,7 @@ async function trackKeywords(
       if (e instanceof OutOfTime) return;
       try {
         if (triedShallow) throw e;
-        const r = await serp(kw.keyword, kw.country_code, kw.language_code, userId, false, 50, deadline);
+        const r = await serp(kw, userId, false, 50, deadline);
         row = rowFrom(kw, r, r.items || []);
       } catch {
         // UNKNOWN, not unranked. `found:false` with an error set is a different fact
@@ -516,6 +550,14 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
   // Paid module — refuse BEFORE spending a SERP call per keyword (invariant 10).
   const ent = await assertEntitled(supabase, website.workspace_id, 'seo-toolkit');
   if (!ent.ok) return ent.response;
+
+  if (action === 'locations') {
+    const country = String(body?.country_code || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(country)) return json({ error: 'country_code must be a two-letter ISO code' }, 400);
+    const r = await listLocations(country);
+    if (!r.ok) return json({ ok: false, error: r.error }, 502);
+    return json({ ok: true, country_code: country, locations: r.locations });
+  }
 
   // `p_only_stale: false` — a person pressing Check now gets work done whatever the
   // sweep already covered today. The order is the same, so the keywords they have been

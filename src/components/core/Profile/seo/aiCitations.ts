@@ -25,6 +25,9 @@ export interface AiEngine {
   cost_usd: number | null;
   avg_latency_ms: number | null;
   last_run_at: string | null;
+  /** The newest upstream error, even when other calls to this engine answered. */
+  sample_error?: string | null;
+  last_error_at?: string | null;
   mention_rate: AiRate;
   citation_rate: AiRate;
   browses: boolean;
@@ -163,6 +166,8 @@ export interface CitabilityReport {
   status: string;
   window_days: number;
   note: string | null;
+  probes?: number;
+  answered?: number;
   pages_known: number;
   pages_read: number;
   pages_note: string | null;
@@ -192,27 +197,81 @@ export function withRosterEngines(
   return [...engines, ...absent];
 }
 
+export interface LlmLeader {
+  label?: string;
+  /** Rows stored before the collector normalised them carry the vendor's own key. */
+  domain?: string;
+  brand?: string;
+  url?: string;
+  mentions?: number | null;
+  citations?: number | null;
+  ai_search_volume?: number | null;
+}
+
 export interface LlmMentionTarget {
   target: string;
   target_kind: 'domain' | 'keyword';
   platform: string | null;
   language_code: string | null;
+  country_code?: string | null;
+  market_source?: string | null;
   status: SeoMetricStatus | string;
   note: string | null;
-  metrics: Record<string, number | string | null>;
-  top_domains: { domain?: string; citations?: number; mentions?: number }[];
-  top_pages: { url?: string; citations?: number }[];
-  top_brands: { brand?: string; mentions?: number }[];
-  series: { date?: string; value?: number }[];
+  metrics: {
+    mentions?: number | null;
+    ai_search_volume?: number | null;
+    by_platform?: LlmLeader[];
+    sources_domain?: LlmLeader[];
+    search_results_domain?: LlmLeader[];
+    brand_entities?: LlmLeader[];
+    brand_categories?: LlmLeader[];
+    [key: string]: unknown;
+  };
+  top_domains: LlmLeader[];
+  top_pages: LlmLeader[];
+  top_brands: LlmLeader[];
+  series: { date?: string; value?: number | null; ai_search_volume?: number | null }[];
   captured_at: string;
+}
+
+export interface LlmMarket {
+  country_code: string | null;
+  language_code: string | null;
+  source: 'tracked_keywords' | 'tracked_subject' | 'request' | string | null;
+  note: string | null;
+}
+
+export interface LlmPlatformCoverage {
+  platform: string;
+  label: string;
+  covered: boolean;
+  note: string | null;
 }
 
 export interface LlmMentionsReport {
   status: string;
   window_days: number;
   note: string | null;
+  market?: LlmMarket;
+  platforms?: LlmPlatformCoverage[];
+  reads?: number;
+  last_read_at?: string | null;
+  schedule?: string;
   targets: LlmMentionTarget[];
 }
+
+export function leaderLabel(l: LlmLeader): string {
+  return l.label ?? l.domain ?? l.brand ?? l.url ?? '—';
+}
+
+export function leaderCount(l: LlmLeader): number | null {
+  return l.mentions ?? l.citations ?? null;
+}
+
+export const PLATFORM_LABEL: Record<string, string> = {
+  google: 'Google AI Overview',
+  chat_gpt: 'ChatGPT',
+};
 
 export interface AiKeywordVolume {
   keyword: string;

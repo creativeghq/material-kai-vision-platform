@@ -219,3 +219,20 @@ export function buildSerpInventory(featureTypes: string[] | null | undefined): {
 export function humanizeFeatureKey(key: string): string {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+export function serpFeatureDescriptor(key: string): SerpFeatureDescriptor | undefined {
+  return BY_KEY.get(key);
+}
+
+export function serpFeatureLabel(key: string): string {
+  return BY_KEY.get(key)?.label ?? humanizeFeatureKey(key);
+}
+
+/** Share of the ANSWERED checks on one capture day; null when none answered — unknown, not 0%. */
+export function captureShare(p: { answered: number; present: number; owned: number }): {
+  present: number | null;
+  owned: number | null;
+} {
+  if (!p.answered) return { present: null, owned: null };
+  return { present: p.present / p.answered, owned: p.owned / p.answered };
+}

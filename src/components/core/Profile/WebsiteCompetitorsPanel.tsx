@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Swords, Trash2 } from 'lucide-react';
+import { Loader2, Plus, SearchX, Swords, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubFilterSelect, HubResetFilters, HubToolbar } from '@/components/core/hub/HubToolbar';
 import { useToast } from '@/hooks/use-toast';
 import {
   userWebsitesService,
@@ -15,8 +16,12 @@ import {
   type UserWebsite,
 } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
+import { useTableSegments } from './seo/useTableSegments';
 
 /** Websites → Competitors. */
+
+const SOURCE_LABELS: Record<string, string> = { manual: 'Added by you', auto: 'Suggested' };
+const STATE_LABELS: Record<string, string> = { active: 'Active', paused: 'Paused' };
 
 const METRICS: { key: string; label: string }[] = [
   { key: 'organic_traffic', label: 'Organic traffic' },
@@ -159,6 +164,18 @@ export const WebsiteCompetitorsPanel: React.FC<{ website: UserWebsite }> = ({ we
     }));
   }, [series]);
 
+  const t = useTableSegments<CompetitorRow, 'domain', 'source' | 'state'>({
+    rows,
+    searchText: (r) => [r.competitor_domain, r.display_label],
+    sorters: { domain: (r) => r.display_label || r.competitor_domain },
+    initialSort: { key: 'domain', dir: 'asc' },
+    textKeys: ['domain'],
+    facets: {
+      source: { label: 'Source', valueOf: (r) => r.source, labels: SOURCE_LABELS, order: ['manual', 'auto'] },
+      state: { label: 'Status', valueOf: (r) => (r.is_active ? 'active' : 'paused'), labels: STATE_LABELS, order: ['active', 'paused'] },
+    },
+  });
+
   const metricLabel = METRICS.find((m) => m.key === metric)?.label ?? metric;
 
   return (
@@ -269,8 +286,31 @@ export const WebsiteCompetitorsPanel: React.FC<{ website: UserWebsite }> = ({ we
               description="Add the domains you actually lose deals to. Two or three real rivals beat a long list of vaguely similar sites."
             />
           ) : (
+            <>
+            <HubToolbar
+              className="rounded-sm border"
+              search={t.query}
+              onSearchChange={t.setQuery}
+              searchPlaceholder="Search domains"
+              filters={
+                <>
+                  <HubFilterSelect {...t.filterSelect('source', 'Any source')} />
+                  <HubFilterSelect {...t.filterSelect('state', 'Any status')} />
+                </>
+              }
+              actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
+            />
+            {t.visible.length === 0 ? (
+              <HubEmptyState
+                variant="filtered"
+                icon={SearchX}
+                title="No tracked domains match these filters"
+                description={`All ${rows.length} domains are still tracked; the search or a filter is hiding them.`}
+                action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+              />
+            ) : (
             <ul className="space-y-1.5">
-              {rows.map((r) => (
+              {t.visible.map((r) => (
                 <li key={r.id} className="flex items-center gap-2 rounded-sm border border-hairline px-2.5 py-1.5">
                   <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                     {r.display_label || r.competitor_domain}
@@ -284,6 +324,8 @@ export const WebsiteCompetitorsPanel: React.FC<{ website: UserWebsite }> = ({ we
                 </li>
               ))}
             </ul>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

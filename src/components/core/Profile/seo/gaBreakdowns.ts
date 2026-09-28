@@ -90,6 +90,123 @@ export function countryFlag(alpha2: string): string {
   return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 }
 
+/** An exact match on one breakdown's row; `label` pins the second dimension too (city AND its country). */
+export interface GaDrillFilter { dimension: GaBreakdownKey; value: string; label?: string | null }
+
+export interface GaDrillQuery {
+  dimension: GaBreakdownKey;
+  filters?: GaDrillFilter[];
+  search?: string;
+  orderBy?: string;
+  desc?: boolean;
+  days?: number;
+  limit?: number;
+}
+
+export interface GaDrillResult {
+  rows: GaBreakdownRow[];
+  row_count: number;
+  period_start: string;
+  period_end: string;
+  days: number;
+  metrics: string[];
+}
+
+export const GA_WINDOWS = [7, 28, 90] as const;
+export type GaWindow = typeof GA_WINDOWS[number];
+
+/** The stored breakdowns are a 28-day pull; any other window is asked of Google live. */
+export const GA_STORED_WINDOW: GaWindow = 28;
+
+export function drillAsBreakdown(r: GaDrillResult): GaBreakdown {
+  return {
+    status: r.rows.length ? 'ok' : 'no_data',
+    note: r.rows.length ? null : 'Google Analytics answered, and had nothing for this slice.',
+    window_days: r.days,
+    period_start: r.period_start,
+    period_end: r.period_end,
+    captured_at: null,
+    row_count: r.row_count,
+    shown_sessions: r.rows.reduce((n, x) => n + (x.sessions ?? 0), 0),
+    rows: r.rows,
+  };
+}
+
+export function failedBreakdown(message: string): GaBreakdown {
+  return { ...EMPTY_BREAKDOWN, status: 'collector_failed', note: message };
+}
+
+export const GA_DRILL_TARGETS: Record<GaBreakdownKey, GaBreakdownKey[]> = {
+  country: ['city', 'landing_page', 'source', 'device', 'page', 'language', 'returning', 'browser'],
+  city: ['landing_page', 'source', 'device', 'page', 'returning'],
+  page: ['source', 'device', 'country', 'returning', 'city'],
+  landing_page: ['source', 'device', 'country', 'city', 'returning'],
+  device: ['browser', 'os', 'source', 'landing_page', 'country'],
+  browser: ['os', 'device', 'landing_page', 'country'],
+  os: ['browser', 'device', 'landing_page', 'country'],
+  source: ['landing_page', 'device', 'country', 'city', 'returning'],
+  event: ['page', 'source', 'device', 'country'],
+  returning: ['source', 'landing_page', 'device', 'country'],
+  item: ['source', 'country', 'device'],
+  ads_campaign: ['landing_page', 'device', 'country'],
+  age: ['country', 'source', 'device', 'landing_page'],
+  gender: ['country', 'source', 'device', 'landing_page'],
+  language: ['country', 'landing_page', 'device'],
+  hostname: ['page', 'source', 'country'],
+};
+
+export const GA_DIMENSION_NOUN: Record<GaBreakdownKey, string> = {
+  country: 'Country', city: 'City', page: 'Page', landing_page: 'Landing page', device: 'Device',
+  browser: 'Browser', os: 'Operating system', source: 'Source / medium', event: 'Event',
+  returning: 'New vs returning', item: 'Product', ads_campaign: 'Ad campaign', age: 'Age',
+  gender: 'Gender', language: 'Language', hostname: 'Hostname',
+};
+
+export function drillTargets(from: GaBreakdownKey, used: readonly GaBreakdownKey[]): GaBreakdownKey[] {
+  return GA_DRILL_TARGETS[from].filter((k) => !used.includes(k));
+}
+
+export function gaRowText(key: GaBreakdownKey, row: Pick<GaBreakdownRow, 'value' | 'label'>): string {
+  switch (key) {
+    case 'country': return countryName(row.value, row.label);
+    case 'page': return row.label ? `${row.label} ${prettyPath(row.value)}` : prettyPath(row.value);
+    case 'landing_page': return prettyPath(row.value);
+    case 'source': return row.label ? `${row.value} / ${row.label}` : row.value;
+    case 'city': case 'item': case 'ads_campaign':
+      return row.label ? `${row.value} · ${row.label}` : row.value;
+    default: return row.value;
+  }
+}
+
+export function searchGaRows(key: GaBreakdownKey, rows: GaBreakdownRow[], q: string): GaBreakdownRow[] {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return rows;
+  return rows.filter((r) =>
+    [r.value, r.label ?? '', gaRowText(key, r)].some((s) => s.toLowerCase().includes(needle)));
+}
+
+export interface GaSort { key: string; desc: boolean }
+export const GA_NAME_SORT = 'name';
+
+/** Nulls last in both directions: an unknown figure is not the smallest one. */
+export function sortGaRows(key: GaBreakdownKey, rows: GaBreakdownRow[], sort: GaSort | null): GaBreakdownRow[] {
+  if (!sort) return rows;
+  const dir = sort.desc ? -1 : 1;
+  const out = [...rows];
+  if (sort.key === GA_NAME_SORT) {
+    return out.sort((a, b) => dir * gaRowText(key, a).localeCompare(gaRowText(key, b)));
+  }
+  const k = sort.key as keyof GaBreakdownRow;
+  return out.sort((a, b) => {
+    const x = a[k] as number | null;
+    const y = b[k] as number | null;
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return dir * (x - y);
+  });
+}
+
 export interface GaFunnelStepRow {
   step_index: number;
   step_label: string;

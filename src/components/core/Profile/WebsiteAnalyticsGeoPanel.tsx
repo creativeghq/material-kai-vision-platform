@@ -3,9 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Globe2 } from 'lucide-react';
 
 import { WorldChoropleth } from './seo/WorldChoropleth';
-import { GaBreakdownTable, num, sessionsColumn, trendColumn } from './seo/GaBreakdownTable';
+import { GaBreakdownTable, num, sessionsColumn, trendColumn, useWindowedBreakdown } from './seo/GaBreakdownTable';
 import { breakdownOf, countryFlag, countryName, formatDuration, type GaBreakdowns } from './seo/gaBreakdowns';
-import { useGaBreakdowns } from './seo/useGaBreakdowns';
+import { useGaBreakdowns, useGaWindow } from './seo/useGaBreakdowns';
 import { statusPresentation } from './seo/seoMetrics';
 import type { UserWebsite } from '@/services/userWebsitesService';
 
@@ -14,10 +14,12 @@ const engagement = num('secs_per_session', 'Avg. time', (n) => formatDuration(n)
 /** Websites → Analytics → Geography. */
 export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { data, loading, gate } = useGaBreakdowns(website.id);
-  if (gate) return gate;
-
   const countries = breakdownOf(data as GaBreakdowns | null, 'country');
   const cities = breakdownOf(data as GaBreakdowns | null, 'city');
+  const [days] = useGaWindow();
+  const map = useWindowedBreakdown(website.id, 'country', countries, days);
+  const mapData = map.breakdown ?? countries;
+  if (gate) return gate;
 
   return (
     <div className="space-y-4">
@@ -28,26 +30,26 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
             Where your visitors are
           </CardTitle>
           <CardDescription>
-            Sessions by country over the last {countries.window_days ?? 28} days. Shading is relative to your
+            Sessions by country over the last {mapData.window_days ?? days} days. Shading is relative to your
             strongest market, so a second market is visible even when one country holds most of the traffic.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {loading || map.loading ? (
             <div className="h-48 animate-pulse rounded-sm bg-surface-sunken" />
-          ) : countries.status === 'ok' ? (
+          ) : mapData.status === 'ok' ? (
             <WorldChoropleth
-              data={countries.rows
+              data={mapData.rows
                 .filter((r) => r.sessions != null)
                 .map((r) => ({ code: r.value, value: r.sessions as number, label: r.label }))}
             />
           ) : (
             <p className={`py-8 text-center text-xs ${
-              countries.status === 'collector_failed' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'
+              mapData.status === 'collector_failed' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'
             }`}>
-              <span className="font-medium">{statusPresentation(countries.status).placeholder}</span>
+              <span className="font-medium">{statusPresentation(mapData.status).placeholder}</span>
               {' — '}
-              {countries.note || statusPresentation(countries.status).explain}
+              {mapData.note || statusPresentation(mapData.status).explain}
             </p>
           )}
         </CardContent>
@@ -56,6 +58,8 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
       <GaBreakdownTable
         title="Countries"
         description="Every country Analytics attributed a session to."
+        websiteId={website.id}
+        dimension="country"
         breakdown={countries}
         head="Country"
         renderName={(row) => (
@@ -70,6 +74,8 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
       <GaBreakdownTable
         title="Cities"
         description="Google resolves a city from the network, so a capital often absorbs a whole region."
+        websiteId={website.id}
+        dimension="city"
         breakdown={cities}
         head="City"
         renderName={(row) => (
@@ -84,6 +90,8 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
       <GaBreakdownTable
         title="Age"
         description="Google only reports these for visitors it has signals for, so the totals are a SAMPLE and will not match sessions."
+        websiteId={website.id}
+        dimension="age"
         breakdown={breakdownOf(data as GaBreakdowns | null, 'age')}
         head="Age bracket"
         renderName={(row) => <span className="truncate">{row.value}</span>}
@@ -92,6 +100,8 @@ export const WebsiteAnalyticsGeoPanel: React.FC<{ website: UserWebsite }> = ({ w
 
       <GaBreakdownTable
         title="Gender"
+        websiteId={website.id}
+        dimension="gender"
         breakdown={breakdownOf(data as GaBreakdowns | null, 'gender')}
         head="Gender"
         renderName={(row) => <span className="truncate capitalize">{row.value}</span>}

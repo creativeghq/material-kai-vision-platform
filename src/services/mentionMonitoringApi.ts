@@ -49,7 +49,16 @@ export type MentionSubjectType = 'product' | 'brand' | 'keyword';
  * person is actually answered by, and costs roughly 25x per token — which is why the
  * credit price differs and why a trend refuses to compare across a change.
  */
-export type MentionProbeTier = 'cheap' | 'frontier';
+/** Mirrors `tracked_mentions_probe_tier_check`. */
+export const PROBE_TIERS = ['cheap', 'frontier', 'dataforseo', 'scraper'] as const;
+export type MentionProbeTier = typeof PROBE_TIERS[number];
+
+export const PROBE_TIER_LABEL: Record<MentionProbeTier, string> = {
+  cheap: 'Cheap tier · vendor APIs',
+  frontier: 'Frontier tier · ~25x',
+  dataforseo: 'DataForSEO · 4 engines, your country',
+  scraper: 'Scraped · as a buyer sees it',
+};
 
 export interface MentionRow {
   id: string;

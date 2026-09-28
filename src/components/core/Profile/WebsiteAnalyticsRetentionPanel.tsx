@@ -1,14 +1,49 @@
-import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, Repeat } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronsUpDown, Loader2, Repeat } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { userWebsitesService, type GaJourney, type UserWebsite } from '@/services/userWebsitesService';
 import { statusPresentation } from './seo/seoMetrics';
+import { HubToolbar } from '@/components/core/hub/HubToolbar';
+import type { GaCohortRow } from './seo/gaBreakdowns';
+
+type CohortSort = { key: 'cohort' | 'users' | number; desc: boolean };
+
+function cohortValue(row: GaCohortRow, key: CohortSort['key']): string | number | null {
+  if (key === 'cohort') return row.cohort_start ?? row.cohort_label;
+  if (key === 'users') return row.total_users;
+  return row.periods.find((p) => p.nth === key)?.retention ?? null;
+}
+
+const SortHeader: React.FC<{
+  label: string; k: CohortSort['key']; sort: CohortSort | null; onSort: (s: CohortSort) => void; align?: 'left' | 'right';
+}> = ({ label, k, sort, onSort, align = 'right' }) => {
+  const active = sort?.key === k;
+  return (
+    <th
+      className={`whitespace-nowrap px-2 py-1.5 font-semibold ${align === 'left' ? 'text-left' : 'text-right'}`}
+      aria-sort={active ? (sort.desc ? 'descending' : 'ascending') : undefined}
+    >
+      <button
+        type="button"
+        onClick={() => onSort({ key: k, desc: active ? !sort.desc : k !== 'cohort' })}
+        className={`group inline-flex items-center gap-1 hover:text-foreground ${align === 'right' ? 'flex-row-reverse' : ''}`}
+      >
+        {label}
+        {active
+          ? (sort.desc ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)
+          : <ChevronsUpDown className="h-3 w-3 opacity-35 group-hover:opacity-70" />}
+      </button>
+    </th>
+  );
+};
 
 export const WebsiteAnalyticsRetentionPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const [journey, setJourney] = useState<GaJourney | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<CohortSort | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +60,22 @@ export const WebsiteAnalyticsRetentionPanel: React.FC<{ website: UserWebsite }> 
     })();
     return () => { cancelled = true; };
   }, [website.id]);
+
+  const cohortRows = journey?.cohorts?.rows;
+  const rows = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    const list = (cohortRows ?? []).filter((r) => !needle || r.cohort_label.toLowerCase().includes(needle));
+    if (!sort) return list;
+    const dir = sort.desc ? -1 : 1;
+    return [...list].sort((a, b) => {
+      const x = cohortValue(a, sort.key);
+      const y = cohortValue(b, sort.key);
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return dir * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)));
+    });
+  }, [cohortRows, search, sort]);
 
   if (loading) {
     return (
@@ -68,21 +119,29 @@ export const WebsiteAnalyticsRetentionPanel: React.FC<{ website: UserWebsite }> 
         )}
 
         {c?.status === 'ok' && c.rows.length > 0 && (
+          <div className="overflow-hidden rounded-md border border-hairline">
+          <HubToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Search cohorts" />
           <div className="table-scroll">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-surface-sunken">
-                  <th className="whitespace-nowrap px-2 py-1.5 text-left font-semibold">Cohort</th>
-                  <th className="whitespace-nowrap px-2 py-1.5 text-right font-semibold">Users</th>
+                  <SortHeader label="Cohort" k="cohort" sort={sort} onSort={setSort} align="left" />
+                  <SortHeader label="Users" k="users" sort={sort} onSort={setSort} />
                   {periods.map((p) => (
-                    <th key={p} className="whitespace-nowrap px-2 py-1.5 text-right font-semibold">
-                      Week {p}
-                    </th>
+                    <SortHeader key={p} label={`Week ${p}`} k={p} sort={sort} onSort={setSort} />
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {c.rows.map((row) => {
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={periods.length + 2} className="px-2 py-6 text-center text-muted-foreground">
+                      No cohort matches that search.{' '}
+                      <button type="button" className="text-primary hover:underline" onClick={() => setSearch('')}>Clear search</button>
+                    </td>
+                  </tr>
+                )}
+                {rows.map((row) => {
                   const byNth = new Map(row.periods.map((p) => [p.nth, p]));
                   return (
                     <tr key={row.cohort_label} className="border-t border-hairline">
@@ -110,6 +169,7 @@ export const WebsiteAnalyticsRetentionPanel: React.FC<{ website: UserWebsite }> 
                 })}
               </tbody>
             </table>
+          </div>
           </div>
         )}
       </CardContent>
