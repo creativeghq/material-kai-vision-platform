@@ -163,12 +163,12 @@ const DEFAULT_UNIT = 'pcs';
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{
-  workspaceId: string; companyId?: string; contactId?: string; projectId?: string;
+  workspaceId: string; companyId?: string; contactId?: string; projectId?: string; projectName?: string;
   /** The embedded party's role, when mounted inside a CRM contact/company page. Gates which
       order kinds the New-order menu offers (customer → sell, supplier → buy). Omit on the
       global Finance list / project tab — there's no single party, so both kinds stay. */
   partyRoles?: { customer: boolean; supplier: boolean };
-}> = ({ workspaceId, companyId, contactId, projectId, partyRoles }) => {
+}> = ({ workspaceId, companyId, contactId, projectId, projectName, partyRoles }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
   // Outstanding € per order for the visible page (total − settled), so the list doubles as a
@@ -514,6 +514,7 @@ export const OrdersPanel: React.FC<{
         workspaceId={workspaceId}
         lockedCompanyId={companyId}
         lockedContactId={contactId}
+        initialProject={projectId ? { id: projectId, name: projectName ?? 'This project' } : undefined}
         preset={createPreset}
         // `vat_percent` → the form's `vat_code` happens here, where VAT_CATEGORIES lives; the
         // template adapter deliberately does not carry a second copy of that vocabulary.
@@ -570,6 +571,7 @@ export const NewOrderModal: React.FC<{
   /** When the modal is opened from inside a CRM party, that party is pre-selected and locked. */
   lockedCompanyId?: string;
   lockedContactId?: string;
+  initialProject?: { id: string; name: string };
   /** Chosen from the New-order dropdown: sell vs buy + draft (pre-order) vs confirmed. */
   preset: { orderType: OrderType; draft: boolean };
   /**
@@ -592,7 +594,7 @@ export const NewOrderModal: React.FC<{
   onOpenChange: (v: boolean) => void;
   /** Receives the new order's id, so a caller can link it to the record it came from. */
   onCreated: (orderId: string) => void;
-}> = ({ workspaceId, lockedCompanyId, lockedContactId, preset, prefill, categories, open, onOpenChange, onCreated }) => {
+}> = ({ workspaceId, lockedCompanyId, lockedContactId, initialProject, preset, prefill, categories, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
   // Properties are only offered where the workspace runs the real-estate module.
   const { isModuleAvailable } = useEntitlements();
@@ -700,7 +702,7 @@ export const NewOrderModal: React.FC<{
   useEffect(() => {
     if (!open) return;
     setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
-    setLink({ kind: 'none' }); setCurrency('EUR');
+    setLink(initialProject ? { kind: 'project', projectId: initialProject.id, label: initialProject.name } : { kind: 'none' }); setCurrency('EUR');
     setCategoryId('none'); setExpectedDate('');
     setDiscountType('percent'); setDiscountValue('');
     setCurrency(prefill?.currency || 'EUR');
@@ -1697,7 +1699,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // attached to the order + defaulted to the "Order" category. `expensePrefill` seeds it from a line/supplier.
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [sendingBack, setSendingBack] = useState<string | null>(null);
-  const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; vatAmount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
+  const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; vatAmount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; contactId?: string | null; name?: string | null } } | null>(null);
   // Attaching an expense that ALREADY exists (booked before the order, or arriving separately —
   // transport, customs, an installer). `setSupplierBillOrder` on an existing bill, not a new one.
   const [linkExpenseOpen, setLinkExpenseOpen] = useState(false);
@@ -2371,6 +2373,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // Pay a specific supplier straight from the "what we owe" rollup — same expense form, supplier +
   // amount pre-filled. `owed` is GROSS (the rollup's cost is VAT-inclusive), so it is split back
   // into net + VAT in the same proportion the supplier's line costs carry.
+  const orderSupplierPrefill = () => (order?.order_type === 'purchase' && (order.supplier_company_id || order.supplier_contact_id)
+    ? { supplier: { companyId: order.supplier_company_id ?? null, contactId: order.supplier_contact_id ?? null, name: partyName } }
+    : {});
+
   const openPaySupplier = (sup: { supplier_company_id: string; name: string; cost_net: number; cost: number; owed: number }) => {
     const { net, vat } = splitGrossLikeTotals(sup.owed, sup.cost_net, sup.cost);
     setExpensePrefill({
@@ -3094,7 +3100,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       * holds MANY expenses (`supplier_bills.order_id` is not unique), so this stays
                       * available after the first one exists — hence the label counts.
                       */}
-                    <DropdownMenuItem onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                    <DropdownMenuItem onClick={() => { setExpensePrefill(orderSupplierPrefill()); setExpenseOpen(true); }}>
                       <ArrowUpRight className="h-3.5 w-3.5 mr-2 text-red-400" />
                       Add {(fin?.supplierBills.length ?? 0) > 0 ? 'another expense' : 'expense'}
                     </DropdownMenuItem>
@@ -3849,7 +3855,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   {/* The rollup is derived from the LINES, so there is nothing to add here directly.
                       What an operator actually wants at this point is to book the cost — the same
                       expense form the per-supplier Pay button opens, with nothing pre-filled. */}
-                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill(orderSupplierPrefill()); setExpenseOpen(true); }}>
                     <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" /> Add supplier cost
                   </Button>
                 </div>
@@ -4108,7 +4114,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       stay available after the first one: "Add" books a new cost, "Attach" claims one
                       already sitting in Payables — the transport invoice that landed a week late. */}
                   <span className="flex items-center gap-1">
-                    <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                    <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill(orderSupplierPrefill()); setExpenseOpen(true); }}>
                       <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" /> Add {(fin?.supplierBills.length ?? 0) > 0 ? 'another' : 'expense'}
                     </Button>
                     <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setLinkExpenseOpen(true)}>
@@ -4413,7 +4419,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     supplier's own bill the match sits at "awaiting bill" indefinitely, and a
                     purchase raised by hand rather than from the Inbox has no other way in. */}
                 <span className="flex items-center gap-1">
-                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill(orderSupplierPrefill()); setExpenseOpen(true); }}>
                     <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" /> Record the supplier’s bill
                   </Button>
                   {/* Same status gate the Actions menu applies — a fulfilled or cancelled order has

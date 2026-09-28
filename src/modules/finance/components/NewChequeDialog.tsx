@@ -14,7 +14,8 @@ import { parseDecimal } from '@/utils/decimal';
 
 export const NewChequeDialog: React.FC<{
   workspaceId: string; open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void;
-}> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+  initialDirection?: string;
+}> = ({ workspaceId, open, onOpenChange, onCreated, initialDirection }) => {
   const { toast } = useToast();
   const [direction, setDirection] = useState<'in' | 'out'>('in');
   const [number, setNumber] = useState('');
@@ -31,7 +32,7 @@ export const NewChequeDialog: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    setDirection('in'); setNumber(''); setBank(''); setAmount(''); setDueDate(''); setNotes(''); setTargetId('');
+    setDirection(initialDirection === 'out' ? 'out' : 'in'); setNumber(''); setBank(''); setAmount(''); setDueDate(''); setNotes(''); setTargetId('');
     (async () => {
       const [invs, sbs] = await Promise.all([
         financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'overdue'], limit: 200 }).catch(() => []),

@@ -377,6 +377,7 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
       {adding && (
         <AddSnagDialog
           projectId={projectId} rooms={rooms}
+          initialRoomId={roomFilter} initialCostCodeId={tradeFilter}
           onClose={() => setAdding(false)}
           onSaved={() => { setAdding(false); void load(); }}
         />
@@ -387,18 +388,19 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
 
 
 const AddSnagDialog: React.FC<{
-  projectId: string; rooms: ProjectRoom[]; onClose: () => void; onSaved: () => void;
-}> = ({ projectId, rooms, onClose, onSaved }) => {
+  projectId: string; rooms: ProjectRoom[]; initialRoomId?: string; initialCostCodeId?: string;
+  onClose: () => void; onSaved: () => void;
+}> = ({ projectId, rooms, initialRoomId, initialCostCodeId, onClose, onSaved }) => {
   const { toast } = useToast();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<SnagSeverity>('medium');
-  const [roomId, setRoomId] = useState('');
+  const [roomId, setRoomId] = useState(() => rooms.some((r) => r.id === initialRoomId) ? initialRoomId ?? '' : '');
   const [dueDate, setDueDate] = useState('');
   const [clientVisible, setClientVisible] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
-  const [costCodeId, setCostCodeId] = useState<string | null>(null);
+  const [costCodeId, setCostCodeId] = useState<string | null>(initialCostCodeId || null);
 
   const save = async () => {
     if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }

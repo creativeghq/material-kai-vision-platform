@@ -86,6 +86,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [client, setClient] = useState<ClientPickerValue>({
     client_company_id: initialClient?.client_company_id ?? null,
     client_contact_id: initialClient?.client_contact_id ?? null,
+    display_name: initialClient?.name ?? undefined,
   });
 
   // Opening from a different CRM record must re-bind — the modal instance is reused.
@@ -94,6 +95,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setClient({
       client_company_id: initialClient.client_company_id ?? null,
       client_contact_id: initialClient.client_contact_id ?? null,
+      display_name: initialClient.name ?? undefined,
     });
   }, [open, initialClient?.client_company_id, initialClient?.client_contact_id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Reloaded on every open, and after the manager closes, so a category added a moment ago is
@@ -124,6 +126,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setClient({
       client_company_id: initialClient?.client_company_id ?? null,
       client_contact_id: initialClient?.client_contact_id ?? null,
+      display_name: initialClient?.name ?? undefined,
     });
     setAddrUnitId(null);
     setCategoryId(initialCategoryId ?? '');

@@ -264,6 +264,12 @@ export default function PageWatchesPage() {
 
   const filtersActive = search.trim() !== '' || kind !== 'all' || stateFilter !== 'all';
 
+  function openAdd() {
+    const scopedKind = kind in PAGE_WATCH_CATEGORY_LABELS ? (kind as PageWatchCategory) : EMPTY_FORM.category;
+    setForm({ ...EMPTY_FORM, category: scopedKind });
+    setAdding(true);
+  }
+
   async function submit() {
     if (!activeWorkspaceId) return;
     setSaving(true);
@@ -501,7 +507,7 @@ export default function PageWatchesPage() {
               <Info className="h-4 w-4" />
               {explainerOpen ? 'Hide how it works' : 'How it works'}
             </Button>
-            <Button size="sm" onClick={() => setAdding(true)}>
+            <Button size="sm" onClick={openAdd}>
               <Plus className="h-4 w-4" /> Watch a page
             </Button>
           </>
@@ -681,7 +687,7 @@ export default function PageWatchesPage() {
                   title="Nothing is being watched yet"
                   description="Start with the supplier whose terms you would most hate to learn about late — their payment terms or price list page. You will hear about it the day it changes."
                   action={
-                    <Button size="sm" onClick={() => setAdding(true)}>
+                    <Button size="sm" onClick={openAdd}>
                       <Plus className="h-4 w-4" /> Watch a page
                     </Button>
                   }

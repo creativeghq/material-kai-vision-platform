@@ -36,7 +36,8 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
+import { HubEmptyState } from '@/components/core/hub';
 import { buildQuoteRequestFilters } from '../components/quoteFilters';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag, UnquotedRequest } from '../services/QuotesService';
@@ -275,6 +276,12 @@ export const QuoteRequestsAdmin: React.FC = () => {
   }, [filteredQuoteRequests.length]);
   useEffect(() => { setPage(1); }, [filterValues]);
 
+  const openCreateForRequester = () => {
+    const requester = scopedFilterValue(filterValues, 'requester');
+    if (requester && users.some((u) => u.user_id === requester)) setSelectedUserId(requester);
+    setShowCreateModal(true);
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { icon: Clock, className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
@@ -498,7 +505,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
                 Quote settings
               </Button>
               <Button
-                onClick={() => setShowCreateModal(true)}
+                onClick={openCreateForRequester}
                 style={{
                   backgroundColor: 'hsl(var(--primary))',
                   color: 'white',
@@ -541,8 +548,22 @@ export const QuoteRequestsAdmin: React.FC = () => {
                 </TableRow>
               ) : filteredQuoteRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No quote requests found
+                  <TableCell colSpan={7} className="p-0">
+                    {quoteRequests.length > 0 ? (
+                      <HubEmptyState
+                        variant="filtered"
+                        icon={FileText}
+                        title="No quote requests match these filters"
+                        action={<Button size="sm" variant="outline" onClick={() => setFilterValues({})}>Clear filters</Button>}
+                      />
+                    ) : (
+                      <HubEmptyState
+                        icon={FileText}
+                        title="No quote requests yet"
+                        description="Specifications sent from your website land here. You can also start a quote on a customer's behalf."
+                        action={<Button size="sm" onClick={openCreateForRequester}><UserPlus className="h-4 w-4 mr-1" /> Create quote for user</Button>}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (

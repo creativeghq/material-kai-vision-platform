@@ -18,13 +18,14 @@ import { PageHeader } from '@/components/shared/PageHeader';
 
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildQuoteFilters } from '../components/quoteFilters';
 import { QUOTES_TAB, QUOTES_FILTER_KEY, quoteUrl } from '../routes';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { CreateQuoteModal } from '../components/CreateQuoteModal';
+import type { QuoteCustomer } from '../components/CustomerPicker';
 import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
 import { formatDate } from '@/utils/datetime';
@@ -367,9 +368,17 @@ export const QuotesPage: React.FC = () => {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={handleQuoteCreated}
+        defaultCustomer={scopedQuoteCustomer(quotes, scopedFilterValue(filterValues, 'customer'))}
       />
     </div>
   );
 };
+
+function scopedQuoteCustomer(quotes: QuoteWithItems[], name: string | undefined): QuoteCustomer | null {
+  const row = name ? quotes.find((q) => q.customer_name === name) : undefined;
+  if (row?.customer_company_id) return { type: 'company', id: row.customer_company_id, label: name! };
+  if (row?.customer_contact_id) return { type: 'contact', id: row.customer_contact_id, label: name! };
+  return null;
+}
 
 export default QuotesPage;

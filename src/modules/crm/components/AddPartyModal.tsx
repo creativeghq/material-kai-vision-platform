@@ -31,6 +31,19 @@ const KIND_ICONS: Record<NewPartyKindId, React.ComponentType<{ className?: strin
 
 const GROUPS: Array<NewPartyKind['group']> = ['person', 'business'];
 
+export type PartyRelationship = 'client' | 'supplier';
+
+const kindMatchesRelationship = (k: NewPartyKind, relationship: PartyRelationship) =>
+  relationship === 'supplier' ? !!k.contactPrefill.is_supplier : !!k.contactPrefill.is_client;
+
+const fillEmpty = (payload: Record<string, unknown>, scope: Record<string, unknown>) => {
+  const out = { ...payload };
+  for (const [key, value] of Object.entries(scope)) {
+    if (out[key] === undefined || out[key] === null || out[key] === '') out[key] = value;
+  }
+  return out;
+};
+
 /**
  * The ONE "what are you adding?" question for CRM. A business kind runs the shared registry
  * lookup (VAT/ΑΦΜ → ΑΑΔΕ → ΓΕΜΗ) before opening its form; a person kind opens the contact form
@@ -41,13 +54,25 @@ export const AddPartyModal: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categoryId?: string;
-}> = ({ open, onOpenChange, categoryId }) => {
+  relationship?: PartyRelationship;
+  contactScope?: Record<string, unknown>;
+  companyScope?: Record<string, unknown>;
+  companyCategoryIds?: string[];
+  companyId?: string;
+}> = ({
+  open, onOpenChange, categoryId, relationship, contactScope, companyScope, companyCategoryIds, companyId,
+}) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [step, setStep] = useState<'kind' | 'identity'>('kind');
   const [kindId, setKindId] = useState<NewPartyKindId | null>(null);
   const [identity, setIdentity] = useState<CompanyIdentityDraft>(() => emptyCompanyIdentity());
   const [lookupBusy, setLookupBusy] = useState(false);
+  const [showAllKinds, setShowAllKinds] = useState(false);
+  const scoped = !!relationship && !showAllKinds;
+  const offeredKinds = scoped
+    ? NEW_PARTY_KINDS.filter((k) => kindMatchesRelationship(k, relationship))
+    : NEW_PARTY_KINDS;
 
   const kind = NEW_PARTY_KINDS.find((k) => k.id === kindId) ?? null;
 
@@ -64,19 +89,23 @@ export const AddPartyModal: React.FC<{
 
   const reset = () => {
     setStep('kind'); setKindId(null); setIdentity(emptyCompanyIdentity()); setLookupBusy(false);
+    setShowAllKinds(false);
   };
 
   const close = (next: boolean) => { if (!next) reset(); onOpenChange(next); };
 
-  const leave = (to: string, prefill: Record<string, unknown>) => {
+  const leave = (to: string, prefill: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
     onOpenChange(false);
     clearDraft();
     reset();
-    navigate(to, { state: { prefill, categoryId } });
+    navigate(to, { state: { prefill, categoryId, ...extra } });
   };
 
+  const leaveAsContact = (prefill: Record<string, unknown>) =>
+    leave('/crm/contacts/new', fillEmpty(prefill, contactScope ?? {}), { companyId });
+
   const pick = (k: NewPartyKind) => {
-    if (k.entity === 'contact') { leave('/crm/contacts/new', { ...k.contactPrefill }); return; }
+    if (k.entity === 'contact') { leaveAsContact({ ...k.contactPrefill }); return; }
     setKindId(k.id);
     setStep('identity');
   };
@@ -93,14 +122,18 @@ export const AddPartyModal: React.FC<{
 
   const createCompany = () => {
     if (!kind || !requireName()) return;
-    leave('/crm/companies/new', companyIdentityPayload(identity, kind.companyRoles ?? {}));
+    leave(
+      '/crm/companies/new',
+      fillEmpty(companyIdentityPayload(identity, kind.companyRoles ?? {}), companyScope ?? {}),
+      { categoryIds: [categoryId, ...(companyCategoryIds ?? [])].filter(Boolean) },
+    );
   };
 
   /** Same ΑΦΜ, other row — the registry name is their TRADING name, never the person's own. */
   const createSoleTrader = () => {
     if (!kind || !requireName()) return;
     const vat = identity.vatNumber.trim();
-    leave('/crm/contacts/new', {
+    leaveAsContact({
       ...kind.contactPrefill,
       ...narrowToContactFields(identity.fields),
       company: identity.name.trim(),
@@ -123,13 +156,13 @@ export const AddPartyModal: React.FC<{
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              {GROUPS.map((group) => (
+              {GROUPS.filter((group) => offeredKinds.some((k) => k.group === group)).map((group) => (
                 <div key={group} className="space-y-2">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {PARTY_GROUP_LABEL[group]}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {NEW_PARTY_KINDS.filter((k) => k.group === group).map((k) => {
+                    {offeredKinds.filter((k) => k.group === group).map((k) => {
                       const Icon = KIND_ICONS[k.id];
                       return (
                         <button
@@ -147,6 +180,11 @@ export const AddPartyModal: React.FC<{
                   </div>
                 </div>
               ))}
+              {scoped && (
+                <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setShowAllKinds(true)}>
+                  Show all types
+                </Button>
+              )}
             </div>
           </>
         ) : (

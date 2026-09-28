@@ -164,7 +164,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
           </CardDescription>
           </div>
           <Button size="sm" variant="outline" className="shrink-0"
-            onClick={() => launchQuickStart('seo-research', 'Research a keyword')}>
+            onClick={() => launchQuickStart('seo-research', 'Research a keyword', website.id)}>
             <Plus className="w-3.5 h-3.5 mr-1" />New research
           </Button>
         </CardHeader>
@@ -177,7 +177,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
               title="No keyword research yet"
               description="A research pass captures the whole results page for a keyword — AI Overview citations, image and local packs, People Also Ask, and who ranks now."
               action={
-                <Button size="sm" onClick={() => launchQuickStart('seo-research', 'Research a keyword')}>
+                <Button size="sm" onClick={() => launchQuickStart('seo-research', 'Research a keyword', website.id)}>
                   <Plus className="w-3.5 h-3.5 mr-1" />New research
                 </Button>
               }

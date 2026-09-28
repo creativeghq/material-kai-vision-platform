@@ -31,7 +31,7 @@ import { usersAPI, contactsAPI, companiesAPI, type CrmListFilters } from '@/serv
 import { crmCategoriesService, isHandAssignableKind, type CrmCategorySummary } from '@/services/crmCategoriesService';
 import { humanizeLabel } from '@/utils/humanize';
 import { CategoriesPanel } from './CategoriesPage';
-import { AddPartyModal } from '../components/AddPartyModal';
+import { AddPartyModal, type PartyRelationship } from '../components/AddPartyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, scopedFilterValue, useFilters, useFilterValues, type FilterOption, type FilterValues } from '@/components/core/filters';
@@ -41,7 +41,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PipelineBoard } from '@/components/business/crm/PipelineBoard';
 import {
-  PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
+  LIFECYCLE_STAGE_OPTIONS, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
 } from '../crmConstants';
 import { HubEmptyState } from '@/components/core/hub';
@@ -440,6 +440,40 @@ export const CRMManagement: React.FC = () => {
     }),
     [companyCategoryOptions, industryOptions, companyProfessionOptions]);
 
+  const newPartyScope = useMemo(() => {
+    const onCompanies = activeTab === CRM_TAB.companies;
+    const values = onCompanies ? companyValues : contactValues;
+    const pick = (key: string, options: Option[]) => {
+      const v = scopedFilterValue(values, key);
+      return v && options.some((o) => o.value === v) ? v : undefined;
+    };
+    const relationship = scopedFilterValue(values, 'kind');
+    const contactScope: Record<string, string> = {};
+    const companyScope: Record<string, string> = {};
+    const companyCategoryIds: string[] = [];
+    let companyId: string | undefined;
+    if (onCompanies) {
+      const industryId = scopedFilterValue(companyValues, 'industry');
+      const industry = categories.find((c) => c.id === industryId && c.kind === 'industry');
+      if (industry) { companyCategoryIds.push(industry.id); companyScope.industry = industry.name; }
+      const profession = scopedFilterValue(companyValues, 'profession');
+      if (profession) companyScope.profession = profession;
+    } else {
+      const status = pick('status', STATUS_OPTIONS);
+      if (status) contactScope.status = status;
+      const stage = pick('lifecycle_stage', LIFECYCLE_STAGE_OPTIONS);
+      if (stage) contactScope.lifecycle_stage = stage;
+      const companyName = scopedFilterValue(contactValues, 'company');
+      const matches = companyName ? companyLookup.filter((c) => c.name === companyName) : [];
+      if (matches.length === 1) companyId = matches[0].id;
+    }
+    return {
+      categoryId: scopedFilterValue(values, 'category'),
+      relationship: relationship === 'client' || relationship === 'supplier' ? relationship as PartyRelationship : undefined,
+      contactScope, companyScope, companyCategoryIds, companyId,
+    };
+  }, [activeTab, companyValues, contactValues, categories, companyLookup]);
+
   // ── filtered lists ────────────────────────────────────────────────────────
   // Users are the only client-side tab, so they get the full hook (matching + preview).
   const {
@@ -605,7 +639,7 @@ export const CRMManagement: React.FC = () => {
       <AddPartyModal
         open={showAddParty}
         onOpenChange={setShowAddParty}
-        categoryId={scopedFilterValue(activeTab === CRM_TAB.companies ? companyValues : contactValues, 'category')}
+        {...newPartyScope}
       />
 
       <div className="p-3 sm:p-6 space-y-6">

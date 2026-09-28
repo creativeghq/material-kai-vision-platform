@@ -284,6 +284,8 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
         workspaceId={workspaceId}
         template={editing}
         onSaved={loadTemplates}
+        defaultStage={selectedStage !== 'all' ? selectedStage : undefined}
+        defaultIndustry={selectedIndustry !== 'all' ? selectedIndustry : undefined}
       />
     </div>
   );

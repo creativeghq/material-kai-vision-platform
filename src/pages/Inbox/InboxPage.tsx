@@ -54,7 +54,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/core/ui/sheet';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
 import {
   channelForSource, inboxHireOrder, inboxRequestedServices, inboxSourceKey, inboxSourceMeta, inboxThreadSource,
@@ -1920,6 +1920,12 @@ const InboxPage: React.FC = () => {
       {showNew && activeWorkspaceId && (
         <NewThreadDialog
           workspaceId={activeWorkspaceId}
+          initialMode={
+            scopedFilterValue(filterValues, 'thread_type') === 'customer' || scopedFilterValue(filterValues, 'source') === 'customer'
+              ? 'customer'
+              : 'team'
+          }
+          scopedLabelId={labelFilter}
           onClose={() => setShowNew(false)}
           onCreated={(id) => { setShowNew(false); loadThreads(); openThread(id); }}
         />
@@ -5620,9 +5626,15 @@ const LabelAssignButton: React.FC<{
 
 interface ContactOption { id: string; label: string; email: string | null; hasAccount: boolean; }
 
-const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCreated: (id: string) => void }> = ({ workspaceId, onClose, onCreated }) => {
+const NewThreadDialog: React.FC<{
+  workspaceId: string;
+  initialMode: 'team' | 'customer';
+  scopedLabelId: string | null;
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}> = ({ workspaceId, initialMode, scopedLabelId, onClose, onCreated }) => {
   const { toast } = useToast();
-  const [mode, setMode] = useState<'team' | 'customer'>('team');
+  const [mode, setMode] = useState<'team' | 'customer'>(initialMode);
   const [busy, setBusy] = useState(false);
 
   // Team
@@ -5682,6 +5694,15 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
     return () => { cancelled = true; };
   }, [mode, workspaceId, contactQuery]);
 
+  const applyScopedLabel = async (threadId: string) => {
+    if (!scopedLabelId) return;
+    try {
+      await inboxApi.setThreadLabels(threadId, [scopedLabelId]);
+    } catch (e) {
+      toast({ title: 'Conversation created, but the label was not applied', description: (e as Error).message, variant: 'destructive' });
+    }
+  };
+
   const createTeam = async () => {
     setBusy(true);
     try {
@@ -5689,6 +5710,7 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
         thread_type: 'internal', workspace_id: workspaceId, subject: subject.trim() || undefined,
         participants: selected.map((user_id) => ({ type: 'member' as const, user_id })),
       });
+      await applyScopedLabel(thread.id);
       onCreated(thread.id);
     } catch (e) {
       toast({ title: 'Could not create', description: (e as Error).message, variant: 'destructive' });
@@ -5703,6 +5725,7 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
         workspace_id: workspaceId, contact_id: contactId,
         subject: custSubject.trim() || undefined, message: custMessage.trim() || undefined,
       });
+      await applyScopedLabel(res.thread_id);
       if (res.share_url) { setShareUrl(res.share_url); setCreatedThreadId(res.thread_id); }
       else onCreated(res.thread_id);
     } catch (e) {

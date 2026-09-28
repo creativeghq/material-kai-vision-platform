@@ -711,6 +711,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           open={newInvoiceOpen}
           onOpenChange={setNewInvoiceOpen}
           initialCategoryId={categoryScopeFor(categories, scopedCategoryId, 'income')}
+          initialDocType={type === 'receipts' ? '11.1' : undefined}
           onCreated={(invoiceId) => { setNewInvoiceOpen(false); navigate(`${financeBase}/invoices/${invoiceId}`); }}
         />
       )}
@@ -719,6 +720,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           workspaceId={activeWorkspaceId}
           open={newDeliveryOpen}
           onOpenChange={setNewDeliveryOpen}
+          initialKind={type === 'delivery_notes' ? scopedFilterValue(filterValues, 'kind') : undefined}
           onCreated={() => { setNewDeliveryOpen(false); load(); setDispatchRefresh((n) => n + 1); }}
         />
       )}
@@ -727,6 +729,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           workspaceId={activeWorkspaceId}
           open={newChequeOpen}
           onOpenChange={setNewChequeOpen}
+          initialDirection={scopedFilterValue(filterValues, 'direction')}
           onCreated={() => { setNewChequeOpen(false); load(); }}
         />
       )}

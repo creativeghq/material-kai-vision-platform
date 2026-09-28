@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Loader2, ArrowRight, GitBranch } from 'lucide-react';
+import { FileText, Loader2, ArrowRight, GitBranch, Plus } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
+import { CreateQuoteModal } from '@/modules/quotes/components/CreateQuoteModal';
+import { quoteUrl } from '@/modules/quotes/routes';
 
 interface QuotesTabProps {
   projectId: string;
@@ -45,6 +47,7 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
   const navigate = useNavigate();
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -89,21 +92,35 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
     );
   }
 
+  const createModal = (
+    <CreateQuoteModal
+      open={creating}
+      onClose={() => setCreating(false)}
+      defaultProjectId={projectId}
+      onSuccess={(quoteId) => { setCreating(false); navigate(quoteUrl(quoteId)); }}
+    />
+  );
+
   if (quotes.length === 0) {
     return (
       <Card className="dashboard-card p-0">
         <HubEmptyState
           icon={FileText}
           title="No quotes attached to this project yet"
-          description="Create a quote and pick this project to start tracking budget against actual."
-          action={<Button variant="outline" onClick={() => navigate('/quotes')}>Go to Quotes</Button>}
+          description="A quote created here is filed under this project, so its budget tracks against actual."
+          action={<Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" /> New quote</Button>}
         />
+        {createModal}
       </Card>
     );
   }
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" /> New quote</Button>
+      </div>
+      {createModal}
       {chains.map(chain => {
         const hasRevisions = chain.revisions.length > 1;
         return (

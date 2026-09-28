@@ -240,7 +240,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
         rows={summary.payables} total={t.payable_total} due={t.payable_due} kind="payable" />
 
       {/* This project's orders (sales & purchase). */}
-      <OrdersPanel workspaceId={activeWorkspaceId ?? ''} projectId={projectId} />
+      <OrdersPanel workspaceId={activeWorkspaceId ?? ''} projectId={projectId} projectName={projectName} />
 
       {picker && (
         <AttachDialog

@@ -16,7 +16,7 @@ import { stockService, type StockCount, type StockCountLine } from '../services/
 import {
   locationService, countNeedsFreezing, countHasDrifted, type CountDrift,
 } from '@/modules/stock/services/locationService';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildStockCountFilters } from './stockCountFilters';
 import { formatDate } from '@/utils/datetime';
 import { HubEmptyState } from '@/components/core/hub';
@@ -138,6 +138,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
       </CardContent>
 
       <NewCountDialog open={newOpen} onOpenChange={setNewOpen} workspaceId={workspaceId}
+        initialWarehouseName={scopedFilterValue(filterValues, 'warehouse')}
         onCreated={async (id) => { setNewOpen(false); await load(); setOpenCountId(id); }} />
       <CountSheetDialog countId={openCountId} workspaceId={workspaceId}
         onOpenChange={(v) => { if (!v) setOpenCountId(null); }} onChanged={load} />
@@ -145,7 +146,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
   );
 };
 
-const NewCountDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; onCreated: (id: string) => void }> = ({ open, onOpenChange, workspaceId, onCreated }) => {
+const NewCountDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; initialWarehouseName?: string; onCreated: (id: string) => void }> = ({ open, onOpenChange, workspaceId, initialWarehouseName, onCreated }) => {
   const { toast } = useToast();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [whId, setWhId] = useState('');
@@ -159,10 +160,10 @@ const NewCountDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => vo
         await warehouseService.ensureDefaultWarehouse(workspaceId);
         const whs = await warehouseService.listWarehouses(workspaceId);
         setWarehouses(whs);
-        setWhId(whs.find((w) => w.is_default)?.id || whs[0]?.id || '');
+        setWhId(whs.find((w) => w.name === initialWarehouseName)?.id || whs.find((w) => w.is_default)?.id || whs[0]?.id || '');
       } catch (err: any) { toast({ title: 'Failed to load warehouses', description: err?.message, variant: 'destructive' }); }
     })();
-  }, [open, workspaceId, toast]);
+  }, [open, workspaceId, initialWarehouseName, toast]);
 
   const submit = async () => {
     if (!whId) { toast({ title: 'Pick a warehouse', variant: 'destructive' }); return; }

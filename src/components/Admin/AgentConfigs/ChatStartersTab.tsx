@@ -74,9 +74,9 @@ function slugify(s: string): string {
     .slice(0, 60);
 }
 
-function emptyStarter(): Omit<ChatStarterRow, 'id' | 'updated_at'> {
+function emptyStarter(agentId: string): Omit<ChatStarterRow, 'id' | 'updated_at'> {
   return {
-    category:      'kai',
+    category:      AGENT_OPTIONS.some(a => a.value === agentId) ? agentId : 'kai',
     subcategory:   '',
     name:          '',
     description:   '',
@@ -233,7 +233,7 @@ export const ChatStartersTab: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => setCreating(emptyStarter())}>
+            <Button onClick={() => setCreating(emptyStarter(filterAgent))}>
               <Plus className="h-4 w-4 mr-2" />New starter
             </Button>
           </>
@@ -249,7 +249,7 @@ export const ChatStartersTab: React.FC = () => {
             icon={ListChecks}
             title="No starters yet"
             description="The suggested prompts an agent offers before anyone has typed anything — grouped per agent, so each one opens with its own."
-            action={<Button size="sm" onClick={() => setCreating(emptyStarter())}><Plus className="h-4 w-4 mr-2" />New starter</Button>}
+            action={<Button size="sm" onClick={() => setCreating(emptyStarter(filterAgent))}><Plus className="h-4 w-4 mr-2" />New starter</Button>}
           />
         </div>
       ) : Object.keys(grouped).length === 0 ? (

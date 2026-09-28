@@ -32,7 +32,8 @@ export const NewDeliveryNoteDialog: React.FC<{
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: () => void;
-}> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+  initialKind?: string;
+}> = ({ workspaceId, open, onOpenChange, onCreated, initialKind }) => {
   const { toast } = useToast();
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [warehouse, setWarehouse] = useState<WarehousePick[]>([]);
@@ -70,7 +71,7 @@ export const NewDeliveryNoteDialog: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]); setBranchCode('0');
+    setKind(initialKind === 'receipt' ? 'receipt' : 'dispatch'); setCustomer(''); setNotes(''); setLines([]); setBranchCode('0');
     setTransportDate(''); setVehicleNumber(''); setMovePurpose('1');
     setFromAddr({ ...emptyAddr }); setToAddr({ ...emptyAddr }); setToUnitId(null);
     setReceivingPurpose(''); setReceivingPurposeTitle('');

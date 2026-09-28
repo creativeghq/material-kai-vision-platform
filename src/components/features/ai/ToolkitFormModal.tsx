@@ -1,6 +1,8 @@
 /** ToolkitFormModal — generic "collect-then-send" form for toolkit quick-starts. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
+import { userWebsitesService, type UserWebsite } from '@/services/userWebsitesService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Check, ChevronsUpDown, ImagePlus, X } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -271,6 +273,46 @@ const VocabularySelect: React.FC<{
   );
 };
 
+const DEFAULT_WEBSITE = '__default';
+
+const WebsiteSelect: React.FC<{
+  field: ToolkitFormField;
+  value: string;
+  onChange: (v: string) => void;
+}> = ({ field, value, onChange }) => {
+  const { activeWorkspaceId } = useWorkspace();
+  const [sites, setSites] = useState<UserWebsite[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setSites(null);
+    userWebsitesService.list(activeWorkspaceId)
+      .then((s) => { if (alive) setSites(s); })
+      .catch(() => { if (alive) setSites([]); });
+    return () => { alive = false; };
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    if (sites && value && !sites.some((s) => s.id === value)) onChange('');
+  }, [sites, value, onChange]);
+
+  return (
+    <Select
+      value={value || DEFAULT_WEBSITE}
+      onValueChange={(v) => onChange(v === DEFAULT_WEBSITE ? '' : v)}
+      disabled={!sites}
+    >
+      <SelectTrigger><SelectValue placeholder={field.placeholder || 'Default website'} /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value={DEFAULT_WEBSITE}>Default website</SelectItem>
+        {(sites ?? []).map((s) => (
+          <SelectItem key={s.id} value={s.id}>{s.display_name || s.url}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+};
+
 /**
  * Exported so the canvas clarify card (ClarifyCard) renders the SAME inputs as a quick-start form
  * — including the vocabulary-backed market selects. A second set of renderers would drift from
@@ -354,6 +396,8 @@ export const FieldInput: React.FC<{
     case 'country_code':
       // Shows readable market names, emits the ISO alpha-2 code the SEO tools want.
       return <VocabularySelect vocabularyKey="seo_markets" field={field} value={value} onChange={onChange} />;
+    case 'website':
+      return <WebsiteSelect field={field} value={value} onChange={onChange} />;
     case 'text':
     default:
       return (

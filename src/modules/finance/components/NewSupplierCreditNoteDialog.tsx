@@ -37,7 +37,9 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   onCreated: () => void;
   /** Preselect a bill (from the AP row action); when omitted the operator picks a bill or a supplier. */
   supplierBillId?: string;
-}> = ({ workspaceId, open, onOpenChange, onCreated, supplierBillId }) => {
+  initialSupplier?: Supplier;
+  initialCategoryId?: string;
+}> = ({ workspaceId, open, onOpenChange, onCreated, supplierBillId, initialSupplier, initialCategoryId }) => {
   const { toast } = useToast();
   const [bills, setBills] = useState<SupplierBill[]>([]);
   const [billId, setBillId] = useState('');
@@ -63,8 +65,8 @@ export const NewSupplierCreditNoteDialog: React.FC<{
     { billId, categoryId, supplier, issueDate, lines, reason, externalMark, markPaid },
     (d) => {
       setBillId(d?.billId ?? (supplierBillId ?? ''));
-      setCategoryId(d?.categoryId ?? '');
-      setSupplier(d?.supplier ?? null);
+      setCategoryId(d?.categoryId ?? initialCategoryId ?? '');
+      setSupplier(d?.supplier ?? initialSupplier ?? null);
       setSupSearch('');
       setIssueDate(d?.issueDate ?? todayLocalISO());
       setLines(d?.lines ?? [newLine()]);

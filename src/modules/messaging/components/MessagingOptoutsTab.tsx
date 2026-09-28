@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingOptout, MessagingChannelType } from '../services';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -222,6 +222,7 @@ export const MessagingOptoutsTab: React.FC = () => {
       {showAddModal && (
         <AddOptoutModal
           workspaceId={activeWorkspaceId ?? ''}
+          defaultChannelType={scopedFilterValue(filterValues, 'channel_type')}
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
@@ -237,13 +238,16 @@ export const MessagingOptoutsTab: React.FC = () => {
 interface AddOptoutModalProps {
   /** The business this opt-out is being recorded for. */
   workspaceId: string;
+  defaultChannelType?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const AddOptoutModal: React.FC<AddOptoutModalProps> = ({ workspaceId, onClose, onSuccess }) => {
+const AddOptoutModal: React.FC<AddOptoutModalProps> = ({ workspaceId, defaultChannelType, onClose, onSuccess }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [channelType, setChannelType] = useState<MessagingChannelType | 'all'>('all');
+  const [channelType, setChannelType] = useState<MessagingChannelType | 'all'>(
+    defaultChannelType === 'whatsapp' ? 'whatsapp' : 'all',
+  );
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();

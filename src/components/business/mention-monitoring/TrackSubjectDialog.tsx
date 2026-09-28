@@ -1,6 +1,6 @@
 /** TrackSubjectDialog — start tracking a brand or keyword. */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
@@ -21,6 +21,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: (row: TrackedMention) => void;
+  defaultSubjectType?: string;
 }
 
 /** Strip a pasted URL down to a bare host. People paste `https://brand.gr/` — accept it. */
@@ -32,19 +33,24 @@ function normalizeDomain(raw: string): string {
   return host.replace(/^www\./, '');
 }
 
-export const TrackSubjectDialog: React.FC<Props> = ({ open, onClose, onCreated }) => {
+export const TrackSubjectDialog: React.FC<Props> = ({ open, onClose, onCreated, defaultSubjectType }) => {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [subjectType, setSubjectType] = useState<MentionSubjectType>('brand');
+  const scopedSubjectType: MentionSubjectType = defaultSubjectType === 'keyword' ? 'keyword' : 'brand';
+  const [subjectType, setSubjectType] = useState<MentionSubjectType>(scopedSubjectType);
   const [label, setLabel] = useState('');
   const [aliases, setAliases] = useState('');
   const [homepageDomain, setHomepageDomain] = useState('');
   const [autoExpand, setAutoExpand] = useState(false);
 
   const reset = () => {
-    setSubjectType('brand'); setLabel(''); setAliases('');
+    setSubjectType(scopedSubjectType); setLabel(''); setAliases('');
     setHomepageDomain(''); setAutoExpand(false);
   };
+
+  useEffect(() => {
+    if (open) setSubjectType(scopedSubjectType);
+  }, [open, scopedSubjectType]);
 
   const submit = async () => {
     const trimmed = label.trim();

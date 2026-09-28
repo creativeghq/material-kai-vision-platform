@@ -32,7 +32,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, useFilters, optionsFromRows, scopedFilterValue, type FilterGroupDef } from '@/components/core/filters';
+import { FilterBar, useFilters, optionsFromRows, scopedFilterValue, type FilterGroupDef, type FilterValues } from '@/components/core/filters';
 import { buildAgingFilters, AGE_BUCKET_KEY } from '@/modules/finance/components/agingFilters';
 import { categoryScopeFor, financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useToast } from '@/hooks/use-toast';
@@ -138,6 +138,33 @@ function dashRange(p: 'this_month' | 'last_month' | 'last_quarter' | 'ytd'): { f
   return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(today) };
 }
 
+type NewDocScope = { categoryId?: string; party?: { type: 'company' | 'contact'; id: string; label: string } };
+
+function agingScope(side: 'ar' | 'ap', rows: AgingRow[], values: FilterValues, categories: FinanceCategory[]): NewDocScope {
+  const name = scopedFilterValue(values, 'party');
+  const row = name ? rows.find((r) => r.party_name === name) : undefined;
+  const companyId = side === 'ar' ? row?.customer_company_id : row?.supplier_company_id;
+  const contactId = side === 'ar' ? row?.customer_contact_id : row?.supplier_contact_id;
+  const party = companyId ? { type: 'company' as const, id: companyId, label: name! }
+    : contactId ? { type: 'contact' as const, id: contactId, label: name! } : undefined;
+  return {
+    categoryId: categoryScopeFor(categories, scopedFilterValue(values, 'category'), side === 'ar' ? 'income' : 'expense'),
+    party,
+  };
+}
+
+function expenseScopePrefill(scope: NewDocScope) {
+  if (!scope.categoryId && !scope.party) return undefined;
+  return {
+    categoryId: scope.categoryId,
+    supplier: scope.party && {
+      companyId: scope.party.type === 'company' ? scope.party.id : null,
+      contactId: scope.party.type === 'contact' ? scope.party.id : null,
+      name: scope.party.label,
+    },
+  };
+}
+
 const FinancePage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -218,7 +245,7 @@ const FinancePage: React.FC = () => {
   const [invoicePrefill, setInvoicePrefill] = useState<InvoicePrefill | null>(null);
   const [invoiceTemplatePickerOpen, setInvoiceTemplatePickerOpen] = useState(false);
   const [expensePrefill, setExpensePrefill] = useState<ExpensePrefill | null>(null);
-  const [newDocCategoryId, setNewDocCategoryId] = useState<string | undefined>(undefined);
+  const [newDocScope, setNewDocScope] = useState<NewDocScope>({});
   const [expenseTemplatePickerOpen, setExpenseTemplatePickerOpen] = useState(false);
   const [saveExpenseTemplateFor, setSaveExpenseTemplateFor] = useState<{ id: string; name: string | null } | null>(null);
 
@@ -948,7 +975,7 @@ const FinancePage: React.FC = () => {
                       <Button variant="outline" size="sm" onClick={() => setInvoiceTemplatePickerOpen(true)}>
                         <Layers className="h-4 w-4 mr-1" /> From template
                       </Button>
-                      <Button size="sm" onClick={() => { setNewDocCategoryId(categoryScopeFor(categories, scopedFilterValue(arValues, 'category'), 'income')); setNewInvoiceOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+                      <Button size="sm" onClick={() => { setNewDocScope(agingScope('ar', ar, arValues, categories)); setNewInvoiceOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
                     </>
                   )}
                 </div>
@@ -1149,13 +1176,13 @@ const FinancePage: React.FC = () => {
                       {draftAllBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <SendIcon className="h-4 w-4 mr-1" />} Draft all due
                     </Button>
                   )}
-                  {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
+                  {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setNewDocScope(agingScope('ap', ap, apValues, categories)); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
                   {!isAccountant && (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setExpenseTemplatePickerOpen(true)}>
                         <Layers className="h-4 w-4 mr-1" /> From template
                       </Button>
-                      <Button size="sm" onClick={() => { setNewDocCategoryId(categoryScopeFor(categories, scopedFilterValue(apValues, 'category'), 'expense')); setNewExpenseOpen(true); }}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>
+                      <Button size="sm" onClick={() => { setNewDocScope(agingScope('ap', ap, apValues, categories)); setNewExpenseOpen(true); }}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>
                     </>
                   )}
                 </div>
@@ -1476,12 +1503,13 @@ const FinancePage: React.FC = () => {
       <NewInvoiceDialog
         workspaceId={workspaceId}
         open={newInvoiceOpen}
-        onOpenChange={(v) => { setNewInvoiceOpen(v); if (!v) { setInvoicePrefill(null); setNewDocCategoryId(undefined); } }}
+        onOpenChange={(v) => { setNewInvoiceOpen(v); if (!v) { setInvoicePrefill(null); setNewDocScope({}); } }}
         initialItems={invoicePrefill?.items ?? null}
-        initialCategoryId={newDocCategoryId}
+        initialCategoryId={newDocScope.categoryId}
+        initialCustomer={newDocScope.party ?? null}
         initialDocType={invoicePrefill?.documentType}
         initialNotes={invoicePrefill?.notes}
-        onCreated={(invoiceId) => { setNewInvoiceOpen(false); setInvoicePrefill(null); setNewDocCategoryId(undefined); navigate(`${financeBase}/invoices/${invoiceId}`); }}
+        onCreated={(invoiceId) => { setNewInvoiceOpen(false); setInvoicePrefill(null); setNewDocScope({}); navigate(`${financeBase}/invoices/${invoiceId}`); }}
       />
       {saveExpenseTemplateFor && (
         <SaveAsTemplateDialog
@@ -1509,16 +1537,18 @@ const FinancePage: React.FC = () => {
       <NewExpenseDialog
         workspaceId={workspaceId}
         open={newExpenseOpen}
-        onOpenChange={(v) => { setNewExpenseOpen(v); if (!v) { setExpensePrefill(null); setNewDocCategoryId(undefined); } }}
-        prefill={expensePrefill ?? (newDocCategoryId ? { categoryId: newDocCategoryId } : undefined)}
-        onCreated={async () => { setNewExpenseOpen(false); setExpensePrefill(null); setNewDocCategoryId(undefined); if (workspaceId) await loadAll(workspaceId); }}
+        onOpenChange={(v) => { setNewExpenseOpen(v); if (!v) { setExpensePrefill(null); setNewDocScope({}); } }}
+        prefill={expensePrefill ?? expenseScopePrefill(newDocScope)}
+        onCreated={async () => { setNewExpenseOpen(false); setExpensePrefill(null); setNewDocScope({}); if (workspaceId) await loadAll(workspaceId); }}
       />
       <NewSupplierCreditNoteDialog
         workspaceId={workspaceId}
         open={scnOpen}
-        onOpenChange={setScnOpen}
+        onOpenChange={(v) => { setScnOpen(v); if (!v) setNewDocScope({}); }}
         supplierBillId={scnBillId}
-        onCreated={async () => { setScnOpen(false); if (workspaceId) await loadAll(workspaceId); }}
+        initialSupplier={scnBillId ? undefined : newDocScope.party}
+        initialCategoryId={scnBillId ? undefined : newDocScope.categoryId}
+        onCreated={async () => { setScnOpen(false); setNewDocScope({}); if (workspaceId) await loadAll(workspaceId); }}
       />
       {payExpenseId && (
         <RecordPaymentDialog

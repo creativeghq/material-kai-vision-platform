@@ -199,7 +199,9 @@ export const ContactDetailPage: React.FC = () => {
   const [linking, setLinking] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   // item 5 — company chosen while creating a brand-new contact, attached right after create.
-  const [pendingCompanyId, setPendingCompanyId] = useState<string>('');
+  const [pendingCompanyId, setPendingCompanyId] = useState<string>(
+    () => (location.state as { companyId?: string } | null)?.companyId ?? '',
+  );
   const [creatingBusiness, setCreatingBusiness] = useState(false);
   // Business-research pass (ΑΑΔΕ → ΓΕΜΗ → web) driven from the header refresh button.
   const [researchBusy, setResearchBusy] = useState(false);

@@ -20,8 +20,9 @@ export const STATUS_COLOR: Record<string, string> = {
  */
 export function useLaunchQuickStart() {
   const navigate = useNavigate();
-  return (toolkitId: string, label: string) =>
-    navigate(`/agent-hub?quickstart=${encodeURIComponent(toolkitId)}:${encodeURIComponent(label)}`);
+  return (toolkitId: string, label: string, websiteId?: string) =>
+    navigate(`/agent-hub?quickstart=${encodeURIComponent(toolkitId)}:${encodeURIComponent(label)}`
+      + (websiteId ? `&website=${encodeURIComponent(websiteId)}` : ''));
 }
 
 export const Loading: React.FC = () => (

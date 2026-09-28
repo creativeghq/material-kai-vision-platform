@@ -19,7 +19,7 @@ import {
 } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 import { parseDecimal } from '@/utils/decimal';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildPostingFilters } from './hrFilters';
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'outline'> = { open: 'default', draft: 'secondary', closed: 'outline' };
@@ -49,6 +49,14 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
   const filterGroups = useMemo(() => buildPostingFilters(postings, departments), [postings, departments]);
   const { values: filterValues, setValues: setFilterValues, filtered: matched, previewCount, activeCount, reset: resetFilters } =
     useFilters<JobPosting>(postings, filterGroups);
+  const scopedDepartmentId = scopedFilterValue(filterValues, 'department');
+  const scopedEmploymentType = scopedFilterValue(filterValues, 'employment_type');
+  const scopedLocationType = scopedFilterValue(filterValues, 'location_type');
+  const newJobScope: JobFormScope = {
+    ...(departments.some((d) => d.id === scopedDepartmentId) ? { department_id: scopedDepartmentId } : {}),
+    ...(scopedEmploymentType && scopedEmploymentType in EMPLOYMENT_TYPE_LABELS ? { employment_type: scopedEmploymentType as EmploymentType } : {}),
+    ...(scopedLocationType && scopedLocationType in LOCATION_TYPE_LABELS ? { location_type: scopedLocationType as LocationType } : {}),
+  };
 
   if (loading) return <Skeleton className="h-64 w-full" />;
   if (!workspaceId) return null;
@@ -79,7 +87,7 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
                 <ExternalLink className="h-4 w-4 mr-1" />Careers page
               </Button>
             )}
-            {canManage && <JobDialog workspaceId={workspaceId} departments={departments} onDone={load} />}
+            {canManage && <JobDialog workspaceId={workspaceId} departments={departments} onDone={load} scope={newJobScope} />}
           </div>
         }
       />
@@ -381,6 +389,8 @@ const blankForm = () => ({
   require_resume: true, ask_phone: true, ask_location: true, ask_links: true, ask_cover_letter: true,
 });
 
+type JobFormScope = Partial<Pick<ReturnType<typeof blankForm>, 'department_id' | 'employment_type' | 'location_type'>>;
+
 /** Hydrate the form from an existing posting (edit mode). */
 function formFromPosting(p: JobPosting): ReturnType<typeof blankForm> {
   const cfg = p.apply_config ?? {};
@@ -406,16 +416,17 @@ const compRowsFromPosting = (p?: JobPosting | null): CompRow[] =>
     equity: !!b.equity, bonus: !!b.bonus, note: b.note ?? '',
   }));
 
-function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId: string; departments: Department[]; posting?: JobPosting; onDone: () => void }) {
+function JobDialog({ workspaceId, departments, posting, onDone, scope }: { workspaceId: string; departments: Department[]; posting?: JobPosting; onDone: () => void; scope?: JobFormScope }) {
   const { toast } = useToast();
   const isEdit = !!posting;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [f, setF] = useState(() => (posting ? formFromPosting(posting) : blankForm()));
+  const initialForm = () => (posting ? formFromPosting(posting) : { ...blankForm(), ...scope });
+  const [f, setF] = useState(initialForm);
   const [comp, setComp] = useState<CompRow[]>(() => compRowsFromPosting(posting));
   const upd = (k: string, v: unknown) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => { setF(posting ? formFromPosting(posting) : blankForm()); setComp(compRowsFromPosting(posting)); };
+  const reset = () => { setF(initialForm()); setComp(compRowsFromPosting(posting)); };
 
   const updComp = (i: number, patch: Partial<CompRow>) => setComp((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   const addComp = () => setComp((rows) => [...rows, { region: '', currency: f.currency || 'EUR', min: '', max: '', equity: false, bonus: false, note: '' }]);
@@ -464,7 +475,7 @@ function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId:
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); reset(); }}>
       <DialogTrigger asChild>
         {isEdit
           ? <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Edit</Button>

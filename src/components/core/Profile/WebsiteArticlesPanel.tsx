@@ -173,7 +173,7 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
           <CardDescription>Articles generated for this website. Click one to open the full viewer.</CardDescription>
           </div>
           <Button size="sm" variant="outline" className="shrink-0"
-            onClick={() => launchQuickStart('seo-article', 'Generate full article')}>
+            onClick={() => launchQuickStart('seo-article', 'Generate full article', website.id)}>
             <Plus className="w-3.5 h-3.5 mr-1" />New article
           </Button>
         </CardHeader>
@@ -186,7 +186,7 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
               title="No articles yet"
               description="The article pipeline researches a keyword, plans the piece and writes it. Start one and it files itself here."
               action={
-                <Button size="sm" onClick={() => launchQuickStart('seo-article', 'Generate full article')}>
+                <Button size="sm" onClick={() => launchQuickStart('seo-article', 'Generate full article', website.id)}>
                   <Plus className="w-3.5 h-3.5 mr-1" />New article
                 </Button>
               }

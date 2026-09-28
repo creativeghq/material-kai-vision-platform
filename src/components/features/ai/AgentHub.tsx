@@ -889,7 +889,7 @@ interface AgentHubProps {
   /** Deep-link: deterministically launch a guided flow on open, by toolkit + label
    *  (e.g. {toolkitId:'generation', label:'Test on a room'}). Runs the same
    *  handleQuickStart dispatcher the in-app UI uses, so ANY flow is reachable. */
-  initialQuickStart?: { toolkitId: string; label: string };
+  initialQuickStart?: { toolkitId: string; label: string; website?: string };
   /** Deep-link: open with this toolkit enabled + its quick-starts shown (onboarding), so a
    *  capability arrival lands on "here's what you can do" instead of a blank chat. */
   initialToolkitId?: string;
@@ -1356,7 +1356,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    *   2. `form`         → open ToolkitFormModal to collect fields, then auto-send
    *   3.
    */
-  const handleQuickStart = useCallback((qs: ToolkitQuickStart, tk: ToolkitDefinition, agentId?: string) => {
+  const handleQuickStart = useCallback((
+    qs: ToolkitQuickStart, tk: ToolkitDefinition, agentId?: string, seed?: Record<string, string>,
+  ) => {
     // `getToolkitOwnerAgents(tk)[0]` is ALWAYS the generalist (kai owns every toolkit),
     // so this used to move every quick-start click off the specialist the user had
     // selected — Vision → kai on "Design a room", losing the interior prompt, the Opus
@@ -1372,14 +1374,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // Pre-fill the image field with a photo already in play (composer
       // attachment or the latest generated image) so launching from a chip
       // doesn't re-ask for the photo the user already provided.
-      let prefill: Record<string, string> | undefined;
+      let prefill: Record<string, string> | undefined = seed;
       // The LAST image key is the photo being worked on; an earlier one is a reference
       // (a material swatch), which a photo already in play must never be mistaken for.
       const imageKeys = qs.generation?.imageKeys ?? [];
       const imgKey = imageKeys[imageKeys.length - 1];
       if (imgKey) {
         const img = latestAvailableImage();
-        if (img) prefill = { [imgKey]: img };
+        if (img) prefill = { ...prefill, [imgKey]: img };
       }
       setToolkitFormState({ quickStart: qs, toolkit: tk, prefill });
       return;
@@ -4169,8 +4171,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     deepLinkLaunched.current = true;
     const tk = TOOLKITS.find((t) => t.id === initialQuickStart.toolkitId);
     const qs = tk?.quick_starts?.find((q) => q.label === initialQuickStart.label);
-    if (tk && qs) handleQuickStart(qs, tk);
-    else console.warn('[AgentHub] Unknown quickstart deep-link:', initialQuickStart);
+    if (tk && qs) {
+      handleQuickStart(qs, tk, undefined, initialQuickStart.website ? { website_id: initialQuickStart.website } : undefined);
+    } else console.warn('[AgentHub] Unknown quickstart deep-link:', initialQuickStart);
   }, [userId, initialQuickStart, initialImages, attachedImages, handleQuickStart]);
 
   // Deep-link: arrived via `?capability=` with no specific action → enable that capability's

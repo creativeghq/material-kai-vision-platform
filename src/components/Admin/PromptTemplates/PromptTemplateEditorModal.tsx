@@ -57,7 +57,9 @@ export const PromptTemplateEditorModal: React.FC<{
   /** null = create mode; an existing template = edit mode. */
   template: EditableTemplate | null;
   onSaved: () => void;
-}> = ({ open, onOpenChange, workspaceId, template, onSaved }) => {
+  defaultStage?: string;
+  defaultIndustry?: string;
+}> = ({ open, onOpenChange, workspaceId, template, onSaved, defaultStage, defaultIndustry }) => {
   const { toast } = useToast();
   const isEdit = !!template?.id;
   const [form, setForm] = useState<EditableTemplate>({
@@ -73,12 +75,15 @@ export const PromptTemplateEditorModal: React.FC<{
       setForm({ ...template });
     } else {
       setForm({
-        name: '', description: '', industry: 'general', stage: 'discovery', category: '',
+        name: '', description: '',
+        industry: defaultIndustry && INDUSTRIES.some((i) => i.v === defaultIndustry) ? defaultIndustry : 'general',
+        stage: defaultStage && STAGES.some((st) => st.v === defaultStage) ? defaultStage : 'discovery',
+        category: '',
         prompt_template: '', system_prompt: '', model_preference: 'auto', temperature: 0.1, max_tokens: 4096, is_active: true,
       });
     }
     setChangeReason('');
-  }, [open, template]);
+  }, [open, template, defaultStage, defaultIndustry]);
 
   const set = <K extends keyof EditableTemplate>(k: K, v: EditableTemplate[K]) => setForm((f) => ({ ...f, [k]: v }));
 

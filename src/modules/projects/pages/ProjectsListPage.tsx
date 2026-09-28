@@ -32,7 +32,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/decimal';
 import { timeAgo } from '@/utils/datetime';
-import { buildProjectFilters } from '../components/projectFilters';
+import { buildProjectFilters, clientName } from '../components/projectFilters';
 import { CreateProjectModal } from '../components/CreateProjectModal';
 import { ProjectCategoryManager } from '../components/ProjectCategoryManager';
 import { ProjectCard, projectCoverSrc } from '../components/ProjectCard';
@@ -170,6 +170,18 @@ export const ProjectsListPage: React.FC = () => {
   // Archived is seeded off so the default view matches the old "Show archived" behaviour.
   const { values: filterValues, setValues: setFilterValues, filtered: visible, previewCount, activeCount } =
     useFilters<ProjectWithClient>(projects, filterGroups, { initial: { archived: false } });
+  const scopedClient = useMemo(() => {
+    const id = scopedFilterValue(filterValues, 'client');
+    if (!id) return undefined;
+    const row = projects.find((p) => p.client_company_id === id || p.client_contact_id === id);
+    if (!row) return undefined;
+    const isCompany = row.client_company_id === id;
+    return {
+      client_company_id: isCompany ? id : null,
+      client_contact_id: isCompany ? null : id,
+      name: clientName(row) || 'Unnamed client',
+    };
+  }, [filterValues, projects]);
 
   const gridSort = GRID_SORTS.find((s) => s.id === gridSortId) ?? GRID_SORTS[0];
   const sortKey: SortKey = view === 'grid' ? gridSort.key : (tableSort.columnId as SortKey);
@@ -407,6 +419,8 @@ export const ProjectsListPage: React.FC = () => {
           onClose={() => setShowCreate(false)}
           onSuccess={(id) => navigate(`/projects/${id}`)}
           initialCategoryId={scopedFilterValue(filterValues, 'category')}
+          initialClient={scopedClient}
+          lockClient={false}
         />
       )}
 

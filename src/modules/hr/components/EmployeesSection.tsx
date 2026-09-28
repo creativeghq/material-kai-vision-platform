@@ -20,7 +20,7 @@ import { ErganiFilingDialog } from './ErganiFilingDialog';
 import { parseDecimal } from '@/utils/decimal';
 import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildEmployeeFilters } from './hrFilters';
 
 const empName = (e: Employee) => e.contact?.name || [e.contact?.first_name, e.contact?.last_name].filter(Boolean).join(' ') || 'Unnamed';
@@ -70,12 +70,20 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
     useFilters<Employee>(employees, filterGroups);
   // A narrowed roster is a different list — restart at the first page.
   useEffect(() => { setPage(1); }, [filterValues]);
+  const scopedDepartmentId = scopedFilterValue(filterValues, 'department');
+  const scopedEmploymentType = scopedFilterValue(filterValues, 'employment_type');
+  const newEmployeeScope = {
+    departmentId: departments.some((d) => d.id === scopedDepartmentId) ? scopedDepartmentId : undefined,
+    employmentType: scopedEmploymentType && scopedEmploymentType in EMPLOYMENT_TYPE_LABELS
+      ? scopedEmploymentType as EmploymentType
+      : undefined,
+  };
 
   if (loading) return <Skeleton className="h-64 w-full" />;
 
   return (
     <div className="space-y-4">
-      <SectionHeader title="Employees" subtitle={`${employees.length} people`} actions={canManage && workspaceId ? <AddEmployeeDialog workspaceId={workspaceId} departments={departments} onDone={load} /> : undefined} />
+      <SectionHeader title="Employees" subtitle={`${employees.length} people`} actions={canManage && workspaceId ? <AddEmployeeDialog workspaceId={workspaceId} departments={departments} onDone={load} {...newEmployeeScope} /> : undefined} />
       {employees.length > 0 && (
         <FilterBar
           groups={filterGroups}
@@ -162,12 +170,13 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
   );
 }
 
-function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: string; departments: Department[]; onDone: () => void }) {
+function AddEmployeeDialog({ workspaceId, departments, onDone, departmentId, employmentType }: { workspaceId: string; departments: Department[]; onDone: () => void; departmentId?: string; employmentType?: EmploymentType }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' });
+  const blankForm = () => ({ name: '', email: '', position: '', department_id: departmentId ?? '', employment_type: employmentType ?? 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' });
+  const [f, setF] = useState(blankForm);
 
   // App Launcher deep-link: /hr?tab=employees&new=employee opens this Add-employee dialog.
   useEffect(() => {
@@ -180,7 +189,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   }, [searchParams, setSearchParams]);
   const [workDays, setWorkDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const upd = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => { setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' }); setWorkDays([1, 2, 3, 4, 5]); };
+  const reset = () => { setF(blankForm()); setWorkDays([1, 2, 3, 4, 5]); };
 
   const submit = async () => {
     if (!f.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
@@ -203,7 +212,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); reset(); }}>
       <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Add employee</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader>

@@ -1153,7 +1153,7 @@ export function findTool(toolId: string): AgentToolEntry | undefined {
  * One field in a quick-start's collect-then-send form. Rendered generically by
  * ToolkitFormModal. The `key` is referenced from `promptTemplate` as `{{key}}`.
  */
-export type ToolkitFormFieldKind = 'text' | 'textarea' | 'number' | 'select' | 'country' | 'country_code' | 'tags' | 'image';
+export type ToolkitFormFieldKind = 'text' | 'textarea' | 'number' | 'select' | 'country' | 'country_code' | 'tags' | 'image' | 'website';
 
 export interface ToolkitFormFieldOption {
   value: string;
@@ -3183,6 +3183,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'keyword', label: 'Keyword', kind: 'text', required: true, placeholder: 'porcelain tile installation' },
           { key: 'country', label: 'Market', kind: 'country_code', default: 'GB' },
+          { key: 'website_id', label: 'Website', kind: 'website' },
         ],
       },
       {
@@ -3480,10 +3481,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Generate a complete SEO article.',
         icon: 'Newspaper',
         workflow_id: 'seo-article',
-        promptTemplate: 'Generate a complete SEO article targeting the keyword "{{keyword}}" for {{country}}.',
+        promptTemplate: 'Generate a complete SEO article targeting the keyword "{{keyword}}" for {{country}} (website_id: {{website_id}}).',
         form: [
           { key: 'keyword', label: 'Target keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
           { key: 'country', label: 'Target market', kind: 'country', default: 'the United Kingdom' },
+          { key: 'website_id', label: 'Website', kind: 'website' },
         ],
       },
       {
@@ -3780,6 +3782,7 @@ export function renderPromptTemplate(
     (_m, key: string) => (values[key] ?? '').trim(),
   );
   out = out
+    .replace(/\(\s*[\w ]+:\s*\)/g, '')
     .replace(/[ \t]{2,}/g, ' ')      // collapse doubled spaces
     .replace(/\s+([.,;])/g, '$1')    // drop space before punctuation
     .replace(/\(\s*\)/g, '')         // drop empty parens left by optional fields

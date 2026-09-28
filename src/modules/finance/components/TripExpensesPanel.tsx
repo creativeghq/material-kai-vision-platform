@@ -25,7 +25,7 @@ import {
 } from '@/modules/finance/services/tripExpenseService';
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { FilterBar, optionsFromRows, scopedFilterValue, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import { receiptScanService, splitForForm, RECEIPT_ACCEPT, ReceiptTooLargeError } from '@/services/receiptScanService';
@@ -166,6 +166,7 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
         workspaceId={workspaceId}
         open={newOpen}
         onOpenChange={setNewOpen}
+        initialCardType={scopedFilterValue(filterValues, 'card_type')}
         onCreated={(id) => { setNewOpen(false); setSelectedId(id); void load(); }}
       />
 
@@ -671,9 +672,13 @@ const NewTripCardDialog: React.FC<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onCreated: (id: string) => void;
-}> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+  initialCardType?: string;
+}> = ({ workspaceId, open, onOpenChange, onCreated, initialCardType }) => {
   const { toast } = useToast();
   const [cardType, setCardType] = useState<ExpenseCardType>('trip');
+  useEffect(() => {
+    if (open) setCardType(EXPENSE_CARD_TYPES.find((t) => t.value === initialCardType)?.value ?? 'trip');
+  }, [open, initialCardType]);
   const [title, setTitle] = useState('');
   const [destination, setDestination] = useState('');
   const [purpose, setPurpose] = useState('');

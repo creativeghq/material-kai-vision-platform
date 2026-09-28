@@ -78,7 +78,8 @@ describe('one picker asks what kind of party', () => {
   it('the sole-trader route keeps the resolved identity', () => {
     const body = strippedSource(MODAL);
     const route = body.slice(body.indexOf('createSoleTrader'));
-    expect(route).toContain('/crm/contacts/new');
+    expect(route).toContain('leaveAsContact(');
+    expect(body).toMatch(/const leaveAsContact = [^;]*'\/crm\/contacts\/new'/);
     expect(route).toContain('vat_number');
     expect(route, 'company-only columns would be sprayed onto a contact insert').toContain('narrowToContactFields');
   });

@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/core/
 import { Sparkles, RefreshCw, ExternalLink, Bot, Ghost, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import {
   TrackedMention, LlmVisibilitySnapshot, getSubjectLlmVisibility,
 } from '@/services/mentionMonitoringApi';
@@ -257,6 +257,7 @@ const MentionMonitoringDashboard: React.FC = () => {
 
       <TrackSubjectDialog
         open={creating}
+        defaultSubjectType={scopedFilterValue(filterValues, 'subject_type')}
         onClose={() => setCreating(false)}
         onCreated={(row) => { setCreating(false); void load(); setOpen(row); }}
       />

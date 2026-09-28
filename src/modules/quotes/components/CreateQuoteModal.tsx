@@ -28,6 +28,7 @@ interface CreateQuoteModalProps {
   onSuccess: (quoteId: string, quoteName: string) => void;
   /** Optional pre-selected project (e.g. when invoked from a project detail page) */
   defaultProjectId?: string | null;
+  defaultCustomer?: QuoteCustomer | null;
 }
 
 export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
@@ -35,6 +36,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
   onClose,
   onSuccess,
   defaultProjectId = null,
+  defaultCustomer = null,
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -44,6 +46,13 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
   const [customer, setCustomer] = useState<QuoteCustomer | null>(null);
   const [processing, setProcessing] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const defaultCustomerType = defaultCustomer?.type;
+  const defaultCustomerId = defaultCustomer?.id;
+  const defaultCustomerLabel = defaultCustomer?.label;
+  useEffect(() => {
+    if (!open) return;
+    setCustomer(defaultCustomerType && defaultCustomerId ? { type: defaultCustomerType, id: defaultCustomerId, label: defaultCustomerLabel ?? '' } : null);
+  }, [open, defaultCustomerType, defaultCustomerId, defaultCustomerLabel]);
 
   /**
    * Start from a saved quote shape (#322). The template brings its own line items, so it creates

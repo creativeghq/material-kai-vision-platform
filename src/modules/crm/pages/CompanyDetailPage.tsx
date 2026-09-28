@@ -171,7 +171,8 @@ export const CompanyDetailPage: React.FC = () => {
   // The role-first Add Company modal hands off a prefill (chosen role + any VIES/ΑΑΔΕ lookup)
   // via router state so the create form opens pre-populated for review before saving.
   const prefill = (location.state as { prefill?: Partial<Company> } | null)?.prefill;
-  const scopedCategoryId = (location.state as { categoryId?: string } | null)?.categoryId;
+  const scopedState = location.state as { categoryId?: string; categoryIds?: string[] } | null;
+  const scopedCategoryIds = [...new Set([...(scopedState?.categoryIds ?? []), scopedState?.categoryId].filter((c): c is string => !!c))];
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
@@ -273,8 +274,8 @@ export const CompanyDetailPage: React.FC = () => {
       // Name the workspace. crm-api used to default to `scope.workspaceIds[0]` when a create
       // omitted it, which filed the company in whichever workspace sorted first (#366 BU-10).
       const response = await companiesAPI.createCompany({ ...company, workspace_id: activeWorkspaceId });
-      if (scopedCategoryId) {
-        await crmCategoriesService.setCompanyMembershipsWithinScope(response.data.id, [scopedCategoryId], [scopedCategoryId]).catch((e) => {
+      if (scopedCategoryIds.length) {
+        await crmCategoriesService.setCompanyMembershipsWithinScope(response.data.id, scopedCategoryIds, scopedCategoryIds).catch((e) => {
           toast({ title: 'Saved, but not added to the category', description: getErrorMessage(e), variant: 'destructive' });
         });
       }

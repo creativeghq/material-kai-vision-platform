@@ -20,7 +20,7 @@ const STATUS_OPTIONS: Array<{ value: ProjectStatus; label: string }> = [
 /** Stable id for the client dimension — a project is tied to a company XOR a contact. */
 const clientKey = (p: ProjectWithClient) => p.client_company_id ?? p.client_contact_id ?? undefined;
 
-const clientName = (p: ProjectWithClient): string => {
+export const clientName = (p: ProjectWithClient): string => {
   if (p.client_company?.name) return p.client_company.name;
   const c = p.client_contact;
   if (!c) return '';
