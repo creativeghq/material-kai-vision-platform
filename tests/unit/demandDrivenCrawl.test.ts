@@ -97,8 +97,16 @@ describe('a fetched page carries what a suggestion needs', () => {
     expect(crawler).toMatch(/keywords: kwList/);
   });
 
-  it('marks a seed read as having no demand behind it', () => {
-    expect(crawler, 'a seed has no search evidence, and must not claim one')
-      .toMatch(/entry\.reason === 'seed' \? null :/);
+  it('marks a seed or backfill read as having no demand behind it', () => {
+    expect(crawler, 'a seed or backfill page has no search evidence, and must not claim one')
+      .toMatch(/entry\.reason === 'seed' \|\| isBackfill \? null :/);
+  });
+
+  it('backfills never-read pages direct-only, after the demand queue', () => {
+    expect(crawler).toMatch(/rpc\('get_page_backfill_queue'/);
+    expect(crawler.indexOf("rpc('get_page_crawl_queue'"))
+      .toBeLessThan(crawler.indexOf("rpc('get_page_backfill_queue'"));
+    expect(crawler, 'Firecrawl allowance is finite; a backfill must not spend it')
+      .toMatch(/isBackfill \? await directScrape\(entry\.url\) : await scrapePage\(entry\.url\)/);
   });
 });

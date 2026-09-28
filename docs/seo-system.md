@@ -230,7 +230,7 @@ the read (invariant 10) and refunded for any the budget never reaches; an empty 
 nothing. It was 5 credits per invocation on an hourly cron misnamed `every-6h` — 120 credits a
 day for one site, 1,755 since 2026-07-27, including 240 across two days that read zero pages and
 refunded none, because the run reports `ok` when the sitemap-stamp upserts succeed whatever the
-reads did. Cron is now `user-website-demand-crawl-daily` at 04:45, after the GSC sync.
+reads did. Cron is `user-website-crawl-hourly` (:45): a site runs daily for demand, and hourly while `get_page_backfill_queue` still holds never-read sitemap pages — those fill spare capacity (50 reads a run), direct fetch only. Analytics (GA4) refreshes hourly via `ga-analytics-sync-hourly` → `gsc-api` `cron-ga-sync`.
 
 **A new tenant is not empty on day one.** DataForSEO Labs answers from Google's public index with
 no Search Console connection, so it is the cold start for a domain that already ranks — its feed

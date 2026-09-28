@@ -669,6 +669,42 @@ async function syncConnection(supabase: any, conn: any, startDate: string, endDa
   return corePayload.length;
 }
 
+/** Pull one site's Analytics window and record the outcome on the connection; throws on failure. */
+async function syncGaConnection(supabase: any, conn: any, days: number) {
+  const websiteId = conn.website_id;
+  const end = ymd(new Date(Date.now() - 86400000));
+  const start = ymd(new Date(Date.now() - days * 86400000));
+  try {
+    const token = await validAccessToken(supabase, conn);
+    // Totals and channels are separate reports on purpose — summing channels
+    // to get the total would be a second derivation, and the two diverge as
+    // soon as Google thresholds a sparse channel.
+    const totals = await gaRunReport(token, conn.ga_property_id, start, end, false);
+    const byChannel = await gaRunReport(token, conn.ga_property_id, start, end, true);
+    const n = await storeGaRows(supabase, websiteId, conn.workspace_id, totals, false)
+            + await storeGaRows(supabase, websiteId, conn.workspace_id, byChannel, true);
+    // Each records its own outcome, so a dimension GA rejects leaves the other nine intact.
+    const bd = await syncGaBreakdowns(
+      supabase, websiteId, conn.workspace_id, conn.ga_property_id, token, start, end, days,
+    );
+    const funnel = await syncGaFunnel(
+      supabase, websiteId, conn.ga_property_id, token, start, end, days, bd.events,
+    );
+    const cohorts = await syncGaCohorts(supabase, websiteId, conn.ga_property_id, token, days);
+    await supabase.from('website_gsc_connections')
+      .update({ ga_last_sync_at: new Date().toISOString(), ga_last_sync_error: null })
+      .eq('website_id', websiteId);
+    return { rows: n, days, breakdowns: { ...bd, events: bd.events.size }, funnel, cohorts };
+  } catch (e) {
+    // Recorded, not swallowed: an Analytics panel that is empty because the
+    // sync failed must not look like an Analytics panel with no traffic.
+    await supabase.from('website_gsc_connections')
+      .update({ ga_last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) })
+      .eq('website_id', websiteId);
+    throw e;
+  }
+}
+
 /** Exchange the code, store the connection, auto-match the property, and backfill 28 days.
  *  Shared by the GET callback. Tenancy comes from the (already-verified) website row. */
 async function finishConnect(
@@ -768,6 +804,24 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         // indistinguishable from one that found nothing.
         await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', c.website_id);
         results.push({ website_id: c.website_id, error: msg });
+      }
+    }
+    return json({ ok: true, sites: results });
+  }
+  // ── Cron: refresh Analytics for every connection with a GA property ──
+  if (action === 'cron-ga-sync') {
+    if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
+    const { data: conns, error: connErr } = await supabase.from('website_gsc_connections')
+      .select('website_id, workspace_id, ga_property_id, access_token, refresh_token, token_expires_at')
+      .eq('is_active', true).not('ga_property_id', 'is', null).not('refresh_token', 'is', null);
+    if (connErr) return json({ ok: false, error: connErr.message }, 500);
+    const results: unknown[] = [];
+    for (const c of conns || []) {
+      try {
+        const r = await syncGaConnection(supabase, c, 28);
+        results.push({ website_id: c.website_id, rows: r.rows });
+      } catch (e) {
+        results.push({ website_id: c.website_id, error: String(e instanceof Error ? e.message : e).slice(0, 300) });
       }
     }
     return json({ ok: true, sites: results });
@@ -929,36 +983,10 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
         if (!conn.ga_property_id) return json({ error: 'No Analytics property selected for this site yet.' }, 400);
         const days = Math.min(Math.max(Number(body?.days) || 28, 1), 365);
-        const end = ymd(new Date(Date.now() - 86400000));
-        const start = ymd(new Date(Date.now() - days * 86400000));
         try {
-          const token = await validAccessToken(supabase, conn);
-          // Totals and channels are separate reports on purpose — summing channels
-          // to get the total would be a second derivation, and the two diverge as
-          // soon as Google thresholds a sparse channel.
-          const totals = await gaRunReport(token, conn.ga_property_id, start, end, false);
-          const byChannel = await gaRunReport(token, conn.ga_property_id, start, end, true);
-          const n = await storeGaRows(supabase, websiteId, website.workspace_id, totals, false)
-                  + await storeGaRows(supabase, websiteId, website.workspace_id, byChannel, true);
-          // Each records its own outcome, so a dimension GA rejects leaves the other nine intact.
-          const bd = await syncGaBreakdowns(
-            supabase, websiteId, website.workspace_id, conn.ga_property_id, token, start, end, days,
-          );
-          const funnel = await syncGaFunnel(
-            supabase, websiteId, conn.ga_property_id, token, start, end, days, bd.events,
-          );
-          const cohorts = await syncGaCohorts(supabase, websiteId, conn.ga_property_id, token, days);
-          await supabase.from('website_gsc_connections')
-            .update({ ga_last_sync_at: new Date().toISOString(), ga_last_sync_error: null })
-            .eq('website_id', websiteId);
-          return json({ ok: true, rows: n, days, breakdowns: { ...bd, events: bd.events.size }, funnel, cohorts });
+          return json({ ok: true, ...(await syncGaConnection(supabase, { ...conn, workspace_id: website.workspace_id }, days)) });
         } catch (e) {
-          const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
-          // Recorded, not swallowed: an Analytics panel that is empty because the
-          // sync failed must not look like an Analytics panel with no traffic.
-          await supabase.from('website_gsc_connections')
-            .update({ ga_last_sync_error: msg }).eq('website_id', websiteId);
-          return json({ ok: false, error: msg }, 502);
+          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, 502);
         }
       }
 

@@ -41,6 +41,8 @@ const MAX_PAGE_BYTES = 4 * 1024 * 1024;
 const DIRECT_TEXT_FLOOR = 250;
 /** Ceiling for a tenant whose first Search Console connection arrives with a whole backlog. */
 const MAX_FETCH_PER_RUN = 40;
+/** Spare capacity after the demand queue goes to never-read sitemap pages, direct fetch only. */
+const MAX_BACKFILL_PER_RUN = 50;
 /** Day-one sample for a site that ranks for nothing yet, so neither demand feed can name a page. */
 const SEED_SAMPLE_SIZE = 20;
 const PER_PAGE_CREDIT_COST = 1;
@@ -568,6 +570,23 @@ async function planCrawl(
     }
   }
 
+  const room = MAX_BACKFILL_PER_RUN - queue.length;
+  if (room > 0) {
+    const { data: backfillRows, error: backfillErr } = await supabase.rpc('get_page_backfill_queue', {
+      p_website_id: websiteId,
+      p_limit: room + queue.length,
+    });
+    if (backfillErr) return { error: `backfill queue unavailable: ${backfillErr.message}` };
+    const queued = new Set(queue.map((q) => q.url));
+    for (const r of (backfillRows ?? []) as { page_url: string }[]) {
+      if (queue.length >= MAX_BACKFILL_PER_RUN) break;
+      if (queued.has(r.page_url)) continue;
+      queue.push({
+        url: r.page_url, reason: 'backfill', keywords: null, best_position: null, impressions: null, clicks: null,
+      });
+    }
+  }
+
   return {
     sitemapUrl, seenAt, cap, queue, writes, writeFailures, firstWriteError,
     discovered: allUrls.length,
@@ -608,7 +627,10 @@ async function executeCrawl(
   for (const entry of plan.queue) {
     if (Date.now() > deadline) { pending.push(entry.url); continue; }
 
-    const s = await scrapePage(entry.url);
+    // Firecrawl's monthly allowance is finite; a backfill page with no text in its HTML waits
+    // until search demand names it.
+    const isBackfill = entry.reason === 'backfill';
+    const s = isBackfill ? await directScrape(entry.url) : await scrapePage(entry.url);
     if (s.rate_limited) rateLimited += 1;
     const now = new Date().toISOString();
 
@@ -616,10 +638,12 @@ async function executeCrawl(
       // Keep whatever an earlier crawl stored: a failed read says nothing about the page, and
       // writing nulls over a good excerpt is how 72 indexed pages became empty rows in one
       // rate-limited run. Only the liveness stamp moves, plus a status we genuinely observed.
+      // A failed backfill is stamped regardless so the hourly run does not retry it every hour.
       const { error } = await supabase.from('user_website_pages').upsert({
         website_id: websiteId, user_id: userId, url: entry.url,
         last_seen_in_sitemap: plan.seenAt, is_active: true,
-        ...(s.http_status ? { http_status: s.http_status, fetched_at: now } : {}),
+        ...(s.http_status ? { http_status: s.http_status } : {}),
+        ...(s.http_status || isBackfill ? { fetched_at: now } : {}),
       }, { onConflict: 'website_id,url' });
       recordWrite(error);
       continue;
@@ -642,7 +666,7 @@ async function executeCrawl(
       keywords: kwList,
       demand_reason: entry.reason,
       fetch_method: s.fetch_method ?? null,
-      demand_snapshot: entry.reason === 'seed' ? null : {
+      demand_snapshot: entry.reason === 'seed' || isBackfill ? null : {
         keywords: entry.keywords,
         best_position: entry.best_position,
         impressions: entry.impressions,

@@ -3051,6 +3051,12 @@
         "description": "Cron (x-cron-secret): run inspect_urls for every active, property-bound connection. Scheduled separately from cron-sync because performance rows are a 5-day window refreshed daily while inspection is a multi-day backfill; sharing a schedule would starve one of them. A per-site failure is recorded on the connection, never swallowed.",
         "params": [],
         "response": "{ ok, sites: [{ website_id, inspected, failed, quota_used_today, quota_remaining, budget_exhausted, queue_remaining } | { website_id, error }] }"
+      },
+      {
+        "action": "cron-ga-sync",
+        "description": "Cron (x-cron-secret), hourly: run ga_sync (28 days) for every active connection with an Analytics property. A per-site failure is recorded on the connection as ga_last_sync_error.",
+        "params": [],
+        "response": "{ ok, sites: [{ website_id, rows } | { website_id, error }] }"
       }
     ],
     "request": {
