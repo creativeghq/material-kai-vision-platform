@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AiCitationReport, AiKeywordVolumes, CitabilityReport, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
+import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, CitabilityReport, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -712,7 +712,7 @@ export interface AiAnswers {
   questions: AiQuestion[];
 }
 
-export type { AiCitationReport, AiEngine, AiRate, AiRival, CitabilityReport, LostQuestion, LlmMentionsReport, LlmMentionTarget, AiKeywordVolumes, AiKeywordVolume } from '@/components/core/Profile/seo/aiCitations';
+export type { AiCitationReport, AiEngine, AiQuestionsReport, AiRate, AiRival, CitabilityReport, LostQuestion, LlmMentionsReport, LlmMentionTarget, AiKeywordVolumes, AiKeywordVolume } from '@/components/core/Profile/seo/aiCitations';
 
 export interface AiVisibility {
   status: string;
@@ -1699,6 +1699,15 @@ export const userWebsitesService = {
     });
     if (error) throw new Error(await edgeErrorMessage(error, 'Could not read AI search volume'));
     return data;
+  },
+
+  async aiQuestions(websiteId: string, days = 90): Promise<AiQuestionsReport | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_ai_questions' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as AiQuestionsReport) ?? null;
   },
 
   async llmMentions(websiteId: string, days = 90): Promise<LlmMentionsReport | null> {

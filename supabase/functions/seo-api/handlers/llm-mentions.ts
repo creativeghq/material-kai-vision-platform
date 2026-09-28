@@ -90,6 +90,41 @@ export function parseLeaders(items: Loose[], kind: 'domain' | 'brand' | 'page'):
   }));
 }
 
+export interface CitedQuestion {
+  platform: string; model_name: string | null; question: string; answer: string | null;
+  our_sources: { url: string; title: string | null; position: number | null }[];
+  source_count: number; ai_search_volume: number | null; monthly_searches: unknown[];
+  first_response_at: string | null; last_response_at: string | null;
+}
+
+export function parseCitedQuestions(items: Loose[], domain: string, platform: string): CitedQuestion[] {
+  const ours = (d: unknown) => {
+    const h = String(d ?? '').toLowerCase().replace(/^www\./, '');
+    return h === domain || h.endsWith(`.${domain}`);
+  };
+  const out: CitedQuestion[] = [];
+  for (const it of items) {
+    const question = typeof it?.question === 'string' ? it.question.trim() : '';
+    if (!question) continue;
+    const sources: Loose[] = Array.isArray(it?.sources) ? it.sources : [];
+    out.push({
+      platform: String(it?.platform ?? platform),
+      model_name: typeof it?.model_name === 'string' ? it.model_name : null,
+      question,
+      answer: typeof it?.answer === 'string' ? it.answer.slice(0, 4000) : null,
+      our_sources: sources.filter((x) => ours(x?.domain)).map((x) => ({
+        url: String(x?.url ?? ''), title: typeof x?.title === 'string' ? x.title : null, position: num(x?.position),
+      })),
+      source_count: sources.length,
+      ai_search_volume: num(it?.ai_search_volume),
+      monthly_searches: Array.isArray(it?.monthly_searches) ? it.monthly_searches : [],
+      first_response_at: typeof it?.first_response_at === 'string' ? it.first_response_at : null,
+      last_response_at: typeof it?.last_response_at === 'string' ? it.last_response_at : null,
+    });
+  }
+  return out;
+}
+
 function unparsed(r: CallOut): boolean {
   return r.ok && r.items.length > 0;
 }
@@ -188,7 +223,50 @@ async function collect(
       status: mk.status, note: mk.note, metrics: {},
       top_domains: mk.top_domains, top_pages: mk.top_pages, top_brands: mk.top_brands, series: [],
     });
-    summary.push({ platform: cov.platform, our_status: ours.status, market_status: mk.status, note: ours.note ?? mk.note });
+
+    const qs = await call('ai_llm_mentions_search', {
+      domain, ...p, limit: 200, order_by: ['ai_search_volume,desc'],
+    });
+    const qSnap = blank();
+    let cited: CitedQuestion[] = [];
+    const totalCount = num(firstResult(qs.raw)?.total_count);
+    if (!qs.ok) {
+      qSnap.status = 'collector_failed';
+      qSnap.note = `The question search failed, so which questions cite you is unknown. ${qs.error ?? ''}`.trim().slice(0, 500);
+    } else {
+      cited = parseCitedQuestions(qs.items, domain, cov.platform);
+      if (cited.length === 0 && qs.items.length > 0) {
+        qSnap.status = 'collector_failed';
+        qSnap.note = 'The corpus answered in a shape this build does not read, so the questions are unknown.';
+      } else if (cited.length === 0) {
+        qSnap.status = 'no_data';
+        qSnap.note = `No ${cov.label} answer in the ${market.country_code} / ${market.language_code} corpus cites ${domain} yet.`;
+      }
+    }
+    if (cited.length > 0) {
+      const { error: qErr } = await db.from('website_ai_cited_questions').upsert(
+        cited.map((c) => ({
+          ...c, website_id: site.id, workspace_id: site.workspace_id,
+          country_code: market.country_code, language_code: market.language_code, captured_at: now,
+        })),
+        { onConflict: 'website_id,platform,country_code,language_code,question' },
+      );
+      if (qErr) {
+        qSnap.status = 'collector_failed';
+        qSnap.note = `The questions were fetched but could not be stored: ${qErr.message}`.slice(0, 500);
+      }
+    }
+    rows.push({
+      ...shared, platform: cov.platform, target_kind: 'questions', target: domain,
+      status: qSnap.status, note: qSnap.note,
+      metrics: { total_count: totalCount, stored: qSnap.status === 'ok' ? cited.length : 0 },
+      top_domains: [], top_pages: [], top_brands: [], series: [],
+    });
+
+    summary.push({
+      platform: cov.platform, our_status: ours.status, market_status: mk.status,
+      questions_status: qSnap.status, cited_questions: cited.length, note: ours.note ?? mk.note ?? qSnap.note,
+    });
   }
 
   const { error } = await db.from('website_llm_mentions').insert(rows.filter((r) => !!r.target));

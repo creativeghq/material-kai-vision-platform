@@ -286,3 +286,44 @@ export interface AiKeywordVolumes {
   note: string | null;
   volumes: AiKeywordVolume[];
 }
+
+export interface AiCitedQuestion {
+  platform: string;
+  model_name: string | null;
+  question: string;
+  answer: string | null;
+  our_sources: { url: string; title: string | null; position: number | null }[];
+  source_count: number;
+  ai_search_volume: number | null;
+  first_response_at: string | null;
+  last_response_at: string | null;
+  captured_at: string;
+  tracked: boolean;
+}
+
+export interface AiQuestionsFetchStatus {
+  platform: string;
+  status: string;
+  note: string | null;
+  total_count: number | null;
+  stored: number | null;
+  country_code: string | null;
+  language_code: string | null;
+  captured_at: string;
+}
+
+export interface SearchQuestion {
+  query: string;
+  clicks: number;
+  impressions: number;
+  position: number | null;
+  top_page: string | null;
+  ai_overview: 'cites_you' | 'cites_others' | 'none' | 'unknown';
+  ai_overview_checked_at: string | null;
+  tracked: boolean;
+}
+
+export interface AiQuestionsReport {
+  cited: { status: AiQuestionsFetchStatus[]; rows: AiCitedQuestion[] };
+  search: { days: number; from: string; to: string; status: 'ok' | 'no_data' | 'not_connected' | string; rows: SearchQuestion[] };
+}

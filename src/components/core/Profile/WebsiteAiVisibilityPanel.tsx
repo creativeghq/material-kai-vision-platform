@@ -13,6 +13,7 @@ import {
   type AiAnswers,
   type AiCitationReport,
   type CitabilityReport,
+  type AiQuestionsReport,
   type LlmMentionsReport,
   type AiMonitoringState,
   type AiRival,
@@ -35,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatDate, timeAgo } from '@/utils/datetime';
 import { AiEngineCard, engineGridCols } from './seo/AiEngineCard';
+import { AiQuestionsPanel } from './seo/AiQuestionsPanel';
 import { CitabilityPanel } from './seo/CitabilityPanel';
 import { LlmMentionsPanel } from './seo/LlmMentionsPanel';
 import { Sparkline } from './seo/Sparkline';
@@ -142,12 +144,16 @@ const RivalList: React.FC<{ rivals: AiRival[]; empty: string }> = ({ rivals, emp
   );
 };
 
+const PROBE_LIMIT = 12;
+
 export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
   const [data, setData] = useState<AiVisibility | null>(null);
   const [report, setReport] = useState<AiCitationReport | null>(null);
   const [citability, setCitability] = useState<CitabilityReport | null>(null);
   const [corpus, setCorpus] = useState<LlmMentionsReport | null>(null);
+  const [questions, setQuestions] = useState<AiQuestionsReport | null>(null);
+  const [probeCount, setProbeCount] = useState(0);
   const [state, setState] = useState<AiMonitoringState | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -168,13 +174,14 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     try {
       // `allSettled`: the monitoring state is the thing that EXPLAINS an empty or
       // stale report, so it must still render when the report itself fails.
-      const [v, m, a, c, q, x] = await Promise.allSettled([
+      const [v, m, a, c, q, x, qs] = await Promise.allSettled([
         userWebsitesService.aiVisibility(website.id, 90),
         userWebsitesService.aiMonitoringState(website.id),
         userWebsitesService.aiAnswers(website.id, 90),
         userWebsitesService.aiCitationReport(website.id, 90),
         userWebsitesService.citabilityReport(website.id, 90),
         userWebsitesService.llmMentions(website.id, 90),
+        userWebsitesService.aiQuestions(website.id, 90),
       ]);
       setData(v.status === 'fulfilled' ? v.value : null);
       setState(m.status === 'fulfilled' ? m.value : null);
@@ -182,6 +189,13 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       setReport(c.status === 'fulfilled' ? c.value : null);
       setCitability(q.status === 'fulfilled' ? q.value : null);
       setCorpus(x.status === 'fulfilled' ? x.value : null);
+      setQuestions(qs.status === 'fulfilled' ? qs.value : null);
+      const ownId = m.status === 'fulfilled' ? m.value?.own_brand_subject_id : null;
+      if (ownId) {
+        const { data: tm } = await supabase.from('tracked_mentions').select('source_config').eq('id', ownId).maybeSingle();
+        const probes = (tm as any)?.source_config?.custom_probes;
+        setProbeCount(Array.isArray(probes) ? probes.length : 0);
+      }
     } finally {
       setLoading(false);
     }
@@ -267,8 +281,8 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   // the measurement; they have to be editable where the answers are read.
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<{ prompts: string; aliases: string; languages: string; countries: string; includeDefaults: boolean; tier: MentionProbeTier }>({
-    prompts: '', aliases: '', languages: '', countries: '', includeDefaults: true, tier: 'dataforseo',
+  const [form, setForm] = useState<{ prompts: string; keys: Record<string, string>; aliases: string; languages: string; countries: string; includeDefaults: boolean; tier: MentionProbeTier }>({
+    prompts: '', keys: {}, aliases: '', languages: '', countries: '', includeDefaults: true, tier: 'dataforseo',
   });
   const openEditor = async () => {
     const id = state?.own_brand_subject_id;
@@ -282,6 +296,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     const probes: { key?: string; prompt?: string }[] = Array.isArray(cfg.custom_probes) ? cfg.custom_probes : [];
     setForm({
       prompts: probes.map((p) => p.prompt ?? '').filter(Boolean).join('\n'),
+      keys: Object.fromEntries(probes.filter((p) => p.key && p.prompt).map((p) => [String(p.prompt).trim(), String(p.key)])),
       aliases: ((data as any)?.aliases ?? []).join(', '),
       languages: ((data as any)?.language_codes ?? []).join(', '),
       countries: ((data as any)?.country_codes ?? []).join(', '),
@@ -291,19 +306,47 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     });
     setEditing(true);
   };
+  const currentSourceConfig = async (id: string): Promise<Record<string, unknown>> => {
+    const { data } = await supabase.from('tracked_mentions').select('source_config').eq('id', id).maybeSingle();
+    return ((data as any)?.source_config ?? {}) as Record<string, unknown>;
+  };
+
+  const trackQuestion = async (question: string) => {
+    const id = state?.own_brand_subject_id;
+    if (!id) return;
+    try {
+      const cfg = await currentSourceConfig(id);
+      const probes: { key?: string; prompt?: string }[] = Array.isArray(cfg.custom_probes) ? cfg.custom_probes as any : [];
+      const text = question.trim();
+      if (probes.some((p) => (p.prompt ?? '').trim().toLowerCase() === text.toLowerCase())) return;
+      if (probes.length >= PROBE_LIMIT) {
+        toast({ title: 'The probe list is full', description: `It holds ${PROBE_LIMIT} questions. Remove one in Edit questions first.`, variant: 'destructive' });
+        return;
+      }
+      await updateTrackedMention(id, {
+        source_config: { ...cfg, custom_probes: [...probes, { key: `tracked_${Date.now().toString(36)}`, prompt: text }] },
+      });
+      toast({ title: 'Question tracked', description: 'The next probe run asks it. Run probes now to see it today.' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Could not track it', description: e?.message, variant: 'destructive' });
+    }
+  };
+
   const saveEditor = async () => {
     const id = state?.own_brand_subject_id;
     if (!id) return;
     setSaving(true);
     try {
       const list = (s: string) => s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
-      const prompts = form.prompts.split('\n').map((p) => p.trim()).filter((p) => p.length >= 8).slice(0, 12);
+      const prompts = form.prompts.split('\n').map((p) => p.trim()).filter((p) => p.length >= 8).slice(0, PROBE_LIMIT);
       await updateTrackedMention(id, {
         aliases: list(form.aliases),
         language_codes: list(form.languages).map((l) => l.toLowerCase()),
         country_codes: list(form.countries).map((c) => c.toUpperCase()),
         source_config: {
-          custom_probes: prompts.map((prompt, i) => ({ key: `custom_${i + 1}`, prompt })),
+          ...(await currentSourceConfig(id)),
+          custom_probes: prompts.map((prompt, i) => ({ key: form.keys[prompt] ?? `custom_${Date.now().toString(36)}_${i}`, prompt })),
           include_default_probes: form.includeDefaults,
         },
         probe_tier: form.tier,
@@ -663,6 +706,14 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       </div>
 
       {corpusPanel}
+
+      <AiQuestionsPanel
+        report={questions}
+        canTrack={!!state?.own_brand_subject_id}
+        trackedCount={probeCount}
+        trackLimit={PROBE_LIMIT}
+        onTrack={trackQuestion}
+      />
 
       <CitabilityPanel
         report={citability}
