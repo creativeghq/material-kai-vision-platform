@@ -124,7 +124,8 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
         if (lineGross != null) grossPayable += lineGross;
         const discountPct = specs.discount_pct != null ? Number(specs.discount_pct) : 0;
         // Pre-discount value = net + discount, else unit × qty; discount = the difference.
-        let discountValue = specs.discount_value != null ? Number(specs.discount_value) : null;
+        let discountValue = specs.discount_value != null ? Number(specs.discount_value)
+          : lineGross != null ? 0 : null;
         const grossVal = (netValue != null && discountValue != null) ? round2(netValue + discountValue)
           : (unitPrice != null ? round2(unitPrice * qty) : netValue);
         if (discountValue == null && grossVal != null && netValue != null) discountValue = round2(grossVal - netValue);
