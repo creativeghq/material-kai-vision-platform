@@ -247,7 +247,7 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
                 expense carried VAT.
               </p>
             )}
-            <p className="flex flex-wrap items-center gap-x-2 border-t border-hairline bg-surface-sunken px-5 pb-3 text-[11px] text-muted-foreground">
+            <p className="flex flex-wrap items-center gap-x-2 border-t border-hairline bg-surface-sunken px-5 py-3 text-[11px] text-muted-foreground">
               <span>Every document filed against your ΑΦΜ. It confirms your books — it is never added to them.</span>
               <Link to={financeTabUrl(FINANCE_TAB.mydataBook)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
                 Open the ΑΑΔΕ book <ArrowRight className="h-3 w-3" />
