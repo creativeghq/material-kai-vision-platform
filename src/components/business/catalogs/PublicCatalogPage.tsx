@@ -134,9 +134,7 @@ export const PublicCatalogPage: React.FC = () => {
           const ver = await callAccess({ action: 'verify', slug, token: existingToken });
           if (!cancelled && ver?.granted_access) {
             setVerified(ver);
-            // Fire-and-forget page_view track. Atomically increments the
-            // catalog's view_count and writes a row to catalog_view_events
-            // so the admin operations screen sees the visit.
+            // Fire-and-forget: bumps view_count + logs catalog_view_events for the ops screen.
             callAccess({ action: 'track_view', slug, token: existingToken }).catch(() => {});
           }
         }
@@ -264,12 +262,6 @@ export const PublicCatalogPage: React.FC = () => {
   );
 };
 
-/**
- * Specification tables — the same `body_data.spec_tables` the PDF renders, so the
- * page and the download never disagree. Standard design-system table: plain <table>
- * inside a .dashboard-card, edge-to-edge via -mx-6, overflow-x-auto (NOT hidden —
- * <main> clips horizontally, so a wide table would silently lose columns).
- */
 /**
  * Accent rule ABOVE the heading, then the heading — the same block the PDF draws at the
  * top of every section (see drawHeadingWithRule in _shared/pdf/document.ts).
