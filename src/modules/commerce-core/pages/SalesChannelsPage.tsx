@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Plug, Plus, Trash2, KeyRound, AlertTriangle, Rss, Copy, RefreshCw } from 'lucide-react';
 
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -33,6 +33,8 @@ import { SkroutzQueueCard } from '@/modules/commerce-core/components/SkroutzQueu
 import { ChannelOverviewCard } from '@/modules/commerce-core/components/ChannelOverviewCard';
 import { ConnectionSettingsCard } from '@/modules/commerce-core/components/ConnectionSettingsCard';
 import { FeedSelectionEditor } from '@/modules/commerce-core/components/FeedSelectionEditor';
+import { storefrontService } from '@/modules/finance/services/storefrontService';
+import { financeTabUrl, FINANCE_TAB } from '@/modules/finance/routes';
 
 const PLATFORM_LABEL: Record<CommercePlatform, string> = {
   skroutz: 'Skroutz',
@@ -98,6 +100,7 @@ export default function SalesChannelsPage() {
   const [rotating, setRotating] = useState<string | null>(null);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const [feedEditing, setFeedEditing] = useState<string | null>(null);
+  const [storefrontOpen, setStorefrontOpen] = useState<boolean | null>(null);
   const [rotateCreds, setRotateCreds] = useState<Record<string, string>>({});
   const [rotateSecret, setRotateSecret] = useState('');
 
@@ -118,14 +121,16 @@ export default function SalesChannelsPage() {
     if (!ws) return;
     setLoading(true);
     try {
-      const [conns, entries, feedRows] = await Promise.all([
+      const [conns, entries, feedRows, store] = await Promise.all([
         storeConnectionsService.list(ws),
         storeConnectionsService.syncLog(ws),
         productFeedsService.list(ws),
+        storefrontService.getConfig(ws),
       ]);
       setRows(conns);
       setLog(entries);
       setFeeds(feedRows);
+      setStorefrontOpen(store.enabled);
     } catch (err) {
       toast({ title: 'Could not load sales channels', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     } finally {
@@ -429,6 +434,17 @@ export default function SalesChannelsPage() {
               {!addingFeed && <Button size="sm" variant="outline" onClick={() => { setAddingFeed(true); setFeedName(''); }}><Plus className="mr-1 h-3.5 w-3.5" /> New feed</Button>}
             </CardHeader>
             <CardContent className="space-y-3">
+              {storefrontOpen === false && (
+                <p className="flex items-start gap-2 rounded-sm border border-hairline bg-surface-sunken p-2 text-xs text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    Every product link in every feed points at your storefront, and yours is closed — so a
+                    marketplace would import offers that all land on <em>This store is not open</em>. The feed
+                    refuses to build until you open it, at{' '}
+                    <Link className="underline" to={financeTabUrl(FINANCE_TAB.settings)}>Finance → Settings</Link>.
+                  </span>
+                </p>
+              )}
               {addingFeed && (
                 <div className="grid gap-3 rounded-sm border border-hairline p-3 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -456,7 +472,7 @@ export default function SalesChannelsPage() {
                 <HubEmptyState
                   icon={Rss}
                   title="No feed yet"
-                  description="A feed lists your published products as XML so a marketplace can import them. Skroutz needs its own dialect; Google, Shopify and WooCommerce share one."
+                  description="A feed lists your published products as XML so a marketplace can import them. Skroutz and BestPrice each need their own dialect; Google, Shopify and WooCommerce share one."
                   action={<Button size="sm" onClick={() => { setAddingFeed(true); setFeedName(''); }}><Plus className="mr-1 h-3.5 w-3.5" /> New feed</Button>}
                 />
               ) : feeds.map((f) => (

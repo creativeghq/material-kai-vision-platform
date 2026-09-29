@@ -40,6 +40,17 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
       { status: 404, headers: { 'Content-Type': 'application/xml; charset=utf-8' } });
   }
 
+  // Every productURL in every dialect points at /store/:slug, so a closed storefront makes the
+  // whole feed a list of dead offers — 200 OK, N products, every link "This store is not open."
+  const { data: store } = await supabase.from('workspace_storefront')
+    .select('enabled').eq('workspace_id', feed.workspace_id).maybeSingle();
+  if (!store?.enabled) {
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?><error>${escapeXml('the storefront this feed links to is closed')}</error>`,
+      { status: 409, headers: { 'Content-Type': 'application/xml; charset=utf-8' } },
+    );
+  }
+
   const { data: ws } = await supabase.from('workspaces').select('slug, name').eq('id', feed.workspace_id).maybeSingle();
   const { data: fs } = await supabase.from('finance_settings')
     .select('default_vat_rate').eq('workspace_id', feed.workspace_id).maybeSingle();

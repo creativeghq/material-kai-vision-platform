@@ -3864,7 +3864,6 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Initialize runtime on first real request (not OPTIONS)
     await initRuntime();
 
-    // Get request body
     const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
@@ -4112,7 +4111,6 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
       partnerTurnDebitTxnId = debit.transaction_id ?? null;
     }
 
-    // Get last user message
     const lastMessage = messages[messages.length - 1];
     let userInput = lastMessage?.content || '';
 
