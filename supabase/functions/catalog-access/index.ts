@@ -124,6 +124,7 @@ function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | 
         })),
       })),
       spec_title: catalog.body_data?.spec_title ?? null,
+      prices_include_vat: catalog.body_data?.prices_include_vat === true,
     },
     back_cover_data: {
       closing_message: catalog.back_cover_data?.closing_message ?? null,
