@@ -149,14 +149,16 @@ const DataImportHub: React.FC = () => {
                               </div>
                             ))}
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate('/admin/async-queue-monitor')}
-                            className="mt-2 w-full"
-                          >
-                            View All Jobs in Queue Monitor
-                          </Button>
+                          <div className="flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate('/admin/async-queue-monitor')}
+                              className="mt-2"
+                            >
+                              View All Jobs in Queue Monitor
+                            </Button>
+                          </div>
                         </div>
                       </AlertDescription>
                     </Alert>

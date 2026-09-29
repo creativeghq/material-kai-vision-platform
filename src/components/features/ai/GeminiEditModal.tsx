@@ -649,21 +649,23 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                 </div>
               )}
 
-              <Button
-                onClick={() => {
-                  // For text-only categories, build prompt from custom and advance
-                  if (isTextOnly && custom.trim()) {
-                    setPrompt(custom.trim());
-                  }
-                  setStep(3);
-                }}
-                disabled={!canProceedToStep3}
-                className="w-full gap-2"
-                variant="outline"
-              >
-                Next — Review & Model
-                <ChevronLeft className="w-4 h-4 rotate-180" />
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => {
+                    // For text-only categories, build prompt from custom and advance
+                    if (isTextOnly && custom.trim()) {
+                      setPrompt(custom.trim());
+                    }
+                    setStep(3);
+                  }}
+                  disabled={!canProceedToStep3}
+                  className="gap-2"
+                  variant="outline"
+                >
+                  Next — Review & Model
+                  <ChevronLeft className="w-4 h-4 rotate-180" />
+                </Button>
+              </div>
             </>
           )}
 
@@ -716,20 +718,22 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                 </div>
               </div>
 
-              <Button
-                onClick={handleApply}
-                disabled={generating || !canApply}
-                className="w-full gap-2"
-              >
-                {generating ? (
-                  <>Generating…</>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Apply Edit
-                  </>
-                )}
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleApply}
+                  disabled={generating || !canApply}
+                  className="gap-2"
+                >
+                  {generating ? (
+                    <>Generating…</>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Apply Edit
+                    </>
+                  )}
+                </Button>
+              </div>
             </>
           )}
         </div>

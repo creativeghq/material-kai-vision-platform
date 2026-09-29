@@ -264,14 +264,15 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
                       </button>
                     ))}
                   </div>
-                  <Button
-                    onClick={handleAddToExisting}
-                    className="w-full"
-                    style={{ backgroundColor: 'hsl(var(--primary))', color: 'white' }}
-                    disabled={!selectedQuoteId || processing}
-                  >
-                    {processing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding...</> : <><ShoppingCart className="h-4 w-4 mr-2" />Add to Selected Quote</>}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleAddToExisting}
+                      style={{ backgroundColor: 'hsl(var(--primary))', color: 'white' }}
+                      disabled={!selectedQuoteId || processing}
+                    >
+                      {processing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding...</> : <><ShoppingCart className="h-4 w-4 mr-2" />Add to Selected Quote</>}
+                    </Button>
+                  </div>
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
                     <div className="relative flex justify-center text-xs"><span className="bg-background px-2 text-muted-foreground">or</span></div>

@@ -307,24 +307,24 @@ const XMLImportTab: React.FC = () => {
             </div>
 
             {selectedFile && !detectedFields.length && (
-              <Button
-                onClick={handleDetectFields}
-                disabled={isDetecting || !category}
-                size="lg"
-                className="w-full"
-              >
-                {isDetecting ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Analyzing XML Structure...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-5 w-5 mr-2" />
-                    Detect Fields & Suggest Mappings
-                  </>
-                )}
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleDetectFields}
+                  disabled={isDetecting || !category}
+                >
+                  {isDetecting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyzing XML Structure...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Detect Fields & Suggest Mappings
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </TabsContent>
@@ -351,24 +351,24 @@ const XMLImportTab: React.FC = () => {
                 </div>
 
                 {remoteUrl && !detectedFields.length && (
-                  <Button
-                    onClick={handleDetectFields}
-                    disabled={isDetecting}
-                    size="lg"
-                    className="w-full"
-                  >
-                    {isDetecting ? (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        Analyzing XML Structure...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-5 w-5 mr-2" />
-                        Detect Fields & Suggest Mappings
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleDetectFields}
+                      disabled={isDetecting}
+                    >
+                      {isDetecting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing XML Structure...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Detect Fields & Suggest Mappings
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>

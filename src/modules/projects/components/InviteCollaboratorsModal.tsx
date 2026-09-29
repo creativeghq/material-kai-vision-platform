@@ -155,9 +155,11 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
                 className="mt-1"
               />
             </div>
-            <Button onClick={handleSend} disabled={sending || !email.trim()} className="w-full">
-              {sending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending...</> : <><Send className="h-4 w-4 mr-2" />Send invitation</>}
-            </Button>
+            <div className="flex justify-end">
+              <Button onClick={handleSend} disabled={sending || !email.trim()}>
+                {sending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending...</> : <><Send className="h-4 w-4 mr-2" />Send invitation</>}
+              </Button>
+            </div>
           </div>
 
           {/* List */}

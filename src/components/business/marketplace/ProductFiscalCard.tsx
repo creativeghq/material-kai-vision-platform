@@ -514,10 +514,12 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         </p>
       </Section>
 
-      <Button size="sm" variant="outline" onClick={save} disabled={saving} className="w-full">
-        {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
-        Save product data
-      </Button>
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+          Save product data
+        </Button>
+      </div>
     </div>
   );
 };

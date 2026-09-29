@@ -203,14 +203,15 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
                   </button>
                 ))}
               </div>
-              <Button
-                onClick={handleRoomNext}
-                disabled={!selectedRoom}
-                className="w-full"
-              >
-                Next — choose style
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleRoomNext}
+                  disabled={!selectedRoom}
+                >
+                  Next — choose style
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
             </div>
           )}
 
@@ -271,26 +272,28 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
                     : 'This is sent as the furniture specification to the AI model. Add or remove items as needed.'}
                 </p>
               </div>
-              <Button
-                onClick={handleGenerate}
-                disabled={generating || (!isDesign && !furnitureItems.trim())}
-                className="w-full gap-2"
-              >
-                {generating ? (
-                  <>Generating…</>
-                ) : isDesign ? (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Generate Design
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Accept &amp; Generate
-                    <span className="text-primary-foreground/60 text-xs ml-1">20 credits</span>
-                  </>
-                )}
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleGenerate}
+                  disabled={generating || (!isDesign && !furnitureItems.trim())}
+                  className="gap-2"
+                >
+                  {generating ? (
+                    <>Generating…</>
+                  ) : isDesign ? (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate Design
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Accept &amp; Generate
+                      <span className="text-primary-foreground/60 text-xs ml-1">20 credits</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </div>

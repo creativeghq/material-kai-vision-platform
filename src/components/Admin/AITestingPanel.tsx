@@ -603,28 +603,29 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                     </div>
                   </div>
 
-                  <Button
-                    onClick={testMaterialAnalysis}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        testMaterialAnalysis();
-                      }
-                    }}
-                    disabled={testing || !testImageUrl}
-                    className="w-full"
-                  >
-                    {testing ? (
-                      <>
-                        <Activity className="h-4 w-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <TestTube className="h-4 w-4 mr-2" />
-                        Test Material Analysis
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={testMaterialAnalysis}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          testMaterialAnalysis();
+                        }
+                      }}
+                      disabled={testing || !testImageUrl}
+                    >
+                      {testing ? (
+                        <>
+                          <Activity className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <TestTube className="h-4 w-4 mr-2" />
+                          Test Material Analysis
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -738,28 +739,29 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                       {multiModalTestText.length >= SANDBOX_MAX_CHARS && ' — truncated; this runs a real paid model call'}
                     </p>
                   </div>
-                  <Button
-                    onClick={() => testMultiModalAnalysis('text_analysis')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        testMultiModalAnalysis('text_analysis');
-                      }
-                    }}
-                    disabled={multiModalTesting || !multiModalTestText.trim()}
-                    className="w-full"
-                  >
-                    {multiModalTesting ? (
-                      <>
-                        <Activity className="h-4 w-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Test Text Analysis
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => testMultiModalAnalysis('text_analysis')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          testMultiModalAnalysis('text_analysis');
+                        }
+                      }}
+                      disabled={multiModalTesting || !multiModalTestText.trim()}
+                    >
+                      {multiModalTesting ? (
+                        <>
+                          <Activity className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Test Text Analysis
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -803,28 +805,29 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                         ))}
                     </div>
                   </div>
-                  <Button
-                    onClick={() => testMultiModalAnalysis('image_analysis')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        testMultiModalAnalysis('image_analysis');
-                      }
-                    }}
-                    disabled={multiModalTesting || !multiModalTestImage.trim()}
-                    className="w-full"
-                  >
-                    {multiModalTesting ? (
-                      <>
-                        <Activity className="h-4 w-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <Image className="h-4 w-4 mr-2" />
-                        Test Image Analysis
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => testMultiModalAnalysis('image_analysis')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          testMultiModalAnalysis('image_analysis');
+                        }
+                      }}
+                      disabled={multiModalTesting || !multiModalTestImage.trim()}
+                    >
+                      {multiModalTesting ? (
+                        <>
+                          <Activity className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <Image className="h-4 w-4 mr-2" />
+                          Test Image Analysis
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -841,32 +844,33 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                     Uses both text and image inputs for comprehensive
                     multi-modal analysis.
                   </div>
-                  <Button
-                    onClick={() => testMultiModalAnalysis('combined_analysis')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        testMultiModalAnalysis('combined_analysis');
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => testMultiModalAnalysis('combined_analysis')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          testMultiModalAnalysis('combined_analysis');
+                        }
+                      }}
+                      disabled={
+                        multiModalTesting ||
+                        !multiModalTestText.trim() ||
+                        !multiModalTestImage.trim()
                       }
-                    }}
-                    disabled={
-                      multiModalTesting ||
-                      !multiModalTestText.trim() ||
-                      !multiModalTestImage.trim()
-                    }
-                    className="w-full"
-                  >
-                    {multiModalTesting ? (
-                      <>
-                        <Activity className="h-4 w-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <Layers className="h-4 w-4 mr-2" />
-                        Test Combined Analysis
-                      </>
-                    )}
-                  </Button>
+                    >
+                      {multiModalTesting ? (
+                        <>
+                          <Activity className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <Layers className="h-4 w-4 mr-2" />
+                          Test Combined Analysis
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     Requires both text and image inputs to be filled.
                   </div>
@@ -1060,28 +1064,29 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                   </div>
                 </div>
 
-                <Button
-                  onClick={testSimilaritySearch}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      testSimilaritySearch();
-                    }
-                  }}
-                  disabled={similarityTesting || !similarityQuery.trim()}
-                  className="w-full"
-                >
-                  {similarityTesting ? (
-                    <>
-                      <Activity className="h-4 w-4 mr-2 animate-spin" />
-                      Testing...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="h-4 w-4 mr-2" />
-                      Test Similarity Search
-                    </>
-                  )}
-                </Button>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={testSimilaritySearch}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        testSimilaritySearch();
+                      }
+                    }}
+                    disabled={similarityTesting || !similarityQuery.trim()}
+                  >
+                    {similarityTesting ? (
+                      <>
+                        <Activity className="h-4 w-4 mr-2 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4 mr-2" />
+                        Test Similarity Search
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 

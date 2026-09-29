@@ -265,20 +265,21 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
             </p>
           </div>
 
-          <Button
-            onClick={handleUpload}
-            disabled={isUploading || !category}
-            className="w-full"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              'Upload & Start Processing'
-            )}
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              onClick={handleUpload}
+              disabled={isUploading || !category}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Upload & Start Processing'
+              )}
+            </Button>
+          </div>
         </div>
       )}
     </div>

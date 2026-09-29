@@ -465,10 +465,12 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             )}
           </div>
 
-          <Button onClick={save} disabled={saving} className="w-full">
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Save settings
-          </Button>
+          <div className="flex justify-end">
+            <Button onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Save settings
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -652,10 +654,12 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             </label>
           </div>
 
-          <Button onClick={save} disabled={saving} className="w-full">
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Save settings
-          </Button>
+          <div className="flex justify-end">
+            <Button onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Save settings
+            </Button>
+          </div>
         </CardContent>
       </Card>
         </TabsContent>

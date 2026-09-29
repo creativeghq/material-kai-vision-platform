@@ -123,10 +123,12 @@ export const ProductPackagingCard: React.FC<{ productId: string; workspaceId: st
         )}
       </div>
 
-      <Button size="sm" variant="outline" onClick={save} disabled={saving} className="w-full">
-        {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
-        Save packaging
-      </Button>
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+          Save packaging
+        </Button>
+      </div>
     </div>
   );
 };

@@ -199,13 +199,15 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                   <div className="p-3 space-y-2">
                     {extractedPin.title && <p className="text-sm font-medium">{extractedPin.title}</p>}
                     {extractedPin.author && <p className="text-xs text-muted-foreground">by {extractedPin.author}</p>}
-                    <Button onClick={handleImport} disabled={importing} className="w-full">
-                      {importing ? (
-                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
-                      ) : (
-                        <><Image className="h-4 w-4 mr-2" />Import to Moodboard</>
-                      )}
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button onClick={handleImport} disabled={importing}>
+                        {importing ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
+                        ) : (
+                          <><Image className="h-4 w-4 mr-2" />Import to Moodboard</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -298,13 +300,15 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                 </p>
               </div>
 
-              <Button onClick={handleBulkImport} disabled={bulkImporting} className="w-full">
-                {bulkImporting ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
-                ) : (
-                  <><Plus className="h-4 w-4 mr-2" />Import All Pins</>
-                )}
-              </Button>
+              <div className="flex justify-end">
+                <Button onClick={handleBulkImport} disabled={bulkImporting}>
+                  {bulkImporting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
+                  ) : (
+                    <><Plus className="h-4 w-4 mr-2" />Import All Pins</>
+                  )}
+                </Button>
+              </div>
 
               {bulkResults && (
                 <div className="rounded-xl border border-green-200 bg-green-50 p-3">
