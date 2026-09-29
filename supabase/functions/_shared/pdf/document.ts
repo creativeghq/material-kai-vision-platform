@@ -168,6 +168,8 @@ export interface BrandedDoc {
   /** Heading for the specification pages. Defaults to "Technical specification". */
   spec_title?: string | null;
   totals?: BrandedTotals | null;
+  /** Line prices/totals are printed VAT-inclusive, exactly as the author entered them. */
+  prices_include_vat?: boolean;
   closing_message?: string | null;
   cover_optional?: boolean;
   /** Cover image pixel dimensions — the page is sized to this aspect/orientation. */
@@ -341,7 +343,7 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
     drawPageBackground(page, g, bgImage);
 
     let y = g.TABLE_Y_START;
-    drawTableHeader(page, g, y, cols, fontBold);
+    drawTableHeader(page, g, y, cols, fontBold, doc.prices_include_vat === true);
     y -= g.HEADER_ROW_H;
 
     let drawn = 0, alt = 0;
@@ -375,11 +377,15 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
   return pages;
 }
 
-function drawTableHeader(page: PDFPage, g: Geom, y: number, cols: ColumnSpec[], fontBold: PDFFont): void {
+function drawTableHeader(page: PDFPage, g: Geom, y: number, cols: ColumnSpec[], fontBold: PDFFont, pricesIncludeVat: boolean): void {
   page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.HEADER_ROW_H, width: g.TABLE_W, height: g.HEADER_ROW_H, color: COLOR_DARK });
   const ty = y - g.HEADER_ROW_H / 2 - 3;
   let x = g.TABLE_MARGIN;
-  for (const col of cols) { if (col.label) drawInCell(page, col.label, x, col.width, ty, 8, fontBold, COLOR_WHITE, col.align); x += col.width; }
+  for (const col of cols) {
+    const label = col.key === 'total' && pricesIncludeVat ? 'Total' : col.label;
+    if (label) drawInCell(page, label, x, col.width, ty, 8, fontBold, COLOR_WHITE, col.align);
+    x += col.width;
+  }
 }
 
 /** Draw text inside a column cell honoring its alignment (left/right/center). */
@@ -446,11 +452,6 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
     line('Discount', `- ${formatCurrency(totals.discount_total as number, cur)}`, false, true);
     line('Net value', formatCurrency(totals.subtotal, cur));
   } else {
-    // Plain-net presentation. This branch used to RE-DERIVE the discount here —
-    // `round2(totals.subtotal * cash_discount_pct / 100)` and then `subtotal - discount` — which
-    // is a second derivation of a money quantity in TypeScript, on a document that goes to a
-    // customer. CLAUDE.md's rule is one derivation per money quantity: SQL derives, TypeScript
-    // formats.
     line('Price', formatCurrency(totals.subtotal, cur));
   }
   line(`VAT (${totals.vat_rate}%)`, formatCurrency(totals.vat_amount, cur), false, true);

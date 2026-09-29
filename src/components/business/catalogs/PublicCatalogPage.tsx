@@ -306,7 +306,7 @@ const SpecTables: React.FC<{ tables: SpecTable[] }> = ({ tables }) => (
                     <th scope="row" className="text-left py-2 pr-3 font-normal text-[hsl(var(--ink-muted))] align-top w-2/5">
                       {r.label}
                     </th>
-                    <td className="py-2 font-semibold text-[hsl(var(--ink))]">{r.value}</td>
+                    <td className="py-2 font-semibold break-words text-[hsl(var(--ink))]">{r.value}</td>
                   </tr>
                 ))}
               </tbody>
@@ -318,8 +318,19 @@ const SpecTables: React.FC<{ tables: SpecTable[] }> = ({ tables }) => (
   </section>
 );
 
+const SPEC_LABELS: Record<string, string> = {
+  vat_pct: 'VAT %', discount_pct: 'Discount %', quantity_tem: 'Quantity', quantity_tmet: 'Quantity (m)',
+};
+
+function specLabel(key: string): string {
+  if (SPEC_LABELS[key]) return SPEC_LABELS[key];
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /** One catalog item, laid out as the PDF lays it out: image left, copy right, hairline below. */
-const ItemRow: React.FC<{ material: any; showPrices: boolean }> = ({ material: m, showPrices }) => (
+const ItemRow: React.FC<{ material: any; showPrices: boolean; pricesIncludeVat: boolean }> = ({ material: m, showPrices, pricesIncludeVat }) => {
+  const specs = Object.entries((m.specs || {}) as Record<string, unknown>).filter(([, v]) => v != null && v !== '');
+  return (
   <div className="flex flex-col sm:flex-row gap-5 py-6 border-b border-[hsl(var(--paper-rule))] last:border-b-0">
     {/* object-contain, not cover: these are product shots, dimension drawings and kit
         layouts — cropping one to a square cuts the measurements off the drawing. */}
@@ -331,22 +342,26 @@ const ItemRow: React.FC<{ material: any; showPrices: boolean }> = ({ material: m
     <div className="min-w-0 flex-1">
       <h3 className="text-lg font-semibold text-[hsl(var(--ink))]">{m.name}</h3>
       {m.description && <p className="text-sm text-[hsl(var(--ink))] mt-1 max-w-3xl">{m.description}</p>}
-      {m.specs && Object.keys(m.specs).length > 0 && (
+      {specs.length > 0 && (
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
-          {Object.entries(m.specs).map(([k, v]) => (
+          {specs.map(([k, v]) => (
             <div key={k} className="text-xs">
-              <dt className="inline text-[hsl(var(--ink-muted))]">{k}: </dt>
+              <dt className="inline text-[hsl(var(--ink-muted))]">{specLabel(k)}: </dt>
               <dd className="inline font-semibold text-[hsl(var(--ink))]">{String(v)}</dd>
             </div>
           ))}
         </dl>
       )}
       {showPrices && m.price != null && (
-        <div className="text-lg font-semibold text-[hsl(var(--ink))] mt-3">{formatPrice(m.price, m.currency)}</div>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
+          <span className="text-lg font-semibold text-[hsl(var(--ink))]">{formatPrice(m.price, m.currency)}</span>
+          {pricesIncludeVat && <span className="text-xs text-[hsl(var(--ink-muted))]">incl. VAT</span>}
+        </div>
       )}
     </div>
   </div>
-);
+  );
+};
 
 const CatalogReader: React.FC<{
   catalog: CatalogPayload;
@@ -390,9 +405,9 @@ const CatalogReader: React.FC<{
         </div>
       )}
 
-      {/* Everything below the cover sits on the template's inside page. Fixed so the
-          spine and footer motif stay put while the content scrolls over them, which is
-          how the artwork reads on a page of any length. */}
+      {/* The template's inside-page art frames the text column, never sits under it: header
+          and main are opaque paper, so on a phone (no margins) the art is simply not seen
+          instead of drawing its footer motif over the prices. */}
       <div
         style={contentBg ? {
           backgroundImage: `url(${contentBg})`,
@@ -402,7 +417,7 @@ const CatalogReader: React.FC<{
           backgroundRepeat: 'no-repeat',
         } : undefined}
       >
-        <header className="container mx-auto max-w-5xl px-6 pt-12 pb-8">
+        <header className="container mx-auto max-w-5xl px-6 pt-12 pb-8 bg-[hsl(var(--paper))]">
           {!coverImage && branding?.logo_url && (
             <img src={branding.logo_url} alt={branding.company_name || ''} className="h-10 mb-6" />
           )}
@@ -427,7 +442,7 @@ const CatalogReader: React.FC<{
           </div>
         </header>
 
-        <main className="container mx-auto max-w-5xl px-6 pb-16 space-y-14">
+        <main className="container mx-auto max-w-5xl px-6 pb-16 space-y-14 bg-[hsl(var(--paper))]">
           {sections.length === 0 ? (
             <div className="text-center text-[hsl(var(--ink-muted))] py-12">This catalog has no sections yet.</div>
           ) : sections.map((section) => (
@@ -435,7 +450,7 @@ const CatalogReader: React.FC<{
               <SectionHeading title={section.title} intro={section.intro} />
               <div className="border-t border-[hsl(var(--paper-rule))]">
                 {(section.materials || []).map((m: any) => (
-                  <ItemRow key={m.id} material={m} showPrices={showPrices} />
+                  <ItemRow key={m.id} material={m} showPrices={showPrices} pricesIncludeVat={(catalog.body_data as any)?.prices_include_vat === true} />
                 ))}
               </div>
             </section>

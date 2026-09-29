@@ -76,6 +76,8 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     const layout: 'list' | 'grid' = body.layout === 'grid' ? 'grid' : body.layout === 'list' ? 'list' : (bodyMeta.layout === 'grid' ? 'grid' : 'list');
     const isProforma = body.proforma === true || bodyMeta.proforma === true;
     const currency = (bodyMeta.currency as string) || firstMaterialCurrency(sections) || 'EUR';
+    const pricesIncludeVat = bodyMeta.prices_include_vat === true;
+    let grossPayable = 0;
 
     // Workspace-defined branding (finance_settings) — the same source quotes use.
     const branding = await fetchBrandingConfig(supabase, catalog.workspace_id ?? null);
@@ -112,9 +114,14 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
           : specs.quantity_tem != null ? Number(specs.quantity_tem)
           : specs.quantity != null ? Number(specs.quantity) : 1;
         // Net line value (after discount) = net_value if present, else qty × unit price.
-        const netValue = specs.net_value != null ? Number(specs.net_value)
-          : (unitPrice != null ? round2(unitPrice * qty) : null);
         const lineVatPct = specs.vat_pct != null ? Number(specs.vat_pct) : vatRate;
+        // VAT-inclusive: the entered figure is what the customer pays; net is extracted from it.
+        const lineGross = pricesIncludeVat && unitPrice != null
+          ? round2(unitPrice * qty - Number(specs.discount_value ?? 0)) : null;
+        const netValue = lineGross != null ? lineGross / (1 + lineVatPct / 100)
+          : specs.net_value != null ? Number(specs.net_value)
+          : (unitPrice != null ? round2(unitPrice * qty) : null);
+        if (lineGross != null) grossPayable += lineGross;
         const discountPct = specs.discount_pct != null ? Number(specs.discount_pct) : 0;
         // Pre-discount value = net + discount, else unit × qty; discount = the difference.
         let discountValue = specs.discount_value != null ? Number(specs.discount_value) : null;
@@ -148,7 +155,7 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
           discount_pct: discountPct,
           discount_value: discountValue,
           vat_pct: lineVatPct,
-          line_total: netValue,
+          line_total: lineGross ?? netValue,
           specs,
         });
       }
@@ -162,15 +169,23 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     // Totals only when this is a proforma AND at least one material is priced.
     // Subtotal = Σ net line values; VAT summed per line (handles mixed rates).
     const totals = (isProforma && anyPriced)
-      ? {
-          subtotal: round2(subtotalNet),
-          gross_subtotal: round2(grossSum),
-          discount_total: round2(discountSum),
-          vat_rate: vatRate,
-          vat_amount: round2(vatSum),
-          grand_total: round2(subtotalNet + vatSum),
-          currency,
-        }
+      ? pricesIncludeVat
+        ? {
+            subtotal: round2(subtotalNet),
+            vat_rate: vatRate,
+            vat_amount: round2(round2(grossPayable) - round2(subtotalNet)),
+            grand_total: round2(grossPayable),
+            currency,
+          }
+        : {
+            subtotal: round2(subtotalNet),
+            gross_subtotal: round2(grossSum),
+            discount_total: round2(discountSum),
+            vat_rate: vatRate,
+            vat_amount: round2(vatSum),
+            grand_total: round2(subtotalNet + vatSum),
+            currency,
+          }
       : null;
 
     const cover = (catalog.cover_data ?? {}) as Record<string, any>;
@@ -200,6 +215,7 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
       spec_tables: normalizeSpecTables(bodyMeta.spec_tables),
       spec_title: typeof bodyMeta.spec_title === 'string' ? bodyMeta.spec_title : null,
       totals,
+      prices_include_vat: pricesIncludeVat,
       closing_message: (catalog.back_cover_data as any)?.closing_message ?? null,
       // Page size + orientation follow the workspace's cover template image.
       page_width: branding.cover_width,
