@@ -321,7 +321,12 @@ function specLabel(key: string): string {
 
 /** One catalog item, laid out as the PDF lays it out: image left, copy right, hairline below. */
 const ItemRow: React.FC<{ material: any; showPrices: boolean; pricesIncludeVat: boolean }> = ({ material: m, showPrices, pricesIncludeVat }) => {
-  const specs = Object.entries((m.specs || {}) as Record<string, unknown>).filter(([, v]) => v != null && v !== '');
+  const raw = (m.specs || {}) as Record<string, unknown>;
+  const specs = Object.entries(raw).filter(([, v]) => v != null && v !== '');
+  const qty = Number(raw.quantity_tmet ?? raw.quantity_tem ?? raw.quantity ?? 1) || 1;
+  const lineTotal = !pricesIncludeVat && raw.net_value != null
+    ? Number(raw.net_value)
+    : Math.round((Number(m.price) * qty - Number(raw.discount_value ?? 0)) * 100) / 100;
   return (
   <div className="flex flex-col sm:flex-row gap-5 py-6 border-b border-[hsl(var(--paper-rule))] last:border-b-0">
     {/* object-contain, not cover: these are product shots, dimension drawings and kit
@@ -345,9 +350,18 @@ const ItemRow: React.FC<{ material: any; showPrices: boolean; pricesIncludeVat: 
         </dl>
       )}
       {showPrices && m.price != null && (
-        <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
-          <span className="text-lg font-semibold text-[hsl(var(--ink))]">{formatPrice(m.price, m.currency)}</span>
-          {pricesIncludeVat && <span className="text-xs text-[hsl(var(--ink-muted))]">incl. VAT</span>}
+        <div className="mt-3">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-lg font-semibold text-[hsl(var(--ink))] tabular-nums">
+              {formatPrice(qty > 1 ? lineTotal : Number(m.price), m.currency)}
+            </span>
+            {pricesIncludeVat && <span className="text-xs text-[hsl(var(--ink-muted))]">incl. VAT</span>}
+          </div>
+          {qty > 1 && (
+            <div className="text-xs text-[hsl(var(--ink-muted))] tabular-nums">
+              {qty} × {formatPrice(Number(m.price), m.currency)}
+            </div>
+          )}
         </div>
       )}
     </div>
