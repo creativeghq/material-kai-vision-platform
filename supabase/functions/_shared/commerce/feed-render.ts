@@ -36,6 +36,10 @@ function money(n: number): string {
   return (Math.round(n * 100) / 100).toFixed(2);
 }
 
+function availability(p: FeedProduct): string {
+  return p.in_stock ? 'Άμεσα διαθέσιμο' : 'Κατόπιν παραγγελίας';
+}
+
 export function renderGoogleFeed(products: readonly FeedProduct[], meta: { title: string; link: string }): string {
   const items = products.map((p) => `    <item>
       <g:id>${escapeXml(p.sku ?? p.id)}</g:id>
@@ -77,7 +81,7 @@ export function renderSkroutzFeed(products: readonly FeedProduct[], now: Date): 
       <manufacturer>${escapeXml(p.brand ?? '')}</manufacturer>
       <mpn>${escapeXml(p.mpn ?? '')}</mpn>
       <ean>${escapeXml(p.barcode ?? '')}</ean>
-      <availability>${p.in_stock ? 'Άμεσα διαθέσιμο' : 'Κατόπιν παραγγελίας'}</availability>
+      <availability>${availability(p)}</availability>
       <quantity>${p.quantity ?? 0}</quantity>
       <description>${escapeXml(stripHtml(p.description, 10000))}</description>
 ${p.weight_kg ? `      <weight>${money(p.weight_kg)}</weight>\n` : ''}    </product>`).join('\n');
@@ -91,15 +95,57 @@ ${items}
 </mywebstore>`;
 }
 
-export function skroutzGaps(p: FeedProduct): string[] {
+export function renderBestPriceFeed(products: readonly FeedProduct[], now: Date): string {
+  const created = `${now.toISOString().slice(0, 10)} ${now.toISOString().slice(11, 16)}`;
+  const items = products.map((p) => `    <product>
+      <productId>${escapeXml(p.sku ?? p.id)}</productId>
+      <title>${escapeXml(p.name)}</title>
+      <productURL>${escapeXml(p.link)}</productURL>
+      <imageURL>${escapeXml(p.image ?? '')}</imageURL>
+      <category_path>${escapeXml(p.category ?? '')}</category_path>
+      <price>${money(p.price_gross)}</price>
+      <brand>${escapeXml(p.brand ?? '')}</brand>
+      <mpn>${escapeXml(p.mpn ?? '')}</mpn>
+${p.barcode ? `      <ean>${escapeXml(p.barcode)}</ean>\n` : ''}      <availability>${availability(p)}</availability>
+      <stock>${p.in_stock ? 'Y' : 'N'}</stock>
+${p.weight_kg ? `      <weight>${money(p.weight_kg)}</weight>\n` : ''}    </product>`).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<store>
+  <date>${created}</date>
+  <products>
+${items}
+  </products>
+</store>`;
+}
+
+export function feedGaps(format: string, p: FeedProduct): string[] {
+  if (format !== 'skroutz' && format !== 'bestprice') return [];
   const missing: string[] = [];
   if (!p.name) missing.push('name');
   if (!p.image) missing.push('image');
   if (!p.category) missing.push('category');
-  if (!p.brand) missing.push('manufacturer');
+  if (!p.brand) missing.push(format === 'skroutz' ? 'manufacturer' : 'brand');
   if (!p.mpn) missing.push('mpn');
-  if (!p.barcode) missing.push('ean');
-  if (!p.description) missing.push('description');
   if (!(p.price_gross > 0)) missing.push('price');
+  if (format === 'skroutz') {
+    if (!p.barcode) missing.push('ean');
+    if (!p.description) missing.push('description');
+  }
   return missing;
+}
+
+export function gapSummary(
+  format: string,
+  products: readonly FeedProduct[],
+): { count: number; byAttribute: Record<string, number> } {
+  const byAttribute: Record<string, number> = {};
+  let count = 0;
+  for (const p of products) {
+    const gaps = feedGaps(format, p);
+    if (gaps.length === 0) continue;
+    count += 1;
+    for (const g of gaps) byAttribute[g] = (byAttribute[g] ?? 0) + 1;
+  }
+  return { count, byAttribute };
 }

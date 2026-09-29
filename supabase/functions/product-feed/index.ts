@@ -4,7 +4,7 @@ import { grossFromNet } from '../_shared/money.ts';
 import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
 import { imageFromMetadata } from '../_shared/product-media.ts';
 import {
-  renderGoogleFeed, renderSkroutzFeed, escapeXml, type FeedProduct,
+  renderGoogleFeed, renderSkroutzFeed, renderBestPriceFeed, gapSummary, escapeXml, type FeedProduct,
 } from '../_shared/commerce/feed-render.ts';
 
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
@@ -122,14 +122,23 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
 
   const listed = feed.include_out_of_stock ? products : products.filter((p) => p.in_stock);
 
+  const now = new Date();
   const body = feed.format === 'skroutz'
-    ? renderSkroutzFeed(listed, new Date())
-    : renderGoogleFeed(listed, { title: `${ws?.name ?? 'Catalogue'} — ${feed.name}`, link: storeUrl });
+    ? renderSkroutzFeed(listed, now)
+    : feed.format === 'bestprice'
+      ? renderBestPriceFeed(listed, now)
+      : renderGoogleFeed(listed, { title: `${ws?.name ?? 'Catalogue'} — ${feed.name}`, link: storeUrl });
 
   const gzip = (req.headers.get('accept-encoding') ?? '').includes('gzip')
     && new Blob([body]).size > 512 * 1024;
 
-  await supabase.rpc('bump_product_feed_fetch', { p_feed_id: feed.id, p_item_count: listed.length });
+  const gaps = gapSummary(feed.format, listed);
+  await supabase.rpc('bump_product_feed_fetch', {
+    p_feed_id: feed.id,
+    p_item_count: listed.length,
+    p_gap_count: gaps.count,
+    p_gaps: gaps.byAttribute,
+  });
 
   return xml(body, gzip);
 }));

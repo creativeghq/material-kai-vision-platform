@@ -1,10 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type FeedFormat = 'google' | 'skroutz' | 'generic';
+export type FeedFormat = 'google' | 'skroutz' | 'bestprice' | 'generic';
 
 export const FEED_FORMATS: { value: FeedFormat; label: string; hint: string }[] = [
   { value: 'google', label: 'Google / Shopify / WooCommerce', hint: 'RSS 2.0 with the g: namespace — what Google Merchant Center and both webshop importers read.' },
   { value: 'skroutz', label: 'Skroutz', hint: 'Skroutz has its own <mywebstore> dialect and rejects a product missing any mandatory attribute, silently.' },
+  { value: 'bestprice', label: 'BestPrice.gr', hint: 'A <store> document with its own tag names. BestPrice sends the buyer to your shop rather than taking the order, so it needs the feed and nothing else — there is no channel to connect.' },
   { value: 'generic', label: 'Generic', hint: 'The same RSS document, for any other importer that accepts it.' },
 ];
 
@@ -30,10 +31,12 @@ export interface ProductFeed {
   last_item_count: number | null;
   last_fetched_at: string | null;
   fetch_count: number;
+  last_gap_count: number | null;
+  last_gaps: Record<string, number> | null;
 }
 
 const COLUMNS = 'id, name, slug, format, selection, currency, only_storefront_published, include_out_of_stock, '
-  + 'public_token, enabled, last_built_at, last_item_count, last_fetched_at, fetch_count';
+  + 'public_token, enabled, last_built_at, last_item_count, last_fetched_at, fetch_count, last_gap_count, last_gaps';
 
 export function feedUrl(token: string): string {
   const base = (import.meta.env?.VITE_SUPABASE_URL as string | undefined) ?? '';

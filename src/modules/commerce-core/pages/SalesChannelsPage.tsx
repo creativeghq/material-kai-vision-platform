@@ -14,6 +14,10 @@ import { Skeleton } from '@/components/core/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import {
+  HubCellEmpty, HubCellLink, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, HUB_FILTER_ALL, useHubTable,
+  type HubTableField,
+} from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import { COMMERCE_PLATFORMS, type CommercePlatform } from '@/modules/commerce/commerceVocabulary';
@@ -58,6 +62,20 @@ const OUTCOME_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'n
   created: 'success', updated: 'info', skipped_dupe: 'neutral', needs_review: 'warning', error: 'error',
 };
 
+const LOG_FIELDS: HubTableField<StoreSyncLogRow>[] = [
+  { id: 'when', sortValue: (e) => e.created_at },
+  { id: 'channel', sortValue: (e) => e.platform, filterValue: (e) => e.platform, filterLabel: 'Channel' },
+  { id: 'order', sortValue: (e) => e.external_order_id, searchText: (e) => e.external_order_id },
+  {
+    id: 'outcome',
+    sortValue: (e) => e.outcome,
+    filterValue: (e) => e.outcome,
+    filterLabel: 'Outcome',
+    filterOptionLabel: (v) => v.replace(/_/g, ' '),
+  },
+  { id: 'detail', searchText: (e) => e.message },
+];
+
 export default function SalesChannelsPage() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const ws = activeWorkspaceId ?? '';
@@ -84,6 +102,17 @@ export default function SalesChannelsPage() {
   const [rotateSecret, setRotateSecret] = useState('');
 
   const platformFilter = searchParams.get('platform');
+  const logTable = useHubTable(log, LOG_FIELDS, { columnId: 'when', direction: 'desc' });
+  const logSortHead = (id: string, label: string) => (
+    <HubSortButton
+      active={logTable.sort?.columnId === id ? logTable.sort.direction : undefined}
+      onClick={() => logTable.toggleSort(id)}
+    >
+      {label}
+    </HubSortButton>
+  );
+  const logAriaSort = (id: string) =>
+    logTable.sort?.columnId === id ? (logTable.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
 
   const load = useCallback(async () => {
     if (!ws) return;
@@ -458,6 +487,18 @@ export default function SalesChannelsPage() {
                     </Button>
                   </div>
 
+                  {(f.last_gap_count ?? 0) > 0 && (
+                    <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span>
+                        {f.last_gap_count} of {f.last_item_count ?? 0} will be dropped on arrival for a missing
+                        attribute — {Object.entries(f.last_gaps ?? {}).sort((a, b) => b[1] - a[1])
+                          .map(([k, n]) => `${k} (${n})`).join(', ')}. The feed still returns 200, so the
+                        listing is simply short.
+                      </span>
+                    </p>
+                  )}
+
                   {feedEditing === f.id && <FeedSelectionEditor feed={f} onSaved={load} />}
                 </div>
               ))}
@@ -483,32 +524,63 @@ export default function SalesChannelsPage() {
                   description="Once a channel is connected and enabled, every order it sends shows up here — including the ones we refused and why."
                 />
               ) : (
+                <>
+                {log.length > 8 && (
+                  <HubToolbar
+                    search={logTable.search}
+                    onSearchChange={logTable.setSearch}
+                    searchPlaceholder="Search order or detail"
+                    filters={<>
+                      <HubFilterSelect label="Channel" value={logTable.filters.channel ?? HUB_FILTER_ALL} options={logTable.filterOptions.channel ?? []} onChange={(v) => logTable.setFilter('channel', v)} />
+                      <HubFilterSelect label="Outcome" value={logTable.filters.outcome ?? HUB_FILTER_ALL} options={logTable.filterOptions.outcome ?? []} onChange={(v) => logTable.setFilter('outcome', v)} />
+                      <HubResetFilters count={logTable.activeFilterCount} onReset={logTable.reset} />
+                    </>}
+                  />
+                )}
                 <div className="table-scroll">
                   <table className="w-full text-sm">
                     <thead className="bg-surface-sunken">
                       <tr className="text-left">
-                        <th className="px-3 py-2 text-[11px] font-semibold">When</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold">Channel</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold">Order</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold">Outcome</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold">Detail</th>
+                        <th className="px-3 py-2 text-[11px] font-semibold" aria-sort={logAriaSort('when')}>{logSortHead('when', 'When')}</th>
+                        <th className="hidden px-3 py-2 text-[11px] font-semibold sm:table-cell" aria-sort={logAriaSort('channel')}>{logSortHead('channel', 'Channel')}</th>
+                        <th className="px-3 py-2 text-[11px] font-semibold" aria-sort={logAriaSort('order')}>{logSortHead('order', 'Order')}</th>
+                        <th className="px-3 py-2 text-[11px] font-semibold" aria-sort={logAriaSort('outcome')}>{logSortHead('outcome', 'Outcome')}</th>
+                        <th className="hidden px-3 py-2 text-[11px] font-semibold md:table-cell">Detail</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {log.map((e) => (
+                      {logTable.rows.length === 0 && (
+                        <tr>
+                          <td colSpan={5}>
+                            <HubEmptyState
+                              variant="filtered"
+                              title="No activity matches"
+                              action={<Button size="sm" variant="outline" onClick={logTable.reset}>Clear filters</Button>}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                      {logTable.rows.map((e) => (
                         <tr key={e.id} className="border-t border-hairline">
                           <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatDate(e.created_at, { withTime: true })}</td>
-                          <td className="whitespace-nowrap px-3 py-2">{e.platform ?? '—'}</td>
-                          <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{e.external_order_id ?? '—'}</td>
+                          <td className="hidden whitespace-nowrap px-3 py-2 sm:table-cell">{e.platform ?? <HubCellEmpty />}</td>
+                          <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
+                            {e.external_order_id == null
+                              ? <HubCellEmpty />
+                              : e.order_id
+                                ? <HubCellLink to={`/finance/orders/${e.order_id}`}>{e.external_order_id}</HubCellLink>
+                                : e.external_order_id}
+                          </td>
                           <td className="whitespace-nowrap px-3 py-2">
                             <Badge variant={OUTCOME_TONE[e.outcome] ?? 'neutral'} className="text-[10px]">{e.outcome.replace(/_/g, ' ')}</Badge>
                           </td>
-                          <td className="px-3 py-2 text-muted-foreground">{e.message ?? '—'}</td>
+                          <td className="hidden break-words px-3 py-2 text-muted-foreground md:table-cell">{e.message ?? <HubCellEmpty />}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </CardContent>
           </Card>

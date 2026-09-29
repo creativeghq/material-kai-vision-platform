@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  renderGoogleFeed, renderSkroutzFeed, escapeXml, stripHtml, skroutzGaps,
+  renderGoogleFeed, renderSkroutzFeed, renderBestPriceFeed, escapeXml, stripHtml, feedGaps, gapSummary,
   type FeedProduct,
 } from '../../supabase/functions/_shared/commerce/feed-render';
 
@@ -59,17 +59,68 @@ describe('the two dialects are genuinely different documents', () => {
   });
 });
 
-describe('a product Skroutz would reject is named, not left to fail silently', () => {
-  it('reports nothing missing for a complete product', () => {
-    expect(skroutzGaps(FULL)).toEqual([]);
+describe('BestPrice is a third dialect, not the Skroutz one renamed', () => {
+  it('is a <store> document with its own tag names', () => {
+    const xml = renderBestPriceFeed([FULL], new Date('2026-01-02T03:04:05Z'));
+    expect(xml).toContain('<store>');
+    expect(xml).toContain('<date>2026-01-02 03:04</date>');
+    expect(xml).toContain('<productId>SKU-1</productId>');
+    expect(xml).toContain('<productURL>https://app.example/store/x?product=p1</productURL>');
+    expect(xml).toContain('<category_path>Tiles</category_path>');
+    expect(xml).toContain('<brand>Acme</brand>');
+    expect(xml).not.toContain('<mywebstore>');
+    expect(xml).not.toContain('<price_with_vat>');
+  });
+
+  it('prices are VAT-inclusive under a plain <price>, as BestPrice reads them', () => {
+    expect(renderBestPriceFeed([FULL], new Date())).toContain('<price>24.80</price>');
+  });
+
+  it('escapes as strictly as the others — a raw ampersand invalidates the whole file', () => {
+    const xml = renderBestPriceFeed([FULL], new Date());
+    expect(xml).not.toMatch(/&(?!amp;|lt;|gt;|quot;|apos;)/);
+  });
+
+  it('omits <ean> and <weight> rather than sending an empty one', () => {
+    const xml = renderBestPriceFeed([{ ...FULL, barcode: null, weight_kg: null }], new Date());
+    expect(xml).not.toContain('<ean>');
+    expect(xml).not.toContain('<weight>');
+  });
+});
+
+describe('a product the destination would reject is named, not left to fail silently', () => {
+  it('reports nothing missing for a complete product, in either strict dialect', () => {
+    expect(feedGaps('skroutz', FULL)).toEqual([]);
+    expect(feedGaps('bestprice', FULL)).toEqual([]);
   });
 
   it('names every mandatory attribute the product cannot supply', () => {
-    const gaps = skroutzGaps({ ...FULL, mpn: null, barcode: null, brand: null, image: null });
+    const gaps = feedGaps('skroutz', { ...FULL, mpn: null, barcode: null, brand: null, image: null });
     expect(gaps).toEqual(expect.arrayContaining(['mpn', 'ean', 'manufacturer', 'image']));
   });
 
-  it('counts a zero price as missing — Skroutz drops the product either way', () => {
-    expect(skroutzGaps({ ...FULL, price_gross: 0 })).toContain('price');
+  it('counts a zero price as missing — the product is dropped either way', () => {
+    expect(feedGaps('skroutz', { ...FULL, price_gross: 0 })).toContain('price');
+  });
+
+  it('holds BestPrice to ITS mandatory set: no EAN, no description, and brand is <brand>', () => {
+    expect(feedGaps('bestprice', { ...FULL, barcode: null, description: null })).toEqual([]);
+    expect(feedGaps('bestprice', { ...FULL, brand: null })).toContain('brand');
+    expect(feedGaps('skroutz', { ...FULL, brand: null })).toContain('manufacturer');
+  });
+
+  it('says nothing about a dialect with no mandatory set, rather than inventing rejections', () => {
+    expect(feedGaps('google', { ...FULL, mpn: null, brand: null })).toEqual([]);
+    expect(gapSummary('google', [{ ...FULL, mpn: null }])).toEqual({ count: 0, byAttribute: {} });
+  });
+
+  it('summarises per attribute, counting a product once however many attributes it lacks', () => {
+    const summary = gapSummary('bestprice', [
+      FULL,
+      { ...FULL, mpn: null },
+      { ...FULL, mpn: null, image: null },
+    ]);
+    expect(summary.count).toBe(2);
+    expect(summary.byAttribute).toEqual({ mpn: 2, image: 1 });
   });
 });
