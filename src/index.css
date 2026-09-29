@@ -1056,6 +1056,17 @@ All colors MUST be HSL.
     white-space: nowrap;
   }
 
+  /* In an auto-layout table `truncate` never truncates: its nowrap sizes the
+     column to the longest value and pushes the last columns off the card.
+     Bounding it is what makes the ellipsis happen. */
+  td .truncate {
+    max-width: min(28rem, 60vw);
+  }
+  td span.truncate {
+    display: inline-block;
+    vertical-align: bottom;
+  }
+
   /* `.gradient-border` and the universal bordered-box ring it powered are
      retired. That selector painted a masked pseudo-element ring onto EVERY
      bordered, rounded div in the app — on top of the div's own real border —

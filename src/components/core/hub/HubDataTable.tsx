@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/core/ui/checkbox';
@@ -140,26 +141,13 @@ export function HubDataTable<Row>({
                   }
                 >
                   {col.sortable && onSortChange ? (
-                    <button
-                      type="button"
+                    <HubSortButton
+                      active={isSorted ? sort?.direction : undefined}
+                      align={col.align}
                       onClick={() => handleSort(col)}
-                      className={cn(
-                        'group inline-flex items-center gap-1 rounded-xs transition-colors hover:text-foreground',
-                        col.align === 'right' && 'flex-row-reverse',
-                        isSorted && 'text-foreground',
-                      )}
                     >
                       {col.header}
-                      {isSorted ? (
-                        sort?.direction === 'asc' ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3" />
-                        )
-                      ) : (
-                        <ChevronsUpDown className="h-3 w-3 opacity-35 group-hover:opacity-70" />
-                      )}
-                    </button>
+                    </HubSortButton>
                   ) : (
                     col.header
                   )}
@@ -251,11 +239,47 @@ export function HubDataTable<Row>({
  * in the accent colour so a scan down the table shows exactly one entry point
  * per row — which is what every list in a CRM is for.
  */
-export const HubCellLink: React.FC<{ children: React.ReactNode; className?: string }> = ({
+export const HubCellLink: React.FC<{ children: React.ReactNode; to?: string; className?: string }> = ({
   children,
+  to,
   className,
-}) => (
-  <span className={cn('font-semibold text-primary hover:underline', className)}>{children}</span>
+}) => {
+  const cls = cn('font-semibold text-primary hover:underline', className);
+  return to ? (
+    <Link to={to} className={cls} onClick={(e) => e.stopPropagation()}>
+      {children}
+    </Link>
+  ) : (
+    <span className={cls}>{children}</span>
+  );
+};
+
+/** The sortable column header control — shared by HubDataTable and hand-built tables. */
+export const HubSortButton: React.FC<{
+  children: React.ReactNode;
+  /** Current direction when this column is the sort key. */
+  active?: 'asc' | 'desc';
+  align?: 'left' | 'right';
+  onClick: () => void;
+}> = ({ children, active, align, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'group inline-flex items-center gap-1 rounded-xs transition-colors hover:text-foreground',
+      align === 'right' && 'flex-row-reverse',
+      active && 'text-foreground',
+    )}
+  >
+    {children}
+    {active === 'asc' ? (
+      <ArrowUp className="h-3 w-3" />
+    ) : active === 'desc' ? (
+      <ArrowDown className="h-3 w-3" />
+    ) : (
+      <ChevronsUpDown className="h-3 w-3 opacity-35 group-hover:opacity-70" />
+    )}
+  </button>
 );
 
 /** A cell with no value. Never render an empty cell — a blank one reads as a bug. */

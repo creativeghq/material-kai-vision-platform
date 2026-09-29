@@ -2,7 +2,9 @@
 export { HubToolbar, HubFilterSelect, HubResetFilters } from './HubToolbar';
 export type { HubFilterOption } from './HubToolbar';
 
-export { HubDataTable, HubCellLink, HubCellEmpty } from './HubDataTable';
+export { HubDataTable, HubCellLink, HubCellEmpty, HubSortButton } from './HubDataTable';
+export { useHubTable, HUB_FILTER_ALL } from './useHubTable';
+export type { HubTableField } from './useHubTable';
 export type { HubColumn, HubSort } from './HubDataTable';
 
 export {
