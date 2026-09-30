@@ -210,7 +210,8 @@ function mapResendEventToPatch(lastEvent: string, nowISO: string): StatsPatch | 
 // deno-lint-ignore no-explicit-any
 type AnyClient = any;
 const RESEND = 'https://api.resend.com';
-const CONTACT_SYNC_CAP = 300; // max NEW contacts pushed per run (Resend rate-limit + edge time budget)
+const CONTACT_SYNC_CAP = 150; // Resend writes per run: 150 × ~0.6s fits the 150s edge ceiling
+const CONTACT_WRITE_SPACING_MS = 600;
 
 /** Resolve which Resend key to use for CONTACTS ops: the workspace's own BYOK, or — only for the
  *  operator ROOT workspace — the platform key. A non-root workspace without BYOK is NOT allowed
@@ -264,47 +265,66 @@ function splitName(name: string | null): { first?: string; last?: string } {
   return { first: parts[0], last: parts.length > 1 ? parts.slice(1).join(' ') : undefined };
 }
 
-/** Push CRM contacts (workspace-scoped, with an email) into the Resend audience — additive only
- *  (never deletes; never re-adds an existing/unsubscribed contact). Returns a summary + stamps
- *  contacts_last_synced_at / count / error on workspace_email_config. */
-async function syncCrmContactsToResend(supabase: AnyClient, workspaceId: string): Promise<{ audience_id: string; added: number; already: number; total_crm: number; capped: boolean }> {
+/** Resend's default limit is 2 req/s; an unpaced loop 429s from the third write onward. */
+async function resendWrite(url: string, method: 'POST' | 'PATCH', apiKey: string, body: unknown): Promise<string | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await new Promise((r) => setTimeout(r, CONTACT_WRITE_SPACING_MS));
+    const r = await fetch(url, {
+      method,
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.ok) return null;
+    const data = await r.json().catch(() => ({}));
+    if (r.status !== 429) return `${r.status} ${data?.message || data?.name || ''}`.trim();
+    const wait = Number(r.headers.get('retry-after'));
+    await new Promise((res) => setTimeout(res, Number.isFinite(wait) && wait > 0 ? wait * 1000 : 1500));
+  }
+  return '429 rate limited';
+}
+
+/** Mirror `resend_audience_sync_set` (CRM contacts + companies, with the campaign consent verdict)
+ *  into the Resend audience. Never deletes; a non-mailable address is added or kept as unsubscribed. */
+async function syncCrmContactsToResend(supabase: AnyClient, workspaceId: string): Promise<{ audience_id: string; added: number; already: number; unsubscribed: number; failed: number; total_crm: number; capped: boolean }> {
   const { apiKey, allowed } = await resolveContactsKey(supabase, workspaceId);
   if (!allowed || !apiKey) throw new HttpError(503, 'workspace_sender_required');
   const audienceId = await ensureAudience(supabase, workspaceId, apiKey);
 
-  const existing = new Set<string>();
+  const existing = new Map<string, { id: string; unsubscribed: boolean }>();
   for (const c of await listAudienceContacts(audienceId, apiKey)) {
-    if (c?.email) existing.add(String(c.email).trim().toLowerCase());
+    if (c?.email) existing.set(String(c.email).trim().toLowerCase(), { id: c.id, unsubscribed: !!c.unsubscribed });
   }
 
-  const { data: crm } = await supabase
-    .from('crm_contacts').select('email, name')
-    .eq('workspace_id', workspaceId).not('email', 'is', null).neq('email', '').limit(5000);
+  const { data: book, error: bookErr } = await supabase.rpc('resend_audience_sync_set', { p_workspace_id: workspaceId });
+  if (bookErr) throw new HttpError(500, `Could not read the CRM address book: ${bookErr.message}`);
 
-  const seen = new Set<string>();
-  let added = 0, already = 0, capped = false;
-  for (const c of crm ?? []) {
-    const email = String(c.email).trim().toLowerCase();
-    if (!email || seen.has(email)) continue;
-    seen.add(email);
-    if (existing.has(email)) { already++; continue; }
-    if (added >= CONTACT_SYNC_CAP) { capped = true; break; }
-    const { first, last } = splitName(c.name);
-    const r = await fetch(`${RESEND}/audiences/${audienceId}/contacts`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, first_name: first, last_name: last, unsubscribed: false }),
-    });
-    if (r.ok) added++; else already++; // already-exists / transient → count as skipped, don't fail the run
+  let added = 0, already = 0, unsubscribed = 0, failed = 0, writes = 0, capped = false;
+  let firstError: string | null = null;
+  for (const row of (book ?? []) as { email: string; display_name: string | null; mailable: boolean }[]) {
+    const have = existing.get(row.email);
+    if (have && (row.mailable || have.unsubscribed)) { already++; continue; }
+    if (writes >= CONTACT_SYNC_CAP) { capped = true; break; }
+    writes++;
+    let err: string | null;
+    if (have) {
+      err = await resendWrite(`${RESEND}/audiences/${audienceId}/contacts/${have.id}`, 'PATCH', apiKey, { unsubscribed: true });
+      if (!err) unsubscribed++;
+    } else {
+      const { first, last } = splitName(row.display_name);
+      err = await resendWrite(`${RESEND}/audiences/${audienceId}/contacts`, 'POST', apiKey,
+        { email: row.email, first_name: first, last_name: last, unsubscribed: !row.mailable });
+      if (!err) { if (row.mailable) added++; else unsubscribed++; }
+    }
+    if (err) { failed++; firstError ??= `${row.email}: ${err}`; }
   }
 
   await supabase.from('workspace_email_config').update({
     contacts_last_synced_at: new Date().toISOString(),
     contacts_last_sync_count: added,
-    contacts_last_sync_error: null,
+    contacts_last_sync_error: failed ? `${failed} address(es) not written to Resend — first: ${firstError}`.slice(0, 500) : null,
   }).eq('workspace_id', workspaceId);
 
-  return { audience_id: audienceId, added, already, total_crm: seen.size, capped };
+  return { audience_id: audienceId, added, already, unsubscribed, failed, total_crm: (book ?? []).length, capped };
 }
 
 Deno.serve(withApiLogging('email-api', async (req) => {

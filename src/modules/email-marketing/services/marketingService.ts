@@ -359,13 +359,16 @@ class MarketingService {
     };
   }
 
-  async syncResendContacts(workspaceId: string): Promise<{ added: number; already: number; total_crm: number; capped: boolean }> {
+  async syncResendContacts(workspaceId: string): Promise<{ added: number; already: number; unsubscribed: number; failed: number; total_crm: number; capped: boolean }> {
     const { data, error } = await supabase.functions.invoke('email-api', {
       body: { action: 'sync-resend-contacts', workspace_id: workspaceId },
     });
     if (error) throw await edgeError(error);
     if (!data?.success) throw new Error(data?.error || 'Failed to sync contacts');
-    return { added: data.added ?? 0, already: data.already ?? 0, total_crm: data.total_crm ?? 0, capped: !!data.capped };
+    return {
+      added: data.added ?? 0, already: data.already ?? 0, unsubscribed: data.unsubscribed ?? 0,
+      failed: data.failed ?? 0, total_crm: data.total_crm ?? 0, capped: !!data.capped,
+    };
   }
 
   async setContactAutoSync(workspaceId: string, autoSync: boolean): Promise<void> {

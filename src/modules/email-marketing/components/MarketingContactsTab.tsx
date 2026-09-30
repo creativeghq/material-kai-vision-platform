@@ -1,7 +1,7 @@
 /**
- * Resend Audience / Contacts. Shows the contacts already in the workspace's Resend audience,
- * a toggle to auto-sync CRM contacts to Resend daily, a manual "Sync now" button, and the last-sync
- * status. Sync is additive (never deletes / never touches unsubscribed contacts).
+ * Resend Audience / Contacts. Shows the workspace's Resend audience, the daily auto-sync toggle,
+ * "Sync now" and the last-sync status. The synced set is CRM contacts AND companies with an email;
+ * an address without a mailing basis is kept as unsubscribed. Sync never deletes.
  */
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, Loader2, Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
@@ -39,9 +39,13 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
     setSyncing(true);
     try {
       const res = await marketingService.syncResendContacts(workspaceId);
+      const parts = [`${res.added} added`, `${res.already} already present`];
+      if (res.unsubscribed) parts.push(`${res.unsubscribed} held back as unsubscribed (no consent or opted out)`);
+      if (res.failed) parts.push(`${res.failed} failed`);
       toast({
-        title: 'Sync complete',
-        description: `${res.added} new, ${res.already} already present${res.capped ? ' (capped — run again for the rest)' : ''}.`,
+        title: res.failed ? 'Sync finished with errors' : 'Sync complete',
+        description: `${parts.join(', ')} of ${res.total_crm} CRM addresses${res.capped ? ' — capped, run again for the rest' : ''}.`,
+        variant: res.failed ? 'destructive' : undefined,
       });
       await load();
     } catch (e: any) {
@@ -56,7 +60,7 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
     try {
       await marketingService.setContactAutoSync(workspaceId, on);
       setData((d) => (d ? { ...d, auto_sync: on } : d));
-      toast({ title: on ? 'Auto-sync enabled' : 'Auto-sync disabled', description: on ? 'CRM contacts sync to Resend daily.' : undefined });
+      toast({ title: on ? 'Auto-sync enabled' : 'Auto-sync disabled', description: on ? 'CRM contacts and companies sync to Resend daily.' : undefined });
     } catch (e: any) {
       toast({ title: 'Error', description: e?.message || 'Failed to update', variant: 'destructive' });
     } finally {
@@ -100,8 +104,8 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
 
         <div className="flex items-center justify-between rounded-md border p-3">
           <div>
-            <p className="text-sm font-medium">Auto-sync CRM contacts to Resend</p>
-            <p className="text-xs text-muted-foreground">When on, new CRM contacts are pushed to your Resend audience daily.</p>
+            <p className="text-sm font-medium">Auto-sync CRM contacts and companies to Resend</p>
+            <p className="text-xs text-muted-foreground">When on, new CRM addresses are pushed to your Resend audience daily.</p>
           </div>
           <Switch checked={!!data?.auto_sync} disabled={savingToggle} onCheckedChange={toggleAuto} />
         </div>
@@ -113,7 +117,7 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
             <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Last synced {formatDistanceToNow(new Date(data.last_synced_at), { addSuffix: true })}
               {data.last_sync_count != null && ` · ${data.last_sync_count} added`}</>
           ) : (
-            <>Not synced yet — click “Sync now” to push your CRM contacts.</>
+            <>Not synced yet — click “Sync now” to push your CRM contacts and companies.</>
           )}
         </div>
       </div>
