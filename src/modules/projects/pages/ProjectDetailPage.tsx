@@ -52,6 +52,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   projectsService,
   type ProjectCoverCandidate,
+  type ProjectMember,
   type ProjectWithClient,
   type ProjectStatus,
 } from '../services/projectsService';
@@ -164,14 +165,15 @@ export const ProjectDetailPage: React.FC = () => {
   // The newest moodboard image, fetched ONCE here so the header thumbnail and the Overview's
   // cover panel resolve the same picture. Re-read when a board is added or removed.
   const [coverCandidate, setCoverCandidate] = useState<ProjectCoverCandidate | null>(null);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
 
-  // Ownership: project.user_id is the creator. Anyone else who can read the project
-  // got here via a project_collaborators row (RLS guarantees this). Owner gets the
-  // management surface; collaborator gets a read-only view with budget + timeline hidden.
+  // Three viewers: the owner, a teammate (project_members), and a client (project_collaborators,
+  // read-only). The team gets the working surface; transfer and delete stay with the owner.
   const isOwner = !!user && !!project && project.user_id === user.id;
-  // Finance + Products are professional surfaces (operator/dealer/architect), never the
-  // end customer. Gated identically to Billing: owner + finance.manage capability.
-  const canFinance = isOwner && can('finance.manage');
+  const myMembership = members.find((m) => m.user_id === user?.id) ?? null;
+  const isTeam = isOwner || !!myMembership;
+  const isManager = isOwner || myMembership?.role === 'manager';
+  const canFinance = isManager && can('finance.manage');
   // Hard-delete is a principal action: the owner, and only the business personas
   // (operator / dealer / architect) — not project-client end-users or staff.
   const canDeleteProject = isOwner && ['operator', 'dealer', 'architect'].includes(persona);
@@ -180,10 +182,11 @@ export const ProjectDetailPage: React.FC = () => {
   // cannot drift — a trigger added without an entry here reintroduces the blank-panel state.
   const availableTabs = PROJECT_TABS.filter((t) => {
     if (t === 'finance') return canFinance;
-    return isOwner || !OWNER_ONLY_TABS.has(t);
+    if (t === 'billing') return isManager;
+    return isTeam || !OWNER_ONLY_TABS.has(t);
   });
   // Validated against what THIS viewer gets, so `?tab=timeline` on a collaborator's link falls
-  // back to Overview instead of rendering a blank panel. Safe to read `isOwner` here: the page
+  // back to Overview instead of rendering a blank panel. Safe to read `isTeam` here: the page
   // returns a loader above and only reaches the tabs once the project has resolved.
   const requested = sp.get('tab') as ProjectTab | null;
   const tab: ProjectTab = requested && availableTabs.includes(requested) ? requested : 'overview';
@@ -219,7 +222,14 @@ export const ProjectDetailPage: React.FC = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const data = await projectsService.getProject(id);
+      const [data, team] = await Promise.all([
+        projectsService.getProject(id),
+        projectsService.listProjectMembers(id).catch(() => {
+          toast({ title: 'Could not load the project team', description: 'You may see a read-only view until you reload.', variant: 'destructive' });
+          return [] as ProjectMember[];
+        }),
+      ]);
+      setMembers(team);
       if (!data) {
         toast({ title: 'Project not found', variant: 'destructive' });
         navigate('/projects');
@@ -311,10 +321,15 @@ export const ProjectDetailPage: React.FC = () => {
         subtitle={project.description || undefined}
         actions={
           <>
-            {!isOwner && (
+            {!isTeam && (
               <Badge variant="outline" className="hidden sm:inline-flex bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30">
                 <Eye className="h-3 w-3 mr-1" />
                 Shared with you
+              </Badge>
+            )}
+            {myMembership && (
+              <Badge variant="info" className="hidden sm:inline-flex">
+                {myMembership.role === 'manager' ? 'Project manager' : 'Team member'}
               </Badge>
             )}
             {project.category?.label && (
@@ -325,26 +340,26 @@ export const ProjectDetailPage: React.FC = () => {
             <Badge variant={PROJECT_STATUS_BADGE[project.status]} className="hidden sm:inline-flex">
               {PROJECT_STATUS_LABELS[project.status]}
             </Badge>
-            {isOwner && (
+            {isTeam && (
               <Button variant="outline" size="sm" onClick={() => navigate('/projects')}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 All projects
               </Button>
             )}
-            {isOwner && (
+            {isManager && (
               <Button size="sm" onClick={() => setShowInvite(true)}>
                 <UserPlus className="h-4 w-4 mr-1" />
                 Invite client
               </Button>
             )}
             {/* Reuse this project's rooms + task tree on the next job (#322). */}
-            {isOwner && (
+            {isTeam && (
               <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)}>
                 <Layers className="h-4 w-4 mr-1" />
                 Save as template
               </Button>
             )}
-            {isOwner && project.status !== 'archived' && (
+            {isManager && project.status !== 'archived' && (
               <Button variant="outline" size="sm" onClick={handleArchive}>
                 <Archive className="h-4 w-4 mr-1" />
                 Archive
@@ -404,19 +419,30 @@ export const ProjectDetailPage: React.FC = () => {
                 </TabsList>
               )}
 
-          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} canFinance={canFinance} onOpenSection={setTab} coverCandidate={coverCandidate} onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
-          <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
-          {isOwner && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
-          {isOwner && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isOwner} /></TabsContent>}
-          {isOwner && <TabsContent value="purchases"><PurchaseItemsTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} /></TabsContent>}
+          <TabsContent value="overview"><OverviewTab project={project} isOwner={isTeam} canEditProject={isManager} canFinance={canFinance} onOpenSection={setTab} coverCandidate={coverCandidate}
+            team={isTeam ? {
+              members,
+              canManage: isManager,
+              onChanged: () => {
+                projectsService.listProjectMembers(project.id).then((rows) => {
+                  if (!isOwner && !rows.some((m) => m.user_id === user?.id)) { navigate('/projects'); return; }
+                  setMembers(rows);
+                }).catch(() => {});
+              },
+            } : undefined}
+            onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
+          <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isTeam} /></TabsContent>
+          {isTeam && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
+          {isTeam && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isTeam} /></TabsContent>}
+          {isTeam && <TabsContent value="purchases"><PurchaseItemsTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} /></TabsContent>}
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
           <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} /></ModuleTabGate></TabsContent>
-          {isOwner && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><BillingTab projectId={project.id} /></ModuleTabGate></TabsContent>}
+          {isManager && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><BillingTab projectId={project.id} /></ModuleTabGate></TabsContent>}
           {canFinance && <TabsContent value="finance"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Orders, invoices and payments for this project."><FinanceTab projectId={project.id} projectName={project.name} /></ModuleTabGate></TabsContent>}
-          <TabsContent value="sheets"><SheetsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
-          {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
-          {isOwner && <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" defaultCounterparty={{ name: project.client_contact?.name || project.client_company?.name, email: project.client_contact?.email }} /></ModuleTabGate></TabsContent>}
-          {isOwner && (
+          <TabsContent value="sheets"><SheetsTab projectId={project.id} isOwner={isTeam} /></TabsContent>
+          {isTeam && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isTeam} /></TabsContent>}
+          {isTeam && <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" defaultCounterparty={{ name: project.client_contact?.name || project.client_company?.name, email: project.client_contact?.email }} /></ModuleTabGate></TabsContent>}
+          {isTeam && (
             <TabsContent value="handover">
               <WarrantiesTab
                 companyId={project.client_company_id ?? undefined}
@@ -425,18 +451,18 @@ export const ProjectDetailPage: React.FC = () => {
               />
             </TabsContent>
           )}
-          <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isOwner} /></TabsContent>
-          <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isOwner} /></TabsContent>
-          <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
-          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isOwner} focusRequestId={sp.get('request')} /></TabsContent>
-          {isOwner && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isOwner} subjectName={project.name} /></ModuleTabGate></TabsContent>}
-          {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
+          <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isTeam} /></TabsContent>
+          <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isTeam} /></TabsContent>
+          <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isTeam} /></TabsContent>
+          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isTeam} focusRequestId={sp.get('request')} /></TabsContent>
+          {isTeam && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isTeam} subjectName={project.name} /></ModuleTabGate></TabsContent>}
+          {isTeam && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
             </Tabs>
           </TabsContent>
         </Tabs>
       </main>
 
-      {isOwner && (
+      {isManager && (
         <InviteCollaboratorsModal
           projectId={project.id}
           projectName={project.name}
@@ -445,7 +471,7 @@ export const ProjectDetailPage: React.FC = () => {
         />
       )}
 
-      {isOwner && (
+      {isTeam && (
         <SaveAsTemplateDialog
           entityType="project"
           sourceId={project.id}

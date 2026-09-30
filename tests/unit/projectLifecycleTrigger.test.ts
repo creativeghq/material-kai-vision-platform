@@ -24,6 +24,7 @@ const LIFECYCLE_TRIGGERS = [
   'project_delivery_issued',
   'project_asset_registered',
   'project_task_overdue',
+  'project_member_added',
 ] as const;
 
 /**
@@ -46,6 +47,7 @@ const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string | null> = {
    * file that would never contain it.
    */
   project_task_overdue: null,
+  project_member_added: null,
 };
 
 const TYPES = 'src/services/flows/types.ts';

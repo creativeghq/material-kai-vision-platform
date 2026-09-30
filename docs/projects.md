@@ -179,7 +179,16 @@ Each row carries a `payload jsonb` with the fields relevant to that event (e.g. 
 
 **Owner-all** (Phase 1): `user_id = auth.uid()` gets full ALL on `projects` / `project_rooms` / `project_tasks` / (via parent project lookup) `project_events`.
 
-**Assignee-read**: `project_tasks_assignee_read` lets the task's `assignee_id` read that task (only that task, not the project) while an active member of the project's workspace. Projects themselves remain single-owner.
+**Team** (`project_members`): the owner puts chosen workspace teammates on a project, as `manager` or `member`. Not the whole workspace; clients stay in `project_collaborators`.
+- `_user_is_project_team(project)` = owner, or a member who is still **active** in the project's workspace (suspend them and access ends). `_user_manages_project` = owner or manager.
+- Every owner-only project table has four team policies (one per command), including children reached through a parent (revisions, markups, inspection items, request messages). The team reads moodboards, items and quotes filed on the project. Sheets, the event log and client invites follow the same rule.
+- A member works on the content. A manager also sees Finance/Billing (with `finance.manage`), edits the project record, archives it, invites clients and manages the team. Only the owner transfers (`projects_owner_columns_guard`) or deletes it.
+- DEFINER RPCs that checked `v_owner = auth.uid()` now check the team: inspections, RFIs, snags, baseline, assessment, dashboard, visits, My tasks.
+- Adding someone emits `project_member_added` (`user_id` = the person added) from the AFTER INSERT trigger `_emit_project_member_added`, so every writer notifies, not only the UI. It is delivered by a seeded, locked, tenant-configurable default flow.
+
+**Assignee-read**: `project_tasks_assignee_read` still lets a workspace member who is NOT on the team read a task assigned to them (only that task).
+
+**Storage**: `project-docs/<project>/…` and `project-site/{project-snags,project-site-logs}/<project>/<user>/…` in `pdf-documents` are readable, writable and deletable by the team, and readable by a client only when the document or snag is client-visible. Before 2026-09-30 no authenticated policy covered these paths, so no upload could land. `build_storage_reference_set()` now also keeps `project_snags.fix_photo_paths` and `project_inspection_items.photo_paths`.
 
 **Collaborator-read** (Phase 4): five additional permissive SELECT policies on `projects` / `project_rooms` / `project_tasks` (filtered to `client_visible`) / `moodboards` / `moodboard_items` / `moodboard_presentation_sheets` / `quotes`, gated on the EXISTS predicate:
 

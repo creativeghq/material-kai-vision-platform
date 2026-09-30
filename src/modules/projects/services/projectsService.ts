@@ -559,6 +559,16 @@ export interface UpdateTaskInput {
   priority?: TaskPriority | null;
 }
 
+export type ProjectMemberRole = 'manager' | 'member';
+
+export interface ProjectMember {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role: ProjectMemberRole;
+  created_at: string;
+}
+
 export interface TaskComment {
   id: string;
   task_id: string;
@@ -633,7 +643,7 @@ export async function emitProjectLifecycle(
 class ProjectsService {
   // ---------- PROJECTS ----------
 
-  /** Projects the caller can see: their own plus any they are an active collaborator on. */
+  /** Projects the caller can see: their own, those they are on the team of, and client shares. */
   async listProjects(opts: { status?: ProjectStatus | 'active' } = {}): Promise<ProjectWithClient[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -676,6 +686,11 @@ class ProjectsService {
       for (const p of profiles ?? []) {
         const label = (p as any).full_name || (p as any).email;
         if (label) nameById.set((p as any).user_id, label);
+      }
+      // user_profiles RLS hides teammates, which is exactly who owns a project you are on the team of.
+      if (activeWorkspaceId && otherOwnerIds.some((id) => !nameById.has(id))) {
+        const people = await this.listTaskAssignees(activeWorkspaceId).catch(() => []);
+        for (const p of people) if (p.kind === 'member' && !nameById.has(p.id)) nameById.set(p.id, p.name);
       }
     }
     return rows.map((r) => ({
@@ -1196,6 +1211,32 @@ class ProjectsService {
 
   async removeTaskDependency(id: string): Promise<void> {
     const { error } = await (supabase as any).from('project_task_dependencies').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // ---------- PROJECT TEAM ----------
+
+  async listProjectMembers(projectId: string): Promise<ProjectMember[]> {
+    const { data, error } = await (supabase as any)
+      .from('project_members').select('id, project_id, user_id, role, created_at')
+      .eq('project_id', projectId).order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ProjectMember[];
+  }
+
+  /** Refused unless active in the project's workspace; a DB trigger also notifies the person added. */
+  async addProjectMember(projectId: string, userId: string, role: ProjectMemberRole): Promise<void> {
+    const { error } = await (supabase as any).from('project_members').insert({ project_id: projectId, user_id: userId, role });
+    if (error) throw error;
+  }
+
+  async setProjectMemberRole(id: string, role: ProjectMemberRole): Promise<void> {
+    const { error } = await (supabase as any).from('project_members').update({ role }).eq('id', id);
+    if (error) throw error;
+  }
+
+  async removeProjectMember(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('project_members').delete().eq('id', id);
     if (error) throw error;
   }
 

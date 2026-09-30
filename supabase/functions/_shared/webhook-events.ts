@@ -35,6 +35,7 @@ export const SUBSCRIBABLE_EVENT_TYPES: string[] = [
   'project_task_overdue',
   'project_created',
   'project_task_completed',
+  'project_member_added',
   'project_milestone_reached',
   'project_snag_raised',
   'project_expense_approved',

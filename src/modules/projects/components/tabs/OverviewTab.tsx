@@ -14,7 +14,6 @@ import {
   Home,
   Tags,
   Diamond,
-  Users,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -25,12 +24,13 @@ import {
   type ProjectCoverCandidate,
   type ProjectWithClient,
   type ProjectRoom,
+  type ProjectMember,
 } from '../../services/projectsService';
 import { ProjectCoverPanel } from '../ProjectCoverPanel';
 import { assigneeKey, NO_ASSIGNEE, useProjectTasks } from '../tasks/useProjectTasks';
-import { AssigneeDot } from '../tasks/taskBits';
 import { ProjectCostPanel } from '../ProjectCostPanel';
 import { ProjectVisitsPanel } from '../ProjectVisitsPanel';
+import { ProjectTeamPanel } from '../ProjectTeamPanel';
 
 interface OverviewTabProps {
   project: ProjectWithClient;
@@ -45,7 +45,9 @@ interface OverviewTabProps {
    */
   onProjectPatched?: (patch: Partial<ProjectWithClient>) => void;
   canFinance?: boolean;
+  canEditProject?: boolean;
   onOpenSection?: (tab: string) => void;
+  team?: { members: ProjectMember[]; canManage: boolean; onChanged: () => void };
 }
 
 import { formatMoney } from '@/utils/decimal';
@@ -66,7 +68,7 @@ const daysUntil = (date: string | null) => {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, coverCandidate = null, onProjectPatched, canFinance = false, onOpenSection }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, coverCandidate = null, onProjectPatched, canFinance = false, canEditProject = isOwner, onOpenSection, team }) => {
   const { toast } = useToast();
   // Buildings are only a sensible answer where the workspace actually has them. A permanently
   // empty picker reads as a broken control rather than a neutral one.
@@ -81,7 +83,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
   );
   const [roomBudgetFailed, setRoomBudgetFailed] = useState(false);
   const taskState = useProjectTasks(project.id);
-  const { tasks, assigneeName, assigneesFailed } = taskState;
+  const { tasks } = taskState;
 
   useEffect(() => {
     projectsService.listRooms(project.id).then(setRooms).catch(() => {});
@@ -127,19 +129,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
     .filter(t => t.is_milestone)
     .sort((a, b) => (a.due_date ?? a.end_date ?? '9999').localeCompare(b.due_date ?? b.end_date ?? '9999')), [tasks]);
 
-  // Who is carrying the open work, derived from the assignees on the tasks themselves.
-  const team = useMemo(() => {
-    const m = new Map<string, { name: string | null; open: number; total: number }>();
+  const openTasks = useMemo(() => {
+    const m = new Map<string, number>();
     for (const t of tasks.flatMap(x => [x, ...x.subtasks])) {
       const key = assigneeKey(t);
-      if (key === NO_ASSIGNEE) continue;
-      const row = m.get(key) ?? { name: assigneeName(t), open: 0, total: 0 };
-      row.total += 1;
-      if (t.status !== 'done') row.open += 1;
-      m.set(key, row);
+      if (key === NO_ASSIGNEE || t.status === 'done') continue;
+      m.set(key, (m.get(key) ?? 0) + 1);
     }
-    return [...m.entries()].sort((a, b) => b[1].open - a[1].open);
-  }, [tasks, assigneeName]);
+    return m;
+  }, [tasks]);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -153,7 +151,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {/* The picture the project wears — the same one its card carries on /projects. */}
       <ProjectCoverPanel
         project={project}
-        isOwner={isOwner}
+        isOwner={canEditProject}
         candidate={coverCandidate}
         onProjectPatched={onProjectPatched}
         className="lg:col-span-3"
@@ -171,7 +169,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
               </div>
               <Select
                 value={project.category_id ?? 'none'}
-                disabled={savingCategory}
+                disabled={savingCategory || !canEditProject}
                 onValueChange={async (v) => {
                   const nextId = v === 'none' ? null : v;
                   setSavingCategory(true);
@@ -210,7 +208,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
           development or a fit-out -- the actual work these customers do -- could not be attached
           to the building it happens in. Owner-only and self-hiding without the module: a
           permanently empty control reads as broken, not as neutral. */}
-      {isOwner && realEstate && project.workspace_id && (
+      {canEditProject && realEstate && project.workspace_id && (
         <Card className="dashboard-card lg:col-span-3">
           <CardContent className="p-4">
             <PropertyLinkField
@@ -482,30 +480,23 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
                 )}
               </div>
             )}
-            {isOwner && team.length > 0 && (
-              <div className="pt-2 border-t border-hairline">
-                <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3 w-3" />Team</p>
-                <ul className="space-y-1.5">
-                  {team.map(([key, n]) => {
-                    const name = n.name;
-                    return (
-                      <li key={key} className="flex items-center gap-2 text-sm">
-                        <AssigneeDot name={name ?? '?'} />
-                        <span className={`truncate flex-1 ${name ? '' : 'text-muted-foreground'}`}>
-                          {name ?? (assigneesFailed ? 'Name could not be loaded' : 'No longer on the team')}
-                        </span>
-                        <span className="text-xs tabular-nums text-muted-foreground">{n.open} open</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
 
-      <ProjectVisitsPanel project={project} isOwner={isOwner} className="lg:col-span-3" />
+      {team && (
+        <ProjectTeamPanel
+          project={project}
+          members={team.members}
+          canManage={team.canManage}
+          openTasks={openTasks}
+          assignees={taskState.assignees}
+          assigneesFailed={taskState.assigneesFailed}
+          onChanged={team.onChanged}
+          className="lg:col-span-1"
+        />
+      )}
+      <ProjectVisitsPanel project={project} isOwner={isOwner} className={team ? 'lg:col-span-2' : 'lg:col-span-3'} />
 
       {project.description && (
         <Card className="dashboard-card lg:col-span-3">
