@@ -35,7 +35,7 @@ export const ProjectCostPanel: React.FC<{
   }, [projectId]);
 
   return (
-    <Card className="dashboard-card lg:col-span-3">
+    <Card className="dashboard-card">
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2 font-medium"><Wallet className="h-4 w-4 text-primary" />Cost & margin</CardTitle>

@@ -7,7 +7,7 @@ import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
   Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature,
-  KeyRound, Wrench, Receipt, LineChart, RotateCw, Layers, Gauge,
+  KeyRound, Wrench, Receipt, LineChart, RotateCw, Layers, Gauge, MoreHorizontal, BedDouble, Bath,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -26,7 +26,10 @@ import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { HubEmptyState } from '@/components/core/hub';
+import { HubEmptyState, HubRecordHero, HubHeroChip, type HubHeroFact } from '@/components/core/hub';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 import {
   realEstateService, isPublishBlocked,
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
@@ -49,8 +52,8 @@ import { formatMoney } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 import { propertyName } from '@/utils/propertyLabel';
 
-// Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
-const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
+// Canonical tab trigger styling (design-system.md → Tabs): underline, icon+label gap.
+const RE_TAB = 'flex items-center gap-2';
 
 /**
  * Listing paperwork. `property_documents` had existed since the module shipped, was read by
@@ -245,6 +248,17 @@ export default function PropertyWorkbench() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const coverPath = (photos.find((p) => p.is_cover) ?? photos[0])?.storage_path ?? null;
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!coverPath) { setCoverUrl(null); return; }
+    let alive = true;
+    import('@/integrations/supabase/client').then(({ supabase }) =>
+      supabase.storage.from('property-media').createSignedUrl(coverPath, 3600)
+        .then(({ data }) => { if (alive) setCoverUrl(data?.signedUrl ?? null); }));
+    return () => { alive = false; };
+  }, [coverPath]);
+
   const set = (k: string, v: any) => setForm((p) => ({ ...p, [k]: v }));
 
   const save = async () => {
@@ -388,6 +402,26 @@ export default function PropertyWorkbench() {
   const requestedTab = sp.get('tab') || 'overview';
   const activeTab = availableTabs.includes(requestedTab) ? requestedTab : 'overview';
 
+  const humanize = (v: unknown) => String(v ?? '').replace(/_/g, ' ');
+  const area = property.area_built ?? property.gross_area ?? property.plot_area ?? null;
+  const place = [property.town, property.municipality || property.region].filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i).join(', ');
+  const heroFacts: HubHeroFact[] = [
+    { icon: MapPin, label: 'Location', value: place || '—' },
+    ...(area ? [{ icon: Ruler, label: 'Area', value: `${area} m²` }] : []),
+    ...(property.bedrooms ? [{ icon: BedDouble, label: 'Bedrooms', value: property.bedrooms }] : []),
+    ...(property.bathrooms ? [{ icon: Bath, label: 'Bathrooms', value: property.bathrooms }] : []),
+    ...(property.energy_class ? [{ icon: Zap, label: 'Energy', value: property.energy_class }] : []),
+    { icon: Contact, label: 'Leads', value: inquiries.length, hint: `${viewings.length} ${viewings.length === 1 ? 'viewing' : 'viewings'}` },
+  ];
+  const heroPrice = property.price_on_request
+    ? 'Price on request'
+    : property.price
+      ? `${offerMoney(Number(property.price), property.currency)}${isRental && property.price_period ? ` / ${property.price_period}` : ''}`
+      : undefined;
+  const heroDescription: string | null = property.description_i18n?.en || property.description_i18n?.el || null;
+  const openTab = (v: string) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', v); return n; }, { replace: true });
+
   const publicUrl = property.public_listing_token ? `${window.location.origin}/p/${property.public_listing_token}` : null;
   const stepId = STEPS[step].id;
 
@@ -397,20 +431,32 @@ export default function PropertyWorkbench() {
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}><ArrowLeft className="mr-1 h-4 w-4" /> Portfolio</Button>
-            <Button variant="outline" size="sm" disabled={busy} onClick={async () => {
-              setBusy(true);
-              try { const r = await realEstateService.generateBrochure(id); if (r.pdf_url) window.open(r.pdf_url, '_blank'); toast({ title: 'Brochure ready', description: `${r.page_count} page(s)` }); }
-              catch (e) { toast({ title: 'Brochure failed', description: (e as Error).message, variant: 'destructive' }); }
-              finally { setBusy(false); }
-            }}><FileText className="mr-1 h-4 w-4" /> Brochure</Button>
-            <Button variant="outline" size="sm" onClick={() => setCmaOpen(true)}><LineChart className="mr-1 h-4 w-4" /> CMA</Button>
             {editable && (property.is_public
               ? <Button variant="outline" size="sm" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
               : <Button size="sm" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}
             {editable && <Button size="sm" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
-            {/* Reuse this listing's shape — type, condition, features, boilerplate copy (#322). */}
-            {editable && <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)} title="Save the listing shape as a reusable template"><Layers className="mr-1 h-4 w-4" /> Template</Button>}
-            {editable && <Button variant="ghost" size="sm" className="text-red-700 dark:text-red-500 hover:bg-red-500/10 hover:text-red-600" onClick={() => setDelOpen(true)} disabled={busy} title="Delete listing"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" aria-label="More actions"><MoreHorizontal className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={busy} onSelect={async () => {
+                  setBusy(true);
+                  try { const r = await realEstateService.generateBrochure(id); if (r.pdf_url) window.open(r.pdf_url, '_blank'); toast({ title: 'Brochure ready', description: `${r.page_count} page(s)` }); }
+                  catch (e) { toast({ title: 'Brochure failed', description: (e as Error).message, variant: 'destructive' }); }
+                  finally { setBusy(false); }
+                }}><FileText className="mr-2 h-4 w-4" /> Brochure</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setCmaOpen(true)}><LineChart className="mr-2 h-4 w-4" /> CMA report</DropdownMenuItem>
+                {/* Reuse this listing's shape — type, condition, features, boilerplate copy (#322). */}
+                {editable && <DropdownMenuItem onSelect={() => setSaveTemplateOpen(true)}><Layers className="mr-2 h-4 w-4" /> Save as template</DropdownMenuItem>}
+                {editable && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={busy} onSelect={() => setDelOpen(true)}><Trash2 className="mr-2 h-4 w-4" /> Delete listing</DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         } />
 
@@ -430,8 +476,8 @@ export default function PropertyWorkbench() {
             matching no trigger and no content: a blank page with no tab selected and no error
             Clamping to the tabs actually present covers every conditional
             tab, not just lettings, and keeps the deep link working whenever it is legitimate. */}
-        <Tabs value={activeTab} onValueChange={(v) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', v); return n; }, { replace: true })}>
-          <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
+        <Tabs value={activeTab} onValueChange={openTab}>
+          <TabsList className="mb-4 w-full justify-start gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabsTrigger value="overview" className={RE_TAB}><Home className="h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="media" className={RE_TAB}><ImageIcon className="h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-0.5 border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="inquiries" className={RE_TAB}><Contact className="h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-0.5 border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
@@ -466,6 +512,25 @@ export default function PropertyWorkbench() {
 
           {/* ── Overview / multi-step edit form ── */}
           <TabsContent value="overview" className="space-y-4">
+            <HubRecordHero
+              imageUrl={coverUrl}
+              placeholder={<div className="flex flex-col items-center gap-2 text-sm"><ImageIcon className="h-8 w-8" />No photos yet</div>}
+              badges={<>
+                <HubHeroChip>{property.is_public ? <><Globe className="h-3 w-3" /> Live</> : 'Not published'}</HubHeroChip>
+                <HubHeroChip>{humanize(property.listing_status)}</HubHeroChip>
+                <HubHeroChip>{humanize(property.transaction_type)}</HubHeroChip>
+                {property.subtype && <HubHeroChip>{property.subtype}</HubHeroChip>}
+              </>}
+              headline={heroPrice}
+              description={heroDescription}
+              facts={heroFacts}
+              actions={
+                <Button variant="secondary" size="sm" className="h-8 border-white/30 bg-black/50 text-white hover:bg-black/70" onClick={() => openTab('media')}>
+                  <ImageIcon className="mr-1.5 h-3.5 w-3.5" /> {photos.length > 0 ? `${photos.length} photos` : 'Add photos'}
+                </Button>
+              }
+            />
+
             {canManage && !canEdit && (
               <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
                 <EyeOff className="h-3.5 w-3.5" /> This listing belongs to another agent (shared “open for all”) — read-only.
@@ -486,28 +551,30 @@ export default function PropertyWorkbench() {
                 never asks the agent to do anything. Not gated on `canManage`: an agent who can see
                 the listing can see what it cost, and the RPC is SECURITY INVOKER, so the real
                 boundary is each table's own RLS rather than this condition. */}
+            <div className="grid items-start gap-4 empty:hidden lg:grid-cols-2">
             <PropertyCommercialCard propertyId={id} />
 
             {/* The read side of `projects.property_id` — the picker that writes it is on the
                 project's Overview tab, so until now the link only worked in one direction.
                 Same rule as the card above: renders nothing until something is linked. */}
             <PropertyProjectsCard propertyId={id} />
-
-            {/* Stepper */}
-            <div className="flex flex-wrap gap-1.5">
-              {STEPS.map((s, i) => {
-                const Icon = s.icon;
-                const active = i === step;
-                return (
-                  <button key={s.id} onClick={() => setStep(i)}
-                    className={`flex items-center gap-1.5 border px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted'}`}>
-                    <Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{s.label}</span>
-                    <span className="ml-0.5 rounded-full bg-black/10 px-1.5 text-[10px] dark:bg-white/10">{i + 1}</span>
-                  </button>
-                );
-              })}
             </div>
 
+            {/* Form sections as a side rail beside the fields. */}
+            <Tabs value={stepId} onValueChange={(v) => setStep(Math.max(0, STEPS.findIndex((x) => x.id === v)))} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
+              <TabsList aria-label="Listing sections" className="section-rail flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+                {STEPS.map((s, i) => {
+                  const Icon = s.icon;
+                  return (
+                    <TabsTrigger key={s.id} value={s.id} className="w-full justify-start">
+                      <Icon className="mr-2 h-4 w-4" /> {s.label}
+                      <span className="ml-auto pl-2 text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+
+              <div className="min-w-0 flex-1 space-y-4">
             {/* Step content */}
             {stepId === 'basics' && (
               <FormSection title="Classification" icon={Home}>
@@ -734,6 +801,8 @@ export default function PropertyWorkbench() {
                 ? <Button size="sm" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Next <ChevronRight className="ml-1 h-4 w-4" /></Button>
                 : (editable && <Button size="sm" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>)}
             </div>
+              </div>
+            </Tabs>
           </TabsContent>
 
           {/* ── Media ── */}

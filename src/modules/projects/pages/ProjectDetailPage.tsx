@@ -35,6 +35,7 @@ import {
   HardHat,
   Users,
   BarChart3,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -42,6 +43,13 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 import {
   Tabs,
   TabsContent,
@@ -318,7 +326,7 @@ export const ProjectDetailPage: React.FC = () => {
         thumbnailUrl={projectCoverSrc(cover, 200)}
         recordTitle
         title={project.name}
-        subtitle={project.description || undefined}
+        subtitle={tab === 'overview' ? undefined : project.description || undefined}
         actions={
           <>
             {!isTeam && (
@@ -352,29 +360,36 @@ export const ProjectDetailPage: React.FC = () => {
                 Invite client
               </Button>
             )}
-            {/* Reuse this project's rooms + task tree on the next job (#322). */}
             {isTeam && (
-              <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)}>
-                <Layers className="h-4 w-4 mr-1" />
-                Save as template
-              </Button>
-            )}
-            {isManager && project.status !== 'archived' && (
-              <Button variant="outline" size="sm" onClick={handleArchive}>
-                <Archive className="h-4 w-4 mr-1" />
-                Archive
-              </Button>
-            )}
-            {canDeleteProject && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDelete}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete
-              </Button>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" aria-label="More actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {/* Reuse this project's rooms + task tree on the next job (#322). */}
+                  <DropdownMenuItem onSelect={() => setSaveTemplateOpen(true)}>
+                    <Layers className="h-4 w-4 mr-2" />
+                    Save as template
+                  </DropdownMenuItem>
+                  {isManager && project.status !== 'archived' && (
+                    <DropdownMenuItem onSelect={() => void handleArchive()}>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archive
+                    </DropdownMenuItem>
+                  )}
+                  {canDeleteProject && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => void handleDelete()} className="text-destructive focus:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </>
         }

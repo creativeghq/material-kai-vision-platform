@@ -14,9 +14,12 @@ import {
   Home,
   Tags,
   Diamond,
+  ArrowRight,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import type { HubHeroFact } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
 import { Progress } from '@/components/core/ui/progress';
 import {
@@ -146,368 +149,317 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       .catch(() => setCategories([]));
   }, [isOwner, project.workspace_id]);
 
+  const clientName = project.client_company?.name
+    || project.client_contact?.name
+    || [project.client_contact?.first_name, project.client_contact?.last_name].filter(Boolean).join(' ').trim()
+    || null;
+  const clientEmail: string | null = (project.client_company as any)?.email ?? project.client_contact?.email ?? null;
+  const clientPhone: string | null = (project.client_company as any)?.phone ?? (project.client_contact as any)?.phone ?? null;
+
+  const facts: HubHeroFact[] = [
+    { icon: project.client_company ? Building2 : UserIcon, label: 'Client', value: clientName ?? '—' },
+    {
+      icon: Calendar,
+      label: 'Deadline',
+      value: formatDate(project.deadline) ?? '—',
+      hint: days === null ? undefined : days < 0 ? `${Math.abs(days)} days overdue` : days === 0 ? 'Today' : `${days} days left`,
+      alert: days !== null && days < 0,
+    },
+    ...(isOwner ? [{
+      icon: Wallet,
+      label: 'Budget',
+      value: budget > 0 ? formatMoney(actual, project.budget_currency) : '—',
+      hint: budget > 0 ? `${pct}% of ${formatMoney(budget, project.budget_currency)}${overBudget ? ' · over' : ''}` : 'No budget set',
+      alert: overBudget,
+    }] : []),
+    ...(taskStats.total > 0 ? [{
+      icon: CheckCircle,
+      label: 'Tasks',
+      value: `${taskStats.done} / ${taskStats.total}`,
+      hint: taskStats.blocked > 0 ? `${taskStats.blocked} blocked` : `${Math.round((taskStats.done / taskStats.total) * 100)}% done`,
+      alert: taskStats.blocked > 0,
+    }] : []),
+  ];
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div className="space-y-4">
       {/* The picture the project wears — the same one its card carries on /projects. */}
       <ProjectCoverPanel
         project={project}
         isOwner={canEditProject}
         candidate={coverCandidate}
         onProjectPatched={onProjectPatched}
-        className="lg:col-span-3"
+        facts={facts}
       />
 
-      {/* What kind of job this is. Owner-only: a collaborator on a shared project sees the
-          delivery, not how the business files it. */}
-      {isOwner && (
-        <Card className="dashboard-card lg:col-span-3">
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <Tags className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Category</span>
-              </div>
-              <Select
-                value={project.category_id ?? 'none'}
-                disabled={savingCategory || !canEditProject}
-                onValueChange={async (v) => {
-                  const nextId = v === 'none' ? null : v;
-                  setSavingCategory(true);
-                  try {
-                    await projectsService.updateProject(project.id, { category_id: nextId });
-                    onProjectPatched?.({
-                      category_id: nextId,
-                      category: nextId
-                        ? (() => {
-                            const c = categories.find((x) => x.id === nextId);
-                            return c ? { id: c.id, key: c.key, label: c.label } : null;
-                          })()
-                        : null,
-                    });
-                    toast({ title: nextId ? 'Category updated' : 'Category cleared' });
-                  } catch (e) {
-                    toast({ title: 'Failed to update the category', description: (e as Error).message, variant: 'destructive' });
-                  } finally { setSavingCategory(false); }
-                }}
-              >
-                <SelectTrigger className="sm:w-64"><SelectValue placeholder="No category" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
+          {canFinance && onOpenSection && <ProjectCostPanel projectId={project.id} onOpenSection={onOpenSection} />}
+
+          {/* Rooms summary — switches between simple badge list and per-room budget rollup
+              based on whether any room actually has budget/spend data to show. */}
+          {rooms.length > 0 && !hasMeaningfulRoomBudget && (
+            <Card className="dashboard-card">
+              <CardHeader>
+                <CardTitle className="font-medium flex items-center gap-2">
+                  <Home className="h-4 w-4 text-primary" />
+                  Rooms ({rooms.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {rooms.map(r => (
+                    <Badge key={r.id} variant="outline" className="text-sm py-1 px-3">
+                      {r.name}
+                      {r.room_type && <span className="ml-1.5 text-xs text-muted-foreground capitalize">· {r.room_type}</span>}
+                    </Badge>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* The building this job is at (#378 N4). A deal could point at a property OR a project;
-          the property and the project could not point at each other, so a renovation, a
-          development or a fit-out -- the actual work these customers do -- could not be attached
-          to the building it happens in. Owner-only and self-hiding without the module: a
-          permanently empty control reads as broken, not as neutral. */}
-      {canEditProject && realEstate && project.workspace_id && (
-        <Card className="dashboard-card lg:col-span-3">
-          <CardContent className="p-4">
-            <PropertyLinkField
-              workspaceId={project.workspace_id}
-              propertyId={project.property_id ?? null}
-              disabled={savingProperty}
-              onChange={async (propertyId) => {
-                setSavingProperty(true);
-                try {
-                  await projectsService.updateProject(project.id, { property_id: propertyId });
-                  toast({ title: propertyId ? 'Project attached to the property' : 'Project detached from its property' });
-                } catch (e) {
-                  toast({ title: 'Failed to update the property', description: (e as Error).message, variant: 'destructive' });
-                } finally { setSavingProperty(false); }
-              }}
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Client */}
-      <Card className="dashboard-card lg:col-span-1">
-        <CardHeader>
-          <CardTitle className="font-medium flex items-center gap-2">
-            {project.client_company ? <Building2 className="h-4 w-4 text-primary" /> : <UserIcon className="h-4 w-4 text-primary" />}
-            Client
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!project.client_company && !project.client_contact ? (
-            <p className="text-sm text-muted-foreground">No client assigned yet.</p>
-          ) : project.client_company ? (
-            <div className="space-y-2">
-              <p className="font-medium">{project.client_company.name}</p>
-              {(project.client_company as any).email && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5" />
-                  {(project.client_company as any).email}
-                </p>
-              )}
-              {(project.client_company as any).phone && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5" />
-                  {(project.client_company as any).phone}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="font-medium">
-                {project.client_contact?.name ||
-                  [project.client_contact?.first_name, project.client_contact?.last_name].filter(Boolean).join(' ').trim() ||
-                  'Unnamed contact'}
-              </p>
-              {project.client_contact?.email && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5" />
-                  {project.client_contact.email}
-                </p>
-              )}
-              {(project.client_contact as any)?.phone && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5" />
-                  {(project.client_contact as any).phone}
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Budget — owner only. Collaborators (shared client view) don't see financial internals. */}
-      {isOwner && (
-        <Card className="dashboard-card lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="font-medium flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-primary" />
-              Budget
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {budget === 0 ? (
-              <p className="text-sm text-muted-foreground">No budget set.</p>
-            ) : (
-              <>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-2xl font-light">{formatMoney(actual, project.budget_currency)}</span>
-                  <span className="text-sm text-muted-foreground">of {formatMoney(budget, project.budget_currency)}</span>
                 </div>
-                <Progress value={pct} className={overBudget ? '[&>div]:bg-destructive' : ''} />
-                <p className={`text-xs ${overBudget ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {pct}% spent — {project.accepted_quote_count} accepted {project.accepted_quote_count === 1 ? 'quote' : 'quotes'}
-                  {overBudget && ' (over budget)'}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Deadline */}
-      <Card className="dashboard-card lg:col-span-1">
-        <CardHeader>
-          <CardTitle className="font-medium flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-primary" />
-            Deadline
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!project.deadline ? (
-            <p className="text-sm text-muted-foreground">No deadline set.</p>
-          ) : (
-            <>
-              <p className="text-2xl font-light">{formatDate(project.deadline)}</p>
-              {days !== null && (
-                <p className={`text-sm mt-1 ${days < 0 ? 'text-destructive' : days <= 7 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
-                  {days < 0 ? `${Math.abs(days)} days overdue` : days === 0 ? 'Today' : `${days} days left`}
-                </p>
-              )}
-            </>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
 
-      {canFinance && onOpenSection && <ProjectCostPanel projectId={project.id} onOpenSection={onOpenSection} />}
+          {roomBudgetFailed && isOwner && (
+            <Card className="dashboard-card">
+              <CardContent className="py-6 text-sm text-amber-800 dark:text-amber-400">
+                Budget by room could not be loaded. Spend against each room is unknown — this is not
+                the same as nothing having been spent.
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Rooms summary — switches between simple badge list and per-room budget rollup
-          based on whether any room actually has budget/spend data to show. */}
-      {rooms.length > 0 && !hasMeaningfulRoomBudget && (
-        <Card className="dashboard-card lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-medium flex items-center gap-2">
-              <Home className="h-4 w-4 text-primary" />
-              Rooms ({rooms.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {rooms.map(r => (
-                <Badge key={r.id} variant="outline" className="text-sm py-1 px-3">
-                  {r.name}
-                  {r.room_type && <span className="ml-1.5 text-xs text-muted-foreground capitalize">· {r.room_type}</span>}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {roomBudgetFailed && isOwner && (
-        <Card className="dashboard-card lg:col-span-2">
-          <CardContent className="py-6 text-sm text-amber-800 dark:text-amber-400">
-            Budget by room could not be loaded. Spend against each room is unknown — this is not
-            the same as nothing having been spent.
-          </CardContent>
-        </Card>
-      )}
-
-      {hasMeaningfulRoomBudget && isOwner && !roomBudgetFailed && (
-        <Card className="dashboard-card lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-medium flex items-center gap-2">
-              <Home className="h-4 w-4 text-primary" />
-              Budget by Room
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {roomBudget.rooms.map(({ room, actual_amount, item_count }) => {
-                const budget = Number(room.budget_amount) || 0;
-                const pct = budget > 0 ? Math.min(100, Math.round((actual_amount / budget) * 100)) : 0;
-                const over = budget > 0 && actual_amount > budget;
-                return (
-                  <div key={room.id} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="truncate">
-                        {room.name}
-                        {room.room_type && <span className="ml-1.5 text-xs text-muted-foreground capitalize">· {room.room_type}</span>}
-                      </span>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {formatMoney(actual_amount, project.budget_currency)}
-                        {budget > 0 && <> / {formatMoney(budget, project.budget_currency)}</>}
-                        {item_count > 0 && <> · {item_count} {item_count === 1 ? 'item' : 'items'}</>}
-                      </span>
-                    </div>
-                    {budget > 0 && (
-                      <Progress value={pct} className={over ? '[&>div]:bg-destructive' : ''} />
-                    )}
-                  </div>
-                );
-              })}
-              {/* The rows above are accepted-quote LINE totals on a room. The project figure at the
-                  top of this page is SUM(grand_total), which also carries accepted upsells, the
-                  cash discount and VAT — so these can never add up to it. Naming what is missing
-                  is the difference between a breakdown and a breakdown with a hole in it. */}
-              {roomBudget.unassigned.actual_amount > 0 && (
-                <div className="flex items-center justify-between border-t border-hairline pt-3 text-sm">
-                  <span className="text-muted-foreground">Not assigned to a room</span>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {formatMoney(roomBudget.unassigned.actual_amount, project.budget_currency)}
-                    {roomBudget.unassigned.item_count > 0 && (
-                      <> · {roomBudget.unassigned.item_count} {roomBudget.unassigned.item_count === 1 ? 'item' : 'items'}</>
-                    )}
-                  </span>
-                </div>
-              )}
-              <p className="text-[11px] text-muted-foreground">
-                Accepted-quote line totals. VAT, upsells and any cash discount sit outside these
-                figures, so they will not add up to the project total above.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {taskStats.total > 0 && (
-        <Card className={`dashboard-card ${rooms.length > 0 ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
-          <CardHeader>
-            <CardTitle className="font-medium">Tasks</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <div className="flex items-baseline justify-between text-sm">
-                <span className="text-muted-foreground">{taskStats.done} of {taskStats.total} done</span>
-                <span className="tabular-nums font-semibold">{Math.round((taskStats.done / taskStats.total) * 100)}%</span>
-              </div>
-              <Progress value={(taskStats.done / taskStats.total) * 100} />
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-              <Stat label="Todo" value={taskStats.todo} icon={<Circle className="h-3.5 w-3.5" />} />
-              <Stat label="Active" value={taskStats.in_progress} icon={<Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" />} />
-              <Stat label="Done" value={taskStats.done} icon={<CheckCircle className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />} />
-              <Stat label="Blocked" value={taskStats.blocked} icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-800 dark:text-amber-300" />} />
-            </div>
-            {upcomingTasks.length > 0 && (
-              <div className="pt-2 border-t border-hairline">
-                <p className="text-xs text-muted-foreground mb-2">Next due</p>
-                <ul className="space-y-1.5">
-                  {upcomingTasks.map(t => {
-                    const d = daysUntil(t.due_date);
+          {hasMeaningfulRoomBudget && isOwner && !roomBudgetFailed && (
+            <Card className="dashboard-card">
+              <CardHeader>
+                <CardTitle className="font-medium flex items-center gap-2">
+                  <Home className="h-4 w-4 text-primary" />
+                  Budget by Room
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                  {roomBudget.rooms.map(({ room, actual_amount, item_count }) => {
+                    const budget = Number(room.budget_amount) || 0;
+                    const pct = budget > 0 ? Math.min(100, Math.round((actual_amount / budget) * 100)) : 0;
+                    const over = budget > 0 && actual_amount > budget;
                     return (
-                      <li key={t.id} className="flex items-center gap-2 text-sm">
-                        <Circle className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="truncate flex-1">{t.title}</span>
-                        <span className={`text-xs shrink-0 ${d !== null && d < 0 ? 'text-destructive' : d !== null && d <= 3 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
-                          {d === null ? '' : d < 0 ? `${Math.abs(d)}d over` : d === 0 ? 'Today' : `${d}d`}
-                        </span>
-                      </li>
+                      <div key={room.id} className="min-w-0 space-y-1">
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="truncate">
+                            {room.name}
+                            {room.room_type && <span className="ml-1.5 text-xs text-muted-foreground capitalize">· {room.room_type}</span>}
+                          </span>
+                          <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                            {formatMoney(actual_amount, project.budget_currency)}
+                            {budget > 0 && <> / {formatMoney(budget, project.budget_currency)}</>}
+                          </span>
+                        </div>
+                        {budget > 0 && (
+                          <Progress value={pct} className={over ? '[&>div]:bg-destructive' : ''} />
+                        )}
+                        {item_count > 0 && (
+                          <p className="text-[11px] text-muted-foreground">{item_count} {item_count === 1 ? 'item' : 'items'}</p>
+                        )}
+                      </div>
                     );
                   })}
-                </ul>
-              </div>
-            )}
-            {milestones.length > 0 && (
-              <div className="pt-2 border-t border-hairline">
-                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><Diamond className="h-3 w-3" />Milestones</span>
-                  <span className="tabular-nums">{milestones.filter(m => m.status === 'done').length}/{milestones.length} reached</span>
                 </div>
-                <div className="flex gap-1" aria-hidden="true">
-                  {milestones.map(m => (
-                    <span key={m.id} title={m.title} className={`h-1.5 flex-1 rounded-sm ${m.status === 'done' ? 'bg-primary' : 'bg-surface-sunken border border-hairline'}`} />
-                  ))}
-                </div>
-                {milestones.find(m => m.status !== 'done') && (
-                  <p className="mt-1.5 truncate text-xs">
-                    Next: {milestones.find(m => m.status !== 'done')!.title}
-                  </p>
+                {/* Accepted-quote LINE totals; the project figure is SUM(grand_total) with upsells,
+                    cash discount and VAT, so naming what is missing keeps the breakdown honest. */}
+                {roomBudget.unassigned.actual_amount > 0 && (
+                  <div className="mt-3 flex items-center justify-between border-t border-hairline pt-3 text-sm">
+                    <span className="text-muted-foreground">Not assigned to a room</span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {formatMoney(roomBudget.unassigned.actual_amount, project.budget_currency)}
+                      {roomBudget.unassigned.item_count > 0 && (
+                        <> · {roomBudget.unassigned.item_count} {roomBudget.unassigned.item_count === 1 ? 'item' : 'items'}</>
+                      )}
+                    </span>
+                  </div>
+                )}
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Accepted-quote line totals. VAT, upsells and any cash discount sit outside these
+                  figures, so they will not add up to the project total above.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <ProjectVisitsPanel project={project} isOwner={isOwner} />
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          <Card className="dashboard-card">
+            <CardHeader>
+              <CardTitle className="font-medium">Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="min-w-0 space-y-1">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  {project.client_company ? <Building2 className="h-3.5 w-3.5" /> : <UserIcon className="h-3.5 w-3.5" />}
+                  Client
+                </p>
+                {clientName ? (
+                  <>
+                    <p className="text-sm font-medium">{clientName}</p>
+                    {clientEmail && (
+                      <a href={`mailto:${clientEmail}`} className="flex items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-foreground">
+                        <Mail className="h-3.5 w-3.5 shrink-0" />{clientEmail}
+                      </a>
+                    )}
+                    {clientPhone && (
+                      <a href={`tel:${clientPhone}`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                        <Phone className="h-3.5 w-3.5 shrink-0" />{clientPhone}
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No client assigned yet.</p>
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
-      {team && (
-        <ProjectTeamPanel
-          project={project}
-          members={team.members}
-          canManage={team.canManage}
-          openTasks={openTasks}
-          assignees={taskState.assignees}
-          assigneesFailed={taskState.assigneesFailed}
-          onChanged={team.onChanged}
-          className="lg:col-span-1"
-        />
-      )}
-      <ProjectVisitsPanel project={project} isOwner={isOwner} className={team ? 'lg:col-span-2' : 'lg:col-span-3'} />
+              {/* Owner-only: a collaborator sees the delivery, not how the business files it. */}
+              {isOwner && (
+                <div className="space-y-1.5 border-t border-hairline pt-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <Tags className="h-3.5 w-3.5" />Category
+                  </p>
+                  <Select
+                    value={project.category_id ?? 'none'}
+                    disabled={savingCategory || !canEditProject}
+                    onValueChange={async (v) => {
+                      const nextId = v === 'none' ? null : v;
+                      setSavingCategory(true);
+                      try {
+                        await projectsService.updateProject(project.id, { category_id: nextId });
+                        onProjectPatched?.({
+                          category_id: nextId,
+                          category: nextId
+                            ? (() => {
+                                const c = categories.find((x) => x.id === nextId);
+                                return c ? { id: c.id, key: c.key, label: c.label } : null;
+                              })()
+                            : null,
+                        });
+                        toast({ title: nextId ? 'Category updated' : 'Category cleared' });
+                      } catch (e) {
+                        toast({ title: 'Failed to update the category', description: (e as Error).message, variant: 'destructive' });
+                      } finally { setSavingCategory(false); }
+                    }}
+                  >
+                    <SelectTrigger className="h-9"><SelectValue placeholder="No category" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No category</SelectItem>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-      {project.description && (
-        <Card className="dashboard-card lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="font-medium">Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{project.description}</p>
-          </CardContent>
-        </Card>
-      )}
+              {/* The building this job is at (#378 N4). Self-hiding without the module: a
+                  permanently empty control reads as broken, not as neutral. */}
+              {canEditProject && realEstate && project.workspace_id && (
+                <div className="border-t border-hairline pt-3">
+                  <PropertyLinkField
+                    workspaceId={project.workspace_id}
+                    propertyId={project.property_id ?? null}
+                    disabled={savingProperty}
+                    compact
+                    onChange={async (propertyId) => {
+                      setSavingProperty(true);
+                      try {
+                        await projectsService.updateProject(project.id, { property_id: propertyId });
+                        toast({ title: propertyId ? 'Project attached to the property' : 'Project detached from its property' });
+                      } catch (e) {
+                        toast({ title: 'Failed to update the property', description: (e as Error).message, variant: 'destructive' });
+                      } finally { setSavingProperty(false); }
+                    }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {taskStats.total > 0 && (
+            <Card className="dashboard-card">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="font-medium">Tasks</CardTitle>
+                {onOpenSection && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => onOpenSection('tasks')}>
+                    Open<ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-baseline justify-between text-sm">
+                    <span className="text-muted-foreground">{taskStats.done} of {taskStats.total} done</span>
+                    <span className="tabular-nums font-semibold">{Math.round((taskStats.done / taskStats.total) * 100)}%</span>
+                  </div>
+                  <Progress value={(taskStats.done / taskStats.total) * 100} />
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <Stat label="Todo" value={taskStats.todo} icon={<Circle className="h-3.5 w-3.5" />} />
+                  <Stat label="Active" value={taskStats.in_progress} icon={<Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" />} />
+                  <Stat label="Done" value={taskStats.done} icon={<CheckCircle className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />} />
+                  <Stat label="Blocked" value={taskStats.blocked} icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-800 dark:text-amber-300" />} />
+                </div>
+                {upcomingTasks.length > 0 && (
+                  <div className="pt-2 border-t border-hairline">
+                    <p className="text-xs text-muted-foreground mb-2">Next due</p>
+                    <ul className="space-y-1.5">
+                      {upcomingTasks.map(t => {
+                        const d = daysUntil(t.due_date);
+                        return (
+                          <li key={t.id} className="flex items-center gap-2 text-sm">
+                            <Circle className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <span className="truncate flex-1">{t.title}</span>
+                            <span className={`text-xs shrink-0 ${d !== null && d < 0 ? 'text-destructive' : d !== null && d <= 3 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
+                              {d === null ? '' : d < 0 ? `${Math.abs(d)}d over` : d === 0 ? 'Today' : `${d}d`}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+                {milestones.length > 0 && (
+                  <div className="pt-2 border-t border-hairline">
+                    <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Diamond className="h-3 w-3" />Milestones</span>
+                      <span className="tabular-nums">{milestones.filter(m => m.status === 'done').length}/{milestones.length} reached</span>
+                    </div>
+                    <div className="flex gap-1" aria-hidden="true">
+                      {milestones.map(m => (
+                        <span key={m.id} title={m.title} className={`h-1.5 flex-1 rounded-sm ${m.status === 'done' ? 'bg-primary' : 'bg-surface-sunken border border-hairline'}`} />
+                      ))}
+                    </div>
+                    {milestones.find(m => m.status !== 'done') && (
+                      <p className="mt-1.5 truncate text-xs">
+                        Next: {milestones.find(m => m.status !== 'done')!.title}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {team && (
+            <ProjectTeamPanel
+              project={project}
+              members={team.members}
+              canManage={team.canManage}
+              openTasks={openTasks}
+              assignees={taskState.assignees}
+              assigneesFailed={taskState.assigneesFailed}
+              onChanged={team.onChanged}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 };

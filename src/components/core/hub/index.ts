@@ -33,3 +33,6 @@ export type { HubSegment } from './HubSegmented';
 export { HubEmptyState } from './HubEmptyState';
 
 export { HubFieldRow } from './HubFieldRow';
+
+export { HubRecordHero, HubHeroChip } from './HubRecordHero';
+export type { HubHeroFact } from './HubRecordHero';
