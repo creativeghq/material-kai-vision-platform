@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { inboundService, type InboundDocument, type InboundLinkSummary } from '@/modules/finance/services/inboundService';
 import { needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
 import { correlationCellLabel } from '@/modules/finance/utils/inboundCorrelation';
+import { InboundMatchReviewDialog } from '@/modules/finance/components/InboundMatchReviewDialog';
 
 export const InboundDetailCell: React.FC<{
   doc: InboundDocument;
@@ -14,6 +15,7 @@ export const InboundDetailCell: React.FC<{
 }> = ({ doc, link, readOnly, onChanged }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState(false);
+  const [reviewing, setReviewing] = React.useState(false);
   const cell = correlationCellLabel(link);
 
   // No correlation to report: the column falls back to its own two answers.
@@ -73,28 +75,34 @@ export const InboundDetailCell: React.FC<{
     } finally { setBusy(false); }
   };
 
+  // Accepting happens only in the review, where both documents are on screen.
   return (
     <span className="inline-flex items-center gap-1">
       {warning}{sep}
-      <span
-        className="text-[10px] text-amber-800 dark:text-amber-300 cursor-help border-b border-dotted border-amber-800/40 dark:border-amber-300/40"
-        title={cell.title}
+      <button
+        type="button"
+        onClick={() => setReviewing(true)}
+        className="text-[10px] text-amber-800 dark:text-amber-300 border-b border-dotted border-amber-800/40 dark:border-amber-300/40 hover:border-solid"
+        title={`${cell.title} Click to compare the two documents.`}
       >
         {cell.text}
-      </span>
+      </button>
       {!readOnly && (
-        <>
-          <button
-            type="button" disabled={busy} onClick={() => void rule(true)}
-            className="rounded-sm px-1 text-[10px] text-muted-foreground hover:bg-surface-sunken hover:text-foreground disabled:opacity-50"
-            title={`Yes — ${cell.text.replace(/\?$/, '')} belongs with this document`}
-          >✓</button>
-          <button
-            type="button" disabled={busy} onClick={() => void rule(false)}
-            className="rounded-sm px-1 text-[10px] text-muted-foreground hover:bg-surface-sunken hover:text-foreground disabled:opacity-50"
-            title="No — dismiss this match. It will not be suggested again."
-          >✗</button>
-        </>
+        <button
+          type="button" disabled={busy} onClick={() => void rule(false)}
+          className="rounded-sm px-1 text-[10px] text-muted-foreground hover:bg-surface-sunken hover:text-foreground disabled:opacity-50"
+          title="No — dismiss this match. It will not be suggested again."
+        >✗</button>
+      )}
+      {link && reviewing && (
+        <InboundMatchReviewDialog
+          docId={doc.id}
+          link={link}
+          open={reviewing}
+          onOpenChange={setReviewing}
+          readOnly={readOnly}
+          onChanged={onChanged}
+        />
       )}
     </span>
   );

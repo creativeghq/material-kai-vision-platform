@@ -50,10 +50,17 @@ export interface InboundDocumentDetail {
     vat_category: number | null;
     line_costs: InboundLineCostStatus;
   };
-  correlations: InboundLinkSummary[];
+  correlations: InboundDetailEdge[];
   /** Candidates nobody has ruled on. Deliberately NOT folded into `lines`. */
-  suggestions: InboundLinkSummary[];
+  suggestions: InboundDetailEdge[];
 }
+
+/** One edge as `get_inbound_document_detail` returns it — the summary row plus its ruling. */
+export type InboundDetailEdge = InboundLinkSummary & {
+  other_issue_date?: string | null;
+  confirmed_at?: string | null;
+  rejected_at?: string | null;
+};
 
 export interface InboundDocLine {
   line_number: number | null;
