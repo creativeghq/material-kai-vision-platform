@@ -3,6 +3,7 @@ import { BarChart3 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { formatMoney } from '@/utils/decimal';
 import { aadeVerdict, booksVerdict } from '@/modules/finance/pnlStatus';
 import type { PnlMonthRow } from '@/modules/finance/services/financeService';

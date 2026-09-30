@@ -116,7 +116,7 @@ export default function DataHealthPage() {
     {
       id: 'check',
       sortValue: (f) => checkByKey.get(f.check_key)?.title ?? f.check_key,
-      searchText: (f) => `${checkByKey.get(f.check_key)?.title ?? ''} ${f.check_key} ${f.entity_table ?? ""} ${f.entity_id ?? ''}`,
+      searchText: (f) => `${checkByKey.get(f.check_key)?.title ?? ''} ${f.check_key} ${f.entity_table ?? ''} ${f.entity_id ?? ''}`,
     },
     {
       id: 'severity',
@@ -292,7 +292,7 @@ export default function DataHealthPage() {
                           <TableRow key={f.id}>
                             <TableCell><div className="font-medium">{c?.title ?? f.check_key}</div><div className="text-[11px] text-muted-foreground">{f.domain}</div></TableCell>
                             <TableCell><span className={`text-xs capitalize ${sevTone[f.severity]}`}>{f.severity}</span></TableCell>
-                            <TableCell className="hidden text-xs sm:table-cell"><div>{f.entity_table ?? "—"}</div><div className="font-mono text-muted-foreground">{f.entity_id?.slice(0, 8) ?? '—'}</div></TableCell>
+                            <TableCell className="hidden text-xs sm:table-cell"><div>{f.entity_table ?? '—'}</div><div className="font-mono text-muted-foreground">{f.entity_id?.slice(0, 8) ?? '—'}</div></TableCell>
                             <TableCell className="hidden text-[11px] text-muted-foreground font-mono lg:table-cell">
                               <span className="block max-w-[18rem] truncate" title={JSON.stringify(f.detail)}>{JSON.stringify(f.detail)}</span>
                             </TableCell>
