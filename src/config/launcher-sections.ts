@@ -336,8 +336,10 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
     { label: 'My appointments', to: '/profile?tab=schedule&section=appointments', icon: CalendarDays },
     { label: 'Profile enquiries', to: filterUrl('/inbox', 'f', { source: 'public_profile' }), icon: MessagesSquare },
   ],
-  // The Projects card already lists the project / heat-pump / heating estimators, so the kitchen
-  // calculator is the one that is missing — plus photo recognition and a board starting point.
+  projects: [
+    { label: 'My tasks', to: '/projects/my-tasks', icon: ListChecks },
+    { label: 'Project templates', to: '/templates?type=project', icon: LayoutTemplate },
+  ],
   studio: [
     { label: 'Kitchen calculator', to: '/tools/kitchen-cost', icon: Calculator },
     { label: 'Identify a material', to: '/recognition', icon: ScanLine },

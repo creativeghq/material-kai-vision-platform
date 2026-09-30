@@ -50,13 +50,13 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'interior', label: 'Interior Design', hub: 'studio', agentId: 'interior-designer', agentTool: 'generate_3d', toolkitId: 'generation', canvasKind: 'render' },
   { id: 'presentation-sheet', label: 'Presentation Sheet', hub: 'studio', agentId: 'interior-designer', agentTool: 'generate_presentation_sheet', toolkitId: 'presentation-sheets', recordTable: 'moodboard_presentation_sheets', canvasKind: 'sheet' },
   { id: 'moodboard', label: 'MoodBoards', hub: 'studio', pageRoute: '/moodboard', recordTable: 'moodboards' },
-  { id: 'project', label: 'Projects', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'create_project', toolkitId: 'projects', recordTable: 'projects' },
+  { id: 'project', label: 'Projects', hub: 'projects', pageRoute: '/projects', agentId: 'kai', agentTool: 'create_project', toolkitId: 'projects', recordTable: 'projects' },
   // A capability of its own rather than a field on `project`: it is a separately-sold module, it
   // has its own toolkit, and its records are their own table. Its page surface is the Assessment
   // tab inside a project, so `pageRoute` is the list the reader lands on — the report itself is
   // reached through the `project` capability's detail route, which is why the assessment result
   // chunks map to THAT one in RESULT_TYPE_CAPABILITY below.
-  { id: 'project-assessment', label: 'AI Assessment', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'assess_project', toolkitId: 'project-assessment', recordTable: 'assessments', moduleSlug: 'project-assessment' },
+  { id: 'project-assessment', label: 'AI Assessment', hub: 'projects', pageRoute: '/projects', agentId: 'kai', agentTool: 'assess_project', toolkitId: 'project-assessment', recordTable: 'assessments', moduleSlug: 'project-assessment' },
   // The other two subjects of the same system. Separate capabilities rather than fields on the
   // one above because each is separately SOLD, has its own toolkit and its own agent owner —
   // and because `moduleSlug` here is what tells `toolModuleGates` the agent catalog is not

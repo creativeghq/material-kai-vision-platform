@@ -48,7 +48,7 @@ export type NavRoleRequirement = 'admin';
  * module slugs, capabilities, and entitlements are unchanged. Each app declares its `hub`;
  * apps with no `hub` fall into a catch-all "More" bucket in the launcher.
  */
-export type HubId = 'marketing' | 'sales' | 'finance' | 'service' | 'studio' | 'people';
+export type HubId = 'marketing' | 'sales' | 'projects' | 'finance' | 'service' | 'studio' | 'people';
 
 export interface Hub {
   id: HubId;
@@ -65,9 +65,10 @@ export const HUBS: readonly Hub[] = [
   // gone, and per-supplier analytics now live on the CRM company record — inside CRM, not as a tile.
   // "services" never had an app at all. Describe the tiles this hub actually holds.
   { id: 'sales', label: 'Sales Hub', icon: Briefcase, description: 'CRM, quotes, appointments, properties & market demand.' },
+  { id: 'projects', label: 'Projects Hub', icon: FolderKanban, description: 'Jobs, tasks, schedules, site work, costs and blueprints.' },
   { id: 'finance', label: 'Finance Hub', icon: Wallet, description: 'Invoices, payments, reporting & warehouse.' },
   { id: 'service', label: 'Service Hub', icon: Headset, description: 'Customer conversations, reviews & knowledge base.' },
-  { id: 'studio', label: 'Studio Hub', icon: Palette, description: 'Projects, moodboards & client presentations.' },
+  { id: 'studio', label: 'Studio Hub', icon: Palette, description: 'Moodboards, renders, room planning & client presentations.' },
   { id: 'people', label: 'People Hub', icon: Users, description: 'Employees, absences & HR documents.' },
 ];
 
@@ -144,7 +145,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // public reply are confirm-gated inside the tools. All-users via agent.use + their module.
   { id: 'messaging', label: 'WhatsApp', path: '/agent-hub?capability=messaging', icon: MessageCircle, requireCapability: 'agent.use', moduleSlug: 'messaging', surface: 'app', hub: 'service', description: 'Message customers on WhatsApp — in the AI studio.' },
   { id: 'reviews', label: 'Reviews', path: '/agent-hub?capability=reviews', icon: Star, requireCapability: 'agent.use', moduleSlug: 'reviews', surface: 'app', hub: 'service', description: 'Read reviews about you and reply — in the AI studio.' },
-  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', hub: 'studio', description: 'Plan and manage design projects.' },
+  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', hub: 'projects', description: 'Run jobs end to end: tasks, schedule, site, costs, visits and team.' },
   // MoodBoards moved off the lean top bar into Studio Hub — it's creative
   // delivery work, grouped alongside Projects and client presentations.
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette, surface: 'app', hub: 'studio', description: 'Curate materials and design inspiration.' },
@@ -161,7 +162,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // claimed they "live under Projects", which was true of the page and not of any menu. Gated like
   // MoodBoards and Room Planner (no module, no extra capability): `blueprints` is workspace-scoped
   // by RLS and the editor draws the workspace's own catalogue.
-  { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', description: 'Reusable room and scope templates that price a project in one click.' },
+  { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', hub: 'projects', description: 'Reusable room and scope templates that price a project in one click.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
   // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
