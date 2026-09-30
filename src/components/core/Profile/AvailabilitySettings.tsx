@@ -80,9 +80,11 @@ export function AvailabilitySettings() {
       if (flagErr) throw flagErr;
 
       const entries = Array.from(availability.entries());
+      let timeZone: string | null = null;
+      try { timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { /* unknown zone */ }
       if (entries.length > 0) {
         const { error: upsertErr } = await supabase.from('appointment_availability').upsert(
-          entries.map(([date, ranges]) => ({ user_id: user.id, available_date: date, time_ranges: ranges })),
+          entries.map(([date, ranges]) => ({ user_id: user.id, available_date: date, time_ranges: ranges, time_zone: timeZone })),
           { onConflict: 'user_id,available_date' },
         );
         if (upsertErr) throw upsertErr;

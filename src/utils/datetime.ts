@@ -92,12 +92,17 @@ export function toLocalISODate(value: Date | number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** A `YYYY-MM-DD` as local midnight of that day; `new Date('YYYY-MM-DD')` is UTC midnight. */
+export function fromLocalISODate(iso: string): Date {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
 /**
  * `days` calendar days from today (negative = in the past), as a local `YYYY-MM-DD`.
  *
  * Calendar arithmetic via `setDate`, not `Date.now() ± n * 86400000`: on a DST boundary a day is
- * 23 or 25 hours, so the millisecond form lands at 23:00 the previous day and slices off the
- * wrong date. Every "last 30 days" range in the app was written the millisecond way.
+ * 23 or 25 hours, so the millisecond form lands at 23:00 the previous day: the wrong date.
  */
 export function localISODateOffset(days: number, from: Date = new Date()): string {
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());

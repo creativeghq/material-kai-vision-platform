@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { cn } from '@/lib/utils';
-import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
-import type { ProjectTask } from '../../services/projectsService';
+import { formatTime, toLocalISODate, todayLocalISO } from '@/utils/datetime';
+import { visitStart, type ProjectTask, type ProjectVisit } from '../../services/projectsService';
 import { TASK_STATUS_BADGE } from '../../taskVocabulary';
 import type { ProjectTasksState } from './useProjectTasks';
 
@@ -20,7 +20,12 @@ const CHIP_TONE: Record<string, string> = {
 const dayOf = (t: ProjectTask) => (t.due_date ?? t.end_date)?.slice(0, 10) ?? null;
 
 /** Month grid of tasks by due date (Monday-first). Undated tasks are counted, not hidden. */
-export const TaskCalendar: React.FC<{ state: ProjectTasksState; onOpen: (taskId: string) => void }> = ({ state, onOpen }) => {
+export const TaskCalendar: React.FC<{
+  state: ProjectTasksState;
+  onOpen: (taskId: string) => void;
+  visits?: ProjectVisit[];
+  visitsFailed?: boolean;
+}> = ({ state, onOpen, visits = [], visitsFailed = false }) => {
   const { allTasks } = state;
   const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const today = todayLocalISO();
@@ -37,6 +42,18 @@ export const TaskCalendar: React.FC<{ state: ProjectTasksState; onOpen: (taskId:
     return m;
   }, [allTasks]);
   const undated = allTasks.filter((t) => !dayOf(t)).length;
+
+  const visitsByDay = useMemo(() => {
+    const m = new Map<string, Array<{ v: ProjectVisit; at: Date }>>();
+    for (const v of visits) {
+      const at = visitStart(v);
+      if (!at || v.status === 'cancelled') continue;
+      const k = toLocalISODate(at);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push({ v, at });
+    }
+    return m;
+  }, [visits]);
 
   const cells = useMemo(() => {
     const first = new Date(cursor);
@@ -56,6 +73,7 @@ export const TaskCalendar: React.FC<{ state: ProjectTasksState; onOpen: (taskId:
         <h3 className="text-sm font-semibold">{monthLabel}</h3>
         <span className="text-xs text-muted-foreground">
           {undated > 0 ? `${undated} ${undated === 1 ? 'task has' : 'tasks have'} no date` : ''}
+          {visitsFailed && <span className="ml-2 text-amber-800 dark:text-amber-300">Visits could not be loaded</span>}
         </span>
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={() => shift(-1)} aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></Button>
@@ -87,6 +105,15 @@ export const TaskCalendar: React.FC<{ state: ProjectTasksState; onOpen: (taskId:
                   {d.getDate()}
                 </div>
                 <div className="space-y-1">
+                  {(visitsByDay.get(iso) ?? []).map(({ v, at }) => (
+                    <div
+                      key={`${v.kind}:${v.id}`}
+                      className="truncate rounded-sm border border-dashed border-primary/40 px-1.5 py-0.5 text-[11px] text-primary"
+                      title={`${v.title} · ${formatTime(at)}`}
+                    >
+                      {formatTime(at)} {v.title}
+                    </div>
+                  ))}
                   {shown.map((t) => (
                     <button
                       key={t.id}

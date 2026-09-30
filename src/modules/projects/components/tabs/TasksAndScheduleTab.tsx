@@ -6,7 +6,7 @@ import { HubSegmented, type HubSegment } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { projectsService } from '../../services/projectsService';
+import { projectsService, type ProjectVisit } from '../../services/projectsService';
 import { TasksTab } from './TasksTab';
 import { ScheduleTab } from './ScheduleTab';
 import { TaskBoard } from '../tasks/TaskBoard';
@@ -37,6 +37,15 @@ export const TasksAndScheduleTab: React.FC<{ projectId: string; isOwner: boolean
   const [sp, setSp] = useSearchParams();
   const state = useProjectTasks(projectId);
   const openTaskId = sp.get('task');
+  const [visits, setVisits] = useState<ProjectVisit[] | null>([]);
+  useEffect(() => {
+    if (view !== 'calendar') return;
+    let cancelled = false;
+    projectsService.listProjectVisits(projectId)
+      .then((rows) => { if (!cancelled) setVisits(rows); })
+      .catch(() => { if (!cancelled) setVisits(null); });
+    return () => { cancelled = true; };
+  }, [view, projectId]);
 
   const openTask = useCallback((id: string | null) => {
     setSp((prev) => {
@@ -69,7 +78,7 @@ export const TasksAndScheduleTab: React.FC<{ projectId: string; isOwner: boolean
       {view === 'board' && (state.loading
         ? <Spinner />
         : <TaskBoard state={state} readOnly={!isOwner} onOpen={openTask} />)}
-      {view === 'calendar' && (state.loading ? <Spinner /> : <TaskCalendar state={state} onOpen={openTask} />)}
+      {view === 'calendar' && (state.loading ? <Spinner /> : <TaskCalendar state={state} onOpen={openTask} visits={visits ?? []} visitsFailed={visits === null} />)}
       {/* The Gantt fetches dependencies the other views do not need, so it keeps its own loader. */}
       {view === 'schedule' && <ScheduleTab projectId={projectId} isOwner={isOwner} onShowList={() => choose('list')} />}
 

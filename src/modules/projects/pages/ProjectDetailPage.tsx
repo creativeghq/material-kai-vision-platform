@@ -404,7 +404,7 @@ export const ProjectDetailPage: React.FC = () => {
                 </TabsList>
               )}
 
-          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} coverCandidate={coverCandidate} onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
+          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} canFinance={canFinance} onOpenSection={setTab} coverCandidate={coverCandidate} onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
           {isOwner && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isOwner} /></TabsContent>}

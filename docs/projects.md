@@ -137,6 +137,12 @@ Guarded by [tests/unit/projectCategories.test.ts](../tests/unit/projectCategorie
 
 `(id, task_id, project_id, author_id, body, created_at, edited_at)` — the internal discussion on a task. `project_id` is stamped from the task by a trigger, never taken from the client. Readable/writable by the project owner and by the task's assignee while they are an **active** member of the project's workspace (`_user_can_discuss_task`); a collaborator never sees it.
 
+### Overview: cost & margin, visits
+
+**Cost & margin** (owner + `finance.manage`, the Finance section's gate) reads `get_project_dashboard(project, today)`. It wraps `get_project_pnl` (the only cost derivation), adds open purchase orders by `supplier_eta` (late = ETA before the operator's today), crew per day from `time_entries` (people and minutes, never cost), and `budget_headroom`. Headroom is null when the budget and the costs are in different currencies. Against a contract, headroom IS `forecast_margin_amount`.
+
+**Visits & meetings** reads `list_project_visits`, the union of `crm_meetings.project_id` (booked by the team) and `appointments.project_id` (requested by the client). The owner books through `crmMeetingsService.create({ projectId })` in one insert; `crm_meetings_project_guard` holds it to the meeting's workspace. A collaborator requests through `request_project_visit`, which takes an advisory lock and re-checks `get_project_visit_slots`: the owner's published hours minus pending/confirmed bookings and scheduled meetings, computed in the **owner's** zone (`appointment_availability.time_zone`, stamped by Availability settings). `appointments_project_guard` refuses a booking on a project unless it is with the project owner and made by the owner or an active collaborator. Known gap: a booking is stored as the owner's wall-clock date + time, so a client in another zone sees that clock (the request dialog says so).
+
 ### Task views
 
 List, Board (drag between status columns), Calendar (by due date, else end date) and Schedule (Gantt) are four views of one set of rows. List/Board/Calendar and the task drawer share `useProjectTasks`, which is the only place a status change passes the #437 mandatory-steps gate. `?tab=tasks&task=<id>` opens the drawer. `/projects/my-tasks` is `list_my_tasks(workspace)`: tasks assigned to the caller, plus unassigned tasks in projects the caller owns; an assignee moves status with `set_my_task_status`.

@@ -29,6 +29,8 @@ import {
 import { ProjectCoverPanel } from '../ProjectCoverPanel';
 import { assigneeKey, NO_ASSIGNEE, useProjectTasks } from '../tasks/useProjectTasks';
 import { AssigneeDot } from '../tasks/taskBits';
+import { ProjectCostPanel } from '../ProjectCostPanel';
+import { ProjectVisitsPanel } from '../ProjectVisitsPanel';
 
 interface OverviewTabProps {
   project: ProjectWithClient;
@@ -42,6 +44,8 @@ interface OverviewTabProps {
    * two views of one fact that reads as a bug.
    */
   onProjectPatched?: (patch: Partial<ProjectWithClient>) => void;
+  canFinance?: boolean;
+  onOpenSection?: (tab: string) => void;
 }
 
 import { formatMoney } from '@/utils/decimal';
@@ -62,7 +66,7 @@ const daysUntil = (date: string | null) => {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, coverCandidate = null, onProjectPatched }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, coverCandidate = null, onProjectPatched, canFinance = false, onOpenSection }) => {
   const { toast } = useToast();
   // Buildings are only a sensible answer where the workspace actually has them. A permanently
   // empty picker reads as a broken control rather than a neutral one.
@@ -331,6 +335,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
         </CardContent>
       </Card>
 
+      {canFinance && onOpenSection && <ProjectCostPanel projectId={project.id} onOpenSection={onOpenSection} />}
+
       {/* Rooms summary — switches between simple badge list and per-room budget rollup
           based on whether any room actually has budget/spend data to show. */}
       {rooms.length > 0 && !hasMeaningfulRoomBudget && (
@@ -420,7 +426,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
         </Card>
       )}
 
-      {/* Task summary widget */}
       {taskStats.total > 0 && (
         <Card className={`dashboard-card ${rooms.length > 0 ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
           <CardHeader>
@@ -499,6 +504,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
           </CardContent>
         </Card>
       )}
+
+      <ProjectVisitsPanel project={project} isOwner={isOwner} className="lg:col-span-3" />
 
       {project.description && (
         <Card className="dashboard-card lg:col-span-3">

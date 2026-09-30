@@ -90,6 +90,8 @@ class CrmMeetingsService {
     remindEmail?: boolean;
     remindWhatsapp?: boolean;
     reminderMinutesBefore?: number;
+    /** What the meeting is about, written in the same insert; a DB trigger checks the tenant. */
+    projectId?: string | null;
   }): Promise<{ id: string; invitesSent: number; invitesFailed: number; inviteError?: string }> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
@@ -112,6 +114,7 @@ class CrmMeetingsService {
       remind_email: !!input.remindEmail,
       remind_whatsapp: !!input.remindWhatsapp,
       reminder_minutes_before: input.reminderMinutesBefore ?? 60,
+      project_id: input.projectId ?? null,
     }).select('id').single();
     if (error) throw error;
     const meetingId = (data as { id: string }).id;

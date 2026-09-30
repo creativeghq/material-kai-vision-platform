@@ -18,6 +18,7 @@ const ROOM_PLAN_BUCKET = 'generation-images';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 import { parseProjectLabor, type ProjectLabor } from '@/modules/finance/services/timeTrackingService';
+import { todayLocalISO } from '@/utils/datetime';
 
 // TYPES
 
@@ -320,6 +321,86 @@ export interface ProjectPnl {
   labor: ProjectLabor;
   /** Distinct currencies behind the figures — >1 means the totals mix money. */
   currencies: string[];
+}
+
+export function parseProjectPnl(data: unknown): ProjectPnl {
+  const r = (data || {}) as Record<string, any>;
+  const n = (v: unknown): number => (v == null ? 0 : Number(v));
+  const nOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
+  return {
+    contracted_revenue: n(r.contracted_revenue),
+    billed_revenue: n(r.billed_revenue),
+    order_revenue: n(r.order_revenue),
+    order_cogs: n(r.order_cogs),
+    revenue: n(r.revenue),
+    committed_cost: n(r.committed_cost),
+    supplier_cost: n(r.supplier_cost),
+    labor_cost: n(r.labor_cost),
+    expense_cost: n(r.expense_cost),
+    pending_expense_cost: n(r.pending_expense_cost),
+    expense_count: n(r.expense_count),
+    actual_cost: n(r.actual_cost),
+    margin_amount: n(r.margin_amount),
+    margin_pct: nOrNull(r.margin_pct),
+    forecast_margin_amount: n(r.forecast_margin_amount),
+    forecast_margin_pct: nOrNull(r.forecast_margin_pct),
+    wip: n(r.wip),
+    labor: parseProjectLabor(r.labor),
+    currencies: (r.currencies ?? []) as string[],
+  };
+}
+
+export interface ProjectDelivery {
+  id: string;
+  order_number: string | null;
+  supplier_name: string | null;
+  eta: string | null;
+  supplier_status: string | null;
+  amount_net: number | null;
+  currency: string | null;
+  is_late: boolean;
+}
+
+export interface ProjectDashboard {
+  pnl: ProjectPnl;
+  budget_amount: number | null;
+  budget_currency: string | null;
+  /** False when budget and costs are in different currencies; headroom is then null. */
+  budget_comparable: boolean;
+  budget_headroom: number | null;
+  deliveries: ProjectDelivery[];
+  open_purchase_orders: number;
+  crew: Array<{ day: string; workers: number; minutes: number }>;
+}
+
+/** A row of `list_project_visits`: a meeting (timestamptz) or a booking (local date + time). */
+export interface ProjectVisit {
+  kind: 'meeting' | 'appointment';
+  id: string;
+  title: string;
+  status: string;
+  starts_at: string | null;
+  local_date: string | null;
+  local_time: string | null;
+  location: string | null;
+  notes: string | null;
+  party: string | null;
+  requested_by_me: boolean;
+  created_at: string;
+}
+
+export interface VisitSlot { slot_date: string; slot_time: string; time_zone: string }
+
+export function visitStart(v: ProjectVisit): Date | null {
+  if (v.starts_at) return new Date(v.starts_at);
+  if (!v.local_date) return null;
+  const [y, m, d] = v.local_date.split('-').map(Number);
+  const [hh, mm] = (v.local_time ?? '00:00').split(':').map(Number);
+  return new Date(y, m - 1, d, hh, mm);
+}
+
+function browserTimeZone(): string {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; }
 }
 
 // ---------- PURCHASE ITEMS (made-to-order doors / windows) ----------
@@ -1519,30 +1600,64 @@ class ProjectsService {
   async getProjectPnl(projectId: string): Promise<ProjectPnl> {
     const { data, error } = await (supabase as any).rpc('get_project_pnl', { p_project_id: projectId });
     if (error) throw error;
+    return parseProjectPnl(data);
+  }
+
+  async getProjectDashboard(projectId: string): Promise<ProjectDashboard> {
+    const { data, error } = await (supabase as any)
+      .rpc('get_project_dashboard', { p_project_id: projectId, p_today: todayLocalISO() });
+    if (error) throw error;
     const r = (data || {}) as Record<string, any>;
-    const n = (v: unknown): number => (v == null ? 0 : Number(v));
-    const nOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
     return {
-      contracted_revenue: n(r.contracted_revenue),
-      billed_revenue: n(r.billed_revenue),
-      order_revenue: n(r.order_revenue),
-      order_cogs: n(r.order_cogs),
-      revenue: n(r.revenue),
-      committed_cost: n(r.committed_cost),
-      supplier_cost: n(r.supplier_cost),
-      labor_cost: n(r.labor_cost),
-      expense_cost: n(r.expense_cost),
-      pending_expense_cost: n(r.pending_expense_cost),
-      expense_count: n(r.expense_count),
-      actual_cost: n(r.actual_cost),
-      margin_amount: n(r.margin_amount),
-      margin_pct: nOrNull(r.margin_pct),
-      forecast_margin_amount: n(r.forecast_margin_amount),
-      forecast_margin_pct: nOrNull(r.forecast_margin_pct),
-      wip: n(r.wip),
-      labor: parseProjectLabor(r.labor),
-      currencies: (r.currencies ?? []) as string[],
+      pnl: parseProjectPnl(r.pnl),
+      budget_amount: r.budget_amount == null ? null : Number(r.budget_amount),
+      budget_currency: r.budget_currency ?? null,
+      budget_comparable: !!r.budget_comparable,
+      budget_headroom: r.budget_headroom == null ? null : Number(r.budget_headroom),
+      deliveries: ((r.deliveries ?? []) as any[]).map((d) => ({
+        id: d.id,
+        order_number: d.order_number ?? null,
+        supplier_name: d.supplier_name ?? null,
+        eta: d.eta ?? null,
+        supplier_status: d.supplier_status ?? null,
+        amount_net: d.amount_net == null ? null : Number(d.amount_net),
+        currency: d.currency ?? null,
+        is_late: !!d.is_late,
+      })),
+      open_purchase_orders: Number(r.open_purchase_orders ?? 0),
+      crew: ((r.crew ?? []) as any[]).map((c) => ({
+        day: String(c.day).slice(0, 10), workers: Number(c.workers ?? 0), minutes: Number(c.minutes ?? 0),
+      })),
     };
+  }
+
+
+  async listProjectVisits(projectId: string): Promise<ProjectVisit[]> {
+    const { data, error } = await (supabase as any).rpc('list_project_visits', { p_project_id: projectId });
+    if (error) throw error;
+    return (data ?? []) as ProjectVisit[];
+  }
+
+  async getVisitSlots(projectId: string, from: string, to: string): Promise<VisitSlot[]> {
+    const { data, error } = await (supabase as any).rpc('get_project_visit_slots', {
+      p_project_id: projectId, p_from: from, p_to: to, p_tz: browserTimeZone(),
+    });
+    if (error) throw error;
+    return (data ?? []) as VisitSlot[];
+  }
+
+  async requestVisit(projectId: string, input: { date: string; time: string; purpose: string; message?: string | null }): Promise<string> {
+    const { data, error } = await (supabase as any).rpc('request_project_visit', {
+      p_project_id: projectId, p_date: input.date, p_time: input.time,
+      p_purpose: input.purpose, p_message: input.message ?? null, p_tz: browserTimeZone(),
+    });
+    if (error) throw error;
+    return data as string;
+  }
+
+  async setAppointmentStatus(id: string, status: 'confirmed' | 'cancelled' | 'completed'): Promise<void> {
+    const { error } = await (supabase as any).from('appointments').update({ status }).eq('id', id);
+    if (error) throw error;
   }
 
   /**
