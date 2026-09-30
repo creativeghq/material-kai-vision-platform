@@ -220,7 +220,11 @@ export const CatalogOperationsTab: React.FC = () => {
                           <HubCellLink to={`/catalogs/${s.id}`} className="block max-w-[18rem] truncate">
                             <span title={s.title}>{s.title}</span>
                           </HubCellLink>
-                          {s.slug && <div className="max-w-[18rem] truncate text-xs text-muted-foreground" title={`/c/${s.slug}`}>/c/{s.slug}</div>}
+                          {catalogPublicPath(s.public_handle ?? null, s.slug) && (
+                            <div className="max-w-[18rem] truncate text-xs text-muted-foreground" title={catalogPublicPath(s.public_handle ?? null, s.slug)!}>
+                              {catalogPublicPath(s.public_handle ?? null, s.slug)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell><Badge variant={statusBadgeVariant(s.status)}>{labelizeValue(s.status)}</Badge></TableCell>
                         <TableCell className="text-right tabular-nums">{formatNumber(s.page_views)}</TableCell>
