@@ -123,13 +123,23 @@ Guarded by [tests/unit/projectCategories.test.ts](../tests/unit/projectCategorie
 
 ### `project_tasks`
 
-`(id, project_id, parent_task_id, room_id, title, description, status, assignee_id, due_date, visibility, sort_order, created_by, created_at, updated_at, completed_at)`
+`(id, project_id, parent_task_id, room_id, title, description, status, priority, assignee_id, assignee_employee_id, due_date, start_date, end_date, progress_pct, is_milestone, baseline_start_date, baseline_end_date, visibility, sort_order, cost_code_id, is_mandatory, skip_reason, created_by, created_at, updated_at, completed_at)`
+
+**`priority`**: NULL (not set) or `low` / `medium` / `high` / `urgent` — `project_tasks_priority_check`, mirrored in `src/modules/projects/taskVocabulary.ts`.
 
 **Subtask rule (enforced by `_project_tasks_enforce_depth_cap` trigger):** a task with `parent_task_id IS NOT NULL` cannot itself become a parent, and a task with children cannot become a subtask. Max nesting depth = 1 — same as GitHub sub-issues. Cross-project links are also rejected by the trigger.
 
 **`status`**: `todo` / `in_progress` / `done` / `blocked`. Flipping to/from `done` auto-stamps `completed_at` via the `_project_tasks_sync_completed_at` trigger.
 
 **`visibility`**: `internal` (default) or `client_visible`. The collaborator read policy (Phase 4) filters tasks down to `client_visible`-only.
+
+### `project_task_comments`
+
+`(id, task_id, project_id, author_id, body, created_at, edited_at)` — the internal discussion on a task. `project_id` is stamped from the task by a trigger, never taken from the client. Readable/writable by the project owner and by the task's assignee while they are an **active** member of the project's workspace (`_user_can_discuss_task`); a collaborator never sees it.
+
+### Task views
+
+List, Board (drag between status columns), Calendar (by due date, else end date) and Schedule (Gantt) are four views of one set of rows. List/Board/Calendar and the task drawer share `useProjectTasks`, which is the only place a status change passes the #437 mandatory-steps gate. `?tab=tasks&task=<id>` opens the drawer. `/projects/my-tasks` is `list_my_tasks(workspace)`: tasks assigned to the caller, plus unassigned tasks in projects the caller owns; an assignee moves status with `set_my_task_status`.
 
 ### `project_events`
 
@@ -162,6 +172,8 @@ Each row carries a `payload jsonb` with the fields relevant to that event (e.g. 
 ## RLS model
 
 **Owner-all** (Phase 1): `user_id = auth.uid()` gets full ALL on `projects` / `project_rooms` / `project_tasks` / (via parent project lookup) `project_events`.
+
+**Assignee-read**: `project_tasks_assignee_read` lets the task's `assignee_id` read that task (only that task, not the project) while an active member of the project's workspace. Projects themselves remain single-owner.
 
 **Collaborator-read** (Phase 4): five additional permissive SELECT policies on `projects` / `project_rooms` / `project_tasks` (filtered to `client_visible`) / `moodboards` / `moodboard_items` / `moodboard_presentation_sheets` / `quotes`, gated on the EXISTS predicate:
 
@@ -342,7 +354,7 @@ path is not a storage claim), see [storage-buckets.md](storage-buckets.md).
 - **Projects ≠ workspaces.** Workspace = tenant/org boundary. Project = one engagement inside the workspace.
 - **No hard delete via API.** Archive only — the financial / audit history is load-bearing.
 - **Quote line items are not exposed to collaborators.** They see quote name + status + total only.
-- **No collaborator write access.** Read-only by design; comments/approval is a future feature (issue #2 in the brainstorm).
+- **No collaborator write access.** Read-only by design. Task comments exist but are internal (owner + assignee); client-facing comments/approval is still a future feature.
 - **No realtime collaboration.** Standard cache-invalidate-on-action; no presence channels.
 
 ---

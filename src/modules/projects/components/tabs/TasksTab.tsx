@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Plus,
   Loader2,
@@ -18,7 +18,6 @@ import {
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
@@ -32,21 +31,22 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import {
-  warrantyClaimService, taskGateBlocks,
-} from '@/modules/crm/services/warrantyClaimService';
-import {
   projectsService,
   type ProjectTaskWithSubtasks,
   type ProjectTask,
-  type ProjectRoom,
   type TaskStatus,
   type TaskVisibility,
 } from '../../services/projectsService';
+import { TASK_STATUSES, TASK_STATUS_LABEL } from '../../taskVocabulary';
+import { NO_ASSIGNEE, assigneePatch, type ProjectTasksState } from '../tasks/useProjectTasks';
+import { PriorityTag, daysFromToday } from '../tasks/taskBits';
 
 interface TasksTabProps {
   projectId: string;
   /** Collaborators see client_visible tasks (filtered by RLS) but can't add/edit/delete. */
   isOwner?: boolean;
+  state: ProjectTasksState;
+  onOpenTask: (taskId: string) => void;
 }
 
 const STATUS_ICON: Record<TaskStatus, React.ReactNode> = {
@@ -56,49 +56,9 @@ const STATUS_ICON: Record<TaskStatus, React.ReactNode> = {
   blocked: <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-300" />,
 };
 
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  todo: 'Todo',
-  in_progress: 'In Progress',
-  done: 'Done',
-  blocked: 'Blocked',
-};
-
-const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
-
-/** Radix Select has no empty-string value, so "nobody" needs a sentinel of its own. */
-const NO_ASSIGNEE = '__unassigned__';
-
-const daysUntil = (date: string | null) => {
-  if (!date) return null;
-  const target = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-};
-
-export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true }) => {
-  const { activeWorkspaceId } = useWorkspace();
+export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true, state, onOpenTask }) => {
   const { toast } = useToast();
-  const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
-  /**
-   * Who work can be given to (#378 N2). Platform members AND the HR roster in one deduped list —
-   * a fitter or a subcontractor with no login is exactly who a site task is usually for, and until
-   * now the column pointed at auth.users and the UI rendered no assignee at all.
-   */
-  const [assignees, setAssignees] = useState<Array<{ kind: 'employee' | 'member'; id: string; name: string }>>([]);
-
-  // Loaded once per workspace. Failure leaves the list empty and the control still renders
-  // "Unassigned" — a task is not blocked on knowing who could do it.
-  useEffect(() => {
-    if (!activeWorkspaceId) return;
-    let cancelled = false;
-    projectsService.listTaskAssignees(activeWorkspaceId)
-      .then((rows) => { if (!cancelled) setAssignees(rows); })
-      .catch(() => { if (!cancelled) setAssignees([]); });
-    return () => { cancelled = true; };
-  }, [activeWorkspaceId]);
-  const [rooms, setRooms] = useState<ProjectRoom[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { tasks, rooms, assignees, loading, reload: load, changeStatus } = state;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const [newTitle, setNewTitle] = useState('');
@@ -106,24 +66,6 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
   const titleRef = useRef<HTMLInputElement>(null);
   const [newRoomId, setNewRoomId] = useState<string>('');
   const [creating, setCreating] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [t, r] = await Promise.all([
-        projectsService.listTasks(projectId),
-        projectsService.listRooms(projectId),
-      ]);
-      setTasks(t);
-      setRooms(r);
-    } catch (_err) {
-      toast({ title: 'Failed to load tasks', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, toast]);
-
-  useEffect(() => { load(); }, [load]);
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -168,28 +110,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
     }
   };
 
-  const handleStatusChange = async (id: string, status: TaskStatus) => {
-    try {
-      // #437 -- a job cannot be completed while a mandatory step is neither done nor explained.
-      // The server refuses it too; asking first is what turns a raw refusal into the sentence that
-      // says which steps and that a reason is an acceptable answer.
-      if (status === 'done') {
-        const gate = await warrantyClaimService.taskGate(id);
-        if (taskGateBlocks(gate)) {
-          toast({ title: 'Mandatory steps outstanding', description: gate.reason, variant: 'destructive' });
-          return;
-        }
-      }
-      await projectsService.updateTask(id, { status });
-      await load();
-    } catch (err) {
-      toast({
-        title: 'Failed to update task',
-        description: err instanceof Error ? err.message : undefined,
-        variant: 'destructive',
-      });
-    }
-  };
+  const handleStatusChange = (id: string, status: TaskStatus) => { void changeStatus(id, status); };
 
   const handleVisibilityToggle = async (task: ProjectTask) => {
     try {
@@ -206,12 +127,8 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
    * refuses both at once — so the one not chosen is explicitly cleared rather than left behind.
    */
   const handleAssign = async (taskId: string, value: string) => {
-    const [kind, id] = value === NO_ASSIGNEE ? [null, null] : value.split(':');
     try {
-      await projectsService.updateTask(taskId, {
-        assignee_id: kind === 'member' ? id : null,
-        assignee_employee_id: kind === 'employee' ? id : null,
-      });
+      await projectsService.updateTask(taskId, assigneePatch(value));
       await load();
     } catch (err: any) {
       toast({ title: 'Failed to assign the task', description: err?.message, variant: 'destructive' });
@@ -267,7 +184,6 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
       </Card>
       )}
 
-      {/* Task list */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -312,6 +228,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
                   onSubtaskStatusChange={(id, s) => handleStatusChange(id, s)}
                   onSubtaskVisibilityToggle={(t) => handleVisibilityToggle(t)}
                   onSubtaskDelete={(id) => handleDelete(id, false)}
+                  onOpen={onOpenTask}
                   readOnly={!isOwner}
                 />
               ))}
@@ -323,7 +240,6 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
   );
 };
 
-// TaskRow (parent task with optional expanded subtask list)
 
 interface TaskRowProps {
   task: ProjectTaskWithSubtasks;
@@ -339,6 +255,7 @@ interface TaskRowProps {
   onSubtaskStatusChange: (id: string, s: TaskStatus) => void;
   onSubtaskVisibilityToggle: (t: ProjectTask) => void;
   onSubtaskDelete: (id: string) => void;
+  onOpen: (taskId: string) => void;
   /** Collaborator view — disables status changes, visibility toggle, delete, add-subtask. */
   readOnly?: boolean;
 }
@@ -357,13 +274,12 @@ const TaskRow: React.FC<TaskRowProps> = ({
   onSubtaskStatusChange,
   onSubtaskVisibilityToggle,
   onSubtaskDelete,
+  onOpen,
   readOnly = false,
 }) => {
   const [subtaskInput, setSubtaskInput] = useState('');
   const hasSubtasks = task.subtasks.length > 0;
-  const days = daysUntil(task.due_date);
-  // The stored pair as one Select value. Employee wins if both are somehow set — the CHECK makes
-  // that impossible, but reading it the same way the writer writes it costs nothing.
+  const days = daysFromToday(task.due_date);
   const assigneeValue = task.assignee_employee_id
     ? `employee:${task.assignee_employee_id}`
     : task.assignee_id ? `member:${task.assignee_id}` : NO_ASSIGNEE;
@@ -373,10 +289,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
     <li>
       <div className="p-3 sm:p-4 hover:bg-muted/40 transition-colors">
         <div className="flex items-start gap-3">
-          {/* Status toggle (rotates through todo → in_progress → done → blocked → todo).
-              Collaborators get a read-only icon — no Select. */}
           {readOnly ? (
-            <span className="h-7 w-7 flex items-center justify-center shrink-0" title={STATUS_LABEL[task.status]}>
+            <span className="h-7 w-7 flex items-center justify-center shrink-0" title={TASK_STATUS_LABEL[task.status]}>
               {STATUS_ICON[task.status]}
             </span>
           ) : (
@@ -385,21 +299,25 @@ const TaskRow: React.FC<TaskRowProps> = ({
                 <span className="flex items-center justify-center">{STATUS_ICON[task.status]}</span>
               </SelectTrigger>
               <SelectContent>
-                {STATUS_ORDER.map(s => (
+                {TASK_STATUSES.map(s => (
                   <SelectItem key={s} value={s}>
-                    <span className="flex items-center gap-2">{STATUS_ICON[s]}{STATUS_LABEL[s]}</span>
+                    <span className="flex items-center gap-2">{STATUS_ICON[s]}{TASK_STATUS_LABEL[s]}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
 
-          {/* Title + meta */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className={`font-medium ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+              <button
+                type="button"
+                onClick={() => onOpen(task.id)}
+                className={`text-left font-medium hover:underline ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
+              >
                 {task.title}
-              </p>
+              </button>
+              <PriorityTag priority={task.priority} />
               {hasSubtasks && (
                 <Badge variant="outline" className="text-xs">
                   {task.subtask_done_count} / {task.subtask_total_count}
@@ -425,9 +343,6 @@ const TaskRow: React.FC<TaskRowProps> = ({
                   Client visible
                 </span>
               )}
-              {/* Who is doing this (#378 N2). The column and the service field existed; nothing
-                  rendered them, so the schedule could not answer "who" and crew planning happened
-                  off-platform. Read-only for collaborators. */}
               {readOnly ? (
                 assigneeName && (
                   <span className="flex items-center gap-1">
@@ -454,7 +369,6 @@ const TaskRow: React.FC<TaskRowProps> = ({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
             {!readOnly && (
               <>
@@ -474,15 +388,14 @@ const TaskRow: React.FC<TaskRowProps> = ({
           </div>
         </div>
 
-        {/* Subtasks */}
         {expanded && (
           <div className="mt-3 pl-7 space-y-1.5 border-l-2 border-primary/20 ml-3">
             {task.subtasks.map(sub => {
-              const subDays = daysUntil(sub.due_date);
+              const subDays = daysFromToday(sub.due_date);
               return (
                 <div key={sub.id} className="flex items-start gap-2 py-1.5">
                   {readOnly ? (
-                    <span className="h-6 w-6 flex items-center justify-center shrink-0" title={STATUS_LABEL[sub.status]}>
+                    <span className="h-6 w-6 flex items-center justify-center shrink-0" title={TASK_STATUS_LABEL[sub.status]}>
                       {STATUS_ICON[sub.status]}
                     </span>
                   ) : (
@@ -491,18 +404,22 @@ const TaskRow: React.FC<TaskRowProps> = ({
                         <span className="flex items-center justify-center">{STATUS_ICON[sub.status]}</span>
                       </SelectTrigger>
                       <SelectContent>
-                        {STATUS_ORDER.map(s => (
+                        {TASK_STATUSES.map(s => (
                           <SelectItem key={s} value={s}>
-                            <span className="flex items-center gap-2">{STATUS_ICON[s]}{STATUS_LABEL[s]}</span>
+                            <span className="flex items-center gap-2">{STATUS_ICON[s]}{TASK_STATUS_LABEL[s]}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${sub.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+                    <button
+                      type="button"
+                      onClick={() => onOpen(sub.id)}
+                      className={`text-left text-sm hover:underline ${sub.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
+                    >
                       {sub.title}
-                    </p>
+                    </button>
                     {(sub.due_date || sub.visibility === 'client_visible') && (
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         {sub.due_date && (

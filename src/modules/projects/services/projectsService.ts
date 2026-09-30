@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { TaskPriority, TaskStatusValue } from '../taskVocabulary';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { edgeError } from '@/utils/edgeError';
@@ -24,7 +25,8 @@ export type ProjectStatus = 'planning' | 'in_progress' | 'on_hold' | 'completed'
 export type RoomType =
   | 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'dining'
   | 'office' | 'outdoor' | 'hallway' | 'other';
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
+export type TaskStatus = TaskStatusValue;
+export type { TaskPriority } from '../taskVocabulary';
 export type TaskVisibility = 'internal' | 'client_visible';
 
 export interface Project {
@@ -143,6 +145,8 @@ export interface ProjectTask {
   end_date: string | null;
   progress_pct: number;
   is_milestone: boolean;
+  /** NULL = not set. See taskVocabulary.ts. */
+  priority?: TaskPriority | null;
 }
 
 /** A sequencing edge between two tasks of the same project. Cycles are rejected by the DB. */
@@ -453,6 +457,7 @@ export interface CreateTaskInput {
   end_date?: string | null;
   progress_pct?: number;
   is_milestone?: boolean;
+  priority?: TaskPriority | null;
 }
 
 export interface UpdateTaskInput {
@@ -470,6 +475,38 @@ export interface UpdateTaskInput {
   end_date?: string | null;
   progress_pct?: number;
   is_milestone?: boolean;
+  priority?: TaskPriority | null;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  project_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  edited_at: string | null;
+}
+
+/** A row of `list_my_tasks`: assigned to the caller, or unassigned in a project they own. */
+export interface MyTask {
+  id: string;
+  project_id: string;
+  project_name: string;
+  /** False = assigned into someone else's project; the caller cannot open that project page. */
+  owns_project: boolean;
+  parent_task_id: string | null;
+  parent_title: string | null;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority | null;
+  due_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  is_milestone: boolean;
+  assigned_to_me: boolean;
+  comment_count: number;
+  updated_at: string;
 }
 
 // SERVICE
@@ -985,7 +1022,9 @@ class ProjectsService {
         description: input.description ?? null,
         status: input.status ?? 'todo',
         assignee_id: input.assignee_id ?? null,
+        assignee_employee_id: input.assignee_employee_id ?? null,
         due_date: input.due_date ?? null,
+        priority: input.priority ?? null,
         visibility: input.visibility ?? 'internal',
         sort_order: input.sort_order ?? 0,
         created_by: user.id,
@@ -1076,6 +1115,58 @@ class ProjectsService {
 
   async removeTaskDependency(id: string): Promise<void> {
     const { error } = await (supabase as any).from('project_task_dependencies').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // ---------- TASK COMMENTS / MY TASKS ----------
+
+  async listTaskComments(taskId: string): Promise<TaskComment[]> {
+    const { data, error } = await (supabase as any)
+      .from('project_task_comments')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as TaskComment[];
+  }
+
+  /** project_id is stamped from the task by a trigger; the client never supplies it. */
+  async addTaskComment(taskId: string, body: string): Promise<TaskComment> {
+    const { data, error } = await (supabase as any)
+      .from('project_task_comments')
+      .insert({ task_id: taskId, body: body.trim() })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as TaskComment;
+  }
+
+  async deleteTaskComment(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('project_task_comments').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /** Comment count per task for one project. A failed read is "unknown", so it throws. */
+  async taskCommentCounts(projectId: string): Promise<Map<string, number>> {
+    const { data, error } = await (supabase as any)
+      .from('project_task_comments')
+      .select('task_id')
+      .eq('project_id', projectId);
+    if (error) throw error;
+    const counts = new Map<string, number>();
+    for (const r of (data ?? []) as Array<{ task_id: string }>) counts.set(r.task_id, (counts.get(r.task_id) ?? 0) + 1);
+    return counts;
+  }
+
+  async listMyTasks(workspaceId: string): Promise<MyTask[]> {
+    const { data, error } = await (supabase as any).rpc('list_my_tasks', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as MyTask[];
+  }
+
+  /** Works for the owner AND the assignee — the RPC checks either; the completion guard still runs. */
+  async setMyTaskStatus(taskId: string, status: TaskStatus): Promise<void> {
+    const { error } = await (supabase as any).rpc('set_my_task_status', { p_task_id: taskId, p_status: status });
     if (error) throw error;
   }
 

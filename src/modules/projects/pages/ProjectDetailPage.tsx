@@ -193,6 +193,7 @@ export const ProjectDetailPage: React.FC = () => {
       if (next === 'overview') p.delete('tab'); else p.set('tab', next);
       // The focused record belongs to the tab that was open; carrying it across is meaningless.
       p.delete('request');
+      p.delete('task');
       return p;
     }, { replace: true });
   }, [setSp]);

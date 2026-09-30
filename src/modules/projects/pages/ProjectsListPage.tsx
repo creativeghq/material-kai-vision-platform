@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ClipboardList, FolderKanban, LayoutGrid, List as ListIcon, Plus, Tags } from 'lucide-react';
+import { ClipboardList, FolderKanban, LayoutGrid, List as ListIcon, ListTodo, Plus, Tags } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
@@ -309,6 +309,10 @@ export const ProjectsListPage: React.FC = () => {
         subtitle="One place per engagement — rooms, moodboards, quotes, tasks and the money behind them"
         actions={
           <>
+            <Button variant="outline" size="sm" onClick={() => navigate('/projects/my-tasks')}>
+              <ListTodo className="h-4 w-4 mr-2" />
+              My tasks
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/blueprints')}>
               <ClipboardList className="h-4 w-4 mr-2" />
               Blueprints

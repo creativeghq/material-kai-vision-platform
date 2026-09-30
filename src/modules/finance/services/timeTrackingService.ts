@@ -108,6 +108,13 @@ export const timeTrackingService = {
     return this.list(workspaceId, { projectId });
   },
 
+  /** Hours on one task, as minutes. Time only — labor COST stays with get_project_labor. */
+  async taskMinutes(taskId: string): Promise<number> {
+    const { data, error } = await (supabase as any).from('time_entries').select('minutes').eq('task_id', taskId);
+    if (error) throw error;
+    return ((data ?? []) as Array<{ minutes: number | null }>).reduce((s, r) => s + (Number(r.minutes) || 0), 0);
+  },
+
   /**
    * A project's labor roll-up, derived in SQL. Deliberately an RPC and not a client-side sum:
    * labor cost feeds `get_project_pnl`, and two independent implementations of the same money

@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Home,
   Tags,
+  Diamond,
+  Users,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -23,9 +25,10 @@ import {
   type ProjectCoverCandidate,
   type ProjectWithClient,
   type ProjectRoom,
-  type ProjectTaskWithSubtasks,
 } from '../../services/projectsService';
 import { ProjectCoverPanel } from '../ProjectCoverPanel';
+import { assigneeKey, NO_ASSIGNEE, useProjectTasks } from '../tasks/useProjectTasks';
+import { AssigneeDot } from '../tasks/taskBits';
 
 interface OverviewTabProps {
   project: ProjectWithClient;
@@ -73,7 +76,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
     { rooms: [], unassigned: { actual_amount: 0, item_count: 0 } },
   );
   const [roomBudgetFailed, setRoomBudgetFailed] = useState(false);
-  const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
+  const taskState = useProjectTasks(project.id);
+  const { tasks, assigneeName, assigneesFailed } = taskState;
 
   useEffect(() => {
     projectsService.listRooms(project.id).then(setRooms).catch(() => {});
@@ -82,7 +86,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
     projectsService.getRoomBudgetSummary(project.id)
       .then((rows) => { setRoomBudget(rows); setRoomBudgetFailed(false); })
       .catch((err) => { console.error('[OverviewTab] room budget rollup failed:', err); setRoomBudgetFailed(true); });
-    projectsService.listTasks(project.id).then(setTasks).catch(() => {});
   }, [project.id]);
 
   // Per-room budget card replaces the simple rooms-badge card when any room has either
@@ -114,6 +117,25 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
       .slice(0, 3);
   }, [tasks]);
+
+  const milestones = useMemo(() => tasks
+    .flatMap(t => [t, ...t.subtasks])
+    .filter(t => t.is_milestone)
+    .sort((a, b) => (a.due_date ?? a.end_date ?? '9999').localeCompare(b.due_date ?? b.end_date ?? '9999')), [tasks]);
+
+  // Who is carrying the open work, derived from the assignees on the tasks themselves.
+  const team = useMemo(() => {
+    const m = new Map<string, { name: string | null; open: number; total: number }>();
+    for (const t of tasks.flatMap(x => [x, ...x.subtasks])) {
+      const key = assigneeKey(t);
+      if (key === NO_ASSIGNEE) continue;
+      const row = m.get(key) ?? { name: assigneeName(t), open: 0, total: 0 };
+      row.total += 1;
+      if (t.status !== 'done') row.open += 1;
+      m.set(key, row);
+    }
+    return [...m.entries()].sort((a, b) => b[1].open - a[1].open);
+  }, [tasks, assigneeName]);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -405,6 +427,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
             <CardTitle className="font-medium">Tasks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="text-muted-foreground">{taskStats.done} of {taskStats.total} done</span>
+                <span className="tabular-nums font-semibold">{Math.round((taskStats.done / taskStats.total) * 100)}%</span>
+              </div>
+              <Progress value={(taskStats.done / taskStats.total) * 100} />
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
               <Stat label="Todo" value={taskStats.todo} icon={<Circle className="h-3.5 w-3.5" />} />
               <Stat label="Active" value={taskStats.in_progress} icon={<Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" />} />
@@ -424,6 +453,43 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
                         <span className={`text-xs shrink-0 ${d !== null && d < 0 ? 'text-destructive' : d !== null && d <= 3 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
                           {d === null ? '' : d < 0 ? `${Math.abs(d)}d over` : d === 0 ? 'Today' : `${d}d`}
                         </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {milestones.length > 0 && (
+              <div className="pt-2 border-t border-hairline">
+                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Diamond className="h-3 w-3" />Milestones</span>
+                  <span className="tabular-nums">{milestones.filter(m => m.status === 'done').length}/{milestones.length} reached</span>
+                </div>
+                <div className="flex gap-1" aria-hidden="true">
+                  {milestones.map(m => (
+                    <span key={m.id} title={m.title} className={`h-1.5 flex-1 rounded-sm ${m.status === 'done' ? 'bg-primary' : 'bg-surface-sunken border border-hairline'}`} />
+                  ))}
+                </div>
+                {milestones.find(m => m.status !== 'done') && (
+                  <p className="mt-1.5 truncate text-xs">
+                    Next: {milestones.find(m => m.status !== 'done')!.title}
+                  </p>
+                )}
+              </div>
+            )}
+            {isOwner && team.length > 0 && (
+              <div className="pt-2 border-t border-hairline">
+                <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3 w-3" />Team</p>
+                <ul className="space-y-1.5">
+                  {team.map(([key, n]) => {
+                    const name = n.name;
+                    return (
+                      <li key={key} className="flex items-center gap-2 text-sm">
+                        <AssigneeDot name={name ?? '?'} />
+                        <span className={`truncate flex-1 ${name ? '' : 'text-muted-foreground'}`}>
+                          {name ?? (assigneesFailed ? 'Name could not be loaded' : 'No longer on the team')}
+                        </span>
+                        <span className="text-xs tabular-nums text-muted-foreground">{n.open} open</span>
                       </li>
                     );
                   })}

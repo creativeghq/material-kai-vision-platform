@@ -28,7 +28,7 @@ const card = read('src/modules/crm/components/WarrantyClaimsCard.tsx');
 const quality = read('src/modules/hr/components/InstallerQualityCard.tsx');
 const company = read('src/modules/crm/pages/CompanyDetailPage.tsx');
 const hr = read('src/modules/hr/pages/HRPage.tsx');
-const tasks = read('src/modules/projects/components/tabs/TasksTab.tsx');
+const tasks = read('src/modules/projects/components/tasks/useProjectTasks.ts');
 
 const position = (over: Partial<ClaimPosition>): ClaimPosition => ({
   claim_id: 'c', status: 'reported', cause: 'product_failure', money_outcome: 'supplier_claim',
@@ -147,6 +147,7 @@ describe('a job completes when every mandatory step is done OR explained', () =>
   it('the tasks tab asks before completing, and the server refuses anyway', () => {
     expect(tasks).toContain('taskGate');
     expect(tasks).toMatch(/taskGateBlocks\(gate\)/);
+    expect(read('src/modules/projects/pages/MyTasksPage.tsx')).toMatch(/taskGateBlocks\(gate\)/);
   });
 });
 

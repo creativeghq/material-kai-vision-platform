@@ -8,11 +8,12 @@ const ROOT = process.cwd();
 const read = (rel: string) => stripComments(readFileSync(join(ROOT, rel), 'utf8'));
 
 const TAB = read('src/modules/projects/components/tabs/TasksTab.tsx');
+const HOOK = read('src/modules/projects/components/tasks/useProjectTasks.ts');
 const SERVICE = read('src/modules/projects/services/projectsService.ts');
 
 describe('the assignee picker is populated', () => {
   it('the tasks tab actually calls the assignee list', () => {
-    expect(TAB, 'nothing loads the assignees — the dropdown renders empty forever')
+    expect(HOOK, 'nothing loads the assignees — the dropdown renders empty forever')
       .toContain('listTaskAssignees');
   });
 
@@ -30,15 +31,17 @@ describe('the assignee picker is populated', () => {
 
 describe('picking somebody actually writes it', () => {
   const handler = (() => {
-    const i = TAB.indexOf('const handleAssign');
-    expect(i, 'handleAssign should exist').toBeGreaterThan(-1);
-    const rest = TAB.slice(i);
-    const end = rest.indexOf('\n  const ', 1);
+    const i = HOOK.indexOf('export function assigneePatch');
+    expect(i, 'assigneePatch should exist').toBeGreaterThan(-1);
+    const rest = HOOK.slice(i);
+    const end = rest.indexOf('\nexport ', 1);
     return end > 0 ? rest.slice(0, end) : rest;
   })();
 
   it('writes through updateTask', () => {
-    expect(handler).toContain('projectsService.updateTask');
+    const i = TAB.indexOf('const handleAssign');
+    expect(i, 'handleAssign should exist').toBeGreaterThan(-1);
+    expect(TAB.slice(i, i + 400)).toMatch(/projectsService\.updateTask\(taskId, assigneePatch\(value\)\)/);
   });
 
   it('sets BOTH columns on every write, so the unchosen one is cleared', () => {
