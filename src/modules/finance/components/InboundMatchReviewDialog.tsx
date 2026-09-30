@@ -91,7 +91,6 @@ export const InboundMatchReviewDialog: React.FC<{
   const note = selfIsNote ? self : other;
   const invoice = selfIsNote ? other : self;
 
-  // What each side is ALREADY tied to — the fact a 45-day window guess must not override.
   const noteTakenBy = note?.correlations.filter(
     (e) => isLinked(e) && e.other_doc_id !== invoice?.document.id && !isDeliveryNote(e.other_doc_type),
   ) ?? [];
@@ -150,7 +149,7 @@ export const InboundMatchReviewDialog: React.FC<{
                       {note.document.label} is already the detail for {documentLabel(e)}
                       {e.other_total_gross != null ? ` (${formatMoney(Number(e.other_total_gross), 'EUR')})` : ''}
                       {e.confirmed_at ? `, confirmed ${formatDate(e.confirmed_at)}` : ', stated by the issuer'}.
-                      A delivery note is normally invoiced once — linking it here too would count the same goods on two bills.
+                      One delivery cannot be the detail for two invoices, so this match cannot be accepted.
                     </CheckItem>
                   ))
                 : <CheckItem verdict="good">{note.document.label} is not linked to any other invoice.</CheckItem>}
@@ -182,34 +181,25 @@ export const InboundMatchReviewDialog: React.FC<{
                 Items on {note.document.label} — what {invoice.document.label} would be billing
                 {invoice.money.total_gross != null && ` for ${formatMoney(Number(invoice.money.total_gross), invoice.document.currency ?? 'EUR')}`}
               </p>
-              <div className="table-scroll rounded-md border border-hairline">
-                <table className="w-full text-xs">
-                  <thead className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-1.5 text-left">Code</th>
-                      <th className="px-3 py-1.5 text-left">Description</th>
-                      <th className="px-3 py-1.5 text-right">Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {note.lines.length === 0 && (
-                      <tr><td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">No items on the delivery note.</td></tr>
-                    )}
-                    {note.lines.map((l, i) => {
-                      const unit = unitFromMydataCode(l.measurement_unit);
-                      return (
-                        <tr key={i} className="border-t border-hairline">
-                          <td className="px-3 py-1.5 font-mono text-[11px]">{l.item_code ?? '—'}</td>
-                          <td className="px-3 py-1.5">{l.item_description ?? '—'}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">
-                            {l.quantity ?? '—'}{unit ? ` ${unitSuffix(unit)}` : ''}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="divide-y divide-hairline rounded-md border border-hairline text-xs">
+                {note.lines.length === 0 && (
+                  <li className="px-3 py-3 text-center text-muted-foreground">No items on the delivery note.</li>
+                )}
+                {note.lines.map((l, i) => {
+                  const unit = unitFromMydataCode(l.measurement_unit);
+                  return (
+                    <li key={i} className="flex items-baseline gap-3 px-3 py-1.5">
+                      <span className="min-w-0 flex-1">
+                        {l.item_description ?? '—'}
+                        {l.item_code && <span className="ml-2 font-mono text-[10px] text-muted-foreground">{l.item_code}</span>}
+                      </span>
+                      <span className="shrink-0 tabular-nums">
+                        {l.quantity ?? '—'}{unit ? ` ${unitSuffix(unit)}` : ''}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           </>
         )}
@@ -221,8 +211,12 @@ export const InboundMatchReviewDialog: React.FC<{
               <Button variant="secondary" onClick={() => void rule(false)} disabled={busy || !self}>
                 Not a match
               </Button>
-              <Button onClick={() => void rule(true)} disabled={busy || !self || !other}>
-                {noteTakenBy.length > 0 ? 'Link anyway' : 'Link them'}
+              <Button
+                onClick={() => void rule(true)}
+                disabled={busy || !self || !other || noteTakenBy.length > 0}
+                title={noteTakenBy.length > 0 ? 'This delivery note is already linked to another invoice. Unlink it there first.' : undefined}
+              >
+                {noteTakenBy.length > 0 ? `Already on ${documentLabel(noteTakenBy[0])}` : 'Link them'}
               </Button>
             </>
           )}

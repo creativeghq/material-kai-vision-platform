@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, Send, Building2, CreditCard } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, ChevronRight, Send, Building2, CreditCard } from 'lucide-react';
 import { CardTerminalPaymentDialog } from '@/modules/finance/components/CardTerminalPaymentDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
@@ -54,6 +54,8 @@ import {
 } from '@/modules/finance/utils/inboundProvenance';
 import type { InboundSource, InboundLinkSummary } from '@/modules/finance/services/inboundService';
 import { InboundDetailCell } from '@/modules/finance/components/InboundDetailCell';
+import { InboundLinkedDetailPanel } from '@/modules/finance/components/InboundLinkedDetailPanel';
+import { hasLinkedDelivery, isInteractiveClick, nestDeliveryNotes } from '@/modules/finance/utils/inboundNesting';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -1477,52 +1479,18 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
     catch (err: any) { toast({ title: 'Failed to set category', description: err?.message, variant: 'destructive' }); onChanged(); }
   };
 
-  if (rows.length === 0) {
-    return (
-      <div className="space-y-2 p-8 text-center text-sm text-muted-foreground">
-        <p>
-          No documents yet. Two kinds land here once the inbound poller has your AADE credentials:
-          what other businesses issue to you on myDATA, and what <strong>you</strong> entered in myAADE
-          yourself — foreign supplier invoices, rent, payroll. Then you can turn each into a supplier
-          bill or a warehouse intake.
-        </p>
-        {/* This tab lists inbound_documents ONLY, but its "Add expense" button creates a
-            supplier_bills row — so an expense recorded here does not appear here. A workspace with
-            no myDATA feed read "No received documents yet" forever and concluded the expense had
-            not saved. Say where it went. */}
-        <p className="text-xs">
-          Expenses you add yourself are <strong>supplier bills</strong>, not received documents —
-          they appear under <Link to={`${financeBase}?tab=ap`} className="text-primary hover:underline">Payables</Link>.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="table-scroll">
-    <table className="w-full text-sm">
-      <thead className="border-b border-border/60 text-xs text-muted-foreground">
-        <tr>
-          <th className="px-4 py-2 text-left">Date</th>
-          <th className="px-4 py-2 text-left">Number</th>
-          <th className="px-4 py-2 text-left">Issuer</th>
-          <th className="px-4 py-2 text-left">Type</th>
-          <th className="px-4 py-2 text-left">Category</th>
-          <th className="px-4 py-2 text-right">Net</th>
-          <th className="px-4 py-2 text-right">VAT</th>
-          {/* "Gross", not "Payable". This renders what the SUPPLIER invoiced (`invoicedTotal`),
-              which on a reverse-charged purchase is the net — AADE's totalGrossValue there adds
-              VAT we self-assess and is a total nobody will ever pay. It is not reduced by
-              anything paid on the supplier_bills row the document became, so a settled document
-              showed its whole amount under "Payable" forever. What is still owed lives on the
-              bill (its derived amount_due), reachable from the expense this row opens. */}
-          <th className="px-4 py-2 text-right">Gross</th>
-          <th className="px-4 py-2 text-center">Detail</th>
-          <th className="px-4 py-2 text-center">Handled</th>
-          <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((d) => {
+  const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set());
+  const toggle = (id: string) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const { top, nested } = nestDeliveryNotes(rows, links);
+  const byId = new Map(rows.map((r) => [r.id, r] as const));
+
+  const renderRow = (d: InboundDocument, isChild: boolean): React.ReactNode => {
+          const expandable = !isChild && (hasLinkedDelivery(links[d.id]) || (nested[d.id]?.length ?? 0) > 0);
+          const open = expandable && expanded.has(d.id);
           const cat = d.id in localCat ? localCat[d.id] : (d.category_id ?? null);
           const outcomes = inboundOutcomes(d, { ordered: actions.ordered.has(d.id) });
           // Reverse charge: the VAT on a 13.x/14.x is self-accounted and reclaimed in the same
@@ -1532,8 +1500,27 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           const reverseCharged = isReverseCharged(d.doc_type);
           const docNumber = inboundDocumentNumber(d);
           return (
-          <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
-            <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
+          <React.Fragment key={d.id}>
+          <tr
+            className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''} ${isChild ? 'bg-surface-sunken' : ''} ${expandable ? 'cursor-pointer' : ''}`}
+            onClick={expandable ? (e) => { if (!isInteractiveClick(e)) toggle(d.id); } : undefined}
+          >
+            <td className={`py-2 pr-4 ${isChild ? 'pl-10' : 'pl-4'}`}>
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                {expandable && (
+                  <button
+                    type="button"
+                    onClick={() => toggle(d.id)}
+                    aria-expanded={open}
+                    aria-label={open ? 'Collapse linked documents' : 'Expand linked documents'}
+                    className="-ml-1 rounded-sm p-0.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground"
+                  >
+                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} />
+                  </button>
+                )}
+                {d.issue_date ? formatDate(d.issue_date) : '—'}
+              </span>
+            </td>
             <td className="px-4 py-2">
               {/* A self-transmitted document has no supplier invoice number: `series` is OUR ΑΦΜ
                   and `aa` a counter we assigned. Printing them gives the operator a number to
@@ -1601,8 +1588,69 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
               )}
             </td>
           </tr>
+          {open && (nested[d.id] ?? []).map((c) => renderRow(c, true))}
+          {open && (
+            <tr className="border-b border-border/30 bg-surface-sunken">
+              <td colSpan={11} className="p-0">
+                <InboundLinkedDetailPanel
+                  docId={d.id}
+                  readOnly={readOnly}
+                  onChanged={onChanged}
+                  onOpenDocument={(id) => { const r = byId.get(id); if (r) actions.openPreview(r); }}
+                />
+              </td>
+            </tr>
+          )}
+          </React.Fragment>
           );
-        })}
+  };
+
+  if (rows.length === 0) {
+    return (
+      <div className="space-y-2 p-8 text-center text-sm text-muted-foreground">
+        <p>
+          No documents yet. Two kinds land here once the inbound poller has your AADE credentials:
+          what other businesses issue to you on myDATA, and what <strong>you</strong> entered in myAADE
+          yourself — foreign supplier invoices, rent, payroll. Then you can turn each into a supplier
+          bill or a warehouse intake.
+        </p>
+        {/* This tab lists inbound_documents ONLY, but its "Add expense" button creates a
+            supplier_bills row — so an expense recorded here does not appear here. A workspace with
+            no myDATA feed read "No received documents yet" forever and concluded the expense had
+            not saved. Say where it went. */}
+        <p className="text-xs">
+          Expenses you add yourself are <strong>supplier bills</strong>, not received documents —
+          they appear under <Link to={`${financeBase}?tab=ap`} className="text-primary hover:underline">Payables</Link>.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="table-scroll">
+    <table className="w-full text-sm">
+      <thead className="border-b border-border/60 text-xs text-muted-foreground">
+        <tr>
+          <th className="px-4 py-2 text-left">Date</th>
+          <th className="px-4 py-2 text-left">Number</th>
+          <th className="px-4 py-2 text-left">Issuer</th>
+          <th className="px-4 py-2 text-left">Type</th>
+          <th className="px-4 py-2 text-left">Category</th>
+          <th className="px-4 py-2 text-right">Net</th>
+          <th className="px-4 py-2 text-right">VAT</th>
+          {/* "Gross", not "Payable". This renders what the SUPPLIER invoiced (`invoicedTotal`),
+              which on a reverse-charged purchase is the net — AADE's totalGrossValue there adds
+              VAT we self-assess and is a total nobody will ever pay. It is not reduced by
+              anything paid on the supplier_bills row the document became, so a settled document
+              showed its whole amount under "Payable" forever. What is still owed lives on the
+              bill (its derived amount_due), reachable from the expense this row opens. */}
+          <th className="px-4 py-2 text-right">Gross</th>
+          <th className="px-4 py-2 text-center">Detail</th>
+          <th className="px-4 py-2 text-center">Handled</th>
+          <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {top.map((d) => renderRow(d, false))}
       </tbody>
       {/* Every dialog those actions open, mounted once by the hook. */}
       {actions.dialogs}

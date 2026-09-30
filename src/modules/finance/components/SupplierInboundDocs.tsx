@@ -3,13 +3,15 @@
  * they open.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, CalendarDays } from 'lucide-react';
+import { Loader2, CalendarDays, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument, type InboundLinkSummary, type IssuerMoney } from '@/modules/finance/services/inboundService';
 import { InboundDetailCell } from '@/modules/finance/components/InboundDetailCell';
+import { InboundLinkedDetailPanel } from '@/modules/finance/components/InboundLinkedDetailPanel';
+import { hasLinkedDelivery, isInteractiveClick, nestDeliveryNotes } from '@/modules/finance/utils/inboundNesting';
 import { inboundOutcomes, inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { mydataTypeName, useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
@@ -256,6 +258,107 @@ export const SupplierInboundDocs: React.FC<{
   ], [typeLabels]);
   const t = useHubTable(rows, fields, { columnId: 'date', direction: 'desc' });
   useEffect(() => { setPage(1); }, [t.search, t.filters, t.sort]);
+  const { top, nested } = useMemo(() => nestDeliveryNotes(t.rows, links), [t.rows, links]);
+  const byId = useMemo(() => new Map(rows.map((r) => [r.id, r] as const)), [rows]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const renderRow = (d: InboundDocument, isChild: boolean): React.ReactNode => {
+    const outcomes = inboundOutcomes(d, { ordered: actions.ordered.has(d.id) });
+    const expandable = !isChild && (hasLinkedDelivery(links[d.id]) || (nested[d.id]?.length ?? 0) > 0);
+    const open = expandable && expanded.has(d.id);
+    return (
+      <React.Fragment key={d.id}>
+              <TableRow
+                className={`cursor-pointer ${d.status === 'dismissed' ? 'opacity-60' : ''} ${isChild ? 'bg-surface-sunken' : ''}`}
+                // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on
+                // the Number cell. A <tr> cannot be made focusable correctly: tabIndex +
+                // role="button" on a row is invalid ARIA and yields a focus stop with no name.
+                onClick={(e) => { if (!isInteractiveClick(e)) actions.openPreview(d); }}
+              >
+                <TableCell className={`whitespace-nowrap ${isChild ? 'pl-10' : ''}`}>
+                  <span className="inline-flex items-center gap-1">
+                    {expandable && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggle(d.id); }}
+                        aria-expanded={open}
+                        aria-label={open ? 'Collapse linked documents' : 'Expand linked documents'}
+                        className="-ml-1 rounded-sm p-0.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground"
+                      >
+                        <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} />
+                      </button>
+                    )}
+                    {d.issue_date ? formatDate(d.issue_date) : <HubCellEmpty />}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {/* Our own ΑΦΜ is not the supplier's invoice number — see
+                      `inboundDocumentNumber`. */}
+                  <button
+                    type="button"
+                    className="block max-w-[12rem] truncate rounded text-left text-xs font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={(e) => { e.stopPropagation(); actions.openPreview(d); }}
+                    title="Open this document as AADE holds it"
+                  >
+                    {inboundDocumentNumber(d) ?? '—'}
+                  </button>
+                  {d.mark ? <div className="text-[10px] font-mono text-muted-foreground" title={`MARK ${d.mark}`}>{d.mark}</div> : null}
+                </TableCell>
+                <TableCell className="hidden sm:table-cell"><MydataTypeLabel code={d.doc_type} /></TableCell>
+                <TableCell className="hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell">{formatMoney(d.total_net ?? 0, d.currency)}</TableCell>
+                {/* Reverse charge: the supplier charged no VAT, so none is shown and the
+                    total is what they actually invoiced. */}
+                <TableCell className="hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell">
+                  {isReverseCharged(d.doc_type)
+                    ? <span title={`Reverse charge — ${formatMoney(selfAccountedVat(d) ?? 0, d.currency)} self-assessed and reclaimed in the same return.`}>—</span>
+                    : formatMoney(d.total_vat ?? 0, d.currency)}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatMoney(invoicedTotal(d), d.currency)}</TableCell>
+                {/* Value-only lines: the money is transmitted, the detail never was — and on a
+                    supplier who files a ΔΑ alongside, the detail IS transmitted, on the OTHER
+                    document. One cell answers both, and names which. */}
+                <TableCell className="hidden text-center md:table-cell">
+                  <InboundDetailCell doc={d} link={links[d.id]} readOnly={readOnly} onChanged={load} />
+                </TableCell>
+                <TableCell className="text-center">
+                  {outcomes.length > 0
+                    ? <span className="text-[10px]">
+                        {outcomes.map((o, i) => (
+                          <React.Fragment key={o.label}>
+                            {i > 0 && <span className="text-muted-foreground/50"> · </span>}
+                            <span className={o.tone}>{o.label}</span>
+                          </React.Fragment>
+                        ))}
+                      </span>
+                    : <span className="text-[10px] text-muted-foreground/50">Not in Books</span>}
+                </TableCell>
+                {!readOnly && (
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end">{actions.renderActions(d)}</div>
+                  </TableCell>
+                )}
+              </TableRow>
+      {open && (nested[d.id] ?? []).map((c) => renderRow(c, true))}
+      {open && (
+        <TableRow className="bg-surface-sunken hover:bg-surface-sunken">
+          <TableCell colSpan={readOnly ? 8 : 9} className="p-0">
+            <InboundLinkedDetailPanel
+              docId={d.id}
+              readOnly={readOnly}
+              onChanged={() => { void load(); }}
+              onOpenDocument={(id) => { const r = byId.get(id); if (r) actions.openPreview(r); }}
+            />
+          </TableCell>
+        </TableRow>
+      )}
+      </React.Fragment>
+    );
+  };
 
   return (
     <>
@@ -367,70 +470,10 @@ export const SupplierInboundDocs: React.FC<{
               </TableCell>
             </TableRow>
           )}
-          {paginate(t.rows, page).map((d) => {
-            const outcomes = inboundOutcomes(d, { ordered: actions.ordered.has(d.id) });
-            return (
-              <TableRow
-                key={d.id}
-                className={`cursor-pointer ${d.status === 'dismissed' ? 'opacity-60' : ''}`}
-                // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on
-                // the Number cell. A <tr> cannot be made focusable correctly: tabIndex +
-                // role="button" on a row is invalid ARIA and yields a focus stop with no name.
-                onClick={() => actions.openPreview(d)}
-              >
-                <TableCell className="whitespace-nowrap">{d.issue_date ? formatDate(d.issue_date) : <HubCellEmpty />}</TableCell>
-                <TableCell>
-                  {/* Our own ΑΦΜ is not the supplier's invoice number — see
-                      `inboundDocumentNumber`. */}
-                  <button
-                    type="button"
-                    className="block max-w-[12rem] truncate rounded text-left text-xs font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={(e) => { e.stopPropagation(); actions.openPreview(d); }}
-                    title="Open this document as AADE holds it"
-                  >
-                    {inboundDocumentNumber(d) ?? '—'}
-                  </button>
-                  {d.mark ? <div className="text-[10px] font-mono text-muted-foreground" title={`MARK ${d.mark}`}>{d.mark}</div> : null}
-                </TableCell>
-                <TableCell className="hidden sm:table-cell"><MydataTypeLabel code={d.doc_type} /></TableCell>
-                <TableCell className="hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell">{formatMoney(d.total_net ?? 0, d.currency)}</TableCell>
-                {/* Reverse charge: the supplier charged no VAT, so none is shown and the
-                    total is what they actually invoiced. */}
-                <TableCell className="hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell">
-                  {isReverseCharged(d.doc_type)
-                    ? <span title={`Reverse charge — ${formatMoney(selfAccountedVat(d) ?? 0, d.currency)} self-assessed and reclaimed in the same return.`}>—</span>
-                    : formatMoney(d.total_vat ?? 0, d.currency)}
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatMoney(invoicedTotal(d), d.currency)}</TableCell>
-                {/* Value-only lines: the money is transmitted, the detail never was — and on a
-                    supplier who files a ΔΑ alongside, the detail IS transmitted, on the OTHER
-                    document. One cell answers both, and names which. */}
-                <TableCell className="hidden text-center md:table-cell">
-                  <InboundDetailCell doc={d} link={links[d.id]} readOnly={readOnly} onChanged={load} />
-                </TableCell>
-                <TableCell className="text-center">
-                  {outcomes.length > 0
-                    ? <span className="text-[10px]">
-                        {outcomes.map((o, i) => (
-                          <React.Fragment key={o.label}>
-                            {i > 0 && <span className="text-muted-foreground/50"> · </span>}
-                            <span className={o.tone}>{o.label}</span>
-                          </React.Fragment>
-                        ))}
-                      </span>
-                    : <span className="text-[10px] text-muted-foreground/50">Not in Books</span>}
-                </TableCell>
-                {!readOnly && (
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-end">{actions.renderActions(d)}</div>
-                  </TableCell>
-                )}
-              </TableRow>
-            );
-          })}
+          {paginate(top, page).map((d) => renderRow(d, false))}
         </TableBody>
       </Table>
-      <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="documents" />
+      <TablePagination page={page} total={top.length} onPageChange={setPage} label="documents" />
       </>
       )}
 
