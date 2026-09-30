@@ -107,7 +107,7 @@ const OWNER_ONLY_TABS = new Set<ProjectTab>([
  * first row's problem twice over: nothing says which row is primary, and which section falls onto
  * the second row is a different one at every width. So the strip shows the STAGES of a project —
  * design it, specify it, sell it, build it, hand it over, review it — and the selected stage opens
- * its own sections in a smaller strip beneath.
+ * its own sections in a side rail beside the content.
  */
 type ProjectStage = 'overview' | 'design' | 'specification' | 'commercial' | 'delivery' | 'client' | 'review';
 const TAB_GROUPS: ReadonlyArray<{ id: ProjectStage; label: string; icon: LucideIcon; tabs: readonly ProjectTab[] }> = [
@@ -402,15 +402,15 @@ export const ProjectDetailPage: React.FC = () => {
           </TabsList>
 
           <TabsContent value={stage.id} className="mt-0">
-            {/* Section strip: the stage's own sections, one size down. `?tab=` names one of these. */}
-            <Tabs value={tab} onValueChange={setTab}>
+            {/* Section rail: the stage's own sections beside the content. `?tab=` names one of these. */}
+            <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
               {stage.tabs.length > 1 && (
-                <TabsList aria-label={`${stage.label} sections`} className="mt-4 h-8 w-auto gap-0 text-xs">
+                <TabsList aria-label={`${stage.label} sections`} className="section-rail flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
                   {stage.tabs.map((t) => {
                     const Icon = TAB_ICONS[t];
                     return (
-                      <TabsTrigger key={t} value={t} className="min-h-8 gap-1.5 px-3 py-1 text-xs md:min-h-8">
-                        <Icon className="h-3.5 w-3.5" />
+                      <TabsTrigger key={t} value={t} className="w-full justify-start">
+                        <Icon className="h-4 w-4 mr-2" />
                         {PROJECT_SECTION_LABELS[t]}
                         {countBadge(t)}
                       </TabsTrigger>
@@ -418,6 +418,8 @@ export const ProjectDetailPage: React.FC = () => {
                   })}
                 </TabsList>
               )}
+
+              <div className="min-w-0 flex-1">
 
           <TabsContent value="overview"><OverviewTab project={project} isOwner={isTeam} canEditProject={isManager} canFinance={canFinance} onOpenSection={setTab} coverCandidate={coverCandidate}
             team={isTeam ? {
@@ -457,6 +459,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isTeam} focusRequestId={sp.get('request')} /></TabsContent>
           {isTeam && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isTeam} subjectName={project.name} /></ModuleTabGate></TabsContent>}
           {isTeam && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
+              </div>
             </Tabs>
           </TabsContent>
         </Tabs>
