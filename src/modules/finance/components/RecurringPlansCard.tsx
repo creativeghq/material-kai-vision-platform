@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
-import { HubEmptyState } from '@/components/core/hub';
+import {
+  HubEmptyState, HubToolbar, HubFilterSelect, HubResetFilters, HubSortButton, HubCellEmpty, useHubTable,
+  HUB_FILTER_ALL, type HubTableField, type HubSort,
+} from '@/components/core/hub';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import {
@@ -30,6 +34,39 @@ const PLAN_CATEGORIES: PlannedPaymentCategory[] = [
 
 const cadenceLabel = (c: RecurringCadence, every: number) =>
   every > 1 ? `Every ${every} ${c.replace('ly', '')}s` : humanizeLabel(c);
+
+const planTotal = (r: RecurringExpense) => Number(r.subtotal_net) + Number(r.vat_amount);
+
+const FIELDS: HubTableField<RecurringExpense>[] = [
+  { id: 'what', sortValue: (r) => r.description, searchText: (r) => r.description },
+  {
+    id: 'bucket', sortValue: (r) => r.plan_category, filterValue: (r) => r.plan_category,
+    filterLabel: 'Bucket', filterOptionLabel: humanizeLabel,
+  },
+  {
+    id: 'cadence', sortValue: (r) => r.cadence, filterValue: (r) => r.cadence,
+    filterLabel: 'How often', filterOptionLabel: humanizeLabel,
+  },
+  { id: 'amount', sortValue: planTotal },
+  { id: 'next', sortValue: (r) => (r.is_active ? r.next_run_at : null) },
+  {
+    id: 'state', filterValue: (r) => (r.is_active ? 'active' : 'paused'), filterLabel: 'State',
+    filterOptionLabel: humanizeLabel,
+  },
+];
+
+const SortHead: React.FC<{
+  id: string; label: string; sort?: HubSort; onSort: (id: string) => void; className?: string; align?: 'right';
+}> = ({ id, label, sort, onSort, className, align }) => (
+  <TableHead
+    className={[className, align === 'right' ? 'text-right' : ''].filter(Boolean).join(' ') || undefined}
+    aria-sort={sort?.columnId === id ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+  >
+    <HubSortButton active={sort?.columnId === id ? sort.direction : undefined} align={align} onClick={() => onSort(id)}>
+      {label}
+    </HubSortButton>
+  </TableHead>
+);
 
 /**
  * Money that leaves on a schedule and was being typed in every month.
@@ -72,6 +109,7 @@ export const RecurringPlansCard: React.FC<{ workspaceId: string }> = ({ workspac
 
   // Only the plan-producing templates. The bill ones belong to Expenses, where they are created.
   const plans = useMemo(() => (rows ?? []).filter((r) => r.creates === 'plan'), [rows]);
+  const t = useHubTable(plans, FIELDS);
 
   const create = async () => {
     const parsed = parseDecimal(amount);
@@ -180,35 +218,59 @@ export const RecurringPlansCard: React.FC<{ workspaceId: string }> = ({ workspac
                 : undefined}
             />
           ) : (
-            <div className="table-scroll">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
-                  <tr className="border-b border-hairline">
-                    <th className="px-4 py-2 text-left">What</th>
-                    <th className="px-4 py-2 text-left">How often</th>
-                    <th className="px-4 py-2 text-right">Amount</th>
-                    <th className="px-4 py-2 text-left">Next</th>
-                    <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {plans.map((r) => (
-                    <tr key={r.id} className="border-b border-hairline last:border-0">
-                      <td className="px-4 py-2">
-                        <div className="font-medium">{r.description ?? '—'}</div>
+            <>
+              {plans.length > 8 && (
+                <HubToolbar
+                  search={t.search}
+                  onSearchChange={t.setSearch}
+                  searchPlaceholder="Search recurring"
+                  filters={<>
+                    <HubFilterSelect label="Bucket" value={t.filters.bucket ?? HUB_FILTER_ALL} options={t.filterOptions.bucket} onChange={(v) => t.setFilter('bucket', v)} />
+                    <HubFilterSelect label="How often" value={t.filters.cadence ?? HUB_FILTER_ALL} options={t.filterOptions.cadence} onChange={(v) => t.setFilter('cadence', v)} />
+                    <HubFilterSelect label="State" value={t.filters.state ?? HUB_FILTER_ALL} options={t.filterOptions.state} onChange={(v) => t.setFilter('state', v)} />
+                    <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                  </>}
+                />
+              )}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortHead id="what" label="What" sort={t.sort} onSort={t.toggleSort} />
+                    <SortHead id="cadence" label="How often" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell" />
+                    <SortHead id="amount" label="Amount" sort={t.sort} onSort={t.toggleSort} align="right" />
+                    <SortHead id="next" label="Next" sort={t.sort} onSort={t.toggleSort} className="hidden md:table-cell" />
+                    <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {t.rows.length === 0 && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={5}>
+                        <HubEmptyState
+                          variant="filtered"
+                          title="Nothing matches these filters"
+                          action={<HubResetFilters count={t.activeFilterCount} onReset={t.reset} />}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {t.rows.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        <div className="max-w-[20rem] break-words font-medium">{r.description ?? <HubCellEmpty />}</div>
                         <div className="text-[11px] text-muted-foreground">
                           {humanizeLabel(r.plan_category)}
                           {!r.is_active && ' · paused'}
                         </div>
-                      </td>
-                      <td className="px-4 py-2 text-xs">{cadenceLabel(r.cadence, r.interval_count)}</td>
-                      <td className="px-4 py-2 text-right font-medium tabular-nums">
-                        {formatMoney(Number(r.subtotal_net) + Number(r.vat_amount), r.currency)}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                        {r.is_active ? formatDate(r.next_run_at) : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-right">
+                      </TableCell>
+                      <TableCell className="hidden text-xs sm:table-cell">{cadenceLabel(r.cadence, r.interval_count)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
+                        {formatMoney(planTotal(r), r.currency)}
+                      </TableCell>
+                      <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground md:table-cell">
+                        {r.is_active ? formatDate(r.next_run_at) : <HubCellEmpty />}
+                      </TableCell>
+                      <TableCell className="text-right">
                         {canOperateFinance && (
                           <div className="flex justify-end gap-1">
                             <Button
@@ -232,12 +294,12 @@ export const RecurringPlansCard: React.FC<{ workspaceId: string }> = ({ workspac
                             </Button>
                           </div>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
+            </>
           )}
         </CardContent>
       </Card>

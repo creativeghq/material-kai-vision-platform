@@ -4,10 +4,15 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Send, Calendar, Users, Trash2 } from 'lucide-react';
+import { Plus, Send, Trash2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { statusTone } from '@/utils/statusTone';
+import {
+  HubCellEmpty, HubDataTable, HubEmptyState, HubFilterSelect, HubResetFilters, HubToolbar, HUB_FILTER_ALL,
+  useHubTable, type HubColumn, type HubTableField,
+} from '@/components/core/hub';
+import { statusBadgeVariant } from '@/utils/recordDisplay';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +51,25 @@ const statusLabels = {
   cancelled: 'Cancelled',
 };
 
+const CAMPAIGN_FIELDS: HubTableField<Campaign>[] = [
+  { id: 'name', sortValue: (c) => c.name, searchText: (c) => `${c.name} ${c.subject_line ?? ''}` },
+  {
+    id: 'status',
+    sortValue: (c) => c.status,
+    filterValue: (c) => c.status,
+    filterLabel: 'Status',
+    filterOptionLabel: (v) => statusLabels[v as Campaign['status']] ?? v,
+  },
+  {
+    id: 'template',
+    sortValue: (c) => c.template?.name,
+    filterValue: (c) => c.template?.name,
+    filterLabel: 'Template',
+  },
+  { id: 'recipients', sortValue: (c) => c.recipient_count },
+  { id: 'scheduled', sortValue: (c) => c.scheduled_at },
+];
+
 export const CampaignsTab: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,10 +77,15 @@ export const CampaignsTab: React.FC = () => {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [page, setPage] = useState(1);
   const { toast } = useToast();
+  const t = useHubTable(campaigns, CAMPAIGN_FIELDS);
 
   useEffect(() => {
     loadCampaigns();
   }, []);
+
+  useEffect(() => {
+    setPage((p) => clampPage(p, t.rows.length));
+  }, [t.rows.length]);
 
   const loadCampaigns = async () => {
     try {
@@ -118,6 +147,84 @@ export const CampaignsTab: React.FC = () => {
     setSelectedCampaign(campaign);
   };
 
+  const columns: HubColumn<Campaign>[] = [
+    {
+      id: 'name',
+      header: 'Campaign',
+      sortable: true,
+      cell: (campaign) => (
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleViewCampaign(campaign); }}
+            className="text-left font-semibold text-primary hover:underline rounded-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {campaign.name}
+          </button>
+          {campaign.subject_line && (
+            <div className="max-w-[20rem] truncate text-xs text-muted-foreground" title={campaign.subject_line}>
+              {campaign.subject_line}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      sortable: true,
+      cell: (campaign) => (
+        <Badge variant={statusBadgeVariant(campaign.status)}>{statusLabels[campaign.status] ?? campaign.status}</Badge>
+      ),
+    },
+    {
+      id: 'template',
+      header: 'Template',
+      sortable: true,
+      hideBelow: 'md',
+      cell: (campaign) => campaign.template?.name ?? <HubCellEmpty />,
+    },
+    {
+      id: 'recipients',
+      header: 'Recipients',
+      sortable: true,
+      align: 'right',
+      hideBelow: 'sm',
+      cell: (campaign) => campaign.recipient_count,
+    },
+    {
+      id: 'scheduled',
+      header: 'Scheduled',
+      sortable: true,
+      hideBelow: 'md',
+      cell: (campaign) =>
+        campaign.scheduled_at ? (
+          <span className="whitespace-nowrap">{format(new Date(campaign.scheduled_at), 'MMM d, yyyy HH:mm')}</span>
+        ) : (
+          <span className="text-muted-foreground">Not scheduled</span>
+        ),
+    },
+    {
+      id: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      align: 'right',
+      cell: (campaign) =>
+        campaign.status === 'draft' ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Delete campaign"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteCampaign(campaign.id);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        ) : null,
+    },
+  ];
+
   if (loading) {
     return (
       <div className="dashboard-card">
@@ -142,105 +249,51 @@ export const CampaignsTab: React.FC = () => {
         }
       />
 
-      {/* Campaigns List */}
       {campaigns.length === 0 ? (
-        <div className="dashboard-card">
-          <div className="py-12 text-center">
-            <Send className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No campaigns yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first email campaign to get started
-            </p>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create campaign
-            </Button>
-          </div>
+        <div className="dashboard-card p-0">
+          <HubEmptyState
+            icon={Send}
+            title="No campaigns yet"
+            description="Create your first email campaign to get started."
+            action={
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create campaign
+              </Button>
+            }
+          />
         </div>
       ) : (
-        <div className="dashboard-card">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                <tr>
-                  <th className="text-left py-3 px-4 font-medium">Campaign</th>
-                  <th className="text-left py-3 px-4 font-medium">Status</th>
-                  <th className="text-left py-3 px-4 font-medium">Template</th>
-                  <th className="text-left py-3 px-4 font-medium">Recipients</th>
-                  <th className="text-left py-3 px-4 font-medium">Scheduled</th>
-                  <th className="text-right py-3 px-4 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginate(campaigns, page).map((campaign) => (
-                  <tr
-                    key={campaign.id}
-                    className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
-                    // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
-                    // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                    // row is invalid ARIA and yields a focus stop with no name.
-                    onClick={() => handleViewCampaign(campaign)}
-                  >
-                    <td className="py-3 px-4">
-                      <div className="font-medium">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); handleViewCampaign(campaign); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{campaign.name}</button>
-                      </div>
-                      {campaign.subject_line && (
-                        <div className="text-xs text-muted-foreground">{campaign.subject_line}</div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`text-sm capitalize ${statusTone(campaign.status)}`}>
-                        {statusLabels[campaign.status]}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      {campaign.template ? (
-                        <span className="text-sm">{campaign.template.name}</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No template</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{campaign.recipient_count}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      {campaign.scheduled_at ? (
-                        <div className="flex items-center gap-1 text-sm">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {format(new Date(campaign.scheduled_at), 'MMM d, yyyy HH:mm')}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Not scheduled</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        {campaign.status === 'draft' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCampaign(campaign.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="overflow-hidden rounded-md border border-hairline bg-card">
+          <HubToolbar
+            search={t.search}
+            onSearchChange={t.setSearch}
+            searchPlaceholder="Search campaigns"
+            filters={<>
+              <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status ?? []} onChange={(v) => t.setFilter('status', v)} />
+              <HubFilterSelect label="Template" value={t.filters.template ?? HUB_FILTER_ALL} options={t.filterOptions.template ?? []} onChange={(v) => t.setFilter('template', v)} />
+              <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+            </>}
+          />
+          <HubDataTable
+            className="rounded-none border-0"
+            rows={paginate(t.rows, page)}
+            columns={columns}
+            rowId={(c) => c.id}
+            onRowClick={handleViewCampaign}
+            sort={t.sort}
+            onSortChange={t.setSort}
+            empty={
+              <HubEmptyState
+                variant="filtered"
+                title="No campaigns match"
+                action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+              />
+            }
+          />
           <TablePagination
             page={page}
-            total={campaigns.length}
+            total={t.rows.length}
             onPageChange={setPage}
             label="campaigns"
           />

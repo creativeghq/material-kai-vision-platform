@@ -18,10 +18,12 @@ import {
 import { SectionHeader, EmptyState } from './_shared';
 import { ErganiFilingDialog } from './ErganiFilingDialog';
 import { parseDecimal } from '@/utils/decimal';
-import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { buildEmployeeFilters } from './hrFilters';
+import { Badge } from '@/components/core/ui/badge';
+import { statusBadgeVariant } from '@/utils/recordDisplay';
+import { HubCellEmpty, HubCellLink, HubSortButton, useHubTable, type HubTableField } from '@/components/core/hub';
 
 const empName = (e: Employee) => e.contact?.name || [e.contact?.first_name, e.contact?.last_name].filter(Boolean).join(' ') || 'Unnamed';
 
@@ -63,13 +65,27 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
   }, [workspaceId, canManage, toast]);
   useEffect(() => { void load(); }, [load]);
 
-  const deptName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? '—';
+  const deptName = useCallback((id: string | null) => departments.find((d) => d.id === id)?.name ?? '—', [departments]);
 
   const filterGroups = useMemo(() => buildEmployeeFilters(employees, departments), [employees, departments]);
   const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount, reset: resetFilters } =
     useFilters<Employee>(employees, filterGroups);
   // A narrowed roster is a different list — restart at the first page.
   useEffect(() => { setPage(1); }, [filterValues]);
+  const sortFields = useMemo<HubTableField<Employee>[]>(() => [
+    { id: 'name', sortValue: empName },
+    { id: 'position', sortValue: (e) => e.contact?.position },
+    { id: 'department', sortValue: (e) => (e.department_id ? deptName(e.department_id) : null) },
+    { id: 'type', sortValue: (e) => (e.employment_type ? EMPLOYMENT_TYPE_LABELS[e.employment_type] : null) },
+    { id: 'status', sortValue: (e) => EMPLOYEE_STATUS_LABELS[e.status] },
+    { id: 'absence', sortValue: (e) => e.total_absence_days },
+    { id: 'leave', sortValue: (e) => e.remaining_leave_days },
+  ], [deptName]);
+  const t = useHubTable(filtered, sortFields);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
   const scopedDepartmentId = scopedFilterValue(filterValues, 'department');
   const scopedEmploymentType = scopedFilterValue(filterValues, 'employment_type');
   const newEmployeeScope = {
@@ -116,25 +132,38 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
           ) : (
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Name</TableHead><TableHead>Position</TableHead><TableHead>Department</TableHead>
-                <TableHead>Type</TableHead><TableHead>Status</TableHead>
-                <TableHead className="text-right">Absence</TableHead><TableHead className="text-right">Leave left</TableHead>
-                {erganiOn && <TableHead>Ε3</TableHead>}<TableHead />
+                <TableHead aria-sort={ariaSort('name')}>{sortHead('name', 'Name')}</TableHead>
+                <TableHead className="hidden md:table-cell" aria-sort={ariaSort('position')}>{sortHead('position', 'Position')}</TableHead>
+                <TableHead className="hidden lg:table-cell" aria-sort={ariaSort('department')}>{sortHead('department', 'Department')}</TableHead>
+                <TableHead className="hidden lg:table-cell" aria-sort={ariaSort('type')}>{sortHead('type', 'Type')}</TableHead>
+                <TableHead aria-sort={ariaSort('status')}>{sortHead('status', 'Status')}</TableHead>
+                <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('absence')}>{sortHead('absence', 'Absence', 'right')}</TableHead>
+                <TableHead className="hidden sm:table-cell text-right" aria-sort={ariaSort('leave')}>{sortHead('leave', 'Leave left', 'right')}</TableHead>
+                {erganiOn && <TableHead className="hidden md:table-cell">Ε3</TableHead>}<TableHead />
               </TableRow></TableHeader>
               <TableBody>
-                {paginate(filtered, page).map((e) => (
+                {paginate(t.rows, page).map((e) => (
                   <TableRow key={e.id}>
-                    <TableCell className="font-medium">{empName(e)}{e.on_leave_today && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">On leave</span>}</TableCell>
-                    <TableCell>{e.contact?.position || '—'}</TableCell>
-                    <TableCell>{deptName(e.department_id)}</TableCell>
-                    <TableCell>{e.employment_type ? EMPLOYMENT_TYPE_LABELS[e.employment_type] : '—'}</TableCell>
-                    <TableCell><span className={`text-sm capitalize ${statusTone(e.status)}`}>{EMPLOYEE_STATUS_LABELS[e.status]}</span></TableCell>
-                    <TableCell className="text-right">{e.total_absence_days}</TableCell>
-                    <TableCell className="text-right">{e.remaining_leave_days}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {canManage
+                          ? <button type="button" onClick={() => setEditing(e)} className="block max-w-[16rem] truncate text-left font-semibold text-primary hover:underline" title={empName(e)}>{empName(e)}</button>
+                          : e.crm_contact_id
+                            ? <HubCellLink to={`/crm/contacts/${e.crm_contact_id}`} className="block max-w-[16rem] truncate">{empName(e)}</HubCellLink>
+                            : <span className="block max-w-[16rem] truncate" title={empName(e)}>{empName(e)}</span>}
+                        {e.on_leave_today && <Badge variant="warning" className="shrink-0">On leave</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{e.contact?.position ? <span className="block max-w-[14rem] truncate" title={e.contact.position}>{e.contact.position}</span> : <HubCellEmpty />}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{e.department_id ? deptName(e.department_id) : <HubCellEmpty />}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{e.employment_type ? EMPLOYMENT_TYPE_LABELS[e.employment_type] : <HubCellEmpty />}</TableCell>
+                    <TableCell><Badge variant={statusBadgeVariant(e.status)}>{EMPLOYEE_STATUS_LABELS[e.status]}</Badge></TableCell>
+                    <TableCell className="hidden md:table-cell text-right tabular-nums">{e.total_absence_days}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-right tabular-nums">{e.remaining_leave_days}</TableCell>
                     {erganiOn && (
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {hireFilings.get(e.id)?.status === 'submitted'
-                          ? <span className="text-sm text-emerald-600 dark:text-emerald-400" title={`Protocol ${hireFilings.get(e.id)?.protocol}`}>Filed · {hireFilings.get(e.id)?.protocol}</span>
+                          ? <Badge variant="success" title={`Protocol ${hireFilings.get(e.id)?.protocol}`}>Filed · {hireFilings.get(e.id)?.protocol}</Badge>
                           : canManage && workspaceId
                             ? <ErganiFilingDialog
                                 trigger={<Button size="sm" variant="outline" className="h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File Ε3</Button>}
@@ -144,7 +173,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
                                 submit={(document) => hrService.submitHire(workspaceId, { employee_id: e.id, document })}
                                 onDone={load}
                               />
-                            : <span className="text-xs text-muted-foreground">—</span>}
+                            : <HubCellEmpty />}
                       </TableCell>
                     )}
                     <TableCell className="text-right">

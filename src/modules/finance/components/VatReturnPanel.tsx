@@ -7,6 +7,9 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import {
+  Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
+} from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -228,69 +231,69 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                   nil return, not a missing one.
                 </p>
               ) : (
-                <div className="table-scroll">
-                  <table className="w-full text-sm">
-                    <thead className="bg-surface-sunken">
-                      <tr className="text-left text-[11px] font-semibold text-muted-foreground">
-                        <th className="px-3 py-2">Line</th>
-                        <th className="px-3 py-2 text-right">Net</th>
-                        <th className="px-3 py-2 text-right">VAT</th>
-                        <th className="px-3 py-2 text-right">Docs</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
+                <div className="overflow-hidden rounded-md border border-hairline">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Line</TableHead>
+                        <TableHead className="text-right">Net</TableHead>
+                        <TableHead className="text-right">VAT</TableHead>
+                        <TableHead className="hidden text-right sm:table-cell">Docs</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {lines.map((r) => (
-                        <tr key={`${r.section}-${r.vat_rate ?? 'x'}`}>
-                          <td className="px-3 py-2">{vatReturnLineLabel(r.section, r.vat_rate)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{formatMoney(Number(r.net || 0))}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{formatMoney(Number(r.vat || 0))}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{r.doc_count ?? 0}</td>
-                        </tr>
+                        <TableRow key={`${r.section}-${r.vat_rate ?? 'x'}`}>
+                          <TableCell className="break-words">{vatReturnLineLabel(r.section, r.vat_rate)}</TableCell>
+                          <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(Number(r.net || 0))}</TableCell>
+                          <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(Number(r.vat || 0))}</TableCell>
+                          <TableCell className="hidden text-right tabular-nums sm:table-cell">{r.doc_count ?? 0}</TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                    <tfoot className="bg-surface-sunken">
-                      <tr className="font-semibold">
-                        <td className="px-3 py-2">{vatPayableLabel(snap.ours.payable)}</td>
-                        <td className="px-3 py-2" />
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(snap.ours.payable)}</td>
-                        <td className="px-3 py-2" />
-                      </tr>
-                    </tfoot>
-                  </table>
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell>{vatPayableLabel(snap.ours.payable)}</TableCell>
+                        <TableCell />
+                        <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(snap.ours.payable)}</TableCell>
+                        <TableCell className="hidden sm:table-cell" />
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
                 </div>
               )}
             </div>
 
             <div>
               <h3 className="mb-2 text-sm font-semibold">Against ΑΑΔΕ&apos;s book</h3>
-              <div className="table-scroll">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-sunken">
-                    <tr className="text-left text-[11px] font-semibold text-muted-foreground">
-                      <th className="px-3 py-2">Side</th>
-                      <th className="px-3 py-2 text-right">Yours (net)</th>
-                      <th className="px-3 py-2 text-right">ΑΑΔΕ (net)</th>
-                      <th className="px-3 py-2 text-right">Difference</th>
-                      <th className="px-3 py-2">ΑΑΔΕ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    <tr>
-                      <td className="px-3 py-2">Income</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatMoney(snap.ours.income_net)}</td>
-                      <td className="px-3 py-2 text-right"><Figure value={snap.aade.income_net} status={snap.aade.income_status} /></td>
-                      <td className="px-3 py-2 text-right"><Figure value={snap.difference.income_net} /></td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{incomeVerdict?.label}</td>
-                    </tr>
-                    <tr>
-                      <td className="px-3 py-2">Expenses</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatMoney(snap.ours.expense_net)}</td>
-                      <td className="px-3 py-2 text-right"><Figure value={snap.aade.expense_net} status={snap.aade.expense_status} /></td>
-                      <td className="px-3 py-2 text-right"><Figure value={snap.difference.expense_net} /></td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{expenseVerdict?.label}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="overflow-hidden rounded-md border border-hairline">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Side</TableHead>
+                      <TableHead className="text-right">Yours (net)</TableHead>
+                      <TableHead className="text-right">ΑΑΔΕ (net)</TableHead>
+                      <TableHead className="text-right">Difference</TableHead>
+                      <TableHead className="hidden md:table-cell">ΑΑΔΕ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Income</TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(snap.ours.income_net)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums"><Figure value={snap.aade.income_net} status={snap.aade.income_status} /></TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums"><Figure value={snap.difference.income_net} /></TableCell>
+                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">{incomeVerdict?.label}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Expenses</TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(snap.ours.expense_net)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums"><Figure value={snap.aade.expense_net} status={snap.aade.expense_status} /></TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums"><Figure value={snap.difference.expense_net} /></TableCell>
+                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">{expenseVerdict?.label}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </div>
               {!snap.period.aligned_to_months && (
                 <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">

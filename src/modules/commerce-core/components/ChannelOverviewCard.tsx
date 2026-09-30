@@ -65,10 +65,10 @@ export const ChannelOverviewCard: React.FC<{ workspaceId: string; days?: number 
                   <th className="px-3 py-2 text-[11px] font-semibold">Channel</th>
                   <th className="px-3 py-2 text-right text-[11px] font-semibold">Orders</th>
                   <th className="px-3 py-2 text-right text-[11px] font-semibold">Revenue</th>
-                  <th className="px-3 py-2 text-right text-[11px] font-semibold">Cost</th>
-                  <th className="px-3 py-2 text-right text-[11px] font-semibold">Fees</th>
+                  <th className="hidden px-3 py-2 text-right text-[11px] font-semibold md:table-cell">Cost</th>
+                  <th className="hidden px-3 py-2 text-right text-[11px] font-semibold md:table-cell">Fees</th>
                   <th className="px-3 py-2 text-right text-[11px] font-semibold">Margin</th>
-                  <th className="px-3 py-2 text-[11px] font-semibold">Documents</th>
+                  <th className="hidden px-3 py-2 text-[11px] font-semibold sm:table-cell">Documents</th>
                 </tr>
               </thead>
               <tbody>
@@ -78,10 +78,10 @@ export const ChannelOverviewCard: React.FC<{ workspaceId: string; days?: number 
                       <td className="px-3 py-2 font-medium">{r.platform}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{r.orders}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{formatMoney(r.revenue, 'EUR')}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td className="hidden px-3 py-2 text-right tabular-nums md:table-cell">
                         {r.margin_status === 'unknown' ? '—' : formatMoney(r.cogs, 'EUR')}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatMoney(r.fees, 'EUR')}</td>
+                      <td className="hidden px-3 py-2 text-right tabular-nums md:table-cell">{formatMoney(r.fees, 'EUR')}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {r.margin_status === 'unknown'
                           ? <Badge variant="warning" className="text-[10px]">unknown</Badge>
@@ -92,7 +92,7 @@ export const ChannelOverviewCard: React.FC<{ workspaceId: string; days?: number 
                             </span>
                           )}
                       </td>
-                      <td className="px-3 py-2 tabular-nums">{r.documents_issued} of {r.orders}</td>
+                      <td className="hidden px-3 py-2 tabular-nums sm:table-cell">{r.documents_issued} of {r.orders}</td>
                     </tr>
                     {r.margin_note && (
                       <tr>

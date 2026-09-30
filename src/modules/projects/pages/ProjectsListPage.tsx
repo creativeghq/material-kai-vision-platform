@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/core/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import {
   HubCellEmpty,
+  HubCellLink,
   HubDataTable,
   HubEmptyState,
   HubSegmented,
@@ -101,6 +102,12 @@ function compareProjects(a: ProjectWithClient, b: ProjectWithClient, key: SortKe
     default:
       return a.last_activity_at.localeCompare(b.last_activity_at);
   }
+}
+
+function clientHref(p: ProjectWithClient): string | undefined {
+  if (p.client_company?.id) return `/crm/companies/${p.client_company.id}`;
+  if (p.client_contact?.id) return `/crm/contacts/${p.client_contact.id}`;
+  return undefined;
 }
 
 function sortProjects(rows: ProjectWithClient[], key: SortKey, direction: SortDirection): ProjectWithClient[] {
@@ -199,7 +206,7 @@ export const ProjectsListPage: React.FC = () => {
       header: 'Project',
       sortable: true,
       cell: (p) => (
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 max-w-[26rem] items-center gap-3">
           <img
             src={projectCoverSrc(coverFor(p), 200)}
             alt=""
@@ -208,7 +215,9 @@ export const ProjectsListPage: React.FC = () => {
             className="h-9 w-16 shrink-0 rounded-xs border border-hairline bg-surface-sunken object-cover"
           />
           <div className="min-w-0">
-            <div className="truncate font-medium text-foreground">{p.name}</div>
+            <HubCellLink to={`/projects/${p.id}`} className="block truncate">
+              <span title={p.name}>{p.name}</span>
+            </HubCellLink>
             {(p.category?.label || p.is_mine === false) && (
               <div className="truncate text-[11px] text-muted-foreground">
                 {[p.category?.label, p.is_mine === false ? `Owned by ${p.owner_name ?? 'someone else'}` : null]
@@ -225,7 +234,18 @@ export const ProjectsListPage: React.FC = () => {
       header: 'Client',
       sortable: true,
       hideBelow: 'md',
-      cell: (p) => projectClientLabel(p).label ?? <HubCellEmpty />,
+      cell: (p) => {
+        const label = projectClientLabel(p).label;
+        if (!label) return <HubCellEmpty />;
+        const href = clientHref(p);
+        return href ? (
+          <HubCellLink to={href} className="block max-w-[16rem] truncate font-normal">
+            <span title={label}>{label}</span>
+          </HubCellLink>
+        ) : (
+          <span className="block max-w-[16rem] truncate" title={label}>{label}</span>
+        );
+      },
     },
     {
       id: 'status',

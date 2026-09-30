@@ -14,6 +14,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import {
+  HubToolbar, HubFilterSelect, HubResetFilters, HubSortButton, HubCellLink, HubCellEmpty, useHubTable,
+  HUB_FILTER_ALL, type HubTableField, type HubSort,
+} from '@/components/core/hub';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Loader2, Plus, Handshake } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +37,45 @@ interface AgreementRow {
   current_vat: string | null;
 }
 
+type AgreementState = 'revoked' | 'drifted' | 'incomplete' | 'active';
+
+const STATE_LABEL: Record<AgreementState, string> = {
+  revoked: 'Revoked', drifted: 'ΑΦΜ changed', incomplete: 'Incomplete', active: 'Active',
+};
+
+const stateOf = (r: AgreementRow): AgreementState => {
+  if (!r.is_active) return 'revoked';
+  const drifted = !!r.authorized_issuer_vat && !!r.current_vat
+    && r.authorized_issuer_vat.replace(/\D/g, '') !== r.current_vat.replace(/\D/g, '');
+  if (drifted) return 'drifted';
+  if (!r.agreement_signed_on || !r.issuer_vat_authorized_on) return 'incomplete';
+  return 'active';
+};
+
+const FIELDS: HubTableField<AgreementRow>[] = [
+  { id: 'supplier', sortValue: (r) => r.supplier_name, searchText: (r) => r.supplier_name },
+  { id: 'vat', sortValue: (r) => r.authorized_issuer_vat, searchText: (r) => r.authorized_issuer_vat },
+  { id: 'signed', sortValue: (r) => r.agreement_signed_on },
+  { id: 'authorized', sortValue: (r) => r.issuer_vat_authorized_on },
+  {
+    id: 'state', sortValue: stateOf, filterValue: stateOf, filterLabel: 'State',
+    filterOptionLabel: (v) => STATE_LABEL[v as AgreementState] ?? v,
+  },
+];
+
+const SortHead: React.FC<{
+  id: string; label: string; sort?: HubSort; onSort: (id: string) => void; className?: string;
+}> = ({ id, label, sort, onSort, className }) => (
+  <TableHead
+    className={className}
+    aria-sort={sort?.columnId === id ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+  >
+    <HubSortButton active={sort?.columnId === id ? sort.direction : undefined} onClick={() => onSort(id)}>
+      {label}
+    </HubSortButton>
+  </TableHead>
+);
+
 export const SelfBillingCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<AgreementRow[]>([]);
@@ -40,6 +84,7 @@ export const SelfBillingCard: React.FC<{ workspaceId: string }> = ({ workspaceId
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ supplier_id: '', signed_on: '', authorized_on: '', series: 'AT' });
+  const t = useHubTable(rows, FIELDS);
 
   const load = async () => {
     setLoading(true);
@@ -160,53 +205,77 @@ export const SelfBillingCard: React.FC<{ workspaceId: string }> = ({ workspaceId
             )}
 
             {rows.length > 0 && (
-              <div className="table-scroll">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-sunken">
-                    <tr className="text-left">
-                      <th className="px-3 py-2 text-[11px] font-semibold">Supplier</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold">Authorized ΑΦΜ</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold">Agreement signed</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold">ΑΦΜ authorized</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold">State</th>
-                      <th className="px-3 py-2"><span className="sr-only">Actions</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => {
-                      const drifted = !!r.authorized_issuer_vat && !!r.current_vat
-                        && r.authorized_issuer_vat.replace(/\D/g, '') !== r.current_vat.replace(/\D/g, '');
-                      const incomplete = !r.agreement_signed_on || !r.issuer_vat_authorized_on;
+              <div className="overflow-hidden rounded-md border border-hairline">
+                {rows.length > 8 && (
+                  <HubToolbar
+                    search={t.search}
+                    onSearchChange={t.setSearch}
+                    searchPlaceholder="Search suppliers or ΑΦΜ"
+                    filters={<>
+                      <HubFilterSelect label="State" value={t.filters.state ?? HUB_FILTER_ALL} options={t.filterOptions.state} onChange={(v) => t.setFilter('state', v)} />
+                      <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                    </>}
+                  />
+                )}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortHead id="supplier" label="Supplier" sort={t.sort} onSort={t.toggleSort} />
+                      <SortHead id="vat" label="Authorized ΑΦΜ" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell" />
+                      <SortHead id="signed" label="Agreement signed" sort={t.sort} onSort={t.toggleSort} className="hidden md:table-cell" />
+                      <SortHead id="authorized" label="ΑΦΜ authorized" sort={t.sort} onSort={t.toggleSort} className="hidden md:table-cell" />
+                      <SortHead id="state" label="State" sort={t.sort} onSort={t.toggleSort} />
+                      <TableHead><span className="sr-only">Actions</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {t.rows.length === 0 && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={6}>
+                          <HubEmptyState
+                            variant="filtered"
+                            title="No agreements match"
+                            action={<HubResetFilters count={t.activeFilterCount} onReset={t.reset} />}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {t.rows.map((r) => {
+                      const state = stateOf(r);
                       return (
-                        <tr key={r.id} className="border-t border-hairline">
-                          <td className="px-3 py-2">{r.supplier_name}</td>
-                          <td className="px-3 py-2 tabular-nums">{r.authorized_issuer_vat || '—'}</td>
-                          <td className="px-3 py-2 tabular-nums">{r.agreement_signed_on || '—'}</td>
-                          <td className="px-3 py-2 tabular-nums">{r.issuer_vat_authorized_on || '—'}</td>
-                          <td className="px-3 py-2">
-                            {!r.is_active ? (
+                        <TableRow key={r.id}>
+                          <TableCell>
+                            <HubCellLink to={`/crm/companies/${r.supplier_company_id}`} className="block max-w-[16rem] truncate">
+                              <span title={r.supplier_name}>{r.supplier_name}</span>
+                            </HubCellLink>
+                          </TableCell>
+                          <TableCell className="hidden tabular-nums sm:table-cell">{r.authorized_issuer_vat || <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden whitespace-nowrap tabular-nums md:table-cell">{r.agreement_signed_on || <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden whitespace-nowrap tabular-nums md:table-cell">{r.issuer_vat_authorized_on || <HubCellEmpty />}</TableCell>
+                          <TableCell>
+                            {state === 'revoked' ? (
                               <Badge variant="neutral">Revoked{r.revoked_on ? ` ${r.revoked_on}` : ''}</Badge>
-                            ) : drifted ? (
+                            ) : state === 'drifted' ? (
                               <Badge variant="error">ΑΦΜ changed — re-authorize</Badge>
-                            ) : incomplete ? (
+                            ) : state === 'incomplete' ? (
                               <Badge variant="warning">Incomplete</Badge>
                             ) : (
                               <Badge variant="success">Active</Badge>
                             )}
-                          </td>
-                          <td className="px-3 py-2 text-right">
+                          </TableCell>
+                          <TableCell className="text-right">
                             <Button
                               size="sm" variant="ghost" disabled={busy}
                               onClick={() => void setActive(r, !r.is_active)}
                             >
                               {r.is_active ? 'Revoke' : 'Re-authorize'}
                             </Button>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
 

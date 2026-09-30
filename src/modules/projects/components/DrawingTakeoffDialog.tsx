@@ -184,15 +184,15 @@ export const DrawingTakeoffDialog: React.FC<Props> = ({
 
             <div className="table-scroll max-h-[45vh] overflow-y-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-hairline bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
                     <th className="w-8 px-3 py-1.5">
                       <span className="sr-only">Include in the schedule</span>
                     </th>
                     <th className="px-3 py-1.5 text-left">Ref</th>
                     <th className="px-3 py-1.5 text-left">Description</th>
                     <th className="px-3 py-1.5 text-right">Quantity</th>
-                    <th className="px-3 py-1.5 text-left">Read from</th>
+                    <th className="hidden px-3 py-1.5 text-left sm:table-cell">Read from</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,16 +205,16 @@ export const DrawingTakeoffDialog: React.FC<Props> = ({
                           aria-label={`Include ${it.item_ref ? `${it.item_ref} ` : ''}${it.description}`}
                         />
                       </td>
-                      <td className="px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground">
+                      <td className="whitespace-nowrap px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground">
                         {it.item_ref ?? '—'}
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="break-words px-3 py-1.5">
                         {it.description}
                         {it.notes && (
                           <p className="text-[11px] text-amber-800 dark:text-amber-400">{it.notes}</p>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
                         {/* "not stated" rather than a dash or a zero: the sheet lists the item and
                             prints no count, and that is a finding somebody has to close. */}
                         {it.quantity == null ? (
@@ -223,7 +223,7 @@ export const DrawingTakeoffDialog: React.FC<Props> = ({
                           <>{it.quantity}{it.unit ? ` ${it.unit}` : ''}</>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-xs text-muted-foreground">{it.source}</td>
+                      <td className="hidden max-w-[14rem] break-words px-3 py-1.5 text-xs text-muted-foreground sm:table-cell">{it.source}</td>
                     </tr>
                   ))}
                 </tbody>

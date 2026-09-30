@@ -6,6 +6,12 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import {
+  HUB_FILTER_ALL, HubCellEmpty, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar,
+  useHubTable, type HubTableField,
+} from '@/components/core/hub';
+import { cn } from '@/lib/utils';
+import { labelizeValue } from '@/utils/recordDisplay';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney, formatNumber } from '@/utils/decimal';
@@ -38,6 +44,43 @@ const usd = (v: number | null | undefined) => (v == null ? '—' : formatMoney(v
  */
 const formatDateOnly = (v: string) => formatDate(`${v}T00:00:00`);
 
+const CHARGE_FIELDS: HubTableField<ChargeRow>[] = [
+  { id: 'workspace', sortValue: (c) => c.workspace_name, searchText: (c) => c.workspace_name, filterValue: (c) => c.workspace_name, filterLabel: 'Workspace' },
+  { id: 'month', sortValue: (c) => c.period_month, filterValue: (c) => c.period_month, filterLabel: 'Month', filterOptionLabel: formatDateOnly },
+  { id: 'type', sortValue: (c) => c.charge_type, filterValue: (c) => c.charge_type, filterLabel: 'What', filterOptionLabel: labelizeValue },
+  { id: 'quantity', sortValue: (c) => c.quantity },
+  { id: 'credits', sortValue: (c) => c.credits_charged },
+  { id: 'status', sortValue: (c) => c.status, filterValue: (c) => c.status, filterLabel: 'Status', filterOptionLabel: labelizeValue },
+  { id: 'attempts', sortValue: (c) => c.attempts },
+  { id: 'reason', searchText: (c) => c.reason },
+];
+
+const RECON_FIELDS: HubTableField<ReconRow>[] = [
+  { id: 'period', sortValue: (r) => r.period_start, filterValue: (r) => r.period_start, filterLabel: 'Period', filterOptionLabel: formatDateOnly },
+  { id: 'country', sortValue: (r) => r.country_code, filterValue: (r) => r.country_code, filterLabel: 'Country', searchText: (r) => r.country_code },
+  { id: 'category', sortValue: (r) => r.category, filterValue: (r) => r.category, filterLabel: 'Category', filterOptionLabel: labelizeValue, searchText: (r) => r.category },
+  { id: 'volume', sortValue: (r) => r.volume },
+  { id: 'cost', sortValue: (r) => (r.cost_available ? r.cost_usd : null) },
+  { id: 'billed', sortValue: (r) => r.billed_usd },
+  { id: 'margin', sortValue: (r) => r.margin_usd },
+];
+
+const EMPTY_CHARGES: ChargeRow[] = [];
+const EMPTY_RECON: ReconRow[] = [];
+
+interface SortState { sort?: { columnId: string; direction: 'asc' | 'desc' }; toggleSort: (id: string) => void }
+
+const SortHead: React.FC<{ t: SortState; id: string; align?: 'right'; className?: string; children: React.ReactNode }> = ({ t, id, align, className, children }) => {
+  const active = t.sort?.columnId === id ? t.sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => t.toggleSort(id)}>{children}</HubSortButton>
+    </TableHead>
+  );
+};
 
 export const ChannelsBillingDetail: React.FC = () => {
   const { toast } = useToast();
@@ -63,6 +106,9 @@ export const ChannelsBillingDetail: React.FC = () => {
   }, [toast]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const chargeTable = useHubTable(detail?.charges ?? EMPTY_CHARGES, CHARGE_FIELDS);
+  const reconTable = useHubTable(detail?.reconciliation ?? EMPTY_RECON, RECON_FIELDS);
 
   if (denied) return null;
 
@@ -124,20 +170,20 @@ export const ChannelsBillingDetail: React.FC = () => {
                     <TableHead>Workspace</TableHead>
                     <TableHead>Number</TableHead>
                     <TableHead className="text-right">Costs us</TableHead>
-                    <TableHead>Held</TableHead>
-                    <TableHead>Why</TableHead>
+                    <TableHead className="hidden sm:table-cell">Held</TableHead>
+                    <TableHead className="hidden md:table-cell">Why</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {held.map(h => (
                     <TableRow key={h.phone_number}>
-                      <TableCell className="font-medium">{h.workspace_name ?? '—'}</TableCell>
-                      <TableCell className="font-mono text-sm">{h.phone_number}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {h.monthly_cents == null ? '—' : `${usd(h.monthly_cents / 100)}/mo`}
+                      <TableCell className="font-medium">{h.workspace_name ?? <HubCellEmpty />}</TableCell>
+                      <TableCell className="font-mono text-sm whitespace-nowrap">{h.phone_number}</TableCell>
+                      <TableCell className="text-right tabular-nums whitespace-nowrap">
+                        {h.monthly_cents == null ? <HubCellEmpty /> : `${usd(h.monthly_cents / 100)}/mo`}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{timeAgo(h.held_at)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{h.held_reason ?? '—'}</TableCell>
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground whitespace-nowrap">{timeAgo(h.held_at)}</TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground break-words">{h.held_reason ?? <HubCellEmpty />}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -171,37 +217,63 @@ export const ChannelsBillingDetail: React.FC = () => {
               }
             />
           ) : (
-            <div className="overflow-x-auto rounded-sm border border-hairline">
+            <div className="overflow-hidden rounded-sm border border-hairline">
+              {detail!.charges.length > 8 && (
+                <HubToolbar
+                  search={chargeTable.search}
+                  onSearchChange={chargeTable.setSearch}
+                  searchPlaceholder="Search workspace or detail"
+                  filters={<>
+                    <HubFilterSelect label="Status" value={chargeTable.filters.status ?? HUB_FILTER_ALL} options={chargeTable.filterOptions.status} onChange={(v) => chargeTable.setFilter('status', v)} />
+                    <HubFilterSelect label="What" value={chargeTable.filters.type ?? HUB_FILTER_ALL} options={chargeTable.filterOptions.type} onChange={(v) => chargeTable.setFilter('type', v)} />
+                    <HubFilterSelect label="Month" value={chargeTable.filters.month ?? HUB_FILTER_ALL} options={chargeTable.filterOptions.month} onChange={(v) => chargeTable.setFilter('month', v)} />
+                    <HubFilterSelect label="Workspace" value={chargeTable.filters.workspace ?? HUB_FILTER_ALL} options={chargeTable.filterOptions.workspace} onChange={(v) => chargeTable.setFilter('workspace', v)} />
+                    <HubResetFilters count={chargeTable.activeFilterCount} onReset={chargeTable.reset} />
+                  </>}
+                />
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Workspace</TableHead>
-                    <TableHead>Month</TableHead>
-                    <TableHead>What</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Credits</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Tries</TableHead>
-                    <TableHead>Detail</TableHead>
+                    <SortHead t={chargeTable} id="workspace">Workspace</SortHead>
+                    <SortHead t={chargeTable} id="month">Month</SortHead>
+                    <SortHead t={chargeTable} id="type" className="hidden md:table-cell">What</SortHead>
+                    <SortHead t={chargeTable} id="quantity" align="right" className="hidden lg:table-cell">Qty</SortHead>
+                    <SortHead t={chargeTable} id="credits" align="right">Credits</SortHead>
+                    <SortHead t={chargeTable} id="status">Status</SortHead>
+                    <SortHead t={chargeTable} id="attempts" align="right" className="hidden lg:table-cell">Tries</SortHead>
+                    <TableHead className="hidden md:table-cell">Detail</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {detail!.charges.map(c => (
+                  {chargeTable.rows.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={8} className="p-0">
+                        <HubEmptyState
+                          variant="filtered"
+                          title="No charges match these filters"
+                          action={<Button variant="outline" size="sm" onClick={chargeTable.reset}>Clear filters</Button>}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : chargeTable.rows.map(c => (
                     <TableRow key={c.id} className={c.is_failed ? 'bg-[hsl(var(--error-bg))]' : undefined}>
-                      <TableCell className="font-medium">{c.workspace_name ?? '—'}</TableCell>
-                      <TableCell className="text-sm">{formatDateOnly(c.period_month)}</TableCell>
-                      <TableCell className="text-sm capitalize">{c.charge_type}</TableCell>
-                      <TableCell className="text-right tabular-nums">{c.quantity}</TableCell>
+                      <TableCell className="font-medium">{c.workspace_name ?? <HubCellEmpty />}</TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">{formatDateOnly(c.period_month)}</TableCell>
+                      <TableCell className="hidden md:table-cell text-sm capitalize">{c.charge_type}</TableCell>
+                      <TableCell className="hidden lg:table-cell text-right tabular-nums">{c.quantity}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatNumber(c.credits_charged)}</TableCell>
                       <TableCell>
                         <Badge variant={c.status === 'charged' ? 'success' : c.status === 'failed' ? 'error' : 'neutral'}>
-                          {c.status}
+                          {labelizeValue(c.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{c.attempts}</TableCell>
+                      <TableCell className="hidden lg:table-cell text-right tabular-nums">{c.attempts}</TableCell>
                       {/* The reason is the difference between healthy idempotency and a real
                           problem — `skipped` alone shows both the same way. */}
-                      <TableCell className="max-w-xs truncate text-xs text-muted-foreground">{c.reason ?? '—'}</TableCell>
+                      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                        {c.reason ? <div className="max-w-xs truncate" title={c.reason}>{c.reason}</div> : <HubCellEmpty />}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -227,27 +299,50 @@ export const ChannelsBillingDetail: React.FC = () => {
               }
             />
           ) : (
-            <div className="overflow-x-auto rounded-sm border border-hairline">
+            <div className="overflow-hidden rounded-sm border border-hairline">
+              {detail!.reconciliation.length > 8 && (
+                <HubToolbar
+                  search={reconTable.search}
+                  onSearchChange={reconTable.setSearch}
+                  searchPlaceholder="Search country or category"
+                  filters={<>
+                    <HubFilterSelect label="Period" value={reconTable.filters.period ?? HUB_FILTER_ALL} options={reconTable.filterOptions.period} onChange={(v) => reconTable.setFilter('period', v)} />
+                    <HubFilterSelect label="Country" value={reconTable.filters.country ?? HUB_FILTER_ALL} options={reconTable.filterOptions.country} onChange={(v) => reconTable.setFilter('country', v)} />
+                    <HubFilterSelect label="Category" value={reconTable.filters.category ?? HUB_FILTER_ALL} options={reconTable.filterOptions.category} onChange={(v) => reconTable.setFilter('category', v)} />
+                    <HubResetFilters count={reconTable.activeFilterCount} onReset={reconTable.reset} />
+                  </>}
+                />
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Period</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Volume</TableHead>
-                    <TableHead className="text-right">Meta cost</TableHead>
-                    <TableHead className="text-right">We billed</TableHead>
-                    <TableHead className="text-right">Margin</TableHead>
+                    <SortHead t={reconTable} id="period">Period</SortHead>
+                    <SortHead t={reconTable} id="country">Country</SortHead>
+                    <SortHead t={reconTable} id="category" className="hidden sm:table-cell">Category</SortHead>
+                    <SortHead t={reconTable} id="volume" align="right" className="hidden md:table-cell">Volume</SortHead>
+                    <SortHead t={reconTable} id="cost" align="right" className="hidden md:table-cell">Meta cost</SortHead>
+                    <SortHead t={reconTable} id="billed" align="right">We billed</SortHead>
+                    <SortHead t={reconTable} id="margin" align="right">Margin</SortHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {detail!.reconciliation.map((r, i) => (
+                  {reconTable.rows.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={7} className="p-0">
+                        <HubEmptyState
+                          variant="filtered"
+                          title="No rows match these filters"
+                          action={<Button variant="outline" size="sm" onClick={reconTable.reset}>Clear filters</Button>}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : reconTable.rows.map((r, i) => (
                     <TableRow key={`${r.period_start}-${r.country_code}-${r.category}-${i}`}>
-                      <TableCell className="text-sm">{formatDateOnly(r.period_start)}</TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">{formatDateOnly(r.period_start)}</TableCell>
                       <TableCell>{r.country_code}</TableCell>
-                      <TableCell className="capitalize text-sm">{r.category}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(r.volume)}</TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="hidden sm:table-cell capitalize text-sm">{r.category}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right tabular-nums">{formatNumber(r.volume)}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right tabular-nums">
                         {/* Not $0 — Meta withholds cost on a partner credit line, and a zero
                             there would read as a free month. */}
                         {r.cost_available ? usd(r.cost_usd) : <span className="text-muted-foreground">not reported</span>}
@@ -255,7 +350,7 @@ export const ChannelsBillingDetail: React.FC = () => {
                       <TableCell className="text-right tabular-nums">{usd(r.billed_usd)}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {r.margin_usd == null
-                          ? <span className="text-muted-foreground">—</span>
+                          ? <HubCellEmpty />
                           : <span className={r.margin_usd < 0 ? 'text-[hsl(var(--error))] font-semibold' : undefined}>
                               {usd(r.margin_usd)}
                             </span>}

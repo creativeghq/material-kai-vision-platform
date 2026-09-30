@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { DollarSign, Zap, CreditCard, Bot, Image, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { HubDataTable, useHubTable, type HubColumn, type HubTableField } from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import type { AIUsageLog, InteriorDesignStats } from './OperationsDashboard/types';
@@ -26,6 +26,47 @@ interface ModelUsageRow {
   avg_cost: number;
 }
 
+const MODEL_FIELDS: HubTableField<ModelUsageRow>[] = [
+  { id: 'model', sortValue: (m) => m.model_name },
+  { id: 'calls', sortValue: (m) => m.call_count },
+  { id: 'input', sortValue: (m) => m.input_tokens },
+  { id: 'output', sortValue: (m) => m.output_tokens },
+  { id: 'total_cost', sortValue: (m) => m.total_cost },
+  { id: 'avg_cost', sortValue: (m) => m.avg_cost },
+  { id: 'success', sortValue: (m) => m.success_rate },
+];
+
+const MODEL_COLUMNS: HubColumn<ModelUsageRow>[] = [
+  {
+    id: 'model',
+    header: 'Model',
+    sortable: true,
+    cell: (m) => (
+      <div className="flex min-w-0 items-center gap-2">
+        <Bot className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="block max-w-[16rem] truncate font-medium" title={m.model_name}>{m.model_name}</span>
+      </div>
+    ),
+  },
+  { id: 'calls', header: 'API Calls', align: 'right', sortable: true, cell: (m) => formatNumber(m.call_count) },
+  { id: 'input', header: 'Input Tokens', align: 'right', sortable: true, hideBelow: 'md', cell: (m) => formatNumber(m.input_tokens || 0) },
+  { id: 'output', header: 'Output Tokens', align: 'right', sortable: true, hideBelow: 'md', cell: (m) => formatNumber(m.output_tokens || 0) },
+  { id: 'total_cost', header: 'Total Cost', align: 'right', sortable: true, cell: (m) => <span className="font-semibold">${m.total_cost.toFixed(4)}</span> },
+  { id: 'avg_cost', header: 'Avg Cost/Call', align: 'right', sortable: true, hideBelow: 'lg', cell: (m) => `$${m.avg_cost.toFixed(4)}` },
+  {
+    id: 'success',
+    header: 'Success Rate',
+    align: 'right',
+    sortable: true,
+    hideBelow: 'sm',
+    cell: (m) => (
+      <Badge variant={m.success_rate >= 90 ? 'success' : m.success_rate >= 70 ? 'warning' : 'error'}>
+        {m.success_rate.toFixed(1)}%
+      </Badge>
+    ),
+  },
+];
+
 export const AIPerformanceTab: React.FC = () => {
   const [aiUsageLogs, setAIUsageLogs] = useState<AIUsageLog[]>([]);
   const [modelUsage, setModelUsage] = useState<ModelUsageRow[]>([]);
@@ -35,6 +76,7 @@ export const AIPerformanceTab: React.FC = () => {
     total_images: 0,
     unique_users: 0,
   });
+  const modelTable = useHubTable(modelUsage, MODEL_FIELDS, { columnId: 'total_cost', direction: 'desc' });
 
   useEffect(() => {
     const load = async () => {
@@ -298,91 +340,20 @@ export const AIPerformanceTab: React.FC = () => {
             All AI models (GPT, Claude, etc.) - Performance and cost breakdown
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-semibold">Model</TableHead>
-                  <TableHead className="text-right font-semibold">API Calls</TableHead>
-                  <TableHead className="text-right font-semibold">Input Tokens</TableHead>
-                  <TableHead className="text-right font-semibold">Output Tokens</TableHead>
-                  <TableHead className="text-right font-semibold">Total Cost</TableHead>
-                  <TableHead className="text-right font-semibold">Avg Cost/Call</TableHead>
-                  <TableHead className="text-right font-semibold">Success Rate</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {modelUsage.map((model) => (
-                  <TableRow key={model.model_name}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Bot className="h-4 w-4 text-blue-600" />
-                        <span className="text-gray-900">{model.model_name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatNumber(model.call_count)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm text-blue-600">
-                      {model.input_tokens ? formatNumber(model.input_tokens) : '0'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm text-green-600">
-                      {model.output_tokens ? formatNumber(model.output_tokens) : '0'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-semibold">
-                      ${model.total_cost.toFixed(4)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm text-gray-600">
-                      ${model.avg_cost.toFixed(4)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant={model.success_rate >= 90 ? 'default' : model.success_rate >= 70 ? 'secondary' : 'destructive'}
-                        className="font-semibold"
-                      >
-                        {model.success_rate.toFixed(1)}%
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {modelUsage.length === 0 && (
-                  <>
-                    {/* Placeholder rows — canonical Claude models + vision/embedding */}
-                    {[
-                      { name: 'Claude Opus 4.8' },
-                      { name: 'Claude Sonnet 4.6' },
-                      { name: 'Claude Haiku 4.5' },
-                      { name: 'voyage-4' },
-                      { name: 'SLIG 768D' },
-                    ].map((m) => (
-                      <TableRow key={m.name}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">{m.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
-                        <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
-                        <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
-                        <TableCell className="text-right font-mono text-sm text-muted-foreground">$0.0000</TableCell>
-                        <TableCell className="text-right font-mono text-sm text-muted-foreground">$0.0000</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary">0.0%</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
-                        No AI usage data yet. Models will show actual data once API calls are made.
-                      </TableCell>
-                    </TableRow>
-                  </>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+        <CardContent className="p-0">
+          <HubDataTable
+            className="rounded-none border-0 border-t"
+            rows={modelTable.rows}
+            columns={MODEL_COLUMNS}
+            rowId={(m) => m.model_name}
+            sort={modelTable.sort}
+            onSortChange={modelTable.setSort}
+            empty={
+              <span className="text-sm text-muted-foreground">
+                No AI usage data yet. Models will show actual data once API calls are made.
+              </span>
+            }
+          />
         </CardContent>
       </Card>
 

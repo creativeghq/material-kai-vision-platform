@@ -11,7 +11,11 @@ import { catalogPublicPath } from '@/config/catalogPublicUrl';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { FilterBar, applyFilters, type FilterValues } from '@/components/core/filters';
-import { statusTone } from '@/utils/statusTone';
+import { Badge } from '@/components/core/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { HubCellEmpty, HubCellLink, HubSortButton, useHubTable, type HubTableField } from '@/components/core/hub';
+import { labelizeValue, statusBadgeVariant } from '@/utils/recordDisplay';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
   catalogsService,
@@ -24,6 +28,16 @@ import { formatDate, toLocalISODate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 
 /** Preserves the tab's previous default window now that the range Select is a dateRange field. */
+const SUMMARY_FIELDS: HubTableField<CatalogOperationsSummary>[] = [
+  { id: 'title', sortValue: (s) => s.title },
+  { id: 'status', sortValue: (s) => s.status },
+  { id: 'views', sortValue: (s) => s.page_views },
+  { id: 'downloads', sortValue: (s) => s.pdf_downloads },
+  { id: 'denials', sortValue: (s) => s.gate_denials },
+  { id: 'emails', sortValue: (s) => s.unique_email_count },
+  { id: 'last', sortValue: (s) => s.last_event_at },
+];
+
 function defaultFilterValues(): FilterValues {
   const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   return { created_at: { from: toLocalISODate(from) } };
@@ -126,6 +140,18 @@ export const CatalogOperationsTab: React.FC = () => {
   // and the catalog select already scopes it server-side.
   const visibleEvents = useMemo(() => applyFilters(events, filterGroups, filterValues), [events, filterGroups, filterValues]);
   const visibleGateLog = useMemo(() => applyFilters(gateLog, filterGroups, filterValues), [gateLog, filterGroups, filterValues]);
+  const summaryTable = useHubTable(summary, SUMMARY_FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right', className?: string) => {
+    const active = summaryTable.sort?.columnId === id ? summaryTable.sort.direction : undefined;
+    return (
+      <TableHead
+        className={cn(align === 'right' && 'text-right', className)}
+        aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+      >
+        <HubSortButton active={active} align={align} onClick={() => summaryTable.toggleSort(id)}>{label}</HubSortButton>
+      </TableHead>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -173,45 +199,49 @@ export const CatalogOperationsTab: React.FC = () => {
             <Empty>No catalogs yet.</Empty>
           ) : (
             <Card className="dashboard-card">
-              <CardContent className="p-0 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40 text-xs">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium">Catalog</th>
-                      <th className="text-left px-3 py-2 font-medium">Status</th>
-                      <th className="text-right px-3 py-2 font-medium">Views</th>
-                      <th className="text-right px-3 py-2 font-medium">Downloads</th>
-                      <th className="text-right px-3 py-2 font-medium">Gate (granted/denied)</th>
-                      <th className="text-right px-3 py-2 font-medium">Unique emails</th>
-                      <th className="text-left px-3 py-2 font-medium">Last activity</th>
-                      <th><span className="sr-only">Actions</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.map((s) => (
-                      <tr key={s.id} className="border-t hover:bg-muted/20">
-                        <td className="px-3 py-2">
-                          <div className="font-medium">{s.title}</div>
-                          {s.slug && <div className="text-xs text-muted-foreground">/c/{s.slug}</div>}
-                        </td>
-                        <td className="px-3 py-2"><span className={`text-xs capitalize ${statusTone(s.status)}`}>{s.status}</span></td>
-                        <td className="px-3 py-2 text-right">{s.page_views}</td>
-                        <td className="px-3 py-2 text-right">{s.pdf_downloads}</td>
-                        <td className="px-3 py-2 text-right">{s.gate_grants} / <span className={s.gate_denials > 0 ? 'text-destructive' : ''}>{s.gate_denials}</span></td>
-                        <td className="px-3 py-2 text-right">{s.unique_email_count}</td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{s.last_event_at ? formatDate(s.last_event_at, { withTime: true }) : '—'}</td>
-                        <td className="px-3 py-2 flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => navigate(`/catalogs/${s.id}`)}>Open</Button>
-                          {catalogPublicPath(s.public_handle ?? null, s.slug) && (
-                            <Button size="sm" variant="ghost" onClick={() => window.open(catalogPublicPath(s.public_handle ?? null, s.slug)!, '_blank')}>
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {sortHead('title', 'Catalog')}
+                      {sortHead('status', 'Status')}
+                      {sortHead('views', 'Views', 'right')}
+                      {sortHead('downloads', 'Downloads', 'right', 'hidden md:table-cell')}
+                      <TableHead className="hidden lg:table-cell text-right">Gate (granted/denied)</TableHead>
+                      {sortHead('emails', 'Unique emails', 'right', 'hidden md:table-cell')}
+                      {sortHead('last', 'Last activity', undefined, 'hidden sm:table-cell')}
+                      <TableHead><span className="sr-only">Actions</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summaryTable.rows.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <HubCellLink to={`/catalogs/${s.id}`} className="block max-w-[18rem] truncate">
+                            <span title={s.title}>{s.title}</span>
+                          </HubCellLink>
+                          {s.slug && <div className="max-w-[18rem] truncate text-xs text-muted-foreground" title={`/c/${s.slug}`}>/c/{s.slug}</div>}
+                        </TableCell>
+                        <TableCell><Badge variant={statusBadgeVariant(s.status)}>{labelizeValue(s.status)}</Badge></TableCell>
+                        <TableCell className="text-right tabular-nums">{formatNumber(s.page_views)}</TableCell>
+                        <TableCell className="hidden md:table-cell text-right tabular-nums">{formatNumber(s.pdf_downloads)}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right tabular-nums">{s.gate_grants} / <span className={s.gate_denials > 0 ? 'text-destructive' : ''}>{s.gate_denials}</span></TableCell>
+                        <TableCell className="hidden md:table-cell text-right tabular-nums">{formatNumber(s.unique_email_count)}</TableCell>
+                        <TableCell className="hidden sm:table-cell whitespace-nowrap text-xs text-muted-foreground">{s.last_event_at ? formatDate(s.last_event_at, { withTime: true }) : <HubCellEmpty />}</TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => navigate(`/catalogs/${s.id}`)}>Open</Button>
+                            {catalogPublicPath(s.public_handle ?? null, s.slug) && (
+                              <Button size="sm" variant="ghost" aria-label="Open public catalog" onClick={() => window.open(catalogPublicPath(s.public_handle ?? null, s.slug)!, '_blank')}>
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           )}
@@ -222,37 +252,37 @@ export const CatalogOperationsTab: React.FC = () => {
             <Empty>No events for this filter set.</Empty>
           ) : (
             <Card className="dashboard-card">
-              <CardContent className="p-0 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40 text-xs">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium">When</th>
-                      <th className="text-left px-3 py-2 font-medium">Event</th>
-                      <th className="text-left px-3 py-2 font-medium">Email</th>
-                      <th className="text-left px-3 py-2 font-medium">Matched as</th>
-                      <th className="text-left px-3 py-2 font-medium">Catalog</th>
-                      <th className="text-left px-3 py-2 font-medium">User profile</th>
-                      <th className="text-left px-3 py-2 font-medium">IP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className="hidden md:table-cell">Matched as</TableHead>
+                      <TableHead>Catalog</TableHead>
+                      <TableHead className="hidden lg:table-cell">User profile</TableHead>
+                      <TableHead className="hidden lg:table-cell">IP</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {visibleEvents.map((e) => (
-                      <tr key={e.id} className="border-t hover:bg-muted/20">
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(e.created_at, { withTime: true })}</td>
-                        <td className="px-3 py-2">
-                          <span className="inline-flex items-center text-xs text-muted-foreground capitalize">
+                      <TableRow key={e.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{formatDate(e.created_at, { withTime: true })}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center whitespace-nowrap text-xs text-muted-foreground capitalize">
                             {e.event_type === 'pdf_download' ? <FileDown className="h-3 w-3 mr-1 inline" /> : <Eye className="h-3 w-3 mr-1 inline" />}
                             {(e.event_type ?? 'event').replace(/_/g, ' ')}
                           </span>
-                        </td>
-                        <td className="px-3 py-2 font-medium">{e.email || '—'}</td>
-                        <td className="px-3 py-2"><span className="text-xs text-muted-foreground capitalize">{e.matched_kind || '—'}</span></td>
-                        <td className="px-3 py-2 text-xs">
-                          <button className="hover:underline text-primary" onClick={() => navigate(`/catalogs/${e.catalog_id}`)}>
-                            {e.catalog_title || e.catalog_id.slice(0, 8)}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-xs">
+                        </TableCell>
+                        <TableCell className="font-medium break-all">{e.email || <HubCellEmpty />}</TableCell>
+                        <TableCell className="hidden md:table-cell"><span className="text-xs text-muted-foreground capitalize">{e.matched_kind || <HubCellEmpty />}</span></TableCell>
+                        <TableCell className="text-xs">
+                          <HubCellLink to={`/catalogs/${e.catalog_id}`} className="block max-w-[14rem] truncate">
+                            <span title={e.catalog_title ?? undefined}>{e.catalog_title || e.catalog_id.slice(0, 8)}</span>
+                          </HubCellLink>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs">
                           {e.matched_user_id && profiles[e.matched_user_id] ? (
                             <span className="flex items-center gap-1.5">
                               <UserAvatar
@@ -265,13 +295,13 @@ export const CatalogOperationsTab: React.FC = () => {
                               />
                               {profiles[e.matched_user_id].full_name || profiles[e.matched_user_id].email}
                             </span>
-                          ) : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{e.ip_address || '—'}</td>
-                      </tr>
+                          ) : <HubCellEmpty />}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{e.ip_address || <HubCellEmpty />}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           )}
@@ -282,36 +312,34 @@ export const CatalogOperationsTab: React.FC = () => {
             <Empty>No gate attempts for this filter set.</Empty>
           ) : (
             <Card className="dashboard-card">
-              <CardContent className="p-0 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40 text-xs">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium">When</th>
-                      <th className="text-left px-3 py-2 font-medium">Email</th>
-                      <th className="text-left px-3 py-2 font-medium">Granted</th>
-                      <th className="text-left px-3 py-2 font-medium">Matched as</th>
-                      <th className="text-left px-3 py-2 font-medium">Catalog</th>
-                      <th className="text-left px-3 py-2 font-medium">User profile</th>
-                      <th className="text-left px-3 py-2 font-medium">IP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Granted</TableHead>
+                      <TableHead className="hidden md:table-cell">Matched as</TableHead>
+                      <TableHead>Catalog</TableHead>
+                      <TableHead className="hidden lg:table-cell">User profile</TableHead>
+                      <TableHead className="hidden lg:table-cell">IP</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {visibleGateLog.map((row) => (
-                      <tr key={row.id} className="border-t hover:bg-muted/20">
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(row.created_at, { withTime: true })}</td>
-                        <td className="px-3 py-2 font-medium">{row.email}</td>
-                        <td className="px-3 py-2">
-                          <span className={`text-xs font-medium ${row.granted_access ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                            {row.granted_access ? 'GRANTED' : 'DENIED'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2"><span className="text-xs text-muted-foreground capitalize">{row.matched_kind}</span></td>
-                        <td className="px-3 py-2 text-xs">
-                          <button className="hover:underline text-primary" onClick={() => navigate(`/catalogs/${row.catalog_id}`)}>
-                            {row.catalog_title || row.catalog_id.slice(0, 8)}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-xs">
+                      <TableRow key={row.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{formatDate(row.created_at, { withTime: true })}</TableCell>
+                        <TableCell className="font-medium break-all">{row.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={row.granted_access ? 'success' : 'error'}>{row.granted_access ? 'Granted' : 'Denied'}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell"><span className="text-xs text-muted-foreground capitalize">{row.matched_kind}</span></TableCell>
+                        <TableCell className="text-xs">
+                          <HubCellLink to={`/catalogs/${row.catalog_id}`} className="block max-w-[14rem] truncate">
+                            <span title={row.catalog_title ?? undefined}>{row.catalog_title || row.catalog_id.slice(0, 8)}</span>
+                          </HubCellLink>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs">
                           {row.matched_user_id && profiles[row.matched_user_id] ? (
                             <span className="flex items-center gap-1.5">
                               <UserAvatar
@@ -324,13 +352,13 @@ export const CatalogOperationsTab: React.FC = () => {
                               />
                               {profiles[row.matched_user_id].full_name || profiles[row.matched_user_id].email}
                             </span>
-                          ) : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{row.ip_address || '—'}</td>
-                      </tr>
+                          ) : <HubCellEmpty />}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{row.ip_address || <HubCellEmpty />}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           )}

@@ -194,23 +194,23 @@ export const ProductServiceDefaultsPanel: React.FC<Props> = ({ productId, worksp
                 <TableRow>
                   <TableHead>What</TableHead>
                   <TableHead>How often</TableHead>
-                  <TableHead>Remind</TableHead>
-                  <TableHead>Who</TableHead>
-                  <TableHead className="text-right"></TableHead>
+                  <TableHead className="hidden sm:table-cell">Remind</TableHead>
+                  <TableHead className="hidden sm:table-cell">Who</TableHead>
+                  <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {defaults.map((d) => (
                   <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.title}</TableCell>
+                    <TableCell className="font-medium break-words">{d.title}</TableCell>
                     <TableCell>{describeInterval(d)}</TableCell>
-                    <TableCell className="text-xs">{d.lead_days} days before</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="hidden sm:table-cell text-xs whitespace-nowrap">{d.lead_days} days before</TableCell>
+                    <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                       {[d.notify_internal ? 'team' : null, d.notify_customer ? 'customer' : null]
                         .filter(Boolean).join(' + ') || 'nobody'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="ghost" disabled={saving} onClick={() => void removeDefault(d.id)}>
+                      <Button size="sm" variant="ghost" aria-label={`Remove ${d.title}`} disabled={saving} onClick={() => void removeDefault(d.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>

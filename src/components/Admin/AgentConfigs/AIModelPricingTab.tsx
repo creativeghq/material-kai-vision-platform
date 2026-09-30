@@ -12,6 +12,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { edgeError } from '@/utils/edgeError';
 import { statusTone } from '@/utils/statusTone';
+import { cn } from '@/lib/utils';
+import {
+  HubEmptyState,
+  HubFilterSelect,
+  HubResetFilters,
+  HubSortButton,
+  HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
+  type HubSort,
+  type HubTableField,
+} from '@/components/core/hub';
 
 interface ModelPricing {
   id: string;
@@ -114,6 +126,59 @@ function parsePriceField(field: PriceField, raw: string): { value: number } | { 
   }
   return { value };
 }
+
+const BILLING_LABELS: Record<ModelPricing['billing_type'], string> = {
+  token_based: 'Token',
+  time_based: 'Time',
+  per_generation: 'Per Gen',
+  per_unit: 'Per unit',
+};
+
+const PRICING_FIELDS: HubTableField<ModelPricing>[] = [
+  {
+    id: 'model',
+    sortValue: (m) => m.model_name,
+    searchText: (m) => `${m.model_name} ${m.model_key} ${m.provider}`,
+  },
+  {
+    id: 'provider',
+    sortValue: (m) => m.provider,
+    filterValue: (m) => m.provider,
+    filterLabel: 'Provider',
+  },
+  {
+    id: 'billing',
+    sortValue: (m) => m.billing_type,
+    filterValue: (m) => m.billing_type,
+    filterLabel: 'Billing type',
+    filterOptionLabel: (v) => BILLING_LABELS[v as ModelPricing['billing_type']] ?? v,
+  },
+  { id: 'input', sortValue: (m) => m.input_price_per_million },
+  { id: 'output', sortValue: (m) => m.output_price_per_million },
+  { id: 'markup', sortValue: (m) => m.markup_multiplier },
+  { id: 'verified', sortValue: (m) => m.last_verified_at },
+];
+
+const SortHead: React.FC<{
+  id: string;
+  sort?: HubSort;
+  onSort: (id: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, sort, onSort, align, className, children }) => {
+  const active = sort?.columnId === id ? sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => onSort(id)}>
+        {children}
+      </HubSortButton>
+    </TableHead>
+  );
+};
 
 export const AIModelPricingTab: React.FC = () => {
   const [pricing, setPricing] = useState<ModelPricing[]>([]);
@@ -338,7 +403,7 @@ export const AIModelPricingTab: React.FC = () => {
   };
 
   const formatPrice = (value: number, decimals: number = 4) => {
-    return value ? `$${value.toFixed(decimals)}` : '-';
+    return value ? `$${value.toFixed(decimals)}` : '—';
   };
 
   const formatDate = (dateString: string | null) => formatDateValue(dateString, { fallback: 'Never' });
@@ -353,9 +418,10 @@ export const AIModelPricingTab: React.FC = () => {
   const filteredPricing = selectedCategory === 'all'
     ? visiblePricing
     : visiblePricing.filter(p => p.category === selectedCategory);
+  const pricingTable = useHubTable(filteredPricing, PRICING_FIELDS);
 
   // Group by category
-  const groupedPricing = filteredPricing.reduce((acc, model) => {
+  const groupedPricing = pricingTable.rows.reduce((acc, model) => {
     const key = model.category || 'other';
     if (!acc[key]) acc[key] = [];
     acc[key].push(model);
@@ -416,16 +482,16 @@ export const AIModelPricingTab: React.FC = () => {
                   <TableHead>Model key</TableHead>
                   <TableHead className="text-right">Calls</TableHead>
                   <TableHead className="text-right">Billed</TableHead>
-                  <TableHead>Last used</TableHead>
+                  <TableHead className="hidden sm:table-cell">Last used</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {unpriced.map((row) => (
                   <TableRow key={row.model_key}>
-                    <TableCell className="font-mono text-xs">{row.model_key}</TableCell>
-                    <TableCell className="text-right text-xs">{Number(row.calls).toLocaleString()}</TableCell>
-                    <TableCell className="text-right text-xs">{formatPrice(Number(row.billed_usd), 4)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatDate(row.last_used_at)}</TableCell>
+                    <TableCell className="font-mono text-xs break-all">{row.model_key}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">{Number(row.calls).toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">{formatPrice(Number(row.billed_usd), 4)}</TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">{formatDate(row.last_used_at)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -453,7 +519,7 @@ export const AIModelPricingTab: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Model key</TableHead>
-                  <TableHead>Prices through</TableHead>
+                  <TableHead className="hidden sm:table-cell">Prices through</TableHead>
                   <TableHead className="text-right">Calls</TableHead>
                   <TableHead className="text-right">Billed</TableHead>
                 </TableRow>
@@ -461,10 +527,10 @@ export const AIModelPricingTab: React.FC = () => {
               <TableBody>
                 {fallbackPriced.map((row) => (
                   <TableRow key={row.model_key}>
-                    <TableCell className="font-mono text-xs">{row.model_key}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{row.resolved_via}</TableCell>
-                    <TableCell className="text-right text-xs">{Number(row.calls).toLocaleString()}</TableCell>
-                    <TableCell className="text-right text-xs">{formatPrice(Number(row.billed_usd), 4)}</TableCell>
+                    <TableCell className="font-mono text-xs break-all">{row.model_key}</TableCell>
+                    <TableCell className="hidden font-mono text-xs text-muted-foreground break-all sm:table-cell">{row.resolved_via}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">{Number(row.calls).toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">{formatPrice(Number(row.billed_usd), 4)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -542,6 +608,32 @@ export const AIModelPricingTab: React.FC = () => {
         </Card>
       </div>
 
+      <div className="overflow-hidden rounded-md border border-hairline">
+        <HubToolbar
+          className="border-b-0"
+          search={pricingTable.search}
+          onSearchChange={pricingTable.setSearch}
+          searchPlaceholder="Search models"
+          filters={
+            <>
+              <HubFilterSelect
+                label="Provider"
+                value={pricingTable.filters.provider ?? HUB_FILTER_ALL}
+                options={pricingTable.filterOptions.provider}
+                onChange={(v) => pricingTable.setFilter('provider', v)}
+              />
+              <HubFilterSelect
+                label="Billing type"
+                value={pricingTable.filters.billing ?? HUB_FILTER_ALL}
+                options={pricingTable.filterOptions.billing}
+                onChange={(v) => pricingTable.setFilter('billing', v)}
+              />
+              <HubResetFilters count={pricingTable.activeFilterCount} onReset={pricingTable.reset} />
+            </>
+          }
+        />
+      </div>
+
       {/* Category Filter */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex gap-2 flex-wrap">
@@ -566,6 +658,20 @@ export const AIModelPricingTab: React.FC = () => {
         )}
       </div>
 
+      {pricingTable.rows.length === 0 && pricingTable.activeFilterCount > 0 && (
+        <Card>
+          <HubEmptyState
+            variant="filtered"
+            title="No models match these filters"
+            action={
+              <Button variant="outline" size="sm" onClick={pricingTable.reset}>
+                Clear filters
+              </Button>
+            }
+          />
+        </Card>
+      )}
+
       {/* Pricing Tables by Category */}
       {Object.entries(groupedPricing).map(([category, models]) => (
         <Card key={category}>
@@ -582,40 +688,40 @@ export const AIModelPricingTab: React.FC = () => {
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Billing Type</TableHead>
-                  <TableHead className="text-right">Input/1M</TableHead>
-                  <TableHead className="text-right">Output/1M</TableHead>
-                  <TableHead className="text-right">Markup</TableHead>
-                  <TableHead className="text-right">Example Cost</TableHead>
-                  <TableHead>Auto-Update</TableHead>
-                  <TableHead>Last Verified</TableHead>
-                  <TableHead></TableHead>
+                  <SortHead id="model" sort={pricingTable.sort} onSort={pricingTable.toggleSort}>Model</SortHead>
+                  <SortHead id="provider" sort={pricingTable.sort} onSort={pricingTable.toggleSort} className="hidden md:table-cell">Provider</SortHead>
+                  <SortHead id="billing" sort={pricingTable.sort} onSort={pricingTable.toggleSort} className="hidden lg:table-cell">Billing Type</SortHead>
+                  <SortHead id="input" sort={pricingTable.sort} onSort={pricingTable.toggleSort} align="right">Input/1M</SortHead>
+                  <SortHead id="output" sort={pricingTable.sort} onSort={pricingTable.toggleSort} align="right" className="hidden sm:table-cell">Output/1M</SortHead>
+                  <SortHead id="markup" sort={pricingTable.sort} onSort={pricingTable.toggleSort} align="right" className="hidden md:table-cell">Markup</SortHead>
+                  <TableHead className="hidden text-right lg:table-cell">Example Cost</TableHead>
+                  <TableHead className="hidden md:table-cell">Auto-Update</TableHead>
+                  <SortHead id="verified" sort={pricingTable.sort} onSort={pricingTable.toggleSort} className="hidden xl:table-cell">Last Verified</SortHead>
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {models.map(model => (
                   <TableRow key={model.id}>
                     <TableCell>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{model.model_name}</p>
+                          <p className="max-w-[16rem] truncate font-medium" title={model.model_name}>{model.model_name}</p>
                           {!model.is_active && (
                             <span className={`text-xs capitalize ${statusTone('Retired')}`}>Retired</span>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground font-mono">{model.model_key}</p>
+                        <p className="max-w-[16rem] truncate text-xs text-muted-foreground font-mono" title={model.model_key}>{model.model_key}</p>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <span className="text-xs text-muted-foreground capitalize">{model.provider}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <span className="text-xs text-muted-foreground capitalize">
                         {model.billing_type === 'token_based' && 'Token'}
                         {model.billing_type === 'time_based' && `Time (${model.gpu_type || 'GPU'})`}
@@ -623,7 +729,7 @@ export const AIModelPricingTab: React.FC = () => {
                         {model.billing_type === 'per_unit' && `Per ${model.unit_label || 'unit'}`}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       {editingId === model.id ? (
                         model.billing_type === 'per_unit' ? (
                           <Input
@@ -653,7 +759,7 @@ export const AIModelPricingTab: React.FC = () => {
                         formatPrice(model.cost_per_generation, 3)
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden text-right tabular-nums sm:table-cell">
                       {editingId === model.id && model.billing_type === 'token_based' ? (
                         <Input
                           type="number"
@@ -665,10 +771,10 @@ export const AIModelPricingTab: React.FC = () => {
                           className="w-20 h-7 text-right"
                         />
                       ) : (
-                        model.billing_type === 'token_based' ? formatPrice(model.output_price_per_million, 2) : '-'
+                        model.billing_type === 'token_based' ? formatPrice(model.output_price_per_million, 2) : '—'
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden text-right tabular-nums md:table-cell">
                       {editingId === model.id ? (
                         <Input
                           type="number"
@@ -680,17 +786,17 @@ export const AIModelPricingTab: React.FC = () => {
                           className="w-16 h-7 text-right"
                         />
                       ) : (
-                        <span className="text-emerald-600 font-medium">
+                        <span className="font-medium text-[hsl(var(--success))]">
                           {((model.markup_multiplier - 1) * 100).toFixed(0)}%
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden text-right tabular-nums lg:table-cell">
                       <span className="text-xs text-muted-foreground">
                         {formatPrice(calculateBilledCost(model), 4)}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <button
                         onClick={() => toggleAutoUpdate(model)}
                         className="flex items-center gap-1"
@@ -702,7 +808,7 @@ export const AIModelPricingTab: React.FC = () => {
                         )}
                       </button>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden xl:table-cell">
                       <span className="text-xs text-muted-foreground">
                         {formatDate(model.last_verified_at)}
                       </span>

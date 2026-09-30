@@ -18,7 +18,11 @@ import {
   type CompanyAsset, type AssetCategory, type AssetStatus, type AcquisitionType, type DepreciationMethod,
   type AssetInput, type EmployeeOption, type ContactOption, type RecurringExpenseOption, type CompanyOption,
 } from '@/services/assetsService';
-import { HubEmptyState } from '@/components/core/hub';
+import {
+  HubDataTable, HubCellLink, HubCellEmpty, HubEmptyState, HubToolbar, HubFilterSelect, HubResetFilters,
+  useHubTable, HUB_FILTER_ALL, type HubColumn, type HubTableField,
+} from '@/components/core/hub';
+import { Badge } from '@/components/core/ui/badge';
 import { TaxDepreciationCard } from './TaxDepreciationCard';
 import {
   taxDepreciationService, TAX_STATUS_LABEL, taxBasisIsUnknown,
@@ -30,6 +34,34 @@ const CATEGORY_ICON: Record<AssetCategory, React.ComponentType<{ className?: str
 };
 
 const CATEGORIES = Object.keys(ASSET_CATEGORY_LABEL) as AssetCategory[];
+
+const STATUS_VARIANT: Record<AssetStatus, 'success' | 'warning' | 'neutral'> = {
+  active: 'success', in_repair: 'warning', retired: 'neutral', returned: 'neutral',
+};
+
+const ASSET_FIELDS: HubTableField<CompanyAsset>[] = [
+  {
+    id: 'name', sortValue: (a) => a.name,
+    searchText: (a) => [a.name, a.identifier, a.current_holder?.assignee_name, a.supplier_name].filter(Boolean).join(' '),
+  },
+  { id: 'identifier', sortValue: (a) => a.identifier },
+  {
+    id: 'category', filterValue: (a) => a.category, filterLabel: 'Category',
+    filterOptionLabel: (v) => ASSET_CATEGORY_LABEL[v as AssetCategory] ?? v,
+  },
+  {
+    id: 'status', sortValue: (a) => ASSET_STATUS_LABEL[a.status], filterValue: (a) => a.status, filterLabel: 'Status',
+    filterOptionLabel: (v) => ASSET_STATUS_LABEL[v as AssetStatus] ?? v,
+  },
+  {
+    id: 'acquisition', sortValue: (a) => a.acquisition_cost, filterValue: (a) => a.acquisition_type,
+    filterLabel: 'Acquisition', filterOptionLabel: (v) => ACQUISITION_LABEL[v as AcquisitionType] ?? v,
+  },
+  { id: 'holder', sortValue: (a) => a.current_holder?.assignee_name },
+  { id: 'recurring', sortValue: (a) => a.recurring_expense_label },
+];
+
+const FILTER_IDS = [['category', 'Category'], ['status', 'Status'], ['acquisition', 'Acquisition']] as const;
 const STATUSES = Object.keys(ASSET_STATUS_LABEL) as AssetStatus[];
 const ACQ_TYPES = Object.keys(ACQUISITION_LABEL) as AcquisitionType[];
 
@@ -66,8 +98,8 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [recurring, setRecurring] = useState<RecurringExpenseOption[]>([]);
 
-  const [categoryFilter, setCategoryFilter] = useState<'all' | AssetCategory>('all');
-  const [search, setSearch] = useState('');
+  const t = useHubTable(assets, ASSET_FIELDS, { columnId: 'name', direction: 'asc' });
+  const categoryFilter = CATEGORIES.find((c) => c === t.filters.category);
   const [page, setPage] = useState(1);
 
   // Add/Edit dialog state
@@ -114,20 +146,12 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return assets.filter((a) => {
-      if (categoryFilter !== 'all' && a.category !== categoryFilter) return false;
-      if (!q) return true;
-      return [a.name, a.identifier, a.current_holder?.assignee_name, a.supplier_name]
-        .filter(Boolean).some((s) => s!.toLowerCase().includes(q));
-    });
-  }, [assets, categoryFilter, search]);
+  const filtered = t.rows;
 
   const pageRows = useMemo(() => paginate(filtered, page, 15), [filtered, page]);
   useEffect(() => { setPage((p) => clampPage(p, filtered.length, 15)); }, [filtered.length]);
 
-  const openAdd = () => { setEditing(null); setForm(categoryFilter === 'all' ? EMPTY_FORM : { ...EMPTY_FORM, category: categoryFilter }); setCostText(''); setSalvageText(''); setFormOpen(true); };
+  const openAdd = () => { setEditing(null); setForm(categoryFilter ? { ...EMPTY_FORM, category: categoryFilter } : EMPTY_FORM); setCostText(''); setSalvageText(''); setFormOpen(true); };
   const openEdit = (a: CompanyAsset) => {
     setEditing(a);
     setForm({
@@ -206,6 +230,75 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
     finally { setBusy(false); }
   };
 
+  const columns: HubColumn<CompanyAsset>[] = [
+    {
+      id: 'name', header: 'Asset', sortable: true,
+      cell: (a) => {
+        const Icon = CATEGORY_ICON[a.category] || Box;
+        return (
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              {canManage ? (
+                <button type="button" onClick={() => openEdit(a)} className="block max-w-[16rem] truncate text-left" title={a.name}>
+                  <HubCellLink>{a.name}</HubCellLink>
+                </button>
+              ) : (
+                <div className="max-w-[16rem] truncate font-medium" title={a.name}>{a.name}</div>
+              )}
+              <div className="text-xs text-muted-foreground">{ASSET_CATEGORY_LABEL[a.category]}</div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'identifier', header: 'Identifier', sortable: true, hideBelow: 'md',
+      cell: (a) => (a.identifier ? <span className="text-muted-foreground">{a.identifier}</span> : <HubCellEmpty />),
+    },
+    {
+      id: 'status', header: 'Status', sortable: true,
+      cell: (a) => <Badge variant={STATUS_VARIANT[a.status] ?? 'neutral'}>{ASSET_STATUS_LABEL[a.status]}</Badge>,
+    },
+    {
+      id: 'acquisition', header: 'Acquisition', sortable: true, hideBelow: 'sm',
+      cell: (a) => (
+        <>
+          <div>{ACQUISITION_LABEL[a.acquisition_type]}</div>
+          <div className="text-xs text-muted-foreground tabular-nums">{money(a.acquisition_cost, a.currency)}</div>
+          {a.book_value != null && <div className="text-xs text-muted-foreground tabular-nums">Book: {money(a.book_value, a.currency)}</div>}
+          {taxBasis[a.id] && (taxBasisIsUnknown(taxBasis[a.id].status)
+            ? <div className="text-xs text-amber-800 dark:text-amber-300">Tax: {TAX_STATUS_LABEL[taxBasis[a.id].status]}</div>
+            : <div className="text-xs text-muted-foreground tabular-nums">Tax: {money(taxBasis[a.id].written_down_value, a.currency)}</div>)}
+        </>
+      ),
+    },
+    {
+      id: 'holder', header: 'Held by', sortable: true, hideBelow: 'md',
+      cell: (a) => (a.current_holder?.assignee_name
+        ? <span>{a.current_holder.assignee_name}<span className="text-xs text-muted-foreground"> ({a.current_holder.assignee_kind})</span></span>
+        : <span className="text-muted-foreground">Unassigned</span>),
+    },
+    {
+      id: 'recurring', header: 'Recurring cost', sortable: true, hideBelow: 'lg',
+      cell: (a) => (a.recurring_expense_label
+        ? <span className="block max-w-[14rem] truncate text-xs text-muted-foreground" title={a.recurring_expense_label}>{a.recurring_expense_label}</span>
+        : <HubCellEmpty />),
+    },
+    {
+      id: 'actions', header: <span className="sr-only">Actions</span>, align: 'right',
+      cell: (a) => (
+        <div className="flex items-center justify-end gap-1">
+          {canManage && (a.current_holder
+            ? <Button size="sm" variant="ghost" className="h-7 px-2" title="Mark returned" onClick={() => doReturn(a)}><Undo2 className="h-4 w-4" /></Button>
+            : <Button size="sm" variant="ghost" className="h-7 px-2" title="Assign to someone" onClick={() => openAssign(a)}><UserCheck className="h-4 w-4" /></Button>)}
+          {canManage && <Button size="sm" variant="ghost" className="h-7 px-2" title="Edit" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>}
+          {canManage && <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" title="Delete" onClick={() => doDelete(a)}><Trash2 className="h-4 w-4" /></Button>}
+        </div>
+      ),
+    },
+  ];
+
   const showLease = form.acquisition_type === 'leased' || form.acquisition_type === 'financed';
   const assignOptions = assignKind === 'employee' ? employees : contacts;
 
@@ -221,26 +314,36 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
               : 'Vehicles, phones, cards & equipment the company owns or leases — cost and holder.'}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Input
-            placeholder="Search name, plate, holder…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-48"
-          />
-          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
-            <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{ASSET_CATEGORY_LABEL[c]}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {canManage && <Button size="sm" className="h-8" onClick={openAdd}><Plus className="h-4 w-4 mr-1" /> Add asset</Button>}
-        </div>
+        {canManage && <Button size="sm" className="h-8" onClick={openAdd}><Plus className="h-4 w-4 mr-1" /> Add asset</Button>}
       </CardHeader>
       <CardContent className="p-0">
+        {assets.length > 0 && (
+          <HubToolbar
+            search={t.search}
+            onSearchChange={t.setSearch}
+            searchPlaceholder="Search name, plate, holder…"
+            filters={<>
+              {FILTER_IDS.map(([id, label]) => (
+                <HubFilterSelect
+                  key={id}
+                  label={label}
+                  value={t.filters[id] ?? HUB_FILTER_ALL}
+                  options={t.filterOptions[id] ?? []}
+                  onChange={(v) => t.setFilter(id, v)}
+                />
+              ))}
+              <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+            </>}
+          />
+        )}
         {loading ? (
           <div className="p-8 flex items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading…</div>
+        ) : filtered.length === 0 && assets.length > 0 ? (
+          <HubEmptyState
+            variant="filtered"
+            title="No assets match these filters"
+            action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+          />
         ) : filtered.length === 0 ? (
           <HubEmptyState
             icon={Package}
@@ -250,64 +353,14 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
           />
         ) : (
           <>
-            <div className="table-scroll">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
-                  <th className="px-5 py-2 font-medium">Asset</th>
-                  <th className="px-3 py-2 font-medium">Identifier</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Acquisition</th>
-                  <th className="px-3 py-2 font-medium">Held by</th>
-                  <th className="px-3 py-2 font-medium">Recurring cost</th>
-                  <th className="px-3 py-2 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((a) => {
-                  const Icon = CATEGORY_ICON[a.category] || Box;
-                  return (
-                    <tr key={a.id} className="border-b border-border/40 hover:bg-muted/30">
-                      <td className="px-5 py-2">
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <div>
-                            <div className="font-medium">{a.name}</div>
-                            <div className="text-xs text-muted-foreground">{ASSET_CATEGORY_LABEL[a.category]}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">{a.identifier || '—'}</td>
-                      <td className="px-3 py-2">{ASSET_STATUS_LABEL[a.status]}</td>
-                      <td className="px-3 py-2">
-                        <div>{ACQUISITION_LABEL[a.acquisition_type]}</div>
-                        <div className="text-xs text-muted-foreground">{money(a.acquisition_cost, a.currency)}</div>
-                        {a.book_value != null && <div className="text-xs text-muted-foreground">Book: {money(a.book_value, a.currency)}</div>}
-                        {taxBasis[a.id] && (taxBasisIsUnknown(taxBasis[a.id].status)
-                          ? <div className="text-xs text-amber-800 dark:text-amber-300">Tax: {TAX_STATUS_LABEL[taxBasis[a.id].status]}</div>
-                          : <div className="text-xs text-muted-foreground">Tax: {money(taxBasis[a.id].written_down_value, a.currency)}</div>)}
-                      </td>
-                      <td className="px-3 py-2">
-                        {a.current_holder?.assignee_name
-                          ? <span>{a.current_holder.assignee_name}<span className="text-xs text-muted-foreground"> ({a.current_holder.assignee_kind})</span></span>
-                          : <span className="text-muted-foreground">Unassigned</span>}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{a.recurring_expense_label || '—'}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center justify-end gap-1">
-                          {canManage && (a.current_holder
-                            ? <Button size="sm" variant="ghost" className="h-7 px-2" title="Mark returned" onClick={() => doReturn(a)}><Undo2 className="h-4 w-4" /></Button>
-                            : <Button size="sm" variant="ghost" className="h-7 px-2" title="Assign to someone" onClick={() => openAssign(a)}><UserCheck className="h-4 w-4" /></Button>)}
-                          {canManage && <Button size="sm" variant="ghost" className="h-7 px-2" title="Edit" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>}
-                          {canManage && <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" title="Delete" onClick={() => doDelete(a)}><Trash2 className="h-4 w-4" /></Button>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
+            <HubDataTable
+              className="rounded-none border-0"
+              rows={pageRows}
+              columns={columns}
+              rowId={(a) => a.id}
+              sort={t.sort}
+              onSortChange={t.setSort}
+            />
             <TablePagination page={page} total={filtered.length} pageSize={15} onPageChange={setPage} />
           </>
         )}

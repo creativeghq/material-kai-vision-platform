@@ -109,14 +109,14 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
 
   return (
     <Card className="lg:col-span-2">
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-hairline px-5 py-3">
         <CardTitle>Document Types &amp; Series</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="table-scroll">
         <table className="w-full text-sm">
-          <thead className="text-xs text-muted-foreground">
-            <tr className="border-b border-border/60">
+          <thead className="sticky top-0 z-10 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+            <tr className="border-b border-hairline">
               <th className="px-4 py-2 text-left w-8"><span className="sr-only">Actions</span></th>
               <th className="px-4 py-2 text-left">Code</th>
               <th className="px-4 py-2 text-left">Document type</th>
@@ -131,25 +131,26 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
               const typeSeries = series.filter((s) => s.doc_code === t.code);
               return (
                 <React.Fragment key={t.code}>
-                  <tr className="border-b border-border/30">
+                  <tr className="border-b border-hairline hover:bg-surface-hover">
                     <td className="px-4 py-2">
-                      <button onClick={() => setExpanded(isOpen ? null : t.code)} className="text-muted-foreground">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
+                      <button type="button" onClick={() => setExpanded(isOpen ? null : t.code)} className="text-muted-foreground hover:text-foreground"
+                        aria-label={isOpen ? `Hide ${t.code} settings` : `Show ${t.code} settings`} aria-expanded={isOpen}>{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs">{t.code}</td>
-                    <td className="px-4 py-2">{t.description}</td>
+                    <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">{t.code}</td>
+                    <td className="px-4 py-2 break-words">{t.description}</td>
                     <td className="px-4 py-2 text-center"><Switch checked={on} onCheckedChange={(v) => toggle(t.code, v)} /></td>
                   </tr>
                   {isOpen && (
-                    <tr className="bg-muted/20"><td></td><td colSpan={3} className="px-4 py-3 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-44">Default income classification</span>
+                    <tr className="border-b border-hairline bg-surface-sunken"><td></td><td colSpan={3} className="px-4 py-3 space-y-3">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="text-xs text-muted-foreground w-44 shrink-0">Default income classification</span>
                         <Select value={st?.default_income_classification_type ?? ''} onValueChange={(v) => setDefaultClass(t.code, v)}>
                           <SelectTrigger className="h-8 max-w-md"><SelectValue placeholder="Select…" /></SelectTrigger>
                           <SelectContent>{incTypes.map((ic) => <SelectItem key={ic.code} value={ic.code}>{ic.code} — {ic.description}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-44">Default classification category</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="text-xs text-muted-foreground w-44 shrink-0">Default classification category</span>
                         <Select value={st?.default_income_classification_category ?? 'none'} onValueChange={(v) => setDefaultCat(t.code, v)}>
                           <SelectTrigger className="h-8 max-w-md"><SelectValue placeholder="Select…" /></SelectTrigger>
                           <SelectContent>
@@ -158,8 +159,8 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-44">Default withholding tax</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="text-xs text-muted-foreground w-44 shrink-0">Default withholding tax</span>
                         <Select value={st?.default_withholding_code ?? 'none'} onValueChange={(v) => setDefaultWithholding(t.code, v)}>
                           <SelectTrigger className="h-8 max-w-md"><SelectValue placeholder="None" /></SelectTrigger>
                           <SelectContent>
@@ -169,7 +170,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs text-muted-foreground">Numbering series &amp; next number</span>
                           {addingFor !== t.code && (
                             <Button size="sm" variant="outline" onClick={() => startAdd(t.code)}><Plus className="h-3.5 w-3.5 mr-1" /> Add series</Button>
@@ -201,7 +202,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         ))}
 
                         {addingFor === t.code && (
-                          <div className="flex flex-wrap items-end gap-2 rounded-md border border-border/60 p-2">
+                          <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
                             <div className="space-y-1">
                               <span className="text-[10px] text-muted-foreground">Series</span>
                               <Input className="h-7 w-28 text-xs" value={newSeries} onChange={(e) => setNewSeries(e.target.value)} placeholder="INV-" />

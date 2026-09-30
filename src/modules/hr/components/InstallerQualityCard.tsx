@@ -16,12 +16,24 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubSortButton, useHubTable, type HubTableField } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { todayLocalISO } from '@/utils/datetime';
 import {
   warrantyClaimService, reworkRateIsTrustworthy, certificationState, CERTIFICATION_STATE_LABEL,
   type ReworkRate, type WorkerCertification,
 } from '@/modules/crm/services/warrantyClaimService';
+
+type ReworkRow = ReworkRate['rows'][number];
+const REWORK_FIELDS: HubTableField<ReworkRow>[] = [
+  { id: 'name', sortValue: (r) => r.name },
+  { id: 'claims', sortValue: (r) => r.claims },
+  { id: 'ours', sortValue: (r) => r.workmanship_claims },
+  { id: 'hours', sortValue: (r) => r.rework_hours },
+  { id: 'supplier', sortValue: (r) => r.supplier_claims },
+  { id: 'chargeable', sortValue: (r) => r.chargeable_claims },
+];
+const EMPTY_REWORK: ReworkRow[] = [];
 
 export const InstallerQualityCard: React.FC<{ workspaceId: string; canManage?: boolean }> = ({
   workspaceId, canManage = true,
@@ -34,6 +46,11 @@ export const InstallerQualityCard: React.FC<{ workspaceId: string; canManage?: b
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState({ kind: '', reference: '', expiresOn: '' });
   const today = todayLocalISO();
+  const t = useHubTable(rate?.rows ?? EMPTY_REWORK, REWORK_FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
@@ -126,23 +143,23 @@ export const InstallerQualityCard: React.FC<{ workspaceId: string; canManage?: b
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Fitter</TableHead>
-                      <TableHead className="text-right">Claims</TableHead>
-                      <TableHead className="text-right">Ours</TableHead>
-                      <TableHead className="text-right">Rework hrs</TableHead>
-                      <TableHead className="text-right">Supplier</TableHead>
-                      <TableHead className="text-right">Chargeable</TableHead>
+                      <TableHead aria-sort={ariaSort('name')}>{sortHead('name', 'Fitter')}</TableHead>
+                      <TableHead className="text-right" aria-sort={ariaSort('claims')}>{sortHead('claims', 'Claims', 'right')}</TableHead>
+                      <TableHead className="text-right" aria-sort={ariaSort('ours')}>{sortHead('ours', 'Ours', 'right')}</TableHead>
+                      <TableHead className="hidden sm:table-cell text-right" aria-sort={ariaSort('hours')}>{sortHead('hours', 'Rework hrs', 'right')}</TableHead>
+                      <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('supplier')}>{sortHead('supplier', 'Supplier', 'right')}</TableHead>
+                      <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('chargeable')}>{sortHead('chargeable', 'Chargeable', 'right')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rate.rows.map((r) => (
+                    {t.rows.map((r) => (
                       <TableRow key={r.installer_employee_id}>
-                        <TableCell>{r.name}</TableCell>
+                        <TableCell><span className="block max-w-[16rem] truncate" title={r.name}>{r.name}</span></TableCell>
                         <TableCell className="text-right tabular-nums">{r.claims}</TableCell>
                         <TableCell className="text-right tabular-nums">{r.workmanship_claims}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.rework_hours}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.supplier_claims}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.chargeable_claims}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-right tabular-nums">{r.rework_hours}</TableCell>
+                        <TableCell className="hidden md:table-cell text-right tabular-nums">{r.supplier_claims}</TableCell>
+                        <TableCell className="hidden md:table-cell text-right tabular-nums">{r.chargeable_claims}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

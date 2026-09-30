@@ -284,7 +284,7 @@ function SerpBlockTags({ blocks }: { blocks: string[] }) {
 function PageLink({ url }: { url?: string | null }) {
   if (!url) return <span className="text-muted-foreground">—</span>;
   return (
-    <a href={safeHref(url)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block" title={url}>
+    <a href={safeHref(url)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block max-w-[13rem]" title={url}>
       {pathOf(url)}
     </a>
   );
@@ -306,14 +306,14 @@ function RankedKeywordsTable({ items, crawlDate, max = 100 }: { items: any[]; cr
             <TableHead className="text-right">Pos.</TableHead>
             <TableHead className="text-right">Change</TableHead>
             <TableHead className="text-right">Volume</TableHead>
-            <TableHead className="text-right">Trend (yr)</TableHead>
-            <TableHead className="text-right">CPC</TableHead>
-            <TableHead className="text-right">Comp.</TableHead>
+            <TableHead className="hidden md:table-cell text-right">Trend (yr)</TableHead>
+            <TableHead className="hidden md:table-cell text-right">CPC</TableHead>
+            <TableHead className="hidden md:table-cell text-right">Comp.</TableHead>
             <TableHead className="text-right">KD</TableHead>
             <TableHead className="text-right">Est. traffic</TableHead>
-            <TableHead>SERP blocks</TableHead>
+            <TableHead className="hidden md:table-cell">SERP blocks</TableHead>
             <TableHead>Ranking page</TableHead>
-            <TableHead>SERP crawled</TableHead>
+            <TableHead className="hidden md:table-cell">SERP crawled</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -333,8 +333,8 @@ function RankedKeywordsTable({ items, crawlDate, max = 100 }: { items: any[]; cr
             const compTitle = info.competition_level ? `${String(info.competition_level).toLowerCase()} competition` : undefined;
             return (
               <TableRow key={i}>
-                <TableCell className="font-medium max-w-[240px]">
-                  <div className="truncate" title={kd.keyword}>{kd.keyword}</div>
+                <TableCell className="font-medium">
+                  <div className="truncate max-w-[15rem]" title={kd.keyword}>{kd.keyword}</div>
                   {intent && <div className="text-[10px] text-muted-foreground">{String(intent)}</div>}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{serp.rank_absolute ?? '—'}</TableCell>
@@ -342,16 +342,16 @@ function RankedKeywordsTable({ items, crawlDate, max = 100 }: { items: any[]; cr
                   <RankChange current={serp.rank_absolute} previous={changes.previous_rank_absolute} isNew={changes.is_new} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{info.search_volume != null ? fmtNum(info.search_volume) : '—'}</TableCell>
-                <TableCell className="text-right tabular-nums" title={trendTitle || undefined}>
+                <TableCell className="hidden md:table-cell text-right tabular-nums" title={trendTitle || undefined}>
                   {trend.yearly == null ? '—' : <span className={Number(trend.yearly) > 0 ? GOOD : Number(trend.yearly) < 0 ? WARN : ''}>{fmtSignedPct(trend.yearly)}</span>}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">{info.cpc != null ? `$${fmtDec(info.cpc, 2)}` : '—'}</TableCell>
-                <TableCell className="text-right tabular-nums" title={compTitle}>{info.competition != null ? fmtPct(info.competition) : '—'}</TableCell>
+                <TableCell className="hidden md:table-cell text-right tabular-nums">{info.cpc != null ? `$${fmtDec(info.cpc, 2)}` : '—'}</TableCell>
+                <TableCell className="hidden md:table-cell text-right tabular-nums" title={compTitle}>{info.competition != null ? fmtPct(info.competition) : '—'}</TableCell>
                 <TableCell className={`text-right tabular-nums ${difficulty != null ? kdTone(Number(difficulty)) : ''}`}>{difficulty ?? '—'}</TableCell>
                 <TableCell className="text-right tabular-nums">{serp.etv != null ? fmtDec(serp.etv, 1) : '—'}</TableCell>
-                <TableCell className="max-w-[220px]"><SerpBlockTags blocks={serpBlocks(kd.serp_info?.serp_item_types)} /></TableCell>
-                <TableCell className="max-w-[220px]"><PageLink url={serp.url} /></TableCell>
-                <TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">{crawlDate(it) || '—'}</TableCell>
+                <TableCell className="hidden md:table-cell max-w-[220px]"><SerpBlockTags blocks={serpBlocks(kd.serp_info?.serp_item_types)} /></TableCell>
+                <TableCell><PageLink url={serp.url} /></TableCell>
+                <TableCell className="hidden md:table-cell tabular-nums text-muted-foreground whitespace-nowrap">{crawlDate(it) || '—'}</TableCell>
               </TableRow>
             );
           })}
@@ -378,16 +378,16 @@ function TrackedKeywordsTable({ rows, max = 30 }: { rows: any[]; max?: number })
             <TableHead className="text-right">Change</TableHead>
             <TableHead className="text-right">Volume</TableHead>
             <TableHead>Ranking page</TableHead>
-            <TableHead>Checked</TableHead>
+            <TableHead className="hidden md:table-cell">Checked</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.map((k, i) => (
             <TableRow key={i}>
-              <TableCell className="font-medium max-w-[240px]">
-                <div className="truncate" title={k.keyword}>{k.keyword}</div>
+              <TableCell className="font-medium">
+                <div className="truncate max-w-[15rem]" title={k.keyword}>{k.keyword}</div>
                 {Array.isArray(k.tags) && k.tags.length > 0 && (
-                  <div className="text-[10px] text-muted-foreground truncate">{k.tags.join(' · ')}</div>
+                  <div className="text-[10px] text-muted-foreground truncate max-w-[15rem]">{k.tags.join(' · ')}</div>
                 )}
               </TableCell>
               <TableCell className="text-right tabular-nums">{k.position ?? '—'}</TableCell>
@@ -397,8 +397,8 @@ function TrackedKeywordsTable({ rows, max = 30 }: { rows: any[]; max?: number })
                   : <span className={k.change > 0 ? GOOD : BAD}>{k.change > 0 ? `▲ ${k.change}` : `▼ ${Math.abs(k.change)}`}</span>}
               </TableCell>
               <TableCell className="text-right tabular-nums">{k.search_volume != null ? fmtNum(k.search_volume) : '—'}</TableCell>
-              <TableCell className="max-w-[220px]"><PageLink url={k.url} /></TableCell>
-              <TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">{dayOf(k.captured_at)}</TableCell>
+              <TableCell><PageLink url={k.url} /></TableCell>
+              <TableCell className="hidden md:table-cell tabular-nums text-muted-foreground whitespace-nowrap">{dayOf(k.captured_at)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

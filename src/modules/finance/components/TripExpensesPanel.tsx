@@ -4,7 +4,11 @@ import {
   ShoppingCart, Receipt, ScanLine, BadgeCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { HubEmptyState } from '@/components/core/hub';
+import {
+  HubEmptyState, HubToolbar, HubFilterSelect, HubResetFilters, HubSortButton, HubCellEmpty, useHubTable,
+  HUB_FILTER_ALL, type HubTableField, type HubSort,
+} from '@/components/core/hub';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -21,7 +25,7 @@ import {
   tripExpenseService, TRIP_EXPENSE_CATEGORIES, TRIP_STATUS_LABEL,
   EXPENSE_CARD_TYPES, EXPENSE_CARD_TYPE_LABEL,
   type TripExpenseReport, type TripExpenseItem, type TripStatus, type ExpensePaymentMethod, type ExpenseCardType,
-  type TripCardLinks, type TripMoneyByCurrency,
+  type TripCardLinks, type TripMoneyByCurrency, type ExpenseApproval,
 } from '@/modules/finance/services/tripExpenseService';
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -34,6 +38,33 @@ interface Props {
   /** Finance reviewers see every card and can approve/reject lines. Reps see only their own. */
   canReview: boolean;
 }
+
+const APPROVAL_VARIANT: Record<ExpenseApproval, 'success' | 'error' | 'warning'> = {
+  approved: 'success', rejected: 'error', pending: 'warning',
+};
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const ITEM_FIELDS: HubTableField<TripExpenseItem>[] = [
+  { id: 'date', sortValue: (i) => i.expense_date },
+  { id: 'category', sortValue: (i) => i.category, filterValue: (i) => i.category, filterLabel: 'Category', filterOptionLabel: capitalize },
+  { id: 'description', sortValue: (i) => i.description, searchText: (i) => `${i.description ?? ''} ${i.vendor ?? ''}` },
+  { id: 'amount', sortValue: (i) => Number(i.amount) },
+  { id: 'status', sortValue: (i) => i.approval_status, filterValue: (i) => i.approval_status, filterLabel: 'Status', filterOptionLabel: capitalize },
+];
+
+const SortHead: React.FC<{
+  id: string; label: string; sort?: HubSort; onSort: (id: string) => void; className?: string; align?: 'right';
+}> = ({ id, label, sort, onSort, className, align }) => (
+  <TableHead
+    className={[className, align === 'right' ? 'text-right' : ''].filter(Boolean).join(' ') || undefined}
+    aria-sort={sort?.columnId === id ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+  >
+    <HubSortButton active={sort?.columnId === id ? sort.direction : undefined} align={align} onClick={() => onSort(id)}>
+      {label}
+    </HubSortButton>
+  </TableHead>
+);
 
 const STATUS_VARIANT: Record<TripStatus, 'default' | 'outline' | 'secondary' | 'destructive'> = {
   draft: 'outline',
@@ -202,6 +233,7 @@ const TripCardDetail: React.FC<{
   /** Progress while a batch of photographed receipts is being read (#379). */
   const [scanning, setScanning] = useState<{ done: number; total: number } | null>(null);
   const scanInput = useRef<HTMLInputElement | null>(null);
+  const t = useHubTable(items, ITEM_FIELDS);
 
   const isOwner = !!report && report.user_id === uid;
   const isDraft = report?.status === 'draft';
@@ -483,27 +515,50 @@ const TripCardDetail: React.FC<{
             ) : undefined}
           />
         ) : (
-          <div className="table-scroll">
-          <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
-              <tr className="border-b border-border/60">
-                <th className="px-3 py-2 text-left">Date</th>
-                <th className="px-3 py-2 text-left">Category</th>
-                <th className="px-3 py-2 text-left">Description</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-                <th className="px-3 py-2 text-center">Receipt</th>
-                <th className="px-3 py-2 text-center">Status</th>
-                <th className="px-3 py-2 text-right"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <tr key={it.id} className="border-b border-border/30 hover:bg-muted/20">
-                  <td className="px-3 py-2 whitespace-nowrap">{it.expense_date}</td>
-                  <td className="px-3 py-2 capitalize">{it.category}</td>
-                  <td className="px-3 py-2">
+          <>
+          {items.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search description or vendor"
+              filters={<>
+                <HubFilterSelect label="Category" value={t.filters.category ?? HUB_FILTER_ALL} options={t.filterOptions.category} onChange={(v) => t.setFilter('category', v)} />
+                <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status} onChange={(v) => t.setFilter('status', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortHead id="date" label="Date" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell" />
+                <SortHead id="category" label="Category" sort={t.sort} onSort={t.toggleSort} className="hidden md:table-cell" />
+                <SortHead id="description" label="Description" sort={t.sort} onSort={t.toggleSort} />
+                <SortHead id="amount" label="Amount" sort={t.sort} onSort={t.toggleSort} align="right" />
+                <TableHead className="text-center">Receipt</TableHead>
+                <SortHead id="status" label="Status" sort={t.sort} onSort={t.toggleSort} />
+                <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {t.rows.length === 0 && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={7}>
+                    <HubEmptyState
+                      variant="filtered"
+                      title="No lines match"
+                      action={<HubResetFilters count={t.activeFilterCount} onReset={t.reset} />}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+              {t.rows.map((it) => (
+                <TableRow key={it.id}>
+                  <TableCell className="hidden whitespace-nowrap sm:table-cell">{it.expense_date}</TableCell>
+                  <TableCell className="hidden capitalize md:table-cell">{it.category}</TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-1.5">
-                      <span className="truncate max-w-[200px]">{it.description || '—'}</span>
+                      <span className="block max-w-[16rem] truncate" title={it.description || undefined}>{it.description || <HubCellEmpty />}</span>
                       {/* A line the reader produced and nobody has looked at yet. Shown on the row
                           rather than only in a summary, because the thing being checked is THIS
                           line's numbers against THIS line's photo. */}
@@ -511,11 +566,12 @@ const TripCardDetail: React.FC<{
                         <Badge variant="warning" className="shrink-0 text-[9px]">Check</Badge>
                       )}
                     </div>
-                    {it.vendor && <div className="text-[10px] text-muted-foreground">{it.vendor}</div>}
-                    {it.review_notes && it.approval_status === 'rejected' && <div className="text-[10px] text-destructive">Rejected: {it.review_notes}</div>}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums font-medium">{formatMoney(Number(it.amount), it.currency)}</td>
-                  <td className="px-3 py-2 text-center">
+                    {it.vendor && <div className="max-w-[16rem] truncate text-[10px] text-muted-foreground" title={it.vendor}>{it.vendor}</div>}
+                    {it.review_notes && it.approval_status === 'rejected' && <div className="max-w-[20rem] break-words text-[10px] text-destructive">Rejected: {it.review_notes}</div>}
+                    <div className="text-[10px] text-muted-foreground sm:hidden">{it.expense_date}</div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatMoney(Number(it.amount), it.currency)}</TableCell>
+                  <TableCell className="text-center">
                     {it.receipt_path ? (
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openReceipt(it)} title={it.receipt_name || 'Open receipt'}><ExternalLink className="h-3.5 w-3.5" /></Button>
                     ) : canEditItems ? (
@@ -527,12 +583,12 @@ const TripCardDetail: React.FC<{
                         />
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={busy} onClick={() => fileInputs.current[it.id]?.click()} title="Attach receipt"><Paperclip className="h-3.5 w-3.5" /></Button>
                       </>
-                    ) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <span className={`text-xs capitalize ${statusTone(it.approval_status)}`}>{it.approval_status}</span>
-                  </td>
-                  <td className="px-3 py-2 text-right">
+                    ) : <HubCellEmpty />}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={APPROVAL_VARIANT[it.approval_status] ?? 'neutral'}>{capitalize(it.approval_status)}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
                     {canReviewNow ? (
                       <div className="flex justify-end gap-1">
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-500" disabled={busy || it.approval_status === 'approved'} onClick={() => review(it.id, 'approved')} title="Approve"><Check className="h-3.5 w-3.5" /></Button>
@@ -554,12 +610,12 @@ const TripCardDetail: React.FC<{
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => removeItem(it.id)} title="Delete line"><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
                     ) : null}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-          </div>
+            </TableBody>
+          </Table>
+          </>
         )}
       </CardContent>
 

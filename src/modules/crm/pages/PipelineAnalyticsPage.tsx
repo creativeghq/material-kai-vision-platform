@@ -21,11 +21,14 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import {
+  HubCellEmpty,
   HubDataTable,
   HubEmptyState,
   HubStatGrid,
   HubStatTile,
+  useHubTable,
   type HubColumn,
+  type HubTableField,
 } from '@/components/core/hub';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { formatMoney } from '@/utils/decimal';
@@ -65,6 +68,16 @@ const tooltipStyle = {
   fontSize: '12px',
   color: 'hsl(var(--popover-foreground))',
 } as const;
+
+const OWNER_FIELDS: HubTableField<DealOwnerStatRow>[] = [
+  { id: 'owner', sortValue: (r) => r.owner_name },
+  { id: 'open', sortValue: (r) => r.open_count },
+  { id: 'openValue', sortValue: (r) => Number(r.open_value) },
+  { id: 'won', sortValue: (r) => r.won_count },
+  { id: 'wonValue', sortValue: (r) => Number(r.won_value) },
+  { id: 'lost', sortValue: (r) => r.lost_count },
+  { id: 'winRate', sortValue: (r) => r.win_rate_pct },
+];
 
 export default function PipelineAnalyticsPage() {
   const navigate = useNavigate();
@@ -165,29 +178,36 @@ export default function PipelineAnalyticsPage() {
   const winRate = totalWon + totalLost > 0 ? Math.round((100 * totalWon) / (totalWon + totalLost)) : null;
 
   const ownerColumns: HubColumn<DealOwnerStatRow>[] = [
-    { id: 'owner', header: 'Owner', cell: (r) => r.owner_name },
-    { id: 'open', header: 'Open', align: 'right', cell: (r) => r.open_count },
+    {
+      id: 'owner', header: 'Owner', sortable: true,
+      cell: (r) => <span className="block max-w-[16rem] truncate" title={r.owner_name}>{r.owner_name}</span>,
+    },
+    { id: 'open', header: 'Open', align: 'right', sortable: true, hideBelow: 'md', cell: (r) => r.open_count },
     {
       id: 'openValue',
       header: 'Open value',
       align: 'right',
+      sortable: true,
       cell: (r) => formatMoney(Number(r.open_value), r.currency, { decimals: 0 }),
     },
-    { id: 'won', header: 'Won', align: 'right', cell: (r) => r.won_count },
+    { id: 'won', header: 'Won', align: 'right', sortable: true, hideBelow: 'md', cell: (r) => r.won_count },
     {
       id: 'wonValue',
       header: 'Won value',
       align: 'right',
+      sortable: true,
       cell: (r) => formatMoney(Number(r.won_value), r.currency, { decimals: 0 }),
     },
-    { id: 'lost', header: 'Lost', align: 'right', hideBelow: 'sm', cell: (r) => r.lost_count },
+    { id: 'lost', header: 'Lost', align: 'right', sortable: true, hideBelow: 'sm', cell: (r) => r.lost_count },
     {
       id: 'winRate',
       header: 'Win rate',
       align: 'right',
-      cell: (r) => (r.win_rate_pct == null ? '—' : `${r.win_rate_pct}%`),
+      sortable: true,
+      cell: (r) => (r.win_rate_pct == null ? <HubCellEmpty /> : `${r.win_rate_pct}%`),
     },
   ];
+  const ownerTable = useHubTable(owners, OWNER_FIELDS);
 
   if (wsLoading || types === null) {
     return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
@@ -424,8 +444,10 @@ export default function PipelineAnalyticsPage() {
             <section>
               <SectionHeader title="By owner" subtitle="Who is carrying what, and how much of it closes." />
               <HubDataTable
-                rows={owners}
+                rows={ownerTable.rows}
                 columns={ownerColumns}
+                sort={ownerTable.sort}
+                onSortChange={ownerTable.setSort}
                 rowId={(r) => `${r.owner_user_id ?? 'none'}-${r.currency}`}
                 empty={
                   <HubEmptyState

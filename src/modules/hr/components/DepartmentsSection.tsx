@@ -12,6 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type Department, type Employee } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { HubCellEmpty, HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
+
+const DEPARTMENT_FIELDS: HubTableField<Department>[] = [
+  { id: 'name', sortValue: (d) => d.name, searchText: (d) => d.name },
+  { id: 'head', sortValue: (d) => d.head?.name, searchText: (d) => d.head?.name },
+  { id: 'people', sortValue: (d) => d.employee_count },
+];
 
 const empName = (e: Employee) => e.contact?.name || [e.contact?.first_name, e.contact?.last_name].filter(Boolean).join(' ') || 'Unnamed';
 
@@ -20,6 +27,11 @@ export function DepartmentsSection({ workspaceId, canManage }: { workspaceId: st
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Department | null>(null);
+  const t = useHubTable(departments, DEPARTMENT_FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -43,7 +55,10 @@ export function DepartmentsSection({ workspaceId, canManage }: { workspaceId: st
       <SectionHeader title="Departments" subtitle={`${departments.length} departments`} actions={canManage && workspaceId ? <AddDepartmentDialog workspaceId={workspaceId} onDone={load} /> : undefined} />
       <Card>
         <CardContent className="p-0">
-          {departments.length === 0 ? (
+          {departments.length > 8 && <HubToolbar search={t.search} onSearchChange={t.setSearch} searchPlaceholder="Search departments" />}
+          {departments.length > 0 && t.rows.length === 0 ? (
+            <EmptyState icon={Network} variant="filtered" title="No departments match your search" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} />
+          ) : departments.length === 0 ? (
             <EmptyState
               icon={Network}
               title="No departments yet"
@@ -52,14 +67,24 @@ export function DepartmentsSection({ workspaceId, canManage }: { workspaceId: st
             />
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Description</TableHead><TableHead>Head</TableHead><TableHead className="text-right">People</TableHead>{canManage && <TableHead />}</TableRow></TableHeader>
+              <TableHeader><TableRow>
+                <TableHead aria-sort={ariaSort('name')}>{sortHead('name', 'Name')}</TableHead>
+                <TableHead className="hidden md:table-cell">Description</TableHead>
+                <TableHead className="hidden sm:table-cell" aria-sort={ariaSort('head')}>{sortHead('head', 'Head')}</TableHead>
+                <TableHead className="text-right" aria-sort={ariaSort('people')}>{sortHead('people', 'People', 'right')}</TableHead>
+                {canManage && <TableHead />}
+              </TableRow></TableHeader>
               <TableBody>
-                {departments.map((d) => (
+                {t.rows.map((d) => (
                   <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{d.description || '—'}</TableCell>
-                    <TableCell>{d.head?.name || '—'}</TableCell>
-                    <TableCell className="text-right">{d.employee_count}</TableCell>
+                    <TableCell className="font-medium">
+                      {canManage
+                        ? <button type="button" onClick={() => setEditing(d)} className="block max-w-[16rem] truncate text-left font-semibold text-primary hover:underline" title={d.name}>{d.name}</button>
+                        : <span className="block max-w-[16rem] truncate" title={d.name}>{d.name}</span>}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">{d.description ? <span className="block max-w-[24rem] truncate" title={d.description}>{d.description}</span> : <HubCellEmpty />}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{d.head?.name || <HubCellEmpty />}</TableCell>
+                    <TableCell className="text-right tabular-nums">{d.employee_count}</TableCell>
                     {canManage && <TableCell className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" onClick={() => setEditing(d)} title="Edit"><Pencil className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="sm" onClick={() => remove(d)} title="Delete"><Trash2 className="h-4 w-4 text-destructive" /></Button>

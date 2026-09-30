@@ -17,11 +17,36 @@ import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { deliveryNotesService, type DispatchQueueOrder } from '@/modules/finance/services/deliveryNotesService';
 import { formatDate, localISODateOffset } from '@/utils/datetime';
+import { Link } from 'react-router-dom';
+import {
+  HubCellEmpty, HubCellLink, HubEmptyState, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar,
+  HUB_FILTER_ALL, useHubTable, type HubTableField,
+} from '@/components/core/hub';
 type BucketKey = 'overdue' | 'today' | 'next7' | 'later' | 'undated';
 const BUCKET_LABEL: Record<BucketKey, string> = {
   overdue: 'Overdue', today: 'Today', next7: 'Next 7 days', later: 'Later', undated: 'No ship date',
 };
 const BUCKET_ORDER: BucketKey[] = ['overdue', 'today', 'next7', 'later', 'undated'];
+
+const PAYMENT_LABEL: Record<string, string> = { paid: 'Paid', partially_paid: 'Part paid', unpaid: 'Unpaid' };
+const paymentKey = (o: DispatchQueueOrder) => (o.is_paid ? 'paid' : o.payment_status === 'partially_paid' ? 'partially_paid' : 'unpaid');
+
+const FIELDS: HubTableField<DispatchQueueOrder>[] = [
+  { id: 'order', sortValue: (o) => o.internal_number,
+    searchText: (o) => `${o.internal_number} ${o.customer_name ?? ''} ${o.ship_to ?? ''}` },
+  { id: 'customer', sortValue: (o) => o.customer_name, filterValue: (o) => o.customer_name, filterLabel: 'Customer' },
+  { id: 'payment', filterValue: paymentKey, filterLabel: 'Payment', filterOptionLabel: (v) => PAYMENT_LABEL[v] ?? v },
+  { id: 'stock', filterValue: (o) => (o.has_shortfall ? 'short' : 'ok'), filterLabel: 'Stock',
+    filterOptionLabel: (v) => (v === 'short' ? 'Shortfall' : 'Covered') },
+  { id: 'note', filterValue: (o) => (o.dispatch ? 'draft' : 'none'), filterLabel: 'Dispatch note',
+    filterOptionLabel: (v) => (v === 'draft' ? 'Draft cut' : 'Not cut yet') },
+  { id: 'lines', sortValue: (o) => o.lines.length },
+  { id: 'total', sortValue: (o) => o.total },
+];
+
+const orderCustomerHref = (o: DispatchQueueOrder) =>
+  o.customer_company_id ? `/crm/companies/${o.customer_company_id}`
+    : o.customer_contact_id ? `/crm/contacts/${o.customer_contact_id}` : undefined;
 
 export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }> = ({ workspaceId, readOnly }) => {
   const { toast } = useToast();
@@ -44,10 +69,12 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
   };
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId]);
 
+  const t = useHubTable(orders, FIELDS);
+
   const buckets = useMemo(() => {
     const b: Record<BucketKey, DispatchQueueOrder[]> = { overdue: [], today: [], next7: [], later: [], undated: [] };
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    for (const o of orders) {
+    for (const o of t.rows) {
       if (!o.transport_date) { b.undated.push(o); continue; }
       const d = new Date(o.transport_date); d.setHours(0, 0, 0, 0);
       const diff = Math.floor((d.getTime() - today.getTime()) / 86_400_000);
@@ -57,7 +84,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
       else b.later.push(o);
     }
     return b;
-  }, [orders]);
+  }, [t.rows]);
 
   // Issuing/scheduling an order moves it between buckets (or off the board) — clamp so a
   // shrunken bucket never leaves its table stranded on an empty page.
@@ -141,13 +168,28 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
 
   if (orders.length === 0) {
     return (
-      <div className="p-10 text-center text-sm text-muted-foreground">
-        <PackageCheck className="mx-auto mb-3 h-8 w-8 opacity-40" />
-        Nothing to ship. Paid orders flagged for shipping show up here, bucketed by their ship date.
-        Once a dispatch note is issued the order leaves the board.
-      </div>
+      <HubEmptyState
+        icon={PackageCheck}
+        title="Nothing to ship"
+        description="Orders flagged for shipping show up here, bucketed by their ship date. Once a dispatch note is issued the order leaves the board."
+      />
     );
   }
+
+  const sortHead = (id: string, label: string, align?: 'right', className?: string) => (
+    <th
+      className={`px-2 py-2 ${align === 'right' ? 'text-right' : 'text-left'}${className ? ` ${className}` : ''}`}
+      aria-sort={t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton
+        active={t.sort?.columnId === id ? t.sort.direction : undefined}
+        align={align}
+        onClick={() => t.toggleSort(id)}
+      >
+        {label}
+      </HubSortButton>
+    </th>
+  );
 
   return (
     <div className="space-y-4">
@@ -163,30 +205,75 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
         </Button>
       </div>
 
+      {orders.length > 8 && (
+        <HubToolbar
+          className="rounded-md border border-hairline"
+          search={t.search}
+          onSearchChange={t.setSearch}
+          searchPlaceholder="Search order, customer or address"
+          filters={(
+            <>
+              <HubFilterSelect label="Customer" value={t.filters.customer ?? HUB_FILTER_ALL}
+                options={t.filterOptions.customer} onChange={(v) => t.setFilter('customer', v)} />
+              <HubFilterSelect label="Payment" value={t.filters.payment ?? HUB_FILTER_ALL}
+                options={t.filterOptions.payment} onChange={(v) => t.setFilter('payment', v)} />
+              <HubFilterSelect label="Stock" value={t.filters.stock ?? HUB_FILTER_ALL}
+                options={t.filterOptions.stock} onChange={(v) => t.setFilter('stock', v)} />
+              <HubFilterSelect label="Dispatch note" value={t.filters.note ?? HUB_FILTER_ALL}
+                options={t.filterOptions.note} onChange={(v) => t.setFilter('note', v)} />
+              <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+            </>
+          )}
+        />
+      )}
+
+      {t.rows.length === 0 && (
+        <HubEmptyState
+          variant="filtered"
+          title="No orders match"
+          action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+        />
+      )}
+
       {BUCKET_ORDER.filter((k) => buckets[k].length > 0).map((k) => (
         <div key={k} className="space-y-2">
           <div className="flex items-center gap-2 px-1">
-            <h3 className={`text-xs font-semibold uppercase tracking-wide ${k === 'overdue' ? 'text-destructive' : k === 'today' ? 'text-foreground' : 'text-muted-foreground'}`}>{BUCKET_LABEL[k]}</h3>
+            <h3 className={`text-xs font-semibold ${k === 'overdue' ? 'text-destructive' : k === 'today' ? 'text-foreground' : 'text-muted-foreground'}`}>{BUCKET_LABEL[k]}</h3>
             <Badge variant="outline" className="text-[10px]">{buckets[k].length}</Badge>
           </div>
           <Card>
             <CardContent className="p-0">
               <div className="table-scroll">
               <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                  <tr className="border-b border-hairline">
+                    <th className="w-8 px-2 py-2"><span className="sr-only">Lines</span></th>
+                    {sortHead('order', 'Order')}
+                    <th className="hidden px-2 py-2 text-left md:table-cell">Ship to</th>
+                    {sortHead('lines', 'Lines', undefined, 'hidden sm:table-cell')}
+                    {sortHead('total', 'Total', 'right')}
+                    <th className="px-2 py-2 text-right"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
                 <tbody>
                   {paginate(buckets[k], pages[k]).map((o) => {
                     const isOpen = expanded.has(o.invoice_id);
                     return (
                       <React.Fragment key={o.invoice_id}>
-                        <tr className="border-b border-border/30 hover:bg-muted/30">
+                        <tr className="border-b border-hairline hover:bg-surface-hover">
                           <td className="w-8 px-2 py-2">
-                            <button type="button" onClick={() => toggle(o.invoice_id)} className="text-muted-foreground hover:text-foreground">
+                            <button type="button" onClick={() => toggle(o.invoice_id)} className="text-muted-foreground hover:text-foreground"
+                              aria-label={isOpen ? 'Hide lines' : 'Show lines'} aria-expanded={isOpen}>
                               {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             </button>
                           </td>
                           <td className="px-2 py-2">
-                            <div className="font-mono text-xs">{o.internal_number}</div>
-                            <div className="text-xs text-muted-foreground">{o.customer_name ?? 'Customer'}</div>
+                            <HubCellLink to={`/finance/invoices/${o.invoice_id}`} className="font-mono text-xs">{o.internal_number}</HubCellLink>
+                            <div className="max-w-[16rem] truncate text-xs text-muted-foreground" title={o.customer_name ?? undefined}>
+                              {orderCustomerHref(o)
+                                ? <Link to={orderCustomerHref(o)!} className="hover:text-foreground hover:underline">{o.customer_name ?? 'Customer'}</Link>
+                                : (o.customer_name ?? 'Customer')}
+                            </div>
                             {/* Shown rather than filtered on. The board used to require `paid`,
                                 which hid every order sold on terms. Holding a delivery until the
                                 money is in is a decision, and it needs the fact to hand. */}
@@ -196,8 +283,8 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                               </Badge>
                             )}
                           </td>
-                          <td className="px-2 py-2 max-w-[260px]">
-                            <div className="truncate text-xs text-muted-foreground" title={o.ship_to ?? ''}>{o.ship_to ?? '—'}</div>
+                          <td className="hidden px-2 py-2 md:table-cell">
+                            <div className="max-w-[16rem] truncate text-xs text-muted-foreground" title={o.ship_to ?? ''}>{o.ship_to ?? <HubCellEmpty />}</div>
                             {!readOnly && (
                               <div className="mt-1 flex items-center gap-1">
                                 <input
@@ -217,11 +304,14 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                               </div>
                             )}
                           </td>
-                          <td className="px-2 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                          <td className="hidden px-2 py-2 text-xs text-muted-foreground whitespace-nowrap sm:table-cell">
                             {o.lines.length} line{o.lines.length === 1 ? '' : 's'}
                             {o.has_shortfall && <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-red-500 dark:text-red-400"><AlertTriangle className="h-3 w-3" /> short</span>}
                           </td>
-                          <td className="px-2 py-2 text-right text-xs whitespace-nowrap">{formatMoney(o.total, o.currency)}</td>
+                          <td className="px-2 py-2 text-right text-xs tabular-nums whitespace-nowrap">
+                            {formatMoney(o.total, o.currency)}
+                            {o.has_shortfall && <span className="ml-1 inline-flex text-red-500 dark:text-red-400 sm:hidden" title="Stock shortfall"><AlertTriangle className="h-3 w-3" /></span>}
+                          </td>
                           <td className="px-2 py-2 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
                               {!readOnly && !o.dispatch && (
@@ -244,7 +334,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                           </td>
                         </tr>
                         {isOpen && (
-                          <tr className="border-b border-border/30 bg-muted/20">
+                          <tr className="border-b border-hairline bg-surface-sunken">
                             <td />
                             <td colSpan={5} className="px-2 py-2">
                               <div className="table-scroll">
@@ -252,7 +342,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                                 <thead className="text-muted-foreground">
                                   <tr>
                                     <th className="py-1 text-left font-medium">Item</th>
-                                    <th className="py-1 text-left font-medium">SKU</th>
+                                    <th className="hidden py-1 text-left font-medium sm:table-cell">SKU</th>
                                     <th className="py-1 text-right font-medium">Ordered</th>
                                     <th className="py-1 text-right font-medium">On hand</th>
                                   </tr>
@@ -260,10 +350,10 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                                 <tbody>
                                   {o.lines.map((l, i) => (
                                     <tr key={i} className={l.shortfall ? 'text-destructive' : ''}>
-                                      <td className="py-1 pr-2">{l.description}</td>
-                                      <td className="py-1 pr-2 font-mono text-muted-foreground">{l.sku ?? '—'}</td>
-                                      <td className="py-1 text-right">{l.quantity}{l.unit ? ` ${l.unit}` : ''}</td>
-                                      <td className="py-1 text-right">{l.qty_on_hand == null ? <span className="text-muted-foreground">not stocked</span> : l.qty_on_hand}</td>
+                                      <td className="break-words py-1 pr-2">{l.description}</td>
+                                      <td className="hidden py-1 pr-2 font-mono text-muted-foreground sm:table-cell">{l.sku ?? <HubCellEmpty />}</td>
+                                      <td className="py-1 text-right tabular-nums whitespace-nowrap">{l.quantity}{l.unit ? ` ${l.unit}` : ''}</td>
+                                      <td className="py-1 text-right tabular-nums">{l.qty_on_hand == null ? <span className="text-muted-foreground">not stocked</span> : l.qty_on_hand}</td>
                                     </tr>
                                   ))}
                                 </tbody>

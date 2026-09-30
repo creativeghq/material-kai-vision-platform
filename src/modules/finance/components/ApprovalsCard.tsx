@@ -19,6 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubCellEmpty } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { WORKSPACE_MEMBER_ROLES, workspaceRoleLabel } from '@/auth/workspaceRoles';
 import {
@@ -176,20 +177,22 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
               <TableHeader>
                 <TableRow>
                   <TableHead>Subject</TableHead>
-                  <TableHead>Applies to</TableHead>
+                  <TableHead className="hidden sm:table-cell">Applies to</TableHead>
                   <TableHead className="text-right">Band</TableHead>
                   <TableHead>Action</TableHead>
-                  <TableHead>Approver</TableHead>
-                  <TableHead>Limits</TableHead>
-                  <TableHead />
+                  <TableHead className="hidden md:table-cell">Approver</TableHead>
+                  <TableHead className="hidden lg:table-cell">Limits</TableHead>
+                  <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {policies.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{SUBJECT_LABEL[p.subject]}</TableCell>
-                    <TableCell>{p.workspace_role ?? 'every role'}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="hidden sm:table-cell">
+                      {p.workspace_role ? workspaceRoleLabel(p.workspace_role) : 'Every role'}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right tabular-nums">
                       {p.band_from} – {p.band_to ?? '∞'}
                     </TableCell>
                     <TableCell>
@@ -197,8 +200,12 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
                         {p.action}
                       </Badge>
                     </TableCell>
-                    <TableCell>{p.approver_role ?? '—'}</TableCell>
-                    <TableCell className="text-[11px] text-muted-foreground">
+                    <TableCell className="hidden md:table-cell">
+                      {p.approver_role ? workspaceRoleLabel(p.approver_role) : <HubCellEmpty />}
+                    </TableCell>
+                    <TableCell className="hidden text-[11px] text-muted-foreground lg:table-cell">
+                      {p.min_margin_percent == null && p.max_discount_percent == null
+                        && !(p.grace_days != null && p.subject === 'credit_hold') && <HubCellEmpty />}
                       {p.min_margin_percent != null && <div>min margin {p.min_margin_percent}%</div>}
                       {p.max_discount_percent != null && <div>max discount {p.max_discount_percent}%</div>}
                       {p.grace_days != null && p.subject === 'credit_hold' && (

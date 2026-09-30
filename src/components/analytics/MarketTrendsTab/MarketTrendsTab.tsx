@@ -20,6 +20,7 @@ import {
   Download, Calendar, ChevronUp, ChevronDown, Minus, Package, Star, Eye, Users,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
@@ -804,15 +805,15 @@ export const MarketTrendsTab: React.FC = () => {
           {topDemands.length === 0 ? <div className="px-4 pb-4"><EmptyState /></div> : (
             <div className="overflow-auto max-h-[400px]">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                  <tr className="text-xs font-semibold text-muted-foreground">
-                    <th className="text-left px-4 py-2.5 font-medium">#</th>
-                    <th className="text-left px-3 py-2.5 font-medium">Material</th>
-                    <th className="text-left px-3 py-2.5 font-medium">Stage</th>
-                    <th className="text-right px-3 py-2.5 font-medium">Signals</th>
-                    <th className="text-right px-3 py-2.5 font-medium">{'Saves'}</th>
-                    <th className="text-right px-3 py-2.5 font-medium">3D Uses</th>
-                    <th className="text-right px-4 py-2.5 font-medium">Momentum</th>
+                <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                  <tr className="text-[11px] font-semibold text-muted-foreground">
+                    <th className="text-left px-4 py-2.5 whitespace-nowrap">#</th>
+                    <th className="text-left px-3 py-2.5 whitespace-nowrap">Material</th>
+                    <th className="hidden md:table-cell text-left px-3 py-2.5 whitespace-nowrap">Stage</th>
+                    <th className="text-right px-3 py-2.5 whitespace-nowrap">Signals</th>
+                    <th className="text-right px-3 py-2.5 whitespace-nowrap">{'Saves'}</th>
+                    <th className="hidden md:table-cell text-right px-3 py-2.5 whitespace-nowrap">3D Uses</th>
+                    <th className="text-right px-4 py-2.5 whitespace-nowrap">Momentum</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -820,7 +821,7 @@ export const MarketTrendsTab: React.FC = () => {
                     const maxMentions = topDemands[0]?.mentions || 1;
                     const pct = Math.round((row.mentions / maxMentions) * 100);
                     return (
-                      <tr key={i} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                      <tr key={i} className="border-b border-hairline hover:bg-surface-hover transition-colors">
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2">
                           <div className="font-medium flex items-center gap-1.5">
@@ -832,18 +833,18 @@ export const MarketTrendsTab: React.FC = () => {
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="hidden md:table-cell px-3 py-2">
                           <LifecycleBadge stage={getLifecycle(null, null, row.mentions, materialGrowthRates.find(g => g.name === row.name)?.growthPct)} />
                         </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">{row.mentions > 0 ? row.mentions : <span className="text-muted-foreground/40">—</span>}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-green-800 dark:text-green-400">{row.saves}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-violet-700 dark:text-violet-400">{row.in3d > 0 ? row.in3d : <span className="text-muted-foreground/40">—</span>}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{row.mentions > 0 ? row.mentions : <span className="text-muted-foreground/40">—</span>}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-green-800 dark:text-green-400">{row.saves}</td>
+                        <td className="hidden md:table-cell px-3 py-2 text-right tabular-nums text-violet-700 dark:text-violet-400">{row.in3d > 0 ? row.in3d : <span className="text-muted-foreground/40">—</span>}</td>
                         <td className="px-4 py-2 text-right">
                           {row.momentum === 'hot'
-                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-800 dark:text-green-400 border border-green-500/20">▲ HOT</span>
+                            ? <Badge variant="success">▲ Hot</Badge>
                             : row.momentum === 'warm'
-                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-500/20">→ WARM</span>
-                            : <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/30">↓ COOL</span>}
+                            ? <Badge variant="warning">→ Warm</Badge>
+                            : <Badge variant="neutral">↓ Cool</Badge>}
                         </td>
                       </tr>
                     );
@@ -917,27 +918,27 @@ export const MarketTrendsTab: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-border/40">
-                    <th className="text-left py-2 pr-4 text-muted-foreground font-normal">Material</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">Now</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+1</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+2</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+3</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+4</th>
-                    <th className="text-right py-2 pl-3 text-muted-foreground font-normal">Trend</th>
+                  <tr className="text-[11px] font-semibold text-muted-foreground [&_th]:border-b [&_th]:border-hairline">
+                    <th className="text-left py-2 pr-4 whitespace-nowrap">Material</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">Now</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">W+1</th>
+                    <th className="hidden sm:table-cell text-right py-2 px-3 whitespace-nowrap">W+2</th>
+                    <th className="hidden sm:table-cell text-right py-2 px-3 whitespace-nowrap">W+3</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">W+4</th>
+                    <th className="text-right py-2 pl-3 whitespace-nowrap">Trend</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/20">
+                <tbody className="divide-y divide-hairline">
                   {materialGrowthRates.slice(0, 10).map((row, i) => {
                     const fc = forecastWeeks(row.thisWeek, row.growthPct, 4);
                     const up = row.growthPct > 5;
                     const down = row.growthPct < -5;
                     return (
-                      <tr key={i} className="hover:bg-muted/20 transition-colors">
-                        <td className="py-2.5 pr-4 font-medium truncate max-w-[160px]">{row.name}</td>
+                      <tr key={i} className="hover:bg-surface-hover transition-colors">
+                        <td className="py-2.5 pr-4 font-medium"><div className="truncate max-w-[10rem]" title={row.name}>{row.name}</div></td>
                         <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground">{row.thisWeek}</td>
                         {fc.map((v, j) => (
-                          <td key={j} className={`py-2.5 px-3 text-right tabular-nums font-semibold ${up ? 'text-green-800 dark:text-green-400' : down ? 'text-red-700 dark:text-red-400' : 'text-foreground'}`}>{v}</td>
+                          <td key={j} className={`${j === 1 || j === 2 ? 'hidden sm:table-cell ' : ''}py-2.5 px-3 text-right tabular-nums font-semibold ${up ? 'text-green-800 dark:text-green-400' : down ? 'text-red-700 dark:text-red-400' : 'text-foreground'}`}>{v}</td>
                         ))}
                         <td className="py-2.5 pl-3 text-right">
                           {up   ? <ChevronUp   className="h-4 w-4 text-green-800 dark:text-green-400 ml-auto" />
@@ -1021,14 +1022,14 @@ export const MarketTrendsTab: React.FC = () => {
             <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[360px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs text-muted-foreground">
-                      <th className="text-left px-4 py-2.5 font-medium">Product</th>
-                      <th className="text-right px-2 py-2.5 font-medium text-blue-700 dark:text-blue-400">Search</th>
-                      <th className="text-right px-2 py-2.5 font-medium text-violet-700 dark:text-violet-400">AI Agent</th>
-                      <th className="text-right px-2 py-2.5 font-medium text-amber-800 dark:text-amber-400">3D Scene</th>
-                      <th className="text-right px-2 py-2.5 font-medium text-muted-foreground">Manual</th>
-                      <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Page</th>
+                  <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                    <tr className="text-[11px] font-semibold text-muted-foreground">
+                      <th className="text-left px-4 py-2.5 whitespace-nowrap">Product</th>
+                      <th className="text-right px-2 py-2.5 whitespace-nowrap text-blue-700 dark:text-blue-400">Search</th>
+                      <th className="text-right px-2 py-2.5 whitespace-nowrap text-violet-700 dark:text-violet-400">AI Agent</th>
+                      <th className="text-right px-2 py-2.5 whitespace-nowrap text-amber-800 dark:text-amber-400">3D Scene</th>
+                      <th className="hidden md:table-cell text-right px-2 py-2.5 whitespace-nowrap text-muted-foreground">Manual</th>
+                      <th className="hidden md:table-cell text-right px-4 py-2.5 whitespace-nowrap text-muted-foreground">Page</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1038,16 +1039,16 @@ export const MarketTrendsTab: React.FC = () => {
                       const domLabel = dom === row.search ? 'Search' : dom === row.agent ? 'AI Agent' : '3D Scene';
                       const domColor = dom === row.search ? 'text-blue-700 dark:text-blue-400' : dom === row.agent ? 'text-violet-700 dark:text-violet-400' : 'text-amber-800 dark:text-amber-400';
                       return (
-                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
+                        <tr key={i} className="border-b border-hairline last:border-0 hover:bg-surface-hover transition-colors">
                           <td className="px-4 py-2.5">
-                            <div className="font-medium">{row.name}</div>
+                            <div className="font-medium break-words">{row.name}</div>
                             <div className={`text-[11px] ${domColor}`}>dominant: {domLabel}</div>
                           </td>
                           <td className="px-2 py-2.5 text-right tabular-nums">{row.search > 0 ? `${Math.round((row.search / total) * 100)}%` : '—'}</td>
                           <td className="px-2 py-2.5 text-right tabular-nums">{row.agent > 0 ? `${Math.round((row.agent / total) * 100)}%` : '—'}</td>
                           <td className="px-2 py-2.5 text-right tabular-nums">{row.threeD > 0 ? `${Math.round((row.threeD / total) * 100)}%` : '—'}</td>
-                          <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{row.manual > 0 ? `${Math.round((row.manual / total) * 100)}%` : '—'}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{row.page > 0 ? `${Math.round((row.page / total) * 100)}%` : '—'}</td>
+                          <td className="hidden md:table-cell px-2 py-2.5 text-right tabular-nums text-muted-foreground">{row.manual > 0 ? `${Math.round((row.manual / total) * 100)}%` : '—'}</td>
+                          <td className="hidden md:table-cell px-4 py-2.5 text-right tabular-nums text-muted-foreground">{row.page > 0 ? `${Math.round((row.page / total) * 100)}%` : '—'}</td>
                         </tr>
                       );
                     })}
@@ -1094,13 +1095,13 @@ export const MarketTrendsTab: React.FC = () => {
             <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[320px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs text-muted-foreground">
-                      <th className="text-left px-4 py-2.5 font-medium">#</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Buyer Search Term</th>
-                      <th className="text-right px-3 py-2.5 font-medium">Searches</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Urgency</th>
-                      <th className="text-right px-4 py-2.5 font-medium">Last Seen</th>
+                  <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                    <tr className="text-[11px] font-semibold text-muted-foreground">
+                      <th className="text-left px-4 py-2.5 whitespace-nowrap">#</th>
+                      <th className="text-left px-3 py-2.5 whitespace-nowrap">Buyer Search Term</th>
+                      <th className="text-right px-3 py-2.5 whitespace-nowrap">Searches</th>
+                      <th className="text-left px-3 py-2.5 whitespace-nowrap">Urgency</th>
+                      <th className="hidden sm:table-cell text-right px-4 py-2.5 whitespace-nowrap">Last Seen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1108,20 +1109,20 @@ export const MarketTrendsTab: React.FC = () => {
                       const maxCount = zeroResultDemands[0]?.count || 1;
                       const urgency = row.count > maxCount * 0.6 ? 'high' : row.count > maxCount * 0.3 ? 'medium' : 'low';
                       return (
-                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
+                        <tr key={i} className="border-b border-hairline last:border-0 hover:bg-surface-hover transition-colors">
                           <td className="px-4 py-2.5 text-muted-foreground">{i + 1}</td>
                           <td className="px-3 py-2.5">
-                            <span className="font-medium">{row.term}</span>
+                            <span className="font-medium break-words">{row.term}</span>
                           </td>
                           <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-amber-800 dark:text-amber-400">{row.count}</td>
                           <td className="px-3 py-2.5">
                             {urgency === 'high'
-                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20">High</span>
+                              ? <Badge variant="error">High</Badge>
                               : urgency === 'medium'
-                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20">Medium</span>
-                              : <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-muted text-muted-foreground border-border/40">Low</span>}
+                              ? <Badge variant="warning">Medium</Badge>
+                              : <Badge variant="neutral">Low</Badge>}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-muted-foreground">{row.lastSeen}</td>
+                          <td className="hidden sm:table-cell px-4 py-2.5 text-right text-muted-foreground whitespace-nowrap">{row.lastSeen}</td>
                         </tr>
                       );
                     })}
@@ -1175,21 +1176,21 @@ export const MarketTrendsTab: React.FC = () => {
             {buyerTypeData.length === 0 ? <EmptyState /> : (
               <div className="overflow-auto max-h-[280px]">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
-                      <th className="text-left py-2.5 pr-3 font-bold">Buyer Type</th>
-                      <th className="text-right py-2.5 pr-3 font-bold">Saves</th>
-                      <th className="text-right py-2.5 pr-3 font-bold">Quotes</th>
-                      <th className="text-right py-2.5 font-medium">Conv.%</th>
+                  <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                    <tr className="text-[11px] font-semibold text-muted-foreground">
+                      <th className="text-left py-2.5 pr-3 whitespace-nowrap">Buyer Type</th>
+                      <th className="text-right py-2.5 pr-3 whitespace-nowrap">Saves</th>
+                      <th className="text-right py-2.5 pr-3 whitespace-nowrap">Quotes</th>
+                      <th className="text-right py-2.5 whitespace-nowrap">Conv.%</th>
                     </tr>
                   </thead>
                   <tbody>
                     {buyerTypeData.map((row, i) => (
-                      <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors text-xs">
+                      <tr key={i} className="border-b border-hairline last:border-0 hover:bg-surface-hover transition-colors text-xs">
                         <td className="py-2 pr-3 font-medium">{formatProfType(row.type)}</td>
-                        <td className="py-2 pr-3 text-right font-mono tabular-nums">{row.saves}</td>
-                        <td className="py-2 pr-3 text-right font-mono tabular-nums text-primary">{row.quotes}</td>
-                        <td className="py-2 text-right font-mono tabular-nums text-green-800 dark:text-green-400">
+                        <td className="py-2 pr-3 text-right tabular-nums">{row.saves}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-primary">{row.quotes}</td>
+                        <td className="py-2 text-right tabular-nums text-green-800 dark:text-green-400">
                           {convRate(row.quotes, row.saves)}
                         </td>
                       </tr>
@@ -1290,33 +1291,33 @@ export const MarketTrendsTab: React.FC = () => {
           {topMoodboardItems.length === 0 ? <div className="px-4 pb-4"><EmptyState message="No moodboard saves recorded in this period" /></div> : (
             <div className="overflow-auto max-h-[360px]">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                  <tr className="text-xs font-semibold text-muted-foreground">
-                    <th className="text-left px-4 py-2.5 font-medium">#</th>
-                    <th className="text-left px-3 py-2.5 font-medium">Product</th>
-                    <th className="text-left px-3 py-2.5 font-medium">Category</th>
-                    <th className="text-left px-3 py-2.5 font-medium">Type</th>
-                    <th className="text-right px-4 py-2.5 font-medium">Board Saves</th>
+                <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                  <tr className="text-[11px] font-semibold text-muted-foreground">
+                    <th className="text-left px-4 py-2.5 whitespace-nowrap">#</th>
+                    <th className="text-left px-3 py-2.5 whitespace-nowrap">Product</th>
+                    <th className="hidden sm:table-cell text-left px-3 py-2.5 whitespace-nowrap">Category</th>
+                    <th className="hidden md:table-cell text-left px-3 py-2.5 whitespace-nowrap">Type</th>
+                    <th className="text-right px-4 py-2.5 whitespace-nowrap">Board Saves</th>
                   </tr>
                 </thead>
                 <tbody>
                   {topMoodboardItems.map((row, i) => (
-                    <tr key={i} className={'border-b border-border/30 hover:bg-muted/30 transition-colors '}>
+                    <tr key={i} className={'border-b border-hairline hover:bg-surface-hover transition-colors '}>
                       <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-2 font-medium">
                         <div className="flex items-center gap-1.5">
                           {row.name}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
-                      <td className="px-3 py-2">
+                      <td className="hidden sm:table-cell px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
+                      <td className="hidden md:table-cell px-3 py-2">
                         {row.materialType && (
                           <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                             {row.materialType.replace(/_/g, ' ')}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-violet-700 dark:text-violet-400">{row.boardCount}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-bold text-violet-700 dark:text-violet-400">{row.boardCount}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1346,33 +1347,33 @@ export const MarketTrendsTab: React.FC = () => {
             {topQuotedItems.length === 0 ? <div className="px-4 pb-4"><EmptyState message="No quotes recorded in this period" /></div> : (
               <div className="overflow-auto max-h-[320px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs font-semibold text-muted-foreground">
-                      <th className="text-left px-4 py-2.5 font-medium">#</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Product</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Category</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Type</th>
-                      <th className="text-right px-4 py-2.5 font-medium">Quotes</th>
+                  <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                    <tr className="text-[11px] font-semibold text-muted-foreground">
+                      <th className="text-left px-4 py-2.5 whitespace-nowrap">#</th>
+                      <th className="text-left px-3 py-2.5 whitespace-nowrap">Product</th>
+                      <th className="hidden sm:table-cell text-left px-3 py-2.5 whitespace-nowrap">Category</th>
+                      <th className="hidden md:table-cell text-left px-3 py-2.5 whitespace-nowrap">Type</th>
+                      <th className="text-right px-4 py-2.5 whitespace-nowrap">Quotes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {topQuotedItems.map((row, i) => (
-                      <tr key={i} className={'border-b border-border/30 hover:bg-muted/30 transition-colors '}>
+                      <tr key={i} className={'border-b border-hairline hover:bg-surface-hover transition-colors '}>
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2 font-medium">
                           <div className="flex items-center gap-1.5">
                             {row.name}
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
-                        <td className="px-3 py-2">
+                        <td className="hidden sm:table-cell px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
+                        <td className="hidden md:table-cell px-3 py-2">
                           {row.materialType && (
                             <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                               {row.materialType.replace(/_/g, ' ')}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-primary">{row.quoteCount}</td>
+                        <td className="px-4 py-2 text-right tabular-nums font-bold text-primary">{row.quoteCount}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1427,17 +1428,17 @@ export const MarketTrendsTab: React.FC = () => {
             <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[300px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs text-muted-foreground">
-                      <th className="text-left px-4 py-2.5 font-medium">#</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Material</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Room Type</th>
-                      <th className="text-right px-4 py-2.5 font-medium">3D Uses</th>
+                  <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                    <tr className="text-[11px] font-semibold text-muted-foreground">
+                      <th className="text-left px-4 py-2.5 whitespace-nowrap">#</th>
+                      <th className="text-left px-3 py-2.5 whitespace-nowrap">Material</th>
+                      <th className="text-left px-3 py-2.5 whitespace-nowrap">Room Type</th>
+                      <th className="text-right px-4 py-2.5 whitespace-nowrap">3D Uses</th>
                     </tr>
                   </thead>
                   <tbody>
                     {vrUsageData.map((row, i) => (
-                      <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
+                      <tr key={i} className="border-b border-hairline last:border-0 hover:bg-surface-hover transition-colors">
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2 font-medium">{row.name}</td>
                         <td className="px-3 py-2 text-muted-foreground">{row.roomType}</td>
@@ -1471,17 +1472,17 @@ export const MarketTrendsTab: React.FC = () => {
             <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[280px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs text-muted-foreground">
-                      <th className="text-left px-4 py-2.5 font-medium">#</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Product A</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Product B</th>
-                      <th className="text-right px-4 py-2.5 font-medium">Times Together</th>
+                  <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                    <tr className="text-[11px] font-semibold text-muted-foreground">
+                      <th className="text-left px-4 py-2.5 whitespace-nowrap">#</th>
+                      <th className="text-left px-3 py-2.5 whitespace-nowrap">Product A</th>
+                      <th className="text-left px-3 py-2.5 whitespace-nowrap">Product B</th>
+                      <th className="text-right px-4 py-2.5 whitespace-nowrap">Times Together</th>
                     </tr>
                   </thead>
                   <tbody>
                     {quoteBasketsData.map((row, i) => (
-                      <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
+                      <tr key={i} className="border-b border-hairline last:border-0 hover:bg-surface-hover transition-colors">
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2 font-medium">{row.product1}</td>
                         <td className="px-3 py-2 text-muted-foreground">{row.product2}</td>

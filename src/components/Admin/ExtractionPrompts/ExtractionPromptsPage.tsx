@@ -47,6 +47,18 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { formatDate } from '@/utils/datetime';
+import { cn } from '@/lib/utils';
+import {
+  HubEmptyState,
+  HubFilterSelect,
+  HubResetFilters,
+  HubSortButton,
+  HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
+  type HubSort,
+  type HubTableField,
+} from '@/components/core/hub';
 
 interface ExtractionPrompt {
   id: string;
@@ -76,6 +88,44 @@ interface PromptHistory {
   created_at: string;
 }
 
+const promptLabel = (p: ExtractionPrompt) => p.name || `${p.stage} - ${p.category}`;
+
+const PROMPT_FIELDS: HubTableField<ExtractionPrompt>[] = [
+  { id: 'name', sortValue: promptLabel, searchText: (p) => `${promptLabel(p)} ${(p.used_in ?? []).join(' ')}` },
+  {
+    id: 'type',
+    sortValue: (p) => p.prompt_type || 'extraction',
+    filterValue: (p) => p.prompt_type || 'extraction',
+    filterLabel: 'Type',
+    filterOptionLabel: (v) => v.charAt(0).toUpperCase() + v.slice(1),
+  },
+  { id: 'stage', sortValue: (p) => p.stage },
+  { id: 'category', sortValue: (p) => p.category },
+  { id: 'version', sortValue: (p) => p.version },
+  { id: 'updated', sortValue: (p) => p.updated_at },
+];
+
+const SortHead: React.FC<{
+  id: string;
+  sort?: HubSort;
+  onSort: (id: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, sort, onSort, align, className, children }) => {
+  const active = sort?.columnId === id ? sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => onSort(id)}>
+        {children}
+      </HubSortButton>
+    </TableHead>
+  );
+};
+
 export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { toast } = useToast();
   const [prompts, setPrompts] = useState<ExtractionPrompt[]>([]);
@@ -89,6 +139,7 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
   const [editedTemplate, setEditedTemplate] = useState('');
   const [editedSystemPrompt, setEditedSystemPrompt] = useState('');
   const [saving, setSaving] = useState(false);
+  const promptTable = useHubTable(prompts, PROMPT_FIELDS);
 
   // Default workspace ID (should come from auth context)
   const workspaceId = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e';
@@ -321,32 +372,67 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
             Configure AI prompts for each stage of the PDF extraction pipeline
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">Loading prompts...</div>
           ) : prompts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No prompts found</div>
           ) : (
+            <>
+            <HubToolbar
+              search={promptTable.search}
+              onSearchChange={promptTable.setSearch}
+              searchPlaceholder="Search prompts"
+              filters={
+                <>
+                  <HubFilterSelect
+                    label="Type"
+                    value={promptTable.filters.type ?? HUB_FILTER_ALL}
+                    options={promptTable.filterOptions.type}
+                    onChange={(v) => promptTable.setFilter('type', v)}
+                  />
+                  <HubResetFilters count={promptTable.activeFilterCount} onReset={promptTable.reset} />
+                </>
+              }
+            />
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Version</TableHead>
-                  <TableHead>Used In</TableHead>
-                  <TableHead>Updated</TableHead>
+                  <SortHead id="name" sort={promptTable.sort} onSort={promptTable.toggleSort}>Name</SortHead>
+                  <SortHead id="type" sort={promptTable.sort} onSort={promptTable.toggleSort} className="hidden md:table-cell">Type</SortHead>
+                  <SortHead id="stage" sort={promptTable.sort} onSort={promptTable.toggleSort} className="hidden sm:table-cell">Stage</SortHead>
+                  <SortHead id="category" sort={promptTable.sort} onSort={promptTable.toggleSort} className="hidden sm:table-cell">Category</SortHead>
+                  <SortHead id="version" sort={promptTable.sort} onSort={promptTable.toggleSort} align="right" className="hidden md:table-cell">Version</SortHead>
+                  <TableHead className="hidden xl:table-cell">Used In</TableHead>
+                  <SortHead id="updated" sort={promptTable.sort} onSort={promptTable.toggleSort} className="hidden lg:table-cell">Updated</SortHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {prompts.map((prompt) => (
-                  <TableRow key={prompt.id}>
-                    <TableCell className="font-medium">
-                      {prompt.name || `${prompt.stage} - ${prompt.category}`}
+                {promptTable.rows.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={8} className="p-0">
+                      <HubEmptyState
+                        variant="filtered"
+                        title="No prompts match these filters"
+                        action={<Button variant="outline" size="sm" onClick={promptTable.reset}>Clear filters</Button>}
+                      />
                     </TableCell>
+                  </TableRow>
+                )}
+                {promptTable.rows.map((prompt) => (
+                  <TableRow key={prompt.id}>
                     <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => handleEditPrompt(prompt)}
+                        className="block max-w-[18rem] truncate text-left font-semibold text-primary hover:underline"
+                        title={promptLabel(prompt)}
+                      >
+                        {promptLabel(prompt)}
+                      </button>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <span className={`text-xs capitalize ${
                         prompt.prompt_type === 'agent' ? 'text-blue-600 dark:text-blue-400' :
                         prompt.prompt_type === 'extraction' ? 'text-green-600 dark:text-green-400' :
@@ -357,10 +443,10 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
                         {prompt.prompt_type || 'extraction'}
                       </span>
                     </TableCell>
-                    <TableCell>{getStageBadge(prompt.stage)}</TableCell>
-                    <TableCell>{getCategoryBadge(prompt.category)}</TableCell>
-                    <TableCell className="text-muted-foreground">v{prompt.version}</TableCell>
-                    <TableCell className="max-w-[200px]">
+                    <TableCell className="hidden sm:table-cell">{getStageBadge(prompt.stage)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{getCategoryBadge(prompt.category)}</TableCell>
+                    <TableCell className="hidden text-right tabular-nums text-muted-foreground md:table-cell">v{prompt.version}</TableCell>
+                    <TableCell className="hidden max-w-[200px] xl:table-cell">
                       {prompt.used_in && prompt.used_in.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {prompt.used_in.slice(0, 2).map((location, idx) => (
@@ -384,7 +470,7 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
                         <span className="text-muted-foreground text-xs">Not specified</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
+                    <TableCell className="hidden whitespace-nowrap text-muted-foreground text-sm lg:table-cell">
                       {formatDate(prompt.updated_at)}
                     </TableCell>
                     <TableCell className="text-right">
@@ -409,6 +495,7 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>

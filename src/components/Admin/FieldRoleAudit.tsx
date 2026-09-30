@@ -4,8 +4,19 @@ import { Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { cn } from '@/lib/utils';
+import {
+  HubEmptyState,
+  HubFilterSelect,
+  HubResetFilters,
+  HubSortButton,
+  HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
+  type HubSort,
+  type HubTableField,
+} from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,13 +50,48 @@ const SIGNAL_LABEL: Record<string, string> = {
   seed: 'heuristic seed — never revisited',
 };
 
+const FIELD_FIELDS: HubTableField<FieldRow>[] = [
+  {
+    id: 'field',
+    sortValue: (r) => r.display_name || r.field_name,
+    searchText: (r) => `${r.field_name} ${r.display_name ?? ''}`,
+  },
+  { id: 'role', sortValue: (r) => r.role, filterValue: (r) => r.role, filterLabel: 'Role' },
+  {
+    id: 'signal',
+    sortValue: (r) => SIGNAL_RANK[r.classified_signal ?? 'seed'] ?? 0,
+    filterValue: (r) => r.classified_signal ?? 'seed',
+    filterLabel: 'Signal',
+    filterOptionLabel: (v) => SIGNAL_LABEL[v] ?? v,
+  },
+];
+
+const SortHead: React.FC<{
+  id: string;
+  sort?: HubSort;
+  onSort: (id: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, sort, onSort, align, className, children }) => {
+  const active = sort?.columnId === id ? sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => onSort(id)}>
+        {children}
+      </HubSortButton>
+    </TableHead>
+  );
+};
+
 export const FieldRoleAudit: React.FC = () => {
   const { toast } = useToast();
   const [rows, setRows] = useState<FieldRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [filter, setFilter] = useState('');
-  const [signalFilter, setSignalFilter] = useState<string>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,14 +137,8 @@ export const FieldRoleAudit: React.FC = () => {
     }
   };
 
-  const shown = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (signalFilter !== 'all' && (r.classified_signal ?? 'seed') !== signalFilter) return false;
-      if (!q) return true;
-      return r.field_name.toLowerCase().includes(q) || (r.display_name ?? '').toLowerCase().includes(q);
-    });
-  }, [rows, filter, signalFilter]);
+  const t = useHubTable(rows, FIELD_FIELDS);
+  const shown = t.rows;
 
   const counts = useMemo(() => {
     const identity = rows.filter((r) => r.role === 'identity').length;
@@ -130,67 +170,75 @@ export const FieldRoleAudit: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="flex flex-wrap gap-2 p-3 border-b border-border/40">
-          <Input
-            className="h-8 w-56 text-xs"
-            placeholder="Filter by field name…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-          <Select value={signalFilter} onValueChange={setSignalFilter}>
-            <SelectTrigger className="h-8 w-56 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Every signal</SelectItem>
-              {Object.keys(SIGNAL_RANK)
-                .sort((a, b) => SIGNAL_RANK[b] - SIGNAL_RANK[a])
-                .map((s) => <SelectItem key={s} value={s}>{SIGNAL_LABEL[s]}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        <HubToolbar
+          search={t.search}
+          onSearchChange={t.setSearch}
+          searchPlaceholder="Filter by field name…"
+          filters={
+            <>
+              <HubFilterSelect
+                label="Role"
+                value={t.filters.role ?? HUB_FILTER_ALL}
+                options={t.filterOptions.role}
+                onChange={(v) => t.setFilter('role', v)}
+              />
+              <HubFilterSelect
+                label="Signal"
+                value={t.filters.signal ?? HUB_FILTER_ALL}
+                options={t.filterOptions.signal}
+                onChange={(v) => t.setFilter('signal', v)}
+              />
+              <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+            </>
+          }
+        />
 
         {loading ? (
           <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading the registry…
           </div>
         ) : shown.length === 0 ? (
-          <p className="p-6 text-sm text-muted-foreground">No field matches that filter.</p>
+          <HubEmptyState
+            variant="filtered"
+            title="No field matches that filter"
+            action={<Button variant="outline" size="sm" onClick={t.reset}>Clear filters</Button>}
+          />
         ) : (
-          <div className="table-scroll">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border/40 text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Field</th>
-                <th className="px-3 py-2 font-medium">Role</th>
-                <th className="px-3 py-2 font-medium">Decided by</th>
-                <th className="px-3 py-2 font-medium">Why</th>
-                <th className="px-3 py-2 font-medium">Override</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortHead id="field" sort={t.sort} onSort={t.toggleSort}>Field</SortHead>
+                <SortHead id="role" sort={t.sort} onSort={t.toggleSort}>Role</SortHead>
+                <SortHead id="signal" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell">Decided by</SortHead>
+                <TableHead className="hidden md:table-cell">Why</TableHead>
+                <TableHead>Override</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {shown.map((r) => {
                 const signal = r.classified_signal ?? 'seed';
                 return (
-                  <tr key={r.field_name} className="border-b border-border/30 align-top">
-                    <td className="px-3 py-2">
-                      <div>{r.display_name || r.field_name}</div>
-                      <div className="text-xs text-muted-foreground">{r.field_name}</div>
-                    </td>
+                  <TableRow key={r.field_name} className="align-top">
+                    <TableCell>
+                      <div className="break-words">{r.display_name || r.field_name}</div>
+                      <div className="text-xs text-muted-foreground break-all">{r.field_name}</div>
+                    </TableCell>
                     {/* Status as a plain coloured word — never a filled badge (design system). */}
-                    <td className={`px-3 py-2 ${r.role === 'identity' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <TableCell className={r.role === 'identity' ? 'text-primary' : 'text-muted-foreground'}>
                       {r.role}
-                    </td>
-                    <td className="px-3 py-2 text-xs">
+                    </TableCell>
+                    <TableCell className="hidden text-xs sm:table-cell">
                       <div className={signal === 'seed' ? 'text-warning' : ''}>{SIGNAL_LABEL[signal] ?? signal}</div>
                       {r.classified_confidence != null && (
                         <div className="text-muted-foreground">
                           confidence {Math.round(Number(r.classified_confidence) * 100)}%
                         </div>
                       )}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground max-w-md">
+                    </TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground max-w-md break-words md:table-cell">
                       {r.classified_reason || '—'}
-                    </td>
-                    <td className="px-3 py-2">
+                    </TableCell>
+                    <TableCell>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -202,13 +250,12 @@ export const FieldRoleAudit: React.FC = () => {
                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           : `make ${r.role === 'identity' ? 'descriptive' : 'identity'}`}
                       </Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
-          </div>
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

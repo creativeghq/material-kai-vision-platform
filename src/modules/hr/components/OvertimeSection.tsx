@@ -13,11 +13,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type Employee, type Overtime } from '../services/hrService';
-import { SectionHeader, EmptyState, FILING_STATUS_LABELS, filingTone } from './_shared';
+import { SectionHeader, EmptyState, FILING_STATUS_LABELS } from './_shared';
+import { Badge } from '@/components/core/ui/badge';
+import { statusBadgeVariant } from '@/utils/recordDisplay';
+import { HUB_FILTER_ALL, HubCellEmpty, HubCellLink, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
 import { ErganiFilingDialog } from './ErganiFilingDialog';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
+const filingVariant = (s: string) => (s === 'submitted' ? 'success' : statusBadgeVariant(s));
 
 export function OvertimeSection({ workspaceId, canManage }: { workspaceId: string | null; canManage: boolean }) {
   const { toast } = useToast();
@@ -50,6 +54,22 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
   useEffect(() => { void load(); }, [load]);
 
   const nameById = useMemo(() => new Map(employees.map((e) => [e.id, empName(e)])), [employees]);
+  const fields = useMemo<HubTableField<Overtime>[]>(() => {
+    const who = (o: Overtime) => o.employee?.contact?.name || nameById.get(o.employee_id) || null;
+    return [
+      { id: 'employee', sortValue: who, searchText: who, filterValue: who, filterLabel: 'Employee' },
+      { id: 'date', sortValue: (o) => o.work_date },
+      { id: 'hours', sortValue: (o) => Number(o.hours ?? 0) },
+      { id: 'reason', searchText: (o) => o.reason },
+      { id: 'status', sortValue: (o) => o.status, filterValue: (o) => o.status, filterLabel: 'Status', filterOptionLabel: (v) => FILING_STATUS_LABELS[v] ?? v },
+    ];
+  }, [nameById]);
+  const t = useHubTable(entries, fields);
+  useEffect(() => { setPage(1); }, [t.search, t.filters]);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
   const draftIds = useMemo(() => entries.filter((e) => e.status !== 'submitted').map((e) => e.id), [entries]);
   const pendingHours = useMemo(
     () => entries.filter((e) => e.status !== 'submitted').reduce((sum, e) => sum + Number(e.hours ?? 0), 0),
@@ -97,7 +117,21 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
       />
       <Card>
         <CardContent className="p-0">
-          {entries.length === 0 ? (
+          {entries.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search employee or reason"
+              filters={<>
+                <HubFilterSelect label="Employee" value={t.filters.employee ?? HUB_FILTER_ALL} options={t.filterOptions.employee} onChange={(v) => t.setFilter('employee', v)} />
+                <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status} onChange={(v) => t.setFilter('status', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
+          {entries.length > 0 && t.rows.length === 0 ? (
+            <EmptyState icon={Timer} variant="filtered" title="No overtime matches your filters" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} />
+          ) : entries.length === 0 ? (
             <EmptyState
               icon={Timer}
               title="No overtime recorded"
@@ -118,12 +152,16 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
                     />
                   </TableHead>
                 )}
-                <TableHead>Employee</TableHead><TableHead>Date</TableHead><TableHead>From</TableHead><TableHead>To</TableHead>
-                <TableHead className="text-right">Hours</TableHead><TableHead>Reason</TableHead><TableHead>Status</TableHead>
+                <TableHead aria-sort={ariaSort('employee')}>{sortHead('employee', 'Employee')}</TableHead>
+                <TableHead aria-sort={ariaSort('date')}>{sortHead('date', 'Date')}</TableHead>
+                <TableHead className="hidden md:table-cell">From</TableHead><TableHead className="hidden md:table-cell">To</TableHead>
+                <TableHead className="text-right" aria-sort={ariaSort('hours')}>{sortHead('hours', 'Hours', 'right')}</TableHead>
+                <TableHead className="hidden lg:table-cell">Reason</TableHead>
+                <TableHead aria-sort={ariaSort('status')}>{sortHead('status', 'Status')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {paginate(entries, page).map((o) => (
+                {paginate(t.rows, page).map((o) => (
                   <TableRow key={o.id}>
                     {canManage && erganiOn && (
                       <TableCell>
@@ -132,17 +170,21 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
                         )}
                       </TableCell>
                     )}
-                    <TableCell className="font-medium">{o.employee?.contact?.name || nameById.get(o.employee_id) || '—'}</TableCell>
-                    <TableCell>{o.work_date}</TableCell>
-                    <TableCell>{o.start_time?.slice(0, 5)}</TableCell>
-                    <TableCell>{o.end_time?.slice(0, 5)}</TableCell>
+                    <TableCell className="font-medium">
+                      {o.employee?.contact
+                        ? <HubCellLink to={`/crm/contacts/${o.employee.contact.id}`} className="block max-w-[14rem] truncate">{o.employee.contact.name}</HubCellLink>
+                        : nameById.get(o.employee_id) ? <span className="block max-w-[14rem] truncate">{nameById.get(o.employee_id)}</span> : <HubCellEmpty />}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{o.work_date}</TableCell>
+                    <TableCell className="hidden md:table-cell tabular-nums">{o.start_time?.slice(0, 5)}</TableCell>
+                    <TableCell className="hidden md:table-cell tabular-nums">{o.end_time?.slice(0, 5)}</TableCell>
                     <TableCell className="text-right tabular-nums">{Number(o.hours ?? 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate" title={o.reason}>{o.reason}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground"><span className="block max-w-[220px] truncate" title={o.reason}>{o.reason}</span></TableCell>
                     <TableCell>
-                      <span className={`text-sm ${filingTone(o.status)}`}>{FILING_STATUS_LABELS[o.status] ?? o.status}</span>
+                      <Badge variant={filingVariant(o.status)}>{FILING_STATUS_LABELS[o.status] ?? o.status}</Badge>
                       {o.ergani_protocol && <span className="block text-xs text-muted-foreground font-mono">{o.ergani_protocol}</span>}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       {canManage && o.status !== 'submitted' && (
                         <Button size="sm" variant="ghost" disabled={busyId === o.id} onClick={() => setEditing(o)} title="Edit">
                           <Pencil className="h-4 w-4" />
@@ -159,7 +201,7 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
               </TableBody>
             </Table>
           )}
-          <TablePagination page={page} total={entries.length} onPageChange={setPage} label="entries" />
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="entries" />
         </CardContent>
       </Card>
 

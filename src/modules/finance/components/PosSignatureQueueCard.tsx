@@ -15,15 +15,54 @@ import {
 } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import {
+  HubToolbar, HubFilterSelect, HubResetFilters, HubSortButton, HubCellEmpty, useHubTable, HUB_FILTER_ALL,
+  type HubTableField,
+} from '@/components/core/hub';
+import {
   posInterconnectionService, SIGNATURE_VERDICT_LABEL, signatureQueueNeedsAttention,
   needsUnderIssuanceFlag, MATCHING_WINDOW_HOURS,
   type SignatureQueue,
 } from '@/modules/finance/services/posInterconnectionService';
+import type { SignatureRow, SignatureVerdict } from '@/modules/finance/posInterconnectionRules';
+
+const kindLabel = (deferred: boolean) => (deferred ? 'Deferred' : 'Simultaneous');
+
+const FIELDS: HubTableField<SignatureRow>[] = [
+  { id: 'terminal', sortValue: (r) => r.terminal_id, searchText: (r) => r.terminal_id },
+  { id: 'amount', sortValue: (r) => r.amount },
+  {
+    id: 'kind', sortValue: (r) => r.is_deferred, filterLabel: 'Kind',
+    filterValue: (r) => (r.is_deferred ? 'deferred' : 'simultaneous'),
+    filterOptionLabel: (v) => kindLabel(v === 'deferred'),
+  },
+  { id: 'hours', sortValue: (r) => r.hours_remaining },
+  {
+    id: 'state', sortValue: (r) => r.verdict, filterValue: (r) => r.verdict, filterLabel: 'State',
+    filterOptionLabel: (v) => SIGNATURE_VERDICT_LABEL[v as SignatureVerdict] ?? v,
+  },
+];
+
+const EMPTY_ROWS: SignatureRow[] = [];
 
 export const PosSignatureQueueCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const [queue, setQueue] = useState<SignatureQueue | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const t = useHubTable(queue?.rows ?? EMPTY_ROWS, FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <TableHead
+      className={align === 'right' ? 'text-right' : undefined}
+      aria-sort={t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton
+        active={t.sort?.columnId === id ? t.sort.direction : undefined}
+        align={align}
+        onClick={() => t.toggleSort(id)}
+      >
+        {label}
+      </HubSortButton>
+    </TableHead>
+  );
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
@@ -97,25 +136,48 @@ export const PosSignatureQueueCard: React.FC<{ workspaceId: string }> = ({ works
             )}
 
             {queue.rows.length > 0 && (
-              <div className="table-scroll">
+              <div className="overflow-hidden rounded-md border border-hairline">
+                {queue.rows.length > 8 && (
+                  <HubToolbar
+                    search={t.search}
+                    onSearchChange={t.setSearch}
+                    searchPlaceholder="Search terminals"
+                    filters={<>
+                      <HubFilterSelect label="State" value={t.filters.state ?? HUB_FILTER_ALL} options={t.filterOptions.state} onChange={(v) => t.setFilter('state', v)} />
+                      <HubFilterSelect label="Kind" value={t.filters.kind ?? HUB_FILTER_ALL} options={t.filterOptions.kind} onChange={(v) => t.setFilter('kind', v)} />
+                      <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                    </>}
+                  />
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Terminal</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Kind</TableHead>
-                      <TableHead className="text-right">Hours left</TableHead>
-                      <TableHead>State</TableHead>
+                      {sortHead('terminal', 'Terminal')}
+                      {sortHead('amount', 'Amount', 'right')}
+                      <TableHead className="hidden sm:table-cell">Kind</TableHead>
+                      {sortHead('hours', 'Hours left', 'right')}
+                      {sortHead('state', 'State')}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {queue.rows.map((r) => (
+                    {t.rows.length === 0 && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={5}>
+                          <HubEmptyState
+                            variant="filtered"
+                            title="No signatures match"
+                            action={<HubResetFilters count={t.activeFilterCount} onReset={t.reset} />}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {t.rows.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell>{r.terminal_id ?? '—'}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.amount ?? '—'}</TableCell>
-                        <TableCell>{r.is_deferred ? 'Deferred' : 'Simultaneous'}</TableCell>
+                        <TableCell className="whitespace-nowrap">{r.terminal_id ?? <HubCellEmpty />}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.amount ?? <HubCellEmpty />}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{kindLabel(r.is_deferred)}</TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {r.hours_remaining <= 0 ? '—' : r.hours_remaining}
+                          {r.hours_remaining <= 0 ? <HubCellEmpty /> : r.hours_remaining}
                         </TableCell>
                         <TableCell className="space-x-1">
                           <Badge variant={r.verdict === 'expired_unmatched' ? 'error' : r.verdict === 'expiring_soon' ? 'warning' : 'neutral'}>

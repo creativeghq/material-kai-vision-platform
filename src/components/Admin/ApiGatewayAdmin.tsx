@@ -57,11 +57,71 @@ import { statusTone } from '@/utils/statusTone';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import { cn } from '@/lib/utils';
+import {
+  HubEmptyState,
+  HubFilterSelect,
+  HubResetFilters,
+  HubSortButton,
+  HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
+  type HubSort,
+  type HubTableField,
+} from '@/components/core/hub';
 
 interface ApiGatewayAdminProps {
   /** When embedded as a tab (e.g. in AI Configurations), hide the page header. */
   embedded?: boolean;
 }
+
+type ApiLogRow = {
+  request_path: string;
+  request_method: string;
+  response_status: number | null;
+  response_time_ms: number | null;
+  created_at: string | null;
+  ip_address: string | null;
+};
+
+const statusClass = (status: number | null) =>
+  status == null ? '' : status === 429 ? '429' : `${Math.floor(status / 100)}xx`;
+
+const LOG_FIELDS: HubTableField<ApiLogRow>[] = [
+  { id: 'path', sortValue: (l) => l.request_path, searchText: (l) => `${l.request_path} ${l.ip_address ?? ''}` },
+  { id: 'method', sortValue: (l) => l.request_method, filterValue: (l) => l.request_method, filterLabel: 'Method' },
+  {
+    id: 'status',
+    sortValue: (l) => l.response_status,
+    filterValue: (l) => statusClass(l.response_status),
+    filterLabel: 'Status',
+    filterOptionLabel: (v) => (v === '429' ? '429 rate limited' : v),
+  },
+  { id: 'response', sortValue: (l) => l.response_time_ms },
+  { id: 'ip', sortValue: (l) => l.ip_address },
+  { id: 'time', sortValue: (l) => l.created_at },
+];
+
+const SortHead: React.FC<{
+  id: string;
+  sort?: HubSort;
+  onSort: (id: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, sort, onSort, align, className, children }) => {
+  const active = sort?.columnId === id ? sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => onSort(id)}>
+        {children}
+      </HubSortButton>
+    </TableHead>
+  );
+};
 
 export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = false }) => {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -85,13 +145,18 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
     rateLimitedRequests: number;
     avgResponseTime: number;
     topEndpoints: Array<{ path: string; count: number }>;
-    recentLogs: Array<{ request_path: string; request_method: string; response_status: number | null; response_time_ms: number | null; created_at: string | null; ip_address: string | null }>;
+    recentLogs: ApiLogRow[];
   }>({
     totalRequests: 0, successfulRequests: 0, rateLimitedRequests: 0, avgResponseTime: 0,
     topEndpoints: [], recentLogs: [],
   });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [recentLogsPage, setRecentLogsPage] = useState(1);
+  const logTable = useHubTable(analyticsData.recentLogs, LOG_FIELDS);
+  const { search: logSearch, filters: logFilters } = logTable;
+  useEffect(() => {
+    setRecentLogsPage(1);
+  }, [logSearch, logFilters]);
 
   // Users for key generation
   const [users, setUsers] = useState<Array<{ id: string; full_name: string | null }>>([]);
@@ -462,8 +527,8 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                     <TableBody>
                       {analyticsData.topEndpoints.map((ep) => (
                         <TableRow key={ep.path}>
-                          <TableCell className="font-mono text-sm">{ep.path}</TableCell>
-                          <TableCell className="text-right">{formatNumber(ep.count)}</TableCell>
+                          <TableCell className="font-mono text-sm break-all">{ep.path}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatNumber(ep.count)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -480,23 +545,62 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
               <CardContent className="p-0">
                 {analyticsData.recentLogs.length > 0 ? (
                   <>
+                  <HubToolbar
+                    search={logTable.search}
+                    onSearchChange={logTable.setSearch}
+                    searchPlaceholder="Search endpoint or IP"
+                    filters={
+                      <>
+                        <HubFilterSelect
+                          label="Method"
+                          value={logTable.filters.method ?? HUB_FILTER_ALL}
+                          options={logTable.filterOptions.method}
+                          onChange={(v) => logTable.setFilter('method', v)}
+                        />
+                        <HubFilterSelect
+                          label="Status"
+                          value={logTable.filters.status ?? HUB_FILTER_ALL}
+                          options={logTable.filterOptions.status}
+                          onChange={(v) => logTable.setFilter('status', v)}
+                        />
+                        <HubResetFilters count={logTable.activeFilterCount} onReset={logTable.reset} />
+                      </>
+                    }
+                  />
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Endpoint</TableHead>
-                        <TableHead>Method</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Response</TableHead>
-                        <TableHead>IP</TableHead>
-                        <TableHead>Time</TableHead>
+                        <SortHead id="path" sort={logTable.sort} onSort={logTable.toggleSort}>Endpoint</SortHead>
+                        <SortHead id="method" sort={logTable.sort} onSort={logTable.toggleSort} className="hidden sm:table-cell">Method</SortHead>
+                        <SortHead id="status" sort={logTable.sort} onSort={logTable.toggleSort}>Status</SortHead>
+                        <SortHead id="response" sort={logTable.sort} onSort={logTable.toggleSort} align="right" className="hidden md:table-cell">Response</SortHead>
+                        <SortHead id="ip" sort={logTable.sort} onSort={logTable.toggleSort} className="hidden lg:table-cell">IP</SortHead>
+                        <SortHead id="time" sort={logTable.sort} onSort={logTable.toggleSort}>Time</SortHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginate(analyticsData.recentLogs, recentLogsPage).map((log, i) => (
+                      {logTable.rows.length === 0 && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={6} className="p-0">
+                            <HubEmptyState
+                              variant="filtered"
+                              title="No requests match these filters"
+                              action={
+                                <Button variant="outline" size="sm" onClick={logTable.reset}>
+                                  Clear filters
+                                </Button>
+                              }
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {paginate(logTable.rows, recentLogsPage).map((log, i) => (
                         // Absolute index — a per-page index collides across pages.
                         <TableRow key={(recentLogsPage - 1) * TABLE_PAGE_SIZE + i}>
-                          <TableCell className="font-mono text-xs max-w-[200px] truncate">{log.request_path}</TableCell>
-                          <TableCell><span className="text-xs font-mono text-muted-foreground">{log.request_method}</span></TableCell>
+                          <TableCell className="font-mono text-xs">
+                            <span className="block max-w-[20rem] truncate" title={log.request_path}>{log.request_path}</span>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell"><span className="text-xs font-mono text-muted-foreground">{log.request_method}</span></TableCell>
                           <TableCell>
                             <span className={`text-xs font-mono ${
                               (log.response_status ?? 0) >= 200 && (log.response_status ?? 0) < 300 ? 'text-emerald-600 dark:text-emerald-400'
@@ -505,16 +609,16 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                                 : 'text-muted-foreground'
                             }`}>{log.response_status ?? '—'}</span>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{log.response_time_ms != null ? `${log.response_time_ms}ms` : '—'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground font-mono">{log.ip_address || '—'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{log.created_at ? formatDate(log.created_at, { withTime: true }) : '—'}</TableCell>
+                          <TableCell className="hidden text-right text-xs tabular-nums text-muted-foreground md:table-cell">{log.response_time_ms != null ? `${log.response_time_ms}ms` : '—'}</TableCell>
+                          <TableCell className="hidden text-xs text-muted-foreground font-mono lg:table-cell">{log.ip_address || '—'}</TableCell>
+                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{log.created_at ? formatDate(log.created_at, { withTime: true }) : '—'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                   <TablePagination
                     page={recentLogsPage}
-                    total={analyticsData.recentLogs.length}
+                    total={logTable.rows.length}
                     onPageChange={setRecentLogsPage}
                     label="requests"
                   />

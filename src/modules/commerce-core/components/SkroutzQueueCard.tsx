@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import {
+  HubCellLink, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, HUB_FILTER_ALL, useHubTable,
+  type HubTableField,
+} from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import type { StoreConnection } from '@/services/commerce/storeConnectionsService';
@@ -19,7 +23,31 @@ interface QueueRow {
   synced_at: string;
   invoice_id: string | null;
   invoice_number: string | null;
+  order_id: string | null;
 }
+
+const FIELDS: HubTableField<QueueRow>[] = [
+  {
+    id: 'order',
+    sortValue: (r) => r.external_order_number ?? r.external_order_id,
+    searchText: (r) => `${r.external_order_number ?? ''} ${r.external_order_id} ${r.invoice_number ?? ''}`,
+  },
+  {
+    id: 'state',
+    sortValue: (r) => r.external_state,
+    filterValue: (r) => r.external_state,
+    filterLabel: 'State',
+    filterOptionLabel: (v) => v.replace(/_/g, ' '),
+  },
+  {
+    id: 'request',
+    sortValue: (r) => r.document_request,
+    filterValue: (r) => r.document_request,
+    filterLabel: 'Asked for',
+    filterOptionLabel: (v) => v.replace(/_/g, ' '),
+  },
+  { id: 'seen', sortValue: (r) => r.synced_at },
+];
 
 const STATE_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
   open: 'warning', accepted: 'info', dispatched: 'info', delivered: 'success',
@@ -58,6 +86,7 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
         synced_at: r.synced_at,
         invoice_id: issued?.id ?? null,
         invoice_number: issued?.internal_number ?? null,
+        order_id: (r.orders ?? [])[0]?.id ?? null,
       } as QueueRow;
     }));
   }, [connection.id, toast]);
@@ -86,6 +115,14 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
   };
 
   const open = rows.filter((r) => r.external_state === 'open');
+  const t = useHubTable(rows, FIELDS, { columnId: 'seen', direction: 'desc' });
+  const sortHead = (id: string, label: string) => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} onClick={() => t.toggleSort(id)}>
+      {label}
+    </HubSortButton>
+  );
+  const ariaSort = (id: string) =>
+    t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
 
   return (
     <Card>
@@ -117,30 +154,58 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
             action={<Button size="sm" onClick={() => call('pull')}><RefreshCw className="mr-1 h-3.5 w-3.5" /> Fetch orders</Button>}
           />
         ) : (
+          <div className="overflow-hidden rounded-md border border-hairline">
+          {rows.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search order or document"
+              filters={<>
+                <HubFilterSelect label="State" value={t.filters.state ?? HUB_FILTER_ALL} options={t.filterOptions.state ?? []} onChange={(v) => t.setFilter('state', v)} />
+                <HubFilterSelect label="Asked for" value={t.filters.request ?? HUB_FILTER_ALL} options={t.filterOptions.request ?? []} onChange={(v) => t.setFilter('request', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
           <div className="table-scroll">
             <table className="w-full text-sm">
               <thead className="bg-surface-sunken">
                 <tr className="text-left">
-                  <th className="px-2 py-1 text-[11px] font-semibold">Order</th>
-                  <th className="px-2 py-1 text-[11px] font-semibold">State</th>
-                  <th className="px-2 py-1 text-[11px] font-semibold">Asked for</th>
-                  <th className="px-2 py-1 text-[11px] font-semibold">Seen</th>
+                  <th className="px-2 py-1 text-[11px] font-semibold" aria-sort={ariaSort('order')}>{sortHead('order', 'Order')}</th>
+                  <th className="px-2 py-1 text-[11px] font-semibold" aria-sort={ariaSort('state')}>{sortHead('state', 'State')}</th>
+                  <th className="hidden px-2 py-1 text-[11px] font-semibold md:table-cell" aria-sort={ariaSort('request')}>{sortHead('request', 'Asked for')}</th>
+                  <th className="hidden px-2 py-1 text-[11px] font-semibold sm:table-cell" aria-sort={ariaSort('seen')}>{sortHead('seen', 'Seen')}</th>
                   <th className="px-2 py-1"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {t.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={5}>
+                      <HubEmptyState
+                        variant="filtered"
+                        title="No orders match"
+                        action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+                      />
+                    </td>
+                  </tr>
+                )}
+                {t.rows.map((r) => (
                   <tr key={r.id} className="border-t border-hairline">
-                    <td className="px-2 py-1 font-mono text-xs">{r.external_order_number ?? r.external_order_id}</td>
+                    <td className="whitespace-nowrap px-2 py-1 font-mono text-xs">
+                      {r.order_id
+                        ? <HubCellLink to={`/finance/orders/${r.order_id}`}>{r.external_order_number ?? r.external_order_id}</HubCellLink>
+                        : (r.external_order_number ?? r.external_order_id)}
+                    </td>
                     <td className="px-2 py-1">
                       <Badge variant={STATE_TONE[r.external_state ?? ''] ?? 'neutral'} className="text-[10px]">
                         {r.external_state ?? 'unknown'}
                       </Badge>
                     </td>
-                    <td className="px-2 py-1 text-xs text-muted-foreground">
+                    <td className="hidden px-2 py-1 text-xs text-muted-foreground md:table-cell">
                       {r.document_request ? r.document_request.replace(/_/g, ' ') : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-xs text-muted-foreground">{formatDate(r.synced_at)}</td>
+                    <td className="hidden whitespace-nowrap px-2 py-1 text-xs text-muted-foreground sm:table-cell">{formatDate(r.synced_at)}</td>
                     <td className="whitespace-nowrap px-2 py-1 text-right">
                       {r.external_state === 'open' && (
                         <>
@@ -171,6 +236,7 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         )}
       </CardContent>

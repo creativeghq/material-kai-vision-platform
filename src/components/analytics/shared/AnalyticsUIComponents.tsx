@@ -46,7 +46,7 @@ export function getLifecycle(firstRequested: string | null, lastRequested: strin
  * Column definition for AnalyticsTable.
  * `thClass` defaults to `'text-left pr-4'`.
  * `tdClass` defaults to `'pr-4'`.
- * The component always adds `py-2 font-medium` to th and `py-2` to td.
+ * The component always adds `py-2` to th and td.
  */
 export interface AnalyticsCol<T> {
   header: string;
@@ -67,10 +67,10 @@ export function AnalyticsTable<T>({
   return (
     <div className="overflow-auto" style={{ maxHeight: maxH }}>
       <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-          <tr className="border-b text-xs text-muted-foreground">
+        <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+          <tr className="text-[11px] font-semibold text-muted-foreground">
             {columns.map((col, i) => (
-              <th key={i} className={`py-2 font-medium ${col.thClass ?? 'text-left pr-4'}`}>
+              <th key={i} className={`py-2 whitespace-nowrap ${col.thClass ?? 'text-left pr-4'}`}>
                 {col.header}
               </th>
             ))}
@@ -78,7 +78,7 @@ export function AnalyticsTable<T>({
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+            <tr key={i} className="border-b border-hairline last:border-0 hover:bg-surface-hover transition-colors">
               {columns.map((col, j) => (
                 <td key={j} className={`py-2 ${col.tdClass ?? 'pr-4'}`}>
                   {col.render(row, i)}

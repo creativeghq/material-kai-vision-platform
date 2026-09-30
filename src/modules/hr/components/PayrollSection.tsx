@@ -15,10 +15,37 @@ import { hrService, type PayrollRun, type PayrollItem, type PayrollStatus, type 
 import { SectionHeader, EmptyState, hrMoney } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
-import { statusTone } from '@/utils/statusTone';
+import { statusBadgeVariant } from '@/utils/recordDisplay';
+import { HUB_FILTER_ALL, HubCellEmpty, HubCellLink, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
 
 const statusVariant: Record<PayrollStatus, 'secondary' | 'default' | 'outline'> = { draft: 'secondary', approved: 'default', paid: 'outline' };
 const money = (n: number | null | undefined, c: string) => hrMoney(n, c, { minDecimals: 0 });
+const PAYROLL_STATUS_LABELS: Record<string, string> = { draft: 'Draft', approved: 'Approved', paid: 'Paid' };
+
+const RUN_FIELDS: HubTableField<PayrollRun>[] = [
+  { id: 'period', sortValue: (r) => r.period, searchText: (r) => r.period },
+  { id: 'status', sortValue: (r) => r.status, filterValue: (r) => r.status, filterLabel: 'Status', filterOptionLabel: (v) => PAYROLL_STATUS_LABELS[v] ?? v },
+  { id: 'gross', sortValue: (r) => r.total_gross },
+  { id: 'net', sortValue: (r) => r.total_net },
+  { id: 'finance', filterValue: (r) => (r.posted_finance_ref ? 'posted' : 'not_posted'), filterLabel: 'Finance', filterOptionLabel: (v) => (v === 'posted' ? 'Posted' : 'Not posted') },
+];
+
+const ITEM_FIELDS: HubTableField<PayrollItem>[] = [
+  { id: 'employee', sortValue: (i) => i.employee?.contact?.name, searchText: (i) => i.employee?.contact?.name },
+  { id: 'gross', sortValue: (i) => i.gross },
+  { id: 'efka', sortValue: (i) => i.employee_contributions },
+  { id: 'tax', sortValue: (i) => i.income_tax },
+  { id: 'net', sortValue: (i) => i.net },
+  { id: 'employer', sortValue: (i) => i.employer_contributions },
+];
+
+function useSortHead<Row>(t: ReturnType<typeof useHubTable<Row>>) {
+  const head = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const aria = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' as const : 'descending' as const) : undefined);
+  return { head, aria };
+}
 
 /**
  * Locale-tolerant numeric field for number-backed state (EU decimals like `13,87` / `7.572,00`).
@@ -49,6 +76,9 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
   const [loading, setLoading] = useState(true);
   const [openRun, setOpenRun] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const t = useHubTable(runs, RUN_FIELDS);
+  useEffect(() => { setPage(1); }, [t.search, t.filters]);
+  const { head: sortHead, aria: ariaSort } = useSortHead(t);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -77,7 +107,21 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
       />
       <Card>
         <CardContent className="p-0">
-          {runs.length === 0 ? (
+          {runs.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search period"
+              filters={<>
+                <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status} onChange={(v) => t.setFilter('status', v)} />
+                <HubFilterSelect label="Finance" value={t.filters.finance ?? HUB_FILTER_ALL} options={t.filterOptions.finance} onChange={(v) => t.setFilter('finance', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
+          {runs.length > 0 && t.rows.length === 0 ? (
+            <EmptyState icon={Wallet} variant="filtered" title="No payroll runs match your filters" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} />
+          ) : runs.length === 0 ? (
             <EmptyState
               icon={Wallet}
               title="No payroll runs yet"
@@ -86,31 +130,38 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
             />
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Period</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Gross</TableHead><TableHead className="text-right">Net</TableHead><TableHead>Finance</TableHead><TableHead /></TableRow></TableHeader>
+              <TableHeader><TableRow>
+                <TableHead aria-sort={ariaSort('period')}>{sortHead('period', 'Period')}</TableHead>
+                <TableHead aria-sort={ariaSort('status')}>{sortHead('status', 'Status')}</TableHead>
+                <TableHead className="text-right" aria-sort={ariaSort('gross')}>{sortHead('gross', 'Gross', 'right')}</TableHead>
+                <TableHead className="hidden sm:table-cell text-right" aria-sort={ariaSort('net')}>{sortHead('net', 'Net', 'right')}</TableHead>
+                <TableHead className="hidden md:table-cell">Finance</TableHead>
+                <TableHead className="hidden md:table-cell" />
+              </TableRow></TableHeader>
               <TableBody>
-                {paginate(runs, page).map((r) => (
+                {paginate(t.rows, page).map((r) => (
                   <TableRow
                     key={r.id}
-                    className="cursor-pointer hover:bg-muted/30"
+                    className="cursor-pointer"
                     // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                     // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
                     // row is invalid ARIA and yields a focus stop with no name.
                     onClick={() => setOpenRun(r.id)}
                   >
                     <TableCell className="font-medium">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); setOpenRun(r.id); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.period}</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setOpenRun(r.id); }} className="text-left font-semibold text-primary hover:underline rounded-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.period}</button>
                     </TableCell>
-                    <TableCell><span className={`text-sm capitalize ${statusTone(r.status)}`}>{r.status}</span></TableCell>
-                    <TableCell className="text-right">{money(r.total_gross, r.currency)}</TableCell>
-                    <TableCell className="text-right">{money(r.total_net, r.currency)}</TableCell>
-                    <TableCell>{r.posted_finance_ref ? <span className="text-sm text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1"><ArrowUpRight className="h-3 w-3" />Posted</span> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
-                    <TableCell className="text-right text-muted-foreground text-xs">Open →</TableCell>
+                    <TableCell><Badge variant={statusBadgeVariant(r.status)}>{PAYROLL_STATUS_LABELS[r.status] ?? r.status}</Badge></TableCell>
+                    <TableCell className="text-right tabular-nums">{money(r.total_gross, r.currency)}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-right tabular-nums">{money(r.total_net, r.currency)}</TableCell>
+                    <TableCell className="hidden md:table-cell">{r.posted_finance_ref ? <Badge variant="success" className="gap-1"><ArrowUpRight className="h-3 w-3" />Posted</Badge> : <HubCellEmpty />}</TableCell>
+                    <TableCell className="hidden md:table-cell text-right text-muted-foreground text-xs">Open →</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
-          <TablePagination page={page} total={runs.length} onPageChange={setPage} label="runs" />
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="runs" />
         </CardContent>
       </Card>
     </div>
@@ -125,6 +176,9 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [itemPage, setItemPage] = useState(1);
+  const it = useHubTable(items, ITEM_FIELDS);
+  useEffect(() => { setItemPage(1); }, [it.search]);
+  const { head: sortHead, aria: ariaSort } = useSortHead(it);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -214,22 +268,25 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
 
       <Card>
         <CardContent className="p-0">
-          {items.length === 0 ? <EmptyState title="No active employees to pay" /> : (
+          {items.length > 8 && <HubToolbar search={it.search} onSearchChange={it.setSearch} searchPlaceholder="Search employees" />}
+          {items.length === 0 ? <EmptyState title="No active employees to pay" /> : it.rows.length === 0 ? (
+            <EmptyState variant="filtered" title="No employees match your search" action={<Button size="sm" variant="outline" onClick={it.reset}>Clear filters</Button>} />
+          ) : (
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead className="text-right">Gross</TableHead>
-                <TableHead className="text-right">Empl. EFKA</TableHead>
-                <TableHead className="text-right">Income tax</TableHead>
-                <TableHead className="text-right">Net</TableHead>
-                <TableHead className="text-right">Employer EFKA</TableHead>
+                <TableHead aria-sort={ariaSort('employee')}>{sortHead('employee', 'Employee')}</TableHead>
+                <TableHead className="text-right" aria-sort={ariaSort('gross')}>{sortHead('gross', 'Gross', 'right')}</TableHead>
+                <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('efka')}>{sortHead('efka', 'Empl. EFKA', 'right')}</TableHead>
+                <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('tax')}>{sortHead('tax', 'Income tax', 'right')}</TableHead>
+                <TableHead className="text-right" aria-sort={ariaSort('net')}>{sortHead('net', 'Net', 'right')}</TableHead>
+                <TableHead className="hidden lg:table-cell text-right" aria-sort={ariaSort('employer')}>{sortHead('employer', 'Employer EFKA', 'right')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {paginate(items, itemPage).map((it) => <PayrollItemRow key={it.id} item={it} editable={editable} currency={cur} onSaveGross={saveGross} />)}
+                {paginate(it.rows, itemPage).map((row) => <PayrollItemRow key={row.id} item={row} editable={editable} currency={cur} onSaveGross={saveGross} />)}
               </TableBody>
             </Table>
           )}
-          <TablePagination page={itemPage} total={items.length} onPageChange={setItemPage} label="employees" />
+          <TablePagination page={itemPage} total={it.rows.length} onPageChange={setItemPage} label="employees" />
         </CardContent>
       </Card>
       <p className="text-xs text-muted-foreground">
@@ -258,14 +315,16 @@ function PayrollItemRow({ item, editable, currency, onSaveGross }: { item: Payro
   return (
     <TableRow>
       <TableCell className="font-medium">
-        {item.employee?.contact?.name || 'Employee'}
+        {item.employee?.contact
+          ? <HubCellLink to={`/crm/contacts/${item.employee.contact.id}`} className="block max-w-[16rem] truncate">{item.employee.contact.name}</HubCellLink>
+          : 'Employee'}
         <span className="block text-xs text-muted-foreground">{basisLabel}</span>
       </TableCell>
-      <TableCell className="text-right">{editable ? <Input type="text" inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} onBlur={commit} className="h-8 w-28 ml-auto text-right" /> : money(item.gross, currency)}</TableCell>
-      <TableCell className="text-right text-muted-foreground">{money(item.employee_contributions, currency)}</TableCell>
-      <TableCell className="text-right text-muted-foreground">{money(item.income_tax, currency)}</TableCell>
-      <TableCell className="text-right font-medium">{money(item.net, currency)}</TableCell>
-      <TableCell className="text-right text-muted-foreground">{money(item.employer_contributions, currency)}</TableCell>
+      <TableCell className="text-right tabular-nums">{editable ? <Input type="text" inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} onBlur={commit} className="h-8 w-28 ml-auto text-right" /> : money(item.gross, currency)}</TableCell>
+      <TableCell className="hidden md:table-cell text-right tabular-nums text-muted-foreground">{money(item.employee_contributions, currency)}</TableCell>
+      <TableCell className="hidden md:table-cell text-right tabular-nums text-muted-foreground">{money(item.income_tax, currency)}</TableCell>
+      <TableCell className="text-right tabular-nums font-medium">{money(item.net, currency)}</TableCell>
+      <TableCell className="hidden lg:table-cell text-right tabular-nums text-muted-foreground">{money(item.employer_contributions, currency)}</TableCell>
     </TableRow>
   );
 }

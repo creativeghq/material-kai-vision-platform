@@ -16,6 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubCellEmpty } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { downloadCSV } from '@/components/analytics/shared/analyticsUtils';
 import {
@@ -80,7 +81,7 @@ export const CbamPositionCard: React.FC<{ workspaceId: string }> = ({ workspaceI
 
   return (
     <Card>
-      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+      <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <Scale className="h-4 w-4 text-primary" /> Carbon border adjustment (CBAM)
@@ -160,9 +161,9 @@ export const CbamPositionCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                   <TableHead>Sector</TableHead>
                   <TableHead>Goods code</TableHead>
                   <TableHead>Country of origin</TableHead>
-                  <TableHead className="text-right">Entries</TableHead>
+                  <TableHead className="hidden text-right sm:table-cell">Entries</TableHead>
                   <TableHead className="text-right">Net mass</TableHead>
-                  <TableHead className="text-right">Carbon price paid</TableHead>
+                  <TableHead className="hidden text-right md:table-cell">Carbon price paid</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -171,14 +172,14 @@ export const CbamPositionCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                     <TableCell>{r.sector}</TableCell>
                     <TableCell className="tabular-nums">{r.goods_code}</TableCell>
                     <TableCell>{r.country_of_origin}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.entries}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="hidden text-right tabular-nums sm:table-cell">{r.entries}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right tabular-nums">
                       {formatTonnes(r.net_mass_kg)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="hidden text-right tabular-nums md:table-cell">
                       {/* Left as a dash on purpose: art. 9(1) counts only a price EFFECTIVELY
                           PAID, and art. 9(4) default values are published from 2027. */}
-                      {r.carbon_price_paid_eur == null ? '—' : r.carbon_price_paid_eur}
+                      {r.carbon_price_paid_eur == null ? <HubCellEmpty /> : r.carbon_price_paid_eur}
                     </TableCell>
                   </TableRow>
                 ))}

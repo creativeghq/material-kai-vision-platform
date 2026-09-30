@@ -6,6 +6,7 @@
  *     this expense preset. There is deliberately no bespoke "pay this bill" form here.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { HubCellEmpty } from '@/components/core/hub';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -165,30 +166,30 @@ export const ExpensePaymentsDialog: React.FC<{
                 ) : (
                   <div className="table-scroll">
                   <table className="w-full text-sm">
-                    <thead className="border-b border-border/60 text-xs text-muted-foreground">
-                      <tr>
+                    <thead className="sticky top-0 z-10 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                      <tr className="border-b border-hairline">
                         <th className="px-3 py-1.5 text-left">Date</th>
                         <th className="px-3 py-1.5 text-left">How</th>
-                        <th className="px-3 py-1.5 text-left">Reference</th>
+                        <th className="hidden px-3 py-1.5 text-left sm:table-cell">Reference</th>
                         <th className="px-3 py-1.5 text-right">Amount</th>
                         <th className="px-3 py-1.5"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody>
                       {settlements.map((s) => (
-                        <tr key={s.allocation_id} className="border-b border-border/30 last:border-0">
-                          <td className="px-3 py-1.5">{s.occurred_at ? formatDate(s.occurred_at) : '—'}</td>
+                        <tr key={s.allocation_id} className="border-b border-hairline last:border-0">
+                          <td className="px-3 py-1.5 whitespace-nowrap">{s.occurred_at ? formatDate(s.occurred_at) : <HubCellEmpty />}</td>
                           <td className="px-3 py-1.5 text-xs text-muted-foreground">
                             {/* The account the money left from — not the method, which is only
                                 a restatement of the account's kind. */}
                             {s.source === 'payment'
-                              ? (s.bank_account_name ?? '—')
-                              : <span className="text-amber-600 dark:text-amber-400">Credit note</span>}
+                              ? (s.bank_account_name ?? <HubCellEmpty />)
+                              : <span className="text-amber-800 dark:text-amber-300">Credit note</span>}
                           </td>
-                          <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                            {s.document_number ?? s.reference ?? '—'}
+                          <td className="hidden px-3 py-1.5 text-xs text-muted-foreground sm:table-cell">
+                            {s.document_number ?? s.reference ?? <HubCellEmpty />}
                           </td>
-                          <td className="px-3 py-1.5 text-right font-medium">{formatMoney(s.amount, s.currency)}</td>
+                          <td className="px-3 py-1.5 text-right font-medium tabular-nums whitespace-nowrap">{formatMoney(s.amount, s.currency)}</td>
                           <td className="px-3 py-1.5 text-right">
                             {/* Credit-note rows aren't detachable here — the credit note owns that
                                 allocation, so unpicking it means voiding the note, not the link. */}

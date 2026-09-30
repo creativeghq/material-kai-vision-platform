@@ -2,7 +2,7 @@
  * One supplier's received (myDATA) documents — the table, the row actions and the three dialogs
  * they open.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -10,8 +10,14 @@ import { Label } from '@/components/core/ui/label';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument, type InboundLinkSummary, type IssuerMoney } from '@/modules/finance/services/inboundService';
 import { InboundDetailCell } from '@/modules/finance/components/InboundDetailCell';
-import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
+import { inboundOutcomes, inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
+import { mydataTypeName, useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
+import {
+  HubToolbar, HubFilterSelect, HubResetFilters, HubSortButton, HubCellEmpty, HubEmptyState, useHubTable,
+  HUB_FILTER_ALL, type HubTableField, type HubSort,
+} from '@/components/core/hub';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
@@ -32,6 +38,19 @@ export interface SupplierInboundCounts {
    */
   windowed: boolean;
 }
+
+const SortHead: React.FC<{
+  id: string; label: string; sort?: HubSort; onSort: (id: string) => void; className?: string; align?: 'right';
+}> = ({ id, label, sort, onSort, className, align }) => (
+  <TableHead
+    className={[className, align === 'right' ? 'text-right' : ''].filter(Boolean).join(' ') || undefined}
+    aria-sort={sort?.columnId === id ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+  >
+    <HubSortButton active={sort?.columnId === id ? sort.direction : undefined} align={align} onClick={() => onSort(id)}>
+      {label}
+    </HubSortButton>
+  </TableHead>
+);
 
 /** One figure with the sentence that makes it readable. Never a bare number. */
 const Tile: React.FC<{ label: string; value: React.ReactNode; note?: React.ReactNode; tone?: string }> = ({
@@ -219,6 +238,25 @@ export const SupplierInboundDocs: React.FC<{
 
   const clearRange = () => setRange({ from: '', to: '' });
 
+  const typeLabels = useMydataTypeLabels();
+  const fields = useMemo<HubTableField<InboundDocument>[]>(() => [
+    { id: 'date', sortValue: (d) => d.issue_date },
+    {
+      id: 'number', sortValue: (d) => inboundDocumentNumber(d),
+      searchText: (d) => `${inboundDocumentNumber(d) ?? ''} ${d.mark ?? ''}`,
+    },
+    {
+      id: 'type', sortValue: (d) => d.doc_type, filterValue: (d) => d.doc_type, filterLabel: 'Type',
+      filterOptionLabel: (v) => `${v} · ${mydataTypeName(v, typeLabels)}`,
+    },
+    { id: 'net', sortValue: (d) => Number(d.total_net ?? 0) },
+    { id: 'vat', sortValue: (d) => (isReverseCharged(d.doc_type) ? null : Number(d.total_vat ?? 0)) },
+    { id: 'payable', sortValue: (d) => invoicedTotal(d) },
+    { id: 'status', filterValue: (d) => d.status, filterLabel: 'Status', filterOptionLabel: inboundStatusLabel },
+  ], [typeLabels]);
+  const t = useHubTable(rows, fields, { columnId: 'date', direction: 'desc' });
+  useEffect(() => { setPage(1); }, [t.search, t.filters, t.sort]);
+
   return (
     <>
       {/* The window sits ABOVE the loading state, not inside it: re-fetching on every edit would
@@ -276,25 +314,47 @@ export const SupplierInboundDocs: React.FC<{
           {windowed ? ' in this window' : ' from this supplier'}.
         </p>
       )}
-      <div className="table-scroll">
-      <table className="w-full text-sm">
-        <thead className="border-b border-border/60 text-xs text-muted-foreground">
-          <tr>
-            <th className="px-4 py-2 text-left">Date</th>
-            <th className="px-4 py-2 text-left">Number</th>
-            <th className="px-4 py-2 text-left">Type</th>
-            <th className="px-4 py-2 text-right">Net</th>
-            <th className="px-4 py-2 text-right">VAT</th>
-            <th className="px-4 py-2 text-right">Payable</th>
-            <th className="px-4 py-2 text-center">Detail</th>
-            <th className="px-4 py-2 text-center">Handled</th>
-            {!readOnly && <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>}
-          </tr>
-        </thead>
-        <tbody>
+      {rows.length > 8 && (
+        <HubToolbar
+          search={t.search}
+          onSearchChange={t.setSearch}
+          searchPlaceholder="Search number or MARK"
+          filters={<>
+            <HubFilterSelect label="Type" value={t.filters.type ?? HUB_FILTER_ALL} options={t.filterOptions.type} onChange={(v) => t.setFilter('type', v)} />
+            <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status} onChange={(v) => t.setFilter('status', v)} />
+            <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+          </>}
+        />
+      )}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <SortHead id="date" label="Date" sort={t.sort} onSort={t.toggleSort} />
+            <SortHead id="number" label="Number" sort={t.sort} onSort={t.toggleSort} />
+            <SortHead id="type" label="Type" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell" />
+            <SortHead id="net" label="Net" sort={t.sort} onSort={t.toggleSort} align="right" className="hidden lg:table-cell" />
+            <SortHead id="vat" label="VAT" sort={t.sort} onSort={t.toggleSort} align="right" className="hidden lg:table-cell" />
+            <SortHead id="payable" label="Payable" sort={t.sort} onSort={t.toggleSort} align="right" />
+            <TableHead className="hidden text-center md:table-cell">Detail</TableHead>
+            <TableHead className="text-center">Handled</TableHead>
+            {!readOnly && <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length > 0 && t.rows.length === 0 && (
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={readOnly ? 8 : 9}>
+                <HubEmptyState
+                  variant="filtered"
+                  title="No documents match"
+                  action={<HubResetFilters count={t.activeFilterCount} onReset={t.reset} />}
+                />
+              </TableCell>
+            </TableRow>
+          )}
           {rows.length === 0 && (
-            <tr>
-              <td colSpan={readOnly ? 8 : 9} className="px-4 py-6 text-center text-xs text-muted-foreground">
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={readOnly ? 8 : 9} className="py-6 text-center text-xs text-muted-foreground">
                 {/* Two different kinds of nothing, and they need opposite responses. */}
                 {windowed ? (
                   <>
@@ -304,51 +364,51 @@ export const SupplierInboundDocs: React.FC<{
                     </button>
                   </>
                 ) : 'Nothing has been filed against us under this ΑΦΜ.'}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           )}
-          {paginate(rows, page).map((d) => {
+          {paginate(t.rows, page).map((d) => {
             const outcomes = inboundOutcomes(d, { ordered: actions.ordered.has(d.id) });
             return (
-              <tr
+              <TableRow
                 key={d.id}
-                className={`cursor-pointer border-b border-border/30 hover:bg-muted/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}
+                className={`cursor-pointer ${d.status === 'dismissed' ? 'opacity-60' : ''}`}
                 // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on
                 // the Number cell. A <tr> cannot be made focusable correctly: tabIndex +
                 // role="button" on a row is invalid ARIA and yields a focus stop with no name.
                 onClick={() => actions.openPreview(d)}
               >
-                <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
-                <td className="px-4 py-2">
+                <TableCell className="whitespace-nowrap">{d.issue_date ? formatDate(d.issue_date) : <HubCellEmpty />}</TableCell>
+                <TableCell>
                   {/* Our own ΑΦΜ is not the supplier's invoice number — see
                       `inboundDocumentNumber`. */}
                   <button
                     type="button"
-                    className="rounded text-left text-xs font-medium hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="block max-w-[12rem] truncate rounded text-left text-xs font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={(e) => { e.stopPropagation(); actions.openPreview(d); }}
                     title="Open this document as AADE holds it"
                   >
                     {inboundDocumentNumber(d) ?? '—'}
                   </button>
                   {d.mark ? <div className="text-[10px] font-mono text-muted-foreground" title={`MARK ${d.mark}`}>{d.mark}</div> : null}
-                </td>
-                <td className="px-4 py-2"><MydataTypeLabel code={d.doc_type} /></td>
-                <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_net ?? 0, d.currency)}</td>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell"><MydataTypeLabel code={d.doc_type} /></TableCell>
+                <TableCell className="hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell">{formatMoney(d.total_net ?? 0, d.currency)}</TableCell>
                 {/* Reverse charge: the supplier charged no VAT, so none is shown and the
                     total is what they actually invoiced. */}
-                <td className="px-4 py-2 text-right text-muted-foreground">
+                <TableCell className="hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell">
                   {isReverseCharged(d.doc_type)
                     ? <span title={`Reverse charge — ${formatMoney(selfAccountedVat(d) ?? 0, d.currency)} self-assessed and reclaimed in the same return.`}>—</span>
                     : formatMoney(d.total_vat ?? 0, d.currency)}
-                </td>
-                <td className="px-4 py-2 text-right font-medium">{formatMoney(invoicedTotal(d), d.currency)}</td>
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatMoney(invoicedTotal(d), d.currency)}</TableCell>
                 {/* Value-only lines: the money is transmitted, the detail never was — and on a
                     supplier who files a ΔΑ alongside, the detail IS transmitted, on the OTHER
                     document. One cell answers both, and names which. */}
-                <td className="px-4 py-2 text-center">
+                <TableCell className="hidden text-center md:table-cell">
                   <InboundDetailCell doc={d} link={links[d.id]} readOnly={readOnly} onChanged={load} />
-                </td>
-                <td className="px-4 py-2 text-center">
+                </TableCell>
+                <TableCell className="text-center">
                   {outcomes.length > 0
                     ? <span className="text-[10px]">
                         {outcomes.map((o, i) => (
@@ -359,19 +419,18 @@ export const SupplierInboundDocs: React.FC<{
                         ))}
                       </span>
                     : <span className="text-[10px] text-muted-foreground/50">Not in Books</span>}
-                </td>
+                </TableCell>
                 {!readOnly && (
-                  <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end">{actions.renderActions(d)}</div>
-                  </td>
+                  </TableCell>
                 )}
-              </tr>
+              </TableRow>
             );
           })}
-        </tbody>
-      </table>
-      </div>
-      <TablePagination page={page} total={rows.length} onPageChange={setPage} label="documents" />
+        </TableBody>
+      </Table>
+      <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="documents" />
       </>
       )}
 

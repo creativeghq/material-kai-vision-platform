@@ -33,11 +33,11 @@ export const mdComponents: Components = {
   code: ({ node, ...p }) => <code className="rounded bg-muted px-1.5 py-0.5 text-[0.85em] font-mono" {...p} />,
   pre: ({ node, ...p }) => <pre className="bg-muted rounded-xl border border-border p-4 overflow-x-auto my-4 text-sm [&_code]:bg-transparent [&_code]:p-0" {...p} />,
   table: ({ node, ...p }) => (
-    <div className="my-4 overflow-x-auto rounded-lg border border-border">
+    <div className="table-scroll my-4 rounded-sm border border-hairline">
       <table className="w-full text-sm border-collapse" {...p} />
     </div>
   ),
-  thead: ({ node, ...p }) => <thead className="bg-muted/60" {...p} />,
-  th: ({ node, ...p }) => <th className="border-b border-border px-3 py-2 text-left font-medium" {...p} />,
-  td: ({ node, ...p }) => <td className="border-b border-border px-3 py-2 align-top text-foreground/80" {...p} />,
+  thead: ({ node, ...p }) => <thead className="bg-surface-sunken" {...p} />,
+  th: ({ node, ...p }) => <th className="border-b border-hairline px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground" {...p} />,
+  td: ({ node, ...p }) => <td className="border-b border-hairline px-3 py-2 align-top break-words text-foreground/80" {...p} />,
 };

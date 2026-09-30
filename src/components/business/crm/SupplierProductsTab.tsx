@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Package, Search as SearchIcon } from 'lucide-react';
+import { Loader2, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
-import { Input } from '@/components/core/ui/input';
+import { Button } from '@/components/core/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { statusTone } from '@/utils/statusTone';
+import {
+  HubToolbar, HubFilterSelect, HubResetFilters, HubSortButton, HubCellEmpty, HubEmptyState,
+  useHubTable, HUB_FILTER_ALL, type HubTableField,
+} from '@/components/core/hub';
 import {
   PRODUCT_IMAGE_SELECT,
   getProductImageUrl,
@@ -58,6 +62,24 @@ interface ProductRow {
  *  this is a real ceiling — it is SHOWN when hit rather than quietly cutting the list short. */
 const ROW_LIMIT = 500;
 
+const categoryOf = (p: ProductRow) => {
+  const c = getMaterialCategory(p.metadata);
+  return c ? formatMaterialCategory(c) : null;
+};
+
+const FIELDS: HubTableField<ProductRow>[] = [
+  { id: 'name', sortValue: (p) => p.name, searchText: (p) => [p.name, p.sku, p.external_sku].filter(Boolean).join(' ') },
+  { id: 'sku', sortValue: (p) => p.sku || p.external_sku },
+  { id: 'category', sortValue: categoryOf, filterValue: categoryOf, filterLabel: 'Category' },
+  { id: 'maker', sortValue: (p) => getManufacturer(p.metadata), filterValue: (p) => getManufacturer(p.metadata), filterLabel: 'Maker' },
+  { id: 'status', sortValue: (p) => p.status ?? 'draft', filterValue: (p) => p.status ?? 'draft', filterLabel: 'Status' },
+];
+
+const SORTABLE: Array<[string, string, string?]> = [
+  ['name', 'Name'], ['sku', 'SKU', 'hidden sm:table-cell'], ['category', 'Category', 'hidden md:table-cell'],
+  ['maker', 'Maker (on product)', 'hidden lg:table-cell'], ['status', 'Status'],
+];
+
 export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
   workspaceId,
   companyId,
@@ -66,7 +88,6 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -105,18 +126,11 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
     return () => { cancelled = true; };
   }, [workspaceId, companyId]);
 
-  const filteredRows = React.useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      r.name?.toLowerCase().includes(q)
-      || r.sku?.toLowerCase().includes(q)
-      || r.external_sku?.toLowerCase().includes(q),
-    );
-  }, [rows, search]);
+  const t = useHubTable(rows, FIELDS);
+  const filteredRows = t.rows;
 
   // Filtering (or switching to another supplier) can shrink the list under the current page.
-  useEffect(() => { setPage(1); }, [search, companyId]);
+  useEffect(() => { setPage(1); }, [t.search, t.filters, companyId]);
   useEffect(() => { setPage((p) => clampPage(p, filteredRows.length)); }, [filteredRows.length]);
 
   return (
@@ -132,28 +146,42 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
             catalog is imported, or linked manually from a product’s “Factory / manufacturer” field.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter by name or SKU"
-              className="pl-8 h-9 w-56"
-            />
-          </div>
-          <Badge variant="secondary" className="shrink-0">
-            {loading ? '…' : `${filteredRows.length}${filteredRows.length !== rows.length ? ` / ${rows.length}` : ''} products${truncated ? '+' : ''}`}
-          </Badge>
-        </div>
+        <Badge variant="secondary" className="shrink-0">
+          {loading ? '…' : `${filteredRows.length}${filteredRows.length !== rows.length ? ` / ${rows.length}` : ''} products${truncated ? '+' : ''}`}
+        </Badge>
       </CardHeader>
       <CardContent className="p-0">
+        {!loading && !error && rows.length > 0 && (
+          <HubToolbar
+            search={t.search}
+            onSearchChange={t.setSearch}
+            searchPlaceholder="Filter by name or SKU"
+            filters={<>
+              {(['category', 'maker', 'status'] as const).map((id) => (t.filterOptions[id]?.length ?? 0) > 2 && (
+                <HubFilterSelect
+                  key={id}
+                  label={id === 'category' ? 'Category' : id === 'maker' ? 'Maker' : 'Status'}
+                  value={t.filters[id] ?? HUB_FILTER_ALL}
+                  options={t.filterOptions[id]}
+                  onChange={(v) => t.setFilter(id, v)}
+                />
+              ))}
+              <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+            </>}
+          />
+        )}
         {loading ? (
           <div className="flex items-center gap-2 justify-center py-12 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
           </div>
         ) : error ? (
           <div className="p-6 text-sm text-destructive">{error}</div>
+        ) : filteredRows.length === 0 && rows.length > 0 ? (
+          <HubEmptyState
+            variant="filtered"
+            title="No products match these filters"
+            action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+          />
         ) : filteredRows.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground space-y-2">
             <Package className="h-10 w-10 mx-auto opacity-40" />
@@ -164,22 +192,28 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-14"></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Maker (on product)</TableHead>
-                  <TableHead>Status</TableHead>
+                  {SORTABLE.map(([id, label, hide]) => (
+                    <TableHead
+                      key={id}
+                      className={hide}
+                      aria-sort={t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+                    >
+                      <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} onClick={() => t.toggleSort(id)}>
+                        {label}
+                      </HubSortButton>
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginate(filteredRows, page).map((p) => {
                   const img = getProductImageUrl(p);
-                  const cat = getMaterialCategory(p.metadata);
+                  const cat = categoryOf(p);
                   const maker = getManufacturer(p.metadata);
                   return (
                     <TableRow key={p.id}>
@@ -192,12 +226,14 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium">{p.name || '(unnamed)'}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {p.sku || p.external_sku || '—'}
+                      <TableCell className="font-medium">
+                        <span className="block max-w-[20rem] truncate" title={p.name || undefined}>{p.name || '(unnamed)'}</span>
                       </TableCell>
-                      <TableCell>{cat ? formatMaterialCategory(cat) : '—'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{maker ?? '—'}</TableCell>
+                      <TableCell className="hidden sm:table-cell font-mono text-xs">
+                        {p.sku || p.external_sku || <HubCellEmpty />}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{cat ?? <HubCellEmpty />}</TableCell>
+                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{maker ?? <HubCellEmpty />}</TableCell>
                       <TableCell>
                         <span className={`text-xs capitalize ${statusTone(p.status ?? 'draft')}`}>
                           {p.status ?? 'draft'}

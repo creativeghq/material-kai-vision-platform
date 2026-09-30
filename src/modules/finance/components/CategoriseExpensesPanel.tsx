@@ -9,6 +9,10 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import {
+  HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar,
+  HUB_FILTER_ALL, useHubTable, type HubTableField,
+} from '@/components/core/hub';
 import { formatMoney } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
 import { financeService, type ExpenseCategorySuggestions } from '@/modules/finance/services/financeService';
@@ -39,6 +43,23 @@ interface RowState {
   /** Set once the reviewer changes the category: the decision is then theirs, not the model's. */
   edited: boolean;
 }
+
+const DECIDED_BY_LABEL: Record<Row['decidedBy'], string> = {
+  ai: 'Classifier',
+  manual: 'Your decision',
+  fiscal_code: 'Document type',
+  kad: 'Registered activity',
+};
+
+const FIELDS: HubTableField<Row>[] = [
+  { id: 'supplier', sortValue: (r) => r.issuerName ?? '', searchText: (r) => `${r.issuerName ?? ''} ${r.issuerKey}` },
+  { id: 'category', sortValue: (r) => r.categoryLabel, filterValue: (r) => r.categoryLabel, filterLabel: 'Category',
+    searchText: (r) => r.categoryLabel },
+  { id: 'decidedBy', filterValue: (r) => r.decidedBy, filterLabel: 'Decided by',
+    filterOptionLabel: (v) => DECIDED_BY_LABEL[v as Row['decidedBy']] ?? v },
+  { id: 'docs', sortValue: (r) => r.docs },
+  { id: 'net', sortValue: (r) => r.net },
+];
 
 export const CategoriseExpensesPanel: React.FC<{
   workspaceId: string;
@@ -122,6 +143,21 @@ export const CategoriseExpensesPanel: React.FC<{
   }, [workspaceId]);
 
   const selected = rows.filter((r) => state[r.key]?.on && state[r.key]?.categoryKey);
+  const t = useHubTable(rows, FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right', className?: string) => (
+    <th
+      className={`px-3 py-2${align === 'right' ? ' text-right' : ''}${className ? ` ${className}` : ''}`}
+      aria-sort={t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton
+        active={t.sort?.columnId === id ? t.sort.direction : undefined}
+        align={align}
+        onClick={() => t.toggleSort(id)}
+      >
+        {label}
+      </HubSortButton>
+    </th>
+  );
 
   const apply = async () => {
     if (selected.length === 0) return;
@@ -180,8 +216,8 @@ export const CategoriseExpensesPanel: React.FC<{
             aria-label={`Include ${r.issuerName ?? r.issuerKey}`}
           />
         </td>
-        <td className="max-w-[22rem] px-3 py-2 align-top">
-          <p className="truncate font-medium" title={r.issuerName ?? undefined}>
+        <td className="px-3 py-2 align-top">
+          <p className="block max-w-[20rem] truncate font-medium" title={r.issuerName ?? undefined}>
             {r.issuerName ?? 'Unnamed supplier'}
           </p>
           <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -196,7 +232,7 @@ export const CategoriseExpensesPanel: React.FC<{
             value={st.categoryKey ?? ''}
             onValueChange={(v) => setRow(r.key, { categoryKey: v, edited: v !== r.categoryKey, on: true })}
           >
-            <SelectTrigger className="h-8 w-[14rem]">
+            <SelectTrigger className="h-8 w-[12rem] sm:w-[14rem]">
               <SelectValue placeholder={r.categoryLabel} />
             </SelectTrigger>
             <SelectContent>
@@ -211,11 +247,11 @@ export const CategoriseExpensesPanel: React.FC<{
             </p>
           )}
         </td>
-        <td className="px-3 py-2 align-top text-[11px] text-muted-foreground">
+        <td className="hidden min-w-[12rem] break-words px-3 py-2 align-top text-[11px] text-muted-foreground lg:table-cell">
           {st.edited ? 'Your choice.' : r.rationale ?? '—'}
         </td>
-        <td className="px-3 py-2 text-right align-top tabular-nums">{r.docs}</td>
-        <td className="px-3 py-2 text-right align-top tabular-nums">{formatMoney(r.net, 'EUR')}</td>
+        <td className="hidden px-3 py-2 text-right align-top tabular-nums md:table-cell">{r.docs}</td>
+        <td className="whitespace-nowrap px-3 py-2 text-right align-top tabular-nums">{formatMoney(r.net, 'EUR')}</td>
       </tr>
     );
   });
@@ -312,28 +348,62 @@ export const CategoriseExpensesPanel: React.FC<{
             )}
           </div>
 
+          {rows.length > 8 && (
+            <HubToolbar
+              className="rounded-md border border-hairline"
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search suppliers"
+              filters={(
+                <>
+                  <HubFilterSelect
+                    label="Category"
+                    value={t.filters.category ?? HUB_FILTER_ALL}
+                    options={t.filterOptions.category}
+                    onChange={(v) => t.setFilter('category', v)}
+                  />
+                  <HubFilterSelect
+                    label="Decided by"
+                    value={t.filters.decidedBy ?? HUB_FILTER_ALL}
+                    options={t.filterOptions.decidedBy}
+                    onChange={(v) => t.setFilter('decidedBy', v)}
+                  />
+                  <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                </>
+              )}
+            />
+          )}
+
           <div className="table-scroll">
             <table className="w-full text-sm">
-              <thead className="bg-surface-sunken">
-                <tr className="text-left text-[11px] font-semibold text-muted-foreground">
+              <thead className="sticky top-0 z-10 bg-surface-sunken">
+                <tr className="border-b border-hairline text-left text-[11px] font-semibold text-muted-foreground">
                   <th className="w-8 px-3 py-2"><span className="sr-only">Include</span></th>
-                  <th className="px-3 py-2">Supplier</th>
-                  <th className="px-3 py-2">Category</th>
-                  <th className="px-3 py-2">Why</th>
-                  <th className="px-3 py-2 text-right">Docs</th>
-                  <th className="px-3 py-2 text-right">Net</th>
+                  {sortHead('supplier', 'Supplier')}
+                  {sortHead('category', 'Category')}
+                  <th className="hidden px-3 py-2 lg:table-cell">Why</th>
+                  {sortHead('docs', 'Docs', 'right', 'hidden md:table-cell')}
+                  {sortHead('net', 'Net', 'right')}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
-                {renderRows(rows.filter((r) => !r.inForce))}
-                {(data.decided ?? []).length > 0 && (
+              <tbody className="divide-y divide-hairline">
+                {renderRows(t.rows.filter((r) => !r.inForce))}
+                {rows.length > 0 && t.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                      No supplier matches these filters.{' '}
+                      <Button variant="link" size="sm" className="h-auto p-0" onClick={t.reset}>Clear filters</Button>
+                    </td>
+                  </tr>
+                )}
+                {t.rows.some((r) => r.inForce) && (
                   <tr className="bg-surface-sunken">
                     <td colSpan={6} className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground">
                       Already in force — change one to correct it, including the documents it filed
                     </td>
                   </tr>
                 )}
-                {renderRows(rows.filter((r) => r.inForce))}
+                {renderRows(t.rows.filter((r) => r.inForce))}
               </tbody>
             </table>
           </div>

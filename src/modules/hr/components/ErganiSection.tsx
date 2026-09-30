@@ -15,14 +15,22 @@ import { hrService, type ErganiCredsStatus, type ErganiSubmission, type ErganiSu
 import { SectionHeader, EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
+import { HUB_FILTER_ALL, HubCellEmpty, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
 
+const SUBMISSION_STATUS_LABELS: Record<string, string> = { submitted: 'Submitted', failed: 'Failed', cancelled: 'Cancelled at Ergani' };
+// "Cancelled at Ergani" is not "never filed": the withdrawal is itself a filing.
 const statusBadge = (s: string) =>
-  s === 'submitted' ? <span className="text-sm text-emerald-600 dark:text-emerald-400">Submitted</span>
-  : s === 'failed' ? <span className="text-sm text-red-500 dark:text-red-400">Failed</span>
-  // "Cancelled at Ergani" is not "never filed": the document existed, the ministry held it, and
-  // the withdrawal is itself a filing. Written as a light/dark PAIR — amber-300 is chosen for
-  // plum-black and renders at 1.23:1 on the light themes' cream.
-  : <span className="text-sm text-amber-800 dark:text-amber-300">Cancelled at Ergani</span>;
+  s === 'submitted' ? <Badge variant="success">Submitted</Badge>
+  : s === 'failed' ? <Badge variant="error">Failed</Badge>
+  : <Badge variant="warning">Cancelled at Ergani</Badge>;
+
+const SUBMISSION_FIELDS: HubTableField<ErganiSubmission>[] = [
+  { id: 'type', sortValue: (s) => s.submission_type, searchText: (s) => s.submission_type, filterValue: (s) => s.submission_type, filterLabel: 'Type' },
+  { id: 'entity', sortValue: (s) => s.entity_type, filterValue: (s) => s.entity_type, filterLabel: 'Entity' },
+  { id: 'status', sortValue: (s) => s.status, filterValue: (s) => s.status, filterLabel: 'Status', filterOptionLabel: (v) => SUBMISSION_STATUS_LABELS[v] ?? v },
+  { id: 'protocol', sortValue: (s) => s.protocol, searchText: (s) => s.protocol },
+  { id: 'date', sortValue: (s) => s.created_at },
+];
 
 /** Ergani "dd/mm/yyyy hh:mm" (or the row's created_at) → yyyymmdd for the PDF fetch. */
 function toYyyymmdd(submitDate: string | null, createdAt: string): string {
@@ -39,6 +47,12 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [page, setPage] = useState(1);
+  const t = useHubTable(subs, SUBMISSION_FIELDS);
+  useEffect(() => { setPage(1); }, [t.search, t.filters]);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -166,12 +180,27 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border/60">
+        <CardHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-hairline">
           <CardTitle>Submission History</CardTitle>
           <Button size="sm" variant="ghost" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
         </CardHeader>
         <CardContent className="p-0">
-          {subs.length === 0 ? (
+          {subs.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search type or protocol"
+              filters={<>
+                <HubFilterSelect label="Type" value={t.filters.type ?? HUB_FILTER_ALL} options={t.filterOptions.type} onChange={(v) => t.setFilter('type', v)} />
+                <HubFilterSelect label="Entity" value={t.filters.entity ?? HUB_FILTER_ALL} options={t.filterOptions.entity} onChange={(v) => t.setFilter('entity', v)} />
+                <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status} onChange={(v) => t.setFilter('status', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
+          {subs.length > 0 && t.rows.length === 0 ? (
+            <EmptyState icon={FileText} variant="filtered" title="No submissions match your filters" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} />
+          ) : subs.length === 0 ? (
             <EmptyState
               icon={FileText}
               title="No submissions yet"
@@ -183,17 +212,21 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
           ) : (
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Type</TableHead><TableHead>Entity</TableHead><TableHead>Status</TableHead>
-                <TableHead>Protocol</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead>
+                <TableHead aria-sort={ariaSort('type')}>{sortHead('type', 'Type')}</TableHead>
+                <TableHead className="hidden md:table-cell" aria-sort={ariaSort('entity')}>{sortHead('entity', 'Entity')}</TableHead>
+                <TableHead aria-sort={ariaSort('status')}>{sortHead('status', 'Status')}</TableHead>
+                <TableHead className="hidden sm:table-cell" aria-sort={ariaSort('protocol')}>{sortHead('protocol', 'Protocol')}</TableHead>
+                <TableHead className="hidden md:table-cell" aria-sort={ariaSort('date')}>{sortHead('date', 'Date')}</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {paginate(subs, page).map((s) => (
+                {paginate(t.rows, page).map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">{s.submission_type}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{s.entity_type ?? '—'}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{s.entity_type ?? <HubCellEmpty />}</TableCell>
                     <TableCell>{statusBadge(s.status)}{s.status === 'failed' && s.error && <span className="block text-xs text-destructive mt-1 max-w-[240px] truncate" title={s.error}>{s.error}</span>}</TableCell>
-                    <TableCell className="font-mono text-xs">{s.protocol ?? '—'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{s.submit_date ?? formatDate(s.created_at)}</TableCell>
+                    <TableCell className="hidden sm:table-cell font-mono text-xs">{s.protocol ?? <HubCellEmpty />}</TableCell>
+                    <TableCell className="hidden md:table-cell whitespace-nowrap text-xs text-muted-foreground tabular-nums">{s.submit_date ?? formatDate(s.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {s.status === 'submitted' && s.protocol && (
@@ -219,7 +252,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
               </TableBody>
             </Table>
           )}
-          <TablePagination page={page} total={subs.length} onPageChange={setPage} label="submissions" />
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="submissions" />
         </CardContent>
       </Card>
     </div>

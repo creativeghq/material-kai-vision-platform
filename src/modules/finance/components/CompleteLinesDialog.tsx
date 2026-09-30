@@ -138,7 +138,7 @@ export const CompleteLinesDialog: React.FC<{
               placeholder={'AMALFI GRIS 80X80 A\'\t17.92\t295.86\nMARAZZI TREVERK 20X120\t9.6\t184.32'}
               className="font-mono text-xs"
             />
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] text-muted-foreground">
                 One line per row. Description, then quantity, then net — sizes, units and article codes are read out of the text.
               </p>
@@ -148,11 +148,11 @@ export const CompleteLinesDialog: React.FC<{
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-sm border border-hairline">
+          <div className="table-scroll rounded-sm border border-hairline">
             <table className="w-full text-sm">
               <thead className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 text-left">Description</th>
+                  <th className="min-w-[12rem] px-3 py-2 text-left">Description</th>
                   <th className="px-3 py-2 text-left w-28">Code</th>
                   <th className="px-3 py-2 text-right w-24">Qty</th>
                   <th className="px-3 py-2 text-left w-32">Unit</th>

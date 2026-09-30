@@ -1403,15 +1403,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="overflow-hidden -mx-6 -mb-6 mt-2">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                <tr className="text-xs font-semibold text-muted-foreground">
-                  <th className="text-left px-6 py-2.5 font-medium">SKU</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Variant Name</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Color</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Pattern</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Size</th>
+              <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+                <tr className="text-[11px] font-semibold text-muted-foreground">
+                  <th className="text-left px-6 py-2.5 whitespace-nowrap">SKU</th>
+                  <th className="text-left px-3 py-2.5 whitespace-nowrap">Variant Name</th>
+                  <th className="text-left px-3 py-2.5 whitespace-nowrap">Color</th>
+                  <th className="hidden md:table-cell text-left px-3 py-2.5 whitespace-nowrap">Pattern</th>
+                  <th className="text-left px-3 py-2.5 whitespace-nowrap">Size</th>
                   {suppliers.map(sup => (
-                    <th key={sup} className="text-left px-3 py-2.5 font-medium capitalize">
+                    <th key={sup} className="hidden md:table-cell text-left px-3 py-2.5 whitespace-nowrap capitalize">
                       {sup}
                     </th>
                   ))}
@@ -1421,10 +1421,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {productVariants.map((variant, index) => (
                   <tr
                     key={`${variant.sku}-${index}`}
-                    className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+                    className="border-b border-hairline hover:bg-surface-hover transition-colors"
                   >
-                    <td className="px-6 py-2 font-mono font-semibold">{variant.sku}</td>
-                    <td className="px-3 py-2 font-medium">{normVariantName(variant.name)}</td>
+                    <td className="px-6 py-2 font-mono font-semibold whitespace-nowrap">{variant.sku}</td>
+                    <td className="px-3 py-2 font-medium break-words">{normVariantName(variant.name)}</td>
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-2">
                         <span
@@ -1434,10 +1434,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         {normColor(variant.color)}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">{normPattern(variant.pattern)}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{normSize(variant.size)}</td>
+                    <td className="hidden md:table-cell px-3 py-2 text-muted-foreground">{normPattern(variant.pattern)}</td>
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{normSize(variant.size)}</td>
                     {suppliers.map(sup => (
-                      <td key={sup} className="px-3 py-2 font-mono text-muted-foreground">
+                      <td key={sup} className="hidden md:table-cell px-3 py-2 font-mono text-muted-foreground">
                         {variant.groutCodes[sup] || '—'}
                       </td>
                     ))}

@@ -5,7 +5,7 @@
  * just missing inventory." So a loan with no due date is shown as its own failure, not sorted to
  * the bottom of the list: it can never be overdue, which is not the same as being on time.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, AlertTriangle, PackageOpen, Plus, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
@@ -15,13 +15,18 @@ import { Label } from '@/components/core/ui/label';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
-import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import {
+  HubEmptyState, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, HUB_FILTER_ALL, useHubTable,
+  type HubTableField,
+} from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { localISODateOffset, todayLocalISO } from '@/utils/datetime';
 import {
   sampleLoanService, LOAN_STATUS_LABEL, describeLoan, loanIsOverdue, loanIsUnchaseable,
-  type SampleLoanRow, type LoanPosition, type SampleLoanItem,
+  type SampleLoanRow, type LoanPosition, type SampleLoanItem, type LoanStatus,
 } from '@/modules/crm/services/sampleLoanService';
+
+const statusLabel = (v: string) => LOAN_STATUS_LABEL[v as LoanStatus] ?? v;
 
 export const SampleLoansCard: React.FC<{
   workspaceId: string;
@@ -65,6 +70,27 @@ export const SampleLoansCard: React.FC<{
   }, [workspaceId, companyId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const fields = useMemo<HubTableField<SampleLoanRow>[]>(() => [
+    {
+      id: 'borrower',
+      sortValue: (l) => l.borrower_name,
+      searchText: (l) => `${l.borrower_name ?? ''} ${(items[l.id] ?? []).map((i) => i.description).join(' ')}`,
+    },
+    { id: 'loaned_on', sortValue: (l) => l.loaned_on },
+    {
+      id: 'status', sortValue: (l) => l.status, filterValue: (l) => l.status,
+      filterLabel: 'State', filterOptionLabel: statusLabel,
+    },
+  ], [items]);
+  const t = useHubTable(loans, fields);
+  const sortHead = (id: string, label: string) => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} onClick={() => t.toggleSort(id)}>
+      {label}
+    </HubSortButton>
+  );
+  const ariaSort = (id: string) =>
+    t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
 
   const lend = async () => {
     const items = draft.items.split(',').map((s) => s.trim()).filter(Boolean);
@@ -159,26 +185,58 @@ export const SampleLoansCard: React.FC<{
         )}
 
         {loans.length > 0 && (
+          <div className="overflow-hidden rounded-md border border-hairline">
+            {loans.length > 8 && (
+              <HubToolbar
+                search={t.search}
+                onSearchChange={t.setSearch}
+                searchPlaceholder="Search borrowers or samples"
+                filters={(
+                  <>
+                    <HubFilterSelect
+                      label="State"
+                      value={t.filters.status ?? HUB_FILTER_ALL}
+                      options={t.filterOptions.status}
+                      onChange={(v) => t.setFilter('status', v)}
+                    />
+                    <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                  </>
+                )}
+              />
+            )}
           <div className="table-scroll">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Borrower</TableHead>
-                  <TableHead>Out since</TableHead>
-                  <TableHead>State</TableHead>
+                  <TableHead aria-sort={ariaSort('borrower')}>{sortHead('borrower', 'Borrower')}</TableHead>
+                  <TableHead aria-sort={ariaSort('loaned_on')} className="hidden sm:table-cell">
+                    {sortHead('loaned_on', 'Out since')}
+                  </TableHead>
+                  <TableHead aria-sort={ariaSort('status')}>{sortHead('status', 'State')}</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loans.map((l) => (
+                {t.rows.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={4} className="p-0">
+                      <HubEmptyState
+                        variant="filtered"
+                        title="No loans match"
+                        action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+                {t.rows.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell>
+                    <TableCell className="max-w-[20rem] break-words">
                       {l.borrower_name ?? '—'}
                       <span className="block text-[11px] text-muted-foreground">
                         {(items[l.id] ?? []).map((i) => i.description).join(', ') || 'nothing listed'}
                       </span>
                     </TableCell>
-                    <TableCell className="tabular-nums">{l.loaned_on}</TableCell>
+                    <TableCell className="hidden tabular-nums sm:table-cell">{l.loaned_on}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
@@ -191,7 +249,7 @@ export const SampleLoansCard: React.FC<{
                       </Badge>
                       <span className="ml-2 text-[11px] text-muted-foreground">{describeLoan(l, today)}</span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="whitespace-nowrap text-right">
                       {l.status === 'out' && (
                         <>
                           <Button size="sm" variant="ghost" disabled={busy} onClick={() => close(l.id, 'returned')}>
@@ -207,6 +265,7 @@ export const SampleLoansCard: React.FC<{
                 ))}
               </TableBody>
             </Table>
+          </div>
           </div>
         )}
 

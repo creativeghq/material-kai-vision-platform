@@ -131,13 +131,13 @@ export function ProductCertificates({ productId, canEdit = false, suggestedStand
         <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="bg-surface-sunken">
-              <tr className="text-left">
-                <th className="px-3 py-2 text-[11px] font-semibold">Standard</th>
-                <th className="px-3 py-2 text-[11px] font-semibold">Result</th>
-                <th className="px-3 py-2 text-[11px] font-semibold">Number</th>
-                <th className="px-3 py-2 text-[11px] font-semibold">Issuer</th>
-                <th className="px-3 py-2 text-[11px] font-semibold">Valid until</th>
-                <th className="px-3 py-2 text-[11px] font-semibold">Status</th>
+              <tr className="text-left text-[11px] font-semibold text-muted-foreground">
+                <th className="px-3 py-2">Standard</th>
+                <th className="hidden sm:table-cell px-3 py-2">Result</th>
+                <th className="hidden md:table-cell px-3 py-2">Number</th>
+                <th className="hidden md:table-cell px-3 py-2">Issuer</th>
+                <th className="px-3 py-2">Valid until</th>
+                <th className="px-3 py-2">Status</th>
                 {canEdit && <th className="px-3 py-2"><span className="sr-only">Actions</span></th>}
               </tr>
             </thead>
@@ -146,16 +146,16 @@ export function ProductCertificates({ productId, canEdit = false, suggestedStand
                 const v = presentValidity(row.validity);
                 return (
                   <tr key={row.id} className="border-t border-hairline align-top">
-                    <td className="px-3 py-2 font-medium">
+                    <td className="px-3 py-2 font-medium break-words">
                       {row.standard}
                       {row.scope && (
                         <span className="block text-xs text-muted-foreground">{row.scope}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2">{row.result ?? '—'}</td>
-                    <td className="px-3 py-2">{row.certificate_number ?? '—'}</td>
-                    <td className="px-3 py-2">{row.issuer ?? '—'}</td>
-                    <td className="px-3 py-2 tabular-nums">{row.valid_until ?? '—'}</td>
+                    <td className="hidden sm:table-cell px-3 py-2">{row.result ?? '—'}</td>
+                    <td className="hidden md:table-cell px-3 py-2">{row.certificate_number ?? '—'}</td>
+                    <td className="hidden md:table-cell px-3 py-2">{row.issuer ?? '—'}</td>
+                    <td className="px-3 py-2 tabular-nums whitespace-nowrap">{row.valid_until ?? '—'}</td>
                     <td className="px-3 py-2">
                       <Badge variant={v.tone === 'success' ? 'success'
                         : v.tone === 'warning' ? 'warning'

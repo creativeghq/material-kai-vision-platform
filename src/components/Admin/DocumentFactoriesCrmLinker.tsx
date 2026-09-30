@@ -27,6 +27,19 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
+import { cn } from '@/lib/utils';
+import {
+  HubCellLink,
+  HubEmptyState,
+  HubFilterSelect,
+  HubResetFilters,
+  HubSortButton,
+  HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
+  type HubSort,
+  type HubTableField,
+} from '@/components/core/hub';
 
 interface DocumentEntityLike {
   factory_name?: string | null;
@@ -78,6 +91,27 @@ function pickMakerFromMetadata(metadata?: Record<string, unknown> | null): strin
   }
   return typeof candidate === 'string' ? candidate : null;
 }
+
+const SortHead: React.FC<{
+  id: string;
+  sort?: HubSort;
+  onSort: (id: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, sort, onSort, align, className, children }) => {
+  const active = sort?.columnId === id ? sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => onSort(id)}>
+        {children}
+      </HubSortButton>
+    </TableHead>
+  );
+};
 
 export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProps> = ({
   entities, products,
@@ -228,6 +262,22 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
     }
   };
 
+  const factoryFields = useMemo<HubTableField<FactoryAggregate>[]>(() => [
+    { id: 'brand', sortValue: (f) => f.name, searchText: (f) => `${f.name} ${f.inferredGroup ?? ''}` },
+    { id: 'entities', sortValue: (f) => f.entityCount },
+    { id: 'products', sortValue: (f) => f.productCount },
+    {
+      id: 'crm',
+      sortValue: (f) => (matchesByKey.get(f.lowerKey) ? 1 : 0),
+      filterValue: (f) => (matchesByKey.get(f.lowerKey) ? 'linked' : 'missing'),
+      filterLabel: 'CRM status',
+      filterOptionLabel: (v) => (v === 'linked' ? 'Linked' : 'Not in CRM'),
+    },
+  ], [matchesByKey]);
+  const factoryTable = useHubTable(factories, factoryFields);
+  const { search: factorySearch, filters: factoryFilters } = factoryTable;
+  useEffect(() => { setPage(1); }, [factorySearch, factoryFilters]);
+
   if (factories.length === 0) {
     return (
       <Card>
@@ -266,34 +316,69 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
         {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div>
+          {factories.length > 8 && (
+            <HubToolbar
+              search={factoryTable.search}
+              onSearchChange={factoryTable.setSearch}
+              searchPlaceholder="Search brands"
+              filters={
+                <>
+                  <HubFilterSelect
+                    label="CRM status"
+                    value={factoryTable.filters.crm ?? HUB_FILTER_ALL}
+                    options={factoryTable.filterOptions.crm}
+                    onChange={(v) => factoryTable.setFilter('crm', v)}
+                  />
+                  <HubResetFilters count={factoryTable.activeFilterCount} onReset={factoryTable.reset} />
+                </>
+              }
+            />
+          )}
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Brand</TableHead>
-                <TableHead className="text-center">Entities</TableHead>
-                <TableHead className="text-center">Products</TableHead>
-                <TableHead>CRM status</TableHead>
-                <TableHead className="text-right"></TableHead>
+                <SortHead id="brand" sort={factoryTable.sort} onSort={factoryTable.toggleSort}>Brand</SortHead>
+                <SortHead id="entities" sort={factoryTable.sort} onSort={factoryTable.toggleSort} align="right" className="hidden sm:table-cell">Entities</SortHead>
+                <SortHead id="products" sort={factoryTable.sort} onSort={factoryTable.toggleSort} align="right" className="hidden sm:table-cell">Products</SortHead>
+                <SortHead id="crm" sort={factoryTable.sort} onSort={factoryTable.toggleSort} className="hidden md:table-cell">CRM status</SortHead>
+                <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginate(factories, page).map((f) => {
+              {factoryTable.rows.length === 0 && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="p-0">
+                    <HubEmptyState
+                      variant="filtered"
+                      title="No brands match these filters"
+                      action={<Button variant="outline" size="sm" onClick={factoryTable.reset}>Clear filters</Button>}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+              {paginate(factoryTable.rows, page).map((f) => {
                 const match = matchesByKey.get(f.lowerKey) ?? null;
                 const isCreating = creatingKey === f.lowerKey;
                 return (
                   <TableRow key={f.lowerKey}>
-                    <TableCell className="font-medium">
-                      <div>{f.name}</div>
+                    <TableCell>
+                      {match ? (
+                        <HubCellLink to={`/crm/companies/${match.id}`} className="block max-w-[18rem] truncate">
+                          {f.name}
+                        </HubCellLink>
+                      ) : (
+                        <div className="max-w-[18rem] truncate font-medium" title={f.name}>{f.name}</div>
+                      )}
                       {f.inferredGroup && (
                         <div className="text-xs text-muted-foreground mt-0.5">
                           Group: {f.inferredGroup}
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-center font-mono text-xs">{f.entityCount}</TableCell>
-                    <TableCell className="text-center font-mono text-xs">{f.productCount}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden text-right tabular-nums text-xs sm:table-cell">{f.entityCount}</TableCell>
+                    <TableCell className="hidden text-right tabular-nums text-xs sm:table-cell">{f.productCount}</TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {loading ? (
                         <span className="text-xs text-muted-foreground">Checking…</span>
                       ) : match ? (
@@ -314,7 +399,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
                         <span className="text-[10px] text-muted-foreground">Not in CRM</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="whitespace-nowrap text-right">
                       {match ? (
                         <Button
                           size="sm"
@@ -345,7 +430,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
           </Table>
           <TablePagination
             page={page}
-            total={factories.length}
+            total={factoryTable.rows.length}
             onPageChange={setPage}
             label="brands"
           />

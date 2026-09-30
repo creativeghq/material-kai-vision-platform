@@ -4,7 +4,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, CalendarClock, Plus, Coins } from 'lucide-react';
-import { HubEmptyState } from '@/components/core/hub';
+import {
+  HubCellEmpty, HubEmptyState, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar,
+  HUB_FILTER_ALL, useHubTable, type HubTableField,
+} from '@/components/core/hub';
+import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -33,6 +37,16 @@ import { formatNumber } from '@/utils/decimal';
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
 type Target = { contactId?: string; companyId?: string; customerName?: string };
+
+const PAYMENT_FIELDS: HubTableField<PaymentWithAllocation>[] = [
+  { id: 'date', sortValue: (p) => p.paid_at },
+  { id: 'direction', sortValue: (p) => p.direction, filterValue: (p) => p.direction, filterLabel: 'Direction',
+    filterOptionLabel: (v) => (v === 'in' ? 'Received' : 'Paid') },
+  { id: 'account', sortValue: (p) => p.bank_account_name, filterValue: (p) => p.bank_account_name,
+    filterLabel: 'Account', searchText: (p) => p.bank_account_name },
+  { id: 'reference', sortValue: (p) => p.reference, searchText: (p) => p.reference },
+  { id: 'amount', sortValue: (p) => (p.direction === 'in' ? 1 : -1) * Number(p.amount) },
+];
 
 /**
  * Column counts for the account top strip, keyed by how many tiles actually render.
@@ -589,11 +603,27 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
   useEffect(() => { void reload(); }, [reload]);
   // A different party is a different list; deleting a payment shrinks the current one.
   useEffect(() => { setPage(1); }, [contactId, companyId]);
-  useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
+  const t = useHubTable(rows, PAYMENT_FIELDS);
+  useEffect(() => { setPage((p) => clampPage(p, t.rows.length)); }, [t.rows.length]);
+  useEffect(() => { setPage(1); }, [t.search, t.filters, t.sort]);
+  const sortHead = (id: string, label: string, align?: 'right', className?: string) => (
+    <th
+      className={`px-4 py-2 ${align === 'right' ? 'text-right' : 'text-left'}${className ? ` ${className}` : ''}`}
+      aria-sort={t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton
+        active={t.sort?.columnId === id ? t.sort.direction : undefined}
+        align={align}
+        onClick={() => t.toggleSort(id)}
+      >
+        {label}
+      </HubSortButton>
+    </th>
+  );
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="flex items-center gap-2">
           <Banknote className="h-4 w-4" /> Payments
         </CardTitle>
@@ -628,33 +658,66 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
           />
         ) : (
           <>
+          {rows.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search account or reference"
+              filters={(
+                <>
+                  <HubFilterSelect
+                    label="Direction"
+                    value={t.filters.direction ?? HUB_FILTER_ALL}
+                    options={t.filterOptions.direction}
+                    onChange={(v) => t.setFilter('direction', v)}
+                  />
+                  <HubFilterSelect
+                    label="Account"
+                    value={t.filters.account ?? HUB_FILTER_ALL}
+                    options={t.filterOptions.account}
+                    onChange={(v) => t.setFilter('account', v)}
+                  />
+                  <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                </>
+              )}
+            />
+          )}
+          {t.rows.length === 0 ? (
+            <HubEmptyState
+              variant="filtered"
+              title="No payments match"
+              action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+            />
+          ) : (
           <div className="table-scroll">
           <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
-              <tr className="border-b border-border/60">
-                <th className="px-4 py-2 text-left">Date</th>
-                <th className="px-4 py-2 text-left">Direction</th>
-                <th className="px-4 py-2 text-left">Account</th>
-                <th className="px-4 py-2 text-left">Reference</th>
-                <th className="px-4 py-2 text-right">Amount</th>
+            <thead className="sticky top-0 z-10 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+              <tr className="border-b border-hairline">
+                {sortHead('date', 'Date')}
+                {sortHead('direction', 'Direction')}
+                {sortHead('account', 'Account', undefined, 'hidden md:table-cell')}
+                {sortHead('reference', 'Reference', undefined, 'hidden sm:table-cell')}
+                {sortHead('amount', 'Amount', 'right')}
                 <th className="px-4 py-2 text-right w-28"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {paginate(rows, page).map((p) => {
+              {paginate(t.rows, page).map((p) => {
                 const isIn = p.direction === 'in';
                 return (
-                  <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
+                  <tr key={p.id} className="border-b border-hairline hover:bg-surface-hover">
                     <td className="px-4 py-2 whitespace-nowrap">{formatDate(p.paid_at)}</td>
                     <td className="px-4 py-2">
-                      <span className={`text-xs ${isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                        {isIn ? 'Received' : 'Paid'}
-                      </span>
+                      <Badge variant={isIn ? 'success' : 'neutral'}>{isIn ? 'Received' : 'Paid'}</Badge>
                     </td>
                     {/* Account, not method — the account is the fact; the method is derived from it. */}
-                    <td className="px-4 py-2">{p.bank_account_name ?? '—'}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{p.reference || '—'}</td>
-                    <td className={`px-4 py-2 text-right tabular-nums font-medium ${isIn ? 'text-emerald-500' : ''}`}>
+                    <td className="hidden px-4 py-2 md:table-cell">{p.bank_account_name ?? <HubCellEmpty />}</td>
+                    <td className="hidden px-4 py-2 text-muted-foreground sm:table-cell">
+                      {p.reference
+                        ? <span className="block max-w-[16rem] truncate" title={p.reference}>{p.reference}</span>
+                        : <HubCellEmpty />}
+                    </td>
+                    <td className={`px-4 py-2 text-right tabular-nums font-medium whitespace-nowrap ${isIn ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>
                       {isIn ? '+' : '−'}{formatMoney(Number(p.amount), p.currency)}
                     </td>
                     <td className="px-4 py-2 text-right">
@@ -669,7 +732,8 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
             </tbody>
           </table>
           </div>
-          <TablePagination page={page} total={rows.length} onPageChange={setPage} label="payments" />
+          )}
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="payments" />
           </>
         )}
       </CardContent>
@@ -721,20 +785,20 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-hairline px-5 py-3">
         <CardTitle className="flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push <span className="text-[10px] font-normal text-muted-foreground">· in stock</span></CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="table-scroll">
         <table className="w-full text-sm">
-          <thead className="text-xs text-muted-foreground">
-            <tr className="border-b border-border/60">
+          <thead className="sticky top-0 z-10 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+            <tr className="border-b border-hairline">
               <th className="px-4 py-2 text-left">Product</th>
-              <th className="px-4 py-2 text-right">Qty bought</th>
+              <th className="hidden px-4 py-2 text-right sm:table-cell">Qty bought</th>
               <th className="px-4 py-2 text-right">Revenue</th>
-              <th className="px-4 py-2 text-right">Orders</th>
+              <th className="hidden px-4 py-2 text-right md:table-cell">Orders</th>
               <th className="px-4 py-2 text-right">On hand</th>
-              <th className="px-4 py-2 text-right">Last ordered</th>
+              <th className="hidden px-4 py-2 text-right md:table-cell">Last ordered</th>
             </tr>
           </thead>
           <tbody>
@@ -744,16 +808,16 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
               <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No previously-bought items are in stock to push right now.</td></tr>
             ) : (
               topProducts.map((p) => (
-                <tr key={p.product_id} className="border-b border-border/30 hover:bg-muted/30">
+                <tr key={p.product_id} className="border-b border-hairline hover:bg-surface-hover">
                   <td className="px-4 py-2">
-                    <div className="font-medium">{p.description || 'Product'}</div>
+                    <div className="max-w-[20rem] truncate font-medium" title={p.description || undefined}>{p.description || 'Product'}</div>
                     {p.sku && <div className="text-xs text-muted-foreground font-mono">{p.sku}</div>}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">{formatNumber(Number(p.total_quantity))}</td>
-                  <td className="px-4 py-2 text-right">{formatMoney(p.revenue_net)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-emerald-600">{formatNumber(Number(p.on_hand))}</td>
-                  <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? formatDate(p.last_ordered) : '—'}</td>
+                  <td className="hidden px-4 py-2 text-right tabular-nums sm:table-cell">{formatNumber(Number(p.total_quantity))}</td>
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{formatMoney(p.revenue_net)}</td>
+                  <td className="hidden px-4 py-2 text-right tabular-nums md:table-cell">{p.order_count}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatNumber(Number(p.on_hand))}</td>
+                  <td className="hidden px-4 py-2 text-right text-muted-foreground whitespace-nowrap md:table-cell">{p.last_ordered ? formatDate(p.last_ordered) : <HubCellEmpty />}</td>
                 </tr>
               ))
             )}

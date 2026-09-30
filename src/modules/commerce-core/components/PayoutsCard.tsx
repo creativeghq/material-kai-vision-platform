@@ -8,6 +8,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubCellLink } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import { formatMoney } from '@/utils/decimal';
@@ -245,7 +246,9 @@ export const PayoutsCard: React.FC<{ workspaceId: string; connections: StoreConn
                       </td></tr>
                     ) : (lines[p.id] ?? []).map((l) => (
                       <tr key={l.order_id} className="border-t border-hairline">
-                        <td className="px-2 py-1">{l.order_number ?? l.order_id.slice(0, 8)}</td>
+                        <td className="px-2 py-1">
+                          <HubCellLink to={`/finance/orders/${l.order_id}`}>{l.order_number ?? l.order_id.slice(0, 8)}</HubCellLink>
+                        </td>
                         <td className="px-2 py-1">
                           {l.issued
                             ? <span className="font-mono">{l.invoice_number}</span>

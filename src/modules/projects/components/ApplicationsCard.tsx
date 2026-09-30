@@ -136,12 +136,12 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
           <div className="table-scroll">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                <tr className="border-b border-hairline bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
                   <th className="px-5 py-2 text-left">Ref</th>
-                  <th className="px-3 py-2 text-left">To</th>
-                  <th className="px-3 py-2 text-right">Gross to date</th>
-                  <th className="px-3 py-2 text-right">Retention</th>
-                  <th className="px-3 py-2 text-right">Prev. certified</th>
+                  <th className="hidden px-3 py-2 text-left sm:table-cell">To</th>
+                  <th className="hidden px-3 py-2 text-right md:table-cell">Gross to date</th>
+                  <th className="hidden px-3 py-2 text-right lg:table-cell">Retention</th>
+                  <th className="hidden px-3 py-2 text-right lg:table-cell">Prev. certified</th>
                   <th className="px-3 py-2 text-right">Claimed</th>
                   <th className="px-3 py-2 text-right">Certified</th>
                   <th className="px-3 py-2 text-left">Status</th>
@@ -150,14 +150,14 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-t border-border/60">
-                    <td className="px-5 py-2 font-mono text-xs tabular-nums text-muted-foreground">{r.reference}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{formatDate(r.period_to)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{money(r.gross_valuation)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  <tr key={r.id} className="border-t border-hairline">
+                    <td className="whitespace-nowrap px-5 py-2 font-mono text-xs tabular-nums text-muted-foreground">{r.reference}</td>
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground sm:table-cell">{formatDate(r.period_to)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums md:table-cell">{money(r.gross_valuation)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums text-muted-foreground lg:table-cell">
                       {money(r.retention_cumulative)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                    <td className="hidden px-3 py-2 text-right tabular-nums text-muted-foreground lg:table-cell">
                       {money(r.previously_certified)}
                     </td>
                     <td className="px-3 py-2 text-right font-medium tabular-nums">{money(r.net_due)}</td>

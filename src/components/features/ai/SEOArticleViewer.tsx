@@ -2048,20 +2048,20 @@ function buildMarkdownComponents(opts: { dense?: boolean } = {}): Components {
       </div>
     ),
     table: ({ children }) => (
-      <div className="my-7 overflow-x-auto rounded-lg border border-border/60 shadow-sm">
+      <div className="table-scroll my-7 rounded-sm border border-hairline">
         <table className="w-full text-sm border-collapse">{children}</table>
       </div>
     ),
-    thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
-    tbody: ({ children }) => <tbody className="divide-y divide-border/40">{children}</tbody>,
-    tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
+    thead: ({ children }) => <thead className="bg-surface-sunken">{children}</thead>,
+    tbody: ({ children }) => <tbody className="divide-y divide-hairline">{children}</tbody>,
+    tr: ({ children }) => <tr>{children}</tr>,
     th: ({ children }) => (
-      <th className="font-sans text-left px-4 py-3 font-semibold text-foreground text-xs uppercase tracking-wider">
+      <th className="font-sans text-left px-4 py-2.5 border-b border-hairline text-[11px] font-semibold text-muted-foreground">
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className="font-serif px-4 py-3 text-foreground/90 align-top text-[0.9375rem] leading-relaxed">{children}</td>
+      <td className="font-serif px-4 py-3 text-foreground/90 align-top break-words text-[0.9375rem] leading-relaxed">{children}</td>
     ),
     img: ({ src, alt }) => (
       <figure className="my-7">

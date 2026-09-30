@@ -77,6 +77,29 @@ import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
 import { formatDate } from '@/utils/datetime';
 import { formatAddressOneLine } from '@/utils/address';
+import {
+  HubCellEmpty, HubCellLink, HubEmptyState, HubSortButton, HubToolbar, useHubTable, type HubTableField,
+} from '@/components/core/hub';
+
+interface AttachedContactRow {
+  relationship_id: string;
+  contact_id: string;
+  contact_name?: string | null;
+  contact_position?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  is_primary?: boolean | null;
+}
+
+const CONTACT_FIELDS: HubTableField<AttachedContactRow>[] = [
+  {
+    id: 'name', sortValue: (c) => c.contact_name,
+    searchText: (c) => [c.contact_name, c.contact_position, c.contact_email, c.contact_phone].filter(Boolean).join(' '),
+  },
+  { id: 'position', sortValue: (c) => c.contact_position },
+  { id: 'email', sortValue: (c) => c.contact_email },
+];
+const NO_CONTACTS: AttachedContactRow[] = [];
 
 interface Company {
   id: string;
@@ -615,6 +638,18 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
+  const contactTable = useHubTable((company?.contacts as AttachedContactRow[] | undefined) ?? NO_CONTACTS, CONTACT_FIELDS);
+  const contactSortHead = (id: string, label: string) => (
+    <HubSortButton
+      active={contactTable.sort?.columnId === id ? contactTable.sort.direction : undefined}
+      onClick={() => contactTable.toggleSort(id)}
+    >
+      {label}
+    </HubSortButton>
+  );
+  const contactAriaSort = (id: string) =>
+    contactTable.sort?.columnId === id ? (contactTable.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
+
   if (loading) {
     return (
       <div className="min-h-screen p-3 sm:p-6">
@@ -1127,53 +1162,72 @@ export const CompanyDetailPage: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  // The shared <Table> already carries the house styling (sticky muted header,
-                  // text-xs heads, p-3 cells, hover) and its own overflow wrapper — no local
-                  // overflow div, no per-column widths.
+                  <>
+                  {company.contacts.length > 8 && (
+                    <HubToolbar
+                      search={contactTable.search}
+                      onSearchChange={contactTable.setSearch}
+                      searchPlaceholder="Search contacts"
+                    />
+                  )}
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Position / Title</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
+                        <TableHead aria-sort={contactAriaSort('name')}>{contactSortHead('name', 'Name')}</TableHead>
+                        <TableHead aria-sort={contactAriaSort('position')} className="hidden md:table-cell">
+                          {contactSortHead('position', 'Position / Title')}
+                        </TableHead>
+                        <TableHead aria-sort={contactAriaSort('email')} className="hidden sm:table-cell">
+                          {contactSortHead('email', 'Email')}
+                        </TableHead>
+                        <TableHead className="hidden lg:table-cell">Phone</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {company.contacts.map((contact: any) => (
+                      {contactTable.rows.length === 0 && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={5} className="p-0">
+                            <HubEmptyState
+                              variant="filtered"
+                              title="No contacts match"
+                              action={<Button size="sm" variant="outline" onClick={contactTable.reset}>Clear filters</Button>}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {contactTable.rows.map((contact) => (
                         <TableRow key={contact.relationship_id}>
-                          <TableCell className="font-medium">
-                            <button
-                              onClick={() => navigate(`/crm/contacts/${contact.contact_id}`)}
-                              className="text-primary hover:underline text-left"
->
-                              {contact.contact_name || '—'}
-                            </button>
+                          <TableCell className="max-w-[18rem] break-words font-medium">
+                            {contact.contact_name ? (
+                              <HubCellLink to={`/crm/contacts/${contact.contact_id}`}>{contact.contact_name}</HubCellLink>
+                            ) : (
+                              <HubCellEmpty />
+                            )}
                             {/* Primary reads as a plain coloured word, never a pill. */}
                             {contact.is_primary && (
                               <span className="ml-2 text-[10px] text-emerald-600 dark:text-emerald-400">Primary</span>
                             )}
                           </TableCell>
-                          <TableCell>
-                            {contact.contact_position || <span className="text-muted-foreground">—</span>}
+                          <TableCell className="hidden max-w-[16rem] break-words md:table-cell">
+                            {contact.contact_position || <HubCellEmpty />}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden max-w-[18rem] break-all sm:table-cell">
                             {contact.contact_email ? (
                               <a href={`mailto:${contact.contact_email}`} className="text-primary hover:underline">
                                 {contact.contact_email}
                               </a>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <HubCellEmpty />
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden whitespace-nowrap lg:table-cell">
                             {contact.contact_phone ? (
                               <a href={`tel:${contact.contact_phone}`} className="text-primary hover:underline">
                                 {contact.contact_phone}
                               </a>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <HubCellEmpty />
                             )}
                           </TableCell>
                           <TableCell className="text-right">
@@ -1192,6 +1246,7 @@ export const CompanyDetailPage: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  </>
                 )}
               </CardContent>
             </Card>

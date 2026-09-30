@@ -130,7 +130,7 @@ export const TaxDepreciationCard: React.FC<Props> = ({ workspaceId, canManage = 
                   <TableRow>
                     <TableHead>Statutory category</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
-                    <TableHead>From</TableHead>
+                    <TableHead className="hidden sm:table-cell">From</TableHead>
                     <TableHead>State</TableHead>
                     <TableHead className="text-right">Assets</TableHead>
                   </TableRow>
@@ -145,7 +145,7 @@ export const TaxDepreciationCard: React.FC<Props> = ({ workspaceId, canManage = 
                       <TableCell className="text-right tabular-nums">
                         {r.rate_percent != null ? `${r.rate_percent}%` : '—'}
                       </TableCell>
-                      <TableCell className="tabular-nums">{r.effective_from ?? '—'}</TableCell>
+                      <TableCell className="hidden sm:table-cell tabular-nums">{r.effective_from ?? '—'}</TableCell>
                       <TableCell>
                         <Badge variant={rateIsConfirmed(r) ? 'success' : r.rate_percent != null ? 'warning' : 'neutral'}>
                           {TAX_RATE_STATUS_LABEL[r.status]}

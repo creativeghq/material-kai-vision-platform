@@ -8,10 +8,18 @@
  * Approving grants visibility of that ONE factory's operator products. The dealer still
  * never gets a copy — they price the operator's row through product_prices.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Check, X, KeyRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/core/ui/table';
+import {
+  HubEmptyState, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar,
+  HUB_FILTER_ALL, useHubTable, type HubTableField,
+} from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { catalogGrantsService } from '@/services/catalogGrantsService';
@@ -25,6 +33,17 @@ interface RequestRow {
   status: 'requested' | 'active' | 'revoked';
   requestedAt: string;
 }
+
+const STATUS_LABEL: Record<string, string> = { requested: 'Awaiting you', active: 'Granted', revoked: 'Revoked' };
+
+const FIELDS: HubTableField<RequestRow>[] = [
+  { id: 'workspace', sortValue: (r) => r.workspaceName, searchText: (r) => r.workspaceName,
+    filterValue: (r) => r.workspaceName, filterLabel: 'Workspace' },
+  { id: 'factory', sortValue: (r) => r.factoryName ?? '', searchText: (r) => r.factoryName },
+  { id: 'requested', sortValue: (r) => r.requestedAt },
+  { id: 'status', sortValue: (r) => STATUS_LABEL[r.status], filterValue: (r) => r.status,
+    filterLabel: 'Status', filterOptionLabel: (v) => STATUS_LABEL[v] ?? v },
+];
 
 export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({ workspaceIds }) => {
   const { toast } = useToast();
@@ -67,12 +86,29 @@ export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({
     } finally { setBusy(null); }
   };
 
-  const pending = rows.filter((r) => r.status === 'requested');
-  const granted = rows.filter((r) => r.status === 'active');
+  const listed = useMemo(
+    () => [...rows.filter((r) => r.status === 'requested'), ...rows.filter((r) => r.status === 'active')],
+    [rows],
+  );
+  const t = useHubTable(listed, FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <TableHead
+      className={align === 'right' ? 'text-right' : undefined}
+      aria-sort={t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton
+        active={t.sort?.columnId === id ? t.sort.direction : undefined}
+        align={align}
+        onClick={() => t.toggleSort(id)}
+      >
+        {label}
+      </HubSortButton>
+    </TableHead>
+  );
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-hairline px-5 py-3">
         <CardTitle className="flex items-center gap-2">
           <KeyRound className="h-4 w-4" /> Catalog access
         </CardTitle>
@@ -83,60 +119,97 @@ export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({
       <CardContent className="p-0">
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-        ) : rows.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-            No requests yet. A dealer asks from the product form when they try to add something you already carry.
-          </p>
+        ) : listed.length === 0 ? (
+          <HubEmptyState
+            title="No requests yet"
+            description="A dealer asks from the product form when they try to add something you already carry."
+          />
         ) : (
-          <div className="table-scroll">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border/60 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2 text-left">Workspace</th>
-                <th className="px-4 py-2 text-left">Factory</th>
-                <th className="px-4 py-2 text-left">Requested</th>
-                <th className="px-4 py-2 text-center">Status</th>
-                <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...pending, ...granted].map((r) => (
-                <tr key={r.id} className="border-b border-border/30">
-                  <td className="px-4 py-2 font-medium">{r.workspaceName}</td>
-                  <td className="px-4 py-2">
-                    {r.factoryName ?? <span className="text-muted-foreground">All factories</span>}
-                  </td>
-                  <td className="px-4 py-2 text-muted-foreground">
-                    {formatDate(r.requestedAt)}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <span className={`text-[10px] ${r.status === 'active' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                      {r.status === 'active' ? 'Granted' : 'Awaiting you'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex justify-end gap-1">
-                      {r.status === 'requested' && (
-                        <Button size="sm" variant="outline" className="h-7"
-                          disabled={busy === r.id} onClick={() => decide(r.id, 'active')}>
-                          {busy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                          <span className="ml-1 text-xs">Grant</span>
-                        </Button>
-                      )}
-                      {r.status === 'active' && (
-                        <Button size="sm" variant="ghost" className="h-7"
-                          disabled={busy === r.id} onClick={() => decide(r.id, 'revoked')}>
-                          <X className="h-3.5 w-3.5" />
-                          <span className="ml-1 text-xs">Revoke</span>
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
+          <>
+            {listed.length > 8 && (
+              <HubToolbar
+                search={t.search}
+                onSearchChange={t.setSearch}
+                searchPlaceholder="Search workspaces or factories"
+                filters={(
+                  <>
+                    <HubFilterSelect
+                      label="Status"
+                      value={t.filters.status ?? HUB_FILTER_ALL}
+                      options={t.filterOptions.status}
+                      onChange={(v) => t.setFilter('status', v)}
+                    />
+                    <HubFilterSelect
+                      label="Workspace"
+                      value={t.filters.workspace ?? HUB_FILTER_ALL}
+                      options={t.filterOptions.workspace}
+                      onChange={(v) => t.setFilter('workspace', v)}
+                    />
+                    <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                  </>
+                )}
+              />
+            )}
+            {t.rows.length === 0 ? (
+              <HubEmptyState
+                variant="filtered"
+                title="No requests match"
+                action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {sortHead('workspace', 'Workspace')}
+                    {sortHead('factory', 'Factory')}
+                    {sortHead('requested', 'Requested')}
+                    {sortHead('status', 'Status')}
+                    <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {t.rows.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">
+                        <span className="block max-w-[16rem] truncate" title={r.workspaceName}>{r.workspaceName}</span>
+                      </TableCell>
+                      <TableCell>
+                        {r.factoryName
+                          ? <span className="block max-w-[16rem] truncate" title={r.factoryName}>{r.factoryName}</span>
+                          : <span className="text-muted-foreground">All factories</span>}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatDate(r.requestedAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={r.status === 'active' ? 'success' : 'warning'}>
+                          {STATUS_LABEL[r.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {r.status === 'requested' && (
+                            <Button size="sm" variant="outline" className="h-7"
+                              disabled={busy === r.id} onClick={() => decide(r.id, 'active')}>
+                              {busy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                              <span className="ml-1 text-xs">Grant</span>
+                            </Button>
+                          )}
+                          {r.status === 'active' && (
+                            <Button size="sm" variant="ghost" className="h-7"
+                              disabled={busy === r.id} onClick={() => decide(r.id, 'revoked')}>
+                              <X className="h-3.5 w-3.5" />
+                              <span className="ml-1 text-xs">Revoke</span>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

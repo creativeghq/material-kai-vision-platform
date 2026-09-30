@@ -54,6 +54,7 @@ import {
   HubPropertyList,
   HubRecordIdentity,
   HubRecordLayout,
+  HubResetFilters,
   HubSegmented,
   HubSideNav,
   HubStatGrid,
@@ -64,8 +65,10 @@ import {
   HubTimelineGroup,
   HubTimelineItem,
   HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
 } from '@/components/core/hub';
-import type { HubColumn, HubSort } from '@/components/core/hub';
+import type { HubColumn, HubTableField } from '@/components/core/hub';
 import { useTheme } from '@/contexts/ThemeContext';
 import { formatMoney } from '@/utils/decimal';
 
@@ -89,6 +92,14 @@ const DEMO_ROWS: DemoRow[] = [
   { id: '5', name: 'Claire Dubois', company: 'Atelier Sud', stage: 'Lost', owner: 'Anna K.', value: 7300, updated: 'Last week' },
 ];
 
+const DEMO_FIELDS: HubTableField<DemoRow>[] = [
+  { id: 'name', sortValue: (r) => r.name, searchText: (r) => `${r.name} ${r.company ?? ''}` },
+  { id: 'company', sortValue: (r) => r.company },
+  { id: 'stage', sortValue: (r) => r.stage, filterValue: (r) => r.stage, filterLabel: 'Stage' },
+  { id: 'owner', sortValue: (r) => r.owner, filterValue: (r) => r.owner, filterLabel: 'Owner' },
+  { id: 'value', sortValue: (r) => r.value },
+];
+
 const STAGE_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'error' | 'neutral'> = {
   Won: 'success',
   Proposal: 'info',
@@ -107,45 +118,29 @@ const demoMoney = (n: number) =>
 export default function DesignSystemPage() {
   const { theme, setTheme, accent, setAccent } = useTheme();
 
-  const [search, setSearch] = React.useState('');
-  const [stage, setStage] = React.useState('all');
-  const [owner, setOwner] = React.useState('all');
+  const table = useHubTable(DEMO_ROWS, DEMO_FIELDS, { columnId: 'value', direction: 'desc' });
   const [selected, setSelected] = React.useState<Set<string>>(new Set(['2']));
-  const [sort, setSort] = React.useState<HubSort>({ columnId: 'value', direction: 'desc' });
   const [section, setSection] = React.useState('overview');
   const [navItem, setNavItem] = React.useState('account');
   const [dsSide, setDsSide] = React.useState<'customer' | 'supplier'>('customer');
   const [dsLang, setDsLang] = React.useState<'en' | 'gr'>('en');
-
-  const rows = React.useMemo(() => {
-    const filtered = DEMO_ROWS.filter(
-      (r) =>
-        (stage === 'all' || r.stage === stage) &&
-        (owner === 'all' || r.owner === owner) &&
-        (search === '' || `${r.name} ${r.company ?? ''}`.toLowerCase().includes(search.toLowerCase())),
-    );
-    const dir = sort.direction === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sort.columnId === 'value') return (a.value - b.value) * dir;
-      if (sort.columnId === 'name') return a.name.localeCompare(b.name) * dir;
-      return 0;
-    });
-  }, [search, stage, owner, sort]);
 
   const columns: HubColumn<DemoRow>[] = [
     { id: 'name', header: 'Name', sortable: true, cell: (r) => <HubCellLink>{r.name}</HubCellLink> },
     {
       id: 'company',
       header: 'Company',
+      sortable: true,
       hideBelow: 'md',
       cell: (r) => r.company ?? <HubCellEmpty />,
     },
     {
       id: 'stage',
       header: 'Stage',
+      sortable: true,
       cell: (r) => <Badge variant={STAGE_VARIANT[r.stage] ?? 'neutral'}>{r.stage}</Badge>,
     },
-    { id: 'owner', header: 'Owner', hideBelow: 'lg', cell: (r) => r.owner ?? <HubCellEmpty /> },
+    { id: 'owner', header: 'Owner', sortable: true, hideBelow: 'lg', cell: (r) => r.owner ?? <HubCellEmpty /> },
     {
       id: 'value',
       header: 'Value',
@@ -155,8 +150,6 @@ export default function DesignSystemPage() {
     },
     { id: 'updated', header: 'Last activity', align: 'right', hideBelow: 'sm', cell: (r) => r.updated },
   ];
-
-  const activeFilters = [stage, owner].filter((v) => v !== 'all').length;
 
   return (
     <>
@@ -479,47 +472,24 @@ export default function DesignSystemPage() {
             />
             <div className="overflow-hidden rounded-md border border-hairline bg-card">
               <HubToolbar
-                search={search}
-                onSearchChange={setSearch}
+                search={table.search}
+                onSearchChange={table.setSearch}
                 searchPlaceholder="Search name, company"
                 filters={
                   <>
                     <HubFilterSelect
                       label="Stage"
-                      value={stage}
-                      onChange={setStage}
-                      options={[
-                        { value: 'all', label: 'All stages' },
-                        { value: 'New', label: 'New' },
-                        { value: 'Qualified', label: 'Qualified' },
-                        { value: 'Proposal', label: 'Proposal' },
-                        { value: 'Won', label: 'Won' },
-                        { value: 'Lost', label: 'Lost' },
-                      ]}
+                      value={table.filters.stage ?? HUB_FILTER_ALL}
+                      onChange={(v) => table.setFilter('stage', v)}
+                      options={table.filterOptions.stage}
                     />
                     <HubFilterSelect
                       label="Owner"
-                      value={owner}
-                      onChange={setOwner}
-                      options={[
-                        { value: 'all', label: 'Any owner' },
-                        { value: 'Nikos R.', label: 'Nikos R.' },
-                        { value: 'Anna K.', label: 'Anna K.' },
-                      ]}
+                      value={table.filters.owner ?? HUB_FILTER_ALL}
+                      onChange={(v) => table.setFilter('owner', v)}
+                      options={table.filterOptions.owner}
                     />
-                    {activeFilters > 0 && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => {
-                          setStage('all');
-                          setOwner('all');
-                        }}
-                      >
-                        Clear {activeFilters} filter{activeFilters === 1 ? '' : 's'}
-                      </Button>
-                    )}
+                    <HubResetFilters count={table.activeFilterCount} onReset={table.reset} />
                   </>
                 }
                 actions={
@@ -536,13 +506,13 @@ export default function DesignSystemPage() {
                 }
               />
               <HubDataTable
-                rows={rows}
+                rows={table.rows}
                 columns={columns}
                 rowId={(r) => r.id}
                 selected={selected}
                 onSelectedChange={setSelected}
-                sort={sort}
-                onSortChange={setSort}
+                sort={table.sort}
+                onSortChange={table.setSort}
                 className="rounded-none border-0"
                 empty={
                   <HubEmptyState
@@ -550,6 +520,7 @@ export default function DesignSystemPage() {
                     icon={Filter}
                     title="Nothing matches"
                     description="Widen the search or clear a filter."
+                    action={<Button size="sm" variant="outline" onClick={table.reset}>Clear filters</Button>}
                   />
                 }
                 footer={
@@ -557,7 +528,7 @@ export default function DesignSystemPage() {
                     <span>
                       {selected.size > 0
                         ? `${selected.size} selected`
-                        : `Showing ${rows.length} of ${DEMO_ROWS.length}`}
+                        : `Showing ${table.rows.length} of ${table.total}`}
                     </span>
                     {selected.size > 0 && (
                       <div className="ml-auto flex gap-1.5">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Building2, Trash2, Mail, CreditCard, Key, ExternalLink, Tags, Plus, Kanban } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Users, Building2, Trash2, Mail, CreditCard, Key, Tags, Plus, Kanban } from 'lucide-react';
 
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -44,7 +44,9 @@ import {
   LIFECYCLE_STAGE_OPTIONS, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
 } from '../crmConstants';
-import { HubEmptyState } from '@/components/core/hub';
+import {
+  HubCellEmpty, HubCellLink, HubEmptyState, HubSortButton, useHubTable, type HubTableField,
+} from '@/components/core/hub';
 
 // Pipeline renders FIRST, but 'users' stays the landing tab: bare `/crm` is the main nav
 // target, and defaulting to a module-gated tab would show an upsell as the front door of a
@@ -66,6 +68,15 @@ interface UserWithAuth {
   created_at: string;
   roles?: { id: string; name: string; level: number };
 }
+
+const USER_FIELDS: HubTableField<UserWithAuth>[] = [
+  { id: 'email', sortValue: (u) => u.email },
+  { id: 'tier', sortValue: (u) => (u.roles?.name ? roleLabel(u.roles.name) : null) },
+  { id: 'type', sortValue: (u) => professionalTypeLabel(u.professional_type) || null },
+  { id: 'subscription', sortValue: (u) => u.subscription_tier },
+  { id: 'credits', sortValue: (u) => u.credits ?? 0 },
+  { id: 'status', sortValue: (u) => u.status },
+];
 
 interface Contact {
   id: string;
@@ -121,7 +132,6 @@ function intersectIds(...sets: Array<Set<string> | null>): string[] | undefined 
 }
 
 export const CRMManagement: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
@@ -504,7 +514,20 @@ export const CRMManagement: React.FC = () => {
   useEffect(() => { setContactsPage((p) => clampPage(p, contactsTotal)); }, [contactsTotal]);
   useEffect(() => { setCompaniesPage((p) => clampPage(p, companiesTotal)); }, [companiesTotal]);
 
-  const pagedUsers = useMemo(() => paginate(filteredUsers, usersPage), [filteredUsers, usersPage]);
+  const userTable = useHubTable(filteredUsers, USER_FIELDS);
+  const sortedUsers = userTable.rows;
+  const pagedUsers = useMemo(() => paginate(sortedUsers, usersPage), [sortedUsers, usersPage]);
+  const userSortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton
+      align={align}
+      active={userTable.sort?.columnId === id ? userTable.sort.direction : undefined}
+      onClick={() => userTable.toggleSort(id)}
+    >
+      {label}
+    </HubSortButton>
+  );
+  const userAriaSort = (id: string) =>
+    userTable.sort?.columnId === id ? (userTable.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
 
   // ── selection helpers ─────────────────────────────────────────────────────
   // Contacts/companies "select all" covers the CURRENT PAGE only — the other pages were
@@ -712,7 +735,7 @@ export const CRMManagement: React.FC = () => {
                     onClear={() => setSelUsers(new Set())}
                   />
                 )}
-                <div className="border rounded-lg overflow-x-auto">
+                <div className="rounded-md border border-hairline">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -720,16 +743,20 @@ export const CRMManagement: React.FC = () => {
                           <Checkbox checked={allUsersSelected} onCheckedChange={(v) =>
                             setSelUsers(v ? new Set(filteredUsers.map((u) => u.user_id)) : new Set())} aria-label="Select all" />
                         </TableHead>
-                        <TableHead>Email</TableHead>
+                        <TableHead aria-sort={userAriaSort('email')}>{userSortHead('email', 'Email')}</TableHead>
                         {/* The GLOBAL account tier, not a team role. Team roles (Sales, HR,
                             Warehouse, Marketing, Accountant…) are per-workspace and live in
                             Profile → Team; setting one here would make it true in every workspace
                             the user belongs to. */}
-                        <TableHead>Account tier</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Subscription</TableHead>
-                        <TableHead>Credits</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead aria-sort={userAriaSort('tier')}>{userSortHead('tier', 'Account tier')}</TableHead>
+                        <TableHead aria-sort={userAriaSort('type')} className="hidden lg:table-cell">{userSortHead('type', 'Type')}</TableHead>
+                        <TableHead aria-sort={userAriaSort('subscription')} className="hidden md:table-cell">
+                          {userSortHead('subscription', 'Subscription')}
+                        </TableHead>
+                        <TableHead aria-sort={userAriaSort('credits')} className="hidden text-right sm:table-cell">
+                          {userSortHead('credits', 'Credits', 'right')}
+                        </TableHead>
+                        <TableHead aria-sort={userAriaSort('status')}>{userSortHead('status', 'Status')}</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -755,10 +782,11 @@ export const CRMManagement: React.FC = () => {
                           <TableCell>
                             <Checkbox checked={selUsers.has(user.user_id)} onCheckedChange={() => setSelUsers((s) => toggle(s, user.user_id))} aria-label="Select row" />
                           </TableCell>
-                          <TableCell className="font-medium">
-                            <button onClick={() => navigate(`/admin/crm/users/${user.user_id}`)} className="text-primary hover:underline flex items-center gap-2">
-                              <Mail className="h-4 w-4 text-muted-foreground" />{user.email}<ExternalLink className="h-3 w-3" />
-                            </button>
+                          <TableCell className="max-w-[20rem] font-medium">
+                            <HubCellLink to={`/admin/crm/users/${user.user_id}`} className="inline-flex max-w-full items-center gap-2">
+                              <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <span className="block min-w-0 max-w-[16rem] truncate" title={user.email}>{user.email}</span>
+                            </HubCellLink>
                           </TableCell>
                           <TableCell>
                             <Select value={user.role_id || ''} onValueChange={(v) => handleRoleChange(user.user_id, v)}>
@@ -768,9 +796,9 @@ export const CRMManagement: React.FC = () => {
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(user.professional_type) || '-'}</TableCell>
-                          <TableCell><span className="text-xs text-muted-foreground capitalize">{humanizeLabel(user.subscription_tier)}</span></TableCell>
-                          <TableCell><div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-muted-foreground" />{user.credits || 0}</div></TableCell>
+                          <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">{professionalTypeLabel(user.professional_type) || <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden md:table-cell"><span className="text-xs text-muted-foreground capitalize">{humanizeLabel(user.subscription_tier)}</span></TableCell>
+                          <TableCell className="hidden sm:table-cell"><div className="flex items-center justify-end gap-2 tabular-nums"><CreditCard className="h-4 w-4 text-muted-foreground" />{user.credits || 0}</div></TableCell>
                           <TableCell><span className={`text-xs capitalize ${statusTone(user.status)}`}>{humanizeLabel(user.status)}</span></TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
@@ -814,7 +842,7 @@ export const CRMManagement: React.FC = () => {
                     onClear={() => setSelContacts(new Set())}
                   />
                 )}
-                <div className="border rounded-lg overflow-x-auto">
+                <div className="rounded-md border border-hairline">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -826,11 +854,11 @@ export const CRMManagement: React.FC = () => {
                             aria-label="Select all on this page" title="Select all on this page" />
                         </TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Company</TableHead>
+                        <TableHead className="hidden md:table-cell">Email</TableHead>
+                        <TableHead className="hidden lg:table-cell">Phone</TableHead>
+                        <TableHead className="hidden sm:table-cell">Company</TableHead>
                         {/* `profession` — the party's declared activity, not an app type. */}
-                        <TableHead>Activity</TableHead>
+                        <TableHead className="hidden xl:table-cell">Activity</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -858,19 +886,18 @@ export const CRMManagement: React.FC = () => {
                           </TableCell>
                           <TableCell className="font-medium max-w-[24rem]">
                             <div className="flex items-center gap-2 min-w-0">
-                              <button onClick={() => navigate(`/crm/contacts/${contact.id}`)} title={contact.name} className="text-primary hover:underline inline-flex items-center gap-1 max-w-full text-left">
-                                <span className="truncate min-w-0">{contact.name}</span>
-                                <ExternalLink className="h-3 w-3 shrink-0" />
-                              </button>
+                              <HubCellLink to={`/crm/contacts/${contact.id}`} className="block min-w-0 max-w-full truncate">
+                                <span title={contact.name}>{contact.name}</span>
+                              </HubCellLink>
                               {(contact as any).lead_score != null && (
                                 <Badge className={`${leadScoreTint((contact as any).lead_score)} border-0 text-[10px]`} title="Lead score">{(contact as any).lead_score}</Badge>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{contact.email ? <a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a> : '-'}</TableCell>
-                          <TableCell>{contact.phone ? <a href={`tel:${contact.phone}`} className="text-primary hover:underline">{contact.phone}</a> : '-'}</TableCell>
-                          <TableCell>{contactCompanyName(contact) || '-'}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(contact.profession) || contact.profession || '-'}</TableCell>
+                          <TableCell className="hidden max-w-[18rem] break-all md:table-cell">{contact.email ? <a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a> : <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden whitespace-nowrap lg:table-cell">{contact.phone ? <a href={`tel:${contact.phone}`} className="text-primary hover:underline">{contact.phone}</a> : <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden max-w-[16rem] break-words sm:table-cell">{contactCompanyName(contact) || <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">{professionalTypeLabel(contact.profession) || contact.profession || <HubCellEmpty />}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => handleDeleteContact(contact.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                           </TableCell>
@@ -909,7 +936,7 @@ export const CRMManagement: React.FC = () => {
                     onClear={() => setSelCompanies(new Set())}
                   />
                 )}
-                <div className="border rounded-lg overflow-x-auto">
+                <div className="rounded-md border border-hairline">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -920,11 +947,11 @@ export const CRMManagement: React.FC = () => {
                             aria-label="Select all on this page" title="Select all on this page" />
                         </TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Website</TableHead>
+                        <TableHead className="hidden md:table-cell">Email</TableHead>
+                        <TableHead className="hidden lg:table-cell">Phone</TableHead>
+                        <TableHead className="hidden xl:table-cell">Website</TableHead>
                         {/* ΑΑΔΕ ΚΑΔ activity (falls back to industry when unresolved). */}
-                        <TableHead>Activity</TableHead>
+                        <TableHead className="hidden sm:table-cell">Activity</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -951,18 +978,17 @@ export const CRMManagement: React.FC = () => {
                             <Checkbox checked={selCompanies.has(company.id)} onCheckedChange={() => setSelCompanies((s) => toggle(s, company.id))} aria-label="Select row" />
                           </TableCell>
                           <TableCell className="font-medium max-w-[24rem]">
-                            <button onClick={() => navigate(`/crm/companies/${company.id}`)} title={company.name} className="text-primary hover:underline inline-flex items-center gap-1 max-w-full text-left">
-                              <span className="truncate min-w-0">{company.name}</span>
-                              <ExternalLink className="h-3 w-3 shrink-0" />
-                            </button>
+                            <HubCellLink to={`/crm/companies/${company.id}`} className="block max-w-full truncate">
+                              <span title={company.name}>{company.name}</span>
+                            </HubCellLink>
                             {company.commercial_title && company.commercial_title.trim().toLowerCase() !== (company.name || '').trim().toLowerCase() && (
                               <div className="truncate text-xs font-normal text-muted-foreground">{company.commercial_title}</div>
                             )}
                           </TableCell>
-                          <TableCell>{company.email ? <a href={`mailto:${company.email}`} className="text-primary hover:underline">{company.email}</a> : '-'}</TableCell>
-                          <TableCell>{company.phone ? <a href={`tel:${company.phone}`} className="text-primary hover:underline">{company.phone}</a> : '-'}</TableCell>
-                          <TableCell>{company.website ? <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a> : '-'}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(company.profession) || company.profession || company.industry || '-'}</TableCell>
+                          <TableCell className="hidden max-w-[18rem] break-all md:table-cell">{company.email ? <a href={`mailto:${company.email}`} className="text-primary hover:underline">{company.email}</a> : <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden whitespace-nowrap lg:table-cell">{company.phone ? <a href={`tel:${company.phone}`} className="text-primary hover:underline">{company.phone}</a> : <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden max-w-[16rem] break-all xl:table-cell">{company.website ? <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a> : <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">{professionalTypeLabel(company.profession) || company.profession || company.industry || <HubCellEmpty />}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => handleDeleteCompany(company.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                           </TableCell>

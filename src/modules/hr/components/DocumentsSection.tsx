@@ -11,6 +11,14 @@ import { useToast } from '@/hooks/use-toast';
 import { hrService, type HrDocument, type Employee, type DocType, DOC_TYPE_LABELS } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { HUB_FILTER_ALL, HubCellEmpty, HubCellLink, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
+
+const DOCUMENT_FIELDS: HubTableField<HrDocument>[] = [
+  { id: 'name', sortValue: (d) => d.name, searchText: (d) => d.name },
+  { id: 'type', sortValue: (d) => DOC_TYPE_LABELS[d.doc_type], filterValue: (d) => d.doc_type, filterLabel: 'Type', filterOptionLabel: (v) => DOC_TYPE_LABELS[v as DocType] ?? v },
+  { id: 'employee', sortValue: (d) => d.employee?.contact?.name, searchText: (d) => d.employee?.contact?.name, filterValue: (d) => d.employee?.contact?.name, filterLabel: 'Employee' },
+  { id: 'added', sortValue: (d) => d.created_at },
+];
 
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
 
@@ -21,6 +29,12 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const t = useHubTable(docs, DOCUMENT_FIELDS);
+  useEffect(() => { setPage(1); }, [t.search, t.filters]);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -52,7 +66,21 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
       <SectionHeader title="Documents" subtitle={`${docs.length} files`} actions={canManage && workspaceId ? <UploadDialog workspaceId={workspaceId} employees={employees} onDone={load} /> : undefined} />
       <Card>
         <CardContent className="p-0">
-          {docs.length === 0 ? (
+          {docs.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search documents"
+              filters={<>
+                <HubFilterSelect label="Type" value={t.filters.type ?? HUB_FILTER_ALL} options={t.filterOptions.type} onChange={(v) => t.setFilter('type', v)} />
+                <HubFilterSelect label="Employee" value={t.filters.employee ?? HUB_FILTER_ALL} options={t.filterOptions.employee} onChange={(v) => t.setFilter('employee', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
+          {docs.length > 0 && t.rows.length === 0 ? (
+            <EmptyState icon={FolderOpen} variant="filtered" title="No documents match your filters" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} />
+          ) : docs.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title="No documents yet"
@@ -61,14 +89,25 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
             />
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Employee</TableHead><TableHead>Added</TableHead><TableHead /></TableRow></TableHeader>
+              <TableHeader><TableRow>
+                <TableHead aria-sort={ariaSort('name')}>{sortHead('name', 'Name')}</TableHead>
+                <TableHead className="hidden sm:table-cell" aria-sort={ariaSort('type')}>{sortHead('type', 'Type')}</TableHead>
+                <TableHead className="hidden md:table-cell" aria-sort={ariaSort('employee')}>{sortHead('employee', 'Employee')}</TableHead>
+                <TableHead className="hidden md:table-cell" aria-sort={ariaSort('added')}>{sortHead('added', 'Added')}</TableHead>
+                <TableHead />
+              </TableRow></TableHeader>
               <TableBody>
-                {paginate(docs, page).map((d) => (
+                {paginate(t.rows, page).map((d) => (
                   <TableRow key={d.id}>
-                    <TableCell className="font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />{d.name}</TableCell>
-                    <TableCell><span className="text-sm text-muted-foreground capitalize">{DOC_TYPE_LABELS[d.doc_type]}</span></TableCell>
-                    <TableCell>{d.employee?.contact?.name || '—'}</TableCell>
-                    <TableCell className="text-muted-foreground">{d.created_at?.slice(0, 10)}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <button type="button" disabled={busy === d.id} onClick={() => view(d)} className="block max-w-[18rem] truncate text-left font-semibold text-primary hover:underline disabled:opacity-60" title={d.name}>{d.name}</button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell"><span className="text-sm text-muted-foreground">{DOC_TYPE_LABELS[d.doc_type]}</span></TableCell>
+                    <TableCell className="hidden md:table-cell">{d.employee?.contact ? <HubCellLink to={`/crm/contacts/${d.employee.contact.id}`} className="font-normal">{d.employee.contact.name}</HubCellLink> : <HubCellEmpty />}</TableCell>
+                    <TableCell className="hidden md:table-cell whitespace-nowrap text-muted-foreground tabular-nums">{d.created_at?.slice(0, 10) || <HubCellEmpty />}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="sm" disabled={busy === d.id} onClick={() => view(d)} title="Download"><Download className="h-4 w-4" /></Button>
@@ -80,7 +119,7 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
               </TableBody>
             </Table>
           )}
-          <TablePagination page={page} total={docs.length} onPageChange={setPage} label="documents" />
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="documents" />
         </CardContent>
       </Card>
     </div>

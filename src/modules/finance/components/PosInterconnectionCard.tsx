@@ -127,10 +127,10 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
                   <TableHeader>
                     <TableRow>
                       <TableHead>Terminal</TableHead>
-                      <TableHead>Provider / model</TableHead>
+                      <TableHead className="hidden md:table-cell">Provider / model</TableHead>
                       <TableHead>Route</TableHead>
                       <TableHead>Trade</TableHead>
-                      <TableHead className="text-right">Window</TableHead>
+                      <TableHead className="hidden md:table-cell text-right">Window</TableHead>
                       <TableHead>Verdict</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -141,7 +141,7 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
                           <span className="font-medium">{t.label ?? '—'}</span>
                           <span className="block text-[11px] text-muted-foreground">{t.terminal_id}</span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           {t.nsp_name ?? '—'}
                           <span className="block text-[11px] text-muted-foreground">{t.pos_model ?? '—'}</span>
                         </TableCell>
@@ -153,7 +153,7 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
                               interconnection_route: v === 'none' ? null : (v as InterconnectionRoute),
                             })}
                           >
-                            <SelectTrigger className="h-8 w-52 text-xs" aria-label={`Route for ${t.terminal_id}`}>
+                            <SelectTrigger className="h-8 w-40 text-xs lg:w-52" aria-label={`Route for ${t.terminal_id}`}>
                               <SelectValue placeholder="Not stated" />
                             </SelectTrigger>
                             <SelectContent>
@@ -163,7 +163,7 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="space-x-1">
+                        <TableCell className="space-x-1 whitespace-nowrap">
                           <Button
                             size="sm" variant={t.handles_retail ? 'secondary' : 'outline'}
                             className="h-7 px-2 text-[11px]" disabled={busy}
@@ -180,7 +180,7 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
                           </Button>
                           {t.supports_iris && <Badge variant="info">IRIS</Badge>}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">{t.matching_window_hours}h</TableCell>
+                        <TableCell className="hidden md:table-cell text-right tabular-nums">{t.matching_window_hours}h</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Badge variant={t.verdict === 'interconnected' ? 'success' : t.verdict === 'must_interconnect' ? 'error' : 'neutral'}>

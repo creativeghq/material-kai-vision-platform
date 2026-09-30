@@ -362,8 +362,8 @@ export const MaterialCategoriesTab: React.FC = () => {
               <TableRow>
                 <TableHead className="w-24">Order</TableHead>
                 <TableHead>Display name</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead>Default unit</TableHead>
+                <TableHead className="hidden md:table-cell">Key</TableHead>
+                <TableHead className="hidden sm:table-cell">Default unit</TableHead>
                 <TableHead>Active</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -395,14 +395,20 @@ export const MaterialCategoriesTab: React.FC = () => {
                       </Button>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell>
                     <span style={{ paddingLeft: `${row.depth * 1.5}rem` }} className="inline-flex items-center gap-1.5">
                       {row.depth > 0 && <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                      {row.display_name}
+                      <button
+                        type="button"
+                        onClick={() => openEdit(row)}
+                        className="text-left font-semibold text-primary hover:underline"
+                      >
+                        {row.display_name}
+                      </button>
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">{row.category_key}</TableCell>
-                  <TableCell className="text-muted-foreground">{row.default_unit}</TableCell>
+                  <TableCell className="hidden text-muted-foreground font-mono text-xs md:table-cell">{row.category_key}</TableCell>
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">{row.default_unit || '—'}</TableCell>
                   <TableCell>
                     <Switch checked={row.is_active ?? false} onCheckedChange={() => toggleActive(row)} />
                   </TableCell>

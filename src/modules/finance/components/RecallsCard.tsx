@@ -19,12 +19,48 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import {
+  HubToolbar, HubFilterSelect, HubResetFilters, HubSortButton, HubCellLink, HubCellEmpty, useHubTable,
+  HUB_FILTER_ALL, type HubTableField, type HubSort,
+} from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import {
   productComplianceService, bannedPhrasesIn, missingRecallElements,
   RECALL_HEADLINE, RECALL_REQUIRED_FIELDS,
   type ProductRecall, type BannedPhrase, type RecallAffectedCustomer,
 } from '@/modules/finance/services/productComplianceService';
+
+const RECALL_FIELDS: HubTableField<ProductRecall>[] = [
+  { id: 'notice', sortValue: (r) => r.product_description, searchText: (r) => r.product_description },
+  { id: 'status', sortValue: (r) => r.status, filterValue: (r) => r.status, filterLabel: 'Status' },
+  { id: 'published', sortValue: (r) => r.published_at },
+  { id: 'gateway', sortValue: (r) => r.gateway_reference, searchText: (r) => r.gateway_reference },
+];
+
+const AFFECTED_FIELDS: HubTableField<RecallAffectedCustomer>[] = [
+  { id: 'customer', sortValue: (a) => a.customer_name, searchText: (a) => a.customer_name },
+  { id: 'email', sortValue: (a) => a.email, searchText: (a) => a.email },
+  { id: 'orders', sortValue: (a) => a.orders },
+  { id: 'quantity', sortValue: (a) => a.quantity },
+];
+
+const SortHead: React.FC<{
+  id: string; label: string; sort?: HubSort; onSort: (id: string) => void; className?: string; align?: 'right';
+}> = ({ id, label, sort, onSort, className, align }) => (
+  <TableHead
+    className={[className, align === 'right' ? 'text-right' : ''].filter(Boolean).join(' ') || undefined}
+    aria-sort={sort?.columnId === id ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+  >
+    <HubSortButton active={sort?.columnId === id ? sort.direction : undefined} align={align} onClick={() => onSort(id)}>
+      {label}
+    </HubSortButton>
+  </TableHead>
+);
+
+const affectedLink = (a: RecallAffectedCustomer) =>
+  a.company_id ? `/crm/companies/${a.company_id}` : a.contact_id ? `/crm/contacts/${a.contact_id}` : undefined;
+
+const NO_AFFECTED: RecallAffectedCustomer[] = [];
 
 export const RecallsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -35,6 +71,8 @@ export const RecallsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const rt = useHubTable(recalls, RECALL_FIELDS);
+  const at = useHubTable(affected ?? NO_AFFECTED, AFFECTED_FIELDS);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,30 +184,61 @@ export const RecallsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         )}
 
         {recalls.length > 0 && (
-          <div className="table-scroll">
+          <div className="overflow-hidden rounded-md border border-hairline">
+            {recalls.length > 8 && (
+              <HubToolbar
+                search={rt.search}
+                onSearchChange={rt.setSearch}
+                searchPlaceholder="Search notices"
+                filters={<>
+                  <HubFilterSelect label="Status" value={rt.filters.status ?? HUB_FILTER_ALL} options={rt.filterOptions.status} onChange={(v) => rt.setFilter('status', v)} />
+                  <HubResetFilters count={rt.activeFilterCount} onReset={rt.reset} />
+                </>}
+              />
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Notice</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Published</TableHead>
-                  <TableHead>Gateway</TableHead>
+                  <SortHead id="notice" label="Notice" sort={rt.sort} onSort={rt.toggleSort} />
+                  <SortHead id="status" label="Status" sort={rt.sort} onSort={rt.toggleSort} />
+                  <SortHead id="published" label="Published" sort={rt.sort} onSort={rt.toggleSort} className="hidden sm:table-cell" />
+                  <SortHead id="gateway" label="Gateway" sort={rt.sort} onSort={rt.toggleSort} className="hidden md:table-cell" />
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recalls.map((r) => (
+                {rt.rows.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5}>
+                      <HubEmptyState
+                        variant="filtered"
+                        title="No notices match"
+                        action={<HubResetFilters count={rt.activeFilterCount} onReset={rt.reset} />}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+                {rt.rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell>{r.product_description ?? '—'}</TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className="block max-w-[20rem] truncate text-left font-semibold text-primary hover:underline"
+                        title={r.product_description ?? undefined}
+                        onClick={() => { setEditing(r); setAffected(null); }}
+                      >
+                        {r.product_description ?? 'Untitled notice'}
+                      </button>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={r.status === 'published' ? 'error' : r.status === 'closed' ? 'neutral' : 'warning'}>
                         {r.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="tabular-nums">
-                      {r.published_at ? r.published_at.slice(0, 10) : '—'}
+                    <TableCell className="hidden whitespace-nowrap tabular-nums sm:table-cell">
+                      {r.published_at ? r.published_at.slice(0, 10) : <HubCellEmpty />}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {r.gateway_reference
                         ? r.gateway_reference
                         : <span className="text-destructive">not submitted</span>}
@@ -264,23 +333,48 @@ export const RecallsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                 {affected.length === 0
                   ? <p className="text-[11px] text-muted-foreground">No sales order carries this product.</p>
                   : (
-                    <div className="table-scroll">
+                    <div className="overflow-hidden rounded-md border border-hairline">
+                      {affected.length > 8 && (
+                        <HubToolbar
+                          search={at.search}
+                          onSearchChange={at.setSearch}
+                          searchPlaceholder="Search customers"
+                          filters={<HubResetFilters count={at.activeFilterCount} onReset={at.reset} />}
+                        />
+                      )}
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead className="text-right">Orders</TableHead>
-                            <TableHead className="text-right">Quantity</TableHead>
+                            <SortHead id="customer" label="Customer" sort={at.sort} onSort={at.toggleSort} />
+                            <SortHead id="email" label="Email" sort={at.sort} onSort={at.toggleSort} className="hidden sm:table-cell" />
+                            <SortHead id="orders" label="Orders" sort={at.sort} onSort={at.toggleSort} align="right" />
+                            <SortHead id="quantity" label="Quantity" sort={at.sort} onSort={at.toggleSort} align="right" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {affected.map((a, i) => (
+                          {at.rows.length === 0 && (
+                            <TableRow className="hover:bg-transparent">
+                              <TableCell colSpan={4}>
+                                <HubEmptyState
+                                  variant="filtered"
+                                  title="No customers match"
+                                  action={<HubResetFilters count={at.activeFilterCount} onReset={at.reset} />}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {at.rows.map((a, i) => (
                             <TableRow key={`${a.company_id ?? a.contact_id ?? 'x'}:${i}`}>
-                              <TableCell>{a.customer_name ?? '—'}</TableCell>
-                              <TableCell>{a.email ?? <span className="text-destructive">no address</span>}</TableCell>
+                              <TableCell>
+                                {a.customer_name ? (
+                                  <HubCellLink to={affectedLink(a)} className="block max-w-[16rem] truncate">
+                                    <span title={a.customer_name}>{a.customer_name}</span>
+                                  </HubCellLink>
+                                ) : <HubCellEmpty />}
+                              </TableCell>
+                              <TableCell className="hidden break-all sm:table-cell">{a.email ?? <span className="text-destructive">no address</span>}</TableCell>
                               <TableCell className="text-right tabular-nums">{a.orders}</TableCell>
-                              <TableCell className="text-right tabular-nums">{a.quantity ?? '—'}</TableCell>
+                              <TableCell className="text-right tabular-nums">{a.quantity ?? <HubCellEmpty />}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

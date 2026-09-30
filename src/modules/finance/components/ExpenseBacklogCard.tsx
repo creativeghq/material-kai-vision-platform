@@ -7,6 +7,10 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import {
+  HubCellEmpty, HubCellLink, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar,
+  HUB_FILTER_ALL, useHubTable, type HubTableField,
+} from '@/components/core/hub';
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import { TablePagination, clampPage, paginate } from '@/components/core/ui/table-pagination';
@@ -43,6 +47,18 @@ function canBookRow(row: InboundBookableIssuerRow, choice: Record<string, string
   if (chosenCategory(row, choice)) return true;
   return row.category_pending === 0;
 }
+
+const ISSUER_FIELDS: HubTableField<InboundBookableIssuerRow>[] = [
+  { id: 'supplier', sortValue: (r) => r.issuer_name || r.issuer_vat,
+    searchText: (r) => `${r.issuer_name ?? ''} ${r.issuer_vat ?? ''}` },
+  { id: 'docs', sortValue: (r) => r.docs },
+  { id: 'total', sortValue: (r) => r.will_book_total },
+  { id: 'period', sortValue: (r) => r.last_issue_date ?? r.first_issue_date },
+  { id: 'category', sortValue: (r) => r.learned_category_name, filterValue: (r) => r.learned_category_name,
+    filterLabel: 'Category' },
+  { id: 'filed', filterValue: (r) => (r.category_pending === 0 ? 'filed' : 'pending'), filterLabel: 'Filing',
+    filterOptionLabel: (v) => (v === 'filed' ? 'Filed' : 'Needs a category') },
+];
 
 interface CategoryOption { id: string; name: string; kind?: string | null; is_system?: boolean | null }
 
@@ -96,7 +112,23 @@ export const ExpenseBacklogCard: React.FC<Props> = ({ workspaceId, categories, c
   }, [workspaceId]);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setPage((p) => clampPage(p, issuers.length)); }, [issuers.length]);
+  const t = useHubTable(issuers, ISSUER_FIELDS);
+  useEffect(() => { setPage((p) => clampPage(p, t.rows.length)); }, [t.rows.length]);
+  useEffect(() => { setPage(1); }, [t.search, t.filters, t.sort]);
+  const sortHead = (id: string, label: string, align?: 'right', className?: string) => (
+    <th
+      className={`px-4 py-2 ${align === 'right' ? 'text-right' : 'text-left'}${className ? ` ${className}` : ''}`}
+      aria-sort={t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton
+        active={t.sort?.columnId === id ? t.sort.direction : undefined}
+        align={align}
+        onClick={() => t.toggleSort(id)}
+      >
+        {label}
+      </HubSortButton>
+    </th>
+  );
 
   const bookable = backlog.find((b) => b.booking_state === 'bookable');
   const others = useMemo(
@@ -142,7 +174,7 @@ export const ExpenseBacklogCard: React.FC<Props> = ({ workspaceId, categories, c
 
   return (
     <Card>
-      <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-start justify-between gap-3 space-y-0">
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-sm">
             <Inbox className="h-4 w-4 text-muted-foreground" /> Waiting to become expenses
@@ -194,38 +226,69 @@ export const ExpenseBacklogCard: React.FC<Props> = ({ workspaceId, categories, c
           />
         ) : (
           <>
+            {issuers.length > 8 && (
+              <HubToolbar
+                search={t.search}
+                onSearchChange={t.setSearch}
+                searchPlaceholder="Search supplier or ΑΦΜ"
+                filters={(
+                  <>
+                    <HubFilterSelect label="Filing" value={t.filters.filed ?? HUB_FILTER_ALL}
+                      options={t.filterOptions.filed} onChange={(v) => t.setFilter('filed', v)} />
+                    <HubFilterSelect label="Category" value={t.filters.category ?? HUB_FILTER_ALL}
+                      options={t.filterOptions.category} onChange={(v) => t.setFilter('category', v)} />
+                    <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                  </>
+                )}
+              />
+            )}
+            {t.rows.length === 0 ? (
+              <HubEmptyState
+                variant="filtered"
+                title="No supplier matches"
+                action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>}
+              />
+            ) : (
             <div className="table-scroll">
               <table className="w-full text-sm">
-                <thead className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                <thead className="sticky top-0 z-10 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
                   <tr className="border-b border-hairline">
-                    <th className="px-4 py-2 text-left">Supplier</th>
-                    <th className="px-4 py-2 text-right">Docs</th>
-                    <th className="px-4 py-2 text-right">Will add</th>
-                    <th className="px-4 py-2 text-left">Period</th>
-                    <th className="px-4 py-2 text-left">Category</th>
+                    {sortHead('supplier', 'Supplier')}
+                    {sortHead('docs', 'Docs', 'right', 'hidden sm:table-cell')}
+                    {sortHead('total', 'Will add', 'right')}
+                    {sortHead('period', 'Period', undefined, 'hidden md:table-cell')}
+                    {sortHead('category', 'Category')}
                     {canBook && <th className="px-4 py-2 text-right">Book</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {paginate(issuers, page).map((row) => {
+                  {paginate(t.rows, page).map((row) => {
                     const vat = row.issuer_vat;
                     const selected = (vat ? choice[vat] : undefined) ?? row.learned_category_id ?? '';
                     const bookable = canBookRow(row, choice);
                     return (
                       <tr key={vat ?? '__no_vat__'} className="border-b border-hairline last:border-0">
                         <td className="px-4 py-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate font-medium">{row.issuer_name || vat || 'No ΑΦΜ on the document'}</span>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {row.crm_company_id ? (
+                              <HubCellLink to={`/crm/companies/${row.crm_company_id}`} className="block max-w-[16rem] truncate">
+                                <span title={row.issuer_name || vat || undefined}>{row.issuer_name || vat}</span>
+                              </HubCellLink>
+                            ) : (
+                              <span className="block max-w-[16rem] truncate font-medium" title={row.issuer_name || vat || undefined}>
+                                {row.issuer_name || vat || 'No ΑΦΜ on the document'}
+                              </span>
+                            )}
                             {row.crm_company_id && <Building2 className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="In your CRM" />}
                           </div>
                           <div className="text-[11px] text-muted-foreground">
                             {vat ? `ΑΦΜ ${vat}` : 'Booking is by ΑΦΜ — open these in the inbox'}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums">{row.docs.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-right font-medium tabular-nums">{formatMoney(row.will_book_total, 'EUR')}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-[11px] text-muted-foreground">
-                          {row.first_issue_date ? formatDate(row.first_issue_date) : '—'}
+                        <td className="hidden px-4 py-2 text-right tabular-nums sm:table-cell">{row.docs.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-right font-medium tabular-nums whitespace-nowrap">{formatMoney(row.will_book_total, 'EUR')}</td>
+                        <td className="hidden px-4 py-2 whitespace-nowrap text-[11px] text-muted-foreground md:table-cell">
+                          {row.first_issue_date ? formatDate(row.first_issue_date) : <HubCellEmpty />}
                           {row.last_issue_date && row.last_issue_date !== row.first_issue_date && <> → {formatDate(row.last_issue_date)}</>}
                         </td>
                         <td className="px-4 py-2">
@@ -276,7 +339,8 @@ export const ExpenseBacklogCard: React.FC<Props> = ({ workspaceId, categories, c
                 </tbody>
               </table>
             </div>
-            <TablePagination page={page} total={issuers.length} onPageChange={setPage} label="suppliers" />
+            )}
+            <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="suppliers" />
           </>
         )}
 

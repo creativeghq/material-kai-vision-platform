@@ -107,18 +107,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           ),
           // Tables
           table: ({ children }) => (
-            <div className="overflow-x-auto my-2">
-              <table className="min-w-full text-sm border border-white/20 rounded">{children}</table>
+            <div className="table-scroll my-2 rounded-sm border border-hairline">
+              <table className="min-w-full border-collapse text-sm">{children}</table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-white/10">{children}</thead>
+            <thead className="bg-surface-sunken">{children}</thead>
           ),
           th: ({ children }) => (
-            <th className="px-3 py-2 text-left font-semibold border-b border-white/20">{children}</th>
+            <th className="border-b border-hairline px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground">{children}</th>
           ),
           td: ({ children }) => (
-            <td className="px-3 py-2 border-b border-white/10">{children}</td>
+            <td className="border-b border-hairline px-3 py-2 align-top break-words">{children}</td>
           ),
         }}
       >

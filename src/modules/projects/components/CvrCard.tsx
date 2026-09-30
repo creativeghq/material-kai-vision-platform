@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Scale } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { HubEmptyState } from '@/components/core/hub';
+import { HubEmptyState, HubSortButton, useHubTable, type HubTableField } from '@/components/core/hub';
 import { formatMoney } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
 import { variationsService, type CvrRow } from '../services/variationsService';
@@ -15,6 +15,15 @@ interface Props {
 }
 
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
+
+const CVR_FIELDS: HubTableField<CvrRow>[] = [
+  { id: 'code', sortValue: (r) => r.code },
+  { id: 'value', sortValue: (r) => n(r.total_value) },
+  { id: 'actual', sortValue: (r) => n(r.actual_cost) },
+  { id: 'cost', sortValue: (r) => n(r.total_cost) },
+  { id: 'margin', sortValue: (r) => n(r.margin) },
+];
+const NO_ROWS: CvrRow[] = [];
 
 export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadToken }) => {
   const { toast } = useToast();
@@ -38,7 +47,15 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
   const money = (v: number | string | null | undefined) => formatMoney(n(v), currency);
   const cell = (v: number | string | null | undefined) => (n(v) ? money(v) : '—');
 
-  const list = rows ?? [];
+  const list = rows ?? NO_ROWS;
+  const t = useHubTable(list, CVR_FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton align={align} active={t.sort?.columnId === id ? t.sort.direction : undefined} onClick={() => t.toggleSort(id)}>
+      {label}
+    </HubSortButton>
+  );
+  const ariaSort = (id: string) =>
+    t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
   // Summing the SQL's own per-row figures. Never rebuilding a row's total from its parts: that
   // would be a second derivation of the same money, free to drift from the first.
   const totals = list.reduce(
@@ -79,22 +96,26 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
           <div className="table-scroll">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
-                  <th className="px-5 py-2 text-left">Code</th>
-                  <th className="px-3 py-2 text-right">Contracted</th>
-                  <th className="px-3 py-2 text-right">Variations</th>
-                  <th className="px-3 py-2 text-right">Value</th>
-                  <th className="px-3 py-2 text-right">Actual</th>
-                  <th className="px-3 py-2 text-right">Pending</th>
-                  <th className="px-3 py-2 text-right">Committed</th>
-                  <th className="px-3 py-2 text-right">Cost</th>
-                  <th className="px-5 py-2 text-right">Margin</th>
+                <tr className="border-b border-hairline bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                  <th className="px-5 py-2 text-left" aria-sort={ariaSort('code')}>{sortHead('code', 'Code')}</th>
+                  <th className="hidden px-3 py-2 text-right lg:table-cell">Contracted</th>
+                  <th className="hidden px-3 py-2 text-right lg:table-cell">Variations</th>
+                  <th className="px-3 py-2 text-right" aria-sort={ariaSort('value')}>{sortHead('value', 'Value', 'right')}</th>
+                  <th className="hidden px-3 py-2 text-right md:table-cell" aria-sort={ariaSort('actual')}>
+                    {sortHead('actual', 'Actual', 'right')}
+                  </th>
+                  <th className="hidden px-3 py-2 text-right md:table-cell">Pending</th>
+                  <th className="hidden px-3 py-2 text-right md:table-cell">Committed</th>
+                  <th className="hidden px-3 py-2 text-right sm:table-cell" aria-sort={ariaSort('cost')}>
+                    {sortHead('cost', 'Cost', 'right')}
+                  </th>
+                  <th className="px-5 py-2 text-right" aria-sort={ariaSort('margin')}>{sortHead('margin', 'Margin', 'right')}</th>
                 </tr>
               </thead>
               <tbody>
-                {list.map((r) => (
-                  <tr key={r.cost_code_id ?? 'uncoded'} className="border-t border-border/60">
-                    <td className="px-5 py-2">
+                {t.rows.map((r) => (
+                  <tr key={r.cost_code_id ?? 'uncoded'} className="border-t border-hairline">
+                    <td className="max-w-[20rem] break-words px-5 py-2">
                       {r.cost_code_id ? (
                         <>
                           <span className="font-mono text-xs tabular-nums text-muted-foreground">{r.code}</span>
@@ -104,13 +125,13 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
                         <span className="text-amber-800 dark:text-amber-300">Not coded</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums">{cell(r.contracted_value)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{cell(r.variation_value)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums lg:table-cell">{cell(r.contracted_value)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums lg:table-cell">{cell(r.variation_value)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{cell(r.total_value)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{cell(r.actual_cost)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{cell(r.pending_cost)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{cell(r.committed_cost)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{cell(r.total_cost)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums md:table-cell">{cell(r.actual_cost)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums md:table-cell">{cell(r.pending_cost)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums md:table-cell">{cell(r.committed_cost)}</td>
+                    <td className="hidden px-3 py-2 text-right tabular-nums sm:table-cell">{cell(r.total_cost)}</td>
                     <td className={`px-5 py-2 text-right font-medium tabular-nums ${marginTone(n(r.margin))}`}>
                       {money(r.margin)}
                       {/* Null means there is no value to take a percentage of — a different fact
@@ -123,12 +144,15 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
                     </td>
                   </tr>
                 ))}
-                <tr className="border-t border-border/60 bg-surface-sunken font-medium">
+                <tr className="border-t border-hairline bg-surface-sunken font-medium">
                   <td className="px-5 py-2">Total</td>
-                  <td colSpan={2} />
+                  <td className="hidden lg:table-cell" />
+                  <td className="hidden lg:table-cell" />
                   <td className="px-3 py-2 text-right tabular-nums">{money(totals.value)}</td>
-                  <td colSpan={3} />
-                  <td className="px-3 py-2 text-right tabular-nums">{money(totals.cost)}</td>
+                  <td className="hidden md:table-cell" />
+                  <td className="hidden md:table-cell" />
+                  <td className="hidden md:table-cell" />
+                  <td className="hidden px-3 py-2 text-right tabular-nums sm:table-cell">{money(totals.cost)}</td>
                   <td className={`px-5 py-2 text-right tabular-nums ${marginTone(totals.margin)}`}>
                     {money(totals.margin)}
                   </td>

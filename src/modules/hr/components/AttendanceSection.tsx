@@ -15,6 +15,19 @@ import { hrService, type AttendanceRow, type HrSettings, type NotifyCandidate } 
 import { SectionHeader, EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { PunchHistoryDialog, TimesheetDialog } from './AttendanceExtras';
+import { Badge } from '@/components/core/ui/badge';
+import { HUB_FILTER_ALL, HubCellEmpty, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
+
+const clockState = (r: AttendanceRow) => (r.clocked_in ? 'in' : r.last_punch_type === 'departure' ? 'out' : 'none');
+const CLOCK_STATE_LABELS: Record<string, string> = { in: 'In', out: 'Out', none: 'Not clocked' };
+
+const BOARD_FIELDS: HubTableField<AttendanceRow>[] = [
+  { id: 'name', sortValue: (r) => r.name, searchText: (r) => r.name },
+  { id: 'expected', sortValue: (r) => r.work_start_time },
+  { id: 'status', sortValue: (r) => clockState(r), filterValue: (r) => clockState(r), filterLabel: 'Status', filterOptionLabel: (v) => CLOCK_STATE_LABELS[v] ?? v },
+  { id: 'shift', filterValue: (r) => (r.work_today ? 'working' : 'off'), filterLabel: 'Today', filterOptionLabel: (v) => (v === 'working' ? 'Working today' : 'Off today') },
+  { id: 'last', sortValue: (r) => r.last_at },
+];
 
 const fmtTime = (t: string | null) => (t ? String(t).slice(0, 5) : '—');
 
@@ -28,6 +41,16 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [page, setPage] = useState(1);
+  const board = useMemo(() => {
+    const active = rows.filter((r) => r.status === 'active');
+    return [...active.filter((r) => r.work_today), ...active.filter((r) => !r.work_today)];
+  }, [rows]);
+  const t = useHubTable(board, BOARD_FIELDS);
+  useEffect(() => { setPage(1); }, [t.search, t.filters]);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -59,10 +82,6 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
   const copyKiosk = () => { if (kioskUrl) { navigator.clipboard.writeText(kioskUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); } };
 
   if (loading) return <Skeleton className="h-64 w-full" />;
-  const working = rows.filter((r) => r.status === 'active' && r.work_today);
-  const others = rows.filter((r) => r.status === 'active' && !r.work_today);
-  // Working-today first, then the off-today tail — page over the combined order the table renders.
-  const board = [...working, ...others];
 
   return (
     <div className="space-y-4">
@@ -94,27 +113,49 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
 
       <Card>
         <CardContent className="p-0">
-          {board.length === 0 ? <EmptyState icon={Clock} title="No active employees" /> : (
+          {board.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search employees"
+              filters={<>
+                <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status} onChange={(v) => t.setFilter('status', v)} />
+                <HubFilterSelect label="Today" value={t.filters.shift ?? HUB_FILTER_ALL} options={t.filterOptions.shift} onChange={(v) => t.setFilter('shift', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
+          {board.length === 0 ? <EmptyState icon={Clock} title="No active employees" /> : t.rows.length === 0 ? (
+            <EmptyState icon={Clock} variant="filtered" title="No employees match your filters" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} />
+          ) : (
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Employee</TableHead><TableHead>Expected</TableHead><TableHead>Status</TableHead><TableHead>Last punch</TableHead>
+                <TableHead aria-sort={ariaSort('name')}>{sortHead('name', 'Employee')}</TableHead>
+                <TableHead className="hidden md:table-cell" aria-sort={ariaSort('expected')}>{sortHead('expected', 'Expected')}</TableHead>
+                <TableHead aria-sort={ariaSort('status')}>{sortHead('status', 'Status')}</TableHead>
+                <TableHead className="hidden sm:table-cell" aria-sort={ariaSort('last')}>{sortHead('last', 'Last punch')}</TableHead>
                 {canManage && <TableHead className="text-right">Action</TableHead>}
               </TableRow></TableHeader>
               <TableBody>
-                {paginate(board, page).map((r) => (
+                {paginate(t.rows, page).map((r) => (
                   <TableRow key={r.employee_id} className={!r.work_today ? 'opacity-60' : ''}>
-                    <TableCell className="font-medium">{r.name}{!r.work_today && <span className="ml-2 text-xs text-muted-foreground">(off today)</span>}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{fmtTime(r.work_start_time)}–{fmtTime(r.work_end_time)}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <span className="block max-w-[16rem] truncate" title={r.name}>{r.name}</span>
+                        {!r.work_today && <span className="shrink-0 text-xs text-muted-foreground">(off today)</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell whitespace-nowrap text-sm text-muted-foreground tabular-nums">{fmtTime(r.work_start_time)}–{fmtTime(r.work_end_time)}</TableCell>
                     <TableCell>
                       {r.clocked_in
-                        ? <span className="text-sm text-emerald-600 dark:text-emerald-400">In{r.last_is_late ? ' · late' : ''}</span>
+                        ? <Badge variant={r.last_is_late ? 'warning' : 'success'}>In{r.last_is_late ? ' · late' : ''}</Badge>
                         : r.last_punch_type === 'departure'
-                          ? <span className="text-sm text-muted-foreground">Out</span>
-                          : <span className="text-sm text-muted-foreground">—</span>}
+                          ? <Badge variant="neutral">Out</Badge>
+                          : <HubCellEmpty />}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {r.last_at ? new Date(r.last_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}
-                      {r.last_status === 'submitted' && <span className="ml-1 text-emerald-500" title="Filed to Ergani">✓</span>}
+                    <TableCell className="hidden sm:table-cell whitespace-nowrap text-sm text-muted-foreground tabular-nums">
+                      {r.last_at ? new Date(r.last_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : <HubCellEmpty />}
+                      {r.last_status === 'submitted' && <span className="ml-1 text-emerald-700 dark:text-emerald-400" title="Filed to Ergani">✓</span>}
                     </TableCell>
                     {canManage && (
                       <TableCell className="text-right">
@@ -132,7 +173,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
               </TableBody>
             </Table>
           )}
-          <TablePagination page={page} total={board.length} onPageChange={setPage} label="employees" />
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="employees" />
         </CardContent>
       </Card>
     </div>

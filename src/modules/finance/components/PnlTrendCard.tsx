@@ -164,41 +164,41 @@ export const PnlTrendCard: React.FC<Props> = ({ rows, currency, loading }) => {
               </div>
             </div>
 
-            <div className="table-scroll mt-3 border-t border-hairline">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
-                  <tr className="border-b border-hairline">
-                    <th className="px-4 py-2 text-left">Month</th>
-                    <th className="px-4 py-2 text-right">Income</th>
-                    <th className="px-4 py-2 text-right">Expenses</th>
-                    <th className="px-4 py-2 text-right">Net</th>
-                    <th className="px-4 py-2 text-right">To book</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div className="mt-3 border-t border-hairline">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Income</TableHead>
+                    <TableHead className="text-right">Expenses</TableHead>
+                    <TableHead className="text-right">Net</TableHead>
+                    <TableHead className="text-right">To book</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {data.map((c) => (
-                    <tr key={c.month} className="border-b border-hairline last:border-0">
-                      <td className="px-4 py-2 whitespace-nowrap">{c.label}</td>
+                    <TableRow key={c.month}>
+                      <TableCell className="whitespace-nowrap">{c.label}</TableCell>
                       {c.missing ? (
-                        <td colSpan={3} className="px-4 py-2 text-right text-xs text-muted-foreground">{c.missing}</td>
+                        <TableCell colSpan={3} className="text-right text-xs text-muted-foreground">{c.missing}</TableCell>
                       ) : (
                         <>
-                          <td className="px-4 py-2 text-right tabular-nums">{formatMoney(c.income, c.currency)}</td>
-                          <td className="px-4 py-2 text-right tabular-nums">{formatMoney(c.expenses, c.currency)}</td>
-                          <td className={`px-4 py-2 text-right font-medium tabular-nums ${(c.net ?? 0) < 0 ? 'text-red-700 dark:text-red-400' : ''}`}>
+                          <TableCell className="text-right tabular-nums">{formatMoney(c.income, c.currency)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatMoney(c.expenses, c.currency)}</TableCell>
+                          <TableCell className={`text-right font-medium tabular-nums ${(c.net ?? 0) < 0 ? 'text-red-700 dark:text-red-400' : ''}`}>
                             {formatMoney(c.net, c.currency)}
-                          </td>
+                          </TableCell>
                         </>
                       )}
-                      <td className="px-4 py-2 text-right text-xs tabular-nums text-muted-foreground">
+                      <TableCell className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">
                         {c.unbookedDocs > 0
-                          ? `${c.unbookedDocs} Â· ${formatMoney(c.unbookedNet, 'EUR')}`
-                          : 'â€”'}
-                      </td>
-                    </tr>
+                          ? `${c.unbookedDocs} · ${formatMoney(c.unbookedNet, 'EUR')}`
+                          : '—'}
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             {totalUnbooked > 0 && (

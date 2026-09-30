@@ -11,6 +11,7 @@ import { hrService, type Punch, type TimesheetRow } from '../services/hrService'
 import { EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatTime, localISODateOffset, todayLocalISO } from '@/utils/datetime';
+import { HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
 
 const daysAgoISO = (n: number) => localISODateOffset(-n);
 
@@ -19,6 +20,12 @@ function toLocalInput(iso: string): string {
   const d = new Date(iso);
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
+const TIMESHEET_FIELDS: HubTableField<TimesheetRow>[] = [
+  { id: 'name', sortValue: (r) => r.name, searchText: (r) => r.name },
+  { id: 'days', sortValue: (r) => r.days.length },
+  { id: 'hours', sortValue: (r) => r.total_hours },
+];
+
 function csvCell(s: string): string { return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 
 // ── Per-employee punch history + corrections (edit/delete/add manual) ──
@@ -110,6 +117,11 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const t = useHubTable(rows, TIMESHEET_FIELDS);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -144,21 +156,28 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> : rows.length === 0 ? (
           <EmptyState icon={CalendarRange} title="No data for this range" />
         ) : (
-          <>
+          <div className="overflow-hidden rounded-md border border-hairline">
+          {rows.length > 8 && <HubToolbar search={t.search} onSearchChange={(v) => { t.setSearch(v); setPage(1); }} searchPlaceholder="Search employees" />}
           <Table>
-            <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Days worked</TableHead><TableHead className="text-right">Total hours</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>
+              <TableHead aria-sort={ariaSort('name')}>{sortHead('name', 'Employee')}</TableHead>
+              <TableHead className="text-right" aria-sort={ariaSort('days')}>{sortHead('days', 'Days worked', 'right')}</TableHead>
+              <TableHead className="text-right" aria-sort={ariaSort('hours')}>{sortHead('hours', 'Total hours', 'right')}</TableHead>
+            </TableRow></TableHeader>
             <TableBody>
-              {paginate(rows, page).map((r) => (
+              {t.rows.length === 0 ? (
+                <TableRow className="hover:bg-transparent"><TableCell colSpan={3}><EmptyState icon={CalendarRange} variant="filtered" title="No employees match your search" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} /></TableCell></TableRow>
+              ) : paginate(t.rows, page).map((r) => (
                 <TableRow key={r.employee_id}>
-                  <TableCell className="font-medium">{r.name}{r.open && <span className="ml-2 text-xs text-amber-800 dark:text-amber-400" title="Has an unmatched clock-in">open</span>}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{r.days.length}</TableCell>
-                  <TableCell className="text-right font-mono">{r.total_hours.toFixed(2)}</TableCell>
+                  <TableCell className="font-medium"><div className="flex items-center gap-2"><span className="block max-w-[16rem] truncate" title={r.name}>{r.name}</span>{r.open && <span className="shrink-0 text-xs text-amber-800 dark:text-amber-400" title="Has an unmatched clock-in">open</span>}</div></TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">{r.days.length}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.total_hours.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          <TablePagination page={page} total={rows.length} onPageChange={setPage} label="employees" className="px-0" />
-          </>
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="employees" />
+          </div>
         )}
       </DialogContent>
     </Dialog>

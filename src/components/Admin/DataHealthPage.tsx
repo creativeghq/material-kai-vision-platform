@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
 import { RefreshCw, ShieldCheck, AlertTriangle, Wrench, EyeOff, Loader2 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -12,6 +12,18 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { TaricReferencePanel } from './TaricReferencePanel';
 import { TaricRulesPanel } from './TaricRulesPanel';
 import { formatDate } from '@/utils/datetime';
+import { cn } from '@/lib/utils';
+import {
+  HubEmptyState,
+  HubFilterSelect,
+  HubResetFilters,
+  HubSortButton,
+  HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
+  type HubSort,
+  type HubTableField,
+} from '@/components/core/hub';
 import {
   dataIntegrityService as svc,
   type IntegrityCheck, type IntegrityFinding, type IntegrityRun, type IntegritySeverity,
@@ -21,6 +33,55 @@ const sevTone: Record<IntegritySeverity, string> = {
   critical: 'text-red-500 dark:text-red-400',
   warning: 'text-amber-600 dark:text-amber-400',
   info: 'text-sky-600 dark:text-sky-400',
+};
+
+const SEVERITY_RANK: Record<IntegritySeverity, number> = { critical: 3, warning: 2, info: 1 };
+const capitalize = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
+
+const CHECK_FIELDS: HubTableField<IntegrityCheck>[] = [
+  { id: 'check', sortValue: (c) => c.title, searchText: (c) => `${c.title} ${c.key} ${c.description ?? ''}` },
+  { id: 'domain', sortValue: (c) => c.domain, filterValue: (c) => c.domain, filterLabel: 'Domain' },
+  {
+    id: 'severity',
+    sortValue: (c) => SEVERITY_RANK[c.severity],
+    filterValue: (c) => c.severity,
+    filterLabel: 'Severity',
+    filterOptionLabel: capitalize,
+  },
+];
+
+const RUN_FIELDS: HubTableField<IntegrityRun>[] = [
+  { id: 'started', sortValue: (r) => r.started_at },
+  {
+    id: 'by',
+    sortValue: (r) => r.triggered_by,
+    filterValue: (r) => (r.triggered_by === 'cron' ? 'cron' : r.autoheal ? 'admin · heal' : 'admin'),
+    filterLabel: 'Triggered by',
+  },
+  { id: 'checks', sortValue: (r) => r.checks_run },
+  { id: 'open', sortValue: (r) => r.findings_open },
+  { id: 'healed', sortValue: (r) => r.findings_healed },
+];
+
+const SortHead: FC<{
+  id: string;
+  sort?: HubSort;
+  onSort: (id: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
+  children: ReactNode;
+}> = ({ id, sort, onSort, align, className, children }) => {
+  const active = sort?.columnId === id ? sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => onSort(id)}>
+        {children}
+      </HubSortButton>
+    </TableHead>
+  );
 };
 
 export default function DataHealthPage() {
@@ -51,6 +112,29 @@ export default function DataHealthPage() {
   useEffect(() => { void load(); }, [load]);
 
   const checkByKey = useMemo(() => new Map(checks.map((c) => [c.key, c])), [checks]);
+  const findingFields = useMemo<HubTableField<IntegrityFinding>[]>(() => [
+    {
+      id: 'check',
+      sortValue: (f) => checkByKey.get(f.check_key)?.title ?? f.check_key,
+      searchText: (f) => `${checkByKey.get(f.check_key)?.title ?? ''} ${f.check_key} ${f.entity_table ?? ""} ${f.entity_id ?? ''}`,
+    },
+    {
+      id: 'severity',
+      sortValue: (f) => SEVERITY_RANK[f.severity],
+      filterValue: (f) => f.severity,
+      filterLabel: 'Severity',
+      filterOptionLabel: capitalize,
+    },
+    { id: 'domain', filterValue: (f) => f.domain, filterLabel: 'Domain' },
+    { id: 'entity', sortValue: (f) => f.entity_table, filterValue: (f) => f.entity_table, filterLabel: 'Entity' },
+  ], [checkByKey]);
+  const findingTable = useHubTable(findings, findingFields);
+  const checkTable = useHubTable(checks, CHECK_FIELDS);
+  const runTable = useHubTable(runs, RUN_FIELDS);
+  const { search: findingSearch, filters: findingFilters } = findingTable;
+  const { filters: runFilters } = runTable;
+  useEffect(() => { setFindingsPage(1); }, [findingSearch, findingFilters]);
+  useEffect(() => { setRunsPage(1); }, [runFilters]);
   const openCritical = findings.filter((f) => f.severity === 'critical').length;
   const lastRun = runs[0] ?? null;
 
@@ -152,22 +236,66 @@ export default function DataHealthPage() {
                   <div className="p-8 text-center text-sm text-muted-foreground">No open findings. Everything checks out. ✓</div>
                 ) : (
                   <>
+                  <HubToolbar
+                    search={findingTable.search}
+                    onSearchChange={findingTable.setSearch}
+                    searchPlaceholder="Search findings"
+                    filters={
+                      <>
+                        <HubFilterSelect
+                          label="Severity"
+                          value={findingTable.filters.severity ?? HUB_FILTER_ALL}
+                          options={findingTable.filterOptions.severity}
+                          onChange={(v) => findingTable.setFilter('severity', v)}
+                        />
+                        <HubFilterSelect
+                          label="Domain"
+                          value={findingTable.filters.domain ?? HUB_FILTER_ALL}
+                          options={findingTable.filterOptions.domain}
+                          onChange={(v) => findingTable.setFilter('domain', v)}
+                        />
+                        <HubFilterSelect
+                          label="Entity"
+                          value={findingTable.filters.entity ?? HUB_FILTER_ALL}
+                          options={findingTable.filterOptions.entity}
+                          onChange={(v) => findingTable.setFilter('entity', v)}
+                        />
+                        <HubResetFilters count={findingTable.activeFilterCount} onReset={findingTable.reset} />
+                      </>
+                    }
+                  />
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Check</TableHead><TableHead>Severity</TableHead>
-                        <TableHead>Entity</TableHead><TableHead>Detail</TableHead><TableHead className="text-right">Actions</TableHead>
+                        <SortHead id="check" sort={findingTable.sort} onSort={findingTable.toggleSort}>Check</SortHead>
+                        <SortHead id="severity" sort={findingTable.sort} onSort={findingTable.toggleSort}>Severity</SortHead>
+                        <SortHead id="entity" sort={findingTable.sort} onSort={findingTable.toggleSort} className="hidden sm:table-cell">Entity</SortHead>
+                        <TableHead className="hidden lg:table-cell">Detail</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginate(findings, findingsPage).map((f) => {
+                      {findingTable.rows.length === 0 && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={5} className="p-0">
+                            <HubEmptyState
+                              variant="filtered"
+                              title="No findings match these filters"
+                              action={<Button variant="outline" size="sm" onClick={findingTable.reset}>Clear filters</Button>}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {paginate(findingTable.rows, findingsPage).map((f) => {
                         const c = checkByKey.get(f.check_key);
                         return (
                           <TableRow key={f.id}>
                             <TableCell><div className="font-medium">{c?.title ?? f.check_key}</div><div className="text-[11px] text-muted-foreground">{f.domain}</div></TableCell>
                             <TableCell><span className={`text-xs capitalize ${sevTone[f.severity]}`}>{f.severity}</span></TableCell>
-                            <TableCell className="text-xs"><div>{f.entity_table}</div><div className="font-mono text-muted-foreground">{f.entity_id?.slice(0, 8)}</div></TableCell>
-                            <TableCell className="text-[11px] text-muted-foreground max-w-[280px] truncate font-mono">{JSON.stringify(f.detail)}</TableCell>
+                            <TableCell className="hidden text-xs sm:table-cell"><div>{f.entity_table ?? "—"}</div><div className="font-mono text-muted-foreground">{f.entity_id?.slice(0, 8) ?? '—'}</div></TableCell>
+                            <TableCell className="hidden text-[11px] text-muted-foreground font-mono lg:table-cell">
+                              <span className="block max-w-[18rem] truncate" title={JSON.stringify(f.detail)}>{JSON.stringify(f.detail)}</span>
+                            </TableCell>
                             <TableCell className="text-right whitespace-nowrap">
                               {c?.can_autoheal && (
                                 <Button variant="ghost" size="sm" disabled={busyKey === f.check_key} onClick={() => healCheck(f.check_key)} title="Run this check's heal">
@@ -183,7 +311,7 @@ export default function DataHealthPage() {
                   </Table>
                   <TablePagination
                     page={findingsPage}
-                    total={findings.length}
+                    total={findingTable.rows.length}
                     onPageChange={setFindingsPage}
                     label="findings"
                   />
@@ -197,19 +325,58 @@ export default function DataHealthPage() {
           <TabsContent value="checks">
             <Card className="dashboard-card">
               <CardContent className="p-0">
+                <HubToolbar
+                  search={checkTable.search}
+                  onSearchChange={checkTable.setSearch}
+                  searchPlaceholder="Search checks"
+                  filters={
+                    <>
+                      <HubFilterSelect
+                        label="Domain"
+                        value={checkTable.filters.domain ?? HUB_FILTER_ALL}
+                        options={checkTable.filterOptions.domain}
+                        onChange={(v) => checkTable.setFilter('domain', v)}
+                      />
+                      <HubFilterSelect
+                        label="Severity"
+                        value={checkTable.filters.severity ?? HUB_FILTER_ALL}
+                        options={checkTable.filterOptions.severity}
+                        onChange={(v) => checkTable.setFilter('severity', v)}
+                      />
+                      <HubResetFilters count={checkTable.activeFilterCount} onReset={checkTable.reset} />
+                    </>
+                  }
+                />
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Check</TableHead><TableHead>Domain</TableHead><TableHead>Severity</TableHead>
+                      <SortHead id="check" sort={checkTable.sort} onSort={checkTable.toggleSort}>Check</SortHead>
+                      <SortHead id="domain" sort={checkTable.sort} onSort={checkTable.toggleSort} className="hidden md:table-cell">Domain</SortHead>
+                      <SortHead id="severity" sort={checkTable.sort} onSort={checkTable.toggleSort} className="hidden sm:table-cell">Severity</SortHead>
                       <TableHead className="text-center">Enabled</TableHead><TableHead className="text-center">Auto-heal</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {checks.map((c) => (
+                    {checkTable.rows.length === 0 && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={5} className="p-0">
+                          {checkTable.activeFilterCount > 0 ? (
+                            <HubEmptyState
+                              variant="filtered"
+                              title="No checks match these filters"
+                              action={<Button variant="outline" size="sm" onClick={checkTable.reset}>Clear filters</Button>}
+                            />
+                          ) : (
+                            <HubEmptyState title="No checks registered" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {checkTable.rows.map((c) => (
                       <TableRow key={c.key}>
-                        <TableCell><div className="font-medium">{c.title}</div><div className="text-[11px] text-muted-foreground max-w-[420px]">{c.description}</div></TableCell>
-                        <TableCell className="text-xs">{c.domain}</TableCell>
-                        <TableCell><span className={`text-xs capitalize ${sevTone[c.severity]}`}>{c.severity}</span></TableCell>
+                        <TableCell><div className="font-medium">{c.title}</div><div className="text-[11px] text-muted-foreground max-w-[420px] break-words">{c.description}</div></TableCell>
+                        <TableCell className="hidden text-xs md:table-cell">{c.domain}</TableCell>
+                        <TableCell className="hidden sm:table-cell"><span className={`text-xs capitalize ${sevTone[c.severity]}`}>{c.severity}</span></TableCell>
                         <TableCell className="text-center"><Switch checked={c.is_enabled} onCheckedChange={(v) => toggleCheck(c.key, v)} /></TableCell>
                         <TableCell className="text-center">
                           {c.can_autoheal
@@ -228,28 +395,44 @@ export default function DataHealthPage() {
           <TabsContent value="runs">
             <Card className="dashboard-card">
               <CardContent className="p-0">
+                <HubToolbar
+                  filters={
+                    <>
+                      <HubFilterSelect
+                        label="Triggered by"
+                        value={runTable.filters.by ?? HUB_FILTER_ALL}
+                        options={runTable.filterOptions.by}
+                        onChange={(v) => runTable.setFilter('by', v)}
+                      />
+                      <HubResetFilters count={runTable.activeFilterCount} onReset={runTable.reset} />
+                    </>
+                  }
+                />
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Started</TableHead><TableHead>By</TableHead><TableHead className="text-center">Checks</TableHead>
-                      <TableHead className="text-center">Open</TableHead><TableHead className="text-center">Healed</TableHead>
+                      <SortHead id="started" sort={runTable.sort} onSort={runTable.toggleSort}>Started</SortHead>
+                      <SortHead id="by" sort={runTable.sort} onSort={runTable.toggleSort} className="hidden sm:table-cell">By</SortHead>
+                      <SortHead id="checks" sort={runTable.sort} onSort={runTable.toggleSort} align="right" className="hidden sm:table-cell">Checks</SortHead>
+                      <SortHead id="open" sort={runTable.sort} onSort={runTable.toggleSort} align="right">Open</SortHead>
+                      <SortHead id="healed" sort={runTable.sort} onSort={runTable.toggleSort} align="right">Healed</SortHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginate(runs, runsPage).map((r) => (
+                    {paginate(runTable.rows, runsPage).map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className="text-xs">{formatDate(r.started_at, { withTime: true })}</TableCell>
-                        <TableCell className="text-xs">{r.triggered_by === 'cron' ? 'cron' : r.autoheal ? 'admin · heal' : 'admin'}</TableCell>
-                        <TableCell className="text-center tabular-nums">{r.checks_run}</TableCell>
-                        <TableCell className="text-center tabular-nums">{r.findings_open}</TableCell>
-                        <TableCell className="text-center tabular-nums text-emerald-500">{r.findings_healed}</TableCell>
+                        <TableCell className="whitespace-nowrap text-xs">{formatDate(r.started_at, { withTime: true })}</TableCell>
+                        <TableCell className="hidden text-xs sm:table-cell">{r.triggered_by === 'cron' ? 'cron' : r.autoheal ? 'admin · heal' : 'admin'}</TableCell>
+                        <TableCell className="hidden text-right tabular-nums sm:table-cell">{r.checks_run}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.findings_open}</TableCell>
+                        <TableCell className="text-right tabular-nums text-emerald-700 dark:text-emerald-400">{r.findings_healed}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
                 <TablePagination
                   page={runsPage}
-                  total={runs.length}
+                  total={runTable.rows.length}
                   onPageChange={setRunsPage}
                   label="runs"
                 />

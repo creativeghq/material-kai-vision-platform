@@ -14,7 +14,8 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   supplierPricingService, type SupplierProductRow, type SupplierProductInput,
 } from '@/services/supplierPricingService';
-import { HubEmptyState } from '@/components/core/hub';
+import { Badge } from '@/components/core/ui/badge';
+import { HubCellLink, HubEmptyState } from '@/components/core/hub';
 
 /**
  * "Suppliers & pricing" for one product (#324 phase 5).
@@ -146,31 +147,31 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
         ) : (
           <div className="table-scroll">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-xs text-muted-foreground">
-                <th className="text-left font-medium px-4 py-2">Supplier</th>
-                <th className="text-left font-medium px-4 py-2">Their SKU</th>
-                <th className="text-right font-medium px-4 py-2">Your cost</th>
-                <th className="text-right font-medium px-4 py-2">MOQ</th>
-                <th className="text-right font-medium px-4 py-2">Lead time</th>
+            <thead className="bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
+              <tr className="text-[11px] font-semibold text-muted-foreground">
+                <th className="text-left px-4 py-2">Supplier</th>
+                <th className="hidden md:table-cell text-left px-4 py-2">Their SKU</th>
+                <th className="text-right px-4 py-2">Your cost</th>
+                <th className="hidden sm:table-cell text-right px-4 py-2">MOQ</th>
+                <th className="hidden sm:table-cell text-right px-4 py-2">Lead time</th>
                 <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-0">
+                <tr key={r.id} className="border-b border-hairline last:border-0">
                   <td className="px-4 py-2">
-                    <span className={r.is_preferred ? 'font-medium' : undefined}>
-                      {r.supplier_name || '—'}
-                    </span>
-                    {r.is_preferred && <span className="ml-2 text-[10px] text-emerald-600 dark:text-emerald-400">preferred</span>}
+                    {r.supplier_name
+                      ? <HubCellLink to={`/crm/companies/${r.supplier_company_id}`} className="break-words">{r.supplier_name}</HubCellLink>
+                      : <span className="text-muted-foreground">—</span>}
+                    {r.is_preferred && <Badge variant="success" className="ml-2">preferred</Badge>}
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{r.supplier_sku || '—'}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
+                  <td className="hidden md:table-cell px-4 py-2 font-mono text-xs text-muted-foreground">{r.supplier_sku || '—'}</td>
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                     {r.cost != null ? `${r.cost} ${r.currency}` : <span className="text-muted-foreground">not set</span>}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">{r.moq ?? '—'}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{r.lead_time_days != null ? `${r.lead_time_days}d` : '—'}</td>
+                  <td className="hidden sm:table-cell px-4 py-2 text-right tabular-nums">{r.moq ?? '—'}</td>
+                  <td className="hidden sm:table-cell px-4 py-2 text-right tabular-nums">{r.lead_time_days != null ? `${r.lead_time_days}d` : '—'}</td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     {!r.is_preferred && (
                       <Button size="sm" variant="ghost" className="h-8" disabled={busyId === r.id} onClick={() => prefer(r)} title="Make preferred">
@@ -178,7 +179,7 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditing(r)}>Edit</Button>
-                    <Button size="sm" variant="ghost" className="h-8 text-destructive" disabled={busyId === r.id} onClick={() => remove(r)}>
+                    <Button size="sm" variant="ghost" className="h-8 text-destructive" aria-label="Remove supplier" disabled={busyId === r.id} onClick={() => remove(r)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </td>

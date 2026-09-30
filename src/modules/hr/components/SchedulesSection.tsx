@@ -13,11 +13,15 @@ import { useToast } from '@/hooks/use-toast';
 import {
   hrService, type Employee, type WorkSchedule, type ScheduleShift, type ScheduleType,
 } from '../services/hrService';
-import { SectionHeader, EmptyState, FILING_STATUS_LABELS, filingTone } from './_shared';
+import { SectionHeader, EmptyState, FILING_STATUS_LABELS } from './_shared';
+import { Badge } from '@/components/core/ui/badge';
+import { statusBadgeVariant } from '@/utils/recordDisplay';
+import { HUB_FILTER_ALL, HubCellEmpty, HubCellLink, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar, useHubTable, type HubTableField } from '@/components/core/hub';
 import { ErganiFilingDialog } from './ErganiFilingDialog';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
+const filingVariant = (s: string) => (s === 'submitted' ? 'success' : statusBadgeVariant(s));
 
 // Shifts use the JS weekday convention (0=Sunday … 6=Saturday) so a weekday maps straight onto a
 // calendar date server-side. hr_employees.work_days is ISO (1=Mon … 7=Sun) — convert, don't assume.
@@ -62,6 +66,22 @@ export function SchedulesSection({ workspaceId, canManage }: { workspaceId: stri
   useEffect(() => { void load(); }, [load]);
 
   const nameById = useMemo(() => new Map(employees.map((e) => [e.id, empName(e)])), [employees]);
+  const fields = useMemo<HubTableField<WorkSchedule>[]>(() => {
+    const who = (s: WorkSchedule) => s.employee?.contact?.name || nameById.get(s.employee_id) || null;
+    return [
+      { id: 'employee', sortValue: who, searchText: who, filterValue: who, filterLabel: 'Employee' },
+      { id: 'name', sortValue: (s) => s.name, searchText: (s) => s.name },
+      { id: 'type', sortValue: (s) => s.schedule_type, filterValue: (s) => s.schedule_type, filterLabel: 'Type', filterOptionLabel: (v) => v.charAt(0).toUpperCase() + v.slice(1) },
+      { id: 'effective', sortValue: (s) => s.effective_from },
+      { id: 'status', sortValue: (s) => s.status, filterValue: (s) => s.status, filterLabel: 'Status', filterOptionLabel: (v) => FILING_STATUS_LABELS[v] ?? v },
+    ];
+  }, [nameById]);
+  const t = useHubTable(schedules, fields);
+  useEffect(() => { setPage(1); }, [t.search, t.filters]);
+  const sortHead = (id: string, label: string, align?: 'right') => (
+    <HubSortButton active={t.sort?.columnId === id ? t.sort.direction : undefined} align={align} onClick={() => t.toggleSort(id)}>{label}</HubSortButton>
+  );
+  const ariaSort = (id: string) => (t.sort?.columnId === id ? (t.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined);
 
   const remove = async (id: string) => {
     if (!workspaceId) return;
@@ -84,7 +104,22 @@ export function SchedulesSection({ workspaceId, canManage }: { workspaceId: stri
       />
       <Card>
         <CardContent className="p-0">
-          {schedules.length === 0 ? (
+          {schedules.length > 8 && (
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Search employee or schedule"
+              filters={<>
+                <HubFilterSelect label="Employee" value={t.filters.employee ?? HUB_FILTER_ALL} options={t.filterOptions.employee} onChange={(v) => t.setFilter('employee', v)} />
+                <HubFilterSelect label="Type" value={t.filters.type ?? HUB_FILTER_ALL} options={t.filterOptions.type} onChange={(v) => t.setFilter('type', v)} />
+                <HubFilterSelect label="Status" value={t.filters.status ?? HUB_FILTER_ALL} options={t.filterOptions.status} onChange={(v) => t.setFilter('status', v)} />
+                <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+              </>}
+            />
+          )}
+          {schedules.length > 0 && t.rows.length === 0 ? (
+            <EmptyState icon={CalendarClock} variant="filtered" title="No schedules match your filters" action={<Button size="sm" variant="outline" onClick={t.reset}>Clear filters</Button>} />
+          ) : schedules.length === 0 ? (
             <EmptyState
               icon={CalendarClock}
               title="No schedules yet"
@@ -96,20 +131,28 @@ export function SchedulesSection({ workspaceId, canManage }: { workspaceId: stri
           ) : (
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Employee</TableHead><TableHead>Schedule</TableHead><TableHead>Type</TableHead>
-                <TableHead>Effective</TableHead><TableHead>Shifts</TableHead><TableHead>Status</TableHead>
+                <TableHead aria-sort={ariaSort('employee')}>{sortHead('employee', 'Employee')}</TableHead>
+                <TableHead className="hidden md:table-cell" aria-sort={ariaSort('name')}>{sortHead('name', 'Schedule')}</TableHead>
+                <TableHead className="hidden lg:table-cell" aria-sort={ariaSort('type')}>{sortHead('type', 'Type')}</TableHead>
+                <TableHead className="hidden sm:table-cell" aria-sort={ariaSort('effective')}>{sortHead('effective', 'Effective')}</TableHead>
+                <TableHead className="hidden lg:table-cell">Shifts</TableHead>
+                <TableHead aria-sort={ariaSort('status')}>{sortHead('status', 'Status')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {paginate(schedules, page).map((s) => (
+                {paginate(t.rows, page).map((s) => (
                   <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.employee?.contact?.name || nameById.get(s.employee_id) || '—'}</TableCell>
-                    <TableCell>{s.name || '—'}</TableCell>
-                    <TableCell className="capitalize">{s.schedule_type}</TableCell>
-                    <TableCell className="text-sm">{s.effective_from}{s.effective_to ? ` → ${s.effective_to}` : ''}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{summarize(s.details ?? [])}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.employee?.contact
+                        ? <HubCellLink to={`/crm/contacts/${s.employee.contact.id}`} className="block max-w-[14rem] truncate">{s.employee.contact.name}</HubCellLink>
+                        : nameById.get(s.employee_id) ? <span className="block max-w-[14rem] truncate">{nameById.get(s.employee_id)}</span> : <HubCellEmpty />}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{s.name ? <span className="block max-w-[14rem] truncate" title={s.name}>{s.name}</span> : <HubCellEmpty />}</TableCell>
+                    <TableCell className="hidden lg:table-cell capitalize">{s.schedule_type}</TableCell>
+                    <TableCell className="hidden sm:table-cell whitespace-nowrap text-sm tabular-nums">{s.effective_from}{s.effective_to ? ` → ${s.effective_to}` : ''}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{summarize(s.details ?? [])}</TableCell>
                     <TableCell>
-                      <span className={`text-sm ${filingTone(s.status)}`}>{FILING_STATUS_LABELS[s.status] ?? s.status}</span>
+                      <Badge variant={filingVariant(s.status)}>{FILING_STATUS_LABELS[s.status] ?? s.status}</Badge>
                       {s.ergani_protocol && <span className="block text-xs text-muted-foreground font-mono">{s.ergani_protocol}</span>}
                     </TableCell>
                     <TableCell className="text-right">
@@ -139,7 +182,7 @@ export function SchedulesSection({ workspaceId, canManage }: { workspaceId: stri
               </TableBody>
             </Table>
           )}
-          <TablePagination page={page} total={schedules.length} onPageChange={setPage} label="schedules" />
+          <TablePagination page={page} total={t.rows.length} onPageChange={setPage} label="schedules" />
         </CardContent>
       </Card>
     </div>
