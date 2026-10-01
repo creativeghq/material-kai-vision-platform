@@ -1,7 +1,8 @@
 /** The two sides are never merged: ΑΑΔΕ's book confirms ours, and where it does not, it is named. */
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Scale, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, RefreshCw, Scale, Send } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -22,7 +23,27 @@ import { aadeVerdict } from '@/modules/finance/pnlStatus';
 import {
   sortVatReturnLines, vatReturnLineLabel, vatPayableLabel, vatDifferenceLines,
   residualVerdict, vatPeriodPresets, worseAadeStatus, type VatReturnSnapshot,
+  VAT_PERIOD_STATUS_LABEL, PREFILL_STATUS_LABEL,
 } from '@/modules/finance/vatReturn';
+
+const HOW_IT_WORKS: Array<{ title: string; body: string }> = [
+  {
+    title: 'Pick the period you declare',
+    body: 'Whole months or a quarter, matching how often you file the Φ.2. ΑΑΔΕ keeps its book by month, so a part-month cannot be compared.',
+  },
+  {
+    title: 'Read the three figures',
+    body: '"Your figure" is VAT you charged customers minus VAT you paid suppliers, from the invoices, bills and credit notes in this workspace. "ΑΑΔΕ\'s figure" is the same sum from what myDATA holds for you. Positive means you pay; negative means a refund or credit.',
+  },
+  {
+    title: 'Clear the differences',
+    body: '"Why they differ" names each cause: received documents nobody has booked yet, your invoices without a MARK (the number ΑΑΔΕ gives a document it accepted), and bills typed in by hand. Book or transmit them and reload.',
+  },
+  {
+    title: 'Open the period, then file',
+    body: 'Opening records both figures and checks ΑΑΔΕ\'s pre-fill rules: the sales you declare may not be lower than ΑΑΔΕ holds, and the purchases you deduct may not be higher. Submit the Φ.2 in myAADE yourself or through your accountant, then press "Mark as filed" here. This page never sends the declaration.',
+  },
+];
 
 const TONE_CLASS: Record<'ok' | 'warn' | 'unknown', string> = {
   ok: 'text-muted-foreground',
@@ -144,9 +165,11 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
             <CardTitle className="flex items-center gap-2 text-base">
               <Scale className="h-4 w-4 text-primary" /> VAT Return
             </CardTitle>
-            <CardDescription className="text-xs">
-              What you owe for the period, from your own documents — set against what ΑΑΔΕ already
-              holds for the same months, with every difference named rather than averaged away.
+            <CardDescription className="max-w-2xl text-xs">
+              Prepares your periodic VAT declaration (Φ.2): the VAT you charged minus the VAT you
+              paid. It works the figure out from your own documents, checks it against what ΑΑΔΕ
+              already holds in myDATA for the same months, and lists what explains any gap. You
+              still file the Φ.2 in myAADE; this page prepares it and records that it was filed.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-end gap-2">
@@ -181,6 +204,33 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       </CardHeader>
 
       <CardContent className="space-y-5 pt-5">
+        <Collapsible className="rounded-md border border-hairline">
+          <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 p-3 text-left text-sm font-medium">
+            How this works
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 border-t border-hairline p-3">
+            <ol className="space-y-2">
+              {HOW_IT_WORKS.map((s, i) => (
+                <li key={s.title} className="flex gap-3 text-xs">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-sunken font-medium tabular-nums">
+                    {i + 1}
+                  </span>
+                  <span>
+                    <span className="block font-medium">{s.title}</span>
+                    <span className="text-muted-foreground">{s.body}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <p className="text-xs text-muted-foreground">
+              The &ldquo;VAT return ready&rdquo; notification is sent once per month, as soon as
+              ΑΑΔΕ&apos;s book for a finished month has both sides. Its amount is ΑΑΔΕ&apos;s figure,
+              so it can differ from yours until the differences below are cleared.
+            </p>
+          </CollapsibleContent>
+        </Collapsible>
+
         {loading && (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Working out the return…
@@ -199,12 +249,12 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-md border border-hairline bg-surface-sunken p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">From your documents</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Your figure</p>
                 <p className="mt-1 text-lg font-semibold"><Figure value={snap.ours.payable} /></p>
                 <p className="text-[11px] text-muted-foreground">{vatPayableLabel(snap.ours.payable)}</p>
               </div>
               <div className="rounded-md border border-hairline bg-surface-sunken p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">From ΑΑΔΕ&apos;s book</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">ΑΑΔΕ&apos;s figure (myDATA)</p>
                 <p className="mt-1 text-lg font-semibold">
                   <Figure value={snap.aade.payable} status={bothSides ?? undefined} />
                 </p>
@@ -218,7 +268,7 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <p className="text-[11px] text-muted-foreground">
                   {snap.difference.payable == null
                     ? 'Nothing to compare against for these months.'
-                    : 'What your return says, less what their book implies.'}
+                    : 'Your figure minus ΑΑΔΕ’s. Zero means the two agree.'}
                 </p>
               </div>
             </div>
@@ -265,7 +315,10 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
             </div>
 
             <div>
-              <h3 className="mb-2 text-sm font-semibold">Against ΑΑΔΕ&apos;s book</h3>
+              <h3 className="text-sm font-semibold">Compared with ΑΑΔΕ</h3>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Net amounts before VAT. Income is what you invoiced; expenses are what suppliers invoiced you.
+              </p>
               <div className="overflow-hidden rounded-md border border-hairline">
                 <Table>
                   <TableHeader>
@@ -344,17 +397,21 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <h3 className="text-sm font-semibold">Filing</h3>
                 {period && (
                   <Badge variant={period.status === 'submitted' ? 'success' : 'neutral'}>
-                    {period.status}
+                    {VAT_PERIOD_STATUS_LABEL[period.status] ?? period.status}
                   </Badge>
                 )}
               </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Open → Reconciled → Filed tracks where this period stands. Nothing here is sent to ΑΑΔΕ.
+              </p>
 
               {!period ? (
                 <div className="mt-2 space-y-2">
                   <p className="text-xs text-muted-foreground">
-                    This period has not been opened yet. Opening it records ΑΑΔΕ&apos;s figures next
-                    to yours, so the pre-fill rules can be checked — income is a floor, expenses are
-                    a ceiling, and breaching the ceiling forfeits the deduction rather than warning.
+                    This period has not been opened yet. Opening it saves ΑΑΔΕ&apos;s figures next to
+                    yours and checks the pre-fill rules: declared sales may not be below what ΑΑΔΕ
+                    holds, and deducted purchases may not be above it. Deducting more than ΑΑΔΕ
+                    holds loses that deduction unless the extra is declared on a myDATA document.
                   </p>
                   {isWorkspaceManager && (
                     <Button size="sm" onClick={openPeriod} disabled={busy}>Open this period</Button>
@@ -376,7 +433,7 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                         {prefillBlocks(verdict)
                           ? <AlertTriangle className="h-3.5 w-3.5" />
                           : <CheckCircle2 className="h-3.5 w-3.5" />}
-                        {verdict.status}
+                        {PREFILL_STATUS_LABEL[verdict.status] ?? verdict.status}
                       </div>
                       <p>{verdict.reason}</p>
                       {verdict.legal_basis && <p>{verdict.legal_basis}</p>}

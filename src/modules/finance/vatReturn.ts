@@ -192,3 +192,18 @@ export function vatPeriodPresets(today: Date): Array<{ key: string; label: strin
     { key: 'last_year', label: `Last year (${y - 1})`, from: iso(y - 1, 0, 1), to: iso(y - 1, 11, 31) },
   ];
 }
+
+export const VAT_PERIOD_STATUS_LABEL: Record<string, string> = {
+  draft: 'Open',
+  reconciled: 'Reconciled',
+  submitted: 'Filed',
+};
+
+export const PREFILL_STATUS_LABEL: Record<string, string> = {
+  ok: 'Within the pre-fill rules',
+  tolerance: 'Within tolerance',
+  breach: 'Breaches the pre-fill rules',
+  no_mydata_figures: 'No ΑΑΔΕ figures to check against',
+  nothing_declared: 'Nothing declared yet',
+  not_found: 'Period not found',
+};
