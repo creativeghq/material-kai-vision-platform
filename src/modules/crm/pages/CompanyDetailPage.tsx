@@ -968,7 +968,7 @@ export const CompanyDetailPage: React.FC = () => {
                         </CardContent>
                       </Card>
                       {!isNew && id && activeWorkspaceId && (
-                        <CrmBankAccountsCard workspaceId={activeWorkspaceId} companyId={id} />
+                        <CrmBankAccountsCard workspaceId={activeWorkspaceId} companyId={id} onPartyUpdated={() => void loadCompany()} />
                       )}
                     </TabsContent>
 

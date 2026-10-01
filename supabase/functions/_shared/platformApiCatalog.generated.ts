@@ -4358,6 +4358,29 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "supplier-einvoice-details",
+    "tag": "Finance",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Read suppliers' own e-invoice provider pages for their IBANs and contact details",
+    "description": "For each CRM supplier with a myDATA document that links to its e-invoicing provider (download_url), fetches that page through the SSRF guard and reads it deterministically: checksum-valid IBANs are filed as crm_bank_account_suggestions (source einvoice_provider) for review on the party card, never written to crm_bank_accounts; the issuer block's phones, fax and email fill BLANK company fields or a",
+    "fields": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Checked against the caller's membership."
+      },
+      "company_id": {
+        "type": "string",
+        "description": "Read just this supplier now, even if read recently."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Suppliers per run, 1-60 (default 20)."
+      }
+    }
+  },
+  {
     "name": "takeoff-from-drawing",
     "tag": "Projects",
     "methods": [

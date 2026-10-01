@@ -37,6 +37,11 @@ export const PLATFORM_API_BLOCKED: readonly BlockedEndpoint[] = [
   },
   { name: 'xml-import-orchestrator', reason: 'Bulk supplier import — creates and updates products at scale.' },
   { name: 'crm-company-embedding-backfill', reason: 'Bulk embedding backfill over every company in the CRM.' },
+  {
+    name: 'supplier-einvoice-details',
+    reason: 'Bulk read of suppliers\' e-invoice provider sites that fills CRM fields; the providers rate-limit '
+      + 'by IP. Run from a supplier\'s Bank Accounts card.',
+  },
   { name: 'kb-embedding-backfill', reason: 'Bulk backfill over the whole knowledge base.' },
   { name: 'trigger-factory-enrichment', reason: 'Bulk enrichment across the whole product catalogue.' },
   { name: 'taric-reference-sync', reason: 'Bulk sync of the whole TARIC customs reference set.' },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Landmark, Plus, Trash2, Pencil, Loader2, Star, X, Check, FileText, AlertTriangle } from 'lucide-react';
+import { Landmark, Plus, Trash2, Pencil, Loader2, Star, X, Check, FileText, AlertTriangle, ScanSearch } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -9,7 +9,7 @@ import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import {
   crmBankAccountsAPI, crmBankAccountSuggestionsAPI,
-  type CrmBankAccount, type CrmBankAccountInput, type CrmBankAccountSuggestion,
+  type CrmBankAccount, type CrmBankAccountInput, type CrmBankAccountSuggestion, type EinvoiceReadResult,
 } from '@/services/crm.service';
 import { isValidIban, normalizeIban } from '@/utils/iban';
 import { BANKS, bankFromIban, normalizeBankName } from '@/config/bankVocabulary';
@@ -20,6 +20,7 @@ interface Props {
   /** Pass exactly one of these — the CRM entity these banks belong to. */
   companyId?: string;
   contactId?: string;
+  onPartyUpdated?: () => void;
 }
 
 const EMPTY: CrmBankAccountInput = { bank_name: '', account_holder: '', iban: '', account_ref: '', currency: 'EUR', is_primary: false };
@@ -27,12 +28,42 @@ const EMPTY: CrmBankAccountInput = { bank_name: '', account_holder: '', iban: ''
 /** The suggestions read, as a VALUE or a stated reason there is no value — never a bare `[]`. */
 interface SuggestionsRead { rows: CrmBankAccountSuggestion[]; error: string | null }
 
+const SUGGESTION_SOURCE_LABEL: Record<CrmBankAccountSuggestion['source'], string> = {
+  inbox_attachment: 'an Inbox attachment',
+  supplier_bill_scan: 'a scanned invoice',
+  einvoice_provider: 'their e-invoice',
+};
+
+function einvoiceReadToast(r: EinvoiceReadResult | null): { title: string; description?: string; variant?: 'destructive' } {
+  if (r?.outcome === 'failed') return { title: 'Reading their e-invoice failed', description: r.why, variant: 'destructive' };
+  if (!r || r.outcome === 'no_provider_link') {
+    return r?.address_set
+      ? { title: 'Address added from myDATA', description: 'None of their documents links to an e-invoicing provider page to read further.' }
+      : { title: 'No e-invoice link to read', description: 'None of their myDATA documents links to an e-invoicing provider page.' };
+  }
+  if (r.outcome === 'unreachable') return { title: 'Their e-invoice page did not open', description: r.why, variant: 'destructive' };
+  if (r.outcome === 'not_readable') {
+    return { title: 'Their e-invoice page cannot be read automatically', description: `${r.provider ?? ''} — ${r.why ?? ''}`.trim() };
+  }
+  const toReview = (r.ibans ?? []).filter((i) => /:(new|seen_again)$/.test(i)).length;
+  const found = [
+    toReview ? `${toReview} IBAN${toReview > 1 ? 's' : ''} to review` : null,
+    r.phone_set ? 'phone' : null,
+    r.email_set ? 'email' : null,
+    r.phones_added ? `${r.phones_added} more number${r.phones_added > 1 ? 's' : ''}` : null,
+    r.address_set ? 'address' : null,
+  ].filter(Boolean);
+  return found.length
+    ? { title: 'Read their e-invoice', description: `Added: ${found.join(', ')}.` }
+    : { title: 'Nothing new on their e-invoice', description: 'Everything it prints is already on file, or it prints no bank details.' };
+}
+
 /**
  * Manages the bank accounts that belong to a CRM company / contact (their OWN banks — e.g. a
  * supplier IBAN you pay to). These are selectable on a Bank Payment involving this counterparty.
  * Distinct from the workspace treasury accounts in Finance → Settings.
  */
-export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, contactId }) => {
+export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, contactId, onPartyUpdated }) => {
   const { toast } = useToast();
   const [rows, setRows] = React.useState<CrmBankAccount[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -54,6 +85,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
   // Id of the row whose "make primary" is in flight — latches every star so a double-click, or a
   // click on a second row mid-request, cannot race the first.
   const [primaryBusy, setPrimaryBusy] = React.useState<string | null>(null);
+  const [readingEinvoices, setReadingEinvoices] = React.useState(false);
 
   const parent = companyId ? { companyId } : { contactId };
 
@@ -128,6 +160,19 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
           ? <span className="text-xs text-destructive">Name does NOT match this account — verify before paying</span>
           : <span className="text-xs text-muted-foreground">Could not be checked for this bank</span>
   );
+
+  const readEinvoices = async () => {
+    if (!companyId || readingEinvoices) return;
+    setReadingEinvoices(true);
+    try {
+      const r = await crmBankAccountSuggestionsAPI.readFromEinvoices(workspaceId, companyId);
+      toast(einvoiceReadToast(r));
+      await load();
+      if (r?.phone_set || r?.email_set || r?.address_set) onPartyUpdated?.();
+    } catch (e: any) {
+      toast({ title: 'Could not read their e-invoices', description: e?.message, variant: 'destructive' });
+    } finally { setReadingEinvoices(false); }
+  };
 
   const startAdd = () => { setForm(EMPTY); setVopVerdict(null); setReviewing(null); setEditingId('new'); };
 
@@ -312,7 +357,18 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2"><Landmark className="h-4 w-4" />Bank Accounts</CardTitle>
-        {editingId === null && <Button size="sm" variant="outline" onClick={startAdd}><Plus className="h-3.5 w-3.5 mr-1" />Add bank</Button>}
+        {editingId === null && (
+          <div className="flex items-center gap-2">
+            {companyId && (
+              <Button size="sm" variant="ghost" onClick={() => void readEinvoices()} disabled={readingEinvoices}
+                title="Read the IBANs and contact details printed on their e-invoices">
+                {readingEinvoices ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5 mr-1" />}
+                Read their e-invoices
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={startAdd}><Plus className="h-3.5 w-3.5 mr-1" />Add bank</Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground -mt-1">
@@ -390,7 +446,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
                         <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                           <FileText className="h-3 w-3 shrink-0" />
                           <span className="truncate">
-                            {s.document_label || (s.source === 'inbox_attachment' ? 'an Inbox attachment' : 'a scanned invoice')}
+                            {s.document_label || SUGGESTION_SOURCE_LABEL[s.source]}
                             {s.seen_count > 1 ? ` · on ${s.seen_count} documents` : ''}
                           </span>
                         </div>

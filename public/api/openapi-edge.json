@@ -29517,6 +29517,102 @@
         }
       }
     },
+    "/supplier-einvoice-details": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Read suppliers' own e-invoice provider pages for their IBANs and contact details",
+        "operationId": "post_supplier_einvoice_details",
+        "description": "For each CRM supplier with a myDATA document that links to its e-invoicing provider (download_url), fetches that page through the SSRF guard and reads it deterministically: checksum-valid IBANs are filed as crm_bank_account_suggestions (source einvoice_provider) for review on the party card, never written to crm_bank_accounts; the issuer block's phones, fax and email fill BLANK company fields or are added as crm_phones; a blank address is filled from the myDATA issuer address. Each read stamps crm_companies.einvoice_read_at / einvoice_read_outcome. Pages are fetched sequentially with a per-host gap; a run stops at its time budget and reports remaining.\n\n**Response:** {processed, remaining, results:[{company_id, name, outcome, provider, ibans, phone_set, email_set, phones_added, address_set, why}]} (`application/json`)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Checked against the caller's membership."
+                  },
+                  "company_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Read just this supplier now, even if read recently."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "Suppliers per run, 1-60 (default 20)."
+                  }
+                },
+                "required": [
+                  "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/project-assessment": {
       "post": {
         "tags": [

@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (168)
+## 1. Supabase Edge Functions (169)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -124,6 +124,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `revolut-sync` | JWT / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
 | `revolut-webhooks` | revolutSignature | Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret |
 | `scan-receipt` | JWT | Read a photographed receipt into expense fields, and keep the image on the bill |
+| `supplier-einvoice-details` | JWT | Read suppliers' own e-invoice provider pages for their IBANs and contact details |
 | `supplier-orders-api` _(GET + POST)_ | kai_* | Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back |
 | `trip-expense-ops` | JWT | Sales trip-expense receipts: upload, sign, and render the expense PDF |
 

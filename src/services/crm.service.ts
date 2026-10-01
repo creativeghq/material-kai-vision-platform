@@ -2,6 +2,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { isValidIban, normalizeIban } from '@/utils/iban';
 import { resolveBank } from '@/config/bankVocabulary';
 import { formatAddressOneLine, type AddressLike } from '@/utils/address';
+import { edgeError } from '@/utils/edgeError';
+import type { EinvoiceReadOutcome } from '@/config/einvoiceReadOutcomes';
 
 // Get Supabase URL — lazy to avoid crash at module load time
 const getApiBase = (): string => {
@@ -994,7 +996,7 @@ export const crmBankAccountsAPI = {
 // -------- Bank details READ off a counterparty's own documents, awaiting review --------
 
 /** Where a sighting came from. Closed set — `crm_bank_account_suggestions_source_check`. */
-export type CrmBankSuggestionSource = 'supplier_bill_scan' | 'inbox_attachment';
+export type CrmBankSuggestionSource = 'supplier_bill_scan' | 'inbox_attachment' | 'einvoice_provider';
 
 export interface CrmBankAccountSuggestion {
   id: string;
@@ -1041,6 +1043,19 @@ export interface RecordBankSuggestionResult {
   checksum_ok?: boolean;
   seen_count?: number;
   bank_account_id?: string;
+}
+
+/** One supplier's read by `supplier-einvoice-details`. */
+export interface EinvoiceReadResult {
+  outcome: EinvoiceReadOutcome | 'no_provider_link' | 'failed';
+  provider?: string;
+  why?: string;
+  /** `<last 4>:<record outcome>` per IBAN found, e.g. `0489:new`, `5750:already_on_file`. */
+  ibans?: string[];
+  phone_set?: boolean;
+  email_set?: boolean;
+  phones_added?: number;
+  address_set?: boolean;
 }
 
 /** The bank details our document readers found on a counterparty's own invoice, held for review. */
@@ -1120,6 +1135,15 @@ export const crmBankAccountSuggestionsAPI = {
     });
     if (error) throw new Error(error.message || 'Failed to add the bank account');
     return data as string;
+  },
+
+  /** Read this supplier's own e-invoice provider page now; IBANs come back as pending sightings. */
+  async readFromEinvoices(workspaceId: string, companyId: string): Promise<EinvoiceReadResult | null> {
+    const { data, error } = await supabase.functions.invoke('supplier-einvoice-details', {
+      body: { workspace_id: workspaceId, company_id: companyId },
+    });
+    if (error) throw await edgeError(error, 'Could not read their e-invoices');
+    return ((data as { results?: EinvoiceReadResult[] })?.results ?? [])[0] ?? null;
   },
 
   /** Rule against one. The row stays — a rejected account that keeps arriving is worth knowing. */
