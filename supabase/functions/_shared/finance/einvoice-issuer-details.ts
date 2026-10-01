@@ -105,6 +105,18 @@ export function extractIssuerContacts(lines: string[], issuerVat: string): Issue
   };
 }
 
+export function findPdfLink(html: string, pageUrl: string): string | null {
+  const page = new URL(pageUrl);
+  for (const m of html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
+    const href = m[1].replace(/&amp;/g, '&');
+    if (!/\.pdf(\?|$)|\/pdf(\?|$)|download\w*pdf|contentType=PDF/i.test(href)) continue;
+    let u: URL;
+    try { u = new URL(href, page); } catch { continue; }
+    if (u.hostname === page.hostname && u.protocol === 'https:' && u.href !== page.href) return u.href;
+  }
+  return null;
+}
+
 export function readEinvoiceHtml(html: string, issuerVat: string): EinvoiceIssuerDetails {
   const lines = htmlToLines(html);
   return { ibans: extractIbans(lines.join('\n')), contacts: extractIssuerContacts(lines, issuerVat) };

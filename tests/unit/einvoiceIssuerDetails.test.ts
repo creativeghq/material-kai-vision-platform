@@ -6,6 +6,7 @@ import { stripComments } from '../helpers/stripComments';
 import {
   extractIbans,
   extractIssuerContacts,
+  findPdfLink,
   greekPhones,
   htmlToLines,
   readEinvoiceHtml,
@@ -70,6 +71,16 @@ describe('issuer contacts', () => {
   });
 });
 
+describe('PDF behind a provider page', () => {
+  it('follows a same-site PDF link and nothing else', () => {
+    const page = 'https://e-invoicing.gr/edocuments/ViewInvoice/-1/abc';
+    expect(findPdfLink('<a href="/api/DownloadPDFFile?contentType=PDF&amp;id=1">PDF</a>', page))
+      .toBe('https://e-invoicing.gr/api/DownloadPDFFile?contentType=PDF&id=1');
+    expect(findPdfLink('<a href="https://elsewhere.example/x.pdf">x</a>', page)).toBeNull();
+    expect(findPdfLink('<link href="/build/pdf-default.css">', page)).toBeNull();
+  });
+});
+
 describe('the edge function', () => {
   it('never writes the payment-destination table — IBANs go to review as einvoice_provider sightings', () => {
     expect(FN).not.toContain("'crm_bank_accounts'");
@@ -94,6 +105,10 @@ describe('the edge function', () => {
 
   it('a re-read of the same document is not filed as a second sighting', () => {
     expect(FN.indexOf('fromThisDoc.has(iban)')).toBeLessThan(FN.indexOf("rpc('crm_record_bank_account_suggestion'"));
+  });
+
+  it('a PDF yields IBANs only, never contacts: its text mixes our block into theirs', () => {
+    expect(FN).toMatch(/kind === 'pdf'\)\s*\{\s*found = \{ ibans: await pdfIbans\(page\.bytes\), contacts: null \}/);
   });
 
   it('fills blanks only — an operator-typed phone, email or address is never overwritten', () => {

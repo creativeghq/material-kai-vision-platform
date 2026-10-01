@@ -4364,7 +4364,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Read suppliers' own e-invoice provider pages for their IBANs and contact details",
-    "description": "For each CRM supplier with a myDATA document that links to its e-invoicing provider (download_url), fetches that page through the SSRF guard and reads it deterministically: checksum-valid IBANs are filed as crm_bank_account_suggestions (source einvoice_provider) for review on the party card, never written to crm_bank_accounts; the issuer block's phones, fax and email fill BLANK company fields or a",
+    "description": "For each CRM supplier with a myDATA document that links to its e-invoicing provider (download_url), fetches that page (or the PDF it serves or links to on the same site) through the SSRF guard and reads it deterministically: checksum-valid IBANs are filed as crm_bank_account_suggestions (source einvoice_provider) for review on the party card, never written to crm_bank_accounts; the HTML issuer blo",
     "fields": {
       "workspace_id": {
         "type": "string",

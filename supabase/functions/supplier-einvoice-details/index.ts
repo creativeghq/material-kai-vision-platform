@@ -3,7 +3,8 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
-import { readEinvoiceHtml, type EinvoiceIssuerDetails } from '../_shared/finance/einvoice-issuer-details.ts';
+import { extractIbans, findPdfLink, readEinvoiceHtml, type EinvoiceIssuerDetails } from '../_shared/finance/einvoice-issuer-details.ts';
+import { extractText, getDocumentProxy } from 'npm:unpdf@1.4.0';
 import { bankFromIban } from '../_shared/bankVocabulary.generated.ts';
 import { normalizeIban } from '../_shared/iban.generated.ts';
 import type { EinvoiceReadOutcome } from '../_shared/einvoiceReadOutcomes.generated.ts';
@@ -45,7 +46,11 @@ const digits = (v: unknown) => String(v ?? '').replace(/\D/g, '').replace(/^(003
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const addressMissing = (c: CompanyRow) => blank(c.street) && blank(c.address) && blank(c.city);
 
-type Fetched = { kind: 'html'; html: string } | { kind: 'not_readable'; why: string } | { kind: 'unreachable'; why: string };
+type Fetched =
+  | { kind: 'html'; html: string; url: string }
+  | { kind: 'pdf'; bytes: Uint8Array }
+  | { kind: 'not_readable'; why: string }
+  | { kind: 'unreachable'; why: string };
 
 async function fetchPage(rawUrl: string): Promise<Fetched> {
   let url = rawUrl;
@@ -60,7 +65,7 @@ async function fetchPage(rawUrl: string): Promise<Fetched> {
       res = await fetch(url, {
         redirect: 'manual',
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: { 'User-Agent': 'MaterialsHub supplier-details reader', Accept: 'text/html,application/xhtml+xml' },
+        headers: { 'User-Agent': 'MaterialsHub supplier-details reader', Accept: 'text/html,application/xhtml+xml,application/pdf' },
       });
     } catch (e) {
       return { kind: 'unreachable', why: e instanceof Error ? e.message : 'fetch failed' };
@@ -77,7 +82,7 @@ async function fetchPage(rawUrl: string): Promise<Fetched> {
       return { kind: 'unreachable', why: `HTTP ${res.status}` };
     }
     const type = res.headers.get('content-type') ?? '';
-    if (!/text\/html|xhtml/i.test(type)) {
+    if (!/text\/html|xhtml|application\/pdf|octet-stream/i.test(type)) {
       await res.body?.cancel();
       return { kind: 'not_readable', why: type || 'unknown content type' };
     }
@@ -95,11 +100,18 @@ async function fetchPage(rawUrl: string): Promise<Fetched> {
     const buf = new Uint8Array(size);
     let off = 0;
     for (const c of chunks) { buf.set(c, off); off += c.byteLength; }
+    if (new TextDecoder().decode(buf.subarray(0, 5)) === '%PDF-') return { kind: 'pdf', bytes: buf };
+    if (!/text\/html|xhtml/i.test(type)) return { kind: 'not_readable', why: type };
     const html = new TextDecoder().decode(buf);
     if (/challenges\.cloudflare\.com|cf-turnstile/i.test(html)) return { kind: 'not_readable', why: 'bot challenge' };
-    return { kind: 'html', html };
+    return { kind: 'html', html, url };
   }
   return { kind: 'unreachable', why: 'too many redirects' };
+}
+
+async function pdfIbans(bytes: Uint8Array): Promise<string[]> {
+  const { text } = await extractText(await getDocumentProxy(bytes), { mergePages: true });
+  return extractIbans(text);
 }
 
 async function readAll<T>(
@@ -155,11 +167,34 @@ async function readOne(
     lastHit.set(host, Date.now());
     result.provider = host;
 
-    if (page.kind !== 'html') {
+    let found: EinvoiceIssuerDetails | null = null;
+    try {
+      if (page.kind === 'pdf') {
+        found = { ibans: await pdfIbans(page.bytes), contacts: null };
+        result.pdf = true;
+      } else if (page.kind === 'html') {
+        found = readEinvoiceHtml(page.html, vat);
+        const pdfUrl = findPdfLink(page.html, page.url);
+        if (pdfUrl) {
+          await sleep(SAME_HOST_GAP_MS);
+          const pdf = await fetchPage(pdfUrl);
+          lastHit.set(host, Date.now());
+          if (pdf.kind === 'pdf') {
+            found.ibans = [...new Set([...found.ibans, ...await pdfIbans(pdf.bytes)])];
+            result.pdf = true;
+          }
+        }
+      }
+    } catch (e) {
+      result.why = `PDF could not be read: ${e instanceof Error ? e.message : String(e)}`;
+      found = null;
+      outcome = 'not_readable';
+    }
+
+    if (page.kind === 'unreachable' || page.kind === 'not_readable') {
       outcome = page.kind;
       result.why = page.why;
-    } else {
-      const found: EinvoiceIssuerDetails = readEinvoiceHtml(page.html, vat);
+    } else if (found) {
       const label = `their e-invoice ${[doc.series, doc.aa].filter(Boolean).join(' ')}${doc.issue_date ? ` (${doc.issue_date})` : ''}`.trim();
       const ibans = found.ibans.filter((i) => !own.has(i));
       const { data: prior } = await admin.from('crm_bank_account_suggestions')
