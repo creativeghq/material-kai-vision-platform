@@ -101,4 +101,8 @@ describe('the edge function', () => {
     expect(FN).toMatch(/blank\(c\.email\)/);
     expect(FN).toContain('addressMissing(c)');
   });
+
+  it('never writes crm_phones.phone_normalized — it is a GENERATED column', () => {
+    expect(FN).not.toContain('phone_normalized');
+  });
 });

@@ -196,7 +196,7 @@ async function readOne(
         if (extra.length) {
           const { error } = await admin.from('crm_phones').insert(extra.map((x) => ({
             workspace_id: workspaceId, company_id: c.id, label: x.label, phone: `+30${x.p}`,
-            phone_normalized: `+30${x.p}`, phone_type: x.type, notes: `From ${label}`,
+            phone_type: x.type, notes: `From ${label}`,
           })));
           if (error) throw new Error(`adding phone numbers failed: ${error.message}`);
           result.phones_added = extra.length;
