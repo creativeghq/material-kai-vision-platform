@@ -29,7 +29,7 @@ import {
 const HOW_IT_WORKS: Array<{ title: string; body: string }> = [
   {
     title: 'Pick the period you declare',
-    body: 'Whole months or a quarter, matching how often you file the Φ.2. ΑΑΔΕ keeps its book by month, so a part-month cannot be compared.',
+    body: 'The Φ.2 is moving to monthly filing, so the page opens on last month and offers the three months before it. Quarterly presets remain for businesses not moved yet. ΑΑΔΕ keeps its book by month, so a part-month cannot be compared.',
   },
   {
     title: 'Read the three figures',
@@ -66,7 +66,7 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const { toast } = useToast();
   const { isWorkspaceManager } = usePermissions();
   const presets = React.useMemo(() => vatPeriodPresets(new Date()), []);
-  const [range, setRange] = React.useState({ from: presets[1].from, to: presets[1].to });
+  const [range, setRange] = React.useState({ from: presets[0].from, to: presets[0].to });
   const [snap, setSnap] = React.useState<VatReturnSnapshot | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -180,7 +180,7 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 if (p) setRange({ from: p.from, to: p.to });
               }}
             >
-              <SelectTrigger aria-label="VAT period" className="h-9 w-40 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="VAT period" className="h-9 w-56 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {presets.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
                 <SelectItem value="custom">Custom</SelectItem>

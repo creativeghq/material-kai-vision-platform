@@ -189,6 +189,12 @@ describe('the period presets are whole months, because the book is', () => {
     expect(last.to).toBe('2025-12-31');
   });
 
+  it('monthly filing comes first: the default is last month, then the three before', () => {
+    const p = vatPeriodPresets(new Date(2026, 9, 1));
+    expect(p[0]).toMatchObject({ key: 'last_month', from: '2026-09-01', to: '2026-09-30' });
+    expect(p.slice(1, 3).map((x) => x.from)).toEqual(['2026-08-01', '2026-07-01']);
+  });
+
   it('a February end is the real one, not a 30th', () => {
     const mar = vatPeriodPresets(new Date(2026, 2, 3));
     expect(mar.find((p) => p.key === 'last_month')!.to).toBe('2026-02-28');

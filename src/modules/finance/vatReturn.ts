@@ -158,7 +158,7 @@ export function residualVerdict(residual: number | null | undefined): {
   };
 }
 
-/** Whole months only: ΑΑΔΕ's book is monthly, and a part-month has no counterpart in it. */
+/** Monthly first (the Φ.2 is moving to monthly); quarters stay for businesses not moved yet. */
 export function vatPeriodPresets(today: Date): Array<{ key: string; label: string; from: string; to: string }> {
   const iso = (y: number, m: number, d: number) =>
     `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -183,13 +183,16 @@ export function vatPeriodPresets(today: Date): Array<{ key: string; label: strin
     };
   };
 
+  const monthName = (offset: number) =>
+    new Date(y, m + offset, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
   return [
-    { key: 'this_quarter', label: 'This quarter', ...quarter(0) },
-    { key: 'last_quarter', label: 'Last quarter', ...quarter(-1) },
-    { key: 'this_month', label: 'This month', ...month(0) },
-    { key: 'last_month', label: 'Last month', ...month(-1) },
-    { key: 'this_year', label: `This year (${y})`, from: iso(y, 0, 1), to: iso(y, 11, 31) },
-    { key: 'last_year', label: `Last year (${y - 1})`, from: iso(y - 1, 0, 1), to: iso(y - 1, 11, 31) },
+    { key: 'last_month', label: `${monthName(-1)} (last month)`, ...month(-1) },
+    { key: 'month_minus_2', label: monthName(-2), ...month(-2) },
+    { key: 'month_minus_3', label: monthName(-3), ...month(-3) },
+    { key: 'this_month', label: `${monthName(0)} (so far)`, ...month(0) },
+    { key: 'last_quarter', label: 'Last quarter (quarterly filers)', ...quarter(-1) },
+    { key: 'this_quarter', label: 'This quarter (quarterly filers)', ...quarter(0) },
   ];
 }
 
