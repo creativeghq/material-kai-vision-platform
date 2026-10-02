@@ -1044,14 +1044,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const periodEnd = new Date();
         const periodStart = new Date(periodEnd.getTime() - days * 86400000);
 
-        // Every distinct WABA we know about, with the workspace that owns it.
+        // Every distinct WABA we know about, with the Zernio account that reads it and its workspace.
         const { data: channels } = await supabaseClient
-          .from('messaging_channels').select('workspace_id, config').eq('channel_type', 'whatsapp');
+          .from('messaging_channels').select('workspace_id, config, zernio_account_id').eq('channel_type', 'whatsapp');
 
-        const seen = new Map<string, string | null>();
-        for (const c of ((channels ?? []) as Array<{ workspace_id: string | null; config: Record<string, unknown> | null }>)) {
-          const waba = (c.config?.waba_id as string) || null;
-          if (waba && !seen.has(waba)) seen.set(waba, c.workspace_id);
+        const seen = new Map<string, { zernioAccountId: string; workspaceId: string | null }>();
+        for (const c of ((channels ?? []) as Array<{ workspace_id: string | null; config: Record<string, unknown> | null; zernio_account_id: string | null }>)) {
+          // Zernio stores it camelCase; the snake_case read found nothing for every channel ever connected.
+          const waba = (c.config?.wabaId as string) || (c.config?.waba_id as string) || null;
+          const zernioAccountId = c.zernio_account_id || (c.config?.zernio_account_id as string) || null;
+          if (waba && zernioAccountId && !seen.has(waba)) seen.set(waba, { zernioAccountId, workspaceId: c.workspace_id });
         }
 
         if (seen.size === 0) {
@@ -1068,17 +1070,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             whatsapp_channels: waChannels ?? 0,
             message: (waChannels ?? 0) === 0
               ? 'No WhatsApp channel is connected, so there is nothing to reconcile yet.'
-              : 'WhatsApp is connected but no channel carries a WABA id. That normally means the '
-                + 'number was onboarded through the provider\'s own Meta app, so the WhatsApp '
-                + 'Business Account sits in THEIR Business Manager and Meta will not report its '
-                + 'cost to us at all. Take the figures from the provider invoice and record them '
-                + 'with set-whatsapp-rate — no Meta token can read a WABA you do not own.',
+              : 'WhatsApp is connected but no channel carries both a WABA id and a Zernio account id, '
+                + 'so there is nothing to ask Zernio about. Reconnect the number, or take the figures '
+                + 'from the provider invoice and record them with set-whatsapp-rate.',
           });
         }
 
         const results = [];
-        for (const [wabaId, workspaceId] of seen) {
-          results.push(await reconcileWaba(supabaseClient, { wabaId, workspaceId, periodStart, periodEnd }));
+        for (const [wabaId, { zernioAccountId, workspaceId }] of seen) {
+          results.push(await reconcileWaba(supabaseClient, { wabaId, zernioAccountId, workspaceId, periodStart, periodEnd }));
         }
 
         return jsonResponse({

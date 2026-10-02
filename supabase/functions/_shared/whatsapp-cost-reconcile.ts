@@ -1,10 +1,8 @@
 /** Close the loop on the one cost this platform could not see. */
-import { resolveSecret } from './secrets.ts';
+import { ensureZernioSecrets, zernioApi } from './zernio.ts';
 
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = { from: (t: string) => any };
-
-const GRAPH_VERSION = 'v26.0';
 
 /** Meta needs a real sample before its average means anything. */
 const MIN_VOLUME_TO_TRUST = 25;
@@ -26,87 +24,65 @@ export interface ReconcileResult {
 }
 
 /** Meta's pricing categories, lowercased onto ours. `service` is free and never billed. */
-function normaliseCategory(raw: string | undefined): string | null {
+function normaliseCategory(raw: string | null | undefined): string | null {
   const c = (raw ?? '').toLowerCase();
   if (c === 'marketing' || c === 'utility' || c === 'authentication' || c === 'service') return c;
   return null;
 }
 
 /**
- * Read one WABA's actual spend for a window.
- *
- * `dimensions` asks Meta to break the answer down; without them it returns one grand total, which
- * is useless for a rate table that is keyed on country and category.
+ * Read one WhatsApp number's actual spend through Zernio, which proxies Meta's `pricing_analytics`
+ * with its own Meta app — so no Meta token of ours is involved. MONTHLY points over a window that
+ * crosses a month boundary arrive as two rows per country × category, hence the merge.
  */
-export async function fetchMetaPricing(
-  token: string,
-  wabaId: string,
-  startMs: number,
-  endMs: number,
+export async function fetchWhatsAppPricing(
+  zernioAccountId: string,
+  start: Date,
+  end: Date,
 ): Promise<{ rows: ReconcileRow[]; costAvailable: boolean }> {
-  const params = new URLSearchParams({
-    start: String(Math.floor(startMs / 1000)),
-    end: String(Math.floor(endMs / 1000)),
+  const qs = new URLSearchParams({
+    accountId: zernioAccountId,
+    start: start.toISOString(),
+    end: end.toISOString(),
     granularity: 'MONTHLY',
-    metric_types: JSON.stringify(['COST', 'VOLUME']),
-    dimensions: JSON.stringify(['COUNTRY', 'PRICING_CATEGORY']),
-    access_token: token,
+    dimensions: 'COUNTRY,PRICING_CATEGORY',
+    metricTypes: 'COST,VOLUME',
   });
+  const json = await zernioApi('GET', `/whatsapp/pricing-analytics?${qs.toString()}`);
+  const points = (json?.dataPoints ?? []) as Array<{
+    country: string | null; pricingCategory: string | null; volume: number | null; cost: number | null;
+  }>;
 
-  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(wabaId)}/pricing_analytics?${params.toString()}`);
-  if (!res.ok) {
-    throw new Error(`Meta pricing_analytics ${res.status}: ${await res.text()}`);
-  }
-  const json = await res.json();
-
-  const points = (json?.data?.[0]?.data_points ?? json?.data ?? []) as Array<Record<string, unknown>>;
-  const rows: ReconcileRow[] = [];
-  let anyCost = false;
-
+  const merged = new Map<string, ReconcileRow>();
   for (const p of points) {
-    const category = normaliseCategory(p.pricing_category as string);
+    const category = normaliseCategory(p.pricingCategory);
     if (!category) continue;
-    const cost = p.cost == null ? null : Number(p.cost);
-    if (cost != null && cost > 0) anyCost = true;
-    rows.push({
-      country: String(p.country ?? '*').toUpperCase(),
-      category,
-      volume: Number(p.volume ?? 0),
-      costUsd: cost,
-    });
+    const country = String(p.country ?? '*').toUpperCase();
+    const key = `${country}|${category}`;
+    const row = merged.get(key) ?? { country, category, volume: 0, costUsd: null };
+    row.volume += Number(p.volume ?? 0);
+    if (p.cost != null) row.costUsd = (row.costUsd ?? 0) + Number(p.cost);
+    merged.set(key, row);
   }
 
-  return { rows, costAvailable: anyCost };
+  const rows = [...merged.values()];
+  return { rows, costAvailable: rows.some((r) => (r.costUsd ?? 0) > 0) };
 }
 
 /**
- * Reconcile one WABA: read Meta, store the comparison, and correct the rate table.
+ * Reconcile one WABA: read Meta's figures, store the comparison, and correct the rate table.
  *
- * Returns rather than throws on a missing token, because the whole point is that this runs
- * unattended on a cron — a thrown error there is a red job nobody reads, where a returned reason
- * lands in the result the operator is looking at.
+ * Returns rather than throws, because this runs unattended on a cron — a thrown error there is a
+ * red job nobody reads, where a returned reason lands in the result the operator is looking at.
  */
 export async function reconcileWaba(
   supabase: SupabaseLike,
-  params: { wabaId: string; workspaceId: string | null; periodStart: Date; periodEnd: Date },
+  params: { wabaId: string; zernioAccountId: string; workspaceId: string | null; periodStart: Date; periodEnd: Date },
 ): Promise<ReconcileResult> {
-  // resolveSecret answers with provenance, not a bare string — env beats platform_secrets, and
-  // which one won matters when an operator swears they pasted the token.
-  const resolved = await resolveSecret(supabase, 'META_WABA_ACCESS_TOKEN');
-  const token = resolved.value;
-  if (!token) {
-    return {
-      wabaId: params.wabaId,
-      rows: [],
-      costAvailable: false,
-      ratesUpdated: 0,
-      error: 'META_WABA_ACCESS_TOKEN is not set — template rates are still running on the seeded guesses.',
-    };
-  }
-
   let fetched: { rows: ReconcileRow[]; costAvailable: boolean };
   try {
-    fetched = await fetchMetaPricing(token, params.wabaId, params.periodStart.getTime(), params.periodEnd.getTime());
+    await ensureZernioSecrets(supabase);
+    fetched = await fetchWhatsAppPricing(params.zernioAccountId, params.periodStart, params.periodEnd);
   } catch (err) {
     return {
       wabaId: params.wabaId, rows: [], costAvailable: false, ratesUpdated: 0,
@@ -118,17 +94,18 @@ export async function reconcileWaba(
   const endIso = params.periodEnd.toISOString().slice(0, 10);
   let ratesUpdated = 0;
 
-  for (const row of fetched.rows) {
-    // What we charged for the same country, category and window — from our own ledger, so the
-    // comparison is billed-vs-actual rather than billed-vs-assumption.
-    const { data: billed } = await supabase
-      .from('ai_usage_logs')
-      .select('credits_debited, metadata')
-      .eq('model_name', 'whatsapp-template')
-      .gte('created_at', params.periodStart.toISOString())
-      .lt('created_at', params.periodEnd.toISOString());
+  // What we charged in the same window — from our own ledger, so the comparison is
+  // billed-vs-actual rather than billed-vs-assumption.
+  const { data: billed } = await supabase
+    .from('ai_usage_logs')
+    .select('credits_debited, metadata')
+    .eq('model_name', 'whatsapp-template')
+    .gte('created_at', params.periodStart.toISOString())
+    .lt('created_at', params.periodEnd.toISOString());
+  const billedRows = (billed ?? []) as Array<{ credits_debited: number; metadata: Record<string, unknown> | null }>;
 
-    const mine = ((billed ?? []) as Array<{ credits_debited: number; metadata: Record<string, unknown> | null }>)
+  for (const row of fetched.rows) {
+    const mine = billedRows
       .filter((r) => (r.metadata?.rate_country ?? '*') === row.country && r.metadata?.rate_category === row.category);
 
     const { error: reconErr } = await supabase.from('whatsapp_cost_reconciliation').upsert({
@@ -140,8 +117,7 @@ export async function reconcileWaba(
       category: row.category,
       volume: row.volume,
       cost_usd: row.costUsd,
-      // Absent, not zero. A WABA on the partner's credit line reports no cost at all, and
-      // recording that as $0 would read as a free month.
+      // Absent, not zero: a WABA on a partner credit line reports no cost, and $0 would read as a free month.
       cost_available: row.costUsd != null,
       billed_messages: mine.length,
       billed_credits: mine.reduce((n, r) => n + Number(r.credits_debited ?? 0), 0),
@@ -156,7 +132,7 @@ export async function reconcileWaba(
         country_code: row.country,
         category: row.category,
         cost_per_message_usd: Number(actualPerMessage.toFixed(5)),
-        source_note: `Derived from Meta pricing_analytics — ${row.volume} messages, ${startIso}..${endIso}.`,
+        source_note: `Derived from Meta pricing_analytics via Zernio — ${row.volume} messages, ${startIso}..${endIso}.`,
         last_verified_at: new Date().toISOString(),
         derived_from_actuals: true,
         observed_volume: row.volume,
@@ -173,7 +149,7 @@ export async function reconcileWaba(
     costAvailable: fetched.costAvailable,
     ratesUpdated,
     ...(fetched.rows.length === 0
-      ? { error: 'Meta returned no pricing rows for this window — either nothing was sent, or the token cannot read this WABA.' }
+      ? { error: 'Meta returned no pricing rows for this window — nothing billable was sent.' }
       : !fetched.costAvailable
         ? { error: 'Meta reported volume but withheld COST. This WABA is on a Solution Partner credit line, so the actual charge has to come from the partner invoice.' }
         : {}),

@@ -301,6 +301,7 @@ GET /v1/whatsapp/flows/{flowId}/preview
 GET /v1/whatsapp/flows/{flowId}/versions
 GET /v1/whatsapp/media/{mediaId}
 GET /v1/whatsapp/number-info
+GET /v1/whatsapp/pricing-analytics
 GET /v1/whatsapp/sandbox/sessions
 GET /v1/whatsapp/template-library
 GET /v1/whatsapp/templates
