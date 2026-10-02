@@ -1,5 +1,5 @@
 /** Close the loop on the one cost this platform could not see. */
-import { ensureZernioSecrets, zernioApi } from './zernio.ts';
+import { ensureZernioSecrets, zernioApi, ZernioApiError } from './zernio.ts';
 
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = { from: (t: string) => any };
@@ -40,15 +40,24 @@ export async function fetchWhatsAppPricing(
   start: Date,
   end: Date,
 ): Promise<{ rows: ReconcileRow[]; costAvailable: boolean }> {
-  const qs = new URLSearchParams({
+  const query = (metricTypes: string) => zernioApi('GET', `/whatsapp/pricing-analytics?${new URLSearchParams({
     accountId: zernioAccountId,
     start: start.toISOString(),
     end: end.toISOString(),
     granularity: 'MONTHLY',
     dimensions: 'COUNTRY,PRICING_CATEGORY',
-    metricTypes: 'COST,VOLUME',
-  });
-  const json = await zernioApi('GET', `/whatsapp/pricing-analytics?${qs.toString()}`);
+    metricTypes,
+  }).toString()}`);
+
+  let json;
+  try {
+    json = await query('COST,VOLUME');
+  } catch (err) {
+    // Meta 2388184: COST is withheld from a partner-billed WABA and refuses the whole request.
+    // Zernio relays it as "access has been revoked", which it is not — volume still reads.
+    if (!(err instanceof ZernioApiError) || !err.bodyText.includes('2388184')) throw err;
+    json = await query('VOLUME');
+  }
   const points = (json?.dataPoints ?? []) as Array<{
     country: string | null; pricingCategory: string | null; volume: number | null; cost: number | null;
   }>;
