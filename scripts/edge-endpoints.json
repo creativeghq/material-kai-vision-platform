@@ -3989,7 +3989,7 @@
       },
       {
         "name": "set-whatsapp-rate",
-        "summary": "Record a Meta template rate read off an invoice. Automatic reconciliation only works where WE own the WABA; a BSP-owned WABA never reaches our invoice, so the rate is entered by hand rather than guessed.",
+        "summary": "Record a Meta template rate read off the Zernio invoice. Meta withholds COST from a partner-billed WABA, so the reconcile can only count volume and the rate is entered by hand rather than guessed.",
         "params": [
           {
             "name": "country",
@@ -4020,7 +4020,7 @@
       },
       {
         "name": "reconcile-whatsapp-costs",
-        "summary": "Reconcile what Meta actually charged for template messages. Meta bills the WABA directly and never touches Zernio's invoice, so without this the template cost runs entirely on estimates.",
+        "summary": "Reconcile Meta template volume (and cost, where Meta reports it) through Zernio's pricing-analytics, against what we billed. Needs no Meta app or token of ours.",
         "params": [
           {
             "name": "days",

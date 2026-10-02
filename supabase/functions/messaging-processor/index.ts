@@ -190,9 +190,8 @@ serve(withApiLogging('messaging-processor', async (req) => {
         // (don't churn the whole list into 'failed'). No owner → skip metering (shouldn't happen).
         let debitedCredits = 0;
         if (ownerId) {
-          // A campaign is a template blast by definition, so this is the branch where the old
-          // flat $0.005 was furthest from the truth — a European marketing template costs Meta
-          // roughly ten times that, and Meta bills the WABA directly so nothing here saw it.
+          // A campaign is a template blast, priced per country × category — a European marketing
+          // template costs roughly ten times the old flat $0.005.
           const priced = await priceWhatsAppMessage(supabase, {
             to: recipient.phone_number,
             isTemplate: true,
