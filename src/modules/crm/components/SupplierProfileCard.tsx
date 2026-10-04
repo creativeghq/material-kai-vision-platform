@@ -132,7 +132,7 @@ export const SupplierProfileCard: React.FC<{
         <TagEditor id="own-brands" label="Own brands" values={value.own_brands ?? []} onChange={(v) => onSave({ own_brands: v })} />
         <TagEditor
           id="brands-carried"
-          label={type === 'agent' ? 'Factories represented' : 'Brands carried'}
+          label={type === 'agent' ? 'Other brands (not linked to a factory yet)' : 'Brands carried'}
           values={value.brands_carried ?? []}
           onChange={(v) => onSave({ brands_carried: v })}
         />

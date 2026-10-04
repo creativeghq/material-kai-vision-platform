@@ -54,6 +54,7 @@ import { GoogleBusinessCard } from '@/modules/crm/components/GoogleBusinessCard'
 import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { SupplierProfileCard, type SupplierProfile } from '@/modules/crm/components/SupplierProfileCard';
+import { CompanyRepresentationsCard } from '@/modules/crm/components/CompanyRepresentationsCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { SupplyCategorySelect } from '@/components/business/crm/SupplyCategorySelect';
 import { Switch } from '@/components/core/ui/switch';
@@ -1127,6 +1128,9 @@ export const CompanyDetailPage: React.FC = () => {
 
           {/* Contacts Tab */}
           <TabsContent value="contacts" className="space-y-4">
+            {company?.id && activeWorkspaceId && showSupplierFeatures && (
+              <CompanyRepresentationsCard companyId={company.id} workspaceId={activeWorkspaceId} isAgency={company.supplier_type === 'agent'} />
+            )}
             {/* Deals on this account — the reverse side of crm_deals.company_id, which was
                 otherwise a one-way link (#311). */}
             {company?.id && activeWorkspaceId && (

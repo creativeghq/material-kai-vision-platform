@@ -10,6 +10,15 @@ export const SUPPLIER_TYPES = [
 
 export type SupplierType = (typeof SUPPLIER_TYPES)[number]['value'];
 
+/** Mirrors the `crm_company_representations.kind` CHECK. */
+export const REPRESENTATION_KINDS = [
+  { value: 'agent', label: 'Agent' },
+  { value: 'exclusive_distributor', label: 'Exclusive distributor' },
+  { value: 'distributor', label: 'Distributor' },
+] as const;
+
+export type RepresentationKind = (typeof REPRESENTATION_KINDS)[number]['value'];
+
 export const FIELD_SOURCE_LABEL: Record<string, string> = {
   operator: 'entered by your team',
   aade: 'from ΑΑΔΕ',

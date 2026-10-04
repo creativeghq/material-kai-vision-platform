@@ -4564,6 +4564,92 @@ export type Database = {
           },
         ]
       }
+      crm_company_representations: {
+        Row: {
+          agent_company_id: string
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          ended_on: string | null
+          id: string
+          kind: string
+          last_contact_on: string | null
+          notes: string | null
+          principal_company_id: string
+          source: string
+          started_on: string | null
+          status: string
+          territory: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          agent_company_id: string
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          ended_on?: string | null
+          id?: string
+          kind?: string
+          last_contact_on?: string | null
+          notes?: string | null
+          principal_company_id: string
+          source?: string
+          started_on?: string | null
+          status?: string
+          territory?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          agent_company_id?: string
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          ended_on?: string | null
+          id?: string
+          kind?: string
+          last_contact_on?: string | null
+          notes?: string | null
+          principal_company_id?: string
+          source?: string
+          started_on?: string | null
+          status?: string
+          territory?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_company_representations_agent_company_id_fkey"
+            columns: ["agent_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_company_representations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_company_representations_principal_company_id_fkey"
+            columns: ["principal_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_company_representations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_contact_relationships: {
         Row: {
           contact_id: string
