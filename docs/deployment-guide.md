@@ -170,7 +170,7 @@ MODAL_TOKEN_ID  MODAL_TOKEN_SECRET   ← GitHub Actions only; let the deploy-mod
 
 #### **How It Works:**
 1. **Custom contract** (NOT vLLM): `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{regions:[{bbox, label, content, order}], width, height}`. `mode=page` = structural pass, `mode=block` = per-crop OCR.
-2. **Scale-to-zero**: `min_containers=0` + `scaledown_window=120` → **$0 idle**. First request after idle cold-starts a GPU (L4) container (~90s); MIVAA health-probes `/health` as warmup. `max_containers=4`.
+2. **Scale-to-zero**: `min_containers=0` + `scaledown_window=120` → **$0 idle**. First request after idle cold-starts a GPU (A10G) container (~90s); MIVAA health-probes `/health` as warmup. `max_containers=8`.
 3. **In-process pipeline**: runs the full `paddleocr[doc-parser]` `PaddleOCRVL` pipeline on `paddlepaddle-gpu` (forces `device="gpu"`).
 
 #### **Required Secrets:**
@@ -1229,11 +1229,11 @@ This section covers all third-party services used by the platform, their pricing
 
 | Endpoint | Host | Instance | Rate | Scale-to-zero |
 |----------|------|----------|------|-----------|
-| SigLIP2 (SLIG visual embeddings) | **Modal** | GPU | ~$0.80/hour active | Yes — scale-to-zero, $0 idle |
-| PaddleOCR-VL (layout + OCR structural pass) | **Modal** | GPU (L4) | ~$0.80/hour active | Yes — scale-to-zero, $0 idle |
+| SigLIP2 (SLIG visual embeddings) | **Modal** | GPU (A10G) | ~$1.10/GPU-hour active | Yes — scale-to-zero, $0 idle |
+| PaddleOCR-VL (layout + OCR structural pass) | **Modal** | GPU (A10G) | ~$1.10/GPU-hour active | Yes — scale-to-zero, $0 idle |
 | ~~Chandra OCR v2 / YOLO DocParser~~ | ~~HuggingFace~~ | — | — | **REMOVED 2026-06-13** — replaced by PaddleOCR-VL on Modal |
 
-**Cost control**: both SLIG and PaddleOCR-VL scale to zero on Modal ($0 idle). Billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
+**Cost control**: both SLIG and PaddleOCR-VL scale to zero on Modal ($0 idle). Billed per second only when active (A10G list ≈ $1.10/GPU-hour; `ai_model_pricing` books a flat $1.00/GPU-hour). Typical monthly cost: $5–$20 depending on PDF processing volume.
 
 ---
 

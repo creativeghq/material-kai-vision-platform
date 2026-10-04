@@ -255,7 +255,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 **Modal** (structural layout + OCR backbone):
 - **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) — two-stage parser: PP-DocLayoutV3 (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). Runs structure-first as Stage 1, BEFORE discovery (`processing_version="paddleocr-vl"`); also backs Phase 3 per-image OCR (`OCRResult.method` = `paddleocr`/`paddleocr_failed`, metrics in `paddleocr_metrics`, `ocr_engine`=`paddleocr`)
-- **Hosting**: Modal app `paddleocr-vl` (GPU L4, scale-to-zero → $0 idle). Contract `GET /health` + `POST /parse`. ~1-3s/page warm. Only `PADDLEOCR_MODAL_API_KEY` required (URL baked as config default); CI auto-deploys on `modal_app/**` via the `deploy-modal` job
+- **Hosting**: Modal app `paddleocr-vl` (GPU A10G, scale-to-zero → $0 idle). Contract `GET /health` + `POST /parse`. ~1-3s/page warm. Only `PADDLEOCR_MODAL_API_KEY` required (URL baked as config default); CI auto-deploys on `modal_app/**` via the `deploy-modal` job
 - **Replaced**: Surya-2 (2026-06-13); Surya-2 had replaced YOLO + Chandra v2 + `merge_layout` (those, plus pytesseract + EasyOCR, are all removed)
 
 **OpenAI** (optional, not vision):

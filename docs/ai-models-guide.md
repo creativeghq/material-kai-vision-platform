@@ -206,7 +206,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 5 `vision
 
 **Storage**: `document_images` columns — `ocr_text`, `ocr_blocks` (per-fragment bbox in image-local coords), `ocr_failed`, `ocr_attempts`, `ocr_skipped_reason`. **NEVER consumed by chunker** (Stage 1 is canonical text source). Phase 3 OCR runs *after* `vision_analysis`, so it does NOT enrich the vision prompt — it is consumed by icon-metadata extraction and image-search labels only.
 
-**Host — Modal only**: app `paddleocr-vl` at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`. GPU L4, `min_containers=0` + `scaledown_window=120` (=$0 idle), `max_containers=4`, forces `device="gpu"`. Cold start ~90s, paid once per job at warmup. Only required runtime secret: **`PADDLEOCR_MODAL_API_KEY`** (URL baked as config default).
+**Host — Modal only**: app `paddleocr-vl` at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`. GPU A10G, `min_containers=0` + `scaledown_window=120` (=$0 idle), `max_containers=8`, forces `device="gpu"`. Cold start ~90s, paid once per job at warmup. Only required runtime secret: **`PADDLEOCR_MODAL_API_KEY`** (URL baked as config default).
 
 ---
 

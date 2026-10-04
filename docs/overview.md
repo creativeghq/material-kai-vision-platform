@@ -131,7 +131,7 @@ Real-time updates → Frontend displays results
 #### 2. Modal — PaddleOCR-VL (structural layout + OCR backbone)
 
 - **Model**: `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B), a two-stage document parser — PP-DocLayoutV3 (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
-- **Hosting**: Modal app `paddleocr-vl` (GPU L4, scale-to-zero → $0 idle). Contract: `GET /health` + `POST /parse`. ~1-3s/page warm, ~90s cold start
+- **Hosting**: Modal app `paddleocr-vl` (GPU A10G, scale-to-zero → $0 idle). Contract: `GET /health` + `POST /parse`. ~1-3s/page warm, ~90s cold start
 - **Use Cases**: Structure-first Stage 1 layout pass (runs BEFORE discovery, `processing_version="paddleocr-vl"`) + Phase 3 per-image OCR for text-bearing images + admin re-OCR
 - **Failure marker**: `OCRResult.method` = `paddleocr` / `paddleocr_failed` (`ocr_engine` = `paddleocr`)
 - **Per-attempt metrics**: `paddleocr_metrics` table

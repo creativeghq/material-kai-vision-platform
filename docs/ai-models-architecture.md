@@ -260,9 +260,9 @@ Modal endpoint (app: slig). Modes: `zero_shot`, `image_embedding`, `text_embeddi
 
 **Per-call metrics**: `paddleocr_metrics` table.
 
-**Host — Modal only**: app `paddleocr-vl` (workspace `basilakis`) at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`. GPU L4, `min_containers=0` + `scaledown_window=120` (=$0 idle), `max_containers=4`, forces `device="gpu"`. Cold start ~90s (model load + first-call JIT), paid once per job at warmup. Only required runtime secret: **`PADDLEOCR_MODAL_API_KEY`** (URL baked as config default). CI auto-deploys on `modal_app/**` via the `deploy-modal` job (`MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`); manual redeploy via `modal deploy modal_app/paddleocr_vl.py`.
+**Host — Modal only**: app `paddleocr-vl` (workspace `basilakis`) at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`. GPU A10G, `min_containers=0` + `scaledown_window=120` (=$0 idle), `max_containers=8`, forces `device="gpu"`. Cold start ~90s (model load + first-call JIT), paid once per job at warmup. Only required runtime secret: **`PADDLEOCR_MODAL_API_KEY`** (URL baked as config default). CI auto-deploys on `modal_app/**` via the `deploy-modal` job (`MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`); manual redeploy via `modal deploy modal_app/paddleocr_vl.py`.
 
-**Cost**: Modal GPU L4, scale-to-zero ($0 idle)
+**Cost**: Modal GPU A10G, scale-to-zero ($0 idle)
 **Speed**: ~1-3 seconds per page warm; ~90s cold start
 
 ---

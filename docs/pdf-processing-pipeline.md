@@ -389,7 +389,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 - `paddleocr_pipeline.py` — maps `/parse` JSON onto `document_layout_analysis.layout_elements[]`; PP-DocLayout labels (`doc_title`/`paragraph_title`/`text`/`table`/`image`/`figure`/`chart`/…) → existing `region_type` vocab via `PADDLE_LABEL_TO_REGION_TYPE`. RT-DETR **pixel** bboxes → normalized 0..1 at the parser boundary → denormalized at crop render in `region_to_layout_element`
 - `TableExtractor` (`app/services/pdf/table_extraction.py`) — parses the VLM's `metadata.html` (markdown OR `<table>` HTML) into `product_tables` rows. Called from **Stage 2.5**. Never reopens the PDF: the pdfplumber implementation that did was dead from #248 and was removed 2026-08-02 along with the dependency.
 
-**Hosting**: Modal app `paddleocr-vl` at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`, GPU L4, scale-to-zero (`min_containers=0` + `scaledown_window=120` = $0 idle, `max_containers=4`). Custom contract: `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{regions:[{bbox:[x0,y0,x1,y1] px, label, content, order}], width, height}`; `mode=page` = structural pass, `mode=block` = per-crop OCR. Cold start ~90s (paid once per job at warmup); ~1-3s/page warm.
+**Hosting**: Modal app `paddleocr-vl` at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`, GPU A10G, scale-to-zero (`min_containers=0` + `scaledown_window=120` = $0 idle, `max_containers=8`). Custom contract: `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{regions:[{bbox:[x0,y0,x1,y1] px, label, content, order}], width, height}`; `mode=page` = structural pass, `mode=block` = per-crop OCR. Cold start ~90s (paid once per job at warmup); ~1-3s/page warm.
 
 **Data Extracted**:
 
@@ -1220,7 +1220,7 @@ Layout-aware chunking is activated by passing `layout_regions_by_page` (a dict m
 
 ### Performance
 
-- **Processing Time**: ~1-3 seconds per page warm (PaddleOCR-VL structural pass on Modal L4; ~90s cold start paid once per job at warmup)
+- **Processing Time**: ~1-3 seconds per page warm (PaddleOCR-VL structural pass on Modal A10G; ~90s cold start paid once per job at warmup)
 - **Chunk Quality**: 30-40% improvement in semantic coherence
 - **Search Accuracy**: 20-25% improvement in retrieval precision
 
@@ -1275,7 +1275,7 @@ Region counts by type: text, title, table, image/figure, chart, formula counts p
 - **Processing time** per page (identify slow pages; warm vs cold-start)
 - **Modal container utilization** during the structural pass
 - **Error rates** and failure patterns
-- **Cost tracking** (`PADDLEOCR_PRICING`; Modal L4 scale-to-zero = $0 idle)
+- **Cost tracking** (`PADDLEOCR_PRICING`; Modal A10G scale-to-zero = $0 idle)
 
 **Benefits:**
 - 🔍 Identify performance bottlenecks
@@ -1290,19 +1290,19 @@ Metrics would be stored on the `background_jobs` row (as `stage_history` events)
 ### 3. GPU Acceleration
 
 > **Status (2026-06-13): realized.** The structural pass already runs GPU-accelerated on **Modal
-> GPU L4** (PaddleOCR-VL forces `device="gpu"` — the pipeline defaults to CPU, which is minutes/page).
+> GPU A10G** (PaddleOCR-VL forces `device="gpu"` — the pipeline defaults to CPU, which is minutes/page).
 > Scale-to-zero (`min_containers=0` + `scaledown_window=120`) keeps idle cost at $0, with
-> `max_containers=4` for parallel fan-out. The local-CUDA auto-detect plan below is obsolete.
+> `max_containers=8` for parallel fan-out. The local-CUDA auto-detect plan below is obsolete.
 
 **Current Performance:**
-- **Modal GPU L4 (warm)**: ~1-3 seconds per page
+- **Modal GPU A10G (warm)**: ~1-3 seconds per page
 - **Cold start**: ~90s (model load + first-call JIT), paid once per job at warmup
 
 ~~The system would auto-detect GPU availability using `torch.cuda.is_available()`...~~ *(obsolete — superseded by Modal GPU hosting)*
 
 **Benefits:**
 - ⚡ Faster processing
-- 📦 Parallel containers for efficiency (`max_containers=4`)
+- 📦 Parallel containers for efficiency (`max_containers=8`)
 - 💾 $0 idle via scale-to-zero
 - 🎯 Production-ready performance
 
@@ -1348,7 +1348,7 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
   - Two-stage parser on Modal: PP-DocLayoutV3 (RT-DETR + pointer network) localizes/labels regions + predicts reading order; 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
   - Persists `document_layout_analysis` rows with `processing_version='paddleocr-vl'`; discovery/chunking/crops all read the cache
   - Region labels via `PADDLE_LABEL_TO_REGION_TYPE`; `image`/`figure`/`chart` are product-crop sources
-  - Modal-hosted (GPU L4, scale-to-zero = $0 idle); only required secret `PADDLEOCR_MODAL_API_KEY`
+  - Modal-hosted (GPU A10G, scale-to-zero = $0 idle); only required secret `PADDLEOCR_MODAL_API_KEY`
   - OCR is also PaddleOCR (`OCRResult.method='paddleocr'`/`'paddleocr_failed'`, `ocr_engine='paddleocr'`)
   - Graceful degradation if the structural pass fails (resume-skip via `cache_status='ocr_failed'`)
 - ✅ **Table Extraction**: Structured table data linked to products
@@ -1390,7 +1390,7 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
 **Future Enhancements** (Planned):
 - 🔮 Multi-level title hierarchy (H1, H2, H3)
 - 🔮 Structural-pass performance monitoring & metrics (beyond the existing `paddleocr_metrics` table)
-- ✅ GPU acceleration — *realized* (PaddleOCR-VL on Modal GPU L4, scale-to-zero)
+- ✅ GPU acceleration — *realized* (PaddleOCR-VL on Modal GPU A10G, scale-to-zero)
 - 🔮 Advanced chunking rules (lists, cross-references, formulas)
 - ✅ Voyage `voyage-multimodal` page embedding → `vecs.page_embeddings` (8th fusion vector) — *realized #239, 2026-08-08*. Runs as stage 4.7, after chunking, because the page text it embeds alongside the render comes from `document_chunks` (silver) rather than from the PDF. Per-page state in `document_page_embeddings.cache_status`; backfill via `POST /api/internal/backfill-page-embeddings`; breakage surfaces through `ops.page_embeddings_never_written`.
 

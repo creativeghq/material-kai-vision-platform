@@ -48,7 +48,7 @@ All three MUST be updated together.
 - **Status**: HuggingFace hosts nothing. Vision runs on Anthropic Claude Opus 5 via tool use and is billed under section 2 (Anthropic); the GPU endpoints that remain are Modal-hosted (sections 3a and 4).
 
 ### 3a. **Modal Endpoint OCR (PaddleOCR-VL)**
-- **Pricing Unit**: Modal GPU (L4) usage, billed per second of container runtime (scale-to-zero when idle: `min_containers=0`, $0 idle)
+- **Pricing Unit**: Modal GPU (A10G) usage, billed per second of container runtime (scale-to-zero when idle: `min_containers=0`, $0 idle)
 - **Models Tracked**: PaddleOCR-VL (0.9B, PP-DocLayoutV3 detector + 0.9B VLM) on Modal — layout+OCR backbone post-2026-06-13. Replaced Surya-2, which had replaced Chandra v2.
 - **Cost Calculation**: Modal runtime cost amortized across all OCR'd pages/images. Per-attempt telemetry tracked in `paddleocr_metrics`.
 
