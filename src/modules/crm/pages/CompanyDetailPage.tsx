@@ -1137,19 +1137,6 @@ export const CompanyDetailPage: React.FC = () => {
             {company?.id && activeWorkspaceId && showSupplierFeatures && (
               <CompanyRepresentationsCard companyId={company.id} workspaceId={activeWorkspaceId} isAgency={company.supplier_type === 'agent'} onChange={() => setRepsVersion((v) => v + 1)} />
             )}
-            {/* Deals on this account — the reverse side of crm_deals.company_id, which was
-                otherwise a one-way link (#311). */}
-            {company?.id && activeWorkspaceId && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Kanban className="h-4 w-4 text-muted-foreground"/>Deals</CardTitle>
-                  <CardDescription>Pipeline opportunities pointing at this account.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <PartyDealsCard workspaceId={activeWorkspaceId} companyId={company.id} headless />
-                </CardContent>
-              </Card>
-            )}
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
                 <div>
@@ -1329,8 +1316,22 @@ export const CompanyDetailPage: React.FC = () => {
               <PartyWorkTab
                 partyKind="company"
                 partyId={company.id}
-                excludeKinds={['project', 'asset']}
+                excludeKinds={['project', 'asset', 'deal']}
                 panels={[
+                  ...(activeWorkspaceId ? [{
+                    id: 'deals', label: 'Deals', icon: Kanban, group: 'Commercial',
+                    node: (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2"><Kanban className="h-4 w-4 text-muted-foreground"/>Deals</CardTitle>
+                          <CardDescription>Pipeline deals where this company is the customer.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <PartyDealsCard workspaceId={activeWorkspaceId} companyId={company.id} headless />
+                        </CardContent>
+                      </Card>
+                    ),
+                  }] : []),
                   {
                     id: 'projects', label: 'Projects', icon: FolderKanban, group: 'Delivery',
                     node: (
