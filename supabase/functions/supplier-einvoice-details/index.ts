@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { isCronAuthorized, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { extractIbans, findPdfLink, readEinvoiceHtml, type EinvoiceIssuerDetails } from '../_shared/finance/einvoice-issuer-details.ts';
 import { extractText, getDocumentProxy } from 'npm:unpdf@1.4.0';
@@ -270,7 +270,7 @@ Deno.serve(withApiLogging('supplier-einvoice-details', async (req: Request) => {
   const workspaceId = body.workspace_id;
   if (!workspaceId) throw new HttpError(400, 'workspace_id required');
 
-  if (!isServiceRoleRequest(req)) {
+  if (!isCronAuthorized(req)) {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new HttpError(401, 'Missing Authorization bearer');
     const reader = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
