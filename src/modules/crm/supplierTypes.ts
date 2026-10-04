@@ -25,4 +25,5 @@ export const MATCH_LABEL: Record<string, string> = {
   phone: 'their phone on their site',
   address: 'their registered address on their site',
   email_domain: 'their invoice email domain',
+  seve: 'their ΣΕΒΕ exporter-directory entry',
 };

@@ -23,7 +23,7 @@ export interface CompanyEnrichResult {
   /** Found by the search but not confirmed; shown for the operator to accept, never saved automatically. */
   suggestions?: Partial<CompanyEnrichFields>;
   rejected?: { field: keyof CompanyEnrichFields; value: string; reason: string }[];
-  verification?: { domain: string; by: 'afm' | 'gemi' | 'phone' | 'email_domain' } | null;
+  verification?: { domain: string; by: 'afm' | 'gemi' | 'phone' | 'address' | 'email_domain' | 'seve' } | null;
   /** Providers that returned data. */
   sources: string[];
   /** Providers that were skipped / returned nothing (with reason). */

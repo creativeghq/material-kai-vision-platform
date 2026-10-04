@@ -129,6 +129,7 @@ interface Company {
   is_customer?: boolean | null;
   factory_names?: string[] | null; // supplier↔factory pin (ingested metadata.factory_name values)
   supplier_type?: string | null;
+  seve_slug?: string | null;
   is_manufacturer?: boolean | null;
   own_brands?: string[] | null;
   brands_carried?: string[] | null;

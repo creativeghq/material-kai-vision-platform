@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ExternalLink, X } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -14,6 +15,36 @@ export interface SupplierProfile {
   own_brands?: string[] | null;
   brands_carried?: string[] | null;
   field_sources?: Record<string, FieldProvenance> | null;
+  seve_slug?: string | null;
+}
+
+interface SeveEntry { name: string; url: string; industries: string[]; website: string | null; intrastat: { code: string; description: string }[] }
+
+function SeveMembership({ slug }: { slug: string }) {
+  const [entry, setEntry] = useState<SeveEntry | null>(null);
+  useEffect(() => {
+    let live = true;
+    void supabase.from('seve_members').select('name, url, industries, website, intrastat').eq('slug', slug).maybeSingle()
+      .then(({ data }) => { if (live) setEntry((data as unknown as SeveEntry) ?? null); });
+    return () => { live = false; };
+  }, [slug]);
+  if (!entry) return null;
+  return (
+    <div className="space-y-1.5 border-t border-hairline pt-4">
+      <p className="text-xs font-semibold text-muted-foreground">ΣΕΒΕ exporter directory</p>
+      <p className="text-sm">
+        <a href={entry.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:underline">
+          {entry.name} <ExternalLink className="h-3 w-3" />
+        </a>
+      </p>
+      {entry.industries.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">{entry.industries.map((i) => <Badge key={i} variant="neutral">{i}</Badge>)}</div>
+      )}
+      {entry.intrastat.length > 0 && (
+        <p className="text-xs text-muted-foreground">Exports: {entry.intrastat.slice(0, 4).map((c) => c.description).filter(Boolean).join(' · ')}</p>
+      )}
+    </div>
+  );
 }
 
 const NONE = '__none__';
@@ -105,6 +136,7 @@ export const SupplierProfileCard: React.FC<{
           values={value.brands_carried ?? []}
           onChange={(v) => onSave({ brands_carried: v })}
         />
+        {value.seve_slug && <SeveMembership slug={value.seve_slug} />}
         {shown.length > 0 && (
           <div className="space-y-1.5 border-t border-hairline pt-4">
             <p className="text-xs font-semibold text-muted-foreground">Where the details came from</p>

@@ -180,7 +180,7 @@ export interface EnrichCandidate {
 
 export interface GateInput {
   fields: EnrichCandidate;
-  verified: { domain: string; by: MatchedBy | 'email_domain'; aliases?: string[] } | null;
+  verified: { domain: string; by: MatchedBy | 'email_domain' | 'seve'; aliases?: string[] } | null;
   postalCode: string | null;
 }
 

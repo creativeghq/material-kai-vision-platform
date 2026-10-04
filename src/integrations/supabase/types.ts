@@ -4268,6 +4268,7 @@ export type Database = {
           field_sources: Json
           own_brands: string[]
           supplier_type: string | null
+          seve_slug: string | null
           finance_statement_opt_out: boolean
           gemi_data: Json | null
           gemi_data_at: string | null
@@ -4353,6 +4354,7 @@ export type Database = {
           field_sources?: Json
           own_brands?: string[]
           supplier_type?: string | null
+          seve_slug?: string | null
           finance_statement_opt_out?: boolean
           gemi_data?: Json | null
           gemi_data_at?: string | null
@@ -4438,6 +4440,7 @@ export type Database = {
           field_sources?: Json
           own_brands?: string[]
           supplier_type?: string | null
+          seve_slug?: string | null
           finance_statement_opt_out?: boolean
           gemi_data?: Json | null
           gemi_data_at?: string | null
@@ -28133,6 +28136,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      seve_members: {
+        Row: {
+          slug: string
+          url: string
+          name: string
+          name_fold: string
+          address: string | null
+          postal_code: string | null
+          city: string | null
+          phones: string[]
+          emails: string[]
+          website: string | null
+          website_domain: string | null
+          industries: string[]
+          intrastat: Json
+          contact_person: string | null
+          founded_year: number | null
+          certificates: string | null
+          description: string | null
+          lastmod: string | null
+          fetched_at: string | null
+          fetch_error: string | null
+          created_at: string
+        }
+        Insert: {
+          slug: string
+          url: string
+          name: string
+          name_fold?: string
+          address?: string | null
+          postal_code?: string | null
+          city?: string | null
+          phones?: string[]
+          emails?: string[]
+          website?: string | null
+          website_domain?: string | null
+          industries?: string[]
+          intrastat?: Json
+          contact_person?: string | null
+          founded_year?: number | null
+          certificates?: string | null
+          description?: string | null
+          lastmod?: string | null
+          fetched_at?: string | null
+          fetch_error?: string | null
+          created_at?: string
+        }
+        Update: {
+          slug?: string
+          url?: string
+          name?: string
+          name_fold?: string
+          address?: string | null
+          postal_code?: string | null
+          city?: string | null
+          phones?: string[]
+          emails?: string[]
+          website?: string | null
+          website_domain?: string | null
+          industries?: string[]
+          intrastat?: Json
+          contact_person?: string | null
+          founded_year?: number | null
+          certificates?: string | null
+          description?: string | null
+          lastmod?: string | null
+          fetched_at?: string | null
+          fetch_error?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
       social_account_insights: {
         Row: {

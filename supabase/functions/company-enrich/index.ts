@@ -1011,13 +1011,15 @@ async function handleFindCompetitors(
   return jsonResponse({ ok: true, source, competitors, skipped });
 }
 
+interface SeveMatch { slug: string; matched_by: string; website: string | null; phones: string[] }
+
 interface Verification {
-  verified: { domain: string; by: MatchedBy | 'email_domain'; aliases?: string[] } | null;
+  verified: { domain: string; by: MatchedBy | 'email_domain' | 'seve'; aliases?: string[] } | null;
   rejected: { field: keyof EnrichFields; value: string; reason: string }[];
+  seveSlug?: string | null;
 }
 
 const TRUSTED_SOURCES: (FieldSource | undefined)[] = ['operator', 'aade', 'gemi', 'invoice'];
-// Runs after the web search inside the 150s edge ceiling, so the whole website check is capped.
 const VERIFY_BUDGET_MS = 30_000;
 
 /** A site counts as the company's only when it carries its ΑΦΜ, ΓΕΜΗ or invoice phone, or sits on its invoice email domain. */
@@ -1041,12 +1043,20 @@ async function verifyIdentity(
   };
   const until = Date.now() + VERIFY_BUDGET_MS;
 
+  let seve: SeveMatch | null = null;
+  if (company?.id) {
+    const { data } = await admin.rpc('seve_match_company', { p_company_id: company.id });
+    seve = (data as SeveMatch[] | null)?.[0] ?? null;
+    if (seve) keys.phones.push(...(seve.phones ?? []));
+  }
+
   const emailDom = company?.email && TRUSTED_SOURCES.includes(src.email?.src) ? emailDomain(company.email) : null;
   const candidates: { url: string; fromEmail: boolean }[] = [];
   const add = (u: string | null | undefined, fromEmail = false) => {
     const d = domainOf(u);
     if (d && !candidates.some((c) => domainOf(c.url) === d)) candidates.push({ url: d, fromEmail });
   };
+  if (seve?.website) add(seve.website);
   if (isBusinessDomain(emailDom)) add(emailDom, true);
   add(company?.gemi_data?.url ?? bodyGemiUrl);
   add(company?.website);
@@ -1058,11 +1068,13 @@ async function verifyIdentity(
     if (!check) continue;
     if (!check.alive) { rejected.push({ field: 'website', value: c.url, reason: 'site does not load' }); continue; }
     const aliases = check.requested !== check.domain ? [check.requested] : [];
-    if (check.by) return { verified: { domain: check.domain, by: check.by, aliases }, rejected };
-    // An email domain that redirects off-site (parked, a site builder) says nothing about who owns the target.
+    if (check.by) return { verified: { domain: check.domain, by: check.by, aliases }, rejected, seveSlug: seve?.slug ?? null };
+    if (seve && seve.matched_by !== 'postcode_name' && domainOf(seve.website) === check.requested) {
+      return { verified: { domain: check.domain, by: 'seve', aliases }, rejected, seveSlug: seve.slug };
+    }
     if (c.fromEmail && check.domain === check.requested) emailSite = check.domain;
   }
-  return { verified: emailSite ? { domain: emailSite, by: 'email_domain' } : null, rejected };
+  return { verified: emailSite ? { domain: emailSite, by: 'email_domain' } : null, rejected, seveSlug: seve?.slug ?? null };
 }
 
 /** Merge: primary wins per-field, secondary fills only the blanks. */
@@ -1153,7 +1165,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     if (companyId) {
       const { data } = await admin
         .from('crm_companies')
-        .select('id, created_by, workspace_id, name, commercial_title, vat_number, gemi_number, gemi_data, street, postal_code, field_sources, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country')
+        .select('id, created_by, workspace_id, name, commercial_title, vat_number, gemi_number, gemi_data, street, postal_code, field_sources, seve_slug, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country')
         .eq('id', companyId)
         .maybeSingle();
       if (data) {
@@ -1187,6 +1199,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
         patch[k] = v;
         fieldSources[k] = { src: 'web_verified', by: verification.verified?.by, at: now };
       }
+      if (verification.seveSlug && company.seve_slug !== verification.seveSlug) patch.seve_slug = verification.seveSlug;
       if (Object.keys(patch).length > 0) {
         await admin.from('crm_companies')
           .update({ ...patch, field_sources: fieldSources, updated_at: now })
