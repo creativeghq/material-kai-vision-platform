@@ -2899,7 +2899,7 @@ const AttachmentDocumentTag: React.FC<{
                 description,
                 supplier: d.issuer ? { name: d.issuer } : undefined,
                 // The account this document says to pay into, carried to the one screen that
-                // knows WHOSE it is. Filed as a suggestion on that party, not as a destination.
+                // knows WHOSE it is. A checksum-valid IBAN is added to that party's bank accounts.
                 bankDetails: d.bank ? {
                   bank: d.bank,
                   source: 'inbox_attachment',

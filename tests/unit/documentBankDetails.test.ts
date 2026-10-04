@@ -111,7 +111,7 @@ describe('the assistant is told a payment block exists, never what it says', () 
   });
 });
 
-describe('reading is not paying — the only door into crm_bank_accounts is the review path', () => {
+describe('readers never write crm_bank_accounts themselves — only the record/accept RPCs add an account', () => {
   it('neither document reader writes to the payment-destination table', () => {
     for (const [name, src] of [['inbox reader', INBOX_READER], ['scan-receipt', SCAN]] as const) {
       expect(src, name).not.toContain('crm_bank_accounts');

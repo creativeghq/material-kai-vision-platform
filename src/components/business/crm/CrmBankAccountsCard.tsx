@@ -45,8 +45,10 @@ function einvoiceReadToast(r: EinvoiceReadResult | null): { title: string; descr
   if (r.outcome === 'not_readable') {
     return { title: 'Their e-invoice page cannot be read automatically', description: `${r.provider ?? ''} — ${r.why ?? ''}`.trim() };
   }
+  const added = (r.ibans ?? []).filter((i) => i.endsWith(':added')).length;
   const toReview = (r.ibans ?? []).filter((i) => /:(new|seen_again)$/.test(i)).length;
   const found = [
+    added ? `${added} bank account${added > 1 ? 's' : ''}` : null,
     toReview ? `${toReview} IBAN${toReview > 1 ? 's' : ''} to review` : null,
     r.phone_set ? 'phone' : null,
     r.email_set ? 'email' : null,

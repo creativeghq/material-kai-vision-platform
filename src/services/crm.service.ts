@@ -1035,7 +1035,7 @@ export interface DocumentBankDetailsInput {
 
 export interface RecordBankSuggestionResult {
   /** `already_on_file` = nothing to review. `seen_again` = corroboration, not a new decision. */
-  outcome: 'new' | 'seen_again' | 'already_on_file';
+  outcome: 'added' | 'new' | 'seen_again' | 'already_on_file';
   suggestion_id?: string;
   status?: 'pending' | 'accepted' | 'dismissed';
   /** True when this party already has a DIFFERENT account on file — the one to look at twice. */

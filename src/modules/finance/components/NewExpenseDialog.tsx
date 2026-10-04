@@ -578,7 +578,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           // A conflict is announced on EVERY sighting that is still open, not only the first.
           // The second invoice carrying a changed IBAN is precisely the one worth reacting to,
           // and by then the row is `seen_again` — gating on `new` would silence it.
-          if (res.conflict && res.status === 'pending') {
+          if (res.outcome === 'added') {
+            toast({
+              title: res.conflict ? 'New bank account added — differs from the one on file' : 'Bank account added',
+              description: res.conflict
+                ? `${party.label} had a different IBAN on file. This one was added beside it; their primary account is unchanged.`
+                : `The IBAN on this document is now one of ${party.label}'s bank accounts.`,
+            });
+          } else if (res.conflict && res.status === 'pending') {
             toast({
               title: 'Bank details on this document DIFFER from the ones on file',
               description: `${party.label} is on file with a different IBAN. Review it on their page before paying — a changed IBAN on an invoice is the commonest invoice fraud.`,
