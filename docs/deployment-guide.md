@@ -1233,7 +1233,7 @@ This section covers all third-party services used by the platform, their pricing
 | PaddleOCR-VL (layout + OCR structural pass) | **Modal** | GPU (A10G) | ~$1.10/GPU-hour active | Yes — scale-to-zero, $0 idle |
 | ~~Chandra OCR v2 / YOLO DocParser~~ | ~~HuggingFace~~ | — | — | **REMOVED 2026-06-13** — replaced by PaddleOCR-VL on Modal |
 
-**Cost control**: both SLIG and PaddleOCR-VL scale to zero on Modal ($0 idle). Billed per second only when active (A10G list ≈ $1.10/GPU-hour; `ai_model_pricing` books a flat $1.00/GPU-hour). Typical monthly cost: $5–$20 depending on PDF processing volume.
+**Cost control**: both SLIG and PaddleOCR-VL scale to zero on Modal ($0 idle). Billed per second only when active (Modal A10G list, ≈ $1.10/GPU-hour — the rate `ai_model_pricing` books). Typical monthly cost: $5–$20 depending on PDF processing volume.
 
 ---
 
