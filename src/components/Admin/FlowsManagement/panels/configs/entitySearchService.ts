@@ -171,6 +171,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'seo-api', label: 'seo-api', sublabel: 'Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.' },
   { id: 'seo-domain-tracker', label: 'seo-domain-tracker', sublabel: 'Weekly Rankings + Backlinks snapshots for a connected website' },
   { id: 'seo-rank-tracker', label: 'seo-rank-tracker', sublabel: 'Daily positions for the keywords a workspace chose to track' },
+  { id: 'seve-directory-sync', label: 'seve-directory-sync', sublabel: 'Refresh the ΣΕΒΕ exporter directory used to verify supplier identity (cron)' },
   { id: 'seo-reports', label: 'seo-reports', sublabel: 'Build a scheduled SEO report and hand it to Flows to deliver' },
   { id: 'seo-content-freshness', label: 'seo-content-freshness', sublabel: 'Content decay — raise generated articles that are past their own refresh cadence' },
   { id: 'seo-site-audit', label: 'seo-site-audit', sublabel: 'Site Health — homepage Lighthouse + on-page audit for a connected website' },

@@ -29286,6 +29286,73 @@
         }
       }
     },
+    "/seve-directory-sync": {
+      "post": {
+        "tags": [
+          "CRM"
+        ],
+        "summary": "Cron: keep the ΣΕΒΕ exporter directory (seve.gr) copy used as a CRM identity source.",
+        "operationId": "post_seve_directory_sync",
+        "description": "Runs via pg_cron (x-cron-secret via isCronAuthorized). Reads the company sitemaps of seve.gr into public.seve_members (refresh_sitemap, weekly) and fetches member pages that were never read or changed since (limit per run, default 150, max 400), parsing name, address, ΤΚ, phones, emails, website, industries and Intrastat codes. The table is public reference data used by seve_match_company() and company-enrich to confirm a company website. Writes nothing tenant-scoped. Backed by the crm.seve_directory_stale integrity check.\n\n**Response:** `{ success, sitemap, attempted, fetched, failed }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/finance-reminders-cron": {
       "post": {
         "tags": [

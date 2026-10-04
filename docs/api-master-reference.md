@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (169)
+## 1. Supabase Edge Functions (170)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -160,6 +160,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `crm-lead-score` | JWT | AI lead + health scoring for any CRM contact (canonical platform scorer) |
 | `crm-meeting-reminders` | cron | Cron: send reminders for upcoming CRM meetings whose reminder time has arrived. |
 | `customer-assets-api` | JWT | Installed base: a customer's equipment, its warranties and its recurring service schedules (#343). |
+| `seve-directory-sync` | cron | Cron: keep the ΣΕΒΕ exporter directory (seve.gr) copy used as a CRM identity source. |
 | `trade-portal` | public / JWT | A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin |
 
 **Business Profile**
