@@ -36,15 +36,16 @@ interface AuditRow {
   no_response: boolean;
   credits: number | null;
   max_latency_ms: number | null;
+  thumbs_down: number;
+  thumbs_up: number;
 }
 
 const WINDOWS = [7, 30, 90] as const;
 
-/**
- * Worst first, and "worst" here means most likely to be a missing capability rather than a
- * chatty turn: a reply that hedged AND called nothing is the shape this panel exists to surface.
- */
+/** Worst first: the user's own rating outranks every derived verdict, in both directions. */
 function severity(row: AuditRow): number {
+  if (row.thumbs_down > 0) return -1;
+  if (row.thumbs_up > 0) return 5;
   if (row.no_response) return 0;
   if (row.no_tool_call && row.hedges) return 1;
   if (row.hedges) return 2;
@@ -54,6 +55,7 @@ function severity(row: AuditRow): number {
 }
 
 const VERDICT: Record<number, { label: string; variant: 'error' | 'warning' | 'info' | 'neutral'; hint: string }> = {
+  [-1]: { label: 'Rated 👎', variant: 'error', hint: 'The user marked a reply in this conversation as unhelpful.' },
   0: { label: 'No reply', variant: 'error', hint: 'The turn produced nothing at all.' },
   1: { label: 'No tool, hedged', variant: 'error', hint: 'Called nothing and said it could not — the strongest signal of a missing capability.' },
   2: { label: 'Hedged', variant: 'warning', hint: 'Used a tool but still told the user it could not do something.' },
@@ -117,9 +119,9 @@ export const AgentUnmetRequestsPanel: React.FC = () => {
         <div>
           <CardTitle>What the assistant could not do</CardTitle>
           <CardDescription>
-            Conversations where no tool ran, or the reply hedged. Derived by{' '}
+            Conversations rated 👎, where no tool ran, or where the reply hedged. Derived by{' '}
             <code className="text-xs">agent_conversation_audit</code> — the question is verbatim,
-            the verdict is the RPC&apos;s.
+            the signals are the RPC&apos;s, and a 👍 clears a conversation.
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">

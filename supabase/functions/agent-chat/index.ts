@@ -65,6 +65,7 @@ let getSkillsForAgent: any, getSkillContent: any, formatSkillsForSystemPrompt: a
 let emitFlowEvent: any;
 let aiCallLogger: any;
 let resolveBusinessIdentity: any, formatBusinessIdentityForPrompt: any;
+let resolveTurnClock: any, loadAgentUserContext: any, formatUserContextForPrompt: any;
 let clampToolsForCustomer: any, isCustomerAudience: any, fenceCustomerMessage: any,
   customerAudienceGuardrails: any, operatorInstructionBlock: any;
 let inboxAutopilotSettings: any;
@@ -82,7 +83,7 @@ async function initRuntime() {
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY must be set');
 
   // Load all shared modules + npm packages in parallel
-  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod, memoryMod, bizMod, audienceMod, autopilotMod] = await Promise.all([
+  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod, memoryMod, bizMod, audienceMod, autopilotMod, userCtxMod] = await Promise.all([
     import('../_shared/credit-utils.ts'),
     import('../_shared/prompt-utils.ts'),
     import('../_shared/langgraph-core.ts'),
@@ -100,6 +101,7 @@ async function initRuntime() {
     import('../_shared/business-identity.ts'),
     import('../_shared/customer-audience.ts'),
     import('../_shared/inbox-autopilot.ts'),
+    import('../_shared/agent-user-context.ts'),
   ]);
 
   debitAgentChatTurn = creditMod.debitAgentChatTurn;
@@ -122,6 +124,9 @@ async function initRuntime() {
   emitFlowEvent = flowMod.emitFlowEvent;
   resolveBusinessIdentity = bizMod.resolveBusinessIdentity;
   formatBusinessIdentityForPrompt = bizMod.formatBusinessIdentityForPrompt;
+  resolveTurnClock = userCtxMod.resolveTurnClock;
+  loadAgentUserContext = userCtxMod.loadAgentUserContext;
+  formatUserContextForPrompt = userCtxMod.formatUserContextForPrompt;
   clampToolsForCustomer = audienceMod.clampToolsForCustomer;
   isCustomerAudience = audienceMod.isCustomerAudience;
   fenceCustomerMessage = audienceMod.fenceCustomerMessage;
@@ -1565,6 +1570,7 @@ async function executeAgent(
   customerThreadId?: string | null,
   /** Aborted when the client disconnects (#352 A16). Checked between steps by the graph. */
   abortSignal?: AbortSignal,
+  clientTimezone?: string | null,
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -1891,16 +1897,26 @@ async function executeAgent(
     systemPrompt += customerAudienceGuardrails({ publicThread: customerPublicThread });
   }
 
-  // 🧠 Long-term Memory: recall the slice relevant to THIS turn (#233).
-  // Ranked by cosine against the user's message, not by `created_at desc` — the old
-  // recency read meant a user with 30 memories got their 10 newest regardless of what
-  // they had just asked about. `match_reason` on each row says which tier answered
-  // (pinned preference / semantic / recency fallback) so a degraded read is visible.
-  try {
-    const memories = forCustomer ? [] : await longTermMemory.recall(userId, workspaceId, agentId, userInput, {
+  // Situational context and long-term memory are independent lookups, fetched concurrently.
+  const clock = resolveTurnClock(clientTimezone);
+  const [userContextRead, memoryRead] = await Promise.allSettled([
+    !forCustomer && workspaceId
+      ? loadAgentUserContext(supabase, userId, workspaceId, clock, conversation_id ?? null)
+      : Promise.resolve(null),
+    // 🧠 #233: ONE store per user+workspace, recalled by every agent — a fact told to Trinity is known to JARVIS.
+    forCustomer ? Promise.resolve([]) : longTermMemory.recall(userId, workspaceId, null, userInput, {
       limit: 10,
       conversationId: conversation_id ?? null,
-    });
+    }),
+  ]);
+  if (!forCustomer && workspaceId) {
+    if (userContextRead.status === 'rejected') console.warn('[agent-chat] user context failed:', userContextRead.reason);
+    systemPrompt += formatUserContextForPrompt(userContextRead.status === 'fulfilled' ? userContextRead.value : null, clock);
+  }
+
+  try {
+    if (memoryRead.status === 'rejected') throw memoryRead.reason;
+    const memories = memoryRead.value as any[];
 
     if (memories.length > 0) {
       systemPrompt = systemPrompt + longTermMemory.formatForContext(memories);
@@ -3738,6 +3754,7 @@ async function promoteTurnToMemory(
   agentResponse: string,
   conversationId?: string | null,
   turnDidWork = true,
+  priorTurns: Array<{ role: string; content: unknown }> = [],
 ) {
   const result = await longTermMemory.promote({
     userId,
@@ -3747,6 +3764,7 @@ async function promoteTurnToMemory(
     agentResponse,
     conversationId: conversationId ?? null,
     turnDidWork,
+    priorTurns,
   });
 
   if (result.usage && result.usage.totalTokens > 0) {
@@ -3864,7 +3882,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Initialize runtime on first real request (not OPTIONS)
     await initRuntime();
 
-    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null, client_context: bodyClientContext = null } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -4325,6 +4343,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               audience, // 'customer' clamps the tools, drops memory both ways, and fences the message
               customerThreadId, // scopes the account tools — read from the THREAD, never the message
               abortController.signal, // fires when the client goes away (#352 A16)
+              typeof bodyClientContext?.timezone === 'string' ? bodyClientContext.timezone : null,
             );
             if (finalResult) {
             }
@@ -4363,6 +4382,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               promoteTurnToMemory(
                 userId, workspaceId, ranAsAgentId, userInput, finalResult.text, conversation_id,
                 turnProducedWork(finalResult.toolResults),
+                anthropicMessages.slice(0, -1),
               ),
               'agent-memory',
             );

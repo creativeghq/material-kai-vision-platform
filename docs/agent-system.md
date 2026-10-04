@@ -9,7 +9,7 @@ Complete guide to the AI Agent system with database-driven prompts and configura
 The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js, LangGraph, and Anthropic Claude models. Agents are specialized AI assistants that help users with specific tasks like material search, B2B research, interior design, and platform demonstrations.
 
 **Key Features**:
-- LangGraph StateGraph-based execution with checkpointing
+- LangGraph StateGraph-based execution (no checkpointer — the client sends the history each turn)
 - Database-driven system prompts (no code deployment needed)
 - Admin UI for prompt management
 - Real-time prompt updates
@@ -45,7 +45,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 ┌─────────────────────────────────────────────────────────────┐
 │              Database (PostgreSQL/Supabase)                 │
 │  - prompts table (unified for all AI prompts)               │
-│  - agent_checkpoints (conversation state)                   │
+│  - agent_chat_messages (conversation history)               │
 │  - agent_memories (long-term memory, halfvec-searchable)    │
 └─────────────────────────────────────────────────────────────┘
 
@@ -364,7 +364,7 @@ All requests require:
 
 ## Related Documentation
 
-- **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, checkpointing, memory
+- **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, conversation state, memory, situational context, daily brief
 - **[agent-system.md](agent-system.md)** - Full API reference
 - **[ai-models-guide.md](ai-models-guide.md)** - Model configurations
 - **[vr-world-generation.md](vr-world-generation.md)** - VR World generation

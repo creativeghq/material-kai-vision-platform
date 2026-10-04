@@ -26,6 +26,7 @@ export type TriggerType =
   | 'model_3d_created'
   | 'vr_world_created'
   | 'agent_search_completed'
+  | 'daily_brief'
   | 'product_added_to_quote'
   | 'moodboard_created'
   | 'moodboard_item_added'
@@ -543,6 +544,7 @@ export type TriggerConfigMap = {
   model_3d_created: Model3DCreatedTriggerConfig;
   vr_world_created: VRWorldCreatedTriggerConfig;
   agent_search_completed: AgentSearchCompletedTriggerConfig;
+  daily_brief: Record<string, never>;
   product_added_to_quote: ProductAddedToQuoteTriggerConfig;
   moodboard_created: MoodboardCreatedTriggerConfig;
   moodboard_item_added: MoodboardItemAddedTriggerConfig;

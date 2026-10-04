@@ -8,7 +8,7 @@ Technical documentation for the LangGraph-based agent execution system in Materi
 
 The platform uses **LangGraph** for agent orchestration, providing:
 - **StateGraph-based execution** with defined state schema
-- **Checkpointing** for resumable conversations
+- **Client-held history** — no checkpointer; the browser sends the conversation each turn
 - **Long-term memory** for cross-conversation context
 - **Observable execution** with streaming updates
 - **Human-in-the-loop** patterns for critical actions
@@ -116,25 +116,38 @@ The `shouldContinue` function examines the last message in the state. If the ite
 
 ---
 
-## Checkpointing (SupabaseCheckpointer)
+## Conversation state
 
-Enables resumable conversations by persisting state to Supabase.
+There is **no checkpointer**. `graph.compile()` runs without one, and `agent_checkpoints` is
+empty and unused. The conversation lives in `agent_chat_messages`; AgentHub sends its last
+40 messages with each turn (`AGENT_HISTORY_SENT`), and agent-chat compacts everything older
+than its last 6 into a Haiku summary once a conversation passes 12 messages. Only message text
+survives between turns; earlier tool calls and results are not replayed.
 
-### Database Schema
+## Situational context
 
-The `agent_checkpoints` table stores checkpoint data indexed by thread ID. It has a UUID primary key, a `thread_id` text field (unique), a `checkpoint_data` JSONB column, and `created_at`/`updated_at` timestamps. An index on `thread_id` supports fast lookup.
+Every internal turn (never a customer turn) starts with two blocks, built by
+`_shared/agent-user-context.ts`:
 
-### Checkpointer Class
+- **Now** — the caller's local date and time. AgentHub sends `client_context.timezone`; an
+  unusable value falls back to UTC and the block says so. "Today" is the caller's calendar day,
+  never the UTC date.
+- **Who you are talking to** — `get_agent_user_context(user, workspace, today, conversation)`:
+  name, role, workspace, recent conversations with ANY agent (cross-agent continuity), open
+  project tasks, deal tasks due, open deals, approvals waiting on them, appointments this week,
+  quotes touched this week, unread notifications. Fenced as DATA in `<user_context>` because
+  every title in it is user-written. It is a snapshot; the prompt says to query live before
+  quoting a figure. SECURITY DEFINER, `service_role` only, and NULL for a non-member.
 
-The `SupabaseCheckpointer` class provides three methods:
+## Daily brief
 
-- **get(threadId)** — Queries the `agent_checkpoints` table for the given `thread_id` and returns the `checkpoint_data` JSONB, or `null` if not found.
-- **put(threadId, checkpoint)** — Upserts the checkpoint into the table, updating `updated_at` on conflict with `thread_id`.
-- **delete(threadId)** — Deletes the checkpoint record matching the given `thread_id`.
-
-### Thread ID Generation
-
-Thread IDs are constructed as `${agentId}-${conversationId}` when a `conversationId` is provided, or `${agentId}-${crypto.randomUUID()}` for new conversations.
+`emit_daily_briefs()` runs from pg_cron (`agent-daily-brief`, 05:00 UTC ≈ an Athens morning)
+for every active member who used the assistant in the last 30 days. It reads the same
+`get_agent_user_context` and emits `daily_brief` only when something is due today (tasks,
+deal follow-ups, approvals, appointments) — **never an empty brief**. The locked
+`system-default` flow "Daily Brief → Notify Member" turns it into a bell that opens
+`/agent-hub?prompt=Brief me on my day…`. It is `tenant_configurable`, so a workspace owner
+can mute it. One per person per 20 hours.
 
 ---
 
@@ -143,10 +156,9 @@ Thread IDs are constructed as `${agentId}-${conversationId}` when a `conversatio
 Stores user preferences, facts, and context across conversations. Implementation:
 `supabase/functions/_shared/agent-memory.ts` (`AgentMemory`), rebuilt in **issue #233**.
 
-> The version this replaced promoted memories with three regexes over the user message and
-> retrieved them with `order by created_at desc`. Across 801 agent runs it had stored **one**
-> memory. Read the header comment in `agent-memory.ts` before changing anything here — the
-> failure mode was total and completely silent.
+**One store per user + workspace, shared by every agent.** Recall passes `p_agent_id = null`,
+the distiller dedups against the whole set, and restating a fact to a second agent refreshes
+the existing row. `agent_id` records where a memory was first learned; nothing filters on it.
 
 ### Database Schema
 
@@ -177,7 +189,7 @@ Stores user preferences, facts, and context across conversations. Implementation
 Promotion, matching and recall-tracing are SQL RPCs, so each is one atomic round trip:
 
 - **`promote_agent_memory(...)`** — insert-or-refresh *plus* supersede in one statement. Restating an identical fact refreshes the existing row (`restated_count++`) instead of stacking a duplicate. The supersede update is scoped to the caller's user + workspace, so a model-hallucinated id can never reach another tenant.
-- **`match_agent_memories(...)`** — three tiers, each labelled in `match_reason`: `pinned_type` (durable types, always in context), `semantic` (cosine over the turn's embedding), `recency_fallback` (**only** when semantic returns nothing — no query vector, or nothing embedded yet).
+- **`match_agent_memories(...)`** — three tiers, each labelled in `match_reason`: `pinned_type` (durable types, always in context), `semantic` (cosine over the turn's embedding), `recency_fallback` (**only** when there is no query vector — "nothing cleared the similarity floor" is an answer, not a reason to pad with unrelated rows).
 - **`record_agent_memory_recall(ids, conversation_id)`** — bumps `recall_count` / `last_recalled_at`.
 
 All three are `SECURITY INVOKER` and granted to `service_role` only; agent-chat calls them
@@ -187,12 +199,21 @@ having already derived `user_id`/`workspace_id` from the verified JWT.
 
 After each turn `AgentMemory.promote()` runs asynchronously. It sends the turn — fenced in
 `<conversation>` markers as DATA, never as instructions — plus the user's existing memories
+and up to 6 earlier messages of the same conversation (clipped to 600 chars each)
 to Claude Haiku with **forced `tool_use`** (`tools: [record_memories]` + `tool_choice`), so
 the verdict that drives the DB write can never come from a salvage parser. The model may
 return an empty list (the common case), create memories, or supersede an existing one it
 contradicts. `normalizeCandidates()` then narrows the output before it reaches SQL: unknown
 types collapse to `context`, over/undersized content is dropped, the batch is deduped and
 capped at 5, and a `supersedes_id` that was not in the list shown to the model is discarded.
+
+Three things never become a memory, each refused in code after the model answers:
+- **Snapshots** — the schema requires `changes_on_its_own`, and `true` (a count, ranking,
+  balance, status) is rejected. "Ranks for only 2 keywords" recalled a month later is a
+  confident wrong answer.
+- **Capability claims** — `isCapabilityClaim`.
+- **Bank/card numbers and test fixtures** — `isUnsafeToRemember`: IBAN shape, Luhn-valid card
+  numbers, RFC 2606 reserved domains (`.invalid`, `.example`, `.test`).
 
 The distiller's tokens are billed through the same `log_agent_usage` path as the turn that
 produced them (agent type `<agentId>:memory`) — one billing derivation, not a second one.

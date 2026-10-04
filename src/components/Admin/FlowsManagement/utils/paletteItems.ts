@@ -61,6 +61,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'agent_search_completed', group: 'AI & 3D',
     label: 'Agent Search Done', description: 'Agent search returns results', icon: 'SearchCheck', color: 'emerald',
     defaultData: { label: 'Agent Search Done', category: 'trigger', triggerType: 'agent_search_completed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'daily_brief', group: 'AI & 3D',
+    label: 'Daily Brief', description: 'Morning summary of what is on a person\'s plate', icon: 'Sunrise', color: 'emerald',
+    defaultData: { label: 'Daily Brief', category: 'trigger', triggerType: 'daily_brief', config: {} } as TriggerNodeData },
 
   // ── Quotes (product-to-quote) ──
   { type: 'triggerNode', category: 'trigger', subType: 'product_added_to_quote', group: 'Quotes',

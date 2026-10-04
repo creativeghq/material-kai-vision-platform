@@ -187,6 +187,14 @@ interface AgentDefinition {
 // specialist. Users can also pick a specialist directly. Sandbox agents
 // (Stark/Veritas) require a container execution tier that isn't built yet, so they
 // are registered in agent_definitions but not offered in the chat picker.
+const AGENT_HISTORY_SENT = 40;
+
+function boundedAgentHistory<T extends { images?: unknown[]; geminiImageData?: unknown }>(all: T[]): T[] {
+  if (all.length <= AGENT_HISTORY_SENT) return all;
+  const older = all.slice(0, -AGENT_HISTORY_SENT).filter((m) => (m.images?.length ?? 0) > 0 || m.geminiImageData);
+  return [...older, ...all.slice(-AGENT_HISTORY_SENT)];
+}
+
 const AGENTS: AgentDefinition[] = [
   {
     id: 'orchestrator',
@@ -2045,22 +2053,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (!message || !currentConversationId) return;
 
     try {
-      // Find the actual DB row by conversation + timestamp proximity
-      // (local message IDs are not DB UUIDs, so we can't match by id directly)
-      const { data: dbMessages } = await supabase
+      // By linked row id; timestamp proximity only when the save has not linked one yet.
+      const base = supabase
         .from('agent_chat_messages')
         .select('id, metadata, created_at')
         .eq('conversation_id', currentConversationId)
-        .eq('role', 'assistant')
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .eq('role', 'assistant');
+      const { data: dbMessages } = message.dbId
+        ? await base.eq('id', message.dbId)
+        : await base.order('created_at', { ascending: false }).limit(50);
 
       const targetMs = message.timestamp.getTime();
       const match = dbMessages?.reduce((best: any, row: any) => {
-        const diff = Math.abs(new Date(row.created_at).getTime() - targetMs);
-        const bestDiff = best ? Math.abs(new Date(best.created_at).getTime() - targetMs) : Infinity;
-        return diff < bestDiff ? row : best;
-      }, null);
+          const diff = Math.abs(new Date(row.created_at).getTime() - targetMs);
+          const bestDiff = best ? Math.abs(new Date(best.created_at).getTime() - targetMs) : Infinity;
+          return diff < bestDiff ? row : best;
+        }, null);
 
       if (!match) {
         console.error('Rating: could not find matching DB message');
@@ -2632,7 +2640,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       if (!data) {
         // Prepare request body
         const requestBody: any = {
-          messages: messages.concat({
+          // Bounded, but an older message carrying an image still travels: the image tools resolve
+          // "change the floor" against images read off this history.
+          messages: boundedAgentHistory(messages).concat({
             id: `msg-${Date.now()}`,
             role: 'user',
             // apiUserInput carries the catalog source_pdf_id context (if any);
@@ -2642,6 +2652,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }),
           agentId: selectedAgent,
           model: selectedModel,
+          client_context: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
           images: resolvedImageUrls,
           ...(userAttachedDocuments.length > 0 ? { documents: userAttachedDocuments } : {}),
           // Use the local `conversationId` (already includes a freshly-created id),

@@ -206,6 +206,9 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
   svbrdf_extraction_complete: withStandard([
     { key: 'extraction_id', label: 'Extraction ID', note: 'The SVBRDF extraction job.' },
   ]),
+  daily_brief: withStandard([
+    { key: 'items', label: 'Items', note: 'How many things on the plate made the brief.' },
+  ]),
   agent_search_completed: withStandard([
     { key: 'agent_id', label: 'Agent ID', note: 'The background agent.' },
     { key: 'run_id', label: 'Run ID', note: 'The agent run.' },
@@ -491,6 +494,7 @@ export const TRIGGER_TITLES: Record<string, string> = {
   video_generation_failed: 'Video failed',
   svbrdf_extraction_complete: 'SVBRDF maps ready',
   agent_search_completed: 'Agent run completed',
+  daily_brief: 'Daily brief',
   background_agent_failed: 'Agent run failed',
   role_upgrade_request_submitted: 'Role upgrade requested',
   role_upgrade_approved: 'Role upgrade approved',

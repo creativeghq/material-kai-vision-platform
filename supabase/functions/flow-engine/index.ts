@@ -2040,7 +2040,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'purchase_order.sent', 'quote_pdf_generated',
   'video_generation_completed', 'video_generation_failed',
   'vr_world_created', 'vr_world_failed', 'virtual_staging_completed', 'svbrdf_extraction_complete',
-  'agent_search_completed', 'inbox.message_received', 'inbox.thread_assigned',
+  'agent_search_completed', 'daily_brief', 'inbox.message_received', 'inbox.thread_assigned',
   'inbox.thread_labeled', 'inbox.follow_up_due',
   'seo.ranking_movement', 'seo.backlink_movement', 'seo.site_health_changed',
   'seo.article_refresh_due',

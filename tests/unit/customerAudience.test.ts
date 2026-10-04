@@ -161,7 +161,7 @@ describe('agent-chat applies the audience clamp', () => {
     const src = chat();
     // recall — the operator's memories hold things like "always quote 40% on this brand". Reading
     // one into a reply the customer sees is a disclosure with no bug in it.
-    expect(src).toMatch(/forCustomer \? \[\] : await longTermMemory\.recall/);
+    expect(src).toMatch(/forCustomer \? (?:\[\]|Promise\.resolve\(\[\]\)) : (?:await )?longTermMemory\.recall/);
     // promotion — a memory distilled from a CUSTOMER's message is attacker-controlled text written
     // into a store later recalled into the OPERATOR's turns. A persistent injection on a fuse.
     // Further conjuncts may sit beside it (`!isEvalRun`, `!finalResult.failed`); what this pins
