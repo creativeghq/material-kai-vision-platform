@@ -398,7 +398,7 @@ export const ContactDetailPage: React.FC = () => {
           onProgress: setResearchStatus,
         });
         if (Object.keys(res.fields).length > 0) {
-          await companiesAPI.updateCompany(linkedCompanyId, res.fields);
+          await companiesAPI.updateCompany(linkedCompanyId, { ...res.fields, _sources: res.sourceHints });
           const fresh = await companiesAPI.getCompany(linkedCompanyId).catch(() => null);
           if (fresh) setPrimaryCompany((fresh as any)?.data ?? fresh);
         }

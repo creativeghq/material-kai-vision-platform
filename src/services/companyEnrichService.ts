@@ -18,7 +18,12 @@ export interface CompanyEnrichFields {
 
 export interface CompanyEnrichResult {
   ok: boolean;
+  /** Only details confirmed against the company's own website (ΑΦΜ, ΓΕΜΗ, invoice phone or email domain). */
   fields: CompanyEnrichFields | null;
+  /** Found by the search but not confirmed; shown for the operator to accept, never saved automatically. */
+  suggestions?: Partial<CompanyEnrichFields>;
+  rejected?: { field: keyof CompanyEnrichFields; value: string; reason: string }[];
+  verification?: { domain: string; by: 'afm' | 'gemi' | 'phone' | 'email_domain' } | null;
   /** Providers that returned data. */
   sources: string[];
   /** Providers that were skipped / returned nothing (with reason). */
@@ -37,6 +42,9 @@ export interface CompanyEnrichArgs {
   workspaceId?: string;
   /** If set + caller owns the row, empty columns are cached back onto crm_companies. */
   companyId?: string;
+  /** ΓΕΜΗ's registered website and the ΑΑΔΕ postcode, used to verify before anything is saved. */
+  gemiUrl?: string;
+  postalCode?: string;
 }
 
 /**
@@ -51,6 +59,8 @@ export async function enrichCompany({
   vatNumber,
   workspaceId,
   companyId,
+  gemiUrl,
+  postalCode,
 }: CompanyEnrichArgs): Promise<CompanyEnrichResult> {
   try {
     const { data, error } = await supabase.functions.invoke('company-enrich', {
@@ -61,6 +71,8 @@ export async function enrichCompany({
         vat_number: vatNumber,
         workspace_id: workspaceId,
         company_id: companyId,
+        gemi_url: gemiUrl,
+        postal_code: postalCode,
       },
     });
     if (error) {

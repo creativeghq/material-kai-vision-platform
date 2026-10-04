@@ -53,6 +53,7 @@ import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManage
 import { GoogleBusinessCard } from '@/modules/crm/components/GoogleBusinessCard';
 import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
+import { SupplierProfileCard, type SupplierProfile } from '@/modules/crm/components/SupplierProfileCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { SupplyCategorySelect } from '@/components/business/crm/SupplyCategorySelect';
 import { Switch } from '@/components/core/ui/switch';
@@ -127,6 +128,11 @@ interface Company {
   is_supplier?: boolean | null;
   is_customer?: boolean | null;
   factory_names?: string[] | null; // supplier↔factory pin (ingested metadata.factory_name values)
+  supplier_type?: string | null;
+  is_manufacturer?: boolean | null;
+  own_brands?: string[] | null;
+  brands_carried?: string[] | null;
+  field_sources?: SupplierProfile['field_sources'];
   // Commercial depth
   contact_group?: string | null;
   is_government_body?: boolean | null;
@@ -453,7 +459,7 @@ export const CompanyDetailPage: React.FC = () => {
         onProgress: setResearchStatus,
       });
       if (Object.keys(res.fields).length > 0) {
-        await patchInline(res.fields as Partial<Company>);
+        await patchInline({ ...res.fields, _sources: res.sourceHints } as Partial<Company>);
       }
       const failed = res.steps.filter((s) => s.status === 'failed');
       const summary = summarizeResearch(res.steps);
@@ -863,7 +869,7 @@ export const CompanyDetailPage: React.FC = () => {
                       <TabsTrigger value="categories" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Tags className="h-4 w-4 mr-2"/>Categories</TabsTrigger>
                     )}
                     {showSupplierFeatures && (
-                      <TabsTrigger value="factory" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Factory Link</TabsTrigger>
+                      <TabsTrigger value="factory" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Supplier profile</TabsTrigger>
                     )}
                   </TabsList>
 
@@ -1082,7 +1088,8 @@ export const CompanyDetailPage: React.FC = () => {
                     )}
 
                     {showSupplierFeatures && (
-                      <TabsContent value="factory" className="mt-0">
+                      <TabsContent value="factory" className="mt-0 space-y-4">
+                        <SupplierProfileCard value={company} filled={company as unknown as Record<string, unknown>} onSave={(patch) => patchInline(patch)} />
                         <FactoryLinkCard value={company.factory_names ?? []} supplierName={company.name} workspaceId={activeWorkspaceId ?? ''} onChange={handleFactoryPinChange} />
                       </TabsContent>
                     )}

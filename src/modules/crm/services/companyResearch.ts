@@ -54,6 +54,10 @@ export interface CompanyResearchResult {
   aade?: AadeLookupResult;
   gemi?: GemiLookupResult;
   enrich?: CompanyEnrichFields | null;
+  /** Found by web search but not confirmed against the company's own site; never in `fields`. */
+  suggestions?: Partial<CompanyEnrichFields>;
+  /** Send as `_sources` with a company PATCH so confirmed research is not recorded as typed by a person. */
+  sourceHints?: Record<string, 'web_verified'>;
 }
 
 /** Normalized ΚΑΔ entry stored in `crm_companies.kad_all`. Canonical shape — re-exported by
@@ -256,6 +260,8 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
   let aade: AadeLookupResult | undefined;
   let gemi: GemiLookupResult | undefined;
   let enrich: CompanyEnrichFields | null = null;
+  let suggestions: Partial<CompanyEnrichFields> = {};
+  let sourceHints: Record<string, 'web_verified'> = {};
 
   const afm = greekAfm(vatNumber, countryCode);
 
@@ -323,9 +329,12 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
       vatNumber: vatNumber ?? undefined,
       workspaceId,
       companyId,
+      gemiUrl: ((merged.gemi_data as { url?: string } | null | undefined)?.url) || undefined,
+      postalCode: (merged.postal_code as string) || undefined,
     });
     if (res.ok && res.fields) {
       enrich = res.fields;
+      suggestions = res.suggestions ?? {};
       const soft: Record<string, unknown> = {};
       // Soft identity only fills what is still blank — registry data always wins.
       for (const key of ['website', 'email', 'phone', 'linkedin', 'facebook', 'twitter',
@@ -334,13 +343,17 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
         if (!isBlank(v) && isBlank(merged[key])) soft[key] = v;
       }
       fields = { ...fields, ...soft };
+      sourceHints = Object.fromEntries(Object.keys(soft).map((k) => [k, 'web_verified']));
       // Carry the provider-level breakdown up: a run where Apollo is unconfigured and web search
       // found only a URL is NOT the same as "enrichment worked", and the caller must be able to
       // say so. Dropping these is what made a half-empty company look like a successful import.
       steps.push({
         step: 'enrich',
         status: Object.keys(soft).length > 0 ? 'ok' : 'skipped',
-        detail: Object.keys(soft).length > 0 ? Object.keys(soft).join(', ') : 'Nothing new found',
+        detail: [
+          Object.keys(soft).length > 0 ? Object.keys(soft).join(', ') : 'Nothing new confirmed',
+          Object.keys(suggestions).length > 0 ? `unconfirmed, not saved: ${Object.keys(suggestions).join(', ')}` : '',
+        ].filter(Boolean).join('; '),
         sources: res.sources,
         skipped: res.skipped,
       });
@@ -361,6 +374,8 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
     aade,
     gemi,
     enrich,
+    suggestions,
+    sourceHints,
   };
 }
 

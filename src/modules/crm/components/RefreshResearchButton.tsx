@@ -58,7 +58,7 @@ export function useCompanyResearch({ companyId, workspaceId, onDone }: Pick<Prop
       });
 
       if (Object.keys(res.fields).length > 0) {
-        await companiesAPI.updateCompany(companyId, res.fields);
+        await companiesAPI.updateCompany(companyId, { ...res.fields, _sources: res.sourceHints });
         onDone?.();
       }
 

@@ -4264,6 +4264,10 @@ export type Database = {
           employee_count: string | null
           facebook: string | null
           factory_names: string[]
+          brands_carried: string[]
+          field_sources: Json
+          own_brands: string[]
+          supplier_type: string | null
           finance_statement_opt_out: boolean
           gemi_data: Json | null
           gemi_data_at: string | null
@@ -4345,6 +4349,10 @@ export type Database = {
           employee_count?: string | null
           facebook?: string | null
           factory_names?: string[]
+          brands_carried?: string[]
+          field_sources?: Json
+          own_brands?: string[]
+          supplier_type?: string | null
           finance_statement_opt_out?: boolean
           gemi_data?: Json | null
           gemi_data_at?: string | null
@@ -4426,6 +4434,10 @@ export type Database = {
           employee_count?: string | null
           facebook?: string | null
           factory_names?: string[]
+          brands_carried?: string[]
+          field_sources?: Json
+          own_brands?: string[]
+          supplier_type?: string | null
           finance_statement_opt_out?: boolean
           gemi_data?: Json | null
           gemi_data_at?: string | null

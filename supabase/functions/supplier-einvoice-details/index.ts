@@ -8,6 +8,7 @@ import { extractText, getDocumentProxy } from 'npm:unpdf@1.4.0';
 import { bankFromIban } from '../_shared/bankVocabulary.generated.ts';
 import { normalizeIban } from '../_shared/iban.generated.ts';
 import type { EinvoiceReadOutcome } from '../_shared/einvoiceReadOutcomes.generated.ts';
+import { canReplace, isPlaceholderEmail, phoneContradictsPostcode, type FieldProvenance } from '../_shared/crm/identityCheck.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +35,7 @@ interface DocRow {
 interface CompanyRow {
   id: string; name: string; vat_norm: string | null; phone: string | null; email: string | null;
   street: string | null; street_number: string | null; city: string | null; postal_code: string | null;
-  address: string | null; einvoice_read_at: string | null;
+  address: string | null; einvoice_read_at: string | null; field_sources: Record<string, FieldProvenance> | null;
 }
 
 function json(payload: unknown, status = 200): Response {
@@ -220,8 +221,16 @@ async function readOne(
 
       const k = found.contacts;
       if (k) {
-        if (blank(c.phone) && k.phones[0]) { patch.phone = `+30${k.phones[0]}`; result.phone_set = true; }
-        if (blank(c.email) && k.emails[0]) { patch.email = k.emails[0]; result.email_set = true; }
+        // The invoice outranks a web guess, so a wrong first value no longer blocks the right one.
+        const sources = { ...(c.field_sources ?? {}) };
+        const at = new Date().toISOString();
+        if (k.phones[0] && (blank(c.phone) || canReplace(sources.phone?.src, 'invoice', phoneContradictsPostcode(c.phone, c.postal_code)))) {
+          patch.phone = `+30${k.phones[0]}`; sources.phone = { src: 'invoice', by: label, at }; result.phone_set = true;
+        }
+        if (k.emails[0] && (blank(c.email) || canReplace(sources.email?.src, 'invoice', isPlaceholderEmail(c.email)))) {
+          patch.email = k.emails[0]; sources.email = { src: 'invoice', by: label, at }; result.email_set = true;
+        }
+        if (result.phone_set || result.email_set) patch.field_sources = sources;
         const { data: existing } = await admin.from('crm_phones').select('phone').eq('company_id', c.id);
         const have = new Set([digits(patch.phone ?? c.phone), ...(existing ?? []).map((p: { phone: string }) => digits(p.phone))]);
         const extra = [
@@ -274,7 +283,7 @@ Deno.serve(withApiLogging('supplier-einvoice-details', async (req: Request) => {
 
   const companies = await readAll<CompanyRow>((from, to) => {
     let q = admin.from('crm_companies')
-      .select('id, name, vat_norm, phone, email, street, street_number, city, postal_code, address, einvoice_read_at')
+      .select('id, name, vat_norm, phone, email, street, street_number, city, postal_code, address, einvoice_read_at, field_sources')
       .eq('workspace_id', workspaceId);
     if (body.company_id) q = q.eq('id', body.company_id);
     return q.order('id').range(from, to);

@@ -28,6 +28,7 @@ const COMPANY_WRITABLE_COLUMNS = [
   'linkedin', 'twitter', 'facebook', 'description',
   'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
   'factory_names', // supplier↔factory pin (ingested metadata.factory_name values)
+  'supplier_type', 'is_manufacturer', 'own_brands', 'brands_carried',
   'user_level_key', // Pricing level
   'prices_vat_inclusive', // Show this customer gross (VAT-incl) prices
 
@@ -48,6 +49,8 @@ const COMPANY_WRITABLE_COLUMNS = [
   // Normalized queryable ΚΑΔ (merged ΑΑΔΕ+ΓΕΜΗ)
   'kad_codes', 'kad_all',
 ] as const;
+
+const OPERATOR_SOURCED_FIELDS = ['website', 'email', 'phone', 'industry', 'description'] as const;
 
 function pickCompanyFields(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -478,6 +481,25 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // workspace_id is never reassignable through the writable-columns set; drop any
       // attempt so a row can't be moved to another tenant via PATCH.
       delete (updates as Record<string, unknown>).workspace_id;
+
+      // A value a person changes here is theirs and is never replaced. The research flow may mark its own
+      // writes `web_verified` (a downgrade only), so a confirmed web result stays correctable by an invoice.
+      const touched = OPERATOR_SOURCED_FIELDS.filter((f) => f in updates);
+      if (touched.length) {
+        const { data: cur } = await supabase.from('crm_companies')
+          .select(`field_sources, ${touched.join(', ')}`).eq('id', companyId).maybeSingle();
+        const row = (cur ?? {}) as Record<string, unknown> & { field_sources?: Record<string, unknown> | null };
+        const sources: Record<string, unknown> = { ...(row.field_sources ?? {}) };
+        const at = new Date().toISOString();
+        const changed = touched.filter((f) => (row[f] ?? null) !== (updates[f] ?? null));
+        const hinted = (body?._sources ?? {}) as Record<string, unknown>;
+        for (const f of changed) {
+          sources[f] = hinted[f] === 'web_verified'
+            ? { src: 'web_verified', by: 'research', at }
+            : { src: 'operator', by: userId ?? 'api', at };
+        }
+        if (changed.length) updates.field_sources = sources;
+      }
 
       const { data, error } = await supabase
         .from('crm_companies')

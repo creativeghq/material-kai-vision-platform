@@ -11,26 +11,21 @@ import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 import { loadPrompt, PromptNotConfigured, PromptStoreUnavailable } from '../_shared/prompt-utils.ts';
 import { neutraliseFenceMarkers } from '../_shared/customer-audience.ts';
 import { researchAliases } from '../_shared/crm/researchAliases.ts';
+import {
+  canReplace, digitsOnly, domainOf, emailDomain, gateEnrichment, isBusinessDomain,
+  type FieldProvenance, type FieldSource, type MatchedBy,
+} from '../_shared/crm/identityCheck.ts';
+import { verifyWebsite } from '../_shared/crm/verifyWebsite.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-// Lazy getters, never module-load captures: the secrets bootstrap populates env at HANDLER
-// ENTRY, so `const X = Deno.env.get('Y')` at module scope reads undefined for anything that
-// arrives from platform_secrets rather than a deploy-time secret. All three were captured at
-// module load here.
+// Lazy getters: the secrets bootstrap populates env at handler entry.
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const APOLLO_API_KEY = () => Deno.env.get('APOLLO_API_KEY') || '';
 /** `GOOGLE_GENERATIVE_AI_API_KEY`, not `GEMINI_API_KEY`. */
 const GEMINI_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
-/**
- * One constant, used for the endpoint URL, the price lookup and the logged `model_name`, so
- * those three can never disagree about which model actually ran. This sat on
- * `gemini-2.0-flash` — two generations behind the rest of the repo, which is on
- * `gemini-3.5-flash` / `gemini-3.1-pro` — while its hardcoded rates described 2.0-Flash.
- * Must match a `model_key` in `ai_model_pricing`, or the call logs `pricing_missing` and is
- * not debited.
- */
+/** One constant for URL, price lookup and logged model_name; must match an `ai_model_pricing` model_key. */
 const GEMINI_MODEL = 'gemini-3.5-flash';
 
 // Ceiling reserved up front for affordability (web search ~2cr + Apollo ~7.5cr worst case).
@@ -1016,6 +1011,60 @@ async function handleFindCompetitors(
   return jsonResponse({ ok: true, source, competitors, skipped });
 }
 
+interface Verification {
+  verified: { domain: string; by: MatchedBy | 'email_domain'; aliases?: string[] } | null;
+  rejected: { field: keyof EnrichFields; value: string; reason: string }[];
+}
+
+const TRUSTED_SOURCES: (FieldSource | undefined)[] = ['operator', 'aade', 'gemi', 'invoice'];
+// Runs after the web search inside the 150s edge ceiling, so the whole website check is capped.
+const VERIFY_BUDGET_MS = 30_000;
+
+/** A site counts as the company's only when it carries its ΑΦΜ, ΓΕΜΗ or invoice phone, or sits on its invoice email domain. */
+async function verifyIdentity(
+  admin: any, company: any, bodyVat: string | null, found: EnrichFields, bodyGemiUrl: string | null,
+): Promise<Verification> {
+  const rejected: Verification['rejected'] = [];
+  const src = company?.field_sources ?? {};
+  const vatDigits = digitsOnly(company?.vat_number ?? bodyVat);
+  const phones: string[] = [];
+  if (company?.phone && TRUSTED_SOURCES.includes(src.phone?.src)) phones.push(company.phone);
+  if (company?.gemi_data?.phone) phones.push(String(company.gemi_data.phone));
+  if (company?.id) {
+    const { data } = await admin.from('crm_phones').select('phone').eq('company_id', company.id);
+    phones.push(...(data ?? []).map((p: { phone: string }) => p.phone));
+  }
+  const keys = {
+    afm: vatDigits.length >= 8 ? vatDigits : null, gemi: company?.gemi_number ?? null, phones,
+    street: company?.street ?? null, postalCode: company?.postal_code ?? null,
+    names: [company?.name, company?.commercial_title],
+  };
+  const until = Date.now() + VERIFY_BUDGET_MS;
+
+  const emailDom = company?.email && TRUSTED_SOURCES.includes(src.email?.src) ? emailDomain(company.email) : null;
+  const candidates: { url: string; fromEmail: boolean }[] = [];
+  const add = (u: string | null | undefined, fromEmail = false) => {
+    const d = domainOf(u);
+    if (d && !candidates.some((c) => domainOf(c.url) === d)) candidates.push({ url: d, fromEmail });
+  };
+  if (isBusinessDomain(emailDom)) add(emailDom, true);
+  add(company?.gemi_data?.url ?? bodyGemiUrl);
+  add(company?.website);
+  add(found.website);
+
+  let emailSite: string | null = null;
+  for (const c of candidates.slice(0, 4)) {
+    const check = await verifyWebsite(c.url, keys, until);
+    if (!check) continue;
+    if (!check.alive) { rejected.push({ field: 'website', value: c.url, reason: 'site does not load' }); continue; }
+    const aliases = check.requested !== check.domain ? [check.requested] : [];
+    if (check.by) return { verified: { domain: check.domain, by: check.by, aliases }, rejected };
+    // An email domain that redirects off-site (parked, a site builder) says nothing about who owns the target.
+    if (c.fromEmail && check.domain === check.requested) emailSite = check.domain;
+  }
+  return { verified: emailSite ? { domain: emailSite, by: 'email_domain' } : null, rejected };
+}
+
 /** Merge: primary wins per-field, secondary fills only the blanks. */
 function mergeFields(primary: Partial<EnrichFields>, secondary: Partial<EnrichFields>): EnrichFields {
   const out: EnrichFields = { ...EMPTY_FIELDS };
@@ -1042,12 +1091,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
-    /**
-     * The workspace this call is BILLED and AUDITED against (#353 CRM-9, invariant 1), resolved
-     * ONCE for every action. It used to be resolved inside the enrich flow only, so each new
-     * action re-read the body itself — and `find-competitors` reserved credits against a
-     * workspace nobody had checked the caller belonged to.
-     */
+    // The workspace billed and audited for every action, membership-checked once (#353 CRM-9).
     const requestedWorkspaceId = cleanStr(body?.workspace_id);
     const workspaceId = requestedWorkspaceId
       && await userCanAccessWorkspace(admin, user.id, requestedWorkspaceId)
@@ -1101,24 +1145,21 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     if (apollo) sources.push('apollo'); else skipped.push(APOLLO_API_KEY() ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
 
     // Web search wins for the soft fields; Apollo fills structured blanks + employee band.
-    const fields = mergeFields(web ?? {}, apollo ?? {});
+    const found = mergeFields(web ?? {}, apollo ?? {});
 
-    // Optionally cache onto crm_companies — only fields currently EMPTY on the row,
-    // and only if the caller owns it (or is admin). Never overwrites operator input.
+    // Tenancy first (invariant 1): a service-role read of a body-supplied id.
+    let company: any = null;
+    let canWrite = false;
     if (companyId) {
-      const { data: company } = await admin
+      const { data } = await admin
         .from('crm_companies')
-        .select('id, created_by, workspace_id, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country')
+        .select('id, created_by, workspace_id, name, commercial_title, vat_number, gemi_number, gemi_data, street, postal_code, field_sources, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country')
         .eq('id', companyId)
         .maybeSingle();
-
-      if (company) {
-        /**
-         * TENANCY FIRST (#353 CRM-6, invariant 1). This is a service-role client writing to a
-         * row identified by a body-supplied id, and it had no workspace check at all.
-         */
-        const sameTenant = await userCanAccessWorkspace(admin, user.id, (company as any).workspace_id);
-        let canWrite = sameTenant && company.created_by === user.id;
+      if (data) {
+        const sameTenant = await userCanAccessWorkspace(admin, user.id, data.workspace_id);
+        company = sameTenant ? data : null;
+        canWrite = sameTenant && company.created_by === user.id;
         if (sameTenant && !canWrite) {
           const { data: profile } = await admin
             .from('user_profiles')
@@ -1128,21 +1169,35 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
           const rn = (profile as any)?.roles?.name;
           canWrite = rn === 'admin' || rn === 'super_admin' || rn === 'owner';
         }
-        if (canWrite) {
-          const patch: Record<string, string> = {};
-          for (const k of Object.keys(EMPTY_FIELDS) as (keyof EnrichFields)[]) {
-            const existing = cleanStr((company as any)[k]);
-            if (!existing && fields[k]) patch[k] = fields[k]!;
-          }
-          if (Object.keys(patch).length > 0) {
-            patch.updated_at = new Date().toISOString();
-            await admin.from('crm_companies').update(patch).eq('id', companyId);
-          }
-        }
       }
     }
 
-    return jsonResponse({ ok: true, fields, sources, skipped });
+    const verification = await verifyIdentity(admin, company, vat, found, cleanStr(body?.gemi_url));
+    const gated = gateEnrichment({ fields: found, verified: verification.verified, postalCode: company?.postal_code ?? cleanStr(body?.postal_code) });
+    const rejected = [...verification.rejected, ...gated.rejected];
+
+    if (company && canWrite) {
+      const fieldSources: Record<string, FieldProvenance> = { ...(company.field_sources ?? {}) };
+      const now = new Date().toISOString();
+      const patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(gated.save) as [keyof EnrichFields, string][]) {
+        const existing = cleanStr(company[k]);
+        if (existing && existing === v) continue;
+        if (existing && !canReplace(fieldSources[k]?.src, 'web_verified')) continue;
+        patch[k] = v;
+        fieldSources[k] = { src: 'web_verified', by: verification.verified?.by, at: now };
+      }
+      if (Object.keys(patch).length > 0) {
+        await admin.from('crm_companies')
+          .update({ ...patch, field_sources: fieldSources, updated_at: now })
+          .eq('id', companyId).eq('workspace_id', company.workspace_id);
+      }
+    }
+
+    const fields: EnrichFields = { ...EMPTY_FIELDS, ...gated.save };
+    return jsonResponse({
+      ok: true, fields, suggestions: gated.suggestions, rejected, verification: verification.verified, sources, skipped,
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : 'Unknown error';
     console.error('[company-enrich] error:', err);
