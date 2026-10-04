@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { HubCellLink } from '@/components/core/hub';
 import { Factory, Handshake, Loader2, Mail, Phone, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -46,7 +46,7 @@ function PersonCell({ person }: { person: PersonRef | null }) {
   const phone = person.mobile || person.phone;
   return (
     <div className="space-y-0.5">
-      <div className="font-medium">{person.name}{person.position ? <span className="font-normal text-muted-foreground"> · {person.position}</span> : null}</div>
+      <div className="font-medium"><HubCellLink to={`/crm/contacts/${person.id}`}>{person.name}</HubCellLink>{person.position ? <span className="font-normal text-muted-foreground"> · {person.position}</span> : null}</div>
       <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
         {phone && <a href={telHref(phone)} className="inline-flex items-center gap-1 hover:underline"><Phone className="h-3 w-3" />{phone}</a>}
         {person.email && <a href={`mailto:${person.email}`} className="inline-flex items-center gap-1 hover:underline"><Mail className="h-3 w-3" />{person.email}</a>}
@@ -265,7 +265,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                   {represents.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>
-                        <Link to={`/crm/companies/${r.principal_company_id}`} className="font-medium hover:underline">{display(r.principal)}</Link>
+                        <HubCellLink to={`/crm/companies/${r.principal_company_id}`}>{display(r.principal)}</HubCellLink>
                         {r.kind !== 'agent' && <Badge variant="neutral" className="ml-2">{kindLabel(r.kind)}</Badge>}
                       </TableCell>
                       <TableCell>{r.principal?.country_code ?? '—'}</TableCell>
@@ -301,7 +301,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
               <div key={r.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline pb-3 last:border-0 last:pb-0">
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link to={`/crm/companies/${r.agent_company_id}`} className="font-medium hover:underline">{display(r.agent)}</Link>
+                    <HubCellLink to={`/crm/companies/${r.agent_company_id}`}>{display(r.agent)}</HubCellLink>
                     <Badge variant="neutral">{kindLabel(r.kind)}{r.territory ? ` · ${r.territory}` : ''}</Badge>
                   </div>
                   <PersonCell person={r.contact} />
