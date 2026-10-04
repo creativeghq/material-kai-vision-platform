@@ -54,7 +54,7 @@ import { GoogleBusinessCard } from '@/modules/crm/components/GoogleBusinessCard'
 import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { SupplierProfileCard, type SupplierProfile } from '@/modules/crm/components/SupplierProfileCard';
-import { CompanyRepresentationsCard } from '@/modules/crm/components/CompanyRepresentationsCard';
+import { CompanyRepresentationsCard, useRepresentationContactIds } from '@/modules/crm/components/CompanyRepresentationsCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { SupplyCategorySelect } from '@/components/business/crm/SupplyCategorySelect';
 import { Switch } from '@/components/core/ui/switch';
@@ -647,6 +647,12 @@ export const CompanyDetailPage: React.FC = () => {
   };
 
   const contactTable = useHubTable((company?.contacts as AttachedContactRow[] | undefined) ?? NO_CONTACTS, CONTACT_FIELDS);
+  const [repsVersion, setRepsVersion] = useState(0);
+  const reps = useRepresentationContactIds(company?.id, repsVersion);
+  const contactCount = new Set([
+    ...((company?.contacts ?? []) as AttachedContactRow[]).map((c) => c.contact_id),
+    ...reps.ids,
+  ]).size;
   const contactSortHead = (id: string, label: string) => (
     <HubSortButton
       active={contactTable.sort?.columnId === id ? contactTable.sort.direction : undefined}
@@ -847,7 +853,7 @@ export const CompanyDetailPage: React.FC = () => {
                 {(showCommercial || showSupplierFeatures) && (
                   <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wallet className="h-4 w-4 mr-2"/>Account</TabsTrigger>
                 )}
-                <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2"/>Contacts ({company.contacts?.length || 0})</TabsTrigger>
+                <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2"/>Contacts ({contactCount})</TabsTrigger>
                 <TabsTrigger value="work" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2"/>Work</TabsTrigger>
                 {company.is_supplier && (
                   <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Products</TabsTrigger>
@@ -1129,7 +1135,7 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Contacts Tab */}
           <TabsContent value="contacts" className="space-y-4">
             {company?.id && activeWorkspaceId && showSupplierFeatures && (
-              <CompanyRepresentationsCard companyId={company.id} workspaceId={activeWorkspaceId} isAgency={company.supplier_type === 'agent'} />
+              <CompanyRepresentationsCard companyId={company.id} workspaceId={activeWorkspaceId} isAgency={company.supplier_type === 'agent'} onChange={() => setRepsVersion((v) => v + 1)} />
             )}
             {/* Deals on this account — the reverse side of crm_deals.company_id, which was
                 otherwise a one-way link (#311). */}
@@ -1160,7 +1166,9 @@ export const CompanyDetailPage: React.FC = () => {
               <CardContent className="p-0">
                 {!company.contacts || company.contacts.length === 0 ? (
                   <div className="p-12 text-center text-sm text-muted-foreground">
-                    No contacts attached to this company yet.
+                    {reps.representedBy > 0
+                      ? 'Nobody at the factory itself yet. Orders go through the agency above.'
+                      : 'No contacts attached to this company yet.'}
                     <div>
                       <Button
                         variant="outline"

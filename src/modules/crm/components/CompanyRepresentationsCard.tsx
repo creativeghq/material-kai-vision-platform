@@ -184,7 +184,28 @@ function AddRepresentationDialog({ open, onOpenChange, side, companyId, workspac
   );
 }
 
-export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspaceId: string; isAgency: boolean }> = ({ companyId, workspaceId, isAgency }) => {
+/** People reachable through an agency link on this company — they count as its contacts. */
+export function useRepresentationContactIds(companyId: string | undefined, refreshKey = 0): { ids: string[]; representedBy: number } {
+  const [state, setState] = useState<{ ids: string[]; representedBy: number }>({ ids: [], representedBy: 0 });
+  useEffect(() => {
+    if (!companyId) return;
+    let live = true;
+    void supabase.from('crm_company_representations').select('contact_id, principal_company_id')
+      .or(`agent_company_id.eq.${companyId},principal_company_id.eq.${companyId}`)
+      .then(({ data }) => {
+        if (!live) return;
+        const rows = (data ?? []) as { contact_id: string | null; principal_company_id: string }[];
+        setState({
+          ids: [...new Set(rows.map((r) => r.contact_id).filter((x): x is string => !!x))],
+          representedBy: rows.filter((r) => r.principal_company_id === companyId).length,
+        });
+      });
+    return () => { live = false; };
+  }, [companyId, refreshKey]);
+  return state;
+}
+
+export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspaceId: string; isAgency: boolean; onChange?: () => void }> = ({ companyId, workspaceId, isAgency, onChange }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<Representation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,6 +225,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
     const { error } = await supabase.from('crm_company_representations').delete().eq('id', id);
     if (error) { toast({ title: 'Could not remove the link', description: getErrorMessage(error), variant: 'destructive' }); return; }
     setRows((r) => r.filter((x) => x.id !== id));
+    onChange?.();
   };
 
   const represents = rows.filter((r) => r.agent_company_id === companyId)
@@ -296,7 +318,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
       )}
 
       <AddRepresentationDialog open={adding !== null} onOpenChange={(o) => { if (!o) setAdding(null); }} side={adding ?? 'principal'}
-        companyId={companyId} workspaceId={workspaceId} onSaved={() => void load()} />
+        companyId={companyId} workspaceId={workspaceId} onSaved={() => { void load(); onChange?.(); }} />
     </>
   );
 };
