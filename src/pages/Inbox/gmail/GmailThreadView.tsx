@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Sparkles, Archive, ArrowLeft, Download, Loader2, Mail, MailOpen, Paperclip, Reply, ReplyAll, Send, Star, Trash2, X } from 'lucide-react';
+import { Check, ListTodo, Tag, Sparkles, Archive, ArrowLeft, Download, Loader2, Mail, MailOpen, Paperclip, Reply, ReplyAll, Send, Star, Trash2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -12,6 +12,8 @@ import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { splitAddresses } from '../emailRecipients';
 import type { GmailMailboxState } from './useGmailMailbox';
 import { GmailThreadFacts } from './GmailThreadFacts';
+import { GmailTaskDialog } from './GmailTaskDialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
 import { SendLaterMenu } from '../components/SendLater';
 
 export async function fileToAttachment(file: File) {
@@ -78,7 +80,9 @@ const MessageCard: React.FC<{ m: GmailMessage; expanded: boolean; onToggle: () =
 
 export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const { toast } = useToast();
-  const { account, openId, openMessages, loadingThread, modify, threads, setOpenId, openThread } = g;
+  const { account, openId, openMessages, loadingThread, modify, threads, setOpenId, openThread, labels } = g;
+  const [taskOpen, setTaskOpen] = useState(false);
+  const userLabels = labels.filter((l) => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [replying, setReplying] = useState<null | 'reply' | 'all'>(null);
   const [to, setTo] = useState('');
@@ -175,6 +179,26 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
           onClick={() => { void assist('summary'); }}>
           {assisting === 'summary' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}Summarise
         </Button>
+        {userLabels.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="Labels"><Tag className="w-4 h-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
+              {userLabels.map((l) => {
+                const on = (row?.label_ids ?? []).includes(l.id);
+                return (
+                  <DropdownMenuItem key={l.id} onSelect={() => modify(openId, on ? { remove: [l.id] } : { add: [l.id] }, on ? `Removed ${l.name}` : `Labelled ${l.name}`)}>
+                    <Check className={`w-3.5 h-3.5 mr-2 ${on ? '' : 'opacity-0'}`} />{l.name}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <Button variant="ghost" size="icon" className="h-8 w-8" title="Create a task from this email" disabled={!openMessages} onClick={() => setTaskOpen(true)}>
+          <ListTodo className="w-4 h-4" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8" title="Mark unread" onClick={() => modify(openId, { add: ['UNREAD'] }, 'Marked unread')}>
           <MailOpen className="w-4 h-4" />
         </Button>
@@ -185,6 +209,17 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
+      {taskOpen && account && (
+        <GmailTaskDialog
+          subject={row?.subject ?? last?.subject ?? 'Follow up'}
+          context={[
+            lastIncoming ? `From ${lastIncoming.from.name ?? ''} <${lastIncoming.from.address ?? ''}>`.trim() : '',
+            (lastIncoming?.snippet ?? '').trim(),
+            `Gmail: https://mail.google.com/mail/u/?authuser=${encodeURIComponent(account.email)}#all/${openId}`,
+          ].filter(Boolean).join('\n\n')}
+          onClose={() => setTaskOpen(false)}
+        />
+      )}
       {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={row?.subject ?? last?.subject ?? ''} sender={lastIncoming?.from ?? null} />}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2">
         {summary?.threadId === openId && (
