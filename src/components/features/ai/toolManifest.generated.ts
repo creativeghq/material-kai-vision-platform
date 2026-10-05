@@ -1232,6 +1232,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'internal_note', type: 'boolean', optional: true, description: 'reply: post as a private internal note instead of a customer-facing message (no confirmation).' },
       { name: 'agent_state', type: 'enum', enum: ['off', 'active'], optional: true, description: 'handover: active = hand the thread to the AI; off = take it back.' },
       { name: 'label', type: 'string', optional: true, description: 'list: only conversations carrying this label (its name, e.g. "Urgent").' },
+      { name: 'search', type: 'string', optional: true, description: 'list: conversations whose subject, sender or any message contains this text.' },
       { name: 'label_ids', type: 'array', optional: true, description: 'label: the full set of labels for the thread, by NAME (replaces the current set). An unknown name is refused rather than skipped.' },
       { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
     ],

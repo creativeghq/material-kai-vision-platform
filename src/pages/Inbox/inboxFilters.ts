@@ -90,9 +90,8 @@ export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] =
     ...(labelOptions.length > 0 ? [{
       key: 'labels', label: 'Labels', icon: Tag,
       fields: [{
-        key: 'label', type: 'select' as const, label: 'Label',
-        description: 'Only one label can be applied at a time — the list is fetched by label.',
-        placeholder: 'All labels',
+        key: 'label', type: 'multi' as const, label: 'Labels',
+        description: 'Conversations carrying any of the chosen labels.',
         options: labelOptions,
       }],
     }] : []),

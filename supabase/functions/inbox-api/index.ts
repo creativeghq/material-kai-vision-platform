@@ -68,6 +68,7 @@ import { defaultVatPercent, resolveLinePrice } from '../_shared/order-intake/pri
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
+import { escapeLike } from '../_shared/searchFold.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
@@ -1200,6 +1201,18 @@ function cleanEmailCopies(raw: { cc?: unknown; bcc?: unknown } | undefined, excl
   const bcc = pick(raw?.bcc);
   if (cc.length + bcc.length > EMAIL_COPY_LIMIT) throw new HttpError(400, `At most ${EMAIL_COPY_LIMIT} CC/BCC addresses per email`);
   return { cc, bcc };
+}
+
+function parseThreadCursor(raw: unknown): { at: string; id: string } | null {
+  if (typeof raw !== 'string') return null;
+  const [at, id] = raw.split('|');
+  if (!at || Number.isNaN(Date.parse(at)) || !/^[0-9a-f-]{36}$/i.test(id ?? '')) return null;
+  return { at, id };
+}
+
+/** A value inside a PostgREST or() list: quoted, so commas and parentheses in it stay literal. */
+function pgrstQuote(value: string): string {
+  return `"${value.replace(/["\\]/g, '\\$&')}"`;
 }
 
 async function insertMessageAndNotify(
@@ -2552,31 +2565,56 @@ async function handleJwtAction(
         }
       }
 
-      let q = db.from('inbox_threads').select('*').order('last_message_at', { ascending: false }).limit(200);
+      const pageSize = Math.min(Math.max(Number(payload.limit) || 100, 1), 200);
+      let q = db.from('inbox_threads').select('*')
+        .order('last_message_at', { ascending: false }).order('id', { ascending: false })
+        .limit(pageSize + 1);
       if (!wantAll) {
         const ors: string[] = [];
         if (participantThreadIds.length) ors.push(`id.in.(${participantThreadIds.join(',')})`);
         if (businessWsIds.length) {
           ors.push(`and(workspace_id.in.(${businessWsIds.join(',')}),thread_type.in.(customer,upstream))`);
         }
-        if (ors.length === 0) return json({ threads: [] });
+        if (ors.length === 0) return json({ threads: [], next_cursor: null });
         q = q.or(ors.join(','));
+      }
+      const cursor = parseThreadCursor(payload.before);
+      if (cursor) {
+        q = q.or(`last_message_at.lt.${pgrstQuote(cursor.at)},and(last_message_at.eq.${pgrstQuote(cursor.at)},id.lt.${cursor.id})`);
+      }
+      const search = typeof payload.search === 'string' ? payload.search.trim().slice(0, 100) : '';
+      if (search) {
+        const like = `%${escapeLike(search)}%`;
+        const { data: hits, error: hitErr } = await db.from('inbox_messages')
+          .select('thread_id').ilike('body', like).neq('message_type', 'note').limit(500);
+        if (hitErr) throw new HttpError(500, `Search failed: ${hitErr.message}`);
+        const hitIds = [...new Set((hits ?? []).map((h: { thread_id: string }) => h.thread_id))];
+        const terms = [`subject.ilike.${pgrstQuote(like)}`, `last_message_preview.ilike.${pgrstQuote(like)}`,
+          `metadata->>email_from.ilike.${pgrstQuote(like)}`, `metadata->>contact_phone.ilike.${pgrstQuote(like)}`];
+        if (hitIds.length) terms.push(`id.in.(${hitIds.join(',')})`);
+        q = q.or(terms.join(','));
       }
       if (channelFilter) q = q.eq('channel', channelFilter);
       if (typeFilter) q = q.eq('thread_type', typeFilter);
       if (statusFilter) q = q.eq('status', statusFilter);
       // Archived (soft-deleted) threads live in their own view for the 30-day restore window.
       q = payload.archived === true ? q.not('archived_at', 'is', null) : q.is('archived_at', null);
-      // Optional label filter — restrict to threads carrying a given label.
-      if (payload.label_id) {
-        const { data: lt } = await db.from('inbox_thread_labels')
-          .select('thread_id').eq('label_id', String(payload.label_id));
-        const ids = (lt || []).map((r: { thread_id: string }) => r.thread_id);
-        if (ids.length === 0) return json({ threads: [] });
+      const labelIds = (Array.isArray(payload.label_ids) ? payload.label_ids : payload.label_id ? [payload.label_id] : [])
+        .map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+      if (labelIds.length) {
+        const { data: lt, error: ltErr } = await db.from('inbox_thread_labels')
+          .select('thread_id').in('label_id', labelIds);
+        if (ltErr) throw new HttpError(500, ltErr.message);
+        const ids = [...new Set((lt || []).map((r: { thread_id: string }) => r.thread_id))];
+        if (ids.length === 0) return json({ threads: [], next_cursor: null });
         q = q.in('id', ids);
       }
-      const { data: threads, error } = await q;
+      const { data: page, error } = await q;
       if (error) throw new HttpError(500, error.message);
+      const hasMore = (page ?? []).length > pageSize;
+      const threads = (page ?? []).slice(0, pageSize);
+      const lastRow = threads[threads.length - 1] as { id: string; last_message_at: string } | undefined;
+      const nextCursor = hasMore && lastRow ? `${lastRow.last_message_at}|${lastRow.id}` : null;
 
       // Attach labels for the returned threads in one round trip.
       const threadIds = (threads || []).map((t: Record<string, unknown>) => String(t.id));
@@ -2713,7 +2751,7 @@ async function handleJwtAction(
           counterparty_avatar_slot: avatarSlotByThread.get(id) ?? null,
         };
       });
-      return json({ threads: enriched });
+      return json({ threads: enriched, next_cursor: nextCursor });
     }
 
     case 'get_thread': {

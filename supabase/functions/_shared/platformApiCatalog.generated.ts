@@ -2395,6 +2395,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "allow_account_data": {
         "type": "boolean"
       },
+      "label_ids": {
+        "type": "array",
+        "description": "Conversations carrying any of these labels"
+      },
+      "search": {
+        "type": "string",
+        "description": "Text in the subject, sender, number or any message (not private notes)"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Page size, 1–200 (default 100)"
+      },
+      "before": {
+        "type": "string",
+        "description": "next_cursor from the previous page"
+      },
       "peek": {
         "type": "boolean",
         "description": "Members only. A pure read for the assistant: no last_read_at stamp, no read receipt to the customer, the newest 40 messa"
@@ -2442,10 +2458,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "label_id": {
         "type": "string",
         "description": "Label to update (string (uuid))"
-      },
-      "label_ids": {
-        "type": "array",
-        "description": "Complete replacement set"
       },
       "to": {
         "type": "string",

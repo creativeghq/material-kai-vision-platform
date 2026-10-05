@@ -38,6 +38,9 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     openThread,
     visibleThreads,
     groupedThreads,
+    nextCursor,
+    loadingMore,
+    loadMoreThreads,
     sourceCounts,
     threadDisplayName,
   } = s;
@@ -217,6 +220,13 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             })}
           </div>
         ))}
+        {!loadingThreads && nextCursor && (
+          <div className="p-3 flex justify-center">
+            <Button size="sm" variant="outline" onClick={loadMoreThreads} disabled={loadingMore}>
+              {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load older conversations'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

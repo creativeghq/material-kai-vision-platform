@@ -16,7 +16,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     setShowArchived,
     wsLabels,
     canManageLabels,
-    labelFilter,
+    labelIds,
     unreadOnly,
     setUnreadOnly,
     setLabelFilter,
@@ -128,7 +128,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
             icon={<Tag className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
             label="All labels"
             dense
-            active={!labelFilter}
+            active={labelIds.length === 0}
             onClick={() => setLabelFilter(null)}
           />
           {wsLabels.map((l) => (
@@ -137,8 +137,8 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
               icon={<span className={`w-2 h-2 rounded-full shrink-0 ${labelDot(l.color)}`} />}
               label={l.name}
               dense
-              active={labelFilter === l.id}
-              onClick={() => setLabelFilter(labelFilter === l.id ? null : l.id)}
+              active={labelIds.includes(l.id)}
+              onClick={() => setLabelFilter(labelIds.length === 1 && labelIds[0] === l.id ? null : l.id)}
             />
           ))}
           {wsLabels.length === 0 && (

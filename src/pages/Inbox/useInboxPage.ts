@@ -34,7 +34,14 @@ export function useInboxPage() {
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [loadingThreads, setLoadingThreads] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState('');
+  const [serverSearch, setServerSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setServerSearch(query.trim().length >= 2 ? query.trim() : ''), 300);
+    return () => clearTimeout(t);
+  }, [query]);
   const [allWorkspaces, setAllWorkspaces] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
@@ -55,7 +62,11 @@ export function useInboxPage() {
   const { values: filterValues, setValues: setFilterValues, filtered: matchedThreads, previewCount } =
     useFilters<InboxThread>(threads, filterGroups, { urlKey: 'f' });
   const channelFilter = channelForSource(filterValues.source as string | undefined);
-  const labelFilter = (filterValues.label as string) || null;
+  const labelIds = useMemo(() => {
+    const raw = filterValues.label as string | string[] | undefined;
+    return Array.isArray(raw) ? raw : raw ? [raw] : [];
+  }, [filterValues.label]);
+  const labelFilter = labelIds.length === 1 ? labelIds[0] : null;
   // The Unread mailbox folder and the modal's Unread toggle are the same constraint.
   const unreadOnly = filterValues.unread === true;
   const setUnreadOnly = useCallback(
@@ -63,7 +74,7 @@ export function useInboxPage() {
     [filterValues, setFilterValues],
   );
   const setLabelFilter = useCallback(
-    (id: string | null) => setFilterValues({ ...filterValues, label: id ?? undefined }),
+    (id: string | null) => setFilterValues({ ...filterValues, label: id ? [id] : undefined }),
     [filterValues, setFilterValues],
   );
   // The sidebar's Sources list and the modal's Source select are the same constraint, the same
@@ -182,16 +193,20 @@ export function useInboxPage() {
    * `silent` is the difference between "the operator asked for a different list" and "something
    * happened in the background", and it is not cosmetic.
    */
+  const listRequest = useMemo(() => ({
+    ...(channelFilter ? { channel: channelFilter } : {}),
+    ...(allWorkspaces && isPlatformOperator ? { scope: 'all' as const } : {}),
+    ...(showArchived ? { archived: true } : {}),
+    ...(labelIds.length ? { label_ids: labelIds } : {}),
+    ...(serverSearch ? { search: serverSearch } : {}),
+  }), [channelFilter, allWorkspaces, isPlatformOperator, showArchived, labelIds, serverSearch]);
+
   const loadThreads = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoadingThreads(true);
     try {
-      const { threads } = await inboxApi.listThreads({
-        ...(channelFilter ? { channel: channelFilter } : {}),
-        ...(allWorkspaces && isPlatformOperator ? { scope: 'all' as const } : {}),
-        ...(showArchived ? { archived: true } : {}),
-        ...(labelFilter ? { label_id: labelFilter } : {}),
-      });
+      const { threads, next_cursor } = await inboxApi.listThreads(listRequest);
       setThreads(threads);
+      setNextCursor(next_cursor ?? null);
     } catch (e) {
       // A background refresh that fails says nothing: the rows on screen are still the last
       // good answer, and a toast per dropped socket event would be its own kind of blink.
@@ -201,7 +216,19 @@ export function useInboxPage() {
     } finally {
       if (!opts?.silent) setLoadingThreads(false);
     }
-  }, [channelFilter, allWorkspaces, isPlatformOperator, showArchived, labelFilter, toast]);
+  }, [listRequest, toast]);
+
+  const loadMoreThreads = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { threads: more, next_cursor } = await inboxApi.listThreads({ ...listRequest, before: nextCursor });
+      setThreads((cur) => [...cur, ...more.filter((t) => !cur.some((c) => c.id === t.id))]);
+      setNextCursor(next_cursor ?? null);
+    } catch (e) {
+      toast({ title: 'Could not load more conversations', description: (e as Error).message, variant: 'destructive' });
+    } finally { setLoadingMore(false); }
+  }, [nextCursor, loadingMore, listRequest, toast]);
 
   useEffect(() => { void loadThreads(); }, [loadThreads]);
 
@@ -242,8 +269,10 @@ export function useInboxPage() {
   useEffect(() => { loadLabels(); }, [loadLabels]);
   // A label the filter points at may be deleted — clear a dangling filter.
   useEffect(() => {
-    if (labelFilter && !wsLabels.some((l) => l.id === labelFilter)) setLabelFilter(null);
-  }, [wsLabels, labelFilter]);
+    if (!wsLabels.length || !labelIds.length) return;
+    const known = labelIds.filter((id) => wsLabels.some((l) => l.id === id));
+    if (known.length !== labelIds.length) setFilterValues({ ...filterValues, label: known.length ? known : undefined });
+  }, [wsLabels, labelIds, filterValues, setFilterValues]);
 
   const openThread = useCallback(async (id: string) => {
     setActiveId(id);
@@ -639,14 +668,14 @@ export function useInboxPage() {
   const visibleThreads = useMemo(() => {
     let list = matchedThreads;
     const q = query.trim().toLowerCase();
-    if (q) list = list.filter((t) =>
+    if (q && query.trim() !== serverSearch) list = list.filter((t) =>
       (t.subject || '').toLowerCase().includes(q) || (t.last_message_preview || '').toLowerCase().includes(q));
     // Folder + status semantics: Unread ignores status (the unread predicate itself already ran
     // in the filter matcher); Archived is its own view; otherwise the Open / Follow-up (snoozed) /
     // Done (closed) tab narrows the working set.
     if (!unreadOnly && !showArchived) list = list.filter((t) => t.status === statusTab);
     return list;
-  }, [matchedThreads, query, unreadOnly, showArchived, statusTab]);
+  }, [matchedThreads, query, serverSearch, unreadOnly, showArchived, statusTab]);
 
   // Threads grouped into Today / Yesterday / This week / Earlier for the email-client day headers.
   const groupedThreads = useMemo(() => {
@@ -785,6 +814,10 @@ export function useInboxPage() {
     previewCount,
     channelFilter,
     labelFilter,
+    labelIds,
+    nextCursor,
+    loadingMore,
+    loadMoreThreads,
     unreadOnly,
     setUnreadOnly,
     setLabelFilter,

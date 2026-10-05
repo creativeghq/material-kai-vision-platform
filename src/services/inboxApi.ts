@@ -569,9 +569,9 @@ export const inboxApi = {
   },
   listThreads(filters: {
     channel?: InboxChannel; thread_type?: InboxThreadType; status?: InboxThreadStatus;
-    scope?: 'all'; archived?: boolean; label_id?: string;
+    scope?: 'all'; archived?: boolean; label_ids?: string[]; search?: string; before?: string; limit?: number;
   } = {}) {
-    return call<{ threads: InboxThread[] }>('list_threads', filters);
+    return call<{ threads: InboxThread[]; next_cursor: string | null }>('list_threads', filters);
   },
   getThread(thread_id: string) {
     return call<{

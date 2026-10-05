@@ -8105,7 +8105,7 @@
       },
       {
         "name": "list_threads",
-        "summary": "List threads visible to the caller, filterable by status/type",
+        "summary": "List threads visible to the caller, newest first, a page at a time. Filterable by status, type, channel, labels and a text search over subjects, senders and message bodies.",
         "params": [
           {
             "name": "workspace_id",
@@ -8121,9 +8121,39 @@
             "name": "thread_type",
             "type": "string",
             "required": false
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "required": false,
+            "desc": "email | whatsapp | social | internal"
+          },
+          {
+            "name": "label_ids",
+            "type": "string[]",
+            "required": false,
+            "desc": "Conversations carrying any of these labels"
+          },
+          {
+            "name": "search",
+            "type": "string",
+            "required": false,
+            "desc": "Text in the subject, sender, number or any message (not private notes)"
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "Page size, 1–200 (default 100)"
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "required": false,
+            "desc": "next_cursor from the previous page"
           }
         ],
-        "response": "{data: thread[]}"
+        "response": "{threads: thread[], next_cursor: string | null}"
       },
       {
         "name": "get_thread",

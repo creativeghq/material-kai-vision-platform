@@ -91,7 +91,7 @@ export const createManageInboxTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, thread_id, body, internal_note, confirm, agent_state, label_ids, label, message_id, attachment_index, question }) => {
+    async ({ action, status, thread_id, body, internal_note, confirm, agent_state, label_ids, label, search, message_id, attachment_index, question }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
 
@@ -223,11 +223,12 @@ export const createManageInboxTool = (
         const r = await callInbox('list_threads', {
           ...(status ? { status } : {}),
           ...(labelId ? { label_id: labelId } : {}),
+          ...(search ? { search: String(search) } : {}),
         }, jwt);
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `inbox-api ${r.status}` });
         const threads = r.data?.threads ?? [];
         onChunk?.({ type: 'inbox_threads_list', workspace_id: workspaceId, threads, timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: threads.length, label: label ?? null, threads: threads.slice(0, 15) });
+        return JSON.stringify({ success: true, count: threads.length, label: label ?? null, search: search ?? null, threads: threads.slice(0, 15) });
       }
 
       if (action === 'reply') {
@@ -287,6 +288,7 @@ export const createManageInboxTool = (
         internal_note: z.boolean().optional().describe('reply: post as a private internal note instead of a customer-facing message (no confirmation).'),
         agent_state: z.enum(['off', 'active']).optional().describe('handover: active = hand the thread to the AI; off = take it back.'),
         label: z.string().optional().describe('list: only conversations carrying this label (its name, e.g. "Urgent").'),
+        search: z.string().optional().describe('list: conversations whose subject, sender or any message contains this text.'),
         label_ids: z.array(z.string()).optional().describe('label: the full set of labels for the thread, by NAME (replaces the current set). An unknown name is refused rather than skipped.'),
         confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
       }),
