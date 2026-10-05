@@ -22,6 +22,8 @@ import { primeDisplayProfile } from '@/services/displayProfilesService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
+import { MarketplaceParticipationCard } from '@/components/core/Profile/MarketplaceParticipationCard';
+import { SupplierIdentityClaimCard } from '@/components/core/Profile/SupplierIdentityClaimCard';
 import { formatNumber, formatMoney } from '@/utils/decimal';
 import { HubEmptyState } from '@/components/core/hub';
 import { MoneyInput } from '@/components/core/ui/money-input';
@@ -1026,7 +1028,9 @@ export const ProfileTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Personal information */}
+      {/* Records on the left; the short settings panels stack beside them from `xl:`. */}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="min-w-0 space-y-6">
       <Card className="rounded-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -1084,7 +1088,7 @@ export const ProfileTab: React.FC = () => {
               </Field>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-y-6 gap-x-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-y-6 gap-x-8">
               <FieldDisplay label="Full Name" value={personal.full_name} />
               <FieldDisplay label="Email Address" value={user?.email || ''} />
               <FieldDisplay label="Professional Type" value={personal.professional_type ? PROFESSIONAL_TYPE_LABELS[personal.professional_type] : ''} />
@@ -1180,10 +1184,11 @@ export const ProfileTab: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      </div>
 
-      {/* Short panels two-up. Eleven full-width cards for a handful of fields each is why
-          this pane scrolled; `lg:` so a phone still gets one column. */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid min-w-0 content-start gap-6 lg:grid-cols-2 xl:grid-cols-1">
+        <MarketplaceParticipationCard />
+        <SupplierIdentityClaimCard />
         {/* Skill Tags */}
         <Card className="rounded-2xl">
           <CardHeader>
@@ -1466,10 +1471,9 @@ export const ProfileTab: React.FC = () => {
         </Card>
         )}
 
+        <AppearanceSection />
       </div>
-
-      {/* An app-wide preference, so it sits under the profile it is not part of. */}
-      <AppearanceSection />
+      </div>
     </div>
   );
 };

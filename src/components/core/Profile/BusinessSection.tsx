@@ -17,8 +17,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { validateVatViaVies, type ViesValidationResult } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
-import { MarketplaceParticipationCard } from './MarketplaceParticipationCard';
-import { SupplierIdentityClaimCard } from './SupplierIdentityClaimCard';
 import { formatDate } from '@/utils/datetime';
 
 export type EntityType = 'solo' | 'business';
@@ -449,7 +447,6 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
   ].filter((s) => s && s.length > 0).join(', ');
 
   return (
-    <div className="space-y-6">
     <Card className="rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -681,7 +678,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
 
             {entityType === 'business' ? (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-y-4 gap-x-8">
                   <FieldDisplay label="Company name" value={business.name} />
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">VAT number</p>
@@ -751,9 +748,6 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
         )}
       </CardContent>
     </Card>
-    <MarketplaceParticipationCard />
-    <SupplierIdentityClaimCard />
-    </div>
   );
 };
 
