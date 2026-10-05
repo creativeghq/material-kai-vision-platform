@@ -231,6 +231,19 @@ async function fetchClientData(
       client.postal_code = company.postal_code;
       client.country = company.country;
       client.vat_number = company.vat_number;
+      const { data: primary } = await supabase
+        .from('crm_company_contacts')
+        .select('crm_contacts(name, email, phone)')
+        .eq('company_id', customerCompanyId)
+        .eq('is_primary', true)
+        .limit(1)
+        .maybeSingle();
+      const person = (primary as { crm_contacts?: { name: string; email: string | null; phone: string | null } } | null)?.crm_contacts;
+      if (person) {
+        client.contact_name = person.name;
+        client.email = person.email || client.email;
+        client.phone = person.phone || client.phone;
+      }
       return client;
     }
   }
