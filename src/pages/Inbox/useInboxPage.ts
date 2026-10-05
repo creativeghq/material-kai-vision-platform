@@ -309,7 +309,7 @@ export function useInboxPage() {
     } finally { setLoadingMore(false); }
   }, [nextCursor, loadingMore, listRequest, toast]);
 
-  useEffect(() => { void loadThreads(); }, [loadThreads]);
+  useEffect(() => { if (mode !== 'gmail') void loadThreads(); }, [loadThreads, mode]);
 
   /** Go and get the profile photos, once, when some thread is missing one. */
   const avatarSyncDone = useRef(false);

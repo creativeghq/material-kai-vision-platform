@@ -41,3 +41,12 @@ describe('gmail-api — a mailbox is its owner\'s alone', () => {
     expect(send).toContain('renderEmailMarkup(text, escapeHtml)');
   });
 });
+
+describe('the Gmail view shows received mail only through the sanitising frame', () => {
+  const view = stripComments(readFileSync(join(process.cwd(), 'src/pages/Inbox/gmail/GmailThreadView.tsx'), 'utf8'));
+  const inbox = stripComments(readFileSync(join(process.cwd(), 'src/pages/Inbox/gmail/GmailInbox.tsx'), 'utf8'));
+  it('renders m.html with EmailHtmlView and never injects it', () => {
+    expect(view).toMatch(/<EmailHtmlView html=\{m\.html\}/);
+    expect(view + inbox).not.toContain('dangerouslySetInnerHTML');
+  });
+});

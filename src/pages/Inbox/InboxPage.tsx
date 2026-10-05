@@ -13,12 +13,14 @@ import { ConversationPane } from './components/ConversationPane';
 import { ThreadListPane } from './components/ThreadListPane';
 import { InboxSidebar } from './components/InboxSidebar';
 import { ConversationActions } from './components/ConversationActions';
+import { GmailInbox } from './gmail/GmailInbox';
 
 const InboxPage: React.FC = () => {
   const s = useInboxPage();
   const {
     activeWorkspaceId,
     mode,
+    setMode,
     isPlatformOperator,
     threads,
     allWorkspaces,
@@ -68,6 +70,7 @@ const InboxPage: React.FC = () => {
       {/* Desktop: 3-pane grid. Mobile: single-pane drill-in (list ↔ conversation),
           with the details rail moved into a slide-up sheet. */}
       <div className="flex flex-col md:grid md:grid-cols-12 gap-4 flex-1 min-h-0 px-4 sm:px-6 py-4">
+        {mode === 'gmail' ? <GmailInbox mode={mode} setMode={setMode} /> : (<>
         {/* ── Column 0 · Mailbox sidebar (Compose · views · sources · labels) ── */}
         <InboxSidebar s={s} />
 
@@ -79,6 +82,7 @@ const InboxPage: React.FC = () => {
             customer profile is a drawer now (opened from the name or the person icon in this
             header), so there is no fourth column to make room for. */}
         <ConversationPane s={s} />
+        </>)}
 
         {/*
           There is no standing profile column. It used to be a fourth pane from 2xl up; the
