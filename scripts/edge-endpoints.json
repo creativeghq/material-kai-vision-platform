@@ -8162,7 +8162,7 @@
             "name": "folder",
             "type": "string",
             "required": false,
-            "desc": "starred (threads with a message you starred) or sent (threads you wrote in)"
+            "desc": "starred (a message you starred), sent (you wrote in it) or drafts (your unsent reply)"
           }
         ],
         "response": "{threads: thread[], next_cursor: string | null}"

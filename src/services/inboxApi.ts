@@ -570,6 +570,7 @@ export const inboxApi = {
   listThreads(filters: {
     channel?: InboxChannel; thread_type?: InboxThreadType; status?: InboxThreadStatus;
     scope?: 'all'; archived?: boolean; label_ids?: string[]; search?: string; before?: string; limit?: number;
+    channels?: string[]; folder?: 'starred' | 'sent' | 'drafts';
   } = {}) {
     return call<{ threads: InboxThread[]; next_cursor: string | null }>('list_threads', filters);
   },

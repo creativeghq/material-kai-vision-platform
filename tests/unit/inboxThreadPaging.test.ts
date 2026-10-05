@@ -49,7 +49,7 @@ describe('the sidebar narrows by source mode and folder', () => {
   });
 
   it('does not leak the folder embed into the thread rows', () => {
-    expect(list).toMatch(/folder_msgs: _folderMsgs, \.\.\.row/);
+    expect(list).toMatch(/folder_msgs: _folderMsgs, folder_drafts: _folderDrafts, \.\.\.row/);
   });
 
   it('maps every mode to channels the server accepts', async () => {

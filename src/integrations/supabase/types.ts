@@ -11919,6 +11919,41 @@ export type Database = {
           },
         ]
       }
+      inbox_drafts: {
+        Row: {
+          body: string
+          email_bcc: string
+          email_cc: string
+          thread_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string
+          email_bcc?: string
+          email_cc?: string
+          thread_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          email_bcc?: string
+          email_cc?: string
+          thread_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_drafts_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_labels: {
         Row: {
           color: string

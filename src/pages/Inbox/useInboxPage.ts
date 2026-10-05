@@ -138,6 +138,9 @@ export function useInboxPage() {
    * message and delivering the first parts twice.
    */
   const sendToken = useRef<string | null>(null);
+  const seededSay = useRef<string | null>(null);
+  const draftLoadedFor = useRef<string | null>(null);
+  const draftSnapshot = useRef('');
 
   const [showNew, setShowNew] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -164,6 +167,7 @@ export function useInboxPage() {
   useEffect(() => {
     const say = searchParams.get('say');
     if (!say) return;
+    seededSay.current = say.slice(0, 4000);
     setDraft(say.slice(0, 4000));
     setIsNote(false);
     const p = new URLSearchParams(searchParams);
@@ -221,7 +225,7 @@ export function useInboxPage() {
   const view: InboxView = showArchived ? 'archived' : folder ?? (unreadOnly ? 'unread' : 'all');
   const goToView = useCallback((next: InboxView) => {
     setShowArchived(next === 'archived');
-    setFolder(next === 'starred' || next === 'sent' ? next : null);
+    setFolder(next === 'starred' || next === 'sent' || next === 'drafts' ? next : null);
     if ((next === 'unread') !== unreadOnly) setUnreadOnly(next === 'unread');
   }, [unreadOnly, setUnreadOnly]);
 
@@ -361,6 +365,9 @@ export function useInboxPage() {
     setDraftSteer('');
     setDraftSteerOpen(false);
     sendToken.current = null;
+    draftLoadedFor.current = null;
+    setDraft('');
+    setAiDraftShown(false);
     try {
       const { thread, participants, messages, whatsapp_window, starred_message_ids } = await inboxApi.getThread(id);
       setActiveThread(thread);
@@ -374,11 +381,29 @@ export function useInboxPage() {
       // same definition the draft cron claims on. A stale draft answers the previous question,
       // and it is a perfectly valid string, so the only safe thing to do with one is leave it
       // out of the composer.
-      if (thread.agent_draft && thread.agent_draft_is_current) {
+      const seeded = seededSay.current;
+      seededSay.current = null;
+      const { data: saved, error: savedErr } = await supabase.from('inbox_drafts')
+        .select('body, email_cc, email_bcc').eq('thread_id', id).maybeSingle();
+      if (savedErr) console.warn('[inbox] could not load the saved draft', savedErr.message);
+      if (seeded) {
+        setDraft(seeded);
+        setIsNote(false);
+      } else if (saved && (saved.body || saved.email_cc || saved.email_bcc)) {
+        setDraft(saved.body);
+        setEmailCc(saved.email_cc);
+        setEmailBcc(saved.email_bcc);
+        if (saved.email_cc || saved.email_bcc) setEmailCopiesOpen(true);
+        setIsNote(false);
+      } else if (thread.agent_draft && thread.agent_draft_is_current) {
         setDraft(thread.agent_draft);
         setIsNote(false);
         setAiDraftShown(true);
       }
+      draftSnapshot.current = JSON.stringify(seeded
+        ? [seeded, '', '']
+        : saved && (saved.body || saved.email_cc || saved.email_bcc) ? [saved.body, saved.email_cc, saved.email_bcc] : ['', '', '']);
+      draftLoadedFor.current = id;
 
       // CRM context for the right rail (members only; internal threads come back empty).
       let ctx: InboxThreadContext | null = null;
@@ -550,6 +575,31 @@ export function useInboxPage() {
   useEffect(() => {
     if (stickToBottom.current) scrollToBottom(true);
   }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    const threadId = activeId;
+    if (!threadId || !myUserId || isNote || !isMember || aiDraftShown || draftLoadedFor.current !== threadId) return;
+    const body = draft;
+    const cc = emailCc;
+    const bcc = emailBcc;
+    const snapshot = JSON.stringify([body, cc, bcc]);
+    if (snapshot === draftSnapshot.current) return;
+    let pending = true;
+    const save = async () => {
+      pending = false;
+      draftSnapshot.current = snapshot;
+      const empty = !body.trim() && !cc.trim() && !bcc.trim();
+      const { error } = empty
+        ? await supabase.from('inbox_drafts').delete().eq('user_id', myUserId).eq('thread_id', threadId)
+        : await supabase.from('inbox_drafts').upsert({
+          user_id: myUserId, thread_id: threadId, body: body.slice(0, 20000), email_cc: cc, email_bcc: bcc,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) console.warn('[inbox] draft not saved', error.message);
+    };
+    const timer = setTimeout(() => { void save(); }, 800);
+    return () => { clearTimeout(timer); if (pending) void save(); };
+  }, [draft, emailCc, emailBcc, activeId, myUserId, isNote, isMember, aiDraftShown]);
 
   const isEmailReply = activeThread?.channel === 'email' && isMember && !isNote;
   const emailRecipients = useMemo(

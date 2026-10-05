@@ -2080,6 +2080,10 @@ async function handleJwtAction(
         clientToken,
         emailCopies,
       });
+      if (messageType !== 'note') {
+        const { error: draftErr } = await db.from('inbox_drafts').delete().eq('user_id', userId).eq('thread_id', threadId);
+        if (draftErr) console.error('[inbox-api] message sent but its draft was not cleared', threadId, draftErr);
+      }
       // Mark the sender as caught up.
       if (senderParticipantId) {
         await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', senderParticipantId);
@@ -2568,10 +2572,11 @@ async function handleJwtAction(
       }
 
       const pageSize = Math.min(Math.max(Number(payload.limit) || 100, 1), 200);
-      const folder = payload.folder === 'starred' || payload.folder === 'sent' ? payload.folder : null;
+      const folder = payload.folder === 'starred' || payload.folder === 'sent' || payload.folder === 'drafts' ? payload.folder : null;
       const folderEmbed = folder === 'starred'
         ? ', folder_msgs:inbox_messages!inbox_messages_thread_id_fkey!inner(id, inbox_message_stars!inner(user_id))'
-        : folder === 'sent' ? ', folder_msgs:inbox_messages!inbox_messages_thread_id_fkey!inner(id)' : '';
+        : folder === 'sent' ? ', folder_msgs:inbox_messages!inbox_messages_thread_id_fkey!inner(id)'
+          : folder === 'drafts' ? ', folder_drafts:inbox_drafts!inner(user_id)' : '';
       let q = db.from('inbox_threads').select(`*${folderEmbed}`)
         .order('last_message_at', { ascending: false }).order('id', { ascending: false })
         .limit(pageSize + 1);
@@ -2605,6 +2610,7 @@ async function handleJwtAction(
         .filter((c) => INBOX_CHANNELS.has(c));
       if (channelSet.length) q = q.in('channel', channelSet);
       if (folder === 'starred') q = q.eq('folder_msgs.inbox_message_stars.user_id', userId);
+      if (folder === 'drafts') q = q.eq('folder_drafts.user_id', userId);
       if (folder === 'sent') {
         const myPartIds = (myParts || []).map((p: { id: string }) => p.id);
         if (myPartIds.length === 0) return json({ threads: [], next_cursor: null });
@@ -2629,7 +2635,7 @@ async function handleJwtAction(
       const page = (pageData ?? []) as unknown as Array<Record<string, unknown>>;
       const hasMore = page.length > pageSize;
       const threads = page.slice(0, pageSize).map((t) => {
-        const { folder_msgs: _folderMsgs, ...row } = t;
+        const { folder_msgs: _folderMsgs, folder_drafts: _folderDrafts, ...row } = t;
         return row;
       });
       const lastRow = threads[threads.length - 1] as { id: string; last_message_at: string } | undefined;

@@ -2417,7 +2417,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       },
       "folder": {
         "type": "string",
-        "description": "starred (threads with a message you starred) or sent (threads you wrote in)"
+        "description": "starred (a message you starred), sent (you wrote in it) or drafts (your unsent reply)"
       },
       "peek": {
         "type": "boolean",

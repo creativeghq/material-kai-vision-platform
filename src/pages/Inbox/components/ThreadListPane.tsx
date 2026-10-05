@@ -1,5 +1,5 @@
 import React from 'react';
-import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send } from 'lucide-react';
+import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send, FilePen } from 'lucide-react';
 import { INBOX_MODES, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
@@ -23,6 +23,7 @@ const EMPTY_VIEW = {
   archived: { title: 'Nothing archived', description: 'Deleted conversations rest here for 30 days before they are removed for good.' },
   starred: { title: 'Nothing starred', description: 'Star a message to keep its conversation here.' },
   sent: { title: 'Nothing sent yet', description: 'Conversations you have written in show up here.' },
+  drafts: { title: 'No drafts', description: 'A reply you start and do not send is kept here, on every device, until you send it.' },
 } as const;
 
 export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
@@ -101,6 +102,9 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
           </MobileChip>
           <MobileChip active={view === 'starred'} onClick={() => goToView('starred')}>
             <Star className="w-3 h-3" />Starred
+          </MobileChip>
+          <MobileChip active={view === 'drafts'} onClick={() => goToView('drafts')}>
+            <FilePen className="w-3 h-3" />Drafts
           </MobileChip>
           <MobileChip active={view === 'sent'} onClick={() => goToView('sent')}>
             <Send className="w-3 h-3" />Sent
@@ -200,8 +204,8 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
           ) : (
             <HubEmptyState
               icon={MessageSquare}
-              title={EMPTY_VIEW[view === 'starred' || view === 'sent' || view === 'archived' ? view : 'all'].title}
-              description={EMPTY_VIEW[view === 'starred' || view === 'sent' || view === 'archived' ? view : 'all'].description}
+              title={EMPTY_VIEW[view === 'all' || view === 'unread' ? 'all' : view].title}
+              description={EMPTY_VIEW[view === 'all' || view === 'unread' ? 'all' : view].description}
             />
           )
         ) : groupedThreads.map(([bucket, items]) => (

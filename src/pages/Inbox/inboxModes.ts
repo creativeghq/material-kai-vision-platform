@@ -1,7 +1,7 @@
 import type { InboxSourceKey } from './inboxSource';
 
 export type InboxMode = 'all' | 'platform' | 'whatsapp';
-export type InboxFolder = 'starred' | 'sent';
+export type InboxFolder = 'starred' | 'sent' | 'drafts';
 
 export const INBOX_MODES: Array<{ key: InboxMode; label: string }> = [
   { key: 'all', label: 'All' },
