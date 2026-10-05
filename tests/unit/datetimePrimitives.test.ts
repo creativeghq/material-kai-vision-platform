@@ -28,7 +28,7 @@ const ALLOWED = new Set([
   'src/modules/quotes/components/QuoteDocument.tsx',   // en-GB dd/mm/yyyy on a printed document
   'src/pages/AppointmentsPage.tsx',                    // date-only parsed as T00:00:00 (UTC shift)
   'src/modules/quotes/components/QuoteRequestModal.tsx', // month:'long'
-  'src/pages/Inbox/InboxPage.tsx',                     // compact relative time, no "ago"
+  'src/pages/Inbox/inboxFormat.ts',                     // compact relative time, no "ago"
   'src/components/core/Profile/WebsiteDomainIntelPanel.tsx', // today/yesterday granularity
   'src/modules/social-media/pages/SocialMediaAccountsPage.tsx', // hours upward
   'src/modules/social-media/components/SocialAccountsTab.tsx',  // no "just now" floor

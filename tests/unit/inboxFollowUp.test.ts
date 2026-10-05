@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { blankComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 /**
  * Read with LF endings.
@@ -25,7 +26,7 @@ const read = (...p: string[]) =>
  */
 const code = (src: string) => blankComments(src);
 
-const PAGE = read('src', 'pages', 'Inbox', 'InboxPage.tsx');
+const PAGE = inboxUiSource().split('\r\n').join('\n');
 const API = read('supabase', 'functions', 'inbox-api', 'index.ts');
 const CRON = read('supabase', 'functions', 'inbox-follow-up-cron', 'index.ts');
 const ZERNIO = read('supabase', 'functions', 'zernio-webhook-handler', 'index.ts');

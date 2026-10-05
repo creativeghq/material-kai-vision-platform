@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { inboxUiSource } from '../helpers/inboxSource';
 import {
   CAST, CAST_SIZE, castPool, castSlotFor, castSlotForName, castObjectFor, castObjectForSlot,
   castAvatarUrl, normalizeCastSlot, nameGender,
@@ -17,8 +18,7 @@ const API = readFileSync(
   join(process.cwd(), 'supabase', 'functions', 'messaging-api', 'index.ts'), 'utf8');
 const INBOX_API = readFileSync(
   join(process.cwd(), 'supabase', 'functions', 'inbox-api', 'index.ts'), 'utf8');
-const INBOX_PAGE = readFileSync(
-  join(process.cwd(), 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
+const INBOX_PAGE = inboxUiSource();
 
 describe('character avatar cast', () => {
   it('never points a contact at a slot that was never rendered', () => {

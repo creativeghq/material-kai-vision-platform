@@ -3,11 +3,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const ROOT = join(__dirname, '..', '..');
 const hook = readFileSync(join(ROOT, 'supabase', 'functions', 'zernio-webhook-handler', 'index.ts'), 'utf8');
 const messagingApi = readFileSync(join(ROOT, 'supabase', 'functions', 'messaging-api', 'index.ts'), 'utf8');
-const inboxPage = readFileSync(join(ROOT, 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
+const inboxPage = inboxUiSource();
 const zernioClient = readFileSync(join(ROOT, 'supabase', 'functions', '_shared', 'zernio.ts'), 'utf8');
 // The download itself moved to _shared/inbox-media.ts so messaging-api's repair action and the
 // webhook handler share ONE implementation. Assertions follow it there.

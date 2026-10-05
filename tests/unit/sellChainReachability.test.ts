@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
@@ -97,7 +98,7 @@ describe('a quote line does not claim stock it has not checked', () => {
 
 describe('a quote and a pay link can reach the channel the business sells on', () => {
   const WA = read('src/modules/messaging/components/SendOnWhatsAppButton.tsx');
-  const INBOX = read('src/pages/Inbox/InboxPage.tsx');
+  const INBOX = stripComments(inboxUiSource());
 
   it('the action opens the conversation and sends nothing', () => {
     // Sending from a finance screen would post to a customer with no sight of the thread or of

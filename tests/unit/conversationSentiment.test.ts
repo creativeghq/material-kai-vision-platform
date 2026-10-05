@@ -8,9 +8,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import { moodStyle, urgencyIsLoud, MOODS } from '../../src/utils/conversationMood';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const API = readFileSync(join(process.cwd(), 'supabase', 'functions', 'inbox-api', 'index.ts'), 'utf8');
-const PAGE = readFileSync(join(process.cwd(), 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
+const PAGE = inboxUiSource();
 const PANEL = readFileSync(join(process.cwd(), 'src', 'components', 'Admin', 'OperationsDashboard', 'InboxAIPanel.tsx'), 'utf8');
 
 describe('conversation sentiment', () => {

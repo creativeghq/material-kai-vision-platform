@@ -164,8 +164,8 @@ const PALETTES: Array<{ what: string; strings: string[] }> = [
     strings: classStrings(block('src/services/inboxApi.ts', 'export const LABEL_COLORS', '\n];')),
   },
   {
-    what: 'avatar tints (src/pages/Inbox/InboxPage.tsx → avatarTint)',
-    strings: classStrings(block('src/pages/Inbox/InboxPage.tsx', 'function avatarTint', '\n}')),
+    what: 'avatar tints (src/pages/Inbox/inboxFormat.ts → avatarTint)',
+    strings: classStrings(block('src/pages/Inbox/inboxFormat.ts', 'function avatarTint', '\n}')),
   },
   {
     // Not an Inbox chip, but the same defect wearing the same hat: one set of `-600`/`-400`

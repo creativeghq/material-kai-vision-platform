@@ -15,14 +15,11 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 
 const EDGE = read('supabase/functions/inbox-api/index.ts');
 const CLIENT = read('src/services/inboxApi.ts');
-const PAGE = read('src/pages/Inbox/InboxPage.tsx');
 
 const DIALOG = (() => {
-  const start = PAGE.indexOf('const PromoteThreadDialog');
-  expect(start, 'PromoteThreadDialog is gone from the Inbox').toBeGreaterThan(-1);
-  const end = PAGE.indexOf('const DetailsRail', start);
-  expect(end, 'the dialog is no longer followed by DetailsRail — re-anchor this slice').toBeGreaterThan(start);
-  return PAGE.slice(start, end);
+  const src = read('src/pages/Inbox/components/PromoteThreadDialog.tsx');
+  expect(src.indexOf('const PromoteThreadDialog'), 'PromoteThreadDialog is gone from the Inbox').toBeGreaterThan(-1);
+  return src;
 })();
 
 const ACTION = (() => {

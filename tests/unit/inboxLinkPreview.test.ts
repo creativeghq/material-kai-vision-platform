@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { splitMessageLinks, messageUrls, shortenUrlForDisplay } from '../../src/utils/messageLinks';
 import { extractLinkPreview } from '../../supabase/functions/_shared/link-preview';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const INBOX_API = readFileSync(
   join(process.cwd(), 'supabase', 'functions', 'inbox-api', 'index.ts'), 'utf8');
-const INBOX_PAGE = readFileSync(
-  join(process.cwd(), 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
+const INBOX_PAGE = inboxUiSource();
 const FETCH_GUARD = readFileSync(
   join(process.cwd(), 'supabase', 'functions', '_shared', 'fetch-image.ts'), 'utf8');
 

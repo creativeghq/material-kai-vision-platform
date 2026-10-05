@@ -17,6 +17,7 @@ import {
   INBOX_CARD_BUTTON_LABEL, INBOX_CARD_KINDS, INBOX_PRICE_BASES, isInboxCardKind,
 } from '../../src/modules/messaging/inboxCardKinds';
 import { slashCommandMatches, slashTokenAtCaret } from '../../src/pages/Inbox/inboxSlashCommands';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -261,7 +262,7 @@ describe('several WhatsApp sends for one message are recorded, named on failure,
     expect(resume).toMatch(/relayWhatsAppLegs\(db, \{/);
     expect(slice(src, 'async function relayWhatsAppLegs', 'function whatsAppLegFailure')).toMatch(/if \(legs\[i\]\.ok\) continue;/);
     // The composer mints the token once and keeps it across a failure.
-    const page = code('src/pages/Inbox/InboxPage.tsx');
+    const page = stripComments(inboxUiSource());
     const send = slice(page, 'const send = useCallback', 'const aiSuggest = useCallback');
     expect(send).toMatch(/if \(!sendToken\.current\) sendToken\.current = crypto\.randomUUID\(\);/);
     expect(send).toMatch(/client_token: sendToken\.current \?\? undefined/);
@@ -370,7 +371,7 @@ describe('the catalog picker', () => {
     expect(slashTokenAtCaret('/', 1)).toEqual({ query: '', start: 0, end: 1 });
     expect(slashTokenAtCaret('and/or', 6)).toBeNull();
     expect(slashTokenAtCaret('Hi\n/pro\nThanks', 14)).toBeNull();
-    const page = code('src/pages/Inbox/InboxPage.tsx');
+    const page = stripComments(inboxUiSource());
     expect(page).toMatch(/setDraft\(\(d\) => d\.slice\(0, start\) \+ d\.slice\(end\)\)/);
     // Queued cards do not follow the member to the next thread, and a note carries none.
     const open = slice(page, 'const openThread = useCallback', 'const { thread, participants, messages');

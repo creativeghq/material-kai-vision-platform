@@ -9,8 +9,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { inboxUiSource } from '../helpers/inboxSource';
 
-const SRC = readFileSync(join(process.cwd(), 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
+const SRC = inboxUiSource();
 
 /** The `MessageActions` component body, so these assertions cannot pass on some other bar. */
 const ACTIONS = (() => {

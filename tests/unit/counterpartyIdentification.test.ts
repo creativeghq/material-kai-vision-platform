@@ -10,18 +10,18 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 const DIALOG = 'src/components/business/crm/IdentifyBusinessDialog.tsx';
-const PANEL = 'src/pages/Inbox/InboxPage.tsx';
 const ENRICH = 'supabase/functions/company-enrich/index.ts';
 const PARTY = 'supabase/functions/_shared/inbox-customer-party.ts';
 
 describe('the research is fed what the COUNTERPARTY said', () => {
   it('the transcript is filtered to incoming messages', () => {
-    const src = stripComments(read(PANEL));
+    const src = stripComments(inboxUiSource());
     const transcript = src.slice(src.indexOf('const transcript ='), src.indexOf('const transcript =') + 400);
     expect(transcript, 'the transcript sent for identification is not direction-filtered — our own '
       + 'replies get fenced as the other party\'s words, and their domains become OUR domain')

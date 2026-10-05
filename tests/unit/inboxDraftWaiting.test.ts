@@ -12,13 +12,14 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 
 const EDGE = read('supabase/functions/inbox-api/index.ts');
 const CRON = read('supabase/functions/inbox-draft-cron/index.ts');
-const PAGE = read('src/pages/Inbox/InboxPage.tsx');
+const PAGE = stripComments(inboxUiSource());
 const CLIENT = read('src/services/inboxApi.ts');
 const DOC = readFileSync(join(ROOT, 'docs/inbox-system.md'), 'utf8');
 

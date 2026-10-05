@@ -3,11 +3,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const ROOT = join(__dirname, '..', '..');
 const EDGE = 'supabase/functions/inbox-api/index.ts';
 const SERVICE = 'src/services/inboxApi.ts';
-const INBOX_PAGE = 'src/pages/Inbox/InboxPage.tsx';
 
 const read = (rel: string) => stripComments(readFileSync(join(ROOT, rel), 'utf8'));
 
@@ -109,7 +109,7 @@ describe('inbox-api — every action is reachable from a screen', () => {
 });
 
 describe('order intake — the reviewer can fix a line, and a price keeps its provenance', () => {
-  const page = read(INBOX_PAGE);
+  const page = stripComments(inboxUiSource());
 
   it('the rail actually calls the two line-editing actions', () => {
     // Named rather than left to the generic sweep above: these two are the reason it exists, and

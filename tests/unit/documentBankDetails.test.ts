@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 import {
   documentBankToolProperties,
   readDocumentBankDetails,
@@ -200,7 +201,7 @@ describe('a sighting is filed only where the party is actually known', () => {
   });
 
   it('the Inbox carries what it read into the form rather than filing it itself', () => {
-    const page = read('src/pages/Inbox/InboxPage.tsx');
+    const page = stripComments(inboxUiSource());
     expect(page).toContain("source: 'inbox_attachment'");
     expect(page).not.toContain('crmBankAccountSuggestionsAPI');
   });

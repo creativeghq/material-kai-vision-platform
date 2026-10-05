@@ -11,13 +11,14 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 
 const API = read('supabase/functions/inbox-api/index.ts');
 const FILTERS = read('src/pages/Inbox/inboxFilters.ts');
-const PAGE = read('src/pages/Inbox/InboxPage.tsx');
+const PAGE = stripComments(inboxUiSource());
 const TYPES = read('src/services/inboxApi.ts');
 
 describe('the inbox reply state is derived in SQL, once', () => {

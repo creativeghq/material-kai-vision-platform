@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { inboxUiSource } from '../helpers/inboxSource';
 import {
   INBOX_DOCUMENT_KINDS,
   INBOX_DOCUMENT_KIND_LABELS,
@@ -171,7 +172,7 @@ describe('inbox document kinds — the vocabulary is complete on the client side
   });
 
   it('the inbox page links a bookable document to the expense form with the amount left EMPTY', () => {
-    const page = read('src/pages/Inbox/InboxPage.tsx');
+    const page = stripComments(inboxUiSource());
     expect(page).toContain('INBOX_DOCUMENT_KINDS_BOOKABLE_AS_EXPENSE.includes(d.kind)');
     // The document's total is gross and the form's amount is net; passing it would book the VAT
     // into the cost. The prefill names it in the description instead.
