@@ -2237,6 +2237,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "delete_label",
           "set_thread_labels",
           "create_customer_thread",
+          "compose_email",
           "create_share_link",
           "suggest_reply",
           "get_my_email_address",
@@ -2443,6 +2444,18 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "label_ids": {
         "type": "array",
         "description": "Complete replacement set"
+      },
+      "to": {
+        "type": "string",
+        "description": "Recipient email address"
+      },
+      "email_cc": {
+        "type": "array",
+        "description": "Cc addresses (at most 20 with Bcc)"
+      },
+      "email_bcc": {
+        "type": "array",
+        "description": "Bcc addresses"
       },
       "instruction": {
         "type": "string",

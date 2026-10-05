@@ -1416,7 +1416,7 @@ async function insertMessageAndNotify(
       }
 
       const subjectBase = String(thread.subject || 'Your message');
-      const subject = /^re:/i.test(subjectBase) ? subjectBase : `Re: ${subjectBase}`;
+      const subject = !lastInbound || /^re:/i.test(subjectBase) ? subjectBase : `Re: ${subjectBase}`;
       const emailAttachments = await emailAttachmentsFor(db, attachments);
       const text = cards.length
         ? buildEmailCardsText(cards, body)
@@ -3905,6 +3905,83 @@ async function handleJwtAction(
 
       const share_url = c.user_id ? null : await getOrCreateShareLink(db, threadId, contactId);
       return json({ thread_id: threadId, share_url, has_account: !!c.user_id });
+    }
+
+    case 'compose_email': {
+      const workspaceId = String(payload.workspace_id || '');
+      if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
+      const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && (!callerRole || !BUSINESS_ROLES.has(callerRole))) {
+        throw new HttpError(403, 'Only a business member may send email from the Inbox');
+      }
+      const to = String(payload.to ?? '').trim().toLowerCase();
+      if (!EMAIL_ADDRESS.test(to)) throw new HttpError(400, 'A valid To address is required');
+      const subject = String(payload.subject ?? '').trim().slice(0, 300);
+      if (!subject) throw new HttpError(400, 'A subject is required');
+      const body = payload.body != null && String(payload.body).trim() ? String(payload.body) : null;
+      const emailCopies = cleanEmailCopies({ cc: payload.email_cc, bcc: payload.email_bcc }, [to]);
+      const hasFiles = Array.isArray(payload.attachments) && payload.attachments.length > 0;
+      if (!body && !hasFiles) throw new HttpError(400, 'Write a message or attach a file');
+
+      const { data: mailbox } = await db
+        .from('user_email_addresses').select('id, full_address, is_active')
+        .eq('user_id', userId).maybeSingle();
+      const box = mailbox as { id: string; full_address: string; is_active: boolean } | null;
+      if (!box?.full_address || !box.is_active) {
+        throw new HttpError(409, 'You have no active Inbox address to send from. Set one up in Inbox settings first.');
+      }
+
+      let contactId: string | null = null;
+      if (payload.contact_id) {
+        const { data: c } = await db.from('crm_contacts').select('id, workspace_id')
+          .eq('id', String(payload.contact_id)).maybeSingle();
+        if (!c || (c as { workspace_id: string }).workspace_id !== workspaceId) throw new HttpError(404, 'Contact not found in this workspace');
+        contactId = (c as { id: string }).id;
+      } else {
+        contactId = (await resolveCustomer(db, workspaceId, to, null, userId)).contactId;
+      }
+
+      const { data: thread, error } = await db.from('inbox_threads').insert({
+        workspace_id: workspaceId, thread_type: 'customer', channel: 'email',
+        subject, status: 'open', created_by: userId, last_message_at: new Date().toISOString(),
+        metadata: { email_to: box.full_address.toLowerCase(), email_from: to, email_address_id: box.id },
+      }).select('*').single();
+      if (error) throw new HttpError(500, `Failed to create conversation: ${error.message}`);
+      const threadId = (thread as { id: string }).id;
+
+      const { data: creatorP, error: ownerErr } = await db.from('inbox_participants').insert({
+        thread_id: threadId, participant_type: 'member', user_id: userId,
+        workspace_id: workspaceId, thread_role: 'owner', added_by: userId,
+      }).select('id').single();
+      if (ownerErr) throw new HttpError(500, `Failed to add you to the conversation: ${ownerErr.message}`);
+      if (contactId) {
+        const { error: custErr } = await db.from('inbox_participants').insert({
+          thread_id: threadId, participant_type: 'customer', contact_id: contactId,
+          thread_role: 'participant', added_by: userId,
+        });
+        if (custErr) console.error('[inbox-api] compose_email: customer participant insert failed', threadId, custErr);
+      }
+
+      let attachments: Attachment[];
+      try {
+        attachments = await normalizeAttachments(db, threadId, payload.attachments);
+      } catch (e) {
+        const { error: delErr } = await db.from('inbox_threads').delete().eq('id', threadId);
+        if (delErr) console.error('[inbox-api] compose_email: could not remove the empty thread', threadId, delErr);
+        throw e;
+      }
+      try {
+        await insertMessageAndNotify(db, {
+          thread: thread as Record<string, unknown>,
+          senderParticipantId: (creatorP as { id: string }).id,
+          body, attachments, messageType: 'text', senderUserId: userId, senderLabel: 'You',
+          emailCopies,
+        });
+      } catch (e) {
+        if (e instanceof HttpError && e.status === 502) return json({ thread_id: threadId, delivery_error: e.message });
+        throw e;
+      }
+      return json({ thread_id: threadId, delivery_error: null });
     }
 
     case 'create_share_link': {

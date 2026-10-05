@@ -14,18 +14,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { inboxApi } from '@/services/inboxApi';
 import { avatarTint, initials } from '../inboxFormat';
 import { WorkspaceMemberOption } from './InboxPrimitives';
+import { ComposeEmailForm } from './ComposeEmailForm';
 
 export interface ContactOption { id: string; label: string; email: string | null; hasAccount: boolean; }
 
 export const NewThreadDialog: React.FC<{
   workspaceId: string;
-  initialMode: 'team' | 'customer';
+  initialMode: 'team' | 'customer' | 'email';
   scopedLabelId: string | null;
   onClose: () => void;
   onCreated: (id: string) => void;
 }> = ({ workspaceId, initialMode, scopedLabelId, onClose, onCreated }) => {
   const { toast } = useToast();
-  const [mode, setMode] = useState<'team' | 'customer'>(initialMode);
+  const [mode, setMode] = useState<'team' | 'customer' | 'email'>(initialMode);
   const [busy, setBusy] = useState(false);
 
   // Team
@@ -124,10 +125,12 @@ export const NewThreadDialog: React.FC<{
     } finally { setBusy(false); }
   };
 
-  const modeBtn = (m: 'team' | 'customer', label: string) => (
+  const modeBtn = (m: 'team' | 'customer' | 'email', label: string) => (
     <button
+      role="tab"
+      aria-selected={mode === m}
       onClick={() => setMode(m)}
-      className={`flex-1 text-xs py-1.5 rounded-full transition-colors ${mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+      className="flex-1 text-xs py-1.5"
     >
       {label}
     </button>
@@ -159,14 +162,17 @@ export const NewThreadDialog: React.FC<{
           <>
             <DialogHeader>
               <DialogTitle>New Conversation</DialogTitle>
-              <DialogDescription>Start a private team chat, or reach out to a customer.</DialogDescription>
+              <DialogDescription>Start a private team chat, reach out to a customer, or send an email.</DialogDescription>
             </DialogHeader>
-            <div className="flex items-center gap-1 p-0.5 rounded-full bg-muted/40">
+            <div role="tablist" className="flex items-center gap-1 border-b border-hairline">
               {modeBtn('team', 'Team')}
               {modeBtn('customer', 'Customer')}
+              {modeBtn('email', 'Email')}
             </div>
 
-            {mode === 'team' ? (
+            {mode === 'email' ? (
+              <ComposeEmailForm workspaceId={workspaceId} onCancel={onClose} onSent={async (id) => { await applyScopedLabel(id); onCreated(id); }} />
+            ) : mode === 'team' ? (
               <>
                 <div className="space-y-1.5">
                   <label htmlFor="inboxpage-topic" className="text-xs text-muted-foreground">Topic</label>

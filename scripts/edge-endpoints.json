@@ -8362,6 +8362,60 @@
         "response": "{thread_id:string, share_url:string, has_account:boolean}"
       },
       {
+        "name": "compose_email",
+        "summary": "Send a new email from the caller's own Inbox address and open it as an email conversation. Returns `delivery_error` (not a failure status) when the conversation was created but the email could not be sent.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Workspace"
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "required": true,
+            "desc": "Recipient email address"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": true,
+            "desc": "Email subject"
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": false,
+            "desc": "Plain-text body (required unless attachments are sent)"
+          },
+          {
+            "name": "contact_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "CRM contact the email is to; matched by address when omitted"
+          },
+          {
+            "name": "email_cc",
+            "type": "string[]",
+            "required": false,
+            "desc": "Cc addresses (at most 20 with Bcc)"
+          },
+          {
+            "name": "email_bcc",
+            "type": "string[]",
+            "required": false,
+            "desc": "Bcc addresses"
+          },
+          {
+            "name": "attachments",
+            "type": "object[]",
+            "required": false,
+            "desc": "Files: { filename, content_type, data_base64 }"
+          }
+        ]
+      },
+      {
         "name": "create_share_link",
         "summary": "Mint (or rotate) the tokenised customer share URL for a thread.",
         "params": [

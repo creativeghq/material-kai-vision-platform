@@ -68,3 +68,27 @@ describe('emailReplyRecipients', () => {
     expect(splitAddresses(' a@x.gr, b@y.com;c@z.it  ')).toEqual(['a@x.gr', 'b@y.com', 'c@z.it']);
   });
 });
+
+describe('a member can start an email conversation from the Inbox', () => {
+  const compose = API.slice(API.indexOf("case 'compose_email'"), API.indexOf("case 'create_share_link'"));
+
+  it('is a business member sending from their own active mailbox', () => {
+    expect(compose).toContain('BUSINESS_ROLES.has(callerRole)');
+    expect(compose).toMatch(/\.from\('user_email_addresses'\)[\s\S]*\.eq\('user_id', userId\)/);
+    expect(compose).toContain('!box.is_active');
+  });
+
+  it('validates every address before anything is stored', () => {
+    const firstInsert = compose.indexOf(".from('inbox_threads').insert");
+    expect(compose.indexOf('EMAIL_ADDRESS.test(to)')).toBeLessThan(firstInsert);
+    expect(compose.indexOf('cleanEmailCopies(')).toBeLessThan(firstInsert);
+  });
+
+  it('keeps a thread whose send failed, and says so instead of a bare 502', () => {
+    expect(compose).toMatch(/delivery_error: e\.message/);
+  });
+
+  it('does not prefix a first email with Re:', () => {
+    expect(emailBranch).toMatch(/!lastInbound \|\| \/\^re:\/i\.test\(subjectBase\)/);
+  });
+});

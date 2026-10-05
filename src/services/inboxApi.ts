@@ -547,6 +547,12 @@ export const inboxApi = {
   createCustomerThread(input: { workspace_id: string; contact_id: string; subject?: string; message?: string }) {
     return call<{ thread_id: string; share_url: string | null; has_account: boolean }>('create_customer_thread', input);
   },
+  composeEmail(input: {
+    workspace_id: string; to: string; subject: string; body?: string; contact_id?: string;
+    email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[];
+  }) {
+    return call<{ thread_id: string; delivery_error: string | null }>('compose_email', input);
+  },
   /** Get-or-create the public /i/:token link for an existing customer thread. */
   createShareLink(thread_id: string) {
     return call<{ url: string }>('create_share_link', { thread_id });

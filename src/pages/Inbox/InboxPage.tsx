@@ -92,9 +92,11 @@ const InboxPage: React.FC = () => {
         <NewThreadDialog
           workspaceId={activeWorkspaceId}
           initialMode={
-            scopedFilterValue(filterValues, 'thread_type') === 'customer' || scopedFilterValue(filterValues, 'source') === 'customer'
-              ? 'customer'
-              : 'team'
+            scopedFilterValue(filterValues, 'source') === 'email'
+              ? 'email'
+              : scopedFilterValue(filterValues, 'thread_type') === 'customer' || scopedFilterValue(filterValues, 'source') === 'customer'
+                ? 'customer'
+                : 'team'
           }
           scopedLabelId={labelFilter}
           onClose={() => setShowNew(false)}
