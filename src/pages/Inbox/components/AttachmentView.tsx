@@ -264,7 +264,9 @@ export const AttachmentView: React.FC<{
   /** The thread's workspace — the expense a supplier invoice becomes is booked there. */
   workspaceId?: string;
   onRepaired?: () => void;
-}> = ({ att, href, messageId, threadId, workspaceId, onRepaired }) => {
+  /** Email layout: a fixed-size card with a thumbnail or icon, name and size, in a grid. */
+  variant?: 'inline' | 'card';
+}> = ({ att, href, messageId, threadId, workspaceId, onRepaired, variant = 'inline' }) => {
   const name = att.name || 'attachment';
   const ct = (att.content_type || '').toLowerCase();
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
@@ -331,6 +333,33 @@ export const AttachmentView: React.FC<{
         <Paperclip className="w-3 h-3 shrink-0" />
         <span className="truncate">{name}</span>
         <span className="opacity-70">· preparing…</span>
+      </div>
+    );
+  }
+
+  if (variant === 'card' && (kind === 'image' || kind === 'pdf' || kind === 'file')) {
+    const size = att.size ? (att.size >= 1048576 ? `${(att.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(att.size / 1024))} KB`) : '';
+    const Icon = kind === 'pdf' ? FileText : Paperclip;
+    const open = () => (kind === 'file' ? window.open(href, '_blank', 'noopener,noreferrer') : setZoom(true));
+    return (
+      <div className="rounded-sm border border-hairline bg-card overflow-hidden">
+        <button type="button" onClick={open} className="block w-full aspect-[4/3] bg-surface-sunken relative" title={name}>
+          {kind === 'image'
+            ? <img src={href} alt={name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+            : <Icon className={`absolute inset-0 m-auto w-8 h-8 ${kind === 'pdf' ? 'text-destructive' : 'text-muted-foreground'}`} />}
+        </button>
+        <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs">
+          <span className="truncate flex-1" title={name}>{name}</span>
+          {size && <span className="text-muted-foreground tabular-nums shrink-0">{size}</span>}
+        </div>
+        {kind !== 'file' && (
+          <div className="px-2 pb-1.5">
+            <AttachmentDocumentTag
+              att={att} family={kind} threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
+            />
+          </div>
+        )}
+        {kind !== 'file' && <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind={kind} att={att} />}
       </div>
     );
   }

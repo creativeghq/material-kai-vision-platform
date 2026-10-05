@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, MessageSquare, User as UserIcon, ArrowLeft, Archive, Pin, CalendarClock, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -8,6 +8,7 @@ import { inboxApi } from '@/services/inboxApi';
 import { avatarTint } from '../inboxFormat';
 import { LabelChips, SourceTag, ThreadAvatar } from './InboxPrimitives';
 import { MessageBubble } from './MessageBubble';
+import { EmailMessageCard } from './EmailMessageCard';
 import type { InboxPageState } from '../useInboxPage';
 import { InboxComposer } from './InboxComposer';
 import { ConversationActions } from './ConversationActions';
@@ -45,6 +46,11 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     pinnedMessage,
   } = s;
   const showMemberControls = isMember && !!activeThread;
+  const isEmail = activeThread?.channel === 'email';
+  const [openMail, setOpenMail] = useState<Set<string>>(new Set());
+  useEffect(() => { setOpenMail(new Set()); }, [activeId]);
+  const mailIds = isEmail ? messages.filter((x) => x.message_type === 'text' || x.message_type === 'agent').map((x) => x.id) : [];
+  const lastMailId = mailIds[mailIds.length - 1];
   return (
     <div className={`dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
       {!activeThread ? (
@@ -220,9 +226,48 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
             }}
           >
+            {isEmail && !loadingThread && (
+              <h1 className="font-sans text-xl sm:text-2xl font-semibold leading-tight break-words pb-1">
+                {activeThread.subject || threadDisplayName(activeThread)}
+              </h1>
+            )}
             {loadingThread ? (
               <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 animate-spin" /></div>
-            ) : messages.map((m) => (
+            ) : messages.map((m) => (isEmail && (m.message_type === 'text' || m.message_type === 'agent') ? (
+              <EmailMessageCard
+                key={m.id} m={m}
+                info={m.sender_participant_id ? labels.get(m.sender_participant_id) : undefined}
+                ours={(() => {
+                  const info = m.sender_participant_id ? labels.get(m.sender_participant_id) : undefined;
+                  return activeThread.thread_type !== 'internal'
+                    ? (info?.kind === 'member' || info?.kind === 'agent')
+                    : (info?.userId != null && info.userId === myUserId);
+                })()}
+                collapsed={m.id !== lastMailId && !openMail.has(m.id)}
+                onToggle={() => setOpenMail((cur) => {
+                  const n = new Set(cur);
+                  if (n.has(m.id)) n.delete(m.id); else n.add(m.id);
+                  return n;
+                })}
+                workspaceId={activeThread.workspace_id}
+                starred={starredIds.has(m.id)}
+                onAttachmentsRepaired={() => { void openThread(activeThread.id); }}
+                onReplyTo={(msg) => setReplyTo(msg)}
+                onReact={async (msg, emoji) => {
+                  try {
+                    await inboxApi.reactMessage(activeThread.id, msg.id, emoji);
+                    void openThread(activeThread.id);
+                  } catch (e) {
+                    toast({ title: 'Could not react', description: (e as Error).message, variant: 'destructive' });
+                  }
+                }}
+                onForward={isMember ? (msg) => setForwarding(msg) : undefined}
+                onTogglePin={isMember ? togglePin : undefined}
+                onToggleStar={toggleStar}
+                onAddToNote={isMember ? addToNote : undefined}
+                onDelete={isMember ? deleteMessage : undefined}
+              />
+            ) : (
               <MessageBubble
                 key={m.id} m={m}
                 info={m.sender_participant_id ? labels.get(m.sender_participant_id) : undefined}
@@ -255,7 +300,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 onAddToNote={isMember ? addToNote : undefined}
                 onDelete={isMember ? deleteMessage : undefined}
               />
-            ))}
+            )))}
           </div>
 
           {/* Composer */}

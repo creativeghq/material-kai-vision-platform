@@ -19,3 +19,10 @@ export function emailReplyRecipients(messages: MessageLike[], threadMeta: Record
 export function splitAddresses(text: string): string[] {
   return text.split(/[\s,;]+/).map((a) => a.trim()).filter(Boolean);
 }
+
+const asList = (v: unknown): string[] => (Array.isArray(v) ? v.map(String).filter(Boolean) : typeof v === 'string' && v ? [v] : []);
+
+export function emailRecipientsOf(meta: Record<string, unknown>): { to: string[]; cc: string[] } {
+  const to = meta.direction === 'incoming' ? asList(meta.email_to_all) : asList(meta.email_to);
+  return { to: to.length ? to : asList(meta.email_to), cc: asList(meta.email_cc) };
+}

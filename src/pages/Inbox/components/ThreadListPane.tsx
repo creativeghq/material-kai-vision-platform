@@ -1,5 +1,5 @@
 import React from 'react';
-import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send, FilePen } from 'lucide-react';
+import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
 import { INBOX_MODES, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
@@ -249,11 +249,19 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                       <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{name}</span>
                       <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{timeAgo(t.last_message_at)}</span>
                     </div>
+                    {t.channel === 'email' && t.subject && t.subject !== name && (
+                      <div className={`text-sm truncate ${t.unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}`}>{t.subject}</div>
+                    )}
                     {t.last_message_preview && (
                       <div className={`text-xs truncate mt-0.5 ${t.unread ? 'text-foreground/70' : 'text-muted-foreground'}`}>{t.last_message_preview}</div>
                     )}
                     <div className="flex items-center gap-x-2 gap-y-1 mt-1.5 flex-wrap">
                       <SourceWord source={source} />
+                      {t.has_attachments && (
+                        <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground">
+                          <Paperclip className="w-3 h-3" />Files
+                        </span>
+                      )}
                       <span className="text-[11px] text-muted-foreground truncate max-w-[9rem]">
                         {assignee ?? 'Unassigned'}
                       </span>

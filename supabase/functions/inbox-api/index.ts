@@ -2733,6 +2733,14 @@ async function handleJwtAction(
         for (const r of (rs || []) as ReplyState[]) replyStateByThread.set(r.thread_id, r);
       }
 
+      const withFiles = new Set<string>();
+      if (threadIds.length) {
+        const { data: fileRows, error: fileErr } = await db.from('inbox_messages')
+          .select('thread_id').in('thread_id', threadIds).neq('attachments', '[]').is('deleted_at', null).limit(1000);
+        if (fileErr) console.error('[inbox-api] attachment flags unavailable:', fileErr.message);
+        for (const r of (fileRows || []) as Array<{ thread_id: string }>) withFiles.add(r.thread_id);
+      }
+
       const enriched = (threads || []).map((t: Record<string, unknown>) => {
         const id = String(t.id);
         // Threads visible only via workspace membership (not an explicit participant) start unread.
@@ -2751,6 +2759,7 @@ async function handleJwtAction(
           assignees: assigneesByThread.get(id) || [],
           counterparty_participant_id: counterpartyByThread.get(id) ?? null,
           counterparty_avatar_slot: avatarSlotByThread.get(id) ?? null,
+          has_attachments: withFiles.has(id),
         };
       });
       return json({ threads: enriched, next_cursor: nextCursor });
