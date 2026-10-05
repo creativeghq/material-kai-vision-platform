@@ -17,7 +17,10 @@ import { formatDate } from '@/utils/datetime';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { REPRESENTATION_KINDS, type RepresentationKind } from '@/modules/crm/supplierTypes';
 
-interface PartyRef { id: string; name: string; commercial_title: string | null; country_code?: string | null; industry?: string | null }
+interface PartyRef {
+  id: string; name: string; commercial_title: string | null; country_code?: string | null; industry?: string | null;
+  people?: { is_primary: boolean | null; contact: PersonRef | null }[];
+}
 interface PersonRef { id: string; name: string; email: string | null; phone: string | null; mobile: string | null; position: string | null }
 interface Representation {
   id: string;
@@ -33,13 +36,17 @@ interface Representation {
 }
 
 const SELECT = `id, kind, territory, last_contact_on, notes, agent_company_id, principal_company_id,
-  agent:crm_companies!crm_company_representations_agent_company_id_fkey(id, name, commercial_title, country_code, industry),
+  agent:crm_companies!crm_company_representations_agent_company_id_fkey(id, name, commercial_title, country_code, industry,
+    people:crm_company_contacts(is_primary, contact:crm_contacts(id, name, email, phone, mobile, position))),
   principal:crm_companies!crm_company_representations_principal_company_id_fkey(id, name, commercial_title, country_code, industry),
   contact:crm_contacts(id, name, email, phone, mobile, position)`;
 
 const kindLabel = (k: RepresentationKind) => REPRESENTATION_KINDS.find((x) => x.value === k)?.label ?? k;
 const display = (p: PartyRef | null) => (p ? p.commercial_title || p.name : '—');
 const telHref = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`;
+/** The agency's other people, after the link's lead contact. */
+const agencyPeople = (r: Representation): PersonRef[] =>
+  (r.agent?.people ?? []).map((x) => x.contact).filter((c): c is PersonRef => !!c && c.id !== r.contact?.id);
 
 function PersonCell({ person }: { person: PersonRef | null }) {
   if (!person) return <span className="text-muted-foreground">—</span>;
@@ -305,6 +312,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                     <Badge variant="neutral">{kindLabel(r.kind)}{r.territory ? ` · ${r.territory}` : ''}</Badge>
                   </div>
                   <PersonCell person={r.contact} />
+                  {agencyPeople(r).map((p) => <PersonCell key={p.id} person={p} />)}
                   {r.notes && <p className="max-w-prose text-xs text-muted-foreground">{r.notes}</p>}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
