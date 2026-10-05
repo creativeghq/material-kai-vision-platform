@@ -413,7 +413,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'title', type: 'string', optional: false, description: 'Catalog display title, e.g. "Spring 2026 — Porcelain Range"' },
       { name: 'subtitle', type: 'string', optional: true, description: 'Optional subtitle / tagline' },
       { name: 'description', type: 'string', optional: true, description: 'Long description shown on the cover page' },
-      { name: 'template_id', type: 'string', optional: true, description: 'Catalog template ID. Omit to use the workspace default.' },
       { name: 'cover_client_name', type: 'string', optional: true, description: 'Client name to render on the cover' },
     ],
   },
@@ -2486,7 +2485,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'target_catalog_id', type: 'string', optional: true },
       { name: 'new_catalog_title', type: 'string', optional: true },
       { name: 'preserve_original_layout', type: 'boolean', optional: true },
-      { name: 'template_id', type: 'string', optional: true },
     ],
   },
   {

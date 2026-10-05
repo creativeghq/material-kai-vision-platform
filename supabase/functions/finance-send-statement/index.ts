@@ -4,12 +4,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { formatMoneyLocalized } from '../_shared/money.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-// @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
-// failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.
-// Resolve the namespace and prefer its default if present — correct either way, and it
-// does not change which object reaches registerFontkit.
-import * as fontkitNs from '@pdf-lib/fontkit';
-const fontkit = (fontkitNs as unknown as { default?: unknown }).default ?? fontkitNs;
+import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { encodeBase64 as base64Encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
@@ -100,21 +95,6 @@ function paymentAccountLines(accts: Array<{ name: string; kind: string; iban: st
   return lines;
 }
 
-// Open Sans (full Greek + Latin + Cyrillic) — the platform-wide typeface. Greek
-// customer names/labels would throw under pdf-lib's WinAnsi standard fonts, so embed
-// the Unicode TTF. SemiBold is the document "bold" (the app's heaviest weight).
-const FONT_URLS = {
-  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-Regular.ttf',
-  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-SemiBold.ttf',
-};
-let _fontCache: { regular: Uint8Array; bold: Uint8Array } | null = null;
-async function loadFonts() {
-  if (_fontCache) return _fontCache;
-  const [r, b] = await Promise.all([fetch(FONT_URLS.regular), fetch(FONT_URLS.bold)]);
-  if (!r.ok || !b.ok) throw new Error('failed to load PDF fonts');
-  _fontCache = { regular: new Uint8Array(await r.arrayBuffer()), bold: new Uint8Array(await b.arrayBuffer()) };
-  return _fontCache;
-}
 
 
 const fmtMoney = (value: number, currency = 'EUR', lang: Lang = 'el') =>
@@ -234,11 +214,8 @@ async function buildStatementPdf(opts: BuildOpts): Promise<{ bytes: Uint8Array; 
   const cur = ledger.currency;
   const money = (n: number) => fmtMoney(n, cur, lang);
 
-  const fonts = await loadFonts();
   const pdf = await PDFDocument.create();
-  pdf.registerFontkit(fontkit);
-  const font = await pdf.embedFont(fonts.regular, { subset: true });
-  const bold = await pdf.embedFont(fonts.bold, { subset: true });
+  const { regular: font, bold } = await embedOpenSans(pdf);
 
   let backdrop: any = null;
   if (opts.backdrop) {

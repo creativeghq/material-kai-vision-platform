@@ -5,7 +5,8 @@
 // returned as a 7-day signed URL. Regenerated on demand — no stale persisted URL (invariant #8).
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { contractContentHash } from '../_shared/contract-hash.ts';
@@ -61,8 +62,7 @@ Deno.serve(withApiLogging('generate-contract-pdf', async (req) => {
 
     // ── Render ────────────────────────────────────────────────────────────────
     const pdf = await PDFDocument.create();
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const { regular: font, bold } = await embedOpenSans(pdf);
     let page = pdf.addPage([PAGE_W, PAGE_H]);
     let y = PAGE_H - MARGIN;
     const contentW = PAGE_W - MARGIN * 2;

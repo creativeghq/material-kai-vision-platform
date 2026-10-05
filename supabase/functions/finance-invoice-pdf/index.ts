@@ -11,12 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
 import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
-// @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
-// failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.
-// Resolve the namespace and prefer its default if present — correct either way, and it
-// does not change which object reaches registerFontkit.
-import * as fontkitNs from '@pdf-lib/fontkit';
-const fontkit = (fontkitNs as unknown as { default?: unknown }).default ?? fontkitNs;
+import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized, isServiceRoleRequest } from '../_shared/auth.ts';
@@ -32,9 +27,6 @@ import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { mydataExemptionLabel } from '../_shared/finance/vat-exemptions.ts';
 import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
 
-// Open Sans — the platform-wide typeface. Static TTFs cover full Greek + Latin +
-// Cyrillic + Euro (verified), so Greek invoice text renders correctly. SemiBold is
-// the document "bold" (the app's heaviest loaded weight).
 /** #374 Phase 6 — attach each line's full chosen variant, derived by SQL `variant_label`. */
 async function attachVariantLabels(supabase: any, items: any[]): Promise<void> {
   if (!items?.length) return;
@@ -69,18 +61,6 @@ function variantOf(it: any): string {
   return lineDetailLabel(variant, it?.configured_options);
 }
 
-const FONT_URLS = {
-  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-Regular.ttf',
-  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-SemiBold.ttf',
-};
-let _fontCache: { regular: Uint8Array; bold: Uint8Array } | null = null;
-async function loadFonts() {
-  if (_fontCache) return _fontCache;
-  const [r, b] = await Promise.all([fetch(FONT_URLS.regular), fetch(FONT_URLS.bold)]);
-  if (!r.ok || !b.ok) throw new Error('failed to load PDF fonts');
-  _fontCache = { regular: new Uint8Array(await r.arrayBuffer()), bold: new Uint8Array(await b.arrayBuffer()) };
-  return _fontCache;
-}
 
 type Lang = 'el' | 'en';
 const LABELS: Record<Lang, Record<string, string>> = {
@@ -750,11 +730,8 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   const INK = colors.text, MUTED = colors.muted, LINE = colors.line, HEADBG = colors.tableHeaderBg;
   const WHITE = rgb(1, 1, 1);
 
-  const fonts = await loadFonts();
   const pdf = await PDFDocument.create();
-  pdf.registerFontkit(fontkit);
-  const font = await pdf.embedFont(fonts.regular, { subset: true });
-  const bold = await pdf.embedFont(fonts.bold, { subset: true });
+  const { regular: font, bold } = await embedOpenSans(pdf);
 
   let page = pdf.addPage([A4.w, A4.h]);
   let y = A4.h - M;
@@ -1706,11 +1683,8 @@ async function buildPaymentReceiptPdf(d: {
   const fmtDate = (v: any) => (v ? new Date(v).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : '');
   const INK = colors.text, MUTED = colors.muted, LINE = colors.line, ACC = colors.accent, HEADBG = colors.tableHeaderBg;
 
-  const fonts = await loadFonts();
   const pdf = await PDFDocument.create();
-  pdf.registerFontkit(fontkit);
-  const font = await pdf.embedFont(fonts.regular, { subset: true });
-  const bold = await pdf.embedFont(fonts.bold, { subset: true });
+  const { regular: font, bold } = await embedOpenSans(pdf);
   let page = pdf.addPage([A4.w, A4.h]);
   const right = A4.w - M;
   let y = A4.h - M;

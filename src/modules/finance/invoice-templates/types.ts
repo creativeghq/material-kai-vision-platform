@@ -1,42 +1,8 @@
-// Shared invoice-template contract. Consumed by the React renderer (HTML preview)
-// AND mirrored by the pdf-lib generator (supabase/functions/finance-invoice-pdf)
-// so the on-screen invoice and the PDF stay visually similar. Keep the two registries
-// in sync — same ids, same layout flags, same default colors.
+// Shared invoice render contract, drawn by the React preview and the pdf-lib generator.
 
-export type InvoiceColorRole =
-  | 'accent'        // links, emphasis, accent rules / totals highlight
-  | 'headerBg'      // header band fill (band/stacked styles)
-  | 'headerText'    // text on the header band
-  | 'tableHeaderBg' // line-items header row fill
-  | 'text'          // primary ink
-  | 'muted'         // secondary text
-  | 'line';         // hairline rules / borders
-
-export type InvoiceColors = Record<InvoiceColorRole, string>;
-
-/** Header layout variants. */
-export type HeaderStyle =
-  | 'split'    // issuer left, title right (classic)
-  | 'band'     // full-width colored band with title + issuer inside
-  | 'stacked'  // issuer block, big title below
-  | 'minimal'  // oversized title, issuer small underneath
-  | 'sidebar'  // vertical accent wordmark gutter on the left, title right
-  | 'commercial'; // logo left / QR right, three icon party columns, code+comment items, large amount-due
-
-export type TitleStyle = 'right' | 'left-xl' | 'on-band' | 'center';
-export type TotalsBoxStyle = 'plain' | 'boxed' | 'accent' | 'accent-text';
-
-export interface InvoiceTemplateSpec {
-  id: string;
-  label: string;
-  description: string;
-  defaultColors: InvoiceColors;
-  headerStyle: HeaderStyle;
-  titleStyle: TitleStyle;
-  /** Whether the line-items header row gets a filled background (tableHeaderBg). */
-  tableHeaderFill: boolean;
-  totalsBoxStyle: TotalsBoxStyle;
-}
+export type {
+  InvoiceColorRole, InvoiceColors, HeaderStyle, TitleStyle, TotalsBoxStyle, InvoiceTemplateSpec,
+} from './templateRegistry';
 
 // ── Normalized render data (the single field set both renderers draw) ──
 

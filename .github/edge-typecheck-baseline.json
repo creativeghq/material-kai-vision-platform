@@ -1,18 +1,15 @@
 {
   "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
   "entrypoints": 232,
-  "total": 16,
+  "total": 12,
   "uncheckable": {},
   "files": {
     "background-agent-runner/index.ts": 2,
-    "finance-invoice-pdf/index.ts": 2,
     "hr-checkin-cron/index.ts": 2,
     "mivaa-gateway/index.ts": 2,
     "stripe-api/handlers/checkout.ts": 2,
     "stripe-api/handlers/customer-portal.ts": 2,
-    "_shared/fonts/open-sans.ts": 1,
     "_shared/shipping/searates.ts": 1,
-    "finance-send-statement/index.ts": 1,
     "stripe-api/handlers/modules.ts": 1
   }
 }

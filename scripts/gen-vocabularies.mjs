@@ -11,6 +11,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** [source, target] pairs, repo-relative. One line per vocabulary. */
 export const VOCABULARIES = [
   [
+    'src/modules/finance/invoice-templates/templateRegistry.ts',
+    'supabase/functions/_shared/finance/invoiceTemplates.generated.ts',
+  ],
+  [
     // The citability dimensions. The scorer measures them in Deno and the AI Citations panel
     // names them in React; a second copy is a panel labelling something nothing measured.
     'src/components/core/Profile/seo/citabilityDimensions.ts',

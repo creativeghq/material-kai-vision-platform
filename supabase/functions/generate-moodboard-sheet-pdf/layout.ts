@@ -3,7 +3,6 @@ import {
   PDFFont,
   PDFImage,
   PDFPage,
-  StandardFonts,
   rgb,
   RGB,
 } from 'pdf-lib';

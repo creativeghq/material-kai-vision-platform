@@ -54,7 +54,6 @@ export interface CatalogRow {
   id: string;
   owner_user_id: string;
   workspace_id: string | null;
-  template_id: string | null;
   title: string;
   subtitle: string | null;
   description: string | null;

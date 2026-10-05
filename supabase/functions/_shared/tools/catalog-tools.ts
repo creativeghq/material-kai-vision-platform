@@ -149,29 +149,16 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
       title: string;
       subtitle?: string;
       description?: string;
-      template_id?: string;
       cover_client_name?: string;
     }) => {
       const denied = await moduleGate(workspaceId, 'presentation-catalogs');
       if (denied) return denied;
       try {
-        let templateId = input.template_id;
-        if (!templateId) {
-          const { data: tpl } = await supabase
-            .from('catalog_templates')
-            .select('id')
-            .eq('is_default', true)
-            .eq('is_active', true)
-            .maybeSingle();
-          templateId = tpl?.id;
-        }
-
         const { data: catalog, error } = await supabase
           .from('presentation_catalogs')
           .insert({
             owner_user_id: userId,
             workspace_id: workspaceId,
-            template_id: templateId,
             title: input.title,
             subtitle: input.subtitle || null,
             description: input.description || null,
@@ -196,7 +183,6 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
           type: 'catalog_created',
           catalog_id: catalog.id,
           title: catalog.title,
-          template_id: templateId,
         });
 
         // Workflow tracker — boot the plan + mark step 1 complete.
@@ -211,7 +197,7 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
           step_id: 'create',
           status: 'done',
           status_line: 'Catalog created',
-          input: { title: catalog.title, subtitle: catalog.subtitle, template_id: templateId },
+          input: { title: catalog.title, subtitle: catalog.subtitle },
           output: { catalog_id: catalog.id },
         });
 
@@ -219,7 +205,6 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
           success: true,
           catalog_id: catalog.id,
           title: catalog.title,
-          template_id: templateId,
           status: 'draft',
         });
       } catch (err) {
@@ -241,7 +226,6 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
         title: z.string().describe('Catalog display title, e.g. "Spring 2026 — Porcelain Range"'),
         subtitle: z.string().optional().describe('Optional subtitle / tagline'),
         description: z.string().optional().describe('Long description shown on the cover page'),
-        template_id: z.string().uuid().optional().describe('Catalog template ID. Omit to use the workspace default.'),
         cover_client_name: z.string().optional().describe('Client name to render on the cover'),
       }),
     },
@@ -517,7 +501,6 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
       target_catalog_id?: string;
       new_catalog_title?: string;
       preserve_original_layout?: boolean;
-      template_id?: string;
     }) => {
       const denied = await moduleGate(workspaceId, 'presentation-catalogs');
       if (denied) return denied;
@@ -543,19 +526,11 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
           if (!input.new_catalog_title) {
             return JSON.stringify({ error: 'Either target_catalog_id or new_catalog_title is required' });
           }
-          let templateId = input.template_id;
-          if (!templateId) {
-            const { data: tpl } = await supabase
-              .from('catalog_templates')
-              .select('id').eq('is_default', true).eq('is_active', true).maybeSingle();
-            templateId = tpl?.id;
-          }
           const { data: created, error: createErr } = await supabase
             .from('presentation_catalogs')
             .insert({
               owner_user_id: userId,
               workspace_id: workspaceId,
-              template_id: templateId,
               title: input.new_catalog_title,
               source_pdf_ids: [input.source_pdf_id],
               cover_data: {
@@ -653,7 +628,6 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
         target_catalog_id: z.string().uuid().optional(),
         new_catalog_title: z.string().optional(),
         preserve_original_layout: z.boolean().optional(),
-        template_id: z.string().uuid().optional(),
       }),
     },
   );

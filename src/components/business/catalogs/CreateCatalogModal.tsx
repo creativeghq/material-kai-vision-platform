@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { catalogsService, type PresentationCatalog, type CatalogTemplate } from '@/services/catalogsService';
+import { catalogsService, type PresentationCatalog } from '@/services/catalogsService';
 
 interface Props {
   open: boolean;
@@ -21,18 +20,7 @@ export const CreateCatalogModal: React.FC<Props> = ({ open, onClose, onCreated }
   const [subtitle, setSubtitle] = useState('');
   const [description, setDescription] = useState('');
   const [clientName, setClientName] = useState('');
-  const [templateId, setTemplateId] = useState<string>('');
-  const [templates, setTemplates] = useState<CatalogTemplate[]>([]);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    catalogsService.listTemplates().then((rows) => {
-      setTemplates(rows);
-      const def = rows.find((r) => r.is_default) || rows[0];
-      if (def) setTemplateId(def.id);
-    }).catch(() => { /* templates are optional */ });
-  }, [open]);
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -46,7 +34,6 @@ export const CreateCatalogModal: React.FC<Props> = ({ open, onClose, onCreated }
         subtitle: subtitle.trim() || undefined,
         description: description.trim() || undefined,
         cover_client_name: clientName.trim() || undefined,
-        template_id: templateId || undefined,
       });
       toast({ title: 'Catalog created' });
       onCreated(created);
@@ -80,19 +67,6 @@ export const CreateCatalogModal: React.FC<Props> = ({ open, onClose, onCreated }
             <Label>Description</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What this catalog is for…" />
           </div>
-          {templates.length > 0 && (
-            <div className="space-y-2">
-              <Label>Template</Label>
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger><SelectValue placeholder="Pick a template" /></SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}{t.is_default ? ' (default)' : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>

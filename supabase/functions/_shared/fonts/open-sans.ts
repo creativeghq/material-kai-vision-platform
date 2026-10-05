@@ -1,65 +1,85 @@
-// Shared Open Sans embedder for pdf-lib documents — a single platform
-// typeface across server-generated PDFs too.
-// Open Sans is the platform-wide UI/document font. pdf-lib only ships the
-// standard-14 fonts (Helvetica et al.), so to render PDFs in Open Sans we embed
-// the TTF via fontkit. The static instances cover Latin + Greek + Cyrillic +
-// Euro (verified), so Greek invoices render correctly.
-import { PDFDocument, StandardFonts, type PDFFont } from 'pdf-lib';
-// @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
-// failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.
-// Resolve the namespace and prefer its default if present — correct either way, and it
-// does not change which object reaches registerFontkit.
+// Open Sans for every pdf-lib document. pdf-lib's standard-14 fonts are WinAnsi and cannot encode
+// Greek, so there is no Helvetica fallback: a font that cannot be loaded is a FAILED render.
+// The TTFs are pinned to one upstream commit and verified by SHA-256, so a mirror can neither
+// drift to a different font nor serve something else under the same name.
+import type { PDFDocument, PDFFont } from 'pdf-lib';
+// @pdf-lib/fontkit's types declare no default export; esm.sh's interop provides one at runtime.
 import * as fontkitNs from '@pdf-lib/fontkit';
 const fontkit = (fontkitNs as unknown as { default?: unknown }).default ?? fontkitNs;
 
-const OPEN_SANS_URLS = {
-  // The app loads weights 300/400/500/600; 600 (SemiBold) is its heaviest, so
-  // SemiBold is the document "bold" — matches the light-weight design system.
-  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-Regular.ttf',
-  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-SemiBold.ttf',
-};
+const OPEN_SANS_COMMIT = 'bd7e37632246368c60fdcbd374dbf9bad11969b6';
+const MIRRORS = [
+  `https://cdn.jsdelivr.net/gh/googlefonts/opensans@${OPEN_SANS_COMMIT}/fonts/ttf/`,
+  `https://raw.githubusercontent.com/googlefonts/opensans/${OPEN_SANS_COMMIT}/fonts/ttf/`,
+];
+// SemiBold is the document "bold" — the app's heaviest loaded weight.
+const FILES = {
+  regular: { name: 'OpenSans-Regular.ttf', sha256: 'c53aceea2dcf5b4098099c0c4d0a061d17e178a049317b42a422b1a9f7f8eb59' },
+  bold: { name: 'OpenSans-SemiBold.ttf', sha256: '4a413711684a9dd564ef0f1c10cb62b5d9f7eb6df2cff962f5341a6ecd5f64ae' },
+} as const;
 
-let cachedBytes: { regular: Uint8Array; bold: Uint8Array } | null = null;
-
-async function loadOpenSansBytes(): Promise<{ regular: Uint8Array; bold: Uint8Array } | null> {
-  if (cachedBytes) return cachedBytes;
-  try {
-    const [r, b] = await Promise.all([fetch(OPEN_SANS_URLS.regular), fetch(OPEN_SANS_URLS.bold)]);
-    if (!r.ok || !b.ok) return null;
-    const [rb, bb] = await Promise.all([r.arrayBuffer(), b.arrayBuffer()]);
-    cachedBytes = { regular: new Uint8Array(rb), bold: new Uint8Array(bb) };
-    return cachedBytes;
-  } catch {
-    return null;
+export class PdfFontUnavailable extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PdfFontUnavailable';
   }
+}
+
+export interface OpenSansBytes {
+  regular: Uint8Array;
+  bold: Uint8Array;
+}
+
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function fetchVerified(file: { name: string; sha256: string }): Promise<Uint8Array> {
+  const failures: string[] = [];
+  for (const base of MIRRORS) {
+    try {
+      const res = await fetch(base + file.name, { signal: AbortSignal.timeout(10_000) });
+      if (!res.ok) {
+        await res.body?.cancel();
+        failures.push(`${new URL(base).host}: HTTP ${res.status}`);
+        continue;
+      }
+      const buf = await res.arrayBuffer();
+      if ((await sha256Hex(buf)) === file.sha256) return new Uint8Array(buf);
+      failures.push(`${new URL(base).host}: sha256 mismatch`);
+    } catch (e) {
+      failures.push(`${new URL(base).host}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  throw new PdfFontUnavailable(`PDF font ${file.name} could not be loaded (${failures.join('; ')})`);
+}
+
+let cached: Promise<OpenSansBytes> | null = null;
+
+/** The verified TTF bytes, fetched once per isolate. Throws `PdfFontUnavailable`. */
+export function loadOpenSansBytes(): Promise<OpenSansBytes> {
+  cached ??= Promise.all([fetchVerified(FILES.regular), fetchVerified(FILES.bold)])
+    .then(([regular, bold]) => ({ regular, bold }))
+    .catch((e) => {
+      cached = null;
+      throw e;
+    });
+  return cached;
 }
 
 export interface EmbeddedFonts {
   regular: PDFFont;
   bold: PDFFont;
-  /** true when Open Sans embedded; false when it fell back to Helvetica. */
-  isOpenSans: boolean;
 }
 
-/**
- * Embed Open Sans (regular + semibold) into `pdf`. Pass `{ subset: false }` to
- * embed the full font (e.g. when the text is generated after embedding and the
- * subsetter can't see all glyphs up front). Defaults to subsetting.
- */
+/** Embed Open Sans (regular + semibold) into `pdf`, subset unless `{ subset: false }`. */
 export async function embedOpenSans(pdf: PDFDocument, opts?: { subset?: boolean }): Promise<EmbeddedFonts> {
   const bytes = await loadOpenSansBytes();
-  if (!bytes) {
-    return {
-      regular: await pdf.embedFont(StandardFonts.Helvetica),
-      bold: await pdf.embedFont(StandardFonts.HelveticaBold),
-      isOpenSans: false,
-    };
-  }
-  pdf.registerFontkit(fontkit);
+  pdf.registerFontkit(fontkit as Parameters<PDFDocument['registerFontkit']>[0]);
   const subset = opts?.subset !== false;
   return {
     regular: await pdf.embedFont(bytes.regular, { subset }),
     bold: await pdf.embedFont(bytes.bold, { subset }),
-    isOpenSans: true,
   };
 }

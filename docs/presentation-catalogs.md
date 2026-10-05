@@ -108,13 +108,13 @@ Loaded in [supabase/functions/agent-chat/index.ts](../supabase/functions/agent-c
 
 | Tool | Purpose | Key inputs | Emits chunk |
 |---|---|---|---|
-| `create_catalog` | Initialize a new catalog row. Always step 1. | `title`, `subtitle?`, `description?`, `template_id?`, `cover_client_name?` | `catalog_created` |
+| `create_catalog` | Initialize a new catalog row. Always step 1. | `title`, `subtitle?`, `description?`, `cover_client_name?` | `catalog_created` |
 | `attach_catalog_pdfs` | Link uploaded source PDFs (rows in `catalog_source_pdfs`) to a catalog. | `catalog_id`, `source_pdf_ids[]` | `catalog_pdfs_attached` |
 | `extract_from_catalog_pdfs` | Free-form Vision query over attached PDFs. Returns candidate materials with bbox-cropped images. | `catalog_id`, `query` (e.g. "white porcelain tiles"), `max_results?`, `auto_add?` | `catalog_extraction_candidates` |
 | `translate_pdf_to_catalog` | Whole-PDF → catalog body in one Vision pass. `preserve_original_layout` mirrors page-by-page; default restructures by category. | `source_pdf_id`, `target_catalog_id?`, `new_catalog_title?`, `preserve_original_layout?` | `catalog_translation_ready` |
 | `add_material_to_catalog` | Add a single material to a section. Resolves price + image from `catalog_product` / `price_monitoring` / `market_check` / `manual` (or `uploaded` / `web_search_approved` / `extracted_from_pdf` for image). | `catalog_id`, `section_title`, `material{...}` | `catalog_material_added` |
 | `find_image_for_material` | Search platform DB first (`material_search`), then fall back to web (DataForSEO Images). Admin clicks ✓ in the inline approval card. | `catalog_id`, `material_id?`, `material_name`, `search_db_first?`, `max_candidates?` | `catalog_image_candidates` |
-| `generate_catalog_pdf` | Render the body as A4 PDF (cover + body + back cover) using the catalog's template. | `catalog_id`, `regenerate?` | `catalog_pdf_ready` |
+| `generate_catalog_pdf` | Render the body as A4 PDF (cover + body + back cover) using the workspace's PDF branding. | `catalog_id`, `regenerate?` | `catalog_pdf_ready` |
 | `publish_catalog` | Mint a slug + flip status to `published`. Returns the public URL. `unpublish:true` flips back to `archived`. | `catalog_id`, `desired_slug?`, `unpublish?` | `catalog_published` / `catalog_unpublished` |
 
 Tool entries also live in [src/components/features/ai/agentToolsCatalog.ts](../src/components/features/ai/agentToolsCatalog.ts) so the PromptBuilderModal + ToolkitPickerModal can browse them.
@@ -140,7 +140,6 @@ Migration: `../supabase/migrations/20260508_presentation_catalogs_module.sql` + 
 |---|---|---|
 | `presentation_catalogs` | one per catalog | Title + JSONB cover/body/back + status + slug + denormalized counters (`view_count`, `unique_email_count`). Source-of-truth row. |
 | `catalog_source_pdfs` | one per uploaded PDF | Owned by an admin user. Stores `storage_path` in `pdf-documents` (under the `catalog-source/` prefix). Manufacturer name + URL + notes for provenance. Status: `uploaded` / `processing` / `ready` / `failed`. |
-| `catalog_templates` | one per visual template | Cover image path, content background path, back-cover image path, accent color hex. One `is_default=true` row at a time. |
 | `catalog_email_grants` | one per (catalog, email) | Admin-managed allowlist. Visitors with these emails get access in addition to platform-user / CRM auto-match. Supports `expires_at` and `revoked_at`. |
 | `catalog_access_log` | one per email-gate submit | Forensic record of every gate attempt — email + matched_kind enum + matched_user_id + matched_crm_contact_id + matched_crm_company_id + matched_grant_id + ip_address + cookie_token + cookie_expires_at. |
 | `catalog_view_events` | one per page_view / pdf_download | Granular event log per visitor session (after gate granted). FK back to `catalog_access_log` for forensic correlation. Powers the operations dashboard. |
@@ -175,7 +174,6 @@ The 5 dedicated catalog buckets were folded into the 3 anchor buckets. Identity 
 | `pdf-documents` | `catalog-source/<user_id>/<uuid>.pdf` | Admin-uploaded source PDFs. | Deleted when `catalog_source_pdfs` row is deleted from the admin UI. |
 | `pdf-documents` | `catalog-output/<catalog_id>/catalog-<ts>.pdf` | Generated catalog PDFs. | Signed URL with 7-day TTL written into `presentation_catalogs.pdf_url`. Regenerated on `generate_catalog_pdf` calls. |
 | `pdf-tiles` | `catalog-extracted/<source_pdf_id>/page-<n>-<bbox-hash>.png` | Page region crops produced by MIVAA's PyMuPDF rasterizer. | Signed URL TTL = 7 days; deterministic path means re-extraction reuses the same key. |
-| `quote-templates` | `catalog/cover.png`, `catalog/backcover.png`, `catalog/content-bg.png` | Cover / body-background / back-cover template assets. | Admin-uploaded; one set per row in `catalog_templates`. |
 
 ---
 
@@ -185,9 +183,9 @@ All under [supabase/functions/](../supabase/functions/).
 
 ### `generate-catalog-pdf`
 
-A4 portrait PDF builder using `pdf-lib`. Cover page (full-page template image with overlay text) + N body pages (4 materials per page, image left + name/desc/specs/price right) + back cover. Accent color from template. Refuses to render an empty catalog (returns 422). Updates `presentation_catalogs.status / pdf_url / pdf_generated_at / page_count` on success.
+PDF builder using `pdf-lib` through the shared `renderBrandedDocument` (`_shared/pdf/document.ts`). Cover, intro, body background and back cover come from the workspace's `workspace_pdf_templates` row (Profile → Keys → Document templates), the same branding quotes and datasheets use; page size follows the cover image. There is no per-catalog template. Refuses to render an empty catalog (returns 422). Updates `presentation_catalogs.status / pdf_url / pdf_generated_at / page_count` on success.
 
-[supabase/functions/generate-catalog-pdf/](../supabase/functions/generate-catalog-pdf/): `index.ts` (router + auth), `data-fetcher.ts`, `pdf-builder.ts`, `types.ts`.
+[supabase/functions/generate-catalog-pdf/](../supabase/functions/generate-catalog-pdf/): `index.ts` (router + auth + render), `data-fetcher.ts`, `types.ts`.
 
 ### `catalog-extract-from-pdfs`
 
@@ -370,7 +368,7 @@ For per-product/per-image cost attribution, look at `ai_usage_logs.metadata.cata
 
 ## Permissions / RLS
 
-- **All five tables** have RLS enabled. Default policy = **admin-only** (`is_admin_user()` helper). `catalog_templates` allows `SELECT` to any authenticated user when `is_active=true` so the create-catalog modal can list templates without privilege escalation.
+- **All five tables** have RLS enabled. Default policy = **admin-only** (`is_admin_user()` helper).
 - **Public catalog access** does NOT go through RLS. `catalog-access` runs as service role inside the edge function and validates email/cookie before exposing the body. The anon role cannot SELECT from `presentation_catalogs` directly.
 - **Admin tool gating**: `agent-chat/index.ts` only injects the 8 catalog tools when `userRole ∈ {admin, owner}`. Same gate as B2B tools and SEO Article Pipeline.
 
@@ -409,7 +407,7 @@ After pulling the branch:
    - `DATAFORSEO_BASE64` (or `_LOGIN`+`_PASSWORD`) — required for web image fallback in `catalog-image-search`
    - `PUBLIC_APP_URL` — optional, used for the published-catalog URL in agent responses (defaults to `https://app.materialshub.gr`)
 
-6. **Upload default template assets** to the `quote-templates` bucket under the `catalog/` prefix. The seeded "Default" row in `catalog_templates` references `catalog/cover.png` + `catalog/backcover.png` — replace those before the first PDF generation.
+6. **Set the workspace PDF branding** (Profile → Keys → Document templates). Catalogs render with the same cover / intro / background / back-cover set as quotes; a workspace without one inherits the operator's root template.
 
 ---
 

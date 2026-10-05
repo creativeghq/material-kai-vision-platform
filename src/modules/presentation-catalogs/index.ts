@@ -16,7 +16,7 @@ const CatalogSourcesPage = lazy(() =>
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
-    // `presentation_catalogs` / `catalog_templates` / `catalog_source_pdfs` all carry
+    // `presentation_catalogs` / `catalog_source_pdfs` all carry
     // workspace_id — a catalog is the tenant's own sales collateral.
     { path: '/catalogs', component: CatalogsListPage, requireWorkspaceAdmin: true },
     { path: '/catalogs/sources', component: CatalogSourcesPage, requireWorkspaceAdmin: true },

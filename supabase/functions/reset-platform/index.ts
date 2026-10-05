@@ -71,7 +71,6 @@ const TABLES_TO_CLEAR = [
   'moodboards',                    // Moodboards
 
   // ── Catalogs & Presentation (user-generated deliverables) ───────────
-  // 'catalog_templates' (admin branding) is PRESERVED.
   'catalog_view_events',           // Catalog view analytics (child, CASCADE)
   'catalog_access_log',            // Catalog access log (child, CASCADE)
   'catalog_email_sends',           // Catalog email sends (child, CASCADE)

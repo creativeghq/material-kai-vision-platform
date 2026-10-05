@@ -2578,59 +2578,6 @@ export type Database = {
           },
         ]
       }
-      catalog_templates: {
-        Row: {
-          accent_color_hex: string | null
-          back_cover_image_path: string
-          content_background_path: string | null
-          cover_image_path: string
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean
-          is_default: boolean
-          name: string
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          accent_color_hex?: string | null
-          back_cover_image_path: string
-          content_background_path?: string | null
-          cover_image_path: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_default?: boolean
-          name: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          accent_color_hex?: string | null
-          back_cover_image_path?: string
-          content_background_path?: string | null
-          cover_image_path?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_default?: boolean
-          name?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "catalog_templates_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       catalog_view_events: {
         Row: {
           access_log_id: string | null
@@ -18560,7 +18507,6 @@ export type Database = {
           status: Database["public"]["Enums"]["presentation_catalog_status"]
           status_message: string | null
           subtitle: string | null
-          template_id: string | null
           title: string
           unique_email_count: number
           unpublished_at: string | null
@@ -18587,7 +18533,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["presentation_catalog_status"]
           status_message?: string | null
           subtitle?: string | null
-          template_id?: string | null
           title: string
           unique_email_count?: number
           unpublished_at?: string | null
@@ -18614,7 +18559,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["presentation_catalog_status"]
           status_message?: string | null
           subtitle?: string | null
-          template_id?: string | null
           title?: string
           unique_email_count?: number
           unpublished_at?: string | null
@@ -18623,13 +18567,6 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "presentation_catalogs_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_templates"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "presentation_catalogs_workspace_id_fkey"
             columns: ["workspace_id"]

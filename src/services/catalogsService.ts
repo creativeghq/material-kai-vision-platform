@@ -42,7 +42,6 @@ export interface PresentationCatalog {
   id: string;
   owner_user_id: string;
   workspace_id: string | null;
-  template_id: string | null;
   slug: string | null;
   title: string;
   subtitle: string | null;
@@ -68,20 +67,6 @@ export interface PresentationCatalog {
   /** Its workspace's public handle — the first segment of the public URL. Joined, not stored. */
   public_handle?: string | null;
   access_mode: CatalogAccessMode;
-}
-
-export interface CatalogTemplate {
-  id: string;
-  /** null = operator global template (inherited by tenants); else the owning workspace. */
-  workspace_id: string | null;
-  name: string;
-  description: string | null;
-  cover_image_path: string;
-  content_background_path: string | null;
-  back_cover_image_path: string;
-  accent_color_hex: string | null;
-  is_default: boolean;
-  is_active: boolean;
 }
 
 export interface CatalogSourcePdf {
@@ -250,32 +235,15 @@ class CatalogsService {
     title: string;
     subtitle?: string;
     description?: string;
-    template_id?: string;
     cover_client_name?: string;
   }): Promise<PresentationCatalog> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    let templateId = input.template_id;
-    if (!templateId) {
-      // Prefer this workspace's own default template, else the operator's global one
-      // (RLS scopes the visible set to global + own; own sorts first via workspace_id desc).
-      const { data: tpl } = await supabase
-        .from('catalog_templates')
-        .select('id')
-        .eq('is_default', true)
-        .eq('is_active', true)
-        .order('workspace_id', { ascending: false, nullsFirst: false })
-        .limit(1)
-        .maybeSingle();
-      templateId = tpl?.id;
-    }
-
     const { data, error } = await supabase
       .from('presentation_catalogs')
       .insert({
         owner_user_id: user.id,
-        template_id: templateId,
         title: input.title,
         subtitle: input.subtitle ?? null,
         description: input.description ?? null,
@@ -358,20 +326,6 @@ class CatalogsService {
       .from('pdf-documents')
       .createSignedUrl(cat.pdf_storage_path, 60 * 60 * 24);
     return data?.signedUrl ?? null;
-  }
-
-  async listTemplates(): Promise<CatalogTemplate[]> {
-    // RLS scopes to this workspace's own templates + the operator's global ones.
-    // Own-workspace templates first, then the global default, then by name.
-    const { data, error } = await supabase
-      .from('catalog_templates')
-      .select('*')
-      .eq('is_active', true)
-      .order('workspace_id', { ascending: false, nullsFirst: false })
-      .order('is_default', { ascending: false })
-      .order('name');
-    if (error) throw error;
-    return (data || []) as CatalogTemplate[];
   }
 
   async uploadSourcePdf(file: File, opts?: { manufacturer_name?: string; manufacturer_url?: string; notes?: string }): Promise<CatalogSourcePdf> {
