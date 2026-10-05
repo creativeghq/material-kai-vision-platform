@@ -1,6 +1,6 @@
 import React from 'react';
 import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
-import { INBOX_MODES, modeSources } from '../inboxModes';
+import { visibleModes, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
@@ -28,6 +28,7 @@ const EMPTY_VIEW = {
 
 export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
   const {
+    isPlatformOperator,
     activeWorkspaceId,
     loadingThreads,
     query,
@@ -87,7 +88,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             a pill is the silhouette of a primary button, so "where I am" and "what to press"
             would be the same object on the one breakpoint with no room to tell them apart. */}
         <div role="tablist" aria-label="Inbox source" className="flex md:hidden items-center gap-3 border-b border-hairline">
-          {INBOX_MODES.map((m) => (
+          {visibleModes(isPlatformOperator).map((m) => (
             <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-1.5">
               {m.label}
             </button>

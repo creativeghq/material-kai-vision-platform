@@ -10,7 +10,7 @@ import { HubEmptyState } from '@/components/core/hub';
 import { gmailApi } from '@/services/gmailApi';
 import { timeAgo } from '../inboxFormat';
 import { formatDate } from '@/utils/datetime';
-import { INBOX_MODES, type InboxMode } from '../inboxModes';
+import { visibleModes, type InboxMode } from '../inboxModes';
 import { NavRow, SidebarHeading } from '../components/InboxPrimitives';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { GmailThreadView, fileToAttachment } from './GmailThreadView';
@@ -111,7 +111,7 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
 
   const modeTabs = (
     <div role="tablist" aria-label="Inbox source" className="flex items-center gap-3 px-3 border-b border-hairline shrink-0">
-      {INBOX_MODES.map((m) => (
+      {visibleModes(true).map((m) => (
         <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-2">{m.label}</button>
       ))}
     </div>

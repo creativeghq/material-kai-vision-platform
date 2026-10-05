@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { INBOX_CARD_MAX, type InboxCardKind } from '@/modules/messaging/inboxCardKinds';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,7 +51,7 @@ export function useInboxPage() {
   const [allWorkspaces, setAllWorkspaces] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [folder, setFolder] = useState<InboxFolder | null>(null);
-  const mode = parseInboxMode(searchParams.get('src'));
+  const mode = parseInboxMode(searchParams.get('src'), isPlatformOperator);
   const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
   /** MY starred messages on the open thread. Personal — resolved for the caller by get_thread. */
@@ -367,10 +367,15 @@ export function useInboxPage() {
     setDraftSteerOpen(false);
     sendToken.current = null;
     draftLoadedFor.current = null;
+    lastSeenTail.current = { id: null, count: 0 };
+    setOlderCursor(null);
+    setFarPinned(null);
     setDraft('');
     setAiDraftShown(false);
     try {
-      const { thread, participants, messages, whatsapp_window, starred_message_ids } = await inboxApi.getThread(id);
+      const { thread, participants, messages, whatsapp_window, starred_message_ids, older_cursor, pinned_message } = await inboxApi.getThread(id);
+      setOlderCursor(older_cursor ?? null);
+      setFarPinned(pinned_message ?? null);
       setActiveThread(thread);
       setParticipants(participants);
       setMessages(messages);
@@ -540,6 +545,12 @@ export function useInboxPage() {
 
   /** Opening a conversation lands at the BOTTOM. Every time, without animating there. */
   const listRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [farPinned, setFarPinned] = useState<InboxMessage | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const prependAnchor = useRef<number | null>(null);
+  const lastSeenTail = useRef<{ id: string | null; count: number }>({ id: null, count: 0 });
   /** False once the reader scrolls up deliberately — see the handler below. */
   const stickToBottom = useRef(true);
 
@@ -559,23 +570,47 @@ export function useInboxPage() {
     const r1 = requestAnimationFrame(() => scrollToBottom(false));
     const t1 = setTimeout(() => scrollToBottom(false), 120);
 
-    const el = listRef.current;
+    const el = contentRef.current ?? listRef.current;
     if (!el) return () => { cancelAnimationFrame(r1); clearTimeout(t1); };
-    // Media has no single "done" event we can await, and each attachment signs its URL
-    // separately, so the pane keeps growing for a while. Watch the box instead of guessing.
+    // Media and email frames size after paint; the CONTENT box grows with all of them.
     const ro = new ResizeObserver(() => { if (stickToBottom.current) scrollToBottom(false); });
     ro.observe(el);
-    for (const child of Array.from(el.children)) ro.observe(child);
-    const stop = setTimeout(() => ro.disconnect(), 4000);
+    const stop = setTimeout(() => ro.disconnect(), 6000);
     return () => { cancelAnimationFrame(r1); clearTimeout(t1); clearTimeout(stop); ro.disconnect(); };
   }, [activeId, loadingThread, scrollToBottom]);
 
   // A new message in an already-open thread: follow it, but only if the reader is still at the
   // bottom. Yanking someone out of the history they are reading is worse than a missed message,
   // and they can see there is a new one.
-  useEffect(() => {
-    if (stickToBottom.current) scrollToBottom(true);
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    const tail = messages[messages.length - 1]?.id ?? null;
+    const prev = lastSeenTail.current;
+    lastSeenTail.current = { id: tail, count: messages.length };
+    if (el && prependAnchor.current !== null) {
+      el.scrollTop = el.scrollHeight - prependAnchor.current;
+      prependAnchor.current = null;
+      return;
+    }
+    if (!stickToBottom.current || tail === prev.id) return;
+    const oneNew = prev.id !== null && messages.length === prev.count + 1;
+    scrollToBottom(oneNew);
   }, [messages, scrollToBottom]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!activeId || !olderCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const r = await inboxApi.getOlderMessages(activeId, olderCursor);
+      const el = listRef.current;
+      if (el) prependAnchor.current = el.scrollHeight - el.scrollTop;
+      setMessages((cur) => [...r.messages.filter((m) => !cur.some((c) => c.id === m.id)), ...cur]);
+      setOlderCursor(r.older_cursor ?? null);
+      if (r.starred_message_ids?.length) setStarredIds((cur) => new Set([...cur, ...r.starred_message_ids!]));
+    } catch (e) {
+      toast({ title: 'Could not load older messages', description: (e as Error).message, variant: 'destructive' });
+    } finally { setLoadingOlder(false); }
+  }, [activeId, olderCursor, loadingOlder, toast]);
 
   useEffect(() => {
     const threadId = activeId;
@@ -921,8 +956,8 @@ export function useInboxPage() {
       })
       .sort((a, b) => String((b.metadata as Record<string, unknown>).pinned_at)
         .localeCompare(String((a.metadata as Record<string, unknown>).pinned_at)));
-    return pinned[0] ?? null;
-  }, [messages]);
+    return pinned[0] ?? farPinned;
+  }, [messages, farPinned]);
 
   // The per-thread member action cluster (AI toggle, settings, add teammate,
   // status). Reused inline in the desktop header and inside the mobile details
@@ -1061,6 +1096,10 @@ export function useInboxPage() {
     openThread,
     messageMoods,
     listRef,
+    contentRef,
+    olderCursor,
+    loadingOlder,
+    loadOlderMessages,
     stickToBottom,
     scrollToBottom,
     send,

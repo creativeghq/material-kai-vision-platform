@@ -32,14 +32,14 @@ export const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: bo
   const stale = !!sentiment?.analysed_at && !!thread.last_message_at
     && new Date(thread.last_message_at).getTime() > new Date(sentiment.analysed_at).getTime();
 
-  const run = async (force: boolean) => {
+  const run = async (force: boolean, quiet = false) => {
     setBusy(true);
     try {
       const r = await inboxApi.analyzeSentiment(thread.id, force);
       if (!r.analysed) { setEmpty(r.message || 'There is not enough here to read yet.'); setSentiment(null); }
       else { setSentiment(r.sentiment ?? null); setEmpty(null); }
     } catch (e) {
-      toast({ title: 'Could not read the conversation', description: (e as Error).message, variant: 'destructive' });
+      if (!quiet) toast({ title: 'Could not read the conversation', description: (e as Error).message, variant: 'destructive' });
     } finally {
       setBusy(false);
     }
@@ -58,7 +58,7 @@ export const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: bo
     const key = `${thread.id}:${thread.last_message_at}`;
     if (refreshedFor.current === key) return;
     refreshedFor.current = key;
-    void run(false);
+    void run(false, true);
     // `run` is re-created every render; the ref is what makes this fire once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread.id, thread.last_message_at, stale, isMember, busy]);

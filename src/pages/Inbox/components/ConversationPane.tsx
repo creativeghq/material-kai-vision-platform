@@ -32,6 +32,10 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     openThread,
     messageMoods,
     listRef,
+    contentRef,
+    olderCursor,
+    loadingOlder,
+    loadOlderMessages,
     stickToBottom,
     togglePin,
     toggleStar,
@@ -217,15 +221,24 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
 
           <div
             ref={listRef}
-            className="flex-1 overflow-y-auto p-4 space-y-3"
+            className="flex-1 overflow-y-auto overflow-x-hidden p-4"
             onScroll={(e) => {
               // "Near enough" rather than exact: a fractional scrollHeight (any zoom level,
               // any sub-pixel row height) never satisfies an equality check, so an exact
               // test would decide the reader had scrolled up while they sat at the bottom.
               const el = e.currentTarget;
               stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              if (el.scrollTop < 120 && olderCursor && !loadingOlder) void loadOlderMessages();
             }}
           >
+            <div ref={contentRef} className="space-y-3">
+            {olderCursor && !loadingThread && (
+              <div className="flex justify-center py-1">
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" disabled={loadingOlder} onClick={() => { void loadOlderMessages(); }}>
+                  {loadingOlder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Load earlier messages'}
+                </Button>
+              </div>
+            )}
             {isEmail && !loadingThread && (
               <h1 className="font-sans text-xl sm:text-2xl font-semibold leading-tight break-words pb-1">
                 {activeThread.subject || threadDisplayName(activeThread)}
@@ -301,6 +314,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 onDelete={isMember ? deleteMessage : undefined}
               />
             )))}
+            </div>
           </div>
 
           {/* Composer */}

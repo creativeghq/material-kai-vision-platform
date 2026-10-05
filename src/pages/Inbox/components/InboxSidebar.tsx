@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, UserRound, UserX, Copy, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { inboxApi } from '@/services/inboxApi';
-import { INBOX_MODES, modeSources } from '../inboxModes';
+import { visibleModes, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { inboxSourceMeta, SOURCE_FILTER_ORDER } from '../inboxSource';
 import { initials, labelDot } from '../inboxFormat';
@@ -14,6 +14,7 @@ import type { InboxPageState } from '../useInboxPage';
 
 export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
   const {
+    isPlatformOperator,
     activeWorkspaceId,
     activeWorkspace,
     wsLabels,
@@ -65,7 +66,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
       </div>
 
       <div role="tablist" aria-label="Inbox source" className="flex items-center gap-3 px-3 border-b border-hairline shrink-0">
-        {INBOX_MODES.map((m) => (
+        {visibleModes(isPlatformOperator).map((m) => (
           <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-2">
             {m.label}
           </button>

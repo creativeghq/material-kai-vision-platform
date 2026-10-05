@@ -1153,6 +1153,10 @@ function cleanEmailCopies(raw: { cc?: unknown; bcc?: unknown } | undefined, excl
 
 const INBOX_CHANNELS = new Set(['internal', 'whatsapp', 'email', 'social']);
 
+function parseMessageCursor(raw: unknown): { at: string; id: string } | null {
+  return parseThreadCursor(raw);
+}
+
 function parseThreadCursor(raw: unknown): { at: string; id: string } | null {
   if (typeof raw !== 'string') return null;
   const [at, id] = raw.split('|');
@@ -2797,13 +2801,34 @@ async function handleJwtAction(
         .select(isMember ? '*' : 'id, body, attachments, message_type, sender_participant_id, created_at, cards:metadata->cards')
         .eq('thread_id', threadId)
         .is('deleted_at', null)
-        // A peek wants the LATEST forty, not the oldest five hundred; read newest-first and put
-        // them back in order below.
-        .order('created_at', { ascending: !peek })
-        .limit(peek ? 40 : 500);
+        // Always the NEWEST page, read newest-first and put back in order below. Ascending with a
+        // cap returned the oldest 500, so a long WhatsApp chat never showed its latest messages.
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
+      const pageSize = peek ? 40 : Math.min(Math.max(Number(payload.limit) || 20, 1), 100);
+      const olderThan = parseMessageCursor(payload.before);
+      if (olderThan) {
+        mq = mq.or(`created_at.lt.${pgrstQuote(olderThan.at)},and(created_at.eq.${pgrstQuote(olderThan.at)},id.lt.${olderThan.id})`);
+      }
+      mq = mq.limit(pageSize + 1);
       if (!isMember) mq = mq.neq('message_type', 'note'); // customers never see notes
-      const { data: messagesRaw } = await mq;
-      const messages = peek ? (messagesRaw || []).slice().reverse() : messagesRaw;
+      const { data: messagesRaw, error: msgErr } = await mq;
+      if (msgErr) throw new HttpError(500, `Could not load messages: ${msgErr.message}`);
+      const newestFirst = (messagesRaw || []) as unknown as Array<Record<string, unknown>>;
+      const hasOlder = newestFirst.length > pageSize;
+      const messages = newestFirst.slice(0, pageSize).reverse();
+      const oldest = messages[0] as { id?: string; created_at?: string } | undefined;
+      const olderCursor = hasOlder && oldest?.id && oldest.created_at ? `${oldest.created_at}|${oldest.id}` : null;
+      if (olderThan) {
+        const ids = messages.map((m) => String(m.id));
+        const { data: olderStars } = ids.length
+          ? await db.from('inbox_message_stars').select('message_id').eq('user_id', userId).in('message_id', ids)
+          : { data: [] };
+        return json({
+          messages, older_cursor: olderCursor,
+          starred_message_ids: ((olderStars || []) as Array<{ message_id: string }>).map((r) => r.message_id),
+        });
+      }
 
       // The thread row itself carries the routing metadata the relay reads — the mailbox we send
       // from, the provider conversation id — plus assignment and internal counters.
@@ -2916,7 +2941,14 @@ async function handleJwtAction(
           whatsapp_window: wa, starred_message_ids: starredMessageIds, transcript, message_count: count ?? null,
         });
       }
-      return json({ thread: threadForCaller, participants: participantsForCaller, messages: messages || [], whatsapp_window: wa, starred_message_ids: starredMessageIds });
+      let pinnedMessage: Record<string, unknown> | null = null;
+      if (isMember && olderCursor) {
+        const { data: pin } = await db.from('inbox_messages').select('*')
+          .eq('thread_id', threadId).is('deleted_at', null).not('metadata->>pinned_at', 'is', null)
+          .order('metadata->>pinned_at', { ascending: false }).limit(1).maybeSingle();
+        pinnedMessage = (pin as Record<string, unknown> | null) ?? null;
+      }
+      return json({ thread: threadForCaller, participants: participantsForCaller, messages: messages || [], older_cursor: olderCursor, pinned_message: pinnedMessage, whatsapp_window: wa, starred_message_ids: starredMessageIds });
     }
 
     case 'create_marketplace_inquiry': {
@@ -5595,7 +5627,13 @@ async function readConversationSentiment(
         }],
       }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      if (/credit balance is too low/i.test(detail)) {
+        throw new HttpError(402, 'The AI account is out of credit, so the conversation cannot be read. Top up Anthropic billing.');
+      }
+      throw new Error(`HTTP ${res.status}: ${detail.slice(0, 200)}`);
+    }
     const body = await res.json();
     const use = (body.content ?? []).find((c: Record<string, unknown>) => c.type === 'tool_use');
     if (!use?.input) throw new Error('the model returned no verdict');
@@ -5627,6 +5665,7 @@ async function readConversationSentiment(
     });
     if (logErr) console.warn('[inbox-api] sentiment usage log failed:', logErr.message);
   } catch (err) {
+    if (err instanceof HttpError) throw err;
     throw new HttpError(502, `Could not read the conversation: ${err instanceof Error ? err.message : String(err)}`);
   }
 

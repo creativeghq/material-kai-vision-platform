@@ -593,7 +593,16 @@ export const inboxApi = {
        * Absent on an older API response, which reads as "none" and is correct.
        */
       starred_message_ids?: string[];
+      /** Cursor for the page before this one; null when this is the start of the conversation. */
+      older_cursor?: string | null;
+      /** The latest pin when it is older than the page returned. */
+      pinned_message?: InboxMessage | null;
     }>('get_thread', { thread_id });
+  },
+  getOlderMessages(thread_id: string, before: string) {
+    return call<{ messages: InboxMessage[]; older_cursor: string | null; starred_message_ids?: string[] }>(
+      'get_thread', { thread_id, before, limit: 20 },
+    );
   },
   sendMessage(input: {
     thread_id: string; body?: string; attachments?: AttachmentInput[]; message_type?: 'text' | 'note';

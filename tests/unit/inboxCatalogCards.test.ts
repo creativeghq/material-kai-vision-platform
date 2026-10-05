@@ -332,7 +332,8 @@ describe('JARVIS reads a conversation without leaving a trace, and reads it as d
     const c = slice(code(INBOX_API), "case 'get_thread'", "case 'create_marketplace_inquiry'");
     expect(c).toMatch(/const peek = payload\.peek === true && isMember;/);
     expect(c).toMatch(/if \(access\.participant && !peek\) \{/);
-    expect(c).toMatch(/\.order\('created_at', \{ ascending: !peek \}\)/);
+    expect(c).toMatch(/\.order\('created_at', \{ ascending: false \}\)/);
+    expect(c).toMatch(/newestFirst\.slice\(0, pageSize\)\.reverse\(\)/);
     expect(c).toMatch(/buildTranscript\(db, threadId, rows\.slice\(\)\.reverse\(\)\)/);
   });
 

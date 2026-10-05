@@ -24,8 +24,14 @@ const MODE_SOURCES: Record<InboxMode, InboxSourceKey[] | null> = {
   gmail: [],
 };
 
-export function parseInboxMode(raw: string | null | undefined): InboxMode {
-  return raw === 'platform' || raw === 'whatsapp' || raw === 'gmail' ? raw : 'all';
+/** Gmail is the operator's only, until Google verification lets tenants connect it. */
+export function visibleModes(isOperator: boolean) {
+  return INBOX_MODES.filter((m) => m.key !== 'gmail' || isOperator);
+}
+
+export function parseInboxMode(raw: string | null | undefined, isOperator = false): InboxMode {
+  if (raw === 'gmail') return isOperator ? 'gmail' : 'all';
+  return raw === 'platform' || raw === 'whatsapp' ? raw : 'all';
 }
 
 export function modeChannels(mode: InboxMode): string[] {
