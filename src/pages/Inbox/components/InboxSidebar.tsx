@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, UserRound, UserX, Copy, FileText } from 'lucide-react';
+import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, UserRound, UserX, Copy, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { inboxApi } from '@/services/inboxApi';
 import { INBOX_MODES, modeSources } from '../inboxModes';
@@ -26,6 +26,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     goToView,
     assignmentView,
     setAssignmentView,
+    setShowScheduled,
     nextCursor,
     sourceFilter,
     setSourceFilter,
@@ -113,6 +114,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <NavRow icon={<Star className="w-4 h-4 shrink-0" />} label="Starred" active={view === 'starred'} onClick={() => goToView('starred')} />
           <NavRow icon={<FilePen className="w-4 h-4 shrink-0" />} label="Drafts" active={view === 'drafts'} onClick={() => goToView('drafts')} />
           <NavRow icon={<Send className="w-4 h-4 shrink-0" />} label="Sent" active={view === 'sent'} onClick={() => goToView('sent')} />
+          <NavRow icon={<CalendarClock className="w-4 h-4 shrink-0" />} label="Scheduled" active={false} onClick={() => setShowScheduled(true)} />
           <NavRow icon={<Archive className="w-4 h-4 shrink-0" />} label="Archived" active={view === 'archived'} onClick={() => goToView('archived')} />
         </nav>
 

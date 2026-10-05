@@ -11,6 +11,8 @@ import { EmailHtmlView } from '../components/EmailHtmlView';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { splitAddresses } from '../emailRecipients';
 import type { GmailMailboxState } from './useGmailMailbox';
+import { GmailThreadFacts } from './GmailThreadFacts';
+import { SendLaterMenu } from '../components/SendLater';
 
 export async function fileToAttachment(file: File) {
   const buf = new Uint8Array(await file.arrayBuffer());
@@ -108,15 +110,22 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
     requestAnimationFrame(() => bodyRef.current?.focus());
   };
 
-  const send = async () => {
+  const send = async (sendAt?: Date) => {
     if (!account || !openId || !lastIncoming) return;
     setSending(true);
     try {
-      await gmailApi.send({
+      const input = {
         account_id: account.id, thread_id: openId, reply_to_message_id: lastIncoming.id,
         to: splitAddresses(to), cc: splitAddresses(cc), bcc: splitAddresses(bcc), body,
         attachments: files.length ? await Promise.all(files.map(fileToAttachment)) : undefined,
-      });
+      };
+      if (sendAt) {
+        await gmailApi.schedule({ ...input, send_at: sendAt.toISOString() });
+        toast({ title: 'Reply scheduled', description: `It goes out ${formatDate(sendAt.toISOString())} ${formatTime(sendAt.toISOString())}.` });
+        setReplying(null); setBody(''); setFiles([]); setCc(''); setBcc(''); setPreview(false);
+        return;
+      }
+      await gmailApi.send(input);
       toast({ title: 'Reply sent' });
       setReplying(null); setBody(''); setFiles([]); setCc(''); setBcc(''); setPreview(false);
       await openThread(openId);
@@ -153,6 +162,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
+      {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={row?.subject ?? last?.subject ?? ''} sender={lastIncoming?.from ?? null} />}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2">
         {loadingThread || !openMessages ? (
           <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
@@ -197,7 +207,8 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
               ))}
               <span className="ml-auto flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setReplying(null)}>Discard</Button>
-                <Button size="sm" onClick={send} disabled={sending || !to.trim() || (!body.trim() && files.length === 0)}>
+                <SendLaterMenu disabled={sending || !to.trim() || (!body.trim() && files.length === 0)} onPick={(d) => { void send(d); }} />
+                <Button size="sm" onClick={() => { void send(); }} disabled={sending || !to.trim() || (!body.trim() && files.length === 0)}>
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4 mr-1" />Send</>}
                 </Button>
               </span>

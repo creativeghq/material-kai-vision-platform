@@ -1,12 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
-export interface MailAccount { id: string; email: string; display_name: string | null; status: 'active' | 'needs_reauth'; last_error: string | null; workspace_id: string }
+export interface MailAccount {
+  id: string; email: string; display_name: string | null; status: 'active' | 'needs_reauth'; last_error: string | null;
+  workspace_id: string; is_shared: boolean; is_owner: boolean;
+}
+export interface GmailThreadMeta {
+  contact: { id: string; name: string | null; email: string | null; phone: string | null; position: string | null; companies: Array<{ id: string; name: string }> } | null;
+  contact_linked: boolean; contact_suggested: boolean;
+  assignee_user_id: string | null; snoozed_until: string | null;
+  shared: boolean; members: Array<{ user_id: string; name: string }>;
+}
 export interface GmailLabel { id: string; name: string; type: 'system' | 'user'; unread: number; total: number; color: string | null }
 export interface GmailAddress { name: string | null; address: string | null }
 export interface GmailThreadRow {
   id: string; subject: string; from: GmailAddress; participants: string[]; snippet: string; date: string | null;
   unread: boolean; starred: boolean; message_count: number; label_ids: string[];
+  contact_id: string | null; contact_name: string | null; assignee_user_id: string | null; snoozed_until: string | null;
 }
 export interface GmailAttachment { attachmentId: string; filename: string; mimeType: string; size: number }
 export interface GmailMessage {
@@ -39,5 +49,21 @@ export const gmailApi = {
     call<{ data_base64: string; size: number | null }>('attachment', { account_id, message_id, attachment_id }),
   modify: (input: { account_id: string; thread_id: string; add?: string[]; remove?: string[]; trash?: boolean }) =>
     call<{ ok: boolean }>('modify', input),
+  snoozed: (account_id: string) =>
+    call<{ threads: GmailThreadRow[]; next_page_token: null; estimate: number }>('snoozed', { account_id }),
+  threadMeta: (account_id: string, thread_id: string, sender?: string | null) =>
+    call<GmailThreadMeta>('thread_meta', { account_id, thread_id, sender }),
+  linkContact: (input: { account_id: string; thread_id: string; contact_id: string | null; subject?: string; sender?: string }) =>
+    call<{ ok: boolean }>('link_contact', input),
+  createContact: (input: { account_id: string; thread_id: string; email: string; name?: string }) =>
+    call<{ ok: boolean; contact_id: string; created: boolean }>('create_contact', input),
+  snooze: (input: { account_id: string; thread_id: string; until: string | null; subject?: string }) =>
+    call<{ ok: boolean; snoozed_until: string | null }>('snooze', input),
+  assign: (account_id: string, thread_id: string, user_id: string | null) => call<{ ok: boolean }>('assign', { account_id, thread_id, user_id }),
+  members: (account_id: string) => call<{ is_shared: boolean; member_ids: string[] }>('members', { account_id }),
+  share: (account_id: string, is_shared: boolean, member_ids: string[]) =>
+    call<{ ok: boolean; is_shared: boolean; member_ids: string[] }>('share', { account_id, is_shared, member_ids }),
+  schedule: (input: GmailSendInput & { send_at: string }) =>
+    call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule', input),
   send: (input: GmailSendInput) => call<{ ok: boolean; message_id: string; thread_id: string }>('send', input),
 };

@@ -2103,6 +2103,37 @@ async function handleJwtAction(
       return json({ message: msg });
     }
 
+    case 'schedule_message': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      const body = payload.body != null && String(payload.body).trim() ? String(payload.body) : null;
+      const sendAt = new Date(String(payload.send_at ?? ''));
+      const now = Date.now();
+      if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() < now + 60_000 || sendAt.getTime() > now + 366 * 86_400_000) {
+        throw new HttpError(400, 'Pick a send time between a minute and a year from now');
+      }
+      const copies = thread.channel === 'email'
+        ? cleanEmailCopies({ cc: payload.email_cc, bcc: payload.email_bcc }, [])
+        : { cc: [], bcc: [] };
+      const attachments = await normalizeAttachments(db, threadId, payload.attachments);
+      if (!body && attachments.length === 0) throw new HttpError(400, 'Write a message or attach a file');
+      const { data, error } = await db.from('mail_scheduled_sends').insert({
+        user_id: userId, workspace_id: String(thread.workspace_id), kind: 'inbox', inbox_thread_id: threadId,
+        payload: {
+          body, attachments, email_cc: copies.cc, email_bcc: copies.bcc,
+          ...(payload.reply_to_message_id ? { reply_to_message_id: String(payload.reply_to_message_id) } : {}),
+        },
+        send_at: sendAt.toISOString(),
+        summary: (body ?? attachments.map((a) => a.name ?? 'file').join(', ')).replace(/\s+/g, ' ').slice(0, 200),
+        recipients: String(thread.subject ?? '').slice(0, 300),
+      }).select('id, send_at').single();
+      if (error) throw new HttpError(500, `Could not schedule: ${error.message}`);
+      return json({ ok: true, scheduled: data });
+    }
+
     case 'mark_read': {
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');
@@ -5703,6 +5734,23 @@ async function handler(req: Request): Promise<Response> {
   // this, every operator reply on a connected thread relayed with an empty bearer and came back
   // 401 — stored, shown in the transcript, never delivered.
   await ensureZernioSecrets(db);
+
+  /* A scheduled message, sent by mail-scheduler as the person who scheduled it; every access check runs again now. */
+  if (action === 'internal_scheduled_send') {
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) throw new HttpError(401, 'Unauthorized');
+    const { data: row, error } = await db.from('mail_scheduled_sends')
+      .select('id, user_id, inbox_thread_id, payload, status, kind').eq('id', String(payload.scheduled_id || '')).maybeSingle();
+    if (error) throw new HttpError(500, error.message);
+    if (!row || row.kind !== 'inbox' || row.status !== 'sending') throw new HttpError(409, 'That scheduled message is not claimed for sending');
+    const p = (row.payload ?? {}) as Json;
+    return handleJwtAction(db, String(row.user_id), 'send_message', {
+      thread_id: row.inbox_thread_id, body: p.body ?? undefined, attachments: p.attachments ?? [],
+      email_cc: p.email_cc ?? [], email_bcc: p.email_bcc ?? [],
+      ...(p.reply_to_message_id ? { reply_to_message_id: p.reply_to_message_id } : {}),
+      client_token: row.id,
+    });
+  }
 
   /* internal_send_follow_up — the scheduled chase, sent by the cron as the person who scheduled it. */
   if (action === 'internal_send_follow_up') {

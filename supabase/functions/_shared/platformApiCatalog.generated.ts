@@ -2238,6 +2238,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "set_thread_labels",
           "create_customer_thread",
           "compose_email",
+          "schedule_message",
           "list_whatsapp_templates",
           "send_whatsapp_template",
           "create_share_link",
@@ -2270,6 +2271,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "set_follow_up",
           "clear_follow_up",
           "internal_send_follow_up",
+          "internal_scheduled_send",
           "internal_draft_reply"
         ],
         "required": true,
@@ -2479,6 +2481,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "array",
         "description": "Bcc addresses"
       },
+      "send_at": {
+        "type": "string",
+        "description": "When to send: a minute to a year from now (string (ISO time))"
+      },
+      "reply_to_message_id": {
+        "type": "string",
+        "description": "Message being answered (string (uuid))"
+      },
       "template_id": {
         "type": "string",
         "description": "messaging_templates id (string (uuid))"
@@ -2609,6 +2619,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "sender_user_id": {
         "type": "string",
         "description": "Must still be a member of the thread’s workspace, or 403 (string (uuid))"
+      },
+      "scheduled_id": {
+        "type": "string",
+        "description": "mail_scheduled_sends row in status sending (string (uuid))"
       }
     }
   },

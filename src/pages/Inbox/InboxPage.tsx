@@ -14,6 +14,7 @@ import { ThreadListPane } from './components/ThreadListPane';
 import { InboxSidebar } from './components/InboxSidebar';
 import { ConversationActions } from './components/ConversationActions';
 import { GmailInbox } from './gmail/GmailInbox';
+import { ScheduledDialog } from './components/SendLater';
 
 const InboxPage: React.FC = () => {
   const s = useInboxPage();
@@ -21,6 +22,8 @@ const InboxPage: React.FC = () => {
     activeWorkspaceId,
     mode,
     setMode,
+    showScheduled,
+    setShowScheduled,
     isPlatformOperator,
     threads,
     allWorkspaces,
@@ -93,6 +96,7 @@ const InboxPage: React.FC = () => {
         */}
       </div>
 
+      {showScheduled && <ScheduledDialog onClose={() => setShowScheduled(false)} />}
       {showNew && activeWorkspaceId && (
         <NewThreadDialog
           workspaceId={activeWorkspaceId}

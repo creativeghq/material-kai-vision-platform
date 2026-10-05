@@ -19,6 +19,7 @@ import { emailReplyRecipients, splitAddresses } from './emailRecipients';
 import { modeChannels, modeSources, parseInboxMode, type InboxFolder, type InboxMode } from './inboxModes';
 import { NONE_VALUE } from '@/components/core/filters';
 import { bulkSummary, runBulk } from './inboxBulk';
+import { formatDate, formatTime } from '@/utils/datetime';
 
 
 
@@ -663,6 +664,34 @@ export function useInboxPage() {
     }
   }, [activeId, draft, attachment, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, toast]);
 
+  const [showScheduled, setShowScheduled] = useState(false);
+  const scheduleSend = useCallback(async (sendAt: Date) => {
+    if (!activeId || isNote || (!draft.trim() && !attachment)) return;
+    if (pendingCards.length) {
+      toast({ title: 'Catalog cards cannot be scheduled', description: 'Send them now, or remove them to schedule the text.', variant: 'destructive' });
+      return;
+    }
+    setSending(true);
+    try {
+      let attachments;
+      if (attachment) {
+        const buf = new Uint8Array(await attachment.arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+        attachments = [{ filename: attachment.name, content_type: attachment.type || 'application/octet-stream', data_base64: btoa(bin) }];
+      }
+      await inboxApi.scheduleMessage({
+        thread_id: activeId, send_at: sendAt.toISOString(), body: draft.trim() || undefined, attachments,
+        reply_to_message_id: replyTo ? replyTo.id : undefined,
+        ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc) } : {}),
+      });
+      toast({ title: 'Scheduled', description: `It goes out ${formatDate(sendAt.toISOString())} ${formatTime(sendAt.toISOString())}.` });
+      setDraft(''); setAttachment(null); setReplyTo(null); setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false);
+    } catch (e) {
+      toast({ title: 'Could not schedule', description: (e as Error).message, variant: 'destructive' });
+    } finally { setSending(false); }
+  }, [activeId, isNote, draft, attachment, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, toast]);
+
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   // The steer, when the member typed one, tells it WHAT the reply should do.
   const aiSuggest = useCallback(async () => {
@@ -997,6 +1026,9 @@ export function useInboxPage() {
     replyAll,
     templateOpen,
     setTemplateOpen,
+    scheduleSend,
+    showScheduled,
+    setShowScheduled,
     emailPreview,
     setEmailPreview,
     aiDrafting,

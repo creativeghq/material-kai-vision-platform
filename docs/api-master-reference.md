@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (171)
+## 1. Supabase Edge Functions (172)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -359,6 +359,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `gmail-api` _(GET + POST)_ | userJwt | A person's own Gmail, live: connect with the platform Google client, browse labels and threads, read, reply, label, trash |
+| `mail-scheduler` | cron | Cron: wakes snoozed Gmail threads and delivers scheduled sends (Gmail and Inbox) |
 
 **Marketplace**
 

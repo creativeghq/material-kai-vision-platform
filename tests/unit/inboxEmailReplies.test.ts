@@ -92,3 +92,18 @@ describe('a member can start an email conversation from the Inbox', () => {
     expect(emailBranch).toMatch(/!lastInbound \|\| \/\^re:\/i\.test\(subjectBase\)/);
   });
 });
+
+describe('a scheduled Inbox message is sent later as the person who scheduled it', () => {
+  it('schedules only for members, and validates before storing', () => {
+    const sched = API.slice(API.indexOf("case 'schedule_message'"), API.indexOf("case 'mark_read'"));
+    expect(sched).toContain("if (!access.isMember) throw new HttpError(404");
+    expect(sched.indexOf('cleanEmailCopies(')).toBeLessThan(sched.indexOf(".from('mail_scheduled_sends').insert"));
+  });
+
+  it('re-runs send_message as that person, with the row id as its idempotency token', () => {
+    const internal = API.slice(API.indexOf("action === 'internal_scheduled_send'"), API.indexOf("action === 'internal_send_follow_up'"));
+    expect(internal).toContain("row.status !== 'sending'");
+    expect(internal).toContain("handleJwtAction(db, String(row.user_id), 'send_message'");
+    expect(internal).toContain('client_token: row.id');
+  });
+});

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { supabase } from '@/integrations/supabase/client';
 import { gmailApi, type GmailLabel, type GmailMessage, type GmailThreadRow, type MailAccount } from '@/services/gmailApi';
 
 const ACCOUNT_KEY = 'inbox.gmail.account';
+export const SNOOZED_VIEW = '__snoozed';
 
 const CALLBACK_MESSAGES: Record<string, { title: string; description?: string; bad?: boolean }> = {
   connected: { title: 'Gmail connected' },
@@ -38,6 +40,9 @@ export function useGmailMailbox() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const listSeq = useRef(0);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [assignFilter, setAssignFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
+  useEffect(() => { void supabase.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null)); }, []);
 
   const account = useMemo(() => accounts?.find((a) => a.id === accountId) ?? accounts?.[0] ?? null, [accounts, accountId]);
 
@@ -108,7 +113,9 @@ export function useGmailMailbox() {
     setLoadingList(true);
     setListError(null);
     try {
-      const r = await gmailApi.threads({ account_id: account.id, label_id: appliedQuery ? undefined : labelId, q: appliedQuery || undefined });
+      const r = labelId === SNOOZED_VIEW && !appliedQuery
+        ? await gmailApi.snoozed(account.id)
+        : await gmailApi.threads({ account_id: account.id, label_id: appliedQuery ? undefined : labelId, q: appliedQuery || undefined });
       if (seq !== listSeq.current) return;
       setThreads(r.threads);
       setNextPageToken(r.next_page_token);
@@ -179,8 +186,21 @@ export function useGmailMailbox() {
     }
   }, [account, labelId, openId, toast, loadLabels]);
 
+  const patchThread = useCallback((id: string, patch: Partial<GmailThreadRow>) => {
+    setThreads((cur) => cur.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }, []);
+  const dropThread = useCallback((id: string) => {
+    setThreads((cur) => cur.filter((t) => t.id !== id));
+    if (openId === id) { setOpenId(null); setOpenMessages(null); }
+  }, [openId]);
+
+  const visibleThreads = useMemo(() => {
+    if (!account?.is_shared || assignFilter === 'all') return threads;
+    return threads.filter((t) => (assignFilter === 'mine' ? t.assignee_user_id === myUserId : !t.assignee_user_id));
+  }, [threads, account, assignFilter, myUserId]);
+
   return {
-    workspaceId, configured, accounts, account, setAccountId, connect, disconnect,
+    workspaceId, myUserId, reloadAccounts: loadAccounts, assignFilter, setAssignFilter, visibleThreads, patchThread, dropThread, configured, accounts, account, setAccountId, connect, disconnect,
     labels, labelId, setLabelId, query, setQuery, appliedQuery,
     threads, nextPageToken, loadingList, loadingMore, listError, loadThreads, loadMore,
     openId, setOpenId, openMessages, loadingThread, openThread, modify,

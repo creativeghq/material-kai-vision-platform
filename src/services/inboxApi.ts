@@ -557,6 +557,12 @@ export const inboxApi = {
   sendWhatsAppTemplate(input: { thread_id: string; template_id: string; variables: Record<string, string> }) {
     return call<{ message: InboxMessage | null }>('send_whatsapp_template', input);
   },
+  scheduleMessage(input: {
+    thread_id: string; send_at: string; body?: string; attachments?: AttachmentInput[];
+    email_cc?: string[]; email_bcc?: string[]; reply_to_message_id?: string;
+  }) {
+    return call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule_message', input);
+  },
   composeEmail(input: {
     workspace_id: string; to: string; subject: string; body?: string; contact_id?: string;
     email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[];

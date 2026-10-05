@@ -10,6 +10,7 @@ import { formatDate, formatTime } from '@/utils/datetime';
 import { CatalogPicker, EmojiPicker, SlashCommandMenu } from './ComposerPickers';
 import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
+import { SendLaterMenu } from './SendLater';
 import type { InboxPageState } from '../useInboxPage';
 
 
@@ -40,6 +41,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     replyAll,
     templateOpen,
     setTemplateOpen,
+    scheduleSend,
     emailPreview,
     setEmailPreview,
     openThread,
@@ -360,6 +362,9 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
             className={`flex-1 min-h-[44px] max-h-32 resize-none bg-card ${isNote ? 'border-warning/40 focus-visible:ring-warning/30' : ''}`}
             disabled={waBlocked}
           />
+          {isMember && !isNote && !waBlocked && (
+            <SendLaterMenu disabled={sending || (!draft.trim() && !attachment)} onPick={(d) => { void scheduleSend(d); }} />
+          )}
           <Button className="h-9 w-9 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment && pendingCards.length === 0)}>
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>

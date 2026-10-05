@@ -2971,7 +2971,16 @@
       "thread",
       "attachment",
       "modify",
-      "send"
+      "send",
+      "schedule",
+      "snoozed",
+      "thread_meta",
+      "link_contact",
+      "create_contact",
+      "snooze",
+      "assign",
+      "members",
+      "share"
     ],
     "request": [
       "workspace_id",
@@ -2992,9 +3001,33 @@
       "subject",
       "body",
       "reply_to_message_id",
-      "attachments"
+      "attachments",
+      "send_at",
+      "sender",
+      "contact_id",
+      "email",
+      "name",
+      "until",
+      "user_id",
+      "is_shared",
+      "member_ids"
     ],
     "response": "{ configured, accounts } | { auth_url } | { labels } | { threads, next_page_token } | { id, messages } | { data_base64 } | { ok, message_id, thread_id }"
+  },
+  {
+    "name": "mail-scheduler",
+    "tag": "Inbox",
+    "summary": "Cron: wakes snoozed Gmail threads and delivers scheduled sends (Gmail and Inbox)",
+    "description": "Runs every minute. Each row is CLAIMED before it is acted on — a snooze by clearing `snoozed_until` where it still holds the value read, a scheduled send by moving it `pending → sending` — so two overlapping runs cannot act twice. A Gmail send replays the validated payload through the shared Gmail client; an Inbox send calls inbox-api `internal_scheduled_send`, which re-runs `send_message` AS the person who scheduled it (every access check again, the row id as the idempotency token). A send still `sending` after 15 minutes is marked failed with a message saying it may have gone, never resent. A wake that Gmail refuses is retried in 15 minutes. `mail.scheduler_overdue` watches what this should clear.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "docs/inbox-system.md",
+    "methods": [
+      "POST"
+    ],
+    "request": [],
+    "response": "{ ok, stalled, snoozes: { woken, failed }, scheduled: { sent, failed } }"
   },
   {
     "name": "gsc-api",
@@ -8505,6 +8538,54 @@
         ]
       },
       {
+        "name": "schedule_message",
+        "summary": "Send a message into a conversation later. Delivered by mail-scheduler as you, with every access check run again at send time.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Conversation"
+          },
+          {
+            "name": "send_at",
+            "type": "string (ISO time)",
+            "required": true,
+            "desc": "When to send: a minute to a year from now"
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": false,
+            "desc": "Text (required unless a file is attached)"
+          },
+          {
+            "name": "attachments",
+            "type": "object[]",
+            "required": false,
+            "desc": "Files: { filename, content_type, data_base64 }"
+          },
+          {
+            "name": "email_cc",
+            "type": "string[]",
+            "required": false,
+            "desc": "Email threads: Cc"
+          },
+          {
+            "name": "email_bcc",
+            "type": "string[]",
+            "required": false,
+            "desc": "Email threads: Bcc"
+          },
+          {
+            "name": "reply_to_message_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "Message being answered"
+          }
+        ]
+      },
+      {
         "name": "list_whatsapp_templates",
         "summary": "Meta-approved WhatsApp templates of the conversation's workspace, for sending outside the 24-hour window.",
         "params": [
@@ -9168,6 +9249,18 @@
           }
         ],
         "response": "{ok, message_id} — 409 when the WhatsApp service window is closed"
+      },
+      {
+        "name": "internal_scheduled_send",
+        "summary": "Service-role only. mail-scheduler hands over a CLAIMED scheduled message; it is sent with send_message as the person who scheduled it, every access check run again, the row id as idempotency token.",
+        "params": [
+          {
+            "name": "scheduled_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "mail_scheduled_sends row in status sending"
+          }
+        ]
       },
       {
         "name": "internal_draft_reply",
