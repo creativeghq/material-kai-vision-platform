@@ -9,7 +9,7 @@ import {
   exchangeGoogleCode, googleClientId, googleConsentUrl, GOOGLE_USERINFO_URL, revokeGoogleToken,
   signOAuthState, verifyOAuthState,
 } from '../_shared/google-oauth.ts';
-import { parseAddress, parseGmailPayload, type GmailPart } from '../_shared/mail-mime.ts';
+import { parseAddress, parseAddressList, parseGmailPayload, type GmailPart } from '../_shared/mail-mime.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import {
@@ -27,12 +27,12 @@ const SCOPE = 'https://www.googleapis.com/auth/gmail.modify https://www.googleap
 const SCHEDULE_LIMIT_BYTES = 10 * 1024 * 1024;
 const PAGE_SIZE = 25;
 
-interface Account { id: string; user_id: string; workspace_id: string; email: string; display_name: string | null; status: string; is_shared: boolean }
+interface Account { id: string; user_id: string; workspace_id: string; email: string; display_name: string | null; status: string; is_shared: boolean; picture_url: string | null }
 
 /** The caller's own mailbox, or a SHARED one they were let into. `ownerOnly` for settings and disconnect. */
 async function accountFor(db: Db, userId: string, accountId: string, ownerOnly = false): Promise<Account> {
   const { data, error } = await db.from('mail_accounts')
-    .select('id, user_id, workspace_id, email, display_name, status, is_shared').eq('id', accountId).maybeSingle();
+    .select('id, user_id, workspace_id, email, display_name, status, is_shared, picture_url').eq('id', accountId).maybeSingle();
   if (error) throw new HttpError(500, `Could not read the mailbox: ${error.message}`);
   if (!data || data.status === 'disconnected') throw new HttpError(404, 'Mailbox not found');
   if (data.user_id === userId) return data as Account;
@@ -85,8 +85,28 @@ function listRow(t: Record<string, unknown>) {
     starred: labels.has('STARRED'),
     message_count: messages.length,
     label_ids: [...labels],
+    has_attachment: messages.some((m) => ((m.payload as GmailPart | undefined)?.mimeType ?? '').toLowerCase() === 'multipart/mixed'),
   };
 }
+
+/** Photos we already hold for these addresses: the account's own Google photo, then platform users. */
+async function photosFor(db: Db, account: { email: string; picture_url?: string | null }, emails: Array<string | null>) {
+  const wanted = [...new Set(emails.filter((e): e is string => !!e).map((e) => e.toLowerCase()))].slice(0, 200);
+  const map = new Map<string, string>();
+  if (account.picture_url) map.set(account.email.toLowerCase(), account.picture_url);
+  const rest = wanted.filter((e) => !map.has(e));
+  if (rest.length) {
+    const { data, error } = await db.from('user_profiles').select('email, avatar_url').in('email', rest).not('avatar_url', 'is', null);
+    if (error) console.error('[gmail-api] profile photos unavailable', error.message);
+    for (const r of (data ?? []) as Array<{ email: string | null; avatar_url: string | null }>) {
+      if (r.email && r.avatar_url && /^https:\/\//.test(r.avatar_url)) map.set(r.email.toLowerCase(), r.avatar_url);
+    }
+  }
+  return map;
+}
+
+const withPhoto = (photos: Map<string, string>) => (a: { name: string | null; address: string | null }) =>
+  ({ ...a, photo_url: a.address ? photos.get(a.address) ?? null : null });
 
 const SYSTEM_LABELS = ['INBOX', 'STARRED', 'SNOOZED', 'SENT', 'DRAFT', 'IMPORTANT', 'SPAM', 'TRASH'];
 
@@ -107,11 +127,12 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const granted = String(tok.scope ?? '').split(' ');
       if (!granted.some((s) => s.endsWith('/gmail.modify'))) return back('scope_missing');
       const who = await fetch(GOOGLE_USERINFO_URL, { headers: { Authorization: `Bearer ${tok.access_token}` } })
-        .then((r) => r.json()).catch(() => ({})) as { email?: string; name?: string };
+        .then((r) => r.json()).catch(() => ({})) as { email?: string; name?: string; picture?: string };
       if (!who.email) return back('no_email');
       const { data: acct, error } = await db.from('mail_accounts').upsert({
         user_id: state.user_id, workspace_id: state.workspace_id, provider: 'gmail',
         email: who.email.toLowerCase(), display_name: who.name ?? null, status: 'active',
+        picture_url: typeof who.picture === 'string' && who.picture.startsWith('https://') ? who.picture : null,
         scopes: granted, last_error: null, updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id,provider,email' }).select('id').single();
       if (error || !acct) return back('save_failed');
@@ -168,7 +189,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       if (memErr) throw new HttpError(500, memErr.message);
       const sharedIds = (memberOf ?? []).map((m: { account_id: string }) => m.account_id);
       let q = db.from('mail_accounts')
-        .select('id, user_id, email, display_name, status, last_error, workspace_id, is_shared')
+        .select('id, user_id, email, display_name, status, last_error, workspace_id, is_shared, picture_url')
         .neq('status', 'disconnected').order('created_at', { ascending: true });
       q = sharedIds.length
         ? q.or(`user_id.eq.${userId},and(is_shared.eq.true,id.in.(${sharedIds.join(',')}))`)
@@ -234,10 +255,13 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const { error: usedErr } = await db.from('mail_accounts').update({ last_used_at: new Date().toISOString() }).eq('id', account.id);
       if (usedErr) console.error('[gmail-api] last_used_at not stamped', account.id, usedErr);
       const facts = await indexFacts(db, account.id, ids);
-      const rows = threads.map((t) => {
+      const base = threads.map(listRow);
+      const photos = await photosFor(db, account, base.map((r) => r.from.address));
+      const rows = threads.map((t, i) => {
         const f = facts.get(String(t.id));
         return {
-          ...listRow(t),
+          ...base[i],
+          from: withPhoto(photos)(base[i].from),
           contact_id: f?.contact_id ?? null,
           contact_name: (f?.crm_contacts as { name?: string } | null)?.name ?? null,
           assignee_user_id: f?.assignee_user_id ?? null,
@@ -253,16 +277,23 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const threadId = String(body.thread_id ?? '');
       if (!/^[0-9a-f]+$/i.test(threadId)) throw new HttpError(400, 'thread_id is required');
       const t = await gmail(token, `/threads/${threadId}?format=full`);
-      const messages = ((t.messages ?? []) as Array<Record<string, unknown>>).map((m) => {
-        const parsed = parseGmailPayload(m.payload as GmailPart);
+      const raw = ((t.messages ?? []) as Array<Record<string, unknown>>).map((m) => ({ m, parsed: parseGmailPayload(m.payload as GmailPart) }));
+      const people = raw.map(({ parsed }) => ({
+        from: parseAddress(parsed.headers.from),
+        to: parseAddressList(parsed.headers.to),
+        cc: parseAddressList(parsed.headers.cc),
+      }));
+      const photos = await photosFor(db, account, people.flatMap((p) => [p.from.address, ...p.to.map((a) => a.address), ...p.cc.map((a) => a.address)]));
+      const photo = withPhoto(photos);
+      const messages = raw.map(({ m, parsed }, i) => {
         const h = parsed.headers;
         return {
           id: m.id,
           label_ids: m.labelIds ?? [],
           date: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : null,
-          from: parseAddress(h.from),
-          to: (h.to ?? '').split(',').map((a) => parseAddress(a).address).filter(Boolean),
-          cc: (h.cc ?? '').split(',').map((a) => parseAddress(a).address).filter(Boolean),
+          from: photo(people[i].from),
+          to: people[i].to.map(photo),
+          cc: people[i].cc.map(photo),
           reply_to: parseAddress(h['reply-to']).address,
           subject: h.subject ?? '',
           message_id: h['message-id'] ?? null,

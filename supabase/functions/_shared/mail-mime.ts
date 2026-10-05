@@ -156,3 +156,20 @@ export function parseAddress(raw: string | undefined | null): { name: string | n
   if (m) return { name: m[1].trim().replace(/^"|"$/g, '').trim() || null, address: m[2].trim().toLowerCase() };
   return { name: null, address: v.includes('@') ? v.toLowerCase() : null };
 }
+
+/** An address header split into people, keeping commas inside quotes and angle brackets. */
+export function parseAddressList(raw: string | undefined | null): Array<{ name: string | null; address: string | null }> {
+  const out: string[] = [];
+  let cur = '';
+  let quoted = false;
+  let angle = 0;
+  for (const ch of String(raw ?? '')) {
+    if (ch === '"') quoted = !quoted;
+    else if (!quoted && ch === '<') angle++;
+    else if (!quoted && ch === '>') angle = Math.max(0, angle - 1);
+    if (ch === ',' && !quoted && angle === 0) { out.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map((p) => parseAddress(p)).filter((a) => a.address);
+}

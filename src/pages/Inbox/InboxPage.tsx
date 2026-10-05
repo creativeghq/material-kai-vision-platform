@@ -80,10 +80,6 @@ const InboxPage: React.FC = () => {
         {/* ── Column 1 · Message list ── */}
         <ThreadListPane s={s} />
 
-        {/* ── Column 2 · Conversation ──
-            Takes every column the sidebar and the list do not, at every breakpoint. The
-            customer profile is a drawer now (opened from the name or the person icon in this
-            header), so there is no fourth column to make room for. */}
         <ConversationPane s={s} />
         </>)}
 

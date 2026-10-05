@@ -3,7 +3,6 @@ import { AlarmClock, AlertTriangle, Archive, CalendarClock, Users, FilePen, Inbo
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
@@ -12,12 +11,12 @@ import { gmailApi } from '@/services/gmailApi';
 import { timeAgo } from '../inboxFormat';
 import { formatDate } from '@/utils/datetime';
 import { INBOX_MODES, type InboxMode } from '../inboxModes';
-import { splitAddresses } from '../emailRecipients';
 import { NavRow, SidebarHeading } from '../components/InboxPrimitives';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { GmailThreadView, fileToAttachment } from './GmailThreadView';
 import { SNOOZED_VIEW, useGmailMailbox, type GmailMailboxState } from './useGmailMailbox';
 import { GmailShareDialog } from './GmailShareDialog';
+import { MailAvatar, RecipientInput } from './mailParts';
 import { ScheduledDialog, SendLaterMenu } from '../components/SendLater';
 
 const SYSTEM_ROWS: Array<{ id: string; label: string; icon: React.ElementType }> = [
@@ -32,9 +31,9 @@ const SYSTEM_ROWS: Array<{ id: string; label: string; icon: React.ElementType }>
 
 const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }> = ({ g, onClose }) => {
   const { toast } = useToast();
-  const [to, setTo] = useState('');
-  const [cc, setCc] = useState('');
-  const [bcc, setBcc] = useState('');
+  const [to, setTo] = useState<string[]>([]);
+  const [cc, setCc] = useState<string[]>([]);
+  const [bcc, setBcc] = useState<string[]>([]);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -46,7 +45,7 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
     setBusy(true);
     try {
       const input = {
-        account_id: g.account.id, to: splitAddresses(to), cc: splitAddresses(cc), bcc: splitAddresses(bcc), subject, body,
+        account_id: g.account.id, to, cc, bcc, subject, body,
         attachments: files.length ? await Promise.all(files.map(fileToAttachment)) : undefined,
       };
       if (sendAt) await gmailApi.schedule({ ...input, send_at: sendAt.toISOString() });
@@ -65,15 +64,14 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
           <DialogTitle>New Email</DialogTitle>
           <DialogDescription>From {g.account?.email}. It goes out through Gmail and lands in your Sent.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-[3.5rem_1fr] items-center gap-1.5">
-          <Label htmlFor="gc-to" className="text-xs text-muted-foreground">To</Label>
-          <Input id="gc-to" value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@company.com, …" />
-          <Label htmlFor="gc-cc" className="text-xs text-muted-foreground">Cc</Label>
-          <Input id="gc-cc" value={cc} onChange={(e) => setCc(e.target.value)} />
-          <Label htmlFor="gc-bcc" className="text-xs text-muted-foreground">Bcc</Label>
-          <Input id="gc-bcc" value={bcc} onChange={(e) => setBcc(e.target.value)} />
-          <Label htmlFor="gc-subject" className="text-xs text-muted-foreground">Subject</Label>
-          <Input id="gc-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+        <div className="rounded-sm border border-hairline px-3 divide-y divide-hairline">
+          <RecipientInput id="gc-to" label="To" value={to} onChange={setTo} autoFocus />
+          <RecipientInput id="gc-cc" label="Cc" value={cc} onChange={setCc} />
+          <RecipientInput id="gc-bcc" label="Bcc" value={bcc} onChange={setBcc} />
+          <div className="flex items-center gap-2 py-1">
+            <label htmlFor="gc-subject" className="text-xs text-muted-foreground w-8 shrink-0">Subj.</label>
+            <input id="gc-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 bg-transparent text-sm outline-none py-1.5" />
+          </div>
         </div>
         <EmailFormatBar textareaRef={ref} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
         {preview
@@ -92,8 +90,8 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <SendLaterMenu disabled={busy || !to.includes('@') || !subject.trim() || (!body.trim() && !files.length)} onPick={(d) => { void send(d); }} />
-          <Button onClick={() => { void send(); }} disabled={busy || !to.includes('@') || !subject.trim() || (!body.trim() && !files.length)}>
+          <SendLaterMenu disabled={busy || !to.length || !subject.trim() || (!body.trim() && !files.length)} onPick={(d) => { void send(d); }} />
+          <Button onClick={() => { void send(); }} disabled={busy || !to.length || !subject.trim() || (!body.trim() && !files.length)}>
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
           </Button>
         </DialogFooter>
@@ -145,8 +143,12 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
           <div className="p-3 space-y-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="w-full text-left text-[11px] text-muted-foreground truncate hover:text-foreground">
-                  {account?.email ?? 'Loading…'} ▾
+                <button type="button" className="w-full flex items-center gap-2 text-left rounded-sm px-1 py-1 hover:bg-surface-hover">
+                  <MailAvatar name={account?.display_name} email={account?.email} photoUrl={account?.picture_url} className="h-8 w-8" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium truncate">{account?.display_name || 'Gmail'}</span>
+                    <span className="block text-[11px] text-muted-foreground truncate">{account?.email ?? 'Loading…'}{account?.is_shared ? ' · shared' : ''}</span>
+                  </span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -233,24 +235,30 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
             <>
               {g.visibleThreads.map((t) => (
                 <button key={t.id} type="button" onClick={() => g.openThread(t.id)}
-                  className={`w-full text-left px-4 py-3 border-b border-hairline border-l-2 transition-colors ${g.openId === t.id ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}>
-                  <div className="flex items-center gap-2">
-                    {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                    <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold' : 'text-foreground/90'}`}>
-                      {t.participants.join(', ') || t.from.name || t.from.address}
-                      {t.message_count > 1 && <span className="text-muted-foreground font-normal"> {t.message_count}</span>}
-                    </span>
-                    {t.starred && <Star className="w-3 h-3 shrink-0 fill-current text-amber-700 dark:text-amber-300" />}
-                    <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{t.date ? timeAgo(t.date) : ''}</span>
-                  </div>
-                  <div className={`text-xs truncate ${t.unread ? 'text-foreground' : 'text-foreground/80'}`}>{t.subject}</div>
-                  <div className="text-xs text-muted-foreground truncate">{t.snippet}</div>
-                  {(t.contact_name || t.snoozed_until) && (
-                    <div className="mt-1 flex flex-wrap gap-x-2 text-[11px] text-muted-foreground">
-                      {t.contact_name && <span className="truncate">CRM · {t.contact_name}</span>}
-                      {t.snoozed_until && <span className="inline-flex items-center gap-0.5"><AlarmClock className="w-3 h-3" />{formatDate(t.snoozed_until)}</span>}
+                  className={`w-full text-left px-4 py-3 flex gap-3 border-b border-hairline border-l-2 transition-colors ${g.openId === t.id ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}>
+                  <MailAvatar name={t.from.name} email={t.from.address} photoUrl={t.from.photo_url} className="h-9 w-9 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`flex-1 truncate text-xs ${t.unread ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                        {t.participants.join(', ') || t.from.name || t.from.address}
+                        {t.message_count > 1 && <span className="text-muted-foreground font-normal"> · {t.message_count}</span>}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{t.date ? timeAgo(t.date) : ''}</span>
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}`}>{t.subject}</span>
+                      {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" title="Unread" />}
+                      {t.starred && <Star className="w-3.5 h-3.5 shrink-0 fill-current text-amber-700 dark:text-amber-300" />}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{t.snippet}</div>
+                    {(t.has_attachment || t.contact_name || t.snoozed_until) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                        {t.has_attachment && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5"><Paperclip className="w-3 h-3" />Attachment</span>}
+                        {t.contact_name && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 max-w-[12rem] truncate">CRM · {t.contact_name}</span>}
+                        {t.snoozed_until && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5"><AlarmClock className="w-3 h-3" />{formatDate(t.snoozed_until)}</span>}
+                      </div>
+                    )}
+                  </div>
                 </button>
               ))}
               {g.nextPageToken && (

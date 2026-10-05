@@ -3,7 +3,7 @@ import { edgeError } from '@/utils/edgeError';
 
 export interface MailAccount {
   id: string; email: string; display_name: string | null; status: 'active' | 'needs_reauth'; last_error: string | null;
-  workspace_id: string; is_shared: boolean; is_owner: boolean;
+  workspace_id: string; is_shared: boolean; is_owner: boolean; picture_url: string | null;
 }
 export interface GmailThreadMeta {
   contact: { id: string; name: string | null; email: string | null; phone: string | null; position: string | null; companies: Array<{ id: string; name: string }> } | null;
@@ -12,15 +12,15 @@ export interface GmailThreadMeta {
   shared: boolean; members: Array<{ user_id: string; name: string }>;
 }
 export interface GmailLabel { id: string; name: string; type: 'system' | 'user'; unread: number; total: number; color: string | null }
-export interface GmailAddress { name: string | null; address: string | null }
+export interface GmailAddress { name: string | null; address: string | null; photo_url?: string | null }
 export interface GmailThreadRow {
   id: string; subject: string; from: GmailAddress; participants: string[]; snippet: string; date: string | null;
-  unread: boolean; starred: boolean; message_count: number; label_ids: string[];
+  unread: boolean; starred: boolean; message_count: number; label_ids: string[]; has_attachment?: boolean;
   contact_id: string | null; contact_name: string | null; assignee_user_id: string | null; snoozed_until: string | null;
 }
 export interface GmailAttachment { attachmentId: string; filename: string; mimeType: string; size: number }
 export interface GmailMessage {
-  id: string; label_ids: string[]; date: string | null; from: GmailAddress; to: string[]; cc: string[]; reply_to: string | null;
+  id: string; label_ids: string[]; date: string | null; from: GmailAddress; to: GmailAddress[]; cc: GmailAddress[]; reply_to: string | null;
   subject: string; message_id: string | null; text: string | null; html: string | null; attachments: GmailAttachment[]; snippet: string;
 }
 export type GmailSendInput = {

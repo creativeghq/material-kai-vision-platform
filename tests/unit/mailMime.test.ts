@@ -64,3 +64,13 @@ describe('Gmail payloads', () => {
     expect(parseAddress('info@niveco.gr')).toEqual({ name: null, address: 'info@niveco.gr' });
   });
 });
+
+describe('address lists', () => {
+  it('keeps a comma inside a quoted name', async () => {
+    const { parseAddressList } = await import('../../supabase/functions/_shared/mail-mime');
+    expect(parseAddressList('"Doe, John" <John@X.gr>, maria@keros.com')).toEqual([
+      { name: 'Doe, John', address: 'john@x.gr' },
+      { name: null, address: 'maria@keros.com' },
+    ]);
+  });
+});
