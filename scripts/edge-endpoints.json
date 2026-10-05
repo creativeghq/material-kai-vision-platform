@@ -3014,7 +3014,8 @@
       "is_shared",
       "member_ids",
       "mode",
-      "instruction"
+      "instruction",
+      "text"
     ],
     "response": "{ configured, accounts } | { auth_url } | { labels } | { threads, next_page_token } | { id, messages } | { data_base64 } | { ok, message_id, thread_id }"
   },
@@ -8586,6 +8587,36 @@
             "type": "string (uuid)",
             "required": false,
             "desc": "Message being answered"
+          }
+        ]
+      },
+      {
+        "name": "assist",
+        "summary": "JARVIS on a conversation for a member: summary, action items, an answer to a question, or a rewrite/shorten/formal pass over their draft. One fenced customer-audience turn, billed to the caller; instructions are the mail_assist_* prompt rows.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Conversation"
+          },
+          {
+            "name": "mode",
+            "type": "string",
+            "required": true,
+            "desc": "summary | actions | ask | rewrite | shorten | formal"
+          },
+          {
+            "name": "question",
+            "type": "string",
+            "required": false,
+            "desc": "For ask"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "required": false,
+            "desc": "The draft, for rewrite / shorten / formal"
           }
         ]
       },

@@ -13,6 +13,7 @@ import { EmailHtmlView } from '../components/EmailHtmlView';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { SendLaterMenu } from '../components/SendLater';
 import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
+import { CopilotPanel, RewriteMenu } from '../components/AssistTools';
 import type { GmailMailboxState } from './useGmailMailbox';
 import { GmailThreadFacts } from './GmailThreadFacts';
 import { GmailTaskDialog } from './GmailTaskDialog';
@@ -108,6 +109,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const [preparing, setPreparing] = useState(false);
   const [assisting, setAssisting] = useState<null | 'summary' | 'draft'>(null);
   const [summary, setSummary] = useState<{ threadId: string; text: string } | null>(null);
+  const [copilotFor, setCopilotFor] = useState<string | null>(null);
   const [steer, setSteer] = useState('');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -255,7 +257,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
           </DropdownMenu>
         )}
         <ToolButton icon={ListTodo} label="Task" onClick={() => setTaskOpen(true)} disabled={!openMessages} />
-        <ToolButton icon={assisting === 'summary' ? Loader2 : Sparkles} label="Summarise" onClick={() => { void assist('summary'); }} disabled={!!assisting || !openMessages} />
+        <ToolButton icon={Sparkles} label="JARVIS" active={false} onClick={() => setCopilotFor(copilotFor === openId ? null : openId)} disabled={!openMessages} />
         <span className="ml-auto" />
         <ToolButton icon={MailOpen} label="Unread" onClick={() => modify(openId, { add: ['UNREAD'] }, 'Marked unread')} />
         <ToolButton icon={Archive} label="Archive" onClick={() => modify(openId, { remove: ['INBOX'] }, 'Archived')} />
@@ -294,6 +296,11 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
         {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={threadSubject} sender={lastIncoming?.from ?? null} />}
 
         <div className="px-5 pb-4">
+          {copilotFor === openId && account && (
+            <div className="mt-3 rounded-sm border border-hairline p-3">
+              <CopilotPanel run={async (mode, question) => (await gmailApi.assist(account.id, openId, mode, question)).text} />
+            </div>
+          )}
           {summary?.threadId === openId && (
             <div className="mt-3 rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-sm">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
@@ -365,6 +372,8 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
             </div>
             <div className="px-2 pb-2 flex items-center justify-between gap-2">
               <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
+              <RewriteMenu text={body} onReplace={setBody}
+                run={async (m, text) => (account && openId ? (await gmailApi.assist(account.id, openId, m, undefined, text)).text : text)} />
               <ComposerInsertMenu workspaceId={account?.workspace_id ?? null} currentText={body}
                 recipient={{ name: lastIncoming?.from.name ?? null, email: to[0] ?? null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
             </div>

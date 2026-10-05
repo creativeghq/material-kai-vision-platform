@@ -568,6 +568,9 @@ export const inboxApi = {
   }) {
     return call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule_message', input);
   },
+  assist(thread_id: string, mode: 'summary' | 'actions' | 'ask' | 'rewrite' | 'shorten' | 'formal', extra?: { text?: string; question?: string }) {
+    return call<{ text: string; mode: string }>('assist', { thread_id, mode, ...(extra ?? {}) });
+  },
   composeEmail(input: {
     workspace_id: string; to: string; subject: string; body?: string; contact_id?: string;
     email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[];

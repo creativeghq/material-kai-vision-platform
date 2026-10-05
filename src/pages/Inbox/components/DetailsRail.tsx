@@ -16,6 +16,8 @@ import { KitchenEstimatePanel, OrderIntakePanel } from './OrderIntakePanel';
 import { ConversationMoodPanel } from './ConversationMoodPanel';
 import { ChannelIdentityPanel } from './ChannelIdentityPanel';
 import { AddSenderToCrm, CopyButton, DetailsRailExtras } from './DetailsRailExtras';
+import { CopilotPanel } from './AssistTools';
+import { inboxApi } from '@/services/inboxApi';
 
 export const DetailsRail: React.FC<{
   thread: InboxThread;
@@ -29,7 +31,7 @@ export const DetailsRail: React.FC<{
   // A channel tab only where there IS a channel identity distinct from the CRM one. An internal
   // or email thread has nothing to put in it, and an empty tab is worse than no tab.
   const hasChannelIdentity = thread.channel === 'whatsapp' || thread.channel === 'social';
-  const [tab, setTab] = useState<'profile' | 'channel' | 'mood'>('profile');
+  const [tab, setTab] = useState<'profile' | 'channel' | 'mood' | 'jarvis'>('profile');
   const contact = context?.contact ?? null;
   const company = context?.company ?? null;
   const quotes = context?.quotes ?? [];
@@ -60,7 +62,7 @@ export const DetailsRail: React.FC<{
       {/* Mood is offered on EVERY thread, not just the channel ones — an email or an internal
           thread has a temperature too, and the reader is the same person. */}
       <div className="px-4 border-b border-hairline shrink-0">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'profile' | 'channel' | 'mood')}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'profile' | 'channel' | 'mood' | 'jarvis')}>
           <TabsList className="h-auto bg-transparent p-0 gap-4">
             <TabsTrigger value="profile" className="px-0 text-xs">Profile</TabsTrigger>
             {hasChannelIdentity && (
@@ -69,6 +71,7 @@ export const DetailsRail: React.FC<{
               </TabsTrigger>
             )}
             <TabsTrigger value="mood" className="px-0 text-xs">Mood</TabsTrigger>
+            {isMember && <TabsTrigger value="jarvis" className="px-0 text-xs">JARVIS</TabsTrigger>}
           </TabsList>
         </Tabs>
       </div>
@@ -81,6 +84,11 @@ export const DetailsRail: React.FC<{
         />
       )}
       {tab === 'mood' && <ConversationMoodPanel thread={thread} isMember={isMember} />}
+      {tab === 'jarvis' && isMember && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <CopilotPanel run={async (mode, question) => (await inboxApi.assist(thread.id, mode, { question })).text} />
+        </div>
+      )}
       {tab === 'profile' && (
     <div className="flex-1 overflow-y-auto">
       {/*

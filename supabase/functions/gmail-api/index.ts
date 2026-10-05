@@ -25,6 +25,8 @@ const APP_URL = () => (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialsh
 const REDIRECT_URI = () => `${SUPABASE_URL}/functions/v1/gmail-api`;
 const SCOPE = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send openid email profile';
 const SCHEDULE_LIMIT_BYTES = 10 * 1024 * 1024;
+const ASSIST_MODES = new Set(['summary', 'draft', 'actions', 'ask', 'rewrite', 'shorten', 'formal']);
+const REWRITE_MODES = new Set(['rewrite', 'shorten', 'formal']);
 const PAGE_SIZE = 25;
 
 interface Account { id: string; user_id: string; workspace_id: string; email: string; display_name: string | null; status: string; is_shared: boolean; picture_url: string | null }
@@ -364,8 +366,11 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const threadId = String(body.thread_id ?? '');
       if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
-      const mode = body.mode === 'summary' ? 'summary' : 'draft';
+      const mode = ASSIST_MODES.has(String(body.mode)) ? String(body.mode) : 'draft';
       const steer = typeof body.instruction === 'string' ? body.instruction.trim().slice(0, 500) : '';
+      const draftText = typeof body.text === 'string' ? body.text.trim().slice(0, 8000) : '';
+      if (REWRITE_MODES.has(mode) && !draftText) throw new HttpError(400, 'Write something first, then rewrite it');
+      if (mode === 'ask' && !steer) throw new HttpError(400, 'Ask a question');
       const token = await accessTokenFor(db, account);
       const t = await gmail(token, `/threads/${threadId}?format=full`);
       const me = account.email.toLowerCase();
@@ -379,11 +384,13 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
         return `From: ${who}\nDate: ${when}\nSubject: ${parsed.headers.subject ?? ''}\n\n${text}`;
       });
       if (!parts.length) throw new HttpError(400, 'This conversation has no messages');
-      const base = await loadPrompt(db, 'tool', mode === 'summary' ? 'gmail_thread_summary' : 'gmail_reply_draft');
-      const instruction = mode === 'draft' && steer ? `${base}\nWhat the reply should do: ${steer}` : base;
+      const base = await loadPrompt(db, 'tool', mode === 'summary' ? 'gmail_thread_summary' : mode === 'draft' ? 'gmail_reply_draft' : `mail_assist_${mode}`);
+      const instruction = mode === 'draft' && steer ? `${base}\nWhat the reply should do: ${steer}`
+        : mode === 'ask' ? `${base}\nQuestion: ${steer}` : base;
       const turn = await runAgentTurn({
         workspaceId: account.workspace_id, userId,
-        transcript: `Email thread in the mailbox ${account.email} (oldest first):\n\n${parts.join('\n\n---\n\n')}`,
+        transcript: `Email thread in the mailbox ${account.email} (oldest first):\n\n${parts.join('\n\n---\n\n')}`
+          + (REWRITE_MODES.has(mode) ? `\n\n---\n\nOur draft:\n${draftText}` : ''),
         operatorInstruction: instruction,
       });
       if (!turn.ok) {

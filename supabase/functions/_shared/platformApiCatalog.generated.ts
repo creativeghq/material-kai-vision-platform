@@ -2239,6 +2239,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "create_customer_thread",
           "compose_email",
           "schedule_message",
+          "assist",
           "list_whatsapp_templates",
           "send_whatsapp_template",
           "create_share_link",
@@ -2489,6 +2490,18 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "description": "Message being answered (string (uuid))"
       },
+      "mode": {
+        "type": "string",
+        "description": "summary | actions | ask | rewrite | shorten | formal"
+      },
+      "question": {
+        "type": "string",
+        "description": "For ask"
+      },
+      "text": {
+        "type": "string",
+        "description": "The draft, for rewrite / shorten / formal"
+      },
       "template_id": {
         "type": "string",
         "description": "messaging_templates id (string (uuid))"
@@ -2584,9 +2597,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "url": {
         "type": "string",
         "description": "Max 2048 characters. https only; redirects are followed but every hop is re-validated (string (https url))"
-      },
-      "question": {
-        "type": "string"
       },
       "attachment_index": {
         "type": "integer",

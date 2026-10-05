@@ -12,6 +12,8 @@ import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { SendLaterMenu } from './SendLater';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
+import { RewriteMenu } from './AssistTools';
+import { inboxApi } from '@/services/inboxApi';
 import type { InboxPageState } from '../useInboxPage';
 
 
@@ -324,6 +326,8 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 recipient={{ name: threadDisplayName(activeThread), email: emailRecipients?.to ?? null }}
                 onInsert={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))}
               />
+              <RewriteMenu text={draft} disabled={waBlocked} onReplace={setDraft}
+                run={async (mode, text) => (await inboxApi.assist(activeThread.id, mode, { text })).text} />
             </div>
           )}
           <label className="cursor-pointer p-2.5 rounded-sm hover:bg-surface-hover shrink-0">

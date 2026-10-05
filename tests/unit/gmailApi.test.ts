@@ -124,11 +124,22 @@ describe('JARVIS on a Gmail thread treats the mail as data', () => {
   });
 
   it('takes its instructions from the prompt registry, not from code', () => {
-    expect(action('assist')).toContain("loadPrompt(db, 'tool', mode === 'summary' ? 'gmail_thread_summary' : 'gmail_reply_draft')");
+    expect(action('assist')).toContain("loadPrompt(db, 'tool', mode === 'summary' ? 'gmail_thread_summary' : mode === 'draft' ? 'gmail_reply_draft' : `mail_assist_${mode}`)");
   });
 
   it('is billed to the person asking, and says so when they cannot pay', () => {
     expect(action('assist')).toContain('workspaceId: account.workspace_id, userId');
     expect(action('assist')).toContain('turn.status === 402');
+  });
+});
+
+describe('the Inbox copilot and rewrite modes read the conversation as data', () => {
+  const api = stripComments(readFileSync(join(process.cwd(), 'supabase/functions/inbox-api/index.ts'), 'utf8'));
+  const assist = api.slice(api.indexOf("case 'assist': {"), api.indexOf("case 'suggest_reply'"));
+  it('is members-only, prompt-driven and runs one fenced turn billed to the caller', () => {
+    expect(assist).toContain('if (!access.isMember) throw new HttpError(404');
+    expect(assist).toContain("loadPrompt(db, 'tool', `mail_assist_${mode}`)");
+    expect(assist).toContain('runAgentTurn({');
+    expect(assist).toContain("neq('message_type', 'note')");
   });
 });

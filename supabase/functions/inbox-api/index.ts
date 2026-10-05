@@ -4206,6 +4206,39 @@ async function handleJwtAction(
       return json({ url });
     }
 
+    case 'assist': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      const mode = String(payload.mode || '');
+      if (!['summary', 'actions', 'ask', 'rewrite', 'shorten', 'formal'].includes(mode)) throw new HttpError(400, 'Unknown assist mode');
+      const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 500) : '';
+      const draftText = typeof payload.text === 'string' ? payload.text.trim().slice(0, 8000) : '';
+      if (['rewrite', 'shorten', 'formal'].includes(mode) && !draftText) throw new HttpError(400, 'Write something first, then rewrite it');
+      if (mode === 'ask' && !question) throw new HttpError(400, 'Ask a question');
+      const { data: history, error: histErr } = await db.from('inbox_messages')
+        .select('body, message_type, attachments, sender_participant_id, metadata')
+        .eq('thread_id', threadId).is('deleted_at', null).neq('message_type', 'note')
+        .order('created_at', { ascending: false }).limit(30);
+      if (histErr) throw new HttpError(500, `Could not read the conversation: ${histErr.message}`);
+      const transcript = await buildTranscript(db, threadId, (history || []) as Parameters<typeof buildTranscript>[2]);
+      if (!transcript.trim()) throw new HttpError(400, 'This conversation has nothing to read yet');
+      const base = await loadPrompt(db, 'tool', `mail_assist_${mode}`);
+      const turn = await runAgentTurn({
+        agentId: DEFAULT_INBOX_AGENT_ID, threadId, workspaceId: String(thread.workspace_id), userId,
+        transcript: transcript + (draftText ? `\n\n---\n\nOur draft:\n${draftText}` : ''),
+        operatorInstruction: mode === 'ask' ? `${base}\nQuestion: ${question}` : base,
+      });
+      if (!turn.ok) {
+        if (turn.status === 402) throw new HttpError(402, 'Not enough credits for the assistant.');
+        throw new HttpError(502, `The assistant did not answer: ${turn.error}`);
+      }
+      if (!turn.text) throw new HttpError(502, 'The assistant produced nothing — try again.');
+      return json({ text: turn.text, mode });
+    }
+
     case 'suggest_reply': {
       // "Help me write" — the assistant drafts the next reply for a member to review/edit/send.
       // Uses the same injection-proof, thread-scoped brain as the auto-reply, but returns the draft
