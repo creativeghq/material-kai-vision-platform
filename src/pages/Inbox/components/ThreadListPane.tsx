@@ -1,5 +1,6 @@
 import React from 'react';
-import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart } from 'lucide-react';
+import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send } from 'lucide-react';
+import { INBOX_MODES, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
@@ -14,6 +15,13 @@ import { LabelChips, MobileChip, SourceWord, ThreadAvatar } from './InboxPrimiti
 import type { InboxPageState } from '../useInboxPage';
 
 
+const EMPTY_VIEW = {
+  all: { title: 'No conversations yet', description: 'Email, WhatsApp, social and enquiries from your public profile all land here, each tagged with where it came from.' },
+  archived: { title: 'Nothing archived', description: 'Deleted conversations rest here for 30 days before they are removed for good.' },
+  starred: { title: 'Nothing starred', description: 'Star a message to keep its conversation here.' },
+  sent: { title: 'Nothing sent yet', description: 'Conversations you have written in show up here.' },
+} as const;
+
 export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
   const {
     activeWorkspaceId,
@@ -21,7 +29,6 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     query,
     setQuery,
     showArchived,
-    setShowArchived,
     statusTab,
     setStatusTab,
     activeId,
@@ -29,8 +36,10 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     filterValues,
     setFilterValues,
     previewCount,
-    unreadOnly,
-    setUnreadOnly,
+    mode,
+    setMode,
+    view,
+    goToView,
     sourceFilter,
     setSourceFilter,
     setShowNew,
@@ -66,17 +75,30 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
         {/* Mobile views + sources (they live in the sidebar on desktop). Squared, not pills:
             a pill is the silhouette of a primary button, so "where I am" and "what to press"
             would be the same object on the one breakpoint with no room to tell them apart. */}
+        <div role="tablist" aria-label="Inbox source" className="flex md:hidden items-center gap-3 border-b border-hairline">
+          {INBOX_MODES.map((m) => (
+            <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-1.5">
+              {m.label}
+            </button>
+          ))}
+        </div>
         <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-0.5">
-          <MobileChip active={!showArchived && !unreadOnly} onClick={() => { setShowArchived(false); setUnreadOnly(false); }}>
-            <InboxIcon className="w-3 h-3" />All
+          <MobileChip active={view === 'all'} onClick={() => goToView('all')}>
+            <InboxIcon className="w-3 h-3" />Inbox
           </MobileChip>
-          <MobileChip active={unreadOnly && !showArchived} onClick={() => { setShowArchived(false); setUnreadOnly(true); }}>
+          <MobileChip active={view === 'unread'} onClick={() => goToView('unread')}>
             <Mail className="w-3 h-3" />Unread
           </MobileChip>
-          <MobileChip active={showArchived} onClick={() => { setShowArchived(true); setUnreadOnly(false); }}>
+          <MobileChip active={view === 'starred'} onClick={() => goToView('starred')}>
+            <Star className="w-3 h-3" />Starred
+          </MobileChip>
+          <MobileChip active={view === 'sent'} onClick={() => goToView('sent')}>
+            <Send className="w-3 h-3" />Sent
+          </MobileChip>
+          <MobileChip active={view === 'archived'} onClick={() => goToView('archived')}>
             <Archive className="w-3 h-3" />Archived
           </MobileChip>
-          {SOURCE_FILTER_ORDER.map((key) => {
+          {SOURCE_FILTER_ORDER.filter((key) => modeSources(mode)?.includes(key) ?? true).map((key) => {
             const meta = inboxSourceMeta(key);
             const n = sourceCounts?.get(key) ?? null;
             if (sourceCounts && !n && sourceFilter !== key) return null;
@@ -91,7 +113,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             Unread / Archived views, where status is not the axis. The filter bar stays put in
             every view — it is what carries the Unread toggle. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {!showArchived && !unreadOnly ? (
+          {view === 'all' ? (
             <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as InboxThreadStatus)}>
               {/* No active-state override: the underline treatment is global, on
                   [role="tab"] in index.css. A filled pill here would read as a button. */}
@@ -134,10 +156,8 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
           ) : (
             <HubEmptyState
               icon={MessageSquare}
-              title={showArchived ? 'Nothing archived' : 'No conversations yet'}
-              description={showArchived
-                ? 'Deleted conversations rest here for 30 days before they are removed for good.'
-                : 'Email, WhatsApp, social and enquiries from your public profile all land here, each tagged with where it came from.'}
+              title={EMPTY_VIEW[view === 'starred' || view === 'sent' || view === 'archived' ? view : 'all'].title}
+              description={EMPTY_VIEW[view === 'starred' || view === 'sent' || view === 'archived' ? view : 'all'].description}
             />
           )
         ) : groupedThreads.map(([bucket, items]) => (

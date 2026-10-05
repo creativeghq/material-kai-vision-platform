@@ -16277,6 +16277,17 @@
                       "before": {
                         "type": "string",
                         "description": "next_cursor from the previous page"
+                      },
+                      "channels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Only these channels (internal, whatsapp, email, social)"
+                      },
+                      "folder": {
+                        "type": "string",
+                        "description": "starred (threads with a message you starred) or sent (threads you wrote in)"
                       }
                     },
                     "description": "Returns: {threads: thread[], next_cursor: string | null}"

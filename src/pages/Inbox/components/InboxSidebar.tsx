@@ -1,5 +1,9 @@
-import React from 'react';
-import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, UserRound, UserX, Copy, FileText } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { inboxApi } from '@/services/inboxApi';
+import { INBOX_MODES, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { inboxSourceMeta, SOURCE_FILTER_ORDER } from '../inboxSource';
 import { initials, labelDot } from '../inboxFormat';
@@ -12,14 +16,17 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
   const {
     activeWorkspaceId,
     activeWorkspace,
-    showArchived,
-    setShowArchived,
     wsLabels,
     canManageLabels,
     labelIds,
-    unreadOnly,
-    setUnreadOnly,
     setLabelFilter,
+    mode,
+    setMode,
+    view,
+    goToView,
+    assignmentView,
+    setAssignmentView,
+    nextCursor,
     sourceFilter,
     setSourceFilter,
     setShowNew,
@@ -30,6 +37,18 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     sourceCounts,
     threadTotal,
   } = s;
+  const { toast } = useToast();
+  const [address, setAddress] = useState<string | null>(null);
+  useEffect(() => {
+    if (mode !== 'platform' || !activeWorkspaceId) return;
+    let cancelled = false;
+    inboxApi.getMyEmailAddress(activeWorkspaceId)
+      .then((r) => { if (!cancelled) setAddress(r.address?.is_active ? r.address.full_address : null); })
+      .catch(() => { if (!cancelled) setAddress(null); });
+    return () => { cancelled = true; };
+  }, [mode, activeWorkspaceId]);
+  const allowedSources = modeSources(mode);
+  const sources = allowedSources ? SOURCE_FILTER_ORDER.filter((k) => allowedSources.includes(k)) : SOURCE_FILTER_ORDER;
   return (
     <aside className="dashboard-card md:col-span-3 lg:col-span-2 hidden md:flex flex-col overflow-hidden p-0">
       {/* Workspace header. Flat: the ladder is bg-background → bg-card → bg-surface-sunken,
@@ -44,7 +63,29 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
         </div>
       </div>
 
+      <div role="tablist" aria-label="Inbox source" className="flex items-center gap-3 px-3 border-b border-hairline shrink-0">
+        {INBOX_MODES.map((m) => (
+          <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-2">
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 min-h-0 overflow-y-auto">
+        {mode === 'platform' && address && (
+          <div className="px-3 pt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Mail className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate flex-1" title={address}>{address}</span>
+            <button
+              type="button"
+              className="shrink-0 hover:text-foreground"
+              title="Copy your address"
+              onClick={() => { void navigator.clipboard.writeText(address); toast({ title: 'Address copied' }); }}
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         {isMember && (
           <div className="p-3">
             <Button className="w-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
@@ -56,26 +97,41 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
         <nav className="px-2 pb-1 space-y-0.5">
           <NavRow
             icon={<InboxIcon className="w-4 h-4 shrink-0" />}
-            label="All conversations"
-            active={!showArchived && !unreadOnly}
-            count={showArchived ? null : threadTotal}
-            onClick={() => { setShowArchived(false); setUnreadOnly(false); }}
+            label="Inbox"
+            active={view === 'all'}
+            count={view === 'all' ? threadTotal : null}
+            onClick={() => goToView('all')}
           />
           <NavRow
             icon={<Mail className="w-4 h-4 shrink-0" />}
             label="Unread"
-            active={unreadOnly && !showArchived}
-            count={inboxUnread > 0 ? String(inboxUnread) : null}
+            active={view === 'unread'}
+            count={inboxUnread > 0 && view === 'all' ? `${inboxUnread}${nextCursor ? '+' : ''}` : null}
             emphasiseCount
-            onClick={() => { setShowArchived(false); setUnreadOnly(true); }}
+            onClick={() => goToView('unread')}
           />
-          <NavRow
-            icon={<Archive className="w-4 h-4 shrink-0" />}
-            label="Archived"
-            active={showArchived}
-            onClick={() => { setShowArchived(true); setUnreadOnly(false); }}
-          />
+          <NavRow icon={<Star className="w-4 h-4 shrink-0" />} label="Starred" active={view === 'starred'} onClick={() => goToView('starred')} />
+          <NavRow icon={<Send className="w-4 h-4 shrink-0" />} label="Sent" active={view === 'sent'} onClick={() => goToView('sent')} />
+          <NavRow icon={<Archive className="w-4 h-4 shrink-0" />} label="Archived" active={view === 'archived'} onClick={() => goToView('archived')} />
         </nav>
+
+        {isMember && (
+          <>
+            <SidebarHeading>Assignment</SidebarHeading>
+            <nav className="px-2 pb-1 space-y-0.5">
+              <NavRow
+                icon={<UserRound className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                label="Mine" dense active={assignmentView === 'mine'}
+                onClick={() => setAssignmentView(assignmentView === 'mine' ? null : 'mine')}
+              />
+              <NavRow
+                icon={<UserX className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                label="Unassigned" dense active={assignmentView === 'unassigned'}
+                onClick={() => setAssignmentView(assignmentView === 'unassigned' ? null : 'unassigned')}
+              />
+            </nav>
+          </>
+        )}
 
         {/*
           Sources — the door each conversation came through, which is the axis this inbox is
@@ -83,6 +139,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
           inside the filter modal, so the one thing that distinguishes a "Hire me" enquiry
           from cold mail took two clicks and a read to find.
         */}
+        {sources.length > 0 && (<>
         <SidebarHeading>Sources</SidebarHeading>
         <nav className="px-2 pb-1 space-y-0.5">
           <NavRow
@@ -92,12 +149,11 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
             active={!sourceFilter}
             onClick={() => setSourceFilter(null)}
           />
-          {SOURCE_FILTER_ORDER.map((key) => {
+          {sources.map((key) => {
             const meta = inboxSourceMeta(key);
             const n = sourceCounts?.get(key) ?? null;
-            // A source with nothing in it is not a place to go. It stays visible only while
-            // it is the one you picked, so the row you are standing on never vanishes.
-            if (sourceCounts && !n && sourceFilter !== key) return null;
+            // An empty source is hidden only when every page is loaded; the row you are on never vanishes.
+            if (sourceCounts && !n && !nextCursor && sourceFilter !== key) return null;
             return (
               <NavRow
                 key={key}
@@ -105,12 +161,25 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 label={meta.label}
                 dense
                 active={sourceFilter === key}
-                count={n != null ? String(n) : null}
+                count={n != null ? `${n}${nextCursor ? '+' : ''}` : null}
                 onClick={() => setSourceFilter(sourceFilter === key ? null : key)}
               />
             );
           })}
         </nav>
+        </>)}
+
+        {mode === 'whatsapp' && (
+          <nav className="px-2 pt-2 pb-1">
+            <Link
+              to="/profile?tab=social-accounts&section=wa-templates"
+              className="w-full flex items-center gap-2.5 rounded-sm text-sm px-2.5 py-1.5 text-foreground/80 hover:bg-surface-hover"
+            >
+              <FileText className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+              Message templates
+            </Link>
+          </nav>
+        )}
 
         <SidebarHeading
           action={canManageLabels && activeWorkspaceId ? (

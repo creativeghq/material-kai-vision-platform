@@ -8151,6 +8151,18 @@
             "type": "string",
             "required": false,
             "desc": "next_cursor from the previous page"
+          },
+          {
+            "name": "channels",
+            "type": "string[]",
+            "required": false,
+            "desc": "Only these channels (internal, whatsapp, email, social)"
+          },
+          {
+            "name": "folder",
+            "type": "string",
+            "required": false,
+            "desc": "starred (threads with a message you starred) or sent (threads you wrote in)"
           }
         ],
         "response": "{threads: thread[], next_cursor: string | null}"

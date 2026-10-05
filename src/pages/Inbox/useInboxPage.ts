@@ -16,6 +16,8 @@ import { inboxApi, signInboxAttachment, type InboxThread, type InboxMessage, typ
 import { dayBucket } from './inboxFormat';
 import { ParticipantLabel } from './components/InboxPrimitives';
 import { emailReplyRecipients, splitAddresses } from './emailRecipients';
+import { modeChannels, modeSources, parseInboxMode, type InboxFolder, type InboxMode } from './inboxModes';
+import { NONE_VALUE } from '@/components/core/filters';
 
 
 
@@ -44,6 +46,8 @@ export function useInboxPage() {
   }, [query]);
   const [allWorkspaces, setAllWorkspaces] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [folder, setFolder] = useState<InboxFolder | null>(null);
+  const mode = parseInboxMode(searchParams.get('src'));
   const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
   /** MY starred messages on the open thread. Personal — resolved for the caller by get_thread. */
@@ -195,11 +199,39 @@ export function useInboxPage() {
    */
   const listRequest = useMemo(() => ({
     ...(channelFilter ? { channel: channelFilter } : {}),
+    ...(modeChannels(mode).length ? { channels: modeChannels(mode) } : {}),
+    ...(folder ? { folder } : {}),
     ...(allWorkspaces && isPlatformOperator ? { scope: 'all' as const } : {}),
     ...(showArchived ? { archived: true } : {}),
     ...(labelIds.length ? { label_ids: labelIds } : {}),
     ...(serverSearch ? { search: serverSearch } : {}),
-  }), [channelFilter, allWorkspaces, isPlatformOperator, showArchived, labelIds, serverSearch]);
+  }), [channelFilter, mode, folder, allWorkspaces, isPlatformOperator, showArchived, labelIds, serverSearch]);
+
+  const setMode = useCallback((next: InboxMode) => {
+    setSearchParams((p) => { if (next === 'all') p.delete('src'); else p.set('src', next); return p; }, { replace: true });
+    const allowed = modeSources(next);
+    if (sourceFilter && allowed && !allowed.includes(sourceFilter as never)) setSourceFilter(null);
+  }, [setSearchParams, sourceFilter, setSourceFilter]);
+
+  type InboxView = 'all' | 'unread' | 'archived' | InboxFolder;
+  const view: InboxView = showArchived ? 'archived' : folder ?? (unreadOnly ? 'unread' : 'all');
+  const goToView = useCallback((next: InboxView) => {
+    setShowArchived(next === 'archived');
+    setFolder(next === 'starred' || next === 'sent' ? next : null);
+    if ((next === 'unread') !== unreadOnly) setUnreadOnly(next === 'unread');
+  }, [unreadOnly, setUnreadOnly]);
+
+  const assignmentView: 'mine' | 'unassigned' | null = filterValues.mine === true
+    ? 'mine'
+    : Array.isArray(filterValues.assignee) && filterValues.assignee.length === 1 && filterValues.assignee[0] === NONE_VALUE
+      ? 'unassigned' : null;
+  const setAssignmentView = useCallback((next: 'mine' | 'unassigned' | null) => {
+    setFilterValues({
+      ...filterValues,
+      mine: next === 'mine' ? true : undefined,
+      assignee: next === 'unassigned' ? [NONE_VALUE] : undefined,
+    });
+  }, [filterValues, setFilterValues]);
 
   const loadThreads = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoadingThreads(true);
@@ -673,9 +705,9 @@ export function useInboxPage() {
     // Folder + status semantics: Unread ignores status (the unread predicate itself already ran
     // in the filter matcher); Archived is its own view; otherwise the Open / Follow-up (snoozed) /
     // Done (closed) tab narrows the working set.
-    if (!unreadOnly && !showArchived) list = list.filter((t) => t.status === statusTab);
+    if (!unreadOnly && !showArchived && !folder) list = list.filter((t) => t.status === statusTab);
     return list;
-  }, [matchedThreads, query, serverSearch, unreadOnly, showArchived, statusTab]);
+  }, [matchedThreads, query, serverSearch, unreadOnly, showArchived, folder, statusTab]);
 
   // Threads grouped into Today / Yesterday / This week / Earlier for the email-client day headers.
   const groupedThreads = useMemo(() => {
@@ -715,8 +747,7 @@ export function useInboxPage() {
     return counts;
   }, [threads, sourceFilter]);
 
-  /** `200` is the server's page cap, not an answer — say so rather than reporting the ceiling. */
-  const threadTotal = threads.length >= 200 ? '200+' : String(threads.length);
+  const threadTotal = nextCursor ? `${threads.length}+` : String(threads.length);
 
   const isCommentThread = activeThread?.channel === 'social'
     && (activeThread.metadata as Record<string, unknown> | null)?.social_kind === 'comments';
@@ -815,6 +846,13 @@ export function useInboxPage() {
     channelFilter,
     labelFilter,
     labelIds,
+    mode,
+    setMode,
+    view,
+    goToView,
+    folder,
+    assignmentView,
+    setAssignmentView,
     nextCursor,
     loadingMore,
     loadMoreThreads,

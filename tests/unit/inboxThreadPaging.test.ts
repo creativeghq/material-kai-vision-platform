@@ -39,3 +39,22 @@ describe('the Inbox asks the server for those pages', () => {
     expect(ui).toMatch(/if \(q && query\.trim\(\) !== serverSearch\)/);
   });
 });
+
+describe('the sidebar narrows by source mode and folder', () => {
+  it('filters by a channel set and by Starred / Sent on the server', () => {
+    expect(list).toMatch(/\.in\('channel', channelSet\)/);
+    expect(list).toContain("folder_msgs.inbox_message_stars.user_id', userId");
+    expect(list).toContain("folder_msgs.sender_participant_id', myPartIds");
+    expect(list).toContain('inbox_messages!inbox_messages_thread_id_fkey!inner');
+  });
+
+  it('does not leak the folder embed into the thread rows', () => {
+    expect(list).toMatch(/folder_msgs: _folderMsgs, \.\.\.row/);
+  });
+
+  it('maps every mode to channels the server accepts', async () => {
+    const { INBOX_MODES, modeChannels } = await import('@/pages/Inbox/inboxModes');
+    const accepted = API.match(/INBOX_CHANNELS = new Set\(\[([^\]]+)\]\)/)?.[1] ?? '';
+    for (const m of INBOX_MODES) for (const c of modeChannels(m.key)) expect(accepted, `${m.key}:${c}`).toContain(`'${c}'`);
+  });
+});

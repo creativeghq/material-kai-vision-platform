@@ -1203,6 +1203,8 @@ function cleanEmailCopies(raw: { cc?: unknown; bcc?: unknown } | undefined, excl
   return { cc, bcc };
 }
 
+const INBOX_CHANNELS = new Set(['internal', 'whatsapp', 'email', 'social']);
+
 function parseThreadCursor(raw: unknown): { at: string; id: string } | null {
   if (typeof raw !== 'string') return null;
   const [at, id] = raw.split('|');
@@ -2543,7 +2545,7 @@ async function handleJwtAction(
       // way internal (team DM) threads are visible.
       const { data: myParts } = await db
         .from('inbox_participants')
-        .select('thread_id, last_read_at')
+        .select('id, thread_id, last_read_at')
         .eq('user_id', userId)
         .eq('status', 'active');
       const lastReadByThread = new Map<string, string | null>();
@@ -2566,7 +2568,11 @@ async function handleJwtAction(
       }
 
       const pageSize = Math.min(Math.max(Number(payload.limit) || 100, 1), 200);
-      let q = db.from('inbox_threads').select('*')
+      const folder = payload.folder === 'starred' || payload.folder === 'sent' ? payload.folder : null;
+      const folderEmbed = folder === 'starred'
+        ? ', folder_msgs:inbox_messages!inbox_messages_thread_id_fkey!inner(id, inbox_message_stars!inner(user_id))'
+        : folder === 'sent' ? ', folder_msgs:inbox_messages!inbox_messages_thread_id_fkey!inner(id)' : '';
+      let q = db.from('inbox_threads').select(`*${folderEmbed}`)
         .order('last_message_at', { ascending: false }).order('id', { ascending: false })
         .limit(pageSize + 1);
       if (!wantAll) {
@@ -2595,6 +2601,15 @@ async function handleJwtAction(
         q = q.or(terms.join(','));
       }
       if (channelFilter) q = q.eq('channel', channelFilter);
+      const channelSet = (Array.isArray(payload.channels) ? payload.channels : []).map(String)
+        .filter((c) => INBOX_CHANNELS.has(c));
+      if (channelSet.length) q = q.in('channel', channelSet);
+      if (folder === 'starred') q = q.eq('folder_msgs.inbox_message_stars.user_id', userId);
+      if (folder === 'sent') {
+        const myPartIds = (myParts || []).map((p: { id: string }) => p.id);
+        if (myPartIds.length === 0) return json({ threads: [], next_cursor: null });
+        q = q.in('folder_msgs.sender_participant_id', myPartIds).in('folder_msgs.message_type', ['text', 'agent']);
+      }
       if (typeFilter) q = q.eq('thread_type', typeFilter);
       if (statusFilter) q = q.eq('status', statusFilter);
       // Archived (soft-deleted) threads live in their own view for the 30-day restore window.
@@ -2609,10 +2624,14 @@ async function handleJwtAction(
         if (ids.length === 0) return json({ threads: [], next_cursor: null });
         q = q.in('id', ids);
       }
-      const { data: page, error } = await q;
+      const { data: pageData, error } = await q;
       if (error) throw new HttpError(500, error.message);
-      const hasMore = (page ?? []).length > pageSize;
-      const threads = (page ?? []).slice(0, pageSize);
+      const page = (pageData ?? []) as unknown as Array<Record<string, unknown>>;
+      const hasMore = page.length > pageSize;
+      const threads = page.slice(0, pageSize).map((t) => {
+        const { folder_msgs: _folderMsgs, ...row } = t;
+        return row;
+      });
       const lastRow = threads[threads.length - 1] as { id: string; last_message_at: string } | undefined;
       const nextCursor = hasMore && lastRow ? `${lastRow.last_message_at}|${lastRow.id}` : null;
 

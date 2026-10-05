@@ -18,6 +18,7 @@ const InboxPage: React.FC = () => {
   const s = useInboxPage();
   const {
     activeWorkspaceId,
+    mode,
     isPlatformOperator,
     threads,
     allWorkspaces,
@@ -94,7 +95,7 @@ const InboxPage: React.FC = () => {
           initialMode={
             scopedFilterValue(filterValues, 'source') === 'email'
               ? 'email'
-              : scopedFilterValue(filterValues, 'source') === 'whatsapp'
+              : scopedFilterValue(filterValues, 'source') === 'whatsapp' || mode === 'whatsapp'
                 ? 'whatsapp'
                 : scopedFilterValue(filterValues, 'thread_type') === 'customer' || scopedFilterValue(filterValues, 'source') === 'customer'
                 ? 'customer'

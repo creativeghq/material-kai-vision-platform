@@ -2411,6 +2411,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "description": "next_cursor from the previous page"
       },
+      "channels": {
+        "type": "array",
+        "description": "Only these channels (internal, whatsapp, email, social)"
+      },
+      "folder": {
+        "type": "string",
+        "description": "starred (threads with a message you starred) or sent (threads you wrote in)"
+      },
       "peek": {
         "type": "boolean",
         "description": "Members only. A pure read for the assistant: no last_read_at stamp, no read receipt to the customer, the newest 40 messa"

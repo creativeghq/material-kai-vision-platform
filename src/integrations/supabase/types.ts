@@ -40422,7 +40422,7 @@ export type Database = {
         | "ocr"
         | "voice"
         | "combined"
-      inbox_channel: "internal" | "whatsapp" | "email"
+      inbox_channel: "internal" | "whatsapp" | "email" | "social"
       inbox_message_type: "text" | "system" | "agent" | "note"
       inbox_participant_status: "active" | "left" | "removed"
       inbox_participant_type: "member" | "customer" | "agent"
@@ -40749,7 +40749,7 @@ export const Constants = {
         "voice",
         "combined",
       ],
-      inbox_channel: ["internal", "whatsapp", "email"],
+      inbox_channel: ["internal", "whatsapp", "email", "social"],
       inbox_message_type: ["text", "system", "agent", "note"],
       inbox_participant_status: ["active", "left", "removed"],
       inbox_participant_type: ["member", "customer", "agent"],
