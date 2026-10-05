@@ -386,6 +386,10 @@ export interface InboxThreadContext {
   orders?: InboxOrderRef[];
   /** Lifetime value + open balance. Absent on older API responses / internal threads. */
   metrics?: InboxCustomerMetrics | null;
+  deals?: Array<{ id: string; title: string | null; stage: string | null; status: string | null; value: number | null; currency: string | null; expected_close_date: string | null }>;
+  meetings?: Array<{ id: string; subject: string; meeting_at: string; location: string | null; status: string }>;
+  appointments?: Array<{ id: string; service_name: string | null; appointment_date: string; appointment_time: string | null; status: string }>;
+  tasks?: Array<{ id: string; project_id: string; title: string; status: string; due_date: string | null; priority: string | null }>;
 }
 
 /**

@@ -2207,7 +2207,10 @@ async function handleJwtAction(
       const tmeta = (thread.metadata as Json) || {};
       const waProfile = (tmeta.wa_profile ?? {}) as Record<string, unknown>;
       const phone = String(tmeta.contact_phone || '').trim();
-      if (!phone) throw new HttpError(400, 'This conversation has no phone number to file against');
+      const senderEmail = thread.channel === 'email' ? String(tmeta.email_from || '').trim().toLowerCase() : '';
+      if (!phone && !EMAIL_ADDRESS.test(senderEmail)) {
+        throw new HttpError(400, 'This conversation has no phone number or email address to file against');
+      }
 
       // Already linked, or already in the CRM under this number? Then say so rather than making a
       // second record — the whole point of moving this behind a button is to stop duplicating people.
@@ -2220,26 +2223,30 @@ async function handleJwtAction(
       }
 
       const digits = phone.replace(/[^\d]/g, '');
-      const { data: dupe } = await db.from('crm_contacts')
-        .select('id').eq('workspace_id', workspaceId)
-        .or(`phone.eq.+${digits},mobile.eq.+${digits}`).limit(1).maybeSingle();
+      const { data: dupe } = phone
+        ? await db.from('crm_contacts')
+          .select('id').eq('workspace_id', workspaceId)
+          .or(`phone.eq.+${digits},mobile.eq.+${digits}`).limit(1).maybeSingle()
+        : await db.from('crm_contacts')
+          .select('id').eq('workspace_id', workspaceId)
+          .ilike('email', escapeLike(senderEmail)).limit(1).maybeSingle();
       let contactId = (dupe as { id?: string } | null)?.id ?? null;
       let created = false;
 
       if (!contactId) {
         // Prefer what the caller typed, then what WhatsApp reports, and only fall back to the
         // number. A record named after a phone number is the thing we are trying to stop making.
-        const name = String(payload.name || waProfile.name || thread.subject || '').trim() || phone;
+        const name = String(payload.name || waProfile.name || (phone ? thread.subject : '') || '').trim() || phone || senderEmail;
         const { data: made, error: makeErr } = await db.from('crm_contacts').insert({
           workspace_id: workspaceId,
           name,
-          phone: `+${digits}`,
-          email: (payload.email as string | undefined) || (waProfile.email as string | undefined) || null,
+          phone: phone ? `+${digits}` : null,
+          email: senderEmail || (payload.email as string | undefined) || (waProfile.email as string | undefined) || null,
           company: (payload.company as string | undefined) || null,
           website: Array.isArray(waProfile.websites) ? String(waProfile.websites[0] ?? '') || null : null,
           city: (waProfile.address as string | undefined) || null,
           created_by: userId,
-          lead_source: 'whatsapp',
+          lead_source: phone ? 'whatsapp' : 'email',
         }).select('id').single();
         if (makeErr) throw new HttpError(500, `Could not create the contact: ${makeErr.message}`);
         contactId = (made as { id: string }).id;
@@ -2247,8 +2254,8 @@ async function handleJwtAction(
 
         await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
           type: 'crm_contact_created', workspace_id: workspaceId, user_id: uid,
-          contact_id: contactId, contact_name: name, lead_source: 'whatsapp',
-          title: 'New CRM contact', body: `${name} was added from a WhatsApp conversation.`,
+          contact_id: contactId, contact_name: name, lead_source: phone ? 'whatsapp' : 'email',
+          title: 'New CRM contact', body: `${name} was added from ${phone ? 'a WhatsApp' : 'an email'} conversation.`,
           action_url: `/crm/contacts/${contactId}`,
         })).catch(() => {});
       }
@@ -3334,7 +3341,37 @@ async function handleJwtAction(
           due_at: (i.due_at as string) || null,
         }));
 
-      return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, orders, metrics });
+      const ctxCompanyId = (company as { id?: string } | null)?.id ?? party.companyId ?? null;
+      const projectIds = ((projects || []) as Array<{ id: string }>).map((pr) => pr.id);
+      const nowIso = new Date().toISOString();
+      const [dealsRes, meetingsRes, apptsRes, tasksRes] = await Promise.all([
+        contactId || ctxCompanyId
+          ? db.from('crm_deals').select('id, title, stage, status, value, currency, expected_close_date')
+            .eq('workspace_id', String(thread.workspace_id))
+            .or([contactId ? `contact_id.eq.${contactId}` : '', ctxCompanyId ? `company_id.eq.${ctxCompanyId}` : ''].filter(Boolean).join(','))
+            .order('expected_close_date', { ascending: true, nullsFirst: false }).limit(6)
+          : Promise.resolve({ data: [] }),
+        contactId
+          ? db.from('crm_meetings').select('id, subject, meeting_at, location, status')
+            .eq('workspace_id', String(thread.workspace_id))
+            .or(`and(target_kind.eq.contact,target_id.eq.${contactId}),attendee_contact_ids.cs.{${contactId}}`)
+            .gte('meeting_at', nowIso).order('meeting_at', { ascending: true }).limit(5)
+          : Promise.resolve({ data: [] }),
+        contactId
+          ? db.from('appointments').select('id, service_name, appointment_date, appointment_time, status')
+            .eq('crm_contact_id', contactId).gte('appointment_date', nowIso.slice(0, 10))
+            .order('appointment_date', { ascending: true }).limit(5)
+          : Promise.resolve({ data: [] }),
+        projectIds.length
+          ? db.from('project_tasks').select('id, project_id, title, status, due_date, priority')
+            .in('project_id', projectIds).neq('status', 'done')
+            .order('due_date', { ascending: true, nullsFirst: false }).limit(8)
+          : Promise.resolve({ data: [] }),
+      ]);
+      return json({
+        contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, orders, metrics,
+        deals: dealsRes.data ?? [], meetings: meetingsRes.data ?? [], appointments: apptsRes.data ?? [], tasks: tasksRes.data ?? [],
+      });
     }
 
     /* link_preview — what a URL in this conversation actually points at. */

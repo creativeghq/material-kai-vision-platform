@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { castSlotForName } from '@/utils/characterAvatar';
 import { gmailApi, type GmailAttachment } from '@/services/gmailApi';
 import { avatarTint, castAvatarSrc, initials } from '../inboxFormat';
+import { AttachmentActionsMenu } from '../components/AttachmentActions';
 
 export const MailAvatar: React.FC<{ name?: string | null; email?: string | null; photoUrl?: string | null; className?: string }> = ({ name, email, photoUrl, className }) => {
   const label = name || email || '?';
@@ -164,6 +165,14 @@ export const AttachmentCards: React.FC<{ accountId: string; messageId: string; a
                 <button type="button" className="text-muted-foreground hover:text-foreground" title="Download" onClick={() => void download(a)}>
                   {busy === a.attachmentId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                 </button>
+                <AttachmentActionsMenu
+                  name={a.filename}
+                  contentType={a.mimeType}
+                  loadFile={async () => {
+                    const { data_base64 } = await gmailApi.attachment(accountId, messageId, a.attachmentId);
+                    return new File([base64ToBlob(data_base64, a.mimeType || 'application/octet-stream')], a.filename, { type: a.mimeType });
+                  }}
+                />
               </div>
             </div>
           );

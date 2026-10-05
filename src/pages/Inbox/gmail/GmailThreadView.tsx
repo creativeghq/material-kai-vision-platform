@@ -16,6 +16,7 @@ import type { GmailMailboxState } from './useGmailMailbox';
 import { GmailThreadFacts } from './GmailThreadFacts';
 import { GmailTaskDialog } from './GmailTaskDialog';
 import { AttachmentCards, MailAvatar, PersonChip, RecipientInput, base64ToBlob } from './mailParts';
+import { AttachmentActionsProvider } from '../components/AttachmentActions';
 
 export async function fileToAttachment(file: File) {
   const buf = new Uint8Array(await file.arrayBuffer());
@@ -272,6 +273,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
         />
       )}
 
+      <AttachmentActionsProvider value={account ? { workspaceId: account.workspace_id, customer: null, subject: threadSubject } : null}>
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-5 pt-4 pb-2 space-y-2">
           {threadLabels.length > 0 && (
@@ -314,6 +316,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
           )}
         </div>
       </div>
+      </AttachmentActionsProvider>
 
       <div className="border-t border-hairline bg-surface-sunken p-3 shrink-0">
         {!mode ? (

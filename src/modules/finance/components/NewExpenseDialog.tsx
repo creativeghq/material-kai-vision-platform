@@ -65,6 +65,8 @@ interface Props {
     vatAmount?: number;
     description?: string;
     categoryId?: string;
+    /** A document already in hand (an inbox attachment): read and attached as the receipt on open. */
+    receiptFile?: File | null;
     /** Pre-select the payee: a CRM supplier company OR contact (+ display name), or a one-off name. */
     supplier?: { companyId?: string | null; contactId?: string | null; name?: string | null };
     /**
@@ -624,6 +626,15 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setBusy(false);
     }
   };
+
+  const scannedPrefill = useRef<File | null>(null);
+  useEffect(() => {
+    const file = prefill?.receiptFile;
+    if (!open || !file || scannedPrefill.current === file) return;
+    scannedPrefill.current = file;
+    void scanReceipt(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prefill?.receiptFile]);
 
   /** Read a receipt into this form (#379). */
   const scanReceipt = async (file: File) => {

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { messagingService } from '@/modules/messaging/services/messagingService';
 import { INBOX_DOCUMENT_KIND_LABELS, INBOX_DOCUMENT_KINDS_BOOKABLE_AS_EXPENSE, INBOX_DOCUMENT_KIND_LOW_CONFIDENCE } from '@/modules/messaging/inboxDocumentKinds';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
+import { AttachmentActionsMenu } from './AttachmentActions';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -348,9 +349,10 @@ export const AttachmentView: React.FC<{
             ? <img src={href} alt={name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
             : <Icon className={`absolute inset-0 m-auto w-8 h-8 ${kind === 'pdf' ? 'text-destructive' : 'text-muted-foreground'}`} />}
         </button>
-        <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs">
+        <div className="group/att flex items-center gap-1.5 px-2 py-1.5 text-xs">
           <span className="truncate flex-1" title={name}>{name}</span>
           {size && <span className="text-muted-foreground tabular-nums shrink-0">{size}</span>}
+          <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
         </div>
         {kind !== 'file' && (
           <div className="px-2 pb-1.5">
@@ -369,6 +371,10 @@ export const AttachmentView: React.FC<{
       <>
         {/* A button, not a link: opening a new tab loses the conversation you are reading. The
             thumbnail is the message — a photo of the damaged tile IS what the customer said. */}
+        <span className="relative block w-fit group/att">
+        <span className="absolute top-2.5 right-1 z-10 rounded-sm bg-card/90 md:opacity-0 md:group-hover/att:opacity-100 transition-opacity">
+          <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
+        </span>
         <button type="button" onClick={() => setZoom(true)} className="block mt-1.5 group">
           <img
             src={href}
@@ -378,6 +384,7 @@ export const AttachmentView: React.FC<{
                        group-hover:border-primary/40 transition-colors"
           />
         </button>
+        </span>
         <AttachmentDocumentTag
           att={att} family="image" threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
         />
@@ -404,10 +411,11 @@ export const AttachmentView: React.FC<{
     // and losing your place in it to look at a spec sheet is the thing that makes people stop.
     return (
       <>
+        <div className="flex items-center gap-1 mt-1.5 group/att">
         <button
           type="button"
           onClick={() => setZoom(true)}
-          className="flex w-full items-center gap-2 mt-1.5 rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2 text-left hover:border-primary/40 transition-colors"
+          className="flex flex-1 min-w-0 items-center gap-2 rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2 text-left hover:border-primary/40 transition-colors"
         >
           <FileText className="w-4 h-4 shrink-0 text-destructive" />
           <span className="min-w-0 flex-1">
@@ -417,6 +425,8 @@ export const AttachmentView: React.FC<{
             </span>
           </span>
         </button>
+        <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
+        </div>
         <AttachmentDocumentTag
           att={att} family="pdf" threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
         />
@@ -425,9 +435,12 @@ export const AttachmentView: React.FC<{
     );
   }
   return (
-    <a href={href} target="_blank" rel="noreferrer"
-       className="flex items-center gap-1 text-xs mt-1 underline text-primary">
-      <Paperclip className="w-3 h-3 shrink-0" /> <span className="truncate">{name}</span>
-    </a>
+    <span className="flex items-center gap-1 mt-1">
+      <a href={href} target="_blank" rel="noreferrer"
+         className="flex items-center gap-1 text-xs underline text-primary min-w-0">
+        <Paperclip className="w-3 h-3 shrink-0" /> <span className="truncate">{name}</span>
+      </a>
+      <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
+    </span>
   );
 };

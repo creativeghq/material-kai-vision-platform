@@ -9,6 +9,7 @@ import { avatarTint } from '../inboxFormat';
 import { LabelChips, SourceTag, ThreadAvatar } from './InboxPrimitives';
 import { MessageBubble } from './MessageBubble';
 import { EmailMessageCard } from './EmailMessageCard';
+import { AttachmentActionsProvider } from './AttachmentActions';
 import type { InboxPageState } from '../useInboxPage';
 import { InboxComposer } from './InboxComposer';
 import { ConversationActions } from './ConversationActions';
@@ -31,6 +32,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     loadThreads,
     openThread,
     messageMoods,
+    context,
     listRef,
     contentRef,
     olderCursor,
@@ -231,6 +233,13 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               if (el.scrollTop < 120 && olderCursor && !loadingOlder) void loadOlderMessages();
             }}
           >
+            <AttachmentActionsProvider value={isMember ? {
+              workspaceId: activeThread.workspace_id,
+              customer: context?.contact
+                ? { type: 'contact', id: context.contact.id, label: context.contact.name || context.contact.email || 'Contact', sub: context.contact.email ?? undefined }
+                : null,
+              subject: activeThread.subject ?? null,
+            } : null}>
             <div ref={contentRef} className="space-y-3">
             {olderCursor && !loadingThread && (
               <div className="flex justify-center py-1">
@@ -315,6 +324,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               />
             )))}
             </div>
+            </AttachmentActionsProvider>
           </div>
 
           {/* Composer */}

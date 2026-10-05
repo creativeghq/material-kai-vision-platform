@@ -15,6 +15,7 @@ import { ParticipantLabel, Row, SectionTitle, SourceTag, ThreadAvatar } from './
 import { KitchenEstimatePanel, OrderIntakePanel } from './OrderIntakePanel';
 import { ConversationMoodPanel } from './ConversationMoodPanel';
 import { ChannelIdentityPanel } from './ChannelIdentityPanel';
+import { AddSenderToCrm, CopyButton, DetailsRailExtras } from './DetailsRailExtras';
 
 export const DetailsRail: React.FC<{
   thread: InboxThread;
@@ -201,13 +202,15 @@ export const DetailsRail: React.FC<{
         </div>
       )}
 
+      {!contact && isMember && thread.channel === 'email' && <AddSenderToCrm thread={thread} onAdded={() => onIntakeChanged?.()} />}
+      {contact && context && isMember && <DetailsRailExtras thread={thread} context={context} onChanged={() => onIntakeChanged?.()} />}
       {contact ? (
         <>
           {/* Contact details */}
           <div className="p-5 space-y-2.5 border-b border-hairline">
             <SectionTitle icon={<UserIcon className="h-4 w-4" />}>Contact</SectionTitle>
-            {contact.email && <Row icon={<Mail className="w-3.5 h-3.5" />}><a href={`mailto:${contact.email}`} className="hover:underline">{contact.email}</a></Row>}
-            {(contact.phone || contact.mobile) && <Row icon={<Phone className="w-3.5 h-3.5" />}>{contact.phone || contact.mobile}</Row>}
+            {contact.email && <Row icon={<Mail className="w-3.5 h-3.5" />}><span className="flex items-center gap-1.5 min-w-0"><a href={`mailto:${contact.email}`} className="hover:underline truncate">{contact.email}</a><CopyButton value={contact.email} label="email" /></span></Row>}
+            {(contact.phone || contact.mobile) && <Row icon={<Phone className="w-3.5 h-3.5" />}><span className="flex items-center gap-1.5">{contact.phone || contact.mobile}<CopyButton value={String(contact.phone || contact.mobile)} label="phone" /></span></Row>}
             {(contact.city || contact.country) && <Row icon={<MapPin className="w-3.5 h-3.5" />}>{[contact.city, contact.country].filter(Boolean).join(', ')}</Row>}
             {contact.vat_number && <Row icon={<Hash className="w-3.5 h-3.5" />}>VAT {contact.vat_number}</Row>}
             {contact.lead_source && <Row icon={<Tag className="w-3.5 h-3.5" />}><span className="capitalize">{contact.lead_source}</span></Row>}
