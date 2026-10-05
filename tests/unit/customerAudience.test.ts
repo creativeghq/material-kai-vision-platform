@@ -196,9 +196,11 @@ describe('inbox-api runs JARVIS instead of a second assistant', () => {
 
   it('calls agent-chat with the customer audience and the thread id', () => {
     const src = inbox();
-    expect(src).toMatch(/functions\/v1\/agent-chat/);
-    expect(src).toMatch(/audience: 'customer'/);
-    expect(src).toMatch(/thread_id: threadId/);
+    const once = code('supabase/functions/_shared/agent-chat-once.ts');
+    expect(src).toMatch(/runAgentTurn\(\{[\s\S]{0,120}threadId,/);
+    expect(once).toMatch(/functions\/v1\/agent-chat/);
+    expect(once).toMatch(/audience: 'customer'/);
+    expect(once).toMatch(/thread_id: turn\.threadId/);
   });
 
   it('has no second brain left behind', () => {
@@ -219,7 +221,7 @@ describe('inbox-api runs JARVIS instead of a second assistant', () => {
     expect(src).not.toMatch(/inbox_agent_reply_refund/);
     expect(src).not.toMatch(/inbox_agent_suggest_refund/);
     // The credit gate still stops an unfunded workspace — it just lives upstream now.
-    expect(src).toMatch(/resp\.status === 402/);
+    expect(src).toMatch(/turn\.status === 402/);
   });
 
   it('does not make a provider webhook wait for an agent turn', () => {

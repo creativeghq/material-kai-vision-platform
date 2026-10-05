@@ -115,3 +115,20 @@ describe('Gmail rules run through Flows, and personal mail never reaches a works
     expect(internal).toContain('!acct.is_shared');
   });
 });
+
+describe('JARVIS on a Gmail thread treats the mail as data', () => {
+  const once = stripComments(readFileSync(join(process.cwd(), 'supabase/functions/_shared/agent-chat-once.ts'), 'utf8'));
+  it('runs as the customer audience, so the text is fenced and the tools clamped', () => {
+    expect(once).toContain("audience: 'customer'");
+    expect(action('assist')).toContain('runAgentTurn(');
+  });
+
+  it('takes its instructions from the prompt registry, not from code', () => {
+    expect(action('assist')).toContain("loadPrompt(db, 'tool', mode === 'summary' ? 'gmail_thread_summary' : 'gmail_reply_draft')");
+  });
+
+  it('is billed to the person asking, and says so when they cannot pay', () => {
+    expect(action('assist')).toContain('workspaceId: account.workspace_id, userId');
+    expect(action('assist')).toContain('turn.status === 402');
+  });
+});

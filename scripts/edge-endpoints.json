@@ -2981,6 +2981,7 @@
       "assign",
       "members",
       "share",
+      "assist",
       "internal_modify"
     ],
     "request": [
@@ -3011,7 +3012,9 @@
       "until",
       "user_id",
       "is_shared",
-      "member_ids"
+      "member_ids",
+      "mode",
+      "instruction"
     ],
     "response": "{ configured, accounts } | { auth_url } | { labels } | { threads, next_page_token } | { id, messages } | { data_base64 } | { ok, message_id, thread_id }"
   },

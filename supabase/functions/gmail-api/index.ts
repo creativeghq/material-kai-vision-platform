@@ -10,6 +10,8 @@ import {
   signOAuthState, verifyOAuthState,
 } from '../_shared/google-oauth.ts';
 import { parseAddress, parseGmailPayload, type GmailPart } from '../_shared/mail-mime.ts';
+import { runAgentTurn } from '../_shared/agent-chat-once.ts';
+import { loadPrompt } from '../_shared/prompt-utils.ts';
 import {
   EMAIL_ADDRESS, gmailAccessToken, gmailFetch, gmailHeader, prepareGmailSend, sendPreparedGmail,
 } from '../_shared/gmail-client.ts';
@@ -325,6 +327,40 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       }).select('id, send_at').single();
       if (error) throw new HttpError(500, `Could not schedule: ${error.message}`);
       return json({ ok: true, scheduled: data });
+    }
+
+    case 'assist': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const threadId = String(body.thread_id ?? '');
+      if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
+      const mode = body.mode === 'summary' ? 'summary' : 'draft';
+      const steer = typeof body.instruction === 'string' ? body.instruction.trim().slice(0, 500) : '';
+      const token = await accessTokenFor(db, account);
+      const t = await gmail(token, `/threads/${threadId}?format=full`);
+      const me = account.email.toLowerCase();
+      const parts = ((t.messages ?? []) as Array<Record<string, unknown>>).slice(-15).map((m) => {
+        const parsed = parseGmailPayload(m.payload as GmailPart);
+        const from = parseAddress(parsed.headers.from);
+        const who = from.address === me ? 'Our team' : `${from.name ?? ''} <${from.address ?? 'unknown'}>`.trim();
+        const text = (parsed.text ?? (parsed.html ?? '').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' '))
+          .replace(/\s+\n/g, '\n').replace(/[ \t]+/g, ' ').trim().slice(0, 4000);
+        const when = m.internalDate ? new Date(Number(m.internalDate)).toISOString() : '';
+        return `From: ${who}\nDate: ${when}\nSubject: ${parsed.headers.subject ?? ''}\n\n${text}`;
+      });
+      if (!parts.length) throw new HttpError(400, 'This conversation has no messages');
+      const base = await loadPrompt(db, 'tool', mode === 'summary' ? 'gmail_thread_summary' : 'gmail_reply_draft');
+      const instruction = mode === 'draft' && steer ? `${base}\nWhat the reply should do: ${steer}` : base;
+      const turn = await runAgentTurn({
+        workspaceId: account.workspace_id, userId,
+        transcript: `Email thread in the mailbox ${account.email} (oldest first):\n\n${parts.join('\n\n---\n\n')}`,
+        operatorInstruction: instruction,
+      });
+      if (!turn.ok) {
+        if (turn.status === 402) throw new HttpError(402, 'Not enough credits for the assistant.');
+        throw new HttpError(502, `The assistant did not answer: ${turn.error}`);
+      }
+      if (!turn.text) throw new HttpError(502, 'The assistant produced nothing — try again.');
+      return json({ text: turn.text, mode });
     }
 
     case 'snoozed': {

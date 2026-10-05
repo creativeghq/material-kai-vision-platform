@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Archive, ArrowLeft, Download, Loader2, Mail, MailOpen, Paperclip, Reply, ReplyAll, Send, Star, Trash2, X } from 'lucide-react';
+import { Sparkles, Archive, ArrowLeft, Download, Loader2, Mail, MailOpen, Paperclip, Reply, ReplyAll, Send, Star, Trash2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -88,6 +88,9 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState(false);
   const [sending, setSending] = useState(false);
+  const [assisting, setAssisting] = useState<null | 'summary' | 'draft'>(null);
+  const [summary, setSummary] = useState<{ threadId: string; text: string } | null>(null);
+  const [steer, setSteer] = useState('');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const row = threads.find((t) => t.id === openId);
   const last = openMessages?.[openMessages.length - 1] ?? null;
@@ -97,6 +100,22 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
     () => [...(openMessages ?? [])].reverse().find((m) => m.from.address !== me) ?? last,
     [openMessages, me, last],
   );
+
+  const assist = async (mode: 'summary' | 'draft') => {
+    if (!account || !openId) return;
+    setAssisting(mode);
+    try {
+      const r = await gmailApi.assist(account.id, openId, mode, mode === 'draft' ? steer : undefined);
+      if (mode === 'summary') setSummary({ threadId: openId, text: r.text });
+      else {
+        if (!replying) startReply('reply');
+        setBody(r.text);
+        setSteer('');
+      }
+    } catch (e) {
+      toast({ title: mode === 'summary' ? 'Could not summarise' : 'Could not draft', description: (e as Error).message, variant: 'destructive' });
+    } finally { setAssisting(null); }
+  };
 
   const startReply = (kind: 'reply' | 'all') => {
     if (!lastIncoming) return;
@@ -152,6 +171,10 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
           onClick={() => modify(openId, row?.starred ? { remove: ['STARRED'] } : { add: ['STARRED'] }, row?.starred ? 'Unstarred' : 'Starred')}>
           <Star className={`w-4 h-4 ${row?.starred ? 'fill-current text-amber-700 dark:text-amber-300' : ''}`} />
         </Button>
+        <Button variant="ghost" size="sm" className="h-8 text-xs" title="Summarise this conversation with JARVIS" disabled={!!assisting || !openMessages}
+          onClick={() => { void assist('summary'); }}>
+          {assisting === 'summary' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}Summarise
+        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8" title="Mark unread" onClick={() => modify(openId, { add: ['UNREAD'] }, 'Marked unread')}>
           <MailOpen className="w-4 h-4" />
         </Button>
@@ -164,6 +187,15 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       </div>
       {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={row?.subject ?? last?.subject ?? ''} sender={lastIncoming?.from ?? null} />}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2">
+        {summary?.threadId === openId && (
+          <div className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-sm">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+              <Sparkles className="w-3.5 h-3.5" /> Summary by JARVIS
+              <button type="button" className="ml-auto hover:text-foreground" title="Hide" onClick={() => setSummary(null)}><X className="w-3.5 h-3.5" /></button>
+            </div>
+            <div className="whitespace-pre-wrap">{summary.text}</div>
+          </div>
+        )}
         {loadingThread || !openMessages ? (
           <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
         ) : openMessages.map((m, i) => (
@@ -176,9 +208,12 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       </div>
       <div className="border-t border-hairline bg-surface-sunken p-3 shrink-0 space-y-2">
         {!replying ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => startReply('reply')} disabled={!lastIncoming}><Reply className="w-4 h-4 mr-1" />Reply</Button>
             <Button size="sm" variant="outline" onClick={() => startReply('all')} disabled={!lastIncoming}><ReplyAll className="w-4 h-4 mr-1" />Reply all</Button>
+            <Button size="sm" variant="outline" onClick={() => { void assist('draft'); }} disabled={!lastIncoming || !!assisting}>
+              {assisting === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}Draft with AI
+            </Button>
           </div>
         ) : (
           <>
@@ -189,6 +224,12 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
               <Input id="g-cc" value={cc} onChange={(e) => setCc(e.target.value)} className="h-7 text-xs" />
               <Label htmlFor="g-bcc" className="text-xs text-muted-foreground">Bcc</Label>
               <Input id="g-bcc" value={bcc} onChange={(e) => setBcc(e.target.value)} className="h-7 text-xs" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Input value={steer} onChange={(e) => setSteer(e.target.value)} placeholder="Tell JARVIS what the reply should say (optional)" className="h-7 text-xs" />
+              <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" disabled={!!assisting} onClick={() => { void assist('draft'); }}>
+                {assisting === 'draft' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}Draft
+              </Button>
             </div>
             <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
             {preview

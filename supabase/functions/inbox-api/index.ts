@@ -69,6 +69,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { escapeLike } from '../_shared/searchFold.ts';
+import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
@@ -659,81 +660,26 @@ async function buildAgentDraft(
   // Everything that made this function clever used to live HERE — a persona, a hand-built tool
   // map, a hand-built system prompt, one `generateWithClaudeTools` call. All of it is gone, and
   // that is the change: there is ONE assistant on this platform and the Inbox runs it.
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/agent-chat`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      agentId: DEFAULT_INBOX_AGENT_ID,
-      audience: 'customer',
-      thread_id: threadId,
-      workspace_id: workspaceId,
-      // Attribution and billing. agent-chat meters the turn into `agent_usage_logs` against this
-      // user, which is why `maybeRunAgentReply` no longer debits a flat fee of its own — two
-      // ledgers for one reply is how `credit_transactions` and `ai_usage_logs` came to disagree
-      // about which feature had run.
-      user_id: billedTo.userId ?? null,
-      // ONE synthetic user message holding the whole transcript. Not a replayed message array:
-      // the roles here are Customer / Our team / Assistant, which is not the two-role shape a
-      // chat history has, and flattening it into `user`/`assistant` would tell the model that a
-      // colleague's sentence was its own.
-      messages: [{ role: 'user', content: agentInput }],
-      // The member's steer, as its own field. agent-chat appends it AFTER the customer-data fence
-      // and labels it as coming from the operator's side — inside the transcript it would be
-      // fenced as customer text and rightly ignored.
-      ...(billedTo.operatorInstruction ? { operator_instruction: billedTo.operatorInstruction } : {}),
-      // The reply is a single message, so there is no conversation to continue and nothing should
-      // be written to one. A null id also keeps a customer thread out of the operator's Studio.
-      conversation_id: null,
-    }),
+  const turn = await runAgentTurn({
+    agentId: DEFAULT_INBOX_AGENT_ID,
+    threadId,
+    workspaceId,
+    userId: billedTo.userId ?? null,
+    transcript: agentInput,
+    operatorInstruction: billedTo.operatorInstruction,
   });
-
-  if (!resp.ok) {
-    // 402 is the credit gate saying the owner cannot pay for this turn. That is not an error to
-    // retry or report — it is the documented "leave it for a human" outcome, and the caller
-    // treats an empty draft exactly that way.
-    if (resp.status === 402) {
+  if (!turn.ok) {
+    // 402 is the credit gate: leave it for a human, which the caller reads from an empty draft.
+    if (turn.status === 402) {
       console.log(`[inbox-api] agent reply skipped on ${threadId}: insufficient credits`);
       return '';
     }
-    throw new Error(`agent-chat ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
+    throw new Error(`agent-chat ${turn.status}: ${turn.error}`);
   }
-
-  return await readAgentChatReply(resp, threadId);
+  if (!turn.text) console.warn(`[inbox-api] agent-chat produced no final_result for ${threadId}`);
+  return turn.text;
 }
 
-/** Pull the final answer out of agent-chat's stream. */
-async function readAgentChatReply(resp: Response, threadId: string): Promise<string> {
-  const raw = await resp.text();
-  let text = '';
-  let sawFinal = false;
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let chunk: { type?: string; text?: string; error?: string; message?: string };
-    try {
-      chunk = JSON.parse(trimmed);
-    } catch {
-      // A partial line is normal at a chunk boundary; a persistently unparseable body is not, but
-      // it surfaces below as an empty draft rather than as a crash on the customer's turn.
-      continue;
-    }
-    if (chunk.type === 'final_result') {
-      sawFinal = true;
-      text = String(chunk.text || '');
-    } else if (chunk.type === 'error') {
-      console.warn(`[inbox-api] agent-chat error chunk on ${threadId}:`, chunk.error || chunk.message);
-    }
-  }
-  if (!sawFinal) {
-    // The stream ended without an answer. Distinguished from "answered with nothing" on purpose —
-    // the first is a broken turn worth seeing in the logs, the second is a legitimate decline.
-    console.warn(`[inbox-api] agent-chat produced no final_result for ${threadId}`);
-  }
-  return text.trim();
-}
 
 /**
  * Get-or-create a public share token for a customer thread → the `/i/:token` link a member can

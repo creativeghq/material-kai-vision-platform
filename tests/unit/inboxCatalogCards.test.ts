@@ -287,7 +287,8 @@ describe('the operator steer cannot be forged by the customer', () => {
   });
 
   it('inbox-api forwards the steer as its own field; agent-chat appends it after fencing', () => {
-    expect(code(INBOX_API)).toMatch(/operator_instruction: billedTo\.operatorInstruction/);
+    expect(code(INBOX_API)).toMatch(/operatorInstruction: billedTo\.operatorInstruction/);
+    expect(code('supabase/functions/_shared/agent-chat-once.ts')).toMatch(/operator_instruction: turn\.operatorInstruction/);
     expect(code(INBOX_API)).toMatch(/slice\(0, OPERATOR_INSTRUCTION_MAX\)/);
     const chat = code(AGENT_CHAT);
     const fenceAt = chat.indexOf('userInput = fenceCustomerMessage(String(userInput));');
