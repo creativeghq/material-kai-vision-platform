@@ -696,9 +696,9 @@ export async function deliverToInbox(
   const { data: insertedMsg, error: msgErr } = await db.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: customerParticipantId,
-    // Store the plain-text body. The HTML is kept in metadata and rendered through
-    // react-markdown / escapeHtml on the client — inbound HTML is a stranger's markup and is
-    // never handed to dangerouslySetInnerHTML (invariant 11).
+    // Plain text in `body`. The HTML stays in metadata and the client shows it only through
+    // sanitizeEmailHtml inside a script-less sandboxed frame (EmailHtmlView) — a stranger's
+    // markup is never handed to dangerouslySetInnerHTML (invariant 11).
     body: parsed.text || null,
     attachments,
     message_type: 'text',

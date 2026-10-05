@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Lock, Paperclip, Bot, EyeOff, Eye, Reply, Trash2, MoreHorizontal, Forward, Pin, PinOff, Star, StickyNote as StickyNoteIcon, Smile, Copy } from 'lucide-react';
+import { EmailHtmlView } from './EmailHtmlView';
 import { InboxCatalogCards, readInboxCards } from '@/modules/messaging/components/InboxCatalogCards';
 import { splitMessageLinks, messageUrls, shortenUrlForDisplay } from '@/utils/messageLinks';
 import { castSeedForSender } from '@/utils/characterAvatar';
@@ -394,6 +395,8 @@ export const MessageBubble: React.FC<{
   // so without this every social message renders as an unattributed grey bubble and a thread
   // of ten different commenters looks like one anonymous person talking to themselves.
   const meta = (m.metadata ?? {}) as Record<string, unknown>;
+  const emailHtml = typeof meta.email_html === 'string' && meta.email_html.trim() ? meta.email_html : null;
+  const [showPlain, setShowPlain] = useState(false);
   // A channel placeholder standing in for media, with nothing attached to show for it. Both
   // halves matter: once the attachment IS captured, the bubble should render the file rather
   // than keep apologising for it.
@@ -541,13 +544,26 @@ export const MessageBubble: React.FC<{
               customer typed — shown raw it reads as a fault in their phone. We now fetch the file
               from Zernio's attachment endpoint, so this only survives when that fetch has not
               succeeded yet, and it says exactly that rather than telling anyone to give up. */}
-          {m.body && (mediaPlaceholder ? (
+          {emailHtml && !showPlain ? (
+            <EmailHtmlView
+              html={emailHtml}
+              sender={typeof meta.email_from === 'string' ? meta.email_from : null}
+              onShowText={m.body ? () => setShowPlain(true) : undefined}
+            />
+          ) : m.body && (mediaPlaceholder ? (
             <div className="flex items-start gap-1.5 text-sm text-muted-foreground italic">
               <Paperclip className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>They sent a file. It has not been retrieved yet — re-run the import for this conversation to fetch it.</span>
             </div>
           ) : (
-            <MessageBody body={m.body} threadId={m.thread_id} />
+            <>
+              {emailHtml && (
+                <button type="button" className="mb-1 text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => setShowPlain(false)}>
+                  Show formatted
+                </button>
+              )}
+              <MessageBody body={m.body} threadId={m.thread_id} />
+            </>
           ))}
           {/* Catalog cards, as the customer saw them: name, image, THEIR price, the same link. */}
           <InboxCatalogCards cards={readInboxCards(m)} />
