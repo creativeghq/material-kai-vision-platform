@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (170)
+## 1. Supabase Edge Functions (171)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -353,6 +353,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `hr-careers` _(GET + POST)_ | public | Public careers page + job-board API - list a workspace's open postings, read one, accept applications |
 | `hr-checkin-cron` | cron | Cron: fire late check-in alerts for employees who haven't clocked in |
 | `hr-kiosk` | public | Public attendance kiosk — VAT (+ optional PIN) clock in/out |
+
+**Inbox**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `gmail-api` _(GET + POST)_ | userJwt | A person's own Gmail, live: connect with the platform Google client, browse labels and threads, read, reply, label, trash |
 
 **Marketplace**
 

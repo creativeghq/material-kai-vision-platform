@@ -97,6 +97,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'generate-social-video', label: 'generate-social-video', sublabel: 'Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable)' },
   { id: 'generate-virtual-staging', label: 'generate-virtual-staging', sublabel: 'AI virtual staging of an empty room via Replicate proplabs/virtual-staging' },
   { id: 'generate-vr-world', label: 'generate-vr-world', sublabel: 'Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble' },
+  { id: 'gmail-api', label: 'gmail-api', sublabel: "A person's own Gmail, live: connect, browse, read, reply, label (per-user OAuth)" },
   { id: 'gsc-api', label: 'gsc-api', sublabel: 'Google Search Console for connected websites (OAuth + performance sync)' },
   { id: 'health-check', label: 'health-check', sublabel: 'Check liveness and key validity of all AI providers and external services' },
   { id: 'hr-api', label: 'hr-api', sublabel: 'HR module API — employees, absences, recruitment, onboarding, payroll, attendance, Ergani, accounting' },
