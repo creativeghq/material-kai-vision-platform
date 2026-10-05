@@ -296,6 +296,10 @@ says so; there is no unsend to offer.
   - **Channel filters** All / Internal / WhatsApp / Email, plus an **Order** filter (#342); operators get an "All workspaces" toggle (`scope:'all'`).
   - **Realtime**: members subscribe to `inbox_messages` inserts on the open thread + a `inbox_threads` list channel. The details rail is populated by `get_thread_context`.
   - **Received email** renders as the sender formatted it: `metadata.email_html` through `sanitizeEmailHtml` (DOMPurify; scripts, forms, frames and remote CSS removed, remote images held back until "Show images" or "Always for <sender>") inside a script-less sandboxed iframe — [`EmailHtmlView`](../src/pages/Inbox/components/EmailHtmlView.tsx). Plain text stays one click away.
+  - **Source switcher** (`?src=`): All · Platform · WhatsApp · Gmail. Platform and WhatsApp narrow `list_threads` by `channels[]`; Gmail swaps the three panes for the Gmail mailbox ([§10b](#10b-gmail)). Folders: Inbox, Unread, Starred, Drafts, Sent, Archived (`folder` = starred | sent | drafts, filtered in SQL through an inner embed); Mine / Unassigned under Assignment. Counts read "N+" while more pages exist.
+  - **Drafts** (`inbox_drafts`, own rows only): the composer saves the reply and its Cc/Bcc 0.8s after typing stops, flushes on a thread switch, restores on return on any device; `send_message` deletes it once the message is stored. The composer is cleared on every thread switch — it used to carry one customer's reply into the next thread.
+  - **Bulk actions**: select rows → Mark read (skips threads you are not on: there is no read state, and joining would assign you), Done / Reopen, add a Label, Archive. One call per thread, four at a time; a partial run is reported as "10 of 12 — 2 failed: <reason>" and the failed rows stay selected.
+  - **Formatting**: email replies and new emails take **bold**, *italic*, [links](https://…), lists and quotes, with a preview. `src/utils/emailMarkup.ts` (mirrored to Deno) renders it after escaping everything with the canonical escaper; the HTML part is sent only when formatting is used.
   - **New conversation** has four tabs: Team, Customer, Email (To with CRM suggestions, Cc/Bcc, subject, several attachments) and WhatsApp (opens the thread by number; the first message is a template).
   - Client service: [`inboxApi`](../src/services/inboxApi.ts).
 - **Public route** `/i/:token` → [`PublicInboxThreadPage`](../src/pages/PublicInboxThreadPage.tsx). Minimal chrome, one thread, reply box + attachments. Anonymous customers can't use RLS realtime, so it **polls every 15s** via `token_get_thread`. A "Create account to continue" modal routes to signup carrying the token (`/auth?mode=signup&inbox_token=…&redirect=/inbox`); on return the app calls `token_claim` (a fallback in `InboxPage` also claims a token stashed in `localStorage` across the email-confirmation round trip).
@@ -306,7 +310,7 @@ says so; there is no unsend to offer.
 
 **Shipped:** the thread/message/participant/token backbone; directional ACL + shared team inbox; WhatsApp inbound reply-capture with assign-on-reply + 24h-window enforcement; the AI takeover (auto-engage, credit metering, data-grounded thread-scoped tools, human-takeover pause, editable persona); per-workspace `auto_respond` / `allow_account_data` settings **with the UI toggle**; the CRM/finance context rail; the public tokenized thread page + `token_claim` conversion; the marketplace inquiry bridge; Flows-based notifications.
 
-**Pending:** the rest of #471 — connected Gmail as a third source, the source-adaptive sidebar, rich-text compose, mail folders (Sent/Drafts/Trash), attachment preview, scheduling and rules. Templates outside Meta's 24h window are no longer pending: the composer offers every approved template of the workspace (§5).
+**Pending:** the rest of #471 — the Gmail thread index (CRM link, assignee, snooze), shared mailboxes, push sync, scheduled send, and rules as Flows. Templates outside Meta's 24h window are no longer pending: the composer offers every approved template of the workspace (§5).
 
 ---
 
@@ -377,6 +381,20 @@ indistinguishable from success from the operator's side.
 - **Attachments** are read back from storage and sent as files (25 MB total); a file that cannot be
   read refuses the send rather than delivering the text without it.
 - **A first email** (`compose_email`) goes out with its subject as typed, not `Re:`.
+
+---
+
+## 10b. Gmail
+
+A person connects their own Gmail with the platform's one Google OAuth client (`GOOGLE_CLIENT_ID`, shared with Calendar and Search Console through `_shared/google-oauth.ts`). [`gmail-api`](../supabase/functions/gmail-api/index.ts) works it **live** — labels, Gmail search, paging, threads, attachments, label changes and sends all go to the Gmail API, and nothing is mirrored into `inbox_messages`, so deleting in Gmail is never a sync bug.
+
+- **Personal.** `mail_accounts` rows are readable only by their owner, and every action refuses (404) unless the caller owns the account. Workspace membership grants nothing.
+- **Tokens.** The refresh token is in Vault; `mail_account_store_refresh_token` / `mail_account_refresh_token` / `mail_account_forget_token` are service-role-only definer functions and `refresh_secret_id` is not selectable. Access tokens are never stored.
+- **Consent.** `state` is HMAC-signed and lives 10 minutes; `prompt=consent` forces a refresh token; a grant without `gmail.modify` is refused (`scope_missing`). `invalid_grant` marks the account `needs_reauth` and the Inbox shows a Reconnect banner.
+- **Sending** goes through `messages.send`, so it lands in the user's own Sent and threads on their phone. Replies carry `In-Reply-To` / `References` from the message answered (which must belong to the same thread) and default to its Reply-To. MIME is built by `_shared/mail-mime.ts` (pure, unit-tested), which strips CR/LF from every header and decodes legacy Greek charsets on the way in.
+- **Google setup (once, in the Google Cloud console of the existing client):** enable the Gmail API; add `https://<project>.supabase.co/functions/v1/gmail-api` as an authorised redirect URI; add the `gmail.modify` and `gmail.send` scopes to the consent screen. While the app is in Testing, only listed test users can connect; opening it to tenants needs Google verification and a CASA assessment for those restricted scopes.
+
+Not yet built: a thin per-thread index for our own facts on a Gmail thread (CRM link, assignee, snooze, reminders), shared mailboxes, Pub/Sub push sync, and agent tools over Gmail (`gmail-api` is `userJwt`, so it is outside the agent's generic API reach by construction).
 
 ---
 
