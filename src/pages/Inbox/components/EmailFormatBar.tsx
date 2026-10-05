@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bold, Italic, Link2, List, ListOrdered, Quote, Eye, EyeOff } from 'lucide-react';
+import { Bold, Italic, Underline, Heading, Link2, List, ListOrdered, Quote, Eye, EyeOff } from 'lucide-react';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { hasEmailMarkup, renderEmailMarkup } from '@/utils/emailMarkup';
 import { EmailHtmlView } from './EmailHtmlView';
@@ -41,6 +41,8 @@ export const EmailFormatBar: React.FC<{
   const tools: Array<{ icon: React.ElementType; title: string; fn: Parameters<typeof edit>[3] }> = [
     { icon: Bold, title: 'Bold', fn: wrap('**', 'bold text') },
     { icon: Italic, title: 'Italic', fn: wrap('*', 'italic text') },
+    { icon: Underline, title: 'Underline', fn: wrap('__', 'underlined text') },
+    { icon: Heading, title: 'Heading', fn: (sel) => ({ text: `\n## ${sel || 'Heading'}\n` }) },
     {
       icon: Link2, title: 'Link',
       fn: (sel) => {

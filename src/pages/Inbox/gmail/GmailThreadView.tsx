@@ -13,6 +13,7 @@ import { EmailHtmlView } from '../components/EmailHtmlView';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { SendLaterMenu } from '../components/SendLater';
 import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
+import { useFileDrop } from '../useFileDrop';
 import { CopilotPanel, RewriteMenu } from '../components/AssistTools';
 import type { GmailMailboxState } from './useGmailMailbox';
 import { GmailThreadFacts } from './GmailThreadFacts';
@@ -112,6 +113,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const [copilotFor, setCopilotFor] = useState<string | null>(null);
   const [steer, setSteer] = useState('');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
 
   const userLabels = labels.filter((l) => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
   const row = threads.find((t) => t.id === openId);
@@ -337,7 +339,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
             </Button>
           </div>
         ) : (
-          <div className="rounded-sm border border-hairline bg-card">
+          <div {...dropProps} className={`rounded-sm border border-hairline bg-card${dragging ? ' ring-2 ring-primary/40' : ''}`}>
             <div className="px-3 pt-1 border-b border-hairline">
               <div className="flex items-start">
                 <div className="flex-1 min-w-0"><RecipientInput id="g-to" label="To" value={to} onChange={setTo} known={known} autoFocus={mode === 'forward'} /></div>

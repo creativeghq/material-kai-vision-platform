@@ -143,3 +143,16 @@ describe('the Inbox copilot and rewrite modes read the conversation as data', ()
     expect(assist).toContain("neq('message_type', 'note')");
   });
 });
+
+describe('Gmail reminders', () => {
+  const sched = stripComments(readFileSync(join(process.cwd(), 'supabase/functions/mail-scheduler/index.ts'), 'utf8'));
+  const fire = sched.slice(sched.indexOf('async function fireReminders'), sched.indexOf('async function failStalled'));
+  it('claims a due reminder before acting, and an "if no reply" one clears silently when they replied', () => {
+    expect(fire).toContain(".eq('remind_at', row.remind_at)");
+    expect(fire).toContain('if (replied) { cleared++; continue; }');
+  });
+  it('rings through the existing follow-up flow, stamped with the workspace', () => {
+    expect(fire).toContain("emitFlowEvent('inbox.follow_up_due'");
+    expect(fire).toContain('workspace_id: row.workspace_id');
+  });
+});

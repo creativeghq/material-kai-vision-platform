@@ -12,6 +12,7 @@ import { inboxApi, type AttachmentInput } from '@/services/inboxApi';
 import { splitAddresses } from '../emailRecipients';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
+import { useFileDrop } from '../useFileDrop';
 
 type Suggestion = { id: string; label: string; email: string };
 
@@ -39,6 +40,7 @@ export const ComposeEmailForm: React.FC<{
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
   const [preview, setPreview] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -99,7 +101,7 @@ export const ComposeEmailForm: React.FC<{
 
   return (
     <>
-      <div className="space-y-2.5">
+      <div {...dropProps} className={`space-y-2.5 rounded-sm${dragging ? ' ring-2 ring-primary/40' : ''}`}>
         <div className="text-xs text-muted-foreground">
           {from === undefined ? 'Loading your address…' : from ? <>From <span className="text-foreground font-medium">{from}</span></> : 'You have no active Inbox address yet. Set one up in Inbox settings first.'}
         </div>

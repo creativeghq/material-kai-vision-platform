@@ -61,7 +61,7 @@ async function upsertIndex(db: Db, account: Account, threadId: string, patch: Re
 async function indexFacts(db: Db, accountId: string, threadIds: string[]) {
   if (!threadIds.length) return new Map<string, Record<string, unknown>>();
   const { data, error } = await db.from('mail_thread_index')
-    .select('gmail_thread_id, contact_id, company_id, assignee_user_id, snoozed_until, crm_contacts(name)')
+    .select('gmail_thread_id, contact_id, company_id, assignee_user_id, snoozed_until, remind_at, remind_note, remind_if_no_reply, crm_contacts(name)')
     .eq('account_id', accountId).in('gmail_thread_id', threadIds);
   if (error) throw new HttpError(500, `Could not read conversation facts: ${error.message}`);
   return new Map<string, Record<string, unknown>>((data ?? []).map((r: Record<string, unknown>) => [String(r.gmail_thread_id), r]));
@@ -401,6 +401,46 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       return json({ text: turn.text, mode });
     }
 
+    case 'remind': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const threadId = String(body.thread_id ?? '');
+      if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
+      if (body.at == null) {
+        await upsertIndex(db, account, threadId, { remind_at: null, remind_note: null, remind_if_no_reply: false, remind_user_id: null, reminded_at: null });
+        return json({ ok: true, remind_at: null });
+      }
+      const at = new Date(String(body.at));
+      const now = Date.now();
+      if (Number.isNaN(at.getTime()) || at.getTime() < now + 60_000 || at.getTime() > now + 366 * 86_400_000) {
+        throw new HttpError(400, 'Pick a time between a minute and a year from now');
+      }
+      await upsertIndex(db, account, threadId, {
+        remind_at: at.toISOString(), remind_note: typeof body.note === 'string' ? body.note.slice(0, 500) || null : null,
+        remind_if_no_reply: body.if_no_reply === true, remind_user_id: userId, reminded_at: null,
+        ...(typeof body.subject === 'string' ? { subject: body.subject.slice(0, 300) } : {}),
+      });
+      return json({ ok: true, remind_at: at.toISOString() });
+    }
+
+    case 'reminders': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const token = await accessTokenFor(db, account);
+      const { data, error } = await db.from('mail_thread_index').select('gmail_thread_id')
+        .eq('account_id', account.id).not('remind_at', 'is', null).order('remind_at').limit(PAGE_SIZE);
+      if (error) throw new HttpError(500, error.message);
+      const ids = (data ?? []).map((r: { gmail_thread_id: string }) => r.gmail_thread_id);
+      const meta = '&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date';
+      const threads = (await Promise.all(ids.map((id: string) => gmail(token, `/threads/${id}?format=metadata${meta}`).catch(() => null)))).filter(Boolean) as Array<Record<string, unknown>>;
+      const facts = await indexFacts(db, account.id, ids);
+      return json({
+        threads: threads.map((t) => {
+          const f = facts.get(String(t.id));
+          return { ...listRow(t), contact_id: f?.contact_id ?? null, contact_name: (f?.crm_contacts as { name?: string } | null)?.name ?? null, assignee_user_id: f?.assignee_user_id ?? null, snoozed_until: f?.snoozed_until ?? null, remind_at: f?.remind_at ?? null, remind_note: f?.remind_note ?? null };
+        }),
+        next_page_token: null, estimate: threads.length,
+      });
+    }
+
     case 'snoozed': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const token = await accessTokenFor(db, account);
@@ -426,7 +466,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
       const sender = String(body.sender ?? '').trim().toLowerCase();
       const { data: row, error } = await db.from('mail_thread_index')
-        .select('contact_id, company_id, assignee_user_id, snoozed_until').eq('account_id', account.id).eq('gmail_thread_id', threadId).maybeSingle();
+        .select('contact_id, company_id, assignee_user_id, snoozed_until, remind_at, remind_note, remind_if_no_reply').eq('account_id', account.id).eq('gmail_thread_id', threadId).maybeSingle();
       if (error) throw new HttpError(500, error.message);
       let contactId = row?.contact_id ?? null;
       let suggested = false;
@@ -460,6 +500,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       return json({
         contact, contact_linked: !!row?.contact_id && !suggested, contact_suggested: suggested,
         assignee_user_id: row?.assignee_user_id ?? null, snoozed_until: row?.snoozed_until ?? null,
+        remind_at: row?.remind_at ?? null, remind_note: row?.remind_note ?? null, remind_if_no_reply: row?.remind_if_no_reply ?? false,
         shared: account.is_shared, members,
       });
     }

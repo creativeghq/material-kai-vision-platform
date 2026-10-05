@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlarmClock, Building2, Loader2, UserPlus, UserRound, X } from 'lucide-react';
+import { AlarmClock, BellRing, Building2, Loader2, UserPlus, UserRound, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -35,6 +35,9 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState('');
   const [customOpen, setCustomOpen] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
+  const [remindAt, setRemindAt] = useState('');
+  const [remindNote, setRemindNote] = useState('');
 
   const load = useCallback(async () => {
     if (!account) return;
@@ -123,6 +126,40 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="ghost" className="h-6 text-xs" disabled={busy}>
+            <BellRing className="w-3.5 h-3.5 mr-1" />
+            {meta.remind_at ? `Reminder ${formatDate(meta.remind_at)}${meta.remind_if_no_reply ? ' (if no reply)' : ''}` : 'Remind me'}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-60">
+          {[3, 7].map((days) => (
+            <DropdownMenuItem key={days} onSelect={() => run(() => gmailApi.remind({ account_id: account.id, thread_id: threadId, at: at(days, 9).toISOString(), if_no_reply: true, subject }), `I will remind you in ${days} days if they have not replied`)}>
+              If no reply in {days === 7 ? 'a week' : `${days} days`}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuItem onSelect={() => run(() => gmailApi.remind({ account_id: account.id, thread_id: threadId, at: at(1, 9).toISOString(), subject }), 'Reminder set for tomorrow morning')}>Tomorrow morning</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setRemindOpen(true)}>Pick a date and a note…</DropdownMenuItem>
+          {meta.remind_at && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => run(() => gmailApi.remind({ account_id: account.id, thread_id: threadId, at: null }), 'Reminder removed')}>Remove the reminder</DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {remindOpen && (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <Input type="datetime-local" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} className="h-6 text-xs w-48" aria-label="Remind me at" />
+          <Input value={remindNote} onChange={(e) => setRemindNote(e.target.value)} placeholder="Note (optional)" className="h-6 text-xs w-44" aria-label="Reminder note" />
+          <Button size="sm" className="h-6 text-xs" disabled={!remindAt || busy}
+            onClick={() => { setRemindOpen(false); void run(() => gmailApi.remind({ account_id: account.id, thread_id: threadId, at: new Date(remindAt).toISOString(), note: remindNote, subject }), 'Reminder set'); }}>Set</Button>
+          <button type="button" title="Cancel" onClick={() => setRemindOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
+        </span>
+      )}
 
       {customOpen && (
         <span className="inline-flex items-center gap-1.5">

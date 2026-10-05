@@ -12,6 +12,7 @@ import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { SendLaterMenu } from './SendLater';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
+import { useFileDrop } from '../useFileDrop';
 import { RewriteMenu } from './AssistTools';
 import { inboxApi } from '@/services/inboxApi';
 import type { InboxPageState } from '../useInboxPage';
@@ -67,8 +68,9 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     chooseSlashCommand,
     togglePendingCard,
   } = s;
+  const { dragging, dropProps } = useFileDrop((files) => setAttachment(files[0]));
   return (
-    <div className="border-t border-hairline bg-surface-sunken p-3 space-y-2 shrink-0">
+    <div {...dropProps} className={`border-t border-hairline bg-surface-sunken p-3 space-y-2 shrink-0${dragging ? ' ring-2 ring-primary/40' : ''}`}>
       {/* A comment reply is PUBLIC. Nothing else about the composer says so, and the
           same box is used for private DMs one filter click away — an operator who
           assumes private has already published the mistake by the time they find out. */}

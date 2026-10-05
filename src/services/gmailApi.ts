@@ -9,6 +9,7 @@ export interface GmailThreadMeta {
   contact: { id: string; name: string | null; email: string | null; phone: string | null; position: string | null; companies: Array<{ id: string; name: string }> } | null;
   contact_linked: boolean; contact_suggested: boolean;
   assignee_user_id: string | null; snoozed_until: string | null;
+  remind_at?: string | null; remind_note?: string | null; remind_if_no_reply?: boolean;
   shared: boolean; members: Array<{ user_id: string; name: string }>;
 }
 export interface GmailLabel { id: string; name: string; type: 'system' | 'user'; unread: number; total: number; color: string | null }
@@ -17,6 +18,7 @@ export interface GmailThreadRow {
   id: string; subject: string; from: GmailAddress; participants: string[]; snippet: string; date: string | null;
   unread: boolean; starred: boolean; message_count: number; label_ids: string[]; has_attachment?: boolean;
   contact_id: string | null; contact_name: string | null; assignee_user_id: string | null; snoozed_until: string | null;
+  remind_at?: string | null; remind_note?: string | null;
 }
 export interface GmailAttachment { attachmentId: string; filename: string; mimeType: string; size: number }
 export interface GmailMessage {
@@ -59,6 +61,10 @@ export const gmailApi = {
     call<{ ok: boolean; contact_id: string; created: boolean }>('create_contact', input),
   snooze: (input: { account_id: string; thread_id: string; until: string | null; subject?: string }) =>
     call<{ ok: boolean; snoozed_until: string | null }>('snooze', input),
+  remind: (input: { account_id: string; thread_id: string; at: string | null; note?: string; if_no_reply?: boolean; subject?: string }) =>
+    call<{ ok: boolean; remind_at: string | null }>('remind', input),
+  reminders: (account_id: string) =>
+    call<{ threads: GmailThreadRow[]; next_page_token: null; estimate: number }>('reminders', { account_id }),
   assign: (account_id: string, thread_id: string, user_id: string | null) => call<{ ok: boolean }>('assign', { account_id, thread_id, user_id }),
   members: (account_id: string) => call<{ is_shared: boolean; member_ids: string[] }>('members', { account_id }),
   share: (account_id: string, is_shared: boolean, member_ids: string[]) =>

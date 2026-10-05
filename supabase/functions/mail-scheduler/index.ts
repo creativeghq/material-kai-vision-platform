@@ -171,6 +171,48 @@ async function stampSync(db: Db, accountId: string, historyId: string | null, er
   if (error) console.error('[mail-scheduler] sync stamp failed', accountId, error.message);
 }
 
+/** Due Gmail reminders ring through the inbox.follow_up_due flow; "if no reply" ones clear when a reply came. */
+async function fireReminders(db: Db): Promise<{ fired: number; cleared: number }> {
+  const now = new Date().toISOString();
+  const { data, error } = await db.from('mail_thread_index')
+    .select('id, gmail_thread_id, workspace_id, remind_at, remind_note, remind_if_no_reply, remind_user_id, subject, mail_accounts!inner(id, email, display_name, status)')
+    .lte('remind_at', now).limit(BATCH);
+  if (error) throw new HttpError(500, `reminder scan failed: ${error.message}`);
+  let fired = 0;
+  let cleared = 0;
+  for (const row of data ?? []) {
+    const { data: claimed } = await db.from('mail_thread_index')
+      .update({ remind_at: null, reminded_at: now }).eq('id', row.id).eq('remind_at', row.remind_at).select('id');
+    if (!claimed?.length) continue;
+    let replied = false;
+    if (row.remind_if_no_reply && row.mail_accounts.status === 'active') {
+      try {
+        const token = await gmailAccessToken(db, row.mail_accounts);
+        const t = await gmailFetch(token, `/threads/${row.gmail_thread_id}?format=metadata&metadataHeaders=From`);
+        const msgs = (t.messages ?? []) as Array<Record<string, unknown>>;
+        const last = msgs[msgs.length - 1];
+        replied = !!last && parseAddress(gmailHeader(last, 'From')).address !== String(row.mail_accounts.email).toLowerCase();
+      } catch (e) {
+        console.error('[mail-scheduler] reminder check failed; reminding anyway', row.id, (e as Error).message);
+      }
+    }
+    if (replied) { cleared++; continue; }
+    if (!row.remind_user_id) continue;
+    await emitFlowEvent('inbox.follow_up_due', {
+      type: 'inbox.follow_up_due',
+      workspace_id: row.workspace_id,
+      user_id: row.remind_user_id,
+      title: row.remind_if_no_reply ? 'No reply yet — follow up' : 'Reminder',
+      body: [row.subject || 'An email conversation', row.remind_note].filter(Boolean).join(' — '),
+      action_url: '/inbox?src=gmail',
+      gmail_thread_id: row.gmail_thread_id,
+      source: 'gmail',
+    });
+    fired++;
+  }
+  return { fired, cleared };
+}
+
 async function failStalled(db: Db): Promise<number> {
   const cutoff = new Date(Date.now() - STALE_SENDING_MS).toISOString();
   const { data, error } = await db.from('mail_scheduled_sends')
@@ -187,6 +229,7 @@ Deno.serve(withApiLogging('mail-scheduler', async (req) => {
   const stalled = await failStalled(db);
   const snoozes = await wakeSnoozes(db);
   const scheduled = await deliverScheduled(db);
+  const reminders = await fireReminders(db);
   const sync = await syncHistory(db);
-  return json({ ok: true, stalled, snoozes, scheduled, sync });
+  return json({ ok: true, stalled, snoozes, scheduled, reminders, sync });
 }));

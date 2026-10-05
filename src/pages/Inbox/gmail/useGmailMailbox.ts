@@ -7,6 +7,7 @@ import { gmailApi, type GmailLabel, type GmailMessage, type GmailThreadRow, type
 
 const ACCOUNT_KEY = 'inbox.gmail.account';
 export const SNOOZED_VIEW = '__snoozed';
+export const REMINDERS_VIEW = '__reminders';
 
 const CALLBACK_MESSAGES: Record<string, { title: string; description?: string; bad?: boolean }> = {
   connected: { title: 'Gmail connected' },
@@ -115,6 +116,8 @@ export function useGmailMailbox() {
     try {
       const r = labelId === SNOOZED_VIEW && !appliedQuery
         ? await gmailApi.snoozed(account.id)
+        : labelId === REMINDERS_VIEW && !appliedQuery
+        ? await gmailApi.reminders(account.id)
         : await gmailApi.threads({ account_id: account.id, label_id: appliedQuery ? undefined : labelId, q: appliedQuery || undefined });
       if (seq !== listSeq.current) return;
       setThreads(r.threads);
@@ -194,13 +197,19 @@ export function useGmailMailbox() {
     if (openId === id) { setOpenId(null); setOpenMessages(null); }
   }, [openId]);
 
+  const assignCounts = useMemo(() => ({
+    all: threads.length,
+    mine: threads.filter((t) => t.assignee_user_id === myUserId).length,
+    unassigned: threads.filter((t) => !t.assignee_user_id).length,
+  }), [threads, myUserId]);
+
   const visibleThreads = useMemo(() => {
     if (!account?.is_shared || assignFilter === 'all') return threads;
     return threads.filter((t) => (assignFilter === 'mine' ? t.assignee_user_id === myUserId : !t.assignee_user_id));
   }, [threads, account, assignFilter, myUserId]);
 
   return {
-    workspaceId, myUserId, reloadAccounts: loadAccounts, assignFilter, setAssignFilter, visibleThreads, patchThread, dropThread, configured, accounts, account, setAccountId, connect, disconnect,
+    workspaceId, myUserId, reloadAccounts: loadAccounts, assignCounts, assignFilter, setAssignFilter, visibleThreads, patchThread, dropThread, configured, accounts, account, setAccountId, connect, disconnect,
     labels, labelId, setLabelId, query, setQuery, appliedQuery,
     threads, nextPageToken, loadingList, loadingMore, listError, loadThreads, loadMore,
     openId, setOpenId, openMessages, loadingThread, openThread, modify,

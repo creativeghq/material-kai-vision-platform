@@ -28,6 +28,8 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     assignmentView,
     setAssignmentView,
     setShowScheduled,
+    threads,
+    myUserId,
     nextCursor,
     sourceFilter,
     setSourceFilter,
@@ -126,11 +128,13 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
               <NavRow
                 icon={<UserRound className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
                 label="Mine" dense active={assignmentView === 'mine'}
+                count={`${threads.filter((t) => (t.assignees ?? []).some((a) => a.user_id === myUserId)).length}${nextCursor ? '+' : ''}`}
                 onClick={() => setAssignmentView(assignmentView === 'mine' ? null : 'mine')}
               />
               <NavRow
                 icon={<UserX className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
                 label="Unassigned" dense active={assignmentView === 'unassigned'}
+                count={`${threads.filter((t) => !(t.assignees ?? []).length).length}${nextCursor ? '+' : ''}`}
                 onClick={() => setAssignmentView(assignmentView === 'unassigned' ? null : 'unassigned')}
               />
             </nav>

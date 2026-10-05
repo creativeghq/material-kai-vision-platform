@@ -42,3 +42,11 @@ describe('an email reply sends that HTML only through the escaping builders', ()
     expect(api).toContain("from '../_shared/emailMarkup.generated.ts'");
   });
 });
+
+describe('underline and headings', () => {
+  it('renders __underline__ and a # heading line', () => {
+    expect(r('a __b__ c')).toBe('<p>a <u>b</u> c</p>');
+    expect(r('## Delivery\n\nText')).toBe('<h4>Delivery</h4>\n<p>Text</p>');
+    expect(hasEmailMarkup('# Title')).toBe(true);
+  });
+});

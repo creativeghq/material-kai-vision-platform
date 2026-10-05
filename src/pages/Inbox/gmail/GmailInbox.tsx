@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { AlarmClock, AlertTriangle, Archive, CalendarClock, Users, FilePen, Inbox as InboxIcon, Loader2, Mail, Paperclip, Plus, Search, Send, ShieldAlert, Star, Tag, Trash2, X } from 'lucide-react';
+import { AlarmClock, AlertTriangle, Archive, BellRing, CalendarClock, Users, FilePen, Inbox as InboxIcon, Loader2, Mail, Paperclip, Plus, Search, Send, ShieldAlert, Star, Tag, Trash2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -14,8 +14,9 @@ import { visibleModes, type InboxMode } from '../inboxModes';
 import { NavRow, SidebarHeading } from '../components/InboxPrimitives';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
+import { useFileDrop } from '../useFileDrop';
 import { GmailThreadView, fileToAttachment } from './GmailThreadView';
-import { SNOOZED_VIEW, useGmailMailbox, type GmailMailboxState } from './useGmailMailbox';
+import { REMINDERS_VIEW, SNOOZED_VIEW, useGmailMailbox, type GmailMailboxState } from './useGmailMailbox';
 import { GmailShareDialog } from './GmailShareDialog';
 import { MailAvatar, RecipientInput } from './mailParts';
 import { ScheduledDialog, SendLaterMenu } from '../components/SendLater';
@@ -24,6 +25,7 @@ const SYSTEM_ROWS: Array<{ id: string; label: string; icon: React.ElementType }>
   { id: 'INBOX', label: 'Inbox', icon: InboxIcon },
   { id: 'STARRED', label: 'Starred', icon: Star },
   { id: SNOOZED_VIEW, label: 'Snoozed', icon: AlarmClock },
+  { id: REMINDERS_VIEW, label: 'Reminders', icon: BellRing },
   { id: 'DRAFT', label: 'Drafts', icon: FilePen },
   { id: 'SENT', label: 'Sent', icon: Send },
   { id: 'SPAM', label: 'Spam', icon: ShieldAlert },
@@ -41,6 +43,7 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
   const send = async (sendAt?: Date) => {
     if (!g.account) return;
     setBusy(true);
@@ -60,7 +63,7 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
   };
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className={`max-w-2xl${dragging ? ' ring-2 ring-primary/40' : ''}`} {...dropProps}>
         <DialogHeader>
           <DialogTitle>New Email</DialogTitle>
           <DialogDescription>From {g.account?.email}. It goes out through Gmail and lands in your Sent.</DialogDescription>
@@ -214,7 +217,9 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
         {account?.is_shared && (
           <div role="tablist" aria-label="Assignment" className="flex items-center gap-3 px-3 border-b border-hairline text-xs">
             {(['all', 'mine', 'unassigned'] as const).map((k) => (
-              <button key={k} role="tab" aria-selected={g.assignFilter === k} onClick={() => g.setAssignFilter(k)} className="py-1.5 capitalize">{k}</button>
+              <button key={k} role="tab" aria-selected={g.assignFilter === k} onClick={() => g.setAssignFilter(k)} className="py-1.5 capitalize">
+                {k} <span className="text-muted-foreground tabular-nums">{g.assignCounts[k]}{g.nextPageToken ? '+' : ''}</span>
+              </button>
             ))}
           </div>
         )}
@@ -225,7 +230,10 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
             <Button size="sm" variant="outline" className="h-6 text-xs" onClick={g.connect}>Reconnect</Button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && g.nextPageToken && !g.loadingMore) void g.loadMore();
+        }}>
           {g.loadingList ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin" /></div>
           ) : g.listError ? (
@@ -255,11 +263,12 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
                       {t.starred && <Star className="w-3.5 h-3.5 shrink-0 fill-current text-amber-700 dark:text-amber-300" />}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{t.snippet}</div>
-                    {(t.has_attachment || t.contact_name || t.snoozed_until) && (
+                    {(t.has_attachment || t.contact_name || t.snoozed_until || t.remind_at) && (
                       <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
                         {t.has_attachment && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5"><Paperclip className="w-3 h-3" />Attachment</span>}
                         {t.contact_name && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 max-w-[12rem] truncate">CRM · {t.contact_name}</span>}
                         {t.snoozed_until && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5"><AlarmClock className="w-3 h-3" />{formatDate(t.snoozed_until)}</span>}
+                        {t.remind_at && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 max-w-[14rem] truncate"><BellRing className="w-3 h-3" />{formatDate(t.remind_at)}{t.remind_note ? ` · ${t.remind_note}` : ''}</span>}
                       </div>
                     )}
                   </div>

@@ -184,7 +184,10 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
         </div>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" onScroll={(e) => {
+        const el = e.currentTarget;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && nextCursor && !loadingMore) void loadMoreThreads();
+      }}>
         {loadingThreads ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : visibleThreads.length === 0 ? (

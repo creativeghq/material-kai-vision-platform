@@ -1,6 +1,6 @@
 type Escape = (s: string) => string;
 
-const MARKUP = /\*\*[^*\n]+\*\*|(^|[\s(])\*[^*\s][^*\n]*\*|\[[^\]\n]+\]\((https?:\/\/|mailto:)[^)\s]+\)|^\s*([-*]|\d+\.|>)\s/m;
+const MARKUP = /\*\*[^*\n]+\*\*|__[^_\n]+__|(^|[\s(])\*[^*\s][^*\n]*\*|\[[^\]\n]+\]\((https?:\/\/|mailto:)[^)\s]+\)|^\s*([-*]|\d+\.|>|#{1,2})\s/m;
 
 export function hasEmailMarkup(text: string | null | undefined): boolean {
   return !!text && MARKUP.test(text);
@@ -18,6 +18,7 @@ function inline(escaped: string): string {
   });
   out = out
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_\n]+)__/g, '<u>$1</u>')
     .replace(/(^|[\s(])\*([^*\s][^*\n]*?)\*(?=$|[\s.,;:!?)])/g, '$1<em>$2</em>');
   return out.replace(/\u0000(\d+)\u0000/g, (_m, i: string) => links[Number(i)]);
 }
@@ -26,6 +27,11 @@ export function renderEmailMarkup(text: string, escape: Escape): string {
   const blocks = text.replace(/\r\n/g, '\n').split(/\n{2,}/).map((b) => b.replace(/^\n+|\n+$/g, '')).filter(Boolean);
   return blocks.map((block) => {
     const lines = block.split('\n');
+    const heading = /^(#{1,2})\s+(.+)$/.exec(lines[0]);
+    if (heading && lines.length === 1) {
+      const tag = heading[1].length === 1 ? 'h3' : 'h4';
+      return `<${tag}>${inline(escape(heading[2]))}</${tag}>`;
+    }
     if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {
       return `<ul>${lines.map((l) => `<li>${inline(escape(l.replace(/^\s*[-*]\s+/, '')))}</li>`).join('')}</ul>`;
     }
