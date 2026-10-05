@@ -371,6 +371,18 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'list_price', label: 'New list price', note: 'What the factory now ASKS. Not a cost until the operator accepts it.' },
     { key: 'currency', label: 'Currency', note: 'Currency of the published ask.', example: 'EUR' },
   ]),
+  supplier_claim_requested: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Operator (root workspace) admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'company_name', label: 'Company name', note: 'Invoicing name of the claiming workspace.' },
+    { key: 'vat_number', label: 'VAT number', note: 'The VAT number being claimed.' },
+    { key: 'tax_office', label: 'Tax office', note: 'From the invoicing identity of the claimant.' },
+    { key: 'address', label: 'Address', note: 'From the invoicing identity of the claimant.' },
+    { key: 'requester_name', label: 'Requested by', note: 'The member who pressed Request confirmation.' },
+    { key: 'requester_email', label: 'Requester email', note: 'Their sign-in email.' },
+    { key: 'requesting_workspace_name', label: 'Workspace', note: 'The workspace making the claim.' },
+    { key: 'risk_flag', label: 'Risk flag', note: 'low = the VAT matches their own invoicing identity; needs_review otherwise.', example: 'low' },
+    { key: 'claim_request_id', label: 'Claim request ID', note: 'The supplier_claim_requests row.' },
+  ]),
   // #210 — HR labour lifecycle. The Ergani document code is carried on the payload so a flow
   // can branch on it (e.g. route an Ε6 termination to Finance but not an Ε5 resignation).
   'hr.departure_recorded': withStandard([

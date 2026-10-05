@@ -126,7 +126,7 @@ describe('supplier claims — publishing rights follow the confirmed person', ()
 });
 
 describe('flows wiring for the catalog triggers', () => {
-  const TRIGGERS = ['catalog_master_updated', 'supplier_price_changed'];
+  const TRIGGERS = ['catalog_master_updated', 'supplier_price_changed', 'supplier_claim_requested'];
   const MIRRORS = [
     'src/services/flows/types.ts',
     'src/services/flows/triggerVariables.ts',

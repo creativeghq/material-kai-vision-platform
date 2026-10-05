@@ -536,6 +536,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'supplier_price_changed', group: 'Finance',
     label: 'Manufacturer Changed a Price', description: 'A verified manufacturer published a new price. It is an offer to the OPERATOR only — no tenant cost changes until the operator accepts it (notify the operator)', icon: 'DollarSign', color: 'amber',
     defaultData: { label: 'Manufacturer Changed a Price', category: 'trigger', triggerType: 'supplier_price_changed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'supplier_claim_requested', group: 'Finance',
+    label: 'Manufacturer Claim Requested', description: 'A workspace asked to be confirmed as a manufacturer — review it in Supplier Identity Claims (notify the operator)', icon: 'Factory', color: 'amber',
+    defaultData: { label: 'Manufacturer Claim Requested', category: 'trigger', triggerType: 'supplier_claim_requested', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

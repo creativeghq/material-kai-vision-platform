@@ -232,6 +232,7 @@ export type TriggerType =
   // A verified manufacturer published a new PRICE. It is an offer to the OPERATOR only;
   // no tenant's negotiated cost changes until the operator accepts it
   | 'supplier_price_changed'
+  | 'supplier_claim_requested'
   | 'realestate.buyer_matches_found'
   | 'realestate.new_listing_for_buyer'
   | 'realestate.listing_published'
@@ -346,6 +347,7 @@ export interface UpstreamOrderCreatedTriggerConfig {}
 export interface SupplierPoReceivedTriggerConfig {}
 export interface CatalogMasterUpdatedTriggerConfig {}
 export interface SupplierPriceChangedTriggerConfig {}
+export interface SupplierClaimRequestedTriggerConfig {}
 export interface PageWatchChangedTriggerConfig {}
 /** Payload-only. Fires once per occurrence when `due_on - lead_days` is reached. */
 export interface AssetServiceDueTriggerConfig {}
@@ -672,6 +674,7 @@ export type TriggerConfigMap = {
   supplier_po_received: SupplierPoReceivedTriggerConfig;
   catalog_master_updated: CatalogMasterUpdatedTriggerConfig;
   supplier_price_changed: SupplierPriceChangedTriggerConfig;
+  supplier_claim_requested: SupplierClaimRequestedTriggerConfig;
   'realestate.buyer_matches_found': RealestateBuyerMatchesFoundTriggerConfig;
   'realestate.new_listing_for_buyer': RealestateNewListingForBuyerTriggerConfig;
   'realestate.listing_published': RealestateListingPublishedTriggerConfig;
