@@ -12142,6 +12142,42 @@ export type Database = {
           },
         ]
       }
+      inbox_snippets: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          shared: boolean
+          updated_at: string
+          use_count: number
+          workspace_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          name: string
+          shared?: boolean
+          updated_at?: string
+          use_count?: number
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          shared?: boolean
+          updated_at?: string
+          use_count?: number
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       inbox_thread_labels: {
         Row: {
           created_at: string

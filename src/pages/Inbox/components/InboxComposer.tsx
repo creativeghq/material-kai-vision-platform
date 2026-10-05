@@ -11,6 +11,7 @@ import { CatalogPicker, EmojiPicker, SlashCommandMenu } from './ComposerPickers'
 import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { SendLaterMenu } from './SendLater';
+import { ComposerInsertMenu } from './ComposerInsertMenu';
 import type { InboxPageState } from '../useInboxPage';
 
 
@@ -45,6 +46,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     emailPreview,
     setEmailPreview,
     openThread,
+    threadDisplayName,
     aiDrafting,
     aiDraftShown,
     setAiDraftShown,
@@ -313,6 +315,17 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
               onPick={(e) => setDraft((d) => d + e)}
             />
           </div>
+          {isMember && !isNote && (
+            <div className="shrink-0">
+              <ComposerInsertMenu
+                workspaceId={activeThread.workspace_id}
+                currentText={draft}
+                disabled={waBlocked}
+                recipient={{ name: threadDisplayName(activeThread), email: emailRecipients?.to ?? null }}
+                onInsert={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))}
+              />
+            </div>
+          )}
           <label className="cursor-pointer p-2.5 rounded-sm hover:bg-surface-hover shrink-0">
             <Paperclip className="w-4 h-4 text-muted-foreground" />
             {/* `accept` names what the channel can actually carry, so the picker does not

@@ -12,6 +12,7 @@ import { gmailApi, type GmailAddress, type GmailMessage } from '@/services/gmail
 import { EmailHtmlView } from '../components/EmailHtmlView';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { SendLaterMenu } from '../components/SendLater';
+import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
 import type { GmailMailboxState } from './useGmailMailbox';
 import { GmailThreadFacts } from './GmailThreadFacts';
 import { GmailTaskDialog } from './GmailTaskDialog';
@@ -362,7 +363,11 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
                 ? <EmailPreview value={body} onEdit={() => setPreview(false)} />
                 : <Textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your message…" className="min-h-[110px] resize-y border-0 shadow-none focus-visible:ring-0" />}
             </div>
-            <div className="px-2 pb-2"><EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} /></div>
+            <div className="px-2 pb-2 flex items-center justify-between gap-2">
+              <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
+              <ComposerInsertMenu workspaceId={account?.workspace_id ?? null} currentText={body}
+                recipient={{ name: lastIncoming?.from.name ?? null, email: to[0] ?? null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
+            </div>
             {(files.length > 0 || preparing) && (
               <div className="px-3 pb-2 flex flex-wrap gap-1.5 text-xs">
                 {preparing && <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" />Adding the attachments…</span>}

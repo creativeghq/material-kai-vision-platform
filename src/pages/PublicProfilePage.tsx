@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Globe,
   MapPin,
@@ -183,6 +183,7 @@ function ServiceRow({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export const PublicProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
+  const [searchParams] = useSearchParams();
   // Live property listings for this profile's owner (agency Listings tab); shows only when the
   // Real Estate module is enabled AND the profile owner has published listings.
   const { enabled: realEstateEnabled } = useModule('real-estate');
@@ -504,7 +505,7 @@ export const PublicProfilePage: React.FC = () => {
           )}
 
           {/* ── Tabs ─────────────────────────────────────────────────────────── */}
-          <Tabs defaultValue="about" className="mt-5">
+          <Tabs defaultValue={['about', 'moodboards', 'skills', 'services', 'reviews', 'listings'].includes(searchParams.get('tab') ?? '') ? String(searchParams.get('tab')) : 'about'} className="mt-5">
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
               <TabsTrigger value="about" className="flex items-center gap-1.5">
                 <UserCircle className="h-4 w-4" /> About
@@ -726,6 +727,11 @@ export const PublicProfilePage: React.FC = () => {
 
             {/* ── Services ──────────────────────────────────────────────── */}
             <TabsContent value="services" className="mt-5 space-y-5">
+              {richServices.length === 0 && !isOwnProfile && (
+                <div id="booking" className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
+                  <BookingWidget profileUserId={profile.user_id} profileName={displayName} services={[]} />
+                </div>
+              )}
               {richServices.length === 0 ? (
                 <div className="py-12 text-center text-muted-foreground">
                   <Briefcase className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -743,7 +749,7 @@ export const PublicProfilePage: React.FC = () => {
                         <ServiceRow key={svc.id} service={svc} onHire={openHireModal} isLast={i === richServices.length - 1} />
                       ))}
                   </div>
-                  <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
+                  <div id="booking" className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                       <BookingWidget
                         profileUserId={profile.user_id}
                         profileName={displayName}

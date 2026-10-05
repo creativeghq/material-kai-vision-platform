@@ -11,6 +11,7 @@ import { DialogFooter } from '@/components/core/ui/dialog';
 import { inboxApi, type AttachmentInput } from '@/services/inboxApi';
 import { splitAddresses } from '../emailRecipients';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
+import { ComposerInsertMenu } from './ComposerInsertMenu';
 
 type Suggestion = { id: string; label: string; email: string };
 
@@ -132,7 +133,10 @@ export const ComposeEmailForm: React.FC<{
           <Label htmlFor="compose-subject" className="text-xs text-muted-foreground">Subject</Label>
           <Input id="compose-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
         </div>
-        <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
+        <div className="flex items-center justify-between gap-2">
+          <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
+          <ComposerInsertMenu workspaceId={workspaceId} currentText={body} recipient={{ email: to.trim() || null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
+        </div>
         {preview
           ? <EmailPreview value={body} onEdit={() => setPreview(false)} />
           : <Textarea ref={bodyRef} aria-label="Message" placeholder="Write your email…" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-[140px] resize-y" />}

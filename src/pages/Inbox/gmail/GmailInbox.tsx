@@ -13,6 +13,7 @@ import { formatDate } from '@/utils/datetime';
 import { visibleModes, type InboxMode } from '../inboxModes';
 import { NavRow, SidebarHeading } from '../components/InboxPrimitives';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
+import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
 import { GmailThreadView, fileToAttachment } from './GmailThreadView';
 import { SNOOZED_VIEW, useGmailMailbox, type GmailMailboxState } from './useGmailMailbox';
 import { GmailShareDialog } from './GmailShareDialog';
@@ -73,7 +74,10 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
             <input id="gc-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 bg-transparent text-sm outline-none py-1.5" />
           </div>
         </div>
-        <EmailFormatBar textareaRef={ref} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
+        <div className="flex items-center justify-between gap-2">
+          <EmailFormatBar textareaRef={ref} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
+          <ComposerInsertMenu workspaceId={g.account?.workspace_id ?? null} currentText={body} recipient={{ email: to[0] ?? null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
+        </div>
         {preview
           ? <EmailPreview value={body} onEdit={() => setPreview(false)} />
           : <Textarea ref={ref} aria-label="Message" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-[180px] resize-y" />}
