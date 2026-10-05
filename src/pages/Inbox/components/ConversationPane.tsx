@@ -19,6 +19,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     toast,
     myUserId,
     starredIds,
+    messageOpens,
     setForwarding,
     activeId,
     messages,
@@ -273,6 +274,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 })}
                 workspaceId={activeThread.workspace_id}
                 starred={starredIds.has(m.id)}
+                opens={messageOpens[m.id]}
                 onAttachmentsRepaired={() => { void openThread(activeThread.id); }}
                 onReplyTo={(msg) => setReplyTo(msg)}
                 onReact={async (msg, emoji) => {

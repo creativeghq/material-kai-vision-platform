@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
+import type { MailOpens } from '@/pages/Inbox/components/OpenTracking';
 
 export interface MailAccount {
   id: string; email: string; display_name: string | null; status: 'active' | 'needs_reauth'; last_error: string | null;
@@ -24,11 +25,13 @@ export interface GmailAttachment { attachmentId: string; filename: string; mimeT
 export interface GmailMessage {
   id: string; label_ids: string[]; date: string | null; from: GmailAddress; to: GmailAddress[]; cc: GmailAddress[]; reply_to: string | null;
   subject: string; message_id: string | null; text: string | null; html: string | null; attachments: GmailAttachment[]; snippet: string;
+  opens?: MailOpens | null;
 }
 export type GmailSendInput = {
   account_id: string; to: string[]; cc?: string[]; bcc?: string[]; subject?: string; body: string;
   thread_id?: string; reply_to_message_id?: string;
   attachments?: Array<{ filename: string; content_type: string; data_base64: string }>;
+  track_opens?: boolean;
 };
 
 async function call<T>(action: string, payload: Record<string, unknown>): Promise<T> {
@@ -73,5 +76,5 @@ export const gmailApi = {
     call<{ text: string; mode: string }>('assist', { account_id, thread_id, mode, instruction, text }),
   schedule: (input: GmailSendInput & { send_at: string }) =>
     call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule', input),
-  send: (input: GmailSendInput) => call<{ ok: boolean; message_id: string; thread_id: string }>('send', input),
+  send: (input: GmailSendInput) => call<{ ok: boolean; message_id: string; thread_id: string; tracked: boolean }>('send', input),
 };

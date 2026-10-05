@@ -15,6 +15,7 @@ import { NavRow, SidebarHeading } from '../components/InboxPrimitives';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
 import { useFileDrop } from '../useFileDrop';
+import { TrackOpensToggle, useTrackOpens } from '../components/OpenTracking';
 import { GmailThreadView, fileToAttachment } from './GmailThreadView';
 import { REMINDERS_VIEW, SNOOZED_VIEW, useGmailMailbox, type GmailMailboxState } from './useGmailMailbox';
 import { GmailShareDialog } from './GmailShareDialog';
@@ -43,13 +44,14 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [trackOpens, setTrackOpens] = useTrackOpens();
   const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
   const send = async (sendAt?: Date) => {
     if (!g.account) return;
     setBusy(true);
     try {
       const input = {
-        account_id: g.account.id, to, cc, bcc, subject, body,
+        account_id: g.account.id, to, cc, bcc, subject, body, track_opens: trackOpens,
         attachments: files.length ? await Promise.all(files.map(fileToAttachment)) : undefined,
       };
       if (sendAt) await gmailApi.schedule({ ...input, send_at: sendAt.toISOString() });
@@ -80,6 +82,7 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
         <div className="flex items-center justify-between gap-2">
           <EmailFormatBar textareaRef={ref} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
           <ComposerInsertMenu workspaceId={g.account?.workspace_id ?? null} currentText={body} recipient={{ email: to[0] ?? null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
+          <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} />
         </div>
         {preview
           ? <EmailPreview value={body} onEdit={() => setPreview(false)} />

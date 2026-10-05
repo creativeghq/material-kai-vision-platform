@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseEdgeError } from '@/utils/edgeError';
 import type { InboxDocumentKind } from '@/modules/messaging/inboxDocumentKinds';
 import type { InboxCardKind, InboxPriceBasis } from '@/modules/messaging/inboxCardKinds';
+import type { MailOpens } from '@/pages/Inbox/components/OpenTracking';
 
 /**
  * Multi-Tenant Inbox client. Thin wrapper over the single `inbox-api` edge function
@@ -564,7 +565,7 @@ export const inboxApi = {
   },
   scheduleMessage(input: {
     thread_id: string; send_at: string; body?: string; attachments?: AttachmentInput[];
-    email_cc?: string[]; email_bcc?: string[]; reply_to_message_id?: string;
+    email_cc?: string[]; email_bcc?: string[]; reply_to_message_id?: string; track_opens?: boolean;
   }) {
     return call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule_message', input);
   },
@@ -573,7 +574,7 @@ export const inboxApi = {
   },
   composeEmail(input: {
     workspace_id: string; to: string; subject: string; body?: string; contact_id?: string;
-    email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[];
+    email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[]; track_opens?: boolean;
   }) {
     return call<{ thread_id: string; delivery_error: string | null }>('compose_email', input);
   },
@@ -604,10 +605,11 @@ export const inboxApi = {
       older_cursor?: string | null;
       /** The latest pin when it is older than the page returned. */
       pinned_message?: InboxMessage | null;
+      message_opens?: Record<string, MailOpens>;
     }>('get_thread', { thread_id });
   },
   getOlderMessages(thread_id: string, before: string) {
-    return call<{ messages: InboxMessage[]; older_cursor: string | null; starred_message_ids?: string[] }>(
+    return call<{ messages: InboxMessage[]; older_cursor: string | null; starred_message_ids?: string[]; message_opens?: Record<string, MailOpens> }>(
       'get_thread', { thread_id, before, limit: 20 },
     );
   },
@@ -625,6 +627,7 @@ export const inboxApi = {
     client_token?: string;
     email_cc?: string[];
     email_bcc?: string[];
+    track_opens?: boolean;
   }) {
     return call<{ message: InboxMessage }>('send_message', input);
   },

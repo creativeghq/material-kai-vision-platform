@@ -12,6 +12,7 @@ import { MessageActions, MessageBody } from './MessageBubble';
 import { DeliveryState, type ParticipantLabel } from './InboxPrimitives';
 import { MailAvatar, PersonChip } from '../gmail/mailParts';
 import { emailRecipientsOf } from '../emailRecipients';
+import { OpenReceipt, type MailOpens } from './OpenTracking';
 
 const stamp = (iso: string) => `${formatDate(iso)} ${formatTime(iso)}`;
 
@@ -23,6 +24,7 @@ export const EmailMessageCard: React.FC<{
   onToggle: () => void;
   workspaceId?: string;
   starred?: boolean;
+  opens?: MailOpens;
   onAttachmentsRepaired?: () => void;
   onReplyTo?: (m: InboxMessage) => void;
   onReact?: (m: InboxMessage, emoji: string) => void;
@@ -31,7 +33,7 @@ export const EmailMessageCard: React.FC<{
   onToggleStar?: (m: InboxMessage, starred: boolean) => void;
   onAddToNote?: (m: InboxMessage) => void;
   onDelete?: (m: InboxMessage) => void;
-}> = ({ m, info, ours, collapsed, onToggle, workspaceId, starred, onAttachmentsRepaired, onReplyTo, onReact, onForward, onTogglePin, onToggleStar, onAddToNote, onDelete }) => {
+}> = ({ m, info, ours, collapsed, onToggle, workspaceId, starred, opens, onAttachmentsRepaired, onReplyTo, onReact, onForward, onTogglePin, onToggleStar, onAddToNote, onDelete }) => {
   const { toast } = useToast();
   const meta = (m.metadata ?? {}) as Record<string, unknown>;
   const isAgent = m.message_type === 'agent';
@@ -83,6 +85,7 @@ export const EmailMessageCard: React.FC<{
             <span className="block text-xs text-muted-foreground truncate">
               {fromAddress && !ours ? `${fromAddress} · ` : ''}{stamp(m.created_at)}
             </span>
+            {ours && <OpenReceipt opens={opens} />}
           </span>
         </button>
         <div className="ml-auto flex flex-col items-end gap-1 min-w-0 max-w-full">

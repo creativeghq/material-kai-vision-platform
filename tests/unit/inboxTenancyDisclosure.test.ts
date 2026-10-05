@@ -160,7 +160,7 @@ describe('#359 CM-10 — a customer sees the customer projection', () => {
     expect(new Set(keys)).toEqual(new Set([
       'id', 'subject', 'status', 'channel', 'thread_type', 'last_message_at', 'created_at',
     ]));
-    expect(get).toMatch(/return json\(\{ thread: threadForCaller,/);
+    expect(get).toMatch(/return json\(\{\s*thread: threadForCaller,/);
   });
 
   it('it matches what the unauthenticated token path already gave the same person', () => {

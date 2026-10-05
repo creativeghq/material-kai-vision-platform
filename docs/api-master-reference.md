@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (172)
+## 1. Supabase Edge Functions (173)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -230,6 +230,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `email-api` _(GET + POST)_ | JWT / secret | Action-discriminated email sending, domain management, logs, and analytics via Resend. |
 | `email-unsubscribe` _(GET + POST)_ | token | Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe). |
 | `email-webhooks` | sig | Receives Resend delivery event webhooks and updates email_logs. |
+| `mail-track` _(GET)_ | token | Public open-tracking pixel for tracked outgoing email. |
 
 **Messaging**
 

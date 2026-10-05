@@ -14,6 +14,7 @@ import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { SendLaterMenu } from '../components/SendLater';
 import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
 import { useFileDrop } from '../useFileDrop';
+import { OpenReceipt, TrackOpensToggle, useTrackOpens } from '../components/OpenTracking';
 import { CopilotPanel, RewriteMenu } from '../components/AssistTools';
 import type { GmailMailboxState } from './useGmailMailbox';
 import { GmailThreadFacts } from './GmailThreadFacts';
@@ -58,6 +59,7 @@ const FullMessage: React.FC<{ m: GmailMessage; mine: boolean; accountId: string;
           <span className="min-w-0">
             <span className="block text-sm font-semibold truncate">{mine ? `You (${m.from.address})` : who(m.from)}</span>
             <span className="block text-xs text-muted-foreground truncate">{mine ? stamp(m.date) : `${m.from.address} · ${stamp(m.date)}`}</span>
+            {mine && <OpenReceipt opens={m.opens} />}
           </span>
         </button>
         <div className="ml-auto flex flex-col items-end gap-1 min-w-0 max-w-full">
@@ -113,6 +115,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const [copilotFor, setCopilotFor] = useState<string | null>(null);
   const [steer, setSteer] = useState('');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const [trackOpens, setTrackOpens] = useTrackOpens();
   const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
 
   const userLabels = labels.filter((l) => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
@@ -199,7 +202,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
     setSending(true);
     try {
       const input = {
-        account_id: account.id, to, cc, bcc, body,
+        account_id: account.id, to, cc, bcc, body, track_opens: trackOpens,
         ...(mode === 'forward'
           ? { subject }
           : { thread_id: openId, reply_to_message_id: lastIncoming.id }),
@@ -376,6 +379,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
               <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
               <RewriteMenu text={body} onReplace={setBody}
                 run={async (m, text) => (account && openId ? (await gmailApi.assist(account.id, openId, m, undefined, text)).text : text)} />
+              <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} />
               <ComposerInsertMenu workspaceId={account?.workspace_id ?? null} currentText={body}
                 recipient={{ name: lastIncoming?.from.name ?? null, email: to[0] ?? null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
             </div>

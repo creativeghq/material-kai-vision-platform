@@ -230,7 +230,7 @@ describe('inbox-api resolves the card server-side for the one customer party', (
     // The social metadata write merges; it used to replace the column and delete `cards`.
     const social = slice(src, "if (thread.channel === 'social'", "if (thread.channel === 'email'");
     expect(social).toMatch(/metadata: \{\s*\.\.\.storedMetadata,/);
-    expect(src).toMatch(/html: buildEmailCardsHtml\(cards, body\)/);
+    expect(src).toMatch(/\? buildEmailCardsHtml\(cards, body\)/);
     expect(src).toMatch(/const text = cards\.length\s*\? buildEmailCardsText\(cards, body\)/);
     expect(src).toMatch(/\(body \|\| \(cards\.length \? cardsPreview\(cards\) : '\[attachment\]'\)\)/);
     expect(code(ZERNIO)).toMatch(/if \(params\.interactive\) body\.interactive = params\.interactive;/);

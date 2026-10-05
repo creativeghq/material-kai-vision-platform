@@ -13,6 +13,7 @@ import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { SendLaterMenu } from './SendLater';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
 import { useFileDrop } from '../useFileDrop';
+import { TrackOpensToggle } from './OpenTracking';
 import { RewriteMenu } from './AssistTools';
 import { inboxApi } from '@/services/inboxApi';
 import type { InboxPageState } from '../useInboxPage';
@@ -41,6 +42,8 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     emailBcc,
     setEmailBcc,
     emailCopiesOpen,
+    trackOpens,
+    setTrackOpens,
     setEmailCopiesOpen,
     replyAll,
     templateOpen,
@@ -247,6 +250,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
             <span className="font-medium">{emailRecipients.to || '—'}</span>
             {emailRecipients.from && <span className="text-muted-foreground">from {emailRecipients.from}</span>}
             <span className="ml-auto flex items-center gap-2">
+              <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} className="h-6" />
               {emailRecipients.replyAllCc.length > 0 && (
                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={replyAll} title={emailRecipients.replyAllCc.join(', ')}>
                   <ReplyAll className="h-3.5 w-3.5" /> Reply all ({emailRecipients.replyAllCc.length})

@@ -20,6 +20,7 @@ import { modeChannels, modeSources, parseInboxMode, type InboxFolder, type Inbox
 import { NONE_VALUE } from '@/components/core/filters';
 import { bulkSummary, runBulk } from './inboxBulk';
 import { formatDate, formatTime } from '@/utils/datetime';
+import { useTrackOpens, type MailOpens } from './components/OpenTracking';
 
 
 
@@ -56,6 +57,8 @@ export function useInboxPage() {
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
   /** MY starred messages on the open thread. Personal — resolved for the caller by get_thread. */
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  const [messageOpens, setMessageOpens] = useState<Record<string, MailOpens>>({});
+  const [trackOpens, setTrackOpens] = useTrackOpens();
   /** The message being forwarded, while the destination is being chosen. */
   const [forwarding, setForwarding] = useState<InboxMessage | null>(null);
   const [canManageLabels, setCanManageLabels] = useState(false);
@@ -373,7 +376,7 @@ export function useInboxPage() {
     setDraft('');
     setAiDraftShown(false);
     try {
-      const { thread, participants, messages, whatsapp_window, starred_message_ids, older_cursor, pinned_message } = await inboxApi.getThread(id);
+      const { thread, participants, messages, whatsapp_window, starred_message_ids, older_cursor, pinned_message, message_opens } = await inboxApi.getThread(id);
       setOlderCursor(older_cursor ?? null);
       setFarPinned(pinned_message ?? null);
       setActiveThread(thread);
@@ -448,6 +451,7 @@ export function useInboxPage() {
       }
 
       setStarredIds(new Set(starred_message_ids || []));
+      setMessageOpens(message_opens ?? {});
 
       const customerName = ctx?.contact?.name || thread.subject || 'Customer';
       const next = new Map<string, ParticipantLabel>();
@@ -607,6 +611,7 @@ export function useInboxPage() {
       setMessages((cur) => [...r.messages.filter((m) => !cur.some((c) => c.id === m.id)), ...cur]);
       setOlderCursor(r.older_cursor ?? null);
       if (r.starred_message_ids?.length) setStarredIds((cur) => new Set([...cur, ...r.starred_message_ids!]));
+      if (r.message_opens) setMessageOpens((cur) => ({ ...cur, ...r.message_opens }));
     } catch (e) {
       toast({ title: 'Could not load older messages', description: (e as Error).message, variant: 'destructive' });
     } finally { setLoadingOlder(false); }
@@ -664,7 +669,8 @@ export function useInboxPage() {
         for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
         attachments = [{ filename: attachment.name, content_type: attachment.type || 'application/octet-stream', data_base64: btoa(bin) }];
       }
-      await inboxApi.sendMessage({
+      const tracked = isEmailReply && trackOpens;
+      const sent = await inboxApi.sendMessage({
         thread_id: activeId,
         body: draft.trim() || undefined,
         attachments,
@@ -675,7 +681,9 @@ export function useInboxPage() {
         cards: !isNote && pendingCards.length ? pendingCards.map((c) => ({ kind: c.kind, product_id: c.product_id })) : undefined,
         client_token: sendToken.current ?? undefined,
         ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc) } : {}),
+        ...(tracked ? { track_opens: true } : {}),
       });
+      if (tracked && sent?.message?.id) setMessageOpens((cur) => ({ ...cur, [sent.message.id]: { count: 0, first_opened_at: null, last_opened_at: null } }));
       sendToken.current = null;
       setDraft('');
       setAttachment(null);
@@ -697,7 +705,7 @@ export function useInboxPage() {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachment, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, toast]);
+  }, [activeId, draft, attachment, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast]);
 
   const [showScheduled, setShowScheduled] = useState(false);
   const scheduleSend = useCallback(async (sendAt: Date) => {
@@ -718,14 +726,14 @@ export function useInboxPage() {
       await inboxApi.scheduleMessage({
         thread_id: activeId, send_at: sendAt.toISOString(), body: draft.trim() || undefined, attachments,
         reply_to_message_id: replyTo ? replyTo.id : undefined,
-        ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc) } : {}),
+        ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc), track_opens: trackOpens } : {}),
       });
       toast({ title: 'Scheduled', description: `It goes out ${formatDate(sendAt.toISOString())} ${formatTime(sendAt.toISOString())}.` });
       setDraft(''); setAttachment(null); setReplyTo(null); setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false);
     } catch (e) {
       toast({ title: 'Could not schedule', description: (e as Error).message, variant: 'destructive' });
     } finally { setSending(false); }
-  }, [activeId, isNote, draft, attachment, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, toast]);
+  }, [activeId, isNote, draft, attachment, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   // The steer, when the member typed one, tells it WHAT the reply should do.
@@ -990,6 +998,9 @@ export function useInboxPage() {
     setWsLabels,
     starredIds,
     setStarredIds,
+    messageOpens,
+    trackOpens,
+    setTrackOpens,
     forwarding,
     setForwarding,
     canManageLabels,

@@ -6910,6 +6910,73 @@
         }
       }
     },
+    "/mail-track": {
+      "get": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "Public open-tracking pixel for tracked outgoing email.",
+        "operationId": "get_mail_track",
+        "description": "Loaded by the recipient mail client from an <img> in a tracked send. Always answers the same 1x1 GIF with no-store, whatever the token, so it reveals nothing. A valid token increments mail_open_tracking through the service-role-only mail_track_open RPC, which ignores hits in the first 5 seconds after the send. No JWT (verify_jwt=false); the token is an unguessable UUID minted per send.\n\n**Response:** `image/gif (1x1 transparent pixel)`",
+        "security": [
+          {
+            "queryToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/gsc-api": {
       "post": {
         "tags": [

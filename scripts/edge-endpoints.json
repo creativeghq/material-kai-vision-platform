@@ -3020,7 +3020,8 @@
       "text",
       "at",
       "note",
-      "if_no_reply"
+      "if_no_reply",
+      "track_opens"
     ],
     "response": "{ configured, accounts } | { auth_url } | { labels } | { threads, next_page_token } | { id, messages } | { data_base64 } | { ok, message_id, thread_id }"
   },
@@ -3038,6 +3039,29 @@
     ],
     "request": [],
     "response": "{ ok, stalled, snoozes: { woken, failed }, scheduled: { sent, failed } }"
+  },
+  {
+    "name": "mail-track",
+    "tag": "Email",
+    "summary": "Public open-tracking pixel for tracked outgoing email.",
+    "description": "Loaded by the recipient mail client from an <img> in a tracked send. Always answers the same 1x1 GIF with no-store, whatever the token, so it reveals nothing. A valid token increments mail_open_tracking through the service-role-only mail_track_open RPC, which ignores hits in the first 5 seconds after the send. No JWT (verify_jwt=false); the token is an unguessable UUID minted per send.",
+    "security": [
+      "queryToken"
+    ],
+    "docs": null,
+    "methods": [
+      "GET"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "t",
+        "type": "string",
+        "required": true,
+        "desc": "The tracked send id (query param)"
+      }
+    ],
+    "response": "image/gif (1x1 transparent pixel)"
   },
   {
     "name": "gsc-api",

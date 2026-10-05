@@ -4,6 +4,7 @@ import { escapeHtml } from './html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from './emailMarkup.generated.ts';
 import { refreshGoogleToken } from './google-oauth.ts';
 import { base64ToBase64Url, buildMimeMessage, utf8ToBase64, type GmailPart, type MimeAttachment } from './mail-mime.ts';
+import { isTrackId, withTrackingPixel } from './mail-tracking.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -63,7 +64,10 @@ export function cleanAddresses(raw: unknown, field: string, max = 50): string[] 
 export interface PreparedGmailSend {
   to: string[]; cc: string[]; bcc: string[]; subject: string; text: string;
   thread_id: string | null; reply_to_message_id: string | null; attachments: MimeAttachment[];
+  track_id?: string | null;
 }
+
+export interface GmailSender { user_id: string; workspace_id: string }
 
 export function prepareGmailSend(body: Record<string, unknown>, limitBytes = SEND_LIMIT_BYTES): PreparedGmailSend {
   const to = cleanAddresses(body.to, 'to');
@@ -83,10 +87,15 @@ export function prepareGmailSend(body: Record<string, unknown>, limitBytes = SEN
     ? body.reply_to_message_id : null;
   const subject = String(body.subject ?? '').trim().slice(0, 500);
   if (!subject && !replyTo) throw new HttpError(400, 'A subject is required');
-  return { to, cc: cleanAddresses(body.cc, 'cc'), bcc: cleanAddresses(body.bcc, 'bcc'), subject, text, thread_id: threadId, reply_to_message_id: replyTo, attachments };
+  return {
+    to, cc: cleanAddresses(body.cc, 'cc'), bcc: cleanAddresses(body.bcc, 'bcc'), subject, text, thread_id: threadId, reply_to_message_id: replyTo, attachments,
+    track_id: body.track_opens === true ? crypto.randomUUID() : null,
+  };
 }
 
-export async function sendPreparedGmail(db: Db, account: GmailAccount, p: PreparedGmailSend): Promise<{ message_id: string; thread_id: string }> {
+export async function sendPreparedGmail(
+  db: Db, account: GmailAccount, p: PreparedGmailSend, sender?: GmailSender,
+): Promise<{ message_id: string; thread_id: string; tracked: boolean }> {
   const token = await gmailAccessToken(db, account);
   let subject = p.subject;
   let inReplyTo: string | null = null;
@@ -99,15 +108,29 @@ export async function sendPreparedGmail(db: Db, account: GmailAccount, p: Prepar
     const origSubject = gmailHeader(orig, 'Subject');
     if (!subject) subject = /^re:/i.test(origSubject) ? origSubject : `Re: ${origSubject}`;
   }
+  let trackId = isTrackId(p.track_id) && sender ? p.track_id : null;
+  if (trackId) {
+    const { error } = await db.from('mail_open_tracking').upsert({
+      id: trackId, workspace_id: sender!.workspace_id, user_id: sender!.user_id, kind: 'gmail', account_id: account.id,
+      gmail_thread_id: p.thread_id, recipients: [...p.to, ...p.cc].join(', ').slice(0, 500),
+    }, { onConflict: 'id', ignoreDuplicates: true });
+    if (error) { console.error('[gmail] open tracking unavailable, sending untracked', error.message); trackId = null; }
+  }
+  const markup = hasEmailMarkup(p.text) ? renderEmailMarkup(p.text, escapeHtml) : null;
   const from = account.display_name ? `${account.display_name.replace(/["\\]/g, '')} <${account.email}>` : account.email;
   const raw = buildMimeMessage({
     from, to: p.to, cc: p.cc, bcc: p.bcc, subject, text: p.text,
-    html: hasEmailMarkup(p.text) ? renderEmailMarkup(p.text, escapeHtml) : null,
+    html: trackId ? withTrackingPixel(markup, p.text, trackId) : markup,
     inReplyTo, references, attachments: p.attachments,
   });
   const sent = await gmailFetch(token, '/messages/send', {
     method: 'POST',
     body: JSON.stringify({ raw: base64ToBase64Url(utf8ToBase64(raw)), ...(p.thread_id ? { threadId: p.thread_id } : {}) }),
   });
-  return { message_id: String(sent.id), thread_id: String(sent.threadId) };
+  if (trackId) {
+    const { error } = await db.from('mail_open_tracking')
+      .update({ gmail_message_id: String(sent.id), gmail_thread_id: String(sent.threadId) }).eq('id', trackId);
+    if (error) console.error('[gmail] could not link the tracked send to its message', trackId, error.message);
+  }
+  return { message_id: String(sent.id), thread_id: String(sent.threadId), tracked: !!trackId };
 }

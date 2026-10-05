@@ -72,6 +72,7 @@ import { escapeLike } from '../_shared/searchFold.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
+import { withTrackingPixel } from '../_shared/mail-tracking.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
@@ -1169,6 +1170,26 @@ function pgrstQuote(value: string): string {
   return `"${value.replace(/["\\]/g, '\\$&')}"`;
 }
 
+type MessageOpens = Record<string, { count: number; first_opened_at: string | null; last_opened_at: string | null }>;
+
+/** Read receipts for tracked emails — staff only; a customer never sees whether they were tracked. */
+async function messageOpens(db: DbClient, messageIds: string[]): Promise<MessageOpens> {
+  if (!messageIds.length) return {};
+  const { data, error } = await db.from('mail_open_tracking')
+    .select('inbox_message_id, open_count, first_opened_at, last_opened_at').in('inbox_message_id', messageIds);
+  if (error) { console.error('[inbox-api] open tracking read failed', error.message); return {}; }
+  const out: MessageOpens = {};
+  for (const r of (data ?? []) as Array<{ inbox_message_id: string; open_count: number; first_opened_at: string | null; last_opened_at: string | null }>) {
+    const prev = out[r.inbox_message_id];
+    out[r.inbox_message_id] = {
+      count: (prev?.count ?? 0) + r.open_count,
+      first_opened_at: [prev?.first_opened_at, r.first_opened_at].filter(Boolean).sort()[0] ?? null,
+      last_opened_at: [prev?.last_opened_at, r.last_opened_at].filter(Boolean).sort().pop() ?? null,
+    };
+  }
+  return out;
+}
+
 async function insertMessageAndNotify(
   db: DbClient,
   opts: {
@@ -1191,6 +1212,7 @@ async function insertMessageAndNotify(
     /** The composer's per-send token, so a retry can find and resume THIS message. */
     clientToken?: string | null;
     emailCopies?: { cc: string[]; bcc: string[] };
+    trackOpens?: boolean;
   },
 ): Promise<Record<string, unknown>> {
   const { thread, senderParticipantId, body, attachments, messageType, replyToWamid, replyToMessageId } = opts;
@@ -1395,6 +1417,20 @@ async function insertMessageAndNotify(
         ? buildEmailCardsText(cards, body)
         : (body ?? `Attached: ${emailAttachments.map((a) => a.filename).join(', ')}`);
 
+      let trackId: string | null = null;
+      if (opts.trackOpens && opts.senderUserId) {
+        trackId = crypto.randomUUID();
+        const { error: trackErr } = await db.from('mail_open_tracking').insert({
+          id: trackId, workspace_id: String(thread.workspace_id), user_id: opts.senderUserId, kind: 'platform',
+          inbox_message_id: messageId, recipients: [toAddress, ...copies.cc].join(', ').slice(0, 500),
+        });
+        if (trackErr) { console.error('[inbox-api] open tracking unavailable, sending untracked', trackErr.message); trackId = null; }
+      }
+      const markupHtml = cards.length
+        ? buildEmailCardsHtml(cards, body)
+        : hasEmailMarkup(body) ? renderEmailMarkup(String(body), escapeHtml) : null;
+      const html = trackId ? withTrackingPixel(markupHtml, text, trackId) : markupHtml;
+
       let sendErr: string | null = null;
       try {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/email-api`, {
@@ -1411,9 +1447,7 @@ async function insertMessageAndNotify(
             subject,
             // HTML only from the two builders that escape everything first (invariant 11).
             text,
-            ...(cards.length
-              ? { html: buildEmailCardsHtml(cards, body) }
-              : hasEmailMarkup(body) ? { html: renderEmailMarkup(String(body), escapeHtml) } : {}),
+            ...(html ? { html } : {}),
             ...(emailAttachments.length ? { attachments: emailAttachments } : {}),
             replyTo: buildReplyToAddress(ourMailbox, threadId),
             headers,
@@ -2029,6 +2063,7 @@ async function handleJwtAction(
         cards,
         clientToken,
         emailCopies,
+        trackOpens: payload.track_opens === true,
       });
       if (messageType !== 'note') {
         const { error: draftErr } = await db.from('inbox_drafts').delete().eq('user_id', userId).eq('thread_id', threadId);
@@ -2073,7 +2108,7 @@ async function handleJwtAction(
       const { data, error } = await db.from('mail_scheduled_sends').insert({
         user_id: userId, workspace_id: String(thread.workspace_id), kind: 'inbox', inbox_thread_id: threadId,
         payload: {
-          body, attachments, email_cc: copies.cc, email_bcc: copies.bcc,
+          body, attachments, email_cc: copies.cc, email_bcc: copies.bcc, track_opens: payload.track_opens === true,
           ...(payload.reply_to_message_id ? { reply_to_message_id: String(payload.reply_to_message_id) } : {}),
         },
         send_at: sendAt.toISOString(),
@@ -2834,6 +2869,7 @@ async function handleJwtAction(
         return json({
           messages, older_cursor: olderCursor,
           starred_message_ids: ((olderStars || []) as Array<{ message_id: string }>).map((r) => r.message_id),
+          message_opens: isMember ? await messageOpens(db, ids) : {},
         });
       }
 
@@ -2955,7 +2991,11 @@ async function handleJwtAction(
           .order('metadata->>pinned_at', { ascending: false }).limit(1).maybeSingle();
         pinnedMessage = (pin as Record<string, unknown> | null) ?? null;
       }
-      return json({ thread: threadForCaller, participants: participantsForCaller, messages: messages || [], older_cursor: olderCursor, pinned_message: pinnedMessage, whatsapp_window: wa, starred_message_ids: starredMessageIds });
+      return json({
+        thread: threadForCaller, participants: participantsForCaller, messages: messages || [], older_cursor: olderCursor, pinned_message: pinnedMessage,
+        whatsapp_window: wa, starred_message_ids: starredMessageIds,
+        message_opens: isMember && thread.channel === 'email' ? await messageOpens(db, messageIds) : {},
+      });
     }
 
     case 'create_marketplace_inquiry': {
@@ -4179,7 +4219,7 @@ async function handleJwtAction(
           thread: thread as Record<string, unknown>,
           senderParticipantId: (creatorP as { id: string }).id,
           body, attachments, messageType: 'text', senderUserId: userId, senderLabel: 'You',
-          emailCopies,
+          emailCopies, trackOpens: payload.track_opens === true,
         });
       } catch (e) {
         if (e instanceof HttpError && e.status === 502) return json({ thread_id: threadId, delivery_error: e.message });
@@ -5810,7 +5850,7 @@ async function handler(req: Request): Promise<Response> {
     const p = (row.payload ?? {}) as Json;
     return handleJwtAction(db, String(row.user_id), 'send_message', {
       thread_id: row.inbox_thread_id, body: p.body ?? undefined, attachments: p.attachments ?? [],
-      email_cc: p.email_cc ?? [], email_bcc: p.email_bcc ?? [],
+      email_cc: p.email_cc ?? [], email_bcc: p.email_bcc ?? [], track_opens: p.track_opens === true,
       ...(p.reply_to_message_id ? { reply_to_message_id: p.reply_to_message_id } : {}),
       client_token: row.id,
     });

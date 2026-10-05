@@ -10,6 +10,7 @@ import {
   signOAuthState, verifyOAuthState,
 } from '../_shared/google-oauth.ts';
 import { parseAddress, parseAddressList, parseGmailPayload, type GmailPart } from '../_shared/mail-mime.ts';
+import { stripTrackingPixels } from '../_shared/mail-tracking.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import {
@@ -287,6 +288,12 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       }));
       const photos = await photosFor(db, account, people.flatMap((p) => [p.from.address, ...p.to.map((a) => a.address), ...p.cc.map((a) => a.address)]));
       const photo = withPhoto(photos);
+      const { data: tracked, error: trackErr } = await db.from('mail_open_tracking')
+        .select('gmail_message_id, open_count, first_opened_at, last_opened_at')
+        .eq('account_id', account.id).eq('gmail_thread_id', threadId).not('gmail_message_id', 'is', null);
+      if (trackErr) console.error('[gmail-api] open tracking read failed', trackErr.message);
+      const opensById = new Map(((tracked ?? []) as Array<{ gmail_message_id: string; open_count: number; first_opened_at: string | null; last_opened_at: string | null }>)
+        .map((r) => [r.gmail_message_id, { count: r.open_count, first_opened_at: r.first_opened_at, last_opened_at: r.last_opened_at }]));
       const messages = raw.map(({ m, parsed }, i) => {
         const h = parsed.headers;
         return {
@@ -300,8 +307,9 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
           subject: h.subject ?? '',
           message_id: h['message-id'] ?? null,
           text: parsed.text,
-          html: parsed.html,
+          html: parsed.html ? stripTrackingPixels(parsed.html) : null,
           attachments: parsed.attachments,
+          opens: opensById.get(String(m.id)) ?? null,
           snippet: m.snippet ?? '',
         };
       });
@@ -341,7 +349,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
 
     case 'send': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
-      const sent = await sendPreparedGmail(db, account, prepareGmailSend(body));
+      const sent = await sendPreparedGmail(db, account, prepareGmailSend(body), { user_id: userId, workspace_id: account.workspace_id });
       return json({ ok: true, ...sent });
     }
 

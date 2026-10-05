@@ -13,6 +13,7 @@ import { splitAddresses } from '../emailRecipients';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
 import { useFileDrop } from '../useFileDrop';
+import { TrackOpensToggle, useTrackOpens } from './OpenTracking';
 
 type Suggestion = { id: string; label: string; email: string };
 
@@ -40,6 +41,7 @@ export const ComposeEmailForm: React.FC<{
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [trackOpens, setTrackOpens] = useTrackOpens();
   const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
   const [preview, setPreview] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -87,6 +89,7 @@ export const ComposeEmailForm: React.FC<{
         email_cc: splitAddresses(cc),
         email_bcc: splitAddresses(bcc),
         attachments: attachments.length ? attachments : undefined,
+        ...(trackOpens ? { track_opens: true } : {}),
       });
       if (res.delivery_error) {
         toast({ title: 'Saved, but the email was NOT sent', description: res.delivery_error, variant: 'destructive' });
@@ -138,6 +141,7 @@ export const ComposeEmailForm: React.FC<{
         <div className="flex items-center justify-between gap-2">
           <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
           <ComposerInsertMenu workspaceId={workspaceId} currentText={body} recipient={{ email: to.trim() || null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
+          <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} />
         </div>
         {preview
           ? <EmailPreview value={body} onEdit={() => setPreview(false)} />

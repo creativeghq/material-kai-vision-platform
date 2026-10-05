@@ -57,7 +57,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number 
     const { data: rows, error: claimErr } = await db.from('mail_scheduled_sends')
       .update({ status: 'sending', claimed_at: new Date().toISOString() })
       .eq('id', id).eq('status', 'pending')
-      .select('id, kind, account_id, payload, mail_accounts(id, email, display_name, status)');
+      .select('id, kind, account_id, payload, user_id, workspace_id, mail_accounts(id, email, display_name, status)');
     if (claimErr || !rows?.length) continue;
     const row = rows[0];
     let result: Record<string, unknown> | null = null;
@@ -66,7 +66,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number 
       if (row.kind === 'gmail') {
         const account = row.mail_accounts;
         if (!account || account.status !== 'active') throw new Error('the Gmail account needs reconnecting');
-        result = await sendPreparedGmail(db, account, row.payload as PreparedGmailSend);
+        result = await sendPreparedGmail(db, account, row.payload as PreparedGmailSend, { user_id: row.user_id, workspace_id: row.workspace_id });
       } else {
         const r = await fetch(`${SUPABASE_URL}/functions/v1/inbox-api`, {
           method: 'POST',

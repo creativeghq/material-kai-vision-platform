@@ -36,7 +36,7 @@ describe('gmail-api — a mailbox is its owner\'s alone', () => {
   });
 
   it('sends through Gmail and never trusts a reply target from another thread', () => {
-    expect(action('send')).toContain('sendPreparedGmail(db, account, prepareGmailSend(body))');
+    expect(action('send')).toContain('sendPreparedGmail(db, account, prepareGmailSend(body), { user_id: userId, workspace_id: account.workspace_id })');
     expect(client).toContain("'/messages/send'");
     expect(client).toContain('orig.threadId !== p.thread_id');
     expect(client).toContain('renderEmailMarkup(p.text, escapeHtml)');
@@ -154,5 +154,41 @@ describe('Gmail reminders', () => {
   it('rings through the existing follow-up flow, stamped with the workspace', () => {
     expect(fire).toContain("emitFlowEvent('inbox.follow_up_due'");
     expect(fire).toContain('workspace_id: row.workspace_id');
+  });
+});
+
+describe('Open tracking', () => {
+  const read = (p: string) => stripComments(readFileSync(join(process.cwd(), p), 'utf8'));
+  const client = read('supabase/functions/_shared/gmail-client.ts');
+  const gmailFn = read('supabase/functions/gmail-api/index.ts');
+  const inbox = read('supabase/functions/inbox-api/index.ts');
+  const pixelFn = read('supabase/functions/mail-track/index.ts');
+
+  it('records the tracked send BEFORE handing it to Gmail, so an open can never arrive for a row that does not exist', () => {
+    const fn = client.slice(client.indexOf('export async function sendPreparedGmail'));
+    expect(fn.indexOf("from('mail_open_tracking').upsert")).toBeGreaterThan(-1);
+    expect(fn.indexOf("from('mail_open_tracking').upsert")).toBeLessThan(fn.indexOf("'/messages/send'"));
+  });
+
+  it('strips our own pixel before the sender views the thread, or reading your copy counts as an open', () => {
+    expect(gmailFn).toContain('stripTrackingPixels(parsed.html)');
+  });
+
+  it('platform email writes the tracking row before email-api is called', () => {
+    const at = inbox.indexOf("from('mail_open_tracking').insert");
+    expect(at).toBeGreaterThan(-1);
+    const sendAt = inbox.indexOf('/functions/v1/email-api', at);
+    expect(sendAt).toBeGreaterThan(at);
+    expect(inbox.slice(at, sendAt)).not.toContain('async function');
+  });
+
+  it('a customer never learns they were tracked — receipts go to members only', () => {
+    expect(inbox).toContain('message_opens: isMember ? await messageOpens(db, ids) : {}');
+    expect(inbox).toMatch(/message_opens: isMember && thread\.channel === 'email' \? await messageOpens/);
+  });
+
+  it('the pixel answers the same GIF for every token and counts only through the service-role RPC', () => {
+    expect(pixelFn).toContain("rpc('mail_track_open'");
+    expect(pixelFn.match(/return pixel\(\)/g)?.length).toBe(1);
   });
 });
