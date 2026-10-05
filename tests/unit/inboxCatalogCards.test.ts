@@ -225,13 +225,13 @@ describe('inbox-api resolves the card server-side for the one customer party', (
     const src = api();
     expect(src).toMatch(/thread\.channel === 'whatsapp'[\s\S]{0,120}\(body \|\| attachments\.length > 0 \|\| cards\.length > 0\)/);
     expect(src).toMatch(/thread\.channel === 'social'[\s\S]{0,80}\(body \|\| cards\.length\)/);
-    expect(src).toMatch(/thread\.channel === 'email'[\s\S]{0,80}\(body \|\| cards\.length\)/);
+    expect(src).toMatch(/thread\.channel === 'email'[\s\S]{0,80}\(body \|\| cards\.length \|\| attachments\.length > 0\)/);
     expect(src).toMatch(/fitTextWithCards\(body, cards, 1000\)/);
     // The social metadata write merges; it used to replace the column and delete `cards`.
     const social = slice(src, "if (thread.channel === 'social'", "if (thread.channel === 'email'");
     expect(social).toMatch(/metadata: \{\s*\.\.\.storedMetadata,/);
     expect(src).toMatch(/html: buildEmailCardsHtml\(cards, body\)/);
-    expect(src).toMatch(/text: cards\.length \? buildEmailCardsText\(cards, body\) : body/);
+    expect(src).toMatch(/const text = cards\.length\s*\? buildEmailCardsText\(cards, body\)/);
     expect(src).toMatch(/\(body \|\| \(cards\.length \? cardsPreview\(cards\) : '\[attachment\]'\)\)/);
     expect(code(ZERNIO)).toMatch(/if \(params\.interactive\) body\.interactive = params\.interactive;/);
   });

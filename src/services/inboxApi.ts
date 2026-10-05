@@ -583,6 +583,8 @@ export const inboxApi = {
      * missing parts instead of storing a second message and delivering the first ones twice.
      */
     client_token?: string;
+    email_cc?: string[];
+    email_bcc?: string[];
   }) {
     return call<{ message: InboxMessage }>('send_message', input);
   },

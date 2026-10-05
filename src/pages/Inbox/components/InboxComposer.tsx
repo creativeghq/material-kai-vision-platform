@@ -1,7 +1,8 @@
 import React from 'react';
-import { Send, Loader2, Paperclip, StickyNote, X, MessagesSquare, Reply, Sparkles, ShoppingCart, AlertTriangle, Package, Wrench } from 'lucide-react';
+import { Send, Loader2, Paperclip, StickyNote, X, MessagesSquare, Reply, ReplyAll, Sparkles, ShoppingCart, AlertTriangle, Package, Wrench } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Input } from '@/components/core/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { Label } from '@/components/core/ui/label';
 import { slashCommandMatches, slashTokenAtCaret } from '../inboxSlashCommands';
@@ -26,6 +27,15 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     setAttachment,
     replyTo,
     setReplyTo,
+    isEmailReply,
+    emailRecipients,
+    emailCc,
+    setEmailCc,
+    emailBcc,
+    setEmailBcc,
+    emailCopiesOpen,
+    setEmailCopiesOpen,
+    replyAll,
     aiDrafting,
     aiDraftShown,
     setAiDraftShown,
@@ -201,6 +211,33 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <button onClick={() => setReplyTo(null)} className="shrink-0 hover:text-foreground" title="Cancel reply">
             <X className="w-3 h-3" />
           </button>
+        </div>
+      )}
+      {isEmailReply && emailRecipients && (
+        <div className="space-y-1.5 text-xs">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-muted-foreground">To</span>
+            <span className="font-medium">{emailRecipients.to || '—'}</span>
+            {emailRecipients.from && <span className="text-muted-foreground">from {emailRecipients.from}</span>}
+            <span className="ml-auto flex items-center gap-2">
+              {emailRecipients.replyAllCc.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={replyAll} title={emailRecipients.replyAllCc.join(', ')}>
+                  <ReplyAll className="h-3.5 w-3.5" /> Reply all ({emailRecipients.replyAllCc.length})
+                </Button>
+              )}
+              {!emailCopiesOpen && (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setEmailCopiesOpen(true)}>Cc / Bcc</Button>
+              )}
+            </span>
+          </div>
+          {emailCopiesOpen && (
+            <div className="grid grid-cols-[2.5rem_1fr] items-center gap-1.5">
+              <Label htmlFor="inbox-cc" className="text-xs text-muted-foreground">Cc</Label>
+              <Input id="inbox-cc" value={emailCc} onChange={(e) => setEmailCc(e.target.value)} placeholder="name@company.com, …" className="h-7 text-xs" />
+              <Label htmlFor="inbox-bcc" className="text-xs text-muted-foreground">Bcc</Label>
+              <Input id="inbox-bcc" value={emailBcc} onChange={(e) => setEmailBcc(e.target.value)} placeholder="name@company.com, …" className="h-7 text-xs" />
+            </div>
+          )}
         </div>
       )}
       {attachment && (

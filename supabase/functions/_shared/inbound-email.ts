@@ -411,6 +411,9 @@ export async function resolveThread(
 export interface ParsedInbound {
   headers: Map<string, string>;
   from: { address: string | null; name: string | null };
+  to: string[];
+  cc: string[];
+  replyTo: string[];
   subject: string | null;
   messageId: string | null;
   inReplyTo: string | null;
@@ -418,6 +421,12 @@ export interface ParsedInbound {
   text: string | null;
   html: string | null;
   attachments: Array<{ filename: string; mimeType: string; base64: string; size: number }>;
+}
+
+function addressList(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((a: { address?: string; group?: unknown[] }) => (a.group ? addressList(a.group) : [bareAddress(a.address ?? null)]))
+    .filter((x): x is string => !!x);
 }
 
 /** Raw RFC822 → the fields the Inbox needs. No interpretation beyond decoding. */
@@ -453,6 +462,9 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedInbound> {
       address: bareAddress(email.from?.address ?? null),
       name: email.from?.name || null,
     },
+    to: addressList(email.to),
+    cc: addressList(email.cc),
+    replyTo: addressList(email.replyTo),
     subject: email.subject || null,
     messageId: email.messageId ? parseMessageIdRefs(email.messageId)[0] || email.messageId : null,
     inReplyTo: email.inReplyTo || null,
@@ -710,6 +722,9 @@ export async function deliverToInbox(
       email_subject: parsed.subject,
       email_from: args.fromAddress,
       email_to: args.toAddress,
+      email_to_all: parsed.to,
+      email_cc: parsed.cc,
+      email_reply_to: parsed.replyTo,
       email_html: parsed.html,
       thread_matched_by: found.matchedBy,
     },

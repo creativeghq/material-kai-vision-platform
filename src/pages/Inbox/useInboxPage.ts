@@ -15,6 +15,7 @@ import { channelForSource, inboxSourceKey, inboxThreadSource, type InboxSourceKe
 import { inboxApi, signInboxAttachment, type InboxThread, type InboxMessage, type InboxParticipant, type WhatsAppWindow, type InboxThreadContext, type InboxLabel, type InboxThreadStatus, type InboxCatalogItem } from '@/services/inboxApi';
 import { dayBucket } from './inboxFormat';
 import { ParticipantLabel } from './components/InboxPrimitives';
+import { emailReplyRecipients, splitAddresses } from './emailRecipients';
 
 
 
@@ -85,6 +86,9 @@ export function useInboxPage() {
 
   const [draft, setDraft] = useState('');
   const [isNote, setIsNote] = useState(false);
+  const [emailCc, setEmailCc] = useState('');
+  const [emailBcc, setEmailBcc] = useState('');
+  const [emailCopiesOpen, setEmailCopiesOpen] = useState(false);
   /** Focused after "Add text to note" fills the box — the point is to type the thought next. */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const [sending, setSending] = useState(false);
@@ -442,6 +446,18 @@ export function useInboxPage() {
     if (stickToBottom.current) scrollToBottom(true);
   }, [messages, scrollToBottom]);
 
+  const isEmailReply = activeThread?.channel === 'email' && isMember && !isNote;
+  const emailRecipients = useMemo(
+    () => (activeThread?.channel === 'email' ? emailReplyRecipients(messages, activeThread.metadata as Record<string, unknown> | null) : null),
+    [activeThread, messages],
+  );
+  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); }, [activeId]);
+  const replyAll = useCallback(() => {
+    if (!emailRecipients?.replyAllCc.length) return;
+    setEmailCc((cur) => [...new Set([...splitAddresses(cur), ...emailRecipients.replyAllCc])].join(', '));
+    setEmailCopiesOpen(true);
+  }, [emailRecipients]);
+
   const send = useCallback(async () => {
     if (!activeId || (!draft.trim() && !attachment && pendingCards.length === 0)) return;
     // Re-entrancy guard, on a ref rather than the `sending` state.
@@ -467,6 +483,7 @@ export function useInboxPage() {
         // Picks only. The card the customer sees — price included — is resolved by inbox-api.
         cards: !isNote && pendingCards.length ? pendingCards.map((c) => ({ kind: c.kind, product_id: c.product_id })) : undefined,
         client_token: sendToken.current ?? undefined,
+        ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc) } : {}),
       });
       sendToken.current = null;
       setDraft('');
@@ -475,6 +492,9 @@ export function useInboxPage() {
       setSlashMenu(null);
       setReplyTo(null);
       setAiDraftShown(false);
+      setEmailCc('');
+      setEmailBcc('');
+      setEmailCopiesOpen(false);
       // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
       if (!isNote && isMember && activeThread?.agent_state === 'active') {
         setActiveThread((t) => (t ? { ...t, agent_state: 'paused' } : t));
@@ -485,7 +505,7 @@ export function useInboxPage() {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachment, pendingCards, isNote, isMember, activeThread, replyTo, toast]);
+  }, [activeId, draft, attachment, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, toast]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   // The steer, when the member typed one, tells it WHAT the reply should do.
@@ -794,6 +814,15 @@ export function useInboxPage() {
     setAttachment,
     replyTo,
     setReplyTo,
+    isEmailReply,
+    emailRecipients,
+    emailCc,
+    setEmailCc,
+    emailBcc,
+    setEmailBcc,
+    emailCopiesOpen,
+    setEmailCopiesOpen,
+    replyAll,
     aiDrafting,
     setAiDrafting,
     aiDraftShown,

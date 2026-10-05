@@ -1170,6 +1170,32 @@ async function emailAttachmentsFor(db: DbClient, attachments: Attachment[]): Pro
   return out;
 }
 
+const EMAIL_COPY_LIMIT = 20;
+const EMAIL_ADDRESS = /^[^s@<>,;]+@[^s@<>,;]+.[^s@<>,;]+$/;
+
+/** CC/BCC as the member typed them → bare, deduped addresses; refuses a malformed one rather than drop it. */
+function cleanEmailCopies(raw: { cc?: unknown; bcc?: unknown } | undefined, exclude: string[]): { cc: string[]; bcc: string[] } {
+  const seen = new Set(exclude.map((a) => a.toLowerCase()).filter(Boolean));
+  const pick = (list: unknown): string[] => {
+    if (list == null) return [];
+    if (!Array.isArray(list)) throw new HttpError(400, 'cc and bcc must be lists of addresses');
+    const out: string[] = [];
+    for (const item of list) {
+      const addr = String(item ?? '').trim().toLowerCase();
+      if (!addr) continue;
+      if (!EMAIL_ADDRESS.test(addr)) throw new HttpError(400, `"${addr}" is not an email address`);
+      if (seen.has(addr)) continue;
+      seen.add(addr);
+      out.push(addr);
+    }
+    return out;
+  };
+  const cc = pick(raw?.cc);
+  const bcc = pick(raw?.bcc);
+  if (cc.length + bcc.length > EMAIL_COPY_LIMIT) throw new HttpError(400, `At most ${EMAIL_COPY_LIMIT} CC/BCC addresses per email`);
+  return { cc, bcc };
+}
+
 async function insertMessageAndNotify(
   db: DbClient,
   opts: {
@@ -1191,6 +1217,7 @@ async function insertMessageAndNotify(
     cards?: InboxCard[];
     /** The composer's per-send token, so a retry can find and resume THIS message. */
     clientToken?: string | null;
+    emailCopies?: { cc: string[]; bcc: string[] };
   },
 ): Promise<Record<string, unknown>> {
   const { thread, senderParticipantId, body, attachments, messageType, replyToWamid, replyToMessageId } = opts;
@@ -1338,7 +1365,7 @@ async function insertMessageAndNotify(
   if (thread.channel === 'email' && (messageType === 'text' || messageType === 'agent')
       && (body || cards.length || attachments.length > 0)) {
     const meta = (thread.metadata as Json) || {};
-    const toAddress = String(meta.email_from || '');
+    let toAddress = String(meta.email_from || '');
     const ourMailbox = String(meta.email_to || '');
     // A recipient with no mailbox to send FROM used to fall straight through this branch: the
     // member saw their own reply, the composer cleared, and nothing left the building. Inbound
@@ -1368,8 +1395,11 @@ async function insertMessageAndNotify(
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      const inboundId = ((lastInbound as { metadata?: Record<string, unknown> } | null)?.metadata
-        ?.email_message_id ?? null) as string | null;
+      const inboundMeta = (lastInbound as { metadata?: Record<string, unknown> } | null)?.metadata ?? {};
+      const inboundId = (inboundMeta.email_message_id ?? null) as string | null;
+      const replyTo = Array.isArray(inboundMeta.email_reply_to) ? String(inboundMeta.email_reply_to[0] ?? '') : '';
+      if (replyTo) toAddress = replyTo;
+      const copies = cleanEmailCopies(opts.emailCopies, [toAddress, ourMailbox]);
 
       const ourMessageId = buildOutboundMessageId(threadId, messageId, domain);
       const headers: Record<string, string> = { 'Message-ID': `<${ourMessageId}>` };
@@ -1403,6 +1433,8 @@ async function insertMessageAndNotify(
           body: JSON.stringify({
             action: 'send',
             to: toAddress,
+            ...(copies.cc.length ? { cc: copies.cc } : {}),
+            ...(copies.bcc.length ? { bcc: copies.bcc } : {}),
             subject,
             // Plain text unless there are cards: the body is a member's own words, and building
             // an HTML string around untrusted content is how invariant 11 gets violated by
@@ -1438,6 +1470,8 @@ async function insertMessageAndNotify(
           // Stored so a reply quoting this Message-ID threads via ladder step 1.
           email_message_id: ourMessageId,
           email_to: toAddress,
+          ...(copies.cc.length ? { email_cc: copies.cc } : {}),
+          ...(copies.bcc.length ? { email_bcc: copies.bcc } : {}),
           delivery_status: sendErr ? 'relay_failed' : 'sent',
           ...(sendErr ? { relay_error: sendErr } : {}),
         },
@@ -1988,6 +2022,9 @@ async function handleJwtAction(
       if (!body && attachments.length === 0 && cards.length === 0) {
         throw new HttpError(400, 'message body, attachment or catalog card required');
       }
+      const emailCopies = thread.channel === 'email' && access.isMember && messageType !== 'note'
+        ? cleanEmailCopies({ cc: payload.email_cc, bcc: payload.email_bcc }, [])
+        : undefined;
       // A member replying to a shared workspace thread they hadn't joined becomes a participant.
       let senderParticipantId = access.participant?.id ?? null;
       if (!senderParticipantId && access.isMember) {
@@ -2020,6 +2057,7 @@ async function handleJwtAction(
         replyToMessageId: replyToWamid ? replyToId : undefined,
         cards,
         clientToken,
+        emailCopies,
       });
       // Mark the sender as caught up.
       if (senderParticipantId) {
