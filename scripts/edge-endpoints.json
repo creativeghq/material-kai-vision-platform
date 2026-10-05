@@ -8416,6 +8416,42 @@
         ]
       },
       {
+        "name": "list_whatsapp_templates",
+        "summary": "Meta-approved WhatsApp templates of the conversation's workspace, for sending outside the 24-hour window.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "WhatsApp conversation"
+          }
+        ]
+      },
+      {
+        "name": "send_whatsapp_template",
+        "summary": "Send an approved WhatsApp template into a conversation. Checks the opt-out list and debits credits before the send; refunds when WhatsApp refuses it.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "WhatsApp conversation"
+          },
+          {
+            "name": "template_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "messaging_templates id"
+          },
+          {
+            "name": "variables",
+            "type": "object",
+            "required": true,
+            "desc": "Value for every variable the template declares"
+          }
+        ]
+      },
+      {
         "name": "create_share_link",
         "summary": "Mint (or rotate) the tokenised customer share URL for a thread.",
         "params": [

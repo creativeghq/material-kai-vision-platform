@@ -8,6 +8,7 @@ import { Label } from '@/components/core/ui/label';
 import { slashCommandMatches, slashTokenAtCaret } from '../inboxSlashCommands';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { CatalogPicker, EmojiPicker, SlashCommandMenu } from './ComposerPickers';
+import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
 import type { InboxPageState } from '../useInboxPage';
 
 
@@ -36,6 +37,9 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     emailCopiesOpen,
     setEmailCopiesOpen,
     replyAll,
+    templateOpen,
+    setTemplateOpen,
+    openThread,
     aiDrafting,
     aiDraftShown,
     setAiDraftShown,
@@ -104,7 +108,19 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <strong>You can still message them from the WhatsApp Business app on your
           phone</strong>, which is not subject to this window; it will sync back into
           this thread. (Internal notes are still allowed.)
+          {isMember && (
+            <div className="mt-2">
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTemplateOpen(true)}>Send a template</Button>
+            </div>
+          )}
         </div>
+      )}
+      {templateOpen && activeId && (
+        <WhatsAppTemplateDialog
+          threadId={activeId}
+          onClose={() => setTemplateOpen(false)}
+          onSent={() => { setTemplateOpen(false); openThread(activeId); }}
+        />
       )}
       {isMember && (
         <div className="flex items-center gap-2">

@@ -13,7 +13,8 @@ const service = read('src/modules/messaging/services/messagingService.ts');
 const tab = read('src/modules/messaging/components/MessagingTemplatesTab.tsx');
 
 describe('#359 CM-3 — a template is resolved for sending, not merely fetched', () => {
-  const resolver = api.slice(api.indexOf('async function resolveSendableTemplate'), api.indexOf('function toE164'));
+  const tpl = read('supabase/functions/_shared/whatsapp-templates.ts');
+  const resolver = tpl.slice(tpl.indexOf('async function resolveSendableTemplate'), tpl.indexOf('function toE164'));
 
   it('asks all four questions', () => {
     // Each is a different failure: the wrong tenant, a retired template, one Meta never saw, and

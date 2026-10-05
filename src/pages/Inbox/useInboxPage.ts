@@ -89,6 +89,7 @@ export function useInboxPage() {
   const [emailCc, setEmailCc] = useState('');
   const [emailBcc, setEmailBcc] = useState('');
   const [emailCopiesOpen, setEmailCopiesOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   /** Focused after "Add text to note" fills the box — the point is to type the thought next. */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const [sending, setSending] = useState(false);
@@ -451,7 +452,7 @@ export function useInboxPage() {
     () => (activeThread?.channel === 'email' ? emailReplyRecipients(messages, activeThread.metadata as Record<string, unknown> | null) : null),
     [activeThread, messages],
   );
-  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); }, [activeId]);
+  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); setTemplateOpen(false); }, [activeId]);
   const replyAll = useCallback(() => {
     if (!emailRecipients?.replyAllCc.length) return;
     setEmailCc((cur) => [...new Set([...splitAddresses(cur), ...emailRecipients.replyAllCc])].join(', '));
@@ -823,6 +824,8 @@ export function useInboxPage() {
     emailCopiesOpen,
     setEmailCopiesOpen,
     replyAll,
+    templateOpen,
+    setTemplateOpen,
     aiDrafting,
     setAiDrafting,
     aiDraftShown,

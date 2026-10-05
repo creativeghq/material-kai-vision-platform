@@ -479,6 +479,10 @@ export interface NewParticipantInput {
 }
 
 /** A base64 attachment to upload, or an already-stored reference to pass through. */
+export interface InboxWhatsAppTemplate {
+  id: string; name: string; content: string; variables: string[] | null; category: string | null; whatsapp_language_code: string | null;
+}
+
 export type AttachmentInput =
   | { filename: string; content_type: string; data_base64: string }
   | InboxAttachment;
@@ -546,6 +550,12 @@ export const inboxApi = {
   /** Start a conversation with a customer (CRM contact). Returns a share link when they have no account. */
   createCustomerThread(input: { workspace_id: string; contact_id: string; subject?: string; message?: string }) {
     return call<{ thread_id: string; share_url: string | null; has_account: boolean }>('create_customer_thread', input);
+  },
+  listWhatsAppTemplates(thread_id: string) {
+    return call<{ templates: InboxWhatsAppTemplate[] }>('list_whatsapp_templates', { thread_id });
+  },
+  sendWhatsAppTemplate(input: { thread_id: string; template_id: string; variables: Record<string, string> }) {
+    return call<{ message: InboxMessage | null }>('send_whatsapp_template', input);
   },
   composeEmail(input: {
     workspace_id: string; to: string; subject: string; body?: string; contact_id?: string;

@@ -10,6 +10,7 @@ const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));
 
 const api = read('supabase/functions/messaging-api/index.ts');
+const tpl = read('supabase/functions/_shared/whatsapp-templates.ts');
 const processor = read('supabase/functions/messaging-processor/index.ts');
 const webhook = read('supabase/functions/zernio-webhook-handler/index.ts');
 const service = read('src/modules/messaging/services/messagingService.ts');
@@ -53,8 +54,8 @@ describe('#359 CM-1 — one normalizer, and it refuses to guess', () => {
 
 describe('#359 CM-1 — the send path asks', () => {
   it('the direct send refuses an opted-out number', () => {
-    expect(api).toMatch(/messaging_number_is_opted_out/);
-    expect(api).toMatch(/async function whyNotSendable/);
+    expect(tpl).toMatch(/messaging_number_is_opted_out/);
+    expect(tpl).toMatch(/async function whyNotSendable/);
   });
 
   it('the check runs BEFORE the credit debit and before the provider call', () => {
@@ -80,13 +81,13 @@ describe('#359 CM-1 — the send path asks', () => {
   });
 
   it('an unusable number is refused rather than sent to whoever it resolves to', () => {
-    expect(api).toMatch(/function toE164/);
+    expect(tpl).toMatch(/function toE164/);
     expect(api).toMatch(/international form/);
     expect(api, 'the old prefix-a-plus normalizer is back').not.toMatch(/function normalizePhoneNumber/);
   });
 
   it('a failed check blocks the send — it does not fall through', () => {
-    const fn = api.slice(api.indexOf('async function whyNotSendable'), api.indexOf("case 'send':"));
+    const fn = tpl.slice(tpl.indexOf('async function whyNotSendable'), tpl.indexOf('async function refundWhatsAppCredits'));
     expect(fn).toMatch(/if \(optErr\) return/);
     expect(fn).toMatch(/if \(winErr\) return/);
   });
@@ -94,13 +95,13 @@ describe('#359 CM-1 — the send path asks', () => {
 
 describe('#359 CM-2 — the 24-hour window is computed, not commented', () => {
   it('a freeform send is bounded by the window', () => {
-    const fn = api.slice(api.indexOf('async function whyNotSendable'), api.indexOf("case 'send':"));
+    const fn = tpl.slice(tpl.indexOf('async function whyNotSendable'), tpl.indexOf('async function refundWhatsAppCredits'));
     expect(fn).toMatch(/whatsapp_service_window_open/);
     expect(fn).toMatch(/Outside the 24-hour window/);
   });
 
   it('a template is NOT bounded by it — that is what templates are for', () => {
-    const fn = api.slice(api.indexOf('async function whyNotSendable'), api.indexOf("case 'send':"));
+    const fn = tpl.slice(tpl.indexOf('async function whyNotSendable'), tpl.indexOf('async function refundWhatsAppCredits'));
     const templateShortCircuit = fn.indexOf('if (opts.isTemplate) return null;');
     const windowCheck = fn.indexOf('whatsapp_service_window_open');
     expect(templateShortCircuit).toBeGreaterThan(-1);
@@ -110,7 +111,7 @@ describe('#359 CM-2 — the 24-hour window is computed, not commented', () => {
   it('the opt-out check is NOT short-circuited by the template branch', () => {
     // An approved template does not buy consent. This ordering is the whole point: opt-out first,
     // window second, and only the second one exempts templates.
-    const fn = api.slice(api.indexOf('async function whyNotSendable'), api.indexOf("case 'send':"));
+    const fn = tpl.slice(tpl.indexOf('async function whyNotSendable'), tpl.indexOf('async function refundWhatsAppCredits'));
     const optout = fn.indexOf('messaging_number_is_opted_out');
     const templateShortCircuit = fn.indexOf('if (opts.isTemplate) return null;');
     expect(optout < templateShortCircuit, 'a template skips the opt-out check').toBe(true);

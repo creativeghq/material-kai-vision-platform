@@ -2238,6 +2238,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "set_thread_labels",
           "create_customer_thread",
           "compose_email",
+          "list_whatsapp_templates",
+          "send_whatsapp_template",
           "create_share_link",
           "suggest_reply",
           "get_my_email_address",
@@ -2456,6 +2458,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "email_bcc": {
         "type": "array",
         "description": "Bcc addresses"
+      },
+      "template_id": {
+        "type": "string",
+        "description": "messaging_templates id (string (uuid))"
+      },
+      "variables": {
+        "type": "object",
+        "description": "Value for every variable the template declares"
       },
       "instruction": {
         "type": "string",

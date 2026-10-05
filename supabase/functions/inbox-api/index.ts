@@ -68,6 +68,12 @@ import { defaultVatPercent, resolveLinePrice } from '../_shared/order-intake/pri
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
+import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
+import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
+import {
+  orderedTemplateParams, refundWhatsAppCredits, renderTemplate, resolveSendableTemplate, toE164, whyNotSendable,
+} from '../_shared/whatsapp-templates.ts';
 import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
 import { CRM_VAT_COLUMN, normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { describeAttachmentForAssistant, enrichInboundAttachments } from '../_shared/inbox-attachment-intelligence.ts';
@@ -3905,6 +3911,86 @@ async function handleJwtAction(
 
       const share_url = c.user_id ? null : await getOrCreateShareLink(db, threadId, contactId);
       return json({ thread_id: threadId, share_url, has_account: !!c.user_id });
+    }
+
+    case 'list_whatsapp_templates': {
+      const thread = await getThreadOrThrow(db, String(payload.thread_id || ''));
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      const { data, error } = await db.from('messaging_templates')
+        .select('id, name, content, variables, category, whatsapp_language_code')
+        .eq('workspace_id', String(thread.workspace_id)).eq('channel_type', 'whatsapp')
+        .eq('approval_status', 'approved').neq('is_active', false)
+        .not('whatsapp_template_name', 'is', null)
+        .order('name', { ascending: true });
+      if (error) throw new HttpError(500, `Could not load templates: ${error.message}`);
+      return json({ templates: data ?? [] });
+    }
+
+    case 'send_whatsapp_template': {
+      const thread = await getThreadOrThrow(db, String(payload.thread_id || ''));
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      if (thread.channel !== 'whatsapp') throw new HttpError(400, 'Templates are for WhatsApp conversations');
+      const workspaceId = String(thread.workspace_id);
+      const meta = (thread.metadata || {}) as Record<string, unknown>;
+      const accountId = String(meta.zernio_account_id || '');
+      const to = toE164(String(meta.contact_phone || ''));
+      if (!accountId || !to) throw new HttpError(409, 'This conversation has no WhatsApp number to send to.');
+      if (!(await isWorkspaceEntitled(db, workspaceId, 'messaging'))) {
+        throw new HttpError(402, 'WhatsApp templates need the Messaging module.');
+      }
+      const resolved = await resolveSendableTemplate(db, workspaceId, String(payload.template_id || ''));
+      if ('error' in resolved) throw new HttpError(404, resolved.error);
+      const template = resolved.template;
+      const variables: Record<string, string> = {};
+      const rawVars = (payload.variables ?? {}) as Record<string, unknown>;
+      for (const name of (Array.isArray(template.variables) ? template.variables : []) as string[]) {
+        const v = String(rawVars[name] ?? '').trim();
+        if (!v) throw new HttpError(400, `Fill in "${name}" before sending`);
+        variables[name] = v.slice(0, 1000);
+      }
+      const refusal = await whyNotSendable(db, { workspaceId, to, isTemplate: true });
+      if (refusal) throw new HttpError(409, refusal);
+
+      const priced = await priceWhatsAppMessage(db, { to, isTemplate: true, category: template.category ?? null });
+      const debit = await debitExternalServiceCredits(
+        db, userId, priced.serviceKey, 'messaging_whatsapp', 1,
+        { to, template_id: template.id, thread_id: thread.id, rate_country: priced.country, rate_category: priced.category },
+        workspaceId, {}, priced.costPerUnit,
+      );
+      if (!debit.success) throw new HttpError(402, debit.error || 'Insufficient credits');
+
+      const body = renderTemplate(template.content, variables);
+      const fixture = await isFixtureWorkspace(db, workspaceId);
+      const sent = fixture
+        ? { success: true, messageId: undefined as string | undefined, error: undefined as string | undefined }
+        : await sendWhatsAppMessage({
+          accountId, to, message: body,
+          templateName: template.whatsapp_template_name,
+          templateLanguage: template.whatsapp_language_code || undefined,
+          templateParams: orderedTemplateParams(template, variables),
+        }).catch((e: unknown) => ({ success: false, messageId: undefined, error: e instanceof Error ? e.message : String(e) }));
+      if (!sent.success) {
+        await refundWhatsAppCredits(db, userId, debit.credits_debited ?? 0, to);
+        throw new HttpError(502, `Template NOT sent: ${sent.error ?? 'WhatsApp refused it'}`);
+      }
+
+      let senderParticipantId = access.participant?.id ?? null;
+      if (!senderParticipantId) senderParticipantId = await ensureMemberParticipant(db, thread, userId);
+      const { data: msg, error: msgErr } = await db.from('inbox_messages').insert({
+        thread_id: thread.id, sender_participant_id: senderParticipantId, body, attachments: [], message_type: 'text',
+        metadata: {
+          channel: 'whatsapp', direction: 'outgoing', wamid: sent.messageId ?? null, delivery_status: 'sent',
+          template: { id: template.id, name: template.name },
+        },
+      }).select('*').single();
+      if (msgErr) console.error('[inbox-api] template sent but its message row FAILED', thread.id, msgErr);
+      const { error: threadErr } = await db.from('inbox_threads')
+        .update({ last_message_at: new Date().toISOString(), last_message_preview: body.replace(/s+/g, ' ').slice(0, 140) })
+        .eq('id', thread.id);
+      if (threadErr) console.error('[inbox-api] template sent but the thread preview FAILED', thread.id, threadErr);
+      return json({ message: msg ?? null });
     }
 
     case 'compose_email': {

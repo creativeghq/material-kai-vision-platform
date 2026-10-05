@@ -15,18 +15,19 @@ import { inboxApi } from '@/services/inboxApi';
 import { avatarTint, initials } from '../inboxFormat';
 import { WorkspaceMemberOption } from './InboxPrimitives';
 import { ComposeEmailForm } from './ComposeEmailForm';
+import { ComposeWhatsAppForm } from './ComposeWhatsAppForm';
 
 export interface ContactOption { id: string; label: string; email: string | null; hasAccount: boolean; }
 
 export const NewThreadDialog: React.FC<{
   workspaceId: string;
-  initialMode: 'team' | 'customer' | 'email';
+  initialMode: 'team' | 'customer' | 'email' | 'whatsapp';
   scopedLabelId: string | null;
   onClose: () => void;
   onCreated: (id: string) => void;
 }> = ({ workspaceId, initialMode, scopedLabelId, onClose, onCreated }) => {
   const { toast } = useToast();
-  const [mode, setMode] = useState<'team' | 'customer' | 'email'>(initialMode);
+  const [mode, setMode] = useState<'team' | 'customer' | 'email' | 'whatsapp'>(initialMode);
   const [busy, setBusy] = useState(false);
 
   // Team
@@ -125,7 +126,7 @@ export const NewThreadDialog: React.FC<{
     } finally { setBusy(false); }
   };
 
-  const modeBtn = (m: 'team' | 'customer' | 'email', label: string) => (
+  const modeBtn = (m: 'team' | 'customer' | 'email' | 'whatsapp', label: string) => (
     <button
       role="tab"
       aria-selected={mode === m}
@@ -162,15 +163,18 @@ export const NewThreadDialog: React.FC<{
           <>
             <DialogHeader>
               <DialogTitle>New Conversation</DialogTitle>
-              <DialogDescription>Start a private team chat, reach out to a customer, or send an email.</DialogDescription>
+              <DialogDescription>Start a team chat, reach out to a customer, or write an email or WhatsApp.</DialogDescription>
             </DialogHeader>
             <div role="tablist" className="flex items-center gap-1 border-b border-hairline">
               {modeBtn('team', 'Team')}
               {modeBtn('customer', 'Customer')}
               {modeBtn('email', 'Email')}
+              {modeBtn('whatsapp', 'WhatsApp')}
             </div>
 
-            {mode === 'email' ? (
+            {mode === 'whatsapp' ? (
+              <ComposeWhatsAppForm workspaceId={workspaceId} onCancel={onClose} onOpened={async (id) => { await applyScopedLabel(id); onCreated(id); }} />
+            ) : mode === 'email' ? (
               <ComposeEmailForm workspaceId={workspaceId} onCancel={onClose} onSent={async (id) => { await applyScopedLabel(id); onCreated(id); }} />
             ) : mode === 'team' ? (
               <>

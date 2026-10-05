@@ -94,7 +94,9 @@ const InboxPage: React.FC = () => {
           initialMode={
             scopedFilterValue(filterValues, 'source') === 'email'
               ? 'email'
-              : scopedFilterValue(filterValues, 'thread_type') === 'customer' || scopedFilterValue(filterValues, 'source') === 'customer'
+              : scopedFilterValue(filterValues, 'source') === 'whatsapp'
+                ? 'whatsapp'
+                : scopedFilterValue(filterValues, 'thread_type') === 'customer' || scopedFilterValue(filterValues, 'source') === 'customer'
                 ? 'customer'
                 : 'team'
           }

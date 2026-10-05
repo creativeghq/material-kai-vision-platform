@@ -14,22 +14,10 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
+import { orderedTemplateParams, renderTemplate } from '../_shared/whatsapp-templates.ts';
 
 const BATCH_SIZE = 10;
 const MAX_RETRIES = 3;
-
-function renderTemplate(content: string, variables: Record<string, any>): string {
-  let out = content || '';
-  for (const [k, v] of Object.entries(variables || {})) {
-    out = out.replace(new RegExp(`{{${k}}}`, 'g'), String(v ?? ''));
-  }
-  return out;
-}
-
-function orderedTemplateParams(template: any, variables: Record<string, any>): string[] {
-  const names: string[] = Array.isArray(template?.variables) ? template.variables : [];
-  return names.map((name) => String(variables?.[name] ?? ''));
-}
 
 serve(withApiLogging('messaging-processor', async (req) => {
   await bootstrapForFunction();
