@@ -11,6 +11,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** [source, target] pairs, repo-relative. One line per vocabulary. */
 export const VOCABULARIES = [
   [
+    'src/utils/emailMarkup.ts',
+    'supabase/functions/_shared/emailMarkup.generated.ts',
+  ],
+  [
     'src/modules/finance/invoice-templates/templateRegistry.ts',
     'supabase/functions/_shared/finance/invoiceTemplates.generated.ts',
   ],

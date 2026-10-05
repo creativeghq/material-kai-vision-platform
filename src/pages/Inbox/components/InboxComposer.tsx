@@ -9,6 +9,7 @@ import { slashCommandMatches, slashTokenAtCaret } from '../inboxSlashCommands';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { CatalogPicker, EmojiPicker, SlashCommandMenu } from './ComposerPickers';
 import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
+import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import type { InboxPageState } from '../useInboxPage';
 
 
@@ -39,6 +40,8 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     replyAll,
     templateOpen,
     setTemplateOpen,
+    emailPreview,
+    setEmailPreview,
     openThread,
     aiDrafting,
     aiDraftShown,
@@ -246,6 +249,8 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
               )}
             </span>
           </div>
+          <EmailFormatBar textareaRef={composerRef} value={draft} onChange={setDraft} preview={emailPreview} onPreview={setEmailPreview} />
+          {emailPreview && <EmailPreview value={draft} onEdit={() => setEmailPreview(false)} />}
           {emailCopiesOpen && (
             <div className="grid grid-cols-[2.5rem_1fr] items-center gap-1.5">
               <Label htmlFor="inbox-cc" className="text-xs text-muted-foreground">Cc</Label>

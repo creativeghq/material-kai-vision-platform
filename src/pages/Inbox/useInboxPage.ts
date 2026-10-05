@@ -105,6 +105,7 @@ export function useInboxPage() {
   const [emailBcc, setEmailBcc] = useState('');
   const [emailCopiesOpen, setEmailCopiesOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [emailPreview, setEmailPreview] = useState(false);
   /** Focused after "Add text to note" fills the box — the point is to type the thought next. */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const [sending, setSending] = useState(false);
@@ -513,7 +514,7 @@ export function useInboxPage() {
     () => (activeThread?.channel === 'email' ? emailReplyRecipients(messages, activeThread.metadata as Record<string, unknown> | null) : null),
     [activeThread, messages],
   );
-  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); setTemplateOpen(false); }, [activeId]);
+  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); setTemplateOpen(false); setEmailPreview(false); }, [activeId]);
   const replyAll = useCallback(() => {
     if (!emailRecipients?.replyAllCc.length) return;
     setEmailCc((cur) => [...new Set([...splitAddresses(cur), ...emailRecipients.replyAllCc])].join(', '));
@@ -557,6 +558,7 @@ export function useInboxPage() {
       setEmailCc('');
       setEmailBcc('');
       setEmailCopiesOpen(false);
+      setEmailPreview(false);
       // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
       if (!isNote && isMember && activeThread?.agent_state === 'active') {
         setActiveThread((t) => (t ? { ...t, agent_state: 'paused' } : t));
@@ -897,6 +899,8 @@ export function useInboxPage() {
     replyAll,
     templateOpen,
     setTemplateOpen,
+    emailPreview,
+    setEmailPreview,
     aiDrafting,
     setAiDrafting,
     aiDraftShown,

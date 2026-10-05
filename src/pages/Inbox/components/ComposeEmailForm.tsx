@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Paperclip, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { DialogFooter } from '@/components/core/ui/dialog';
 import { inboxApi, type AttachmentInput } from '@/services/inboxApi';
 import { splitAddresses } from '../emailRecipients';
+import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 
 type Suggestion = { id: string; label: string; email: string };
 
@@ -37,6 +38,8 @@ export const ComposeEmailForm: React.FC<{
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     inboxApi.getMyEmailAddress(workspaceId)
@@ -129,7 +132,10 @@ export const ComposeEmailForm: React.FC<{
           <Label htmlFor="compose-subject" className="text-xs text-muted-foreground">Subject</Label>
           <Input id="compose-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
         </div>
-        <Textarea aria-label="Message" placeholder="Write your email…" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-[140px] resize-y" />
+        <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
+        {preview
+          ? <EmailPreview value={body} onEdit={() => setPreview(false)} />
+          : <Textarea ref={bodyRef} aria-label="Message" placeholder="Write your email…" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-[140px] resize-y" />}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="inline-flex items-center gap-1 cursor-pointer text-muted-foreground hover:text-foreground">
             <Paperclip className="w-3.5 h-3.5" /> Attach files

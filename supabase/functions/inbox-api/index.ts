@@ -69,6 +69,8 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { escapeLike } from '../_shared/searchFold.ts';
+import { escapeHtml } from '../_shared/html.ts';
+import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
@@ -1457,13 +1459,11 @@ async function insertMessageAndNotify(
             ...(copies.cc.length ? { cc: copies.cc } : {}),
             ...(copies.bcc.length ? { bcc: copies.bcc } : {}),
             subject,
-            // Plain text unless there are cards: the body is a member's own words, and building
-            // an HTML string around untrusted content is how invariant 11 gets violated by
-            // accident. With cards the HTML is built by `buildEmailCardsHtml`, which runs every
-            // field — the member's text included — through the canonical escaper, and the text
-            // part lists the same cards so a text-only client loses nothing.
+            // HTML only from the two builders that escape everything first (invariant 11).
             text,
-            ...(cards.length ? { html: buildEmailCardsHtml(cards, body) } : {}),
+            ...(cards.length
+              ? { html: buildEmailCardsHtml(cards, body) }
+              : hasEmailMarkup(body) ? { html: renderEmailMarkup(String(body), escapeHtml) } : {}),
             ...(emailAttachments.length ? { attachments: emailAttachments } : {}),
             replyTo: buildReplyToAddress(ourMailbox, threadId),
             headers,
