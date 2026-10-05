@@ -362,7 +362,7 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
     page.drawLine({ start: { x: g.TABLE_MARGIN, y }, end: { x: g.TABLE_MARGIN + g.TABLE_W, y }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
 
     if (idx >= rows.length) {
-      if (doc.totals) { drawTotals(page, g, doc.totals, y, font, fontBold); y -= 110; }
+      if (doc.totals) { drawTotals(page, g, doc.totals, y, font, fontBold); y -= 122; }
       const ffeItems = doc.sections.flatMap((s) => s.items).filter((it) => it.installation_requirements || it.delivery_date);
       if (ffeItems.length > 0) {
         if (y < 140) {
@@ -441,8 +441,8 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
     drawRightAligned(page, value, rightEdge, y, bold ? 12 : 10, bold ? fontBold : font, gray ? COLOR_GRAY : (bold ? COLOR_DARK : COLOR_BLACK));
     y -= bold ? 0 : 18;
   };
-  y -= 20;
-  page.drawLine({ start: { x: labelX, y: y + 8 }, end: { x: rightEdge, y: y + 8 }, thickness: 1, color: COLOR_DARK });
+  y -= 28;
+  page.drawLine({ start: { x: labelX, y: y + 16 }, end: { x: rightEdge, y: y + 16 }, thickness: 1, color: COLOR_DARK });
 
   // Detailed proforma breakdown when the line-level discount data is present:
   //   Value before discount → Discount → Net value → VAT → Total payable.
@@ -455,8 +455,8 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
     line('Price', formatCurrency(totals.subtotal, cur));
   }
   line(`VAT (${totals.vat_rate}%)`, formatCurrency(totals.vat_amount, cur), false, true);
-  y -= 4;
-  page.drawLine({ start: { x: labelX, y: y + 8 }, end: { x: rightEdge, y: y + 8 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
+  y -= 8;
+  page.drawLine({ start: { x: labelX, y: y + 16 }, end: { x: rightEdge, y: y + 16 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
   line(hasDiscount ? 'Total payable' : 'FINAL', formatCurrency(totals.grand_total, cur), true);
 }
 
