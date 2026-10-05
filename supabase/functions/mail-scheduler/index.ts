@@ -4,7 +4,9 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
-import { gmailAccessToken, gmailFetch, sendPreparedGmail, type PreparedGmailSend } from '../_shared/gmail-client.ts';
+import { gmailAccessToken, gmailFetch, gmailHeader, sendPreparedGmail, type PreparedGmailSend } from '../_shared/gmail-client.ts';
+import { parseAddress } from '../_shared/mail-mime.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -87,6 +89,88 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number 
   return { sent, failed };
 }
 
+const SYNC_ACCOUNTS = 20;
+const SYNC_MESSAGES = 25;
+
+/** New mail in SHARED mailboxes becomes a `mail.received` flow event. Personal mail never leaves its owner. */
+async function syncHistory(db: Db): Promise<{ accounts: number; events: number; failed: number }> {
+  const { data: accounts, error } = await db.from('mail_accounts')
+    .select('id, user_id, workspace_id, email, display_name, status, history_id')
+    .eq('status', 'active').eq('is_shared', true)
+    .order('last_synced_at', { ascending: true, nullsFirst: true }).limit(SYNC_ACCOUNTS);
+  if (error) throw new HttpError(500, `account scan failed: ${error.message}`);
+  let events = 0;
+  let failed = 0;
+  for (const account of accounts ?? []) {
+    try {
+      const token = await gmailAccessToken(db, account);
+      if (!account.history_id) {
+        const profile = await gmailFetch(token, '/profile');
+        await stampSync(db, account.id, String(profile.historyId ?? ''), null);
+        continue;
+      }
+      let history: Record<string, unknown>;
+      try {
+        history = await gmailFetch(token, `/history?startHistoryId=${encodeURIComponent(account.history_id)}&historyTypes=messageAdded&labelId=INBOX&maxResults=100`);
+      } catch (e) {
+        if ((e as { status?: number }).status === 404) {
+          const profile = await gmailFetch(token, '/profile');
+          await stampSync(db, account.id, String(profile.historyId ?? ''), 'History expired; restarted from now.');
+          continue;
+        }
+        throw e;
+      }
+      const added = ((history.history ?? []) as Array<{ messagesAdded?: Array<{ message: { id: string; threadId: string; labelIds?: string[] } }> }>)
+        .flatMap((h) => h.messagesAdded ?? []).map((m) => m.message)
+        .filter((m) => !(m.labelIds ?? []).includes('SENT') && !(m.labelIds ?? []).includes('DRAFT'));
+      const unique = [...new Map(added.map((m) => [m.id, m])).values()].slice(0, SYNC_MESSAGES);
+      for (const m of unique) {
+        const msg = await gmailFetch(token, `/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`).catch(() => null);
+        if (!msg) continue;
+        const from = parseAddress(gmailHeader(msg, 'From'));
+        if (from.address === account.email.toLowerCase()) continue;
+        const { data: contact } = from.address
+          ? await db.from('crm_contacts').select('id, name').eq('workspace_id', account.workspace_id)
+            .ilike('email', from.address.replace(/[%_\\]/g, '\\$&')).limit(1).maybeSingle()
+          : { data: null };
+        const subject = gmailHeader(msg, 'Subject') || '(no subject)';
+        const who = contact?.name || from.name || from.address || 'someone';
+        await emitFlowEvent('mail.received', {
+          type: 'mail.received',
+          workspace_id: account.workspace_id,
+          user_id: account.user_id,
+          account_id: account.id,
+          account_email: account.email,
+          gmail_thread_id: m.threadId,
+          gmail_message_id: m.id,
+          from_address: from.address,
+          from_name: from.name,
+          subject,
+          snippet: String(msg.snippet ?? '').slice(0, 300),
+          label_ids: m.labelIds ?? [],
+          contact_id: contact?.id ?? null,
+          contact_name: contact?.name ?? null,
+          title: `${who} emailed ${account.email}`,
+          body: subject,
+          action_url: '/inbox?src=gmail',
+        });
+        events++;
+      }
+      await stampSync(db, account.id, String(history.historyId ?? account.history_id), null);
+    } catch (e) {
+      failed++;
+      await stampSync(db, account.id, account.history_id, (e as Error).message.slice(0, 500));
+    }
+  }
+  return { accounts: accounts?.length ?? 0, events, failed };
+}
+
+async function stampSync(db: Db, accountId: string, historyId: string | null, err: string | null) {
+  const { error } = await db.from('mail_accounts')
+    .update({ history_id: historyId || null, last_synced_at: new Date().toISOString(), sync_error: err }).eq('id', accountId);
+  if (error) console.error('[mail-scheduler] sync stamp failed', accountId, error.message);
+}
+
 async function failStalled(db: Db): Promise<number> {
   const cutoff = new Date(Date.now() - STALE_SENDING_MS).toISOString();
   const { data, error } = await db.from('mail_scheduled_sends')
@@ -103,5 +187,6 @@ Deno.serve(withApiLogging('mail-scheduler', async (req) => {
   const stalled = await failStalled(db);
   const snoozes = await wakeSnoozes(db);
   const scheduled = await deliverScheduled(db);
-  return json({ ok: true, stalled, snoozes, scheduled });
+  const sync = await syncHistory(db);
+  return json({ ok: true, stalled, snoozes, scheduled, sync });
 }));

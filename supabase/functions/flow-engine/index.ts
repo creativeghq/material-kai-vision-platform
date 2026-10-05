@@ -1352,6 +1352,38 @@ async function executeAction(
     }
 
     /** Put work on somebody's list (#378 Phase 4). */
+    /** Label / archive / star / mark read the Gmail thread a mail.received event came from. */
+    case 'gmail_modify': {
+      const accountId = String(resolved.account_id ?? '');
+      const threadId = String(resolved.thread_id ?? '');
+      if (!accountId || accountId.includes('{{') || !threadId || threadId.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_thread' } };
+      }
+      if (!scope?.workspaceId || scope.isGlobal) {
+        return { output: { skipped: true, reason: 'only a workspace flow may act on a mailbox' } };
+      }
+      const { data: acct } = await supabase.from('mail_accounts')
+        .select('id, workspace_id, is_shared, status').eq('id', accountId).maybeSingle();
+      const a = acct as { workspace_id?: string; is_shared?: boolean; status?: string } | null;
+      if (!a || a.workspace_id !== scope.workspaceId || !a.is_shared || a.status !== 'active') {
+        return { output: { skipped: true, reason: 'not an active shared mailbox of this workspace' } };
+      }
+      const names = (v: unknown) => String(v ?? '').split(',').map((x) => x.trim()).filter((x) => x && !x.includes('{{')).slice(0, 10);
+      if (isTestRun) return { output: { test: true, account_id: accountId, thread_id: threadId } };
+      const res = await fetch(`${supabaseUrl}/functions/v1/gmail-api`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'internal_modify', account_id: accountId, thread_id: threadId,
+          add_names: names(resolved.add_labels), remove_names: names(resolved.remove_labels),
+          archive: resolved.archive === true, mark_read: resolved.mark_read === true, star: resolved.star === true,
+        }),
+      });
+      const j = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error(`gmail_modify failed: ${String(j.error ?? res.status)}`);
+      return { output: { modified: true, thread_id: threadId, added: j.added ?? [], removed: j.removed ?? [] } };
+    }
+
     case 'create_task': {
       const projectId = String(resolved.project_id ?? '');
       const title = String(resolved.title ?? '').trim();

@@ -23,6 +23,8 @@ export const TENANT_TRIGGERS = [
   // Inbox
   'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
   'inbox.thread_labeled', 'inbox.follow_up_due',
+  // New mail in a SHARED Gmail mailbox (mail-scheduler). Personal mailboxes never emit.
+  'mail.received',
   // CRM, deals & contracts
   'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
   'deal_won', 'deal_lost', 'deal_stage_changed',
@@ -54,7 +56,7 @@ export const TENANT_TRIGGERS = [
 /** Actions a workspace-owned flow may run. Mirrors `tenant_flow_allowed_actions()`. */
 export const TENANT_ACTIONS = [
   'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
-  'create_task', 'advance_deal_stage', 'add_note', 'assign_user',
+  'create_task', 'advance_deal_stage', 'add_note', 'assign_user', 'gmail_modify',
 ] as const;
 
 /**

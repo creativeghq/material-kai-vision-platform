@@ -204,6 +204,9 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Inbox Thread Labeled', icon: 'Tag', color: 'emerald',
     description: 'A label was added to a conversation. The event carries the label names — filter on them with a condition.',
     defaultData: { label: 'Inbox Thread Labeled', category: 'trigger', triggerType: 'inbox.thread_labeled', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'mail.received', group: 'Inbox',
+    label: 'Email Received (Shared Gmail)', description: 'New mail arrived in a shared Gmail mailbox of this workspace', icon: 'Mail', color: 'green',
+    defaultData: { label: 'Email Received (Shared Gmail)', category: 'trigger', triggerType: 'mail.received', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'inbox.follow_up_due', group: 'Inbox',
     label: 'Inbox Follow-up Due', icon: 'BellRing', color: 'emerald',
     description: 'A scheduled follow-up came due. Carries message_sent and error — condition on them to fire only when the chase could not be sent.',
@@ -640,6 +643,10 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'actionNode', category: 'action', subType: 'create_task', group: 'Projects',
     label: 'Create Task', description: 'Put work on a project task list', icon: 'CheckSquare', color: 'blue',
     defaultData: { label: 'Create Task', category: 'action', actionType: 'create_task', config: { project_id: '', title: '' } } as ActionNodeData },
+
+  { type: 'actionNode', category: 'action', subType: 'gmail_modify', group: 'Inbox',
+    label: 'Label / Archive Email', description: 'Label, archive, star or mark read the Gmail thread that triggered this', icon: 'Mail', color: 'blue',
+    defaultData: { label: 'Label / Archive Email', category: 'action', actionType: 'gmail_modify', config: { account_id: '{{trigger.data.account_id}}', thread_id: '{{trigger.data.gmail_thread_id}}' } } as ActionNodeData },
 
   { type: 'actionNode', category: 'action', subType: 'log_event', group: 'Data',
     label: 'Log Event', description: 'Write an audit / dedup-marker row', icon: 'ScrollText', color: 'blue',

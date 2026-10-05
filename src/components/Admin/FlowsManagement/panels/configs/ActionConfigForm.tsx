@@ -32,6 +32,7 @@ import type {
   UpdateContactConfig,
   UpdateProductConfig,
   CreateTaskConfig,
+  GmailModifyConfig,
   AdvanceDealStageConfig,
   CreatePlannedPaymentConfig,
   LinkDocumentConfig,
@@ -830,6 +831,35 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               database, so the run log will say so rather than moving it somewhere impossible.
             </p>
           </div>
+        </div>
+      );
+    }
+
+    case 'gmail_modify': {
+      const cfg = config as GmailModifyConfig;
+      const flag = (key: 'archive' | 'mark_read' | 'star', label: string) => (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!!cfg[key]} onChange={(e) => onChange({ ...cfg, [key]: e.target.checked })} />
+          {label}
+        </label>
+      );
+      return (
+        <div className="space-y-3">
+          <p className="text-[11px] text-muted-foreground">
+            Acts on the thread that started this flow. Use it after an &ldquo;Email Received (Shared Gmail)&rdquo; trigger; it
+            refuses any mailbox that is not a shared one of this workspace.
+          </p>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Add labels</Label>
+            <Input value={cfg.add_labels || ''} onChange={(e) => onChange({ ...cfg, add_labels: e.target.value })} placeholder="Suppliers, Orders" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Remove labels</Label>
+            <Input value={cfg.remove_labels || ''} onChange={(e) => onChange({ ...cfg, remove_labels: e.target.value })} placeholder="Optional" />
+          </div>
+          {flag('archive', 'Archive (skip the inbox)')}
+          {flag('mark_read', 'Mark as read')}
+          {flag('star', 'Star')}
         </div>
       );
     }

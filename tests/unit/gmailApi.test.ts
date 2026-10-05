@@ -93,3 +93,25 @@ describe('mail-scheduler claims before it acts', () => {
     expect(sched).toContain('if (!isCronAuthorized(req))');
   });
 });
+
+describe('Gmail rules run through Flows, and personal mail never reaches a workspace flow', () => {
+  const sched = stripComments(readFileSync(join(process.cwd(), 'supabase/functions/mail-scheduler/index.ts'), 'utf8'));
+  const engine = stripComments(readFileSync(join(process.cwd(), 'supabase/functions/flow-engine/index.ts'), 'utf8'));
+  it('emits mail.received only for shared mailboxes, stamped with their workspace', () => {
+    const sync = sched.slice(sched.indexOf('async function syncHistory'), sched.indexOf('async function stampSync'));
+    expect(sync).toContain(".eq('is_shared', true)");
+    expect(sync).toContain("emitFlowEvent('mail.received'");
+    expect(sync).toContain('workspace_id: account.workspace_id');
+  });
+
+  it('the gmail_modify action refuses anything but an active shared mailbox of the flow workspace', () => {
+    const handler = engine.slice(engine.indexOf("case 'gmail_modify'"), engine.indexOf("case 'create_task'"));
+    expect(handler).toContain('a.workspace_id !== scope.workspaceId || !a.is_shared');
+    expect(handler).toContain('scope.isGlobal');
+  });
+
+  it('the internal modify path is service-role only and also refuses a personal mailbox', () => {
+    const internal = src.slice(src.indexOf('if (isServiceRoleRequest(req))'), src.indexOf('const auth = await authenticate'));
+    expect(internal).toContain('!acct.is_shared');
+  });
+});

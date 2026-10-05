@@ -2953,7 +2953,7 @@
     "name": "gmail-api",
     "tag": "Inbox",
     "summary": "A person's own Gmail, live: connect with the platform Google client, browse labels and threads, read, reply, label, trash",
-    "description": "Gmail stays the source of truth: lists, search (Gmail's own `q=`) and paging go live to the Gmail API and nothing is mirrored. The account is PERSONAL — every action loads `mail_accounts` and refuses (404) unless the caller owns it; workspace membership grants nothing. The refresh token lives in Vault behind service-role-only definer functions (`mail_account_store_refresh_token` / `mail_account_refresh_token` / `mail_account_forget_token`) and is never selectable. `state` is HMAC-signed with the service key and expires in 10 minutes, so the callback cannot bind someone else's Google account; `prompt=consent` forces a refresh token on reconnect, and a grant without `gmail.modify` is refused. A refresh that Google answers with `invalid_grant` marks the account `needs_reauth` and says so (409) rather than failing silently. Sending goes through Gmail (`messages.send`), so it lands in the user's own Sent and threads on their phone; replies carry In-Reply-To/References and the thread id, and every header value is stripped of CR/LF. Actions: `status`, `connect`, `disconnect`, `labels`, `threads`, `thread`, `attachment`, `modify`, `send`. The GET path is Google's OAuth callback.",
+    "description": "Gmail stays the source of truth: lists, search (Gmail's own `q=`) and paging go live to the Gmail API and nothing is mirrored. The account is PERSONAL — every action loads `mail_accounts` and refuses (404) unless the caller owns it; workspace membership grants nothing. The refresh token lives in Vault behind service-role-only definer functions (`mail_account_store_refresh_token` / `mail_account_refresh_token` / `mail_account_forget_token`) and is never selectable. `state` is HMAC-signed with the service key and expires in 10 minutes, so the callback cannot bind someone else's Google account; `prompt=consent` forces a refresh token on reconnect, and a grant without `gmail.modify` is refused. A refresh that Google answers with `invalid_grant` marks the account `needs_reauth` and says so (409) rather than failing silently. Sending goes through Gmail (`messages.send`), so it lands in the user's own Sent and threads on their phone; replies carry In-Reply-To/References and the thread id, and every header value is stripped of CR/LF. Actions: `status`, `connect`, `disconnect`, `labels`, `threads`, `thread`, `attachment`, `modify`, `send`, plus the thread facts, snooze, sharing and `schedule`. `internal_modify` is service-role only: the flow engine's `gmail_modify` action, refused for anything but an active SHARED mailbox. The GET path is Google's OAuth callback.",
     "security": [
       "userJwt"
     ],
@@ -2980,7 +2980,8 @@
       "snooze",
       "assign",
       "members",
-      "share"
+      "share",
+      "internal_modify"
     ],
     "request": [
       "workspace_id",
@@ -3018,7 +3019,7 @@
     "name": "mail-scheduler",
     "tag": "Inbox",
     "summary": "Cron: wakes snoozed Gmail threads and delivers scheduled sends (Gmail and Inbox)",
-    "description": "Runs every minute. Each row is CLAIMED before it is acted on — a snooze by clearing `snoozed_until` where it still holds the value read, a scheduled send by moving it `pending → sending` — so two overlapping runs cannot act twice. A Gmail send replays the validated payload through the shared Gmail client; an Inbox send calls inbox-api `internal_scheduled_send`, which re-runs `send_message` AS the person who scheduled it (every access check again, the row id as the idempotency token). A send still `sending` after 15 minutes is marked failed with a message saying it may have gone, never resent. A wake that Gmail refuses is retried in 15 minutes. `mail.scheduler_overdue` watches what this should clear.",
+    "description": "Runs every minute. Each row is CLAIMED before it is acted on — a snooze by clearing `snoozed_until` where it still holds the value read, a scheduled send by moving it `pending → sending` — so two overlapping runs cannot act twice. A Gmail send replays the validated payload through the shared Gmail client; an Inbox send calls inbox-api `internal_scheduled_send`, which re-runs `send_message` AS the person who scheduled it (every access check again, the row id as the idempotency token). A send still `sending` after 15 minutes is marked failed with a message saying it may have gone, never resent. A wake that Gmail refuses is retried in 15 minutes. It also reads Gmail history for SHARED mailboxes and emits `mail.received` per new message (first run only records where to start; personal mailboxes never emit). `mail.scheduler_overdue` watches what this should clear.",
     "security": [
       "cronSecret"
     ],

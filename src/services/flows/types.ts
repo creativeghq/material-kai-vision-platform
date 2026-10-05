@@ -77,6 +77,7 @@ export type TriggerType =
   | 'inbox.follow_up_due'
   // #342: an order was read out of a customer conversation and is waiting for approval
   | 'inbox.order_intake_ready'
+  | 'mail.received'
   // A review was left on a connected platform profile (Google Business). A low rating is the
   // one that needs somebody today, and nobody is watching a screen they do not know changed.
   | 'review_received'
@@ -370,6 +371,7 @@ export interface InboxThreadLabeledTriggerConfig {}
  * mode being added later.
  */
 export interface InboxFollowUpDueTriggerConfig {}
+export interface MailReceivedTriggerConfig {}
 export interface InboxOrderIntakeReadyTriggerConfig {}
 export interface ReviewReceivedTriggerConfig {
   /**
@@ -586,6 +588,7 @@ export type TriggerConfigMap = {
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
   'inbox.thread_labeled': InboxThreadLabeledTriggerConfig;
   'inbox.follow_up_due': InboxFollowUpDueTriggerConfig;
+  'mail.received': MailReceivedTriggerConfig;
   'inbox.order_intake_ready': InboxOrderIntakeReadyTriggerConfig;
   review_received: ReviewReceivedTriggerConfig;
   marketplace_want_match: MarketplaceWantMatchTriggerConfig;
@@ -770,6 +773,7 @@ export type ActionType =
   | 'update_contact'
   | 'update_product'
   | 'create_task'
+  | 'gmail_modify'
   | 'advance_deal_stage'
   | 'create_planned_payment'
   | 'link_document'
@@ -896,6 +900,18 @@ export interface UpdateContactConfig {
 export interface UpdateProductConfig {
   product_id: string;
   fields: Record<string, string>;
+}
+
+/** Act on the Gmail thread a `mail.received` event came from. Shared mailboxes of this workspace only. */
+export interface GmailModifyConfig {
+  account_id?: string;
+  thread_id?: string;
+  /** Label NAMES, comma-separated; a label that does not exist yet is created. */
+  add_labels?: string;
+  remove_labels?: string;
+  archive?: boolean;
+  mark_read?: boolean;
+  star?: boolean;
 }
 
 /** Put work on somebody's list (#378 Phase 4). */

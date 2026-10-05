@@ -175,10 +175,12 @@ describe('tenant flow vocabulary', () => {
     // (two) — every one stamps workspace_id, without which a forked tenant flow never matches.
     'expense.booked', 'expense.settled_outside', 'credit_note.received',
     'plan.due_tomorrow', 'vat.return_ready',
+    // mail-scheduler, shared Gmail mailboxes only; stamps the mailbox workspace_id.
+    'mail.received',
   ];
   const RPC_ACTIONS = [
     'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
-    'create_task', 'advance_deal_stage', 'add_note', 'assign_user',
+    'create_task', 'advance_deal_stage', 'add_note', 'assign_user', 'gmail_modify',
   ];
 
   const SYNC_HINT =

@@ -34,6 +34,7 @@ const actionIcons: Record<ActionType, React.ElementType> = {
   update_contact: UserPen,
   update_product: PackageCheck,
   create_task: CheckSquare,
+  gmail_modify: Mail,
   advance_deal_stage: Kanban,
   create_planned_payment: CalendarClock,
   link_document: Link2,

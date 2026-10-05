@@ -1,7 +1,7 @@
 /** gmail-api — a person's own Gmail, live: connect, browse, read, reply, label. Gmail stays the source of truth. */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -122,6 +122,36 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
   }
 
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  if (isServiceRoleRequest(req)) {
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+    if (body.action !== 'internal_modify') throw new HttpError(400, 'Unknown internal action');
+    const { data: acct, error } = await db.from('mail_accounts')
+      .select('id, email, display_name, status, is_shared').eq('id', String(body.account_id ?? '')).maybeSingle();
+    if (error) throw new HttpError(500, error.message);
+    if (!acct || !acct.is_shared || acct.status !== 'active') throw new HttpError(404, 'Shared mailbox not found');
+    const threadId = String(body.thread_id ?? '');
+    if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
+    const token = await gmailAccessToken(db, acct);
+    const labels = ((await gmailFetch(token, '/labels')).labels ?? []) as Array<{ id: string; name: string }>;
+    const byName = new Map(labels.map((l) => [l.name.toLowerCase(), l.id]));
+    const resolve = async (name: string, create: boolean): Promise<string | null> => {
+      const hit = byName.get(name.toLowerCase());
+      if (hit || !create) return hit ?? null;
+      const made = await gmailFetch(token, '/labels', { method: 'POST', body: JSON.stringify({ name, labelListVisibility: 'labelShow', messageListVisibility: 'show' }) });
+      byName.set(name.toLowerCase(), String(made.id));
+      return String(made.id);
+    };
+    const asNames = (v: unknown) => (Array.isArray(v) ? v.map(String).filter(Boolean).slice(0, 10) : []);
+    const add = (await Promise.all(asNames(body.add_names).map((n) => resolve(n, true)))).filter((x): x is string => !!x);
+    const remove = (await Promise.all(asNames(body.remove_names).map((n) => resolve(n, false)))).filter((x): x is string => !!x);
+    if (body.archive === true) remove.push('INBOX');
+    if (body.mark_read === true) remove.push('UNREAD');
+    if (body.star === true) add.push('STARRED');
+    if (add.length || remove.length) {
+      await gmailFetch(token, `/threads/${threadId}/modify`, { method: 'POST', body: JSON.stringify({ addLabelIds: add, removeLabelIds: remove }) });
+    }
+    return json({ ok: true, added: add, removed: remove });
+  }
   const auth = await authenticate(req, { requireUser: true });
   if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
   const userId = auth.userId;
