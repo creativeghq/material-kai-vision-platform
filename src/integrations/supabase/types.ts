@@ -11954,6 +11954,32 @@ export type Database = {
           },
         ]
       }
+      inbox_message_stars: {
+        Row: {
+          created_at: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_message_stars_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_messages: {
         Row: {
           attachments: Json
@@ -12167,12 +12193,22 @@ export type Database = {
       }
       inbox_threads: {
         Row: {
+          agent_draft: string | null
+          agent_draft_at: string | null
+          agent_draft_error: string | null
+          agent_draft_for_message_id: string | null
           agent_id: string | null
           agent_state: string
           archived_at: string | null
           channel: Database["public"]["Enums"]["inbox_channel"]
           created_at: string
           created_by: string | null
+          follow_up_at: string | null
+          follow_up_error: string | null
+          follow_up_fired_at: string | null
+          follow_up_message: string | null
+          follow_up_note: string | null
+          follow_up_set_by: string | null
           id: string
           last_message_at: string
           last_message_preview: string | null
@@ -12184,12 +12220,22 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          agent_draft?: string | null
+          agent_draft_at?: string | null
+          agent_draft_error?: string | null
+          agent_draft_for_message_id?: string | null
           agent_id?: string | null
           agent_state?: string
           archived_at?: string | null
           channel?: Database["public"]["Enums"]["inbox_channel"]
           created_at?: string
           created_by?: string | null
+          follow_up_at?: string | null
+          follow_up_error?: string | null
+          follow_up_fired_at?: string | null
+          follow_up_message?: string | null
+          follow_up_note?: string | null
+          follow_up_set_by?: string | null
           id?: string
           last_message_at?: string
           last_message_preview?: string | null
@@ -12201,12 +12247,22 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          agent_draft?: string | null
+          agent_draft_at?: string | null
+          agent_draft_error?: string | null
+          agent_draft_for_message_id?: string | null
           agent_id?: string | null
           agent_state?: string
           archived_at?: string | null
           channel?: Database["public"]["Enums"]["inbox_channel"]
           created_at?: string
           created_by?: string | null
+          follow_up_at?: string | null
+          follow_up_error?: string | null
+          follow_up_fired_at?: string | null
+          follow_up_message?: string | null
+          follow_up_note?: string | null
+          follow_up_set_by?: string | null
           id?: string
           last_message_at?: string
           last_message_preview?: string | null

@@ -125,11 +125,13 @@ One `POST`-only, action-discriminated function (merge rule; precedent `moodboard
 |---|---|---|
 | `create_thread` | member / operator (client → customer thread) | Create a thread; creator becomes `owner` participant; optional initial participants (directional-ACL checked); auto-engages the AI on customer-initiated customer threads |
 | `add_participant` / `remove_participant` | thread members | Add/remove a teammate or customer (directional add-rule enforced) |
-| `send_message` | participants (members + customers) | Post a `text` or member-only `note`; relays to WhatsApp when in the 24h window; triggers agent reply / human-takeover pause |
+| `send_message` | participants (members + customers) | Post a `text` or member-only `note`; relays to WhatsApp when in the 24h window, or by email with attachments and optional `email_cc`/`email_bcc`; triggers agent reply / human-takeover pause |
+| `compose_email` | business members | Send a NEW email from the caller's own Inbox address and open it as an email thread; returns `delivery_error` (not a 502) when the thread exists but the send failed |
+| `list_whatsapp_templates` / `send_whatsapp_template` | members | Meta-approved templates of the thread's workspace; send one outside the 24h window (opt-out check → credit debit → send → refund on refusal) |
 | `mark_read` / `set_status` | participants / members | Update `last_read_at`; set `open/snoozed/closed` |
 | `set_agent` | members | Set how much the assistant does (`off/suggesting/active`); `off` also discards any waiting draft; writes a `system` transcript note |
 | `get_agent_settings` / `set_agent_settings` | member reads / owner-admin writes | Per-workspace AI config (`workspaces.settings.inbox_agent`) |
-| `list_threads` | member / operator | Thread list (see visibility rules below); operator `scope:'all'` spans every workspace |
+| `list_threads` | member / operator | Thread list (see visibility rules below), a page at a time (`limit` ≤ 200, `before` = the previous `next_cursor`); `search` matches subject, preview, sender, phone and message bodies (never notes); `label_ids` is any-of; operator `scope:'all'` spans every workspace |
 | `get_thread` | participants (note-filtered for non-members) | Thread + participants + messages + WhatsApp window |
 | `get_thread_context` | members / operator | CRM contact + company + quotes + projects + invoices + finance metrics for the rail |
 | `create_marketplace_inquiry` / `accept_marketplace_inquiry` | business members | Surplus Marketplace buyer↔seller bridge ([§7](#7-marketplace-inquiry-bridge)) |
@@ -172,7 +174,8 @@ WhatsApp threads (`channel='whatsapp'`) store **and** relay through Zernio (Meta
 - **Outbound relay.** In [`insertMessageAndNotify()`](../supabase/functions/inbox-api/index.ts), a `text`/`agent` message on a `whatsapp` thread is relayed via `sendWhatsAppReply({ accountId, conversationId, message })` using the `zernio_account_id` / `zernio_conversation_id` in thread metadata; the relay result is stored on the message. **Notes never leave the inbox.**
 - **Meta 24-hour service window.** [`whatsappWindow()`](../supabase/functions/inbox-api/index.ts) reads the last inbound (`metadata.direction='incoming'`) message; freeform replies are allowed only within 24h of it. `send_message` returns **409** ("an approved template is required") when the window is closed (notes are exempt). `get_thread` returns the current `whatsapp_window` so the composer can disable itself.
 
-> **Status note.** The inbound reply-capture path above is wired in `zernio-webhook-handler`. Per the project tracker (CLAUDE.md Inbox note), the full **WhatsApp cut-over** (template-driven re-engagement outside the 24h window, dedicated inbox reply box) is still being finished; treat template sending outside the window as out of scope of this surface today.
+- **Templates outside the window.** The closed-window banner offers **Send a template**: the workspace's Meta-approved `messaging_templates`, variables filled and previewed, sent by `send_whatsapp_template` — opt-out check, credit debit, send, refund on refusal, in that order. The row stores the `wamid`, so the webhook echo of the same message matches it instead of filing a second bubble. The helpers are shared with `messaging-api` and the campaign processor in [`_shared/whatsapp-templates.ts`](../supabase/functions/_shared/whatsapp-templates.ts).
+- **Starting a conversation.** New conversation → WhatsApp opens the thread by number (`messaging-api` `open-whatsapp-thread`) and sends nothing; the first message is a template.
 
 ---
 
@@ -288,10 +291,12 @@ says so; there is no unsend to offer.
 
 ## 9. Frontend
 
-- **Route** `/inbox` → [`InboxPage`](../src/pages/Inbox/InboxPage.tsx), wrapped in `AuthGuard` + `CapabilityGuard capability="inbox.use"`. Three-pane desktop layout (Conversations · Conversation · Details rail); single-pane mobile drill-in with the rail in a bottom sheet.
+- **Route** `/inbox` → [`InboxPage`](../src/pages/Inbox/InboxPage.tsx), a shell over [`useInboxPage`](../src/pages/Inbox/useInboxPage.ts) (all state and handlers) and the section components in [`src/pages/Inbox/components/`](../src/pages/Inbox/components/) — sidebar, thread list, conversation, composer, dialogs. Tests read the whole folder through `tests/helpers/inboxSource.ts`, so moving code between those files does not break a guard. Wrapped in `AuthGuard` + `CapabilityGuard capability="inbox.use"`. Three-pane desktop layout (Conversations · Conversation · Details rail); single-pane mobile drill-in with the rail in a bottom sheet.
   - **Members** get full controls (AI Bot toggle, agent settings, add teammate, status select, reply/private-note switch). **End-users** (`persona==='end_user'`) get a read/reply surface only.
   - **Channel filters** All / Internal / WhatsApp / Email, plus an **Order** filter (#342); operators get an "All workspaces" toggle (`scope:'all'`).
   - **Realtime**: members subscribe to `inbox_messages` inserts on the open thread + a `inbox_threads` list channel. The details rail is populated by `get_thread_context`.
+  - **Received email** renders as the sender formatted it: `metadata.email_html` through `sanitizeEmailHtml` (DOMPurify; scripts, forms, frames and remote CSS removed, remote images held back until "Show images" or "Always for <sender>") inside a script-less sandboxed iframe — [`EmailHtmlView`](../src/pages/Inbox/components/EmailHtmlView.tsx). Plain text stays one click away.
+  - **New conversation** has four tabs: Team, Customer, Email (To with CRM suggestions, Cc/Bcc, subject, several attachments) and WhatsApp (opens the thread by number; the first message is a template).
   - Client service: [`inboxApi`](../src/services/inboxApi.ts).
 - **Public route** `/i/:token` → [`PublicInboxThreadPage`](../src/pages/PublicInboxThreadPage.tsx). Minimal chrome, one thread, reply box + attachments. Anonymous customers can't use RLS realtime, so it **polls every 15s** via `token_get_thread`. A "Create account to continue" modal routes to signup carrying the token (`/auth?mode=signup&inbox_token=…&redirect=/inbox`); on return the app calls `token_claim` (a fallback in `InboxPage` also claims a token stashed in `localStorage` across the email-confirmation round trip).
 
@@ -301,7 +306,7 @@ says so; there is no unsend to offer.
 
 **Shipped:** the thread/message/participant/token backbone; directional ACL + shared team inbox; WhatsApp inbound reply-capture with assign-on-reply + 24h-window enforcement; the AI takeover (auto-engage, credit metering, data-grounded thread-scoped tools, human-takeover pause, editable persona); per-workspace `auto_respond` / `allow_account_data` settings **with the UI toggle**; the CRM/finance context rail; the public tokenized thread page + `token_claim` conversion; the marketplace inquiry bridge; Flows-based notifications.
 
-**Pending (per CLAUDE.md tracker):** a dedicated agent-facing WhatsApp reply box. Template-driven re-engagement outside Meta's 24h window is no longer wholly pending — #342 built it for one concrete template (`order_confirmation`, §11); a general template picker in the composer is still a fast-follow. Everything documented above reflects the current code.
+**Pending:** the rest of #471 — connected Gmail as a third source, the source-adaptive sidebar, rich-text compose, mail folders (Sent/Drafts/Trash), attachment preview, scheduling and rules. Templates outside Meta's 24h window are no longer pending: the composer offers every approved template of the workspace (§5).
 
 ---
 
@@ -333,9 +338,10 @@ resolve to a *different* mailbox), anything the column CHECK would reject, and t
 role names. `postmaster`/`abuse`/`security` belong to whoever runs the domain; `sales`/`support`/
 `info` would let one workspace's user appear to speak for the platform.
 
-Allocation is an explicit click (`get_my_email_address` with `allocate:true`), surfaced in the
-Inbox settings popover along with a copy button and an "assistant answers email" toggle. It is never
-a side effect of opening the Inbox.
+The address is allocated the first time `get_my_email_address` is read, which the Inbox does on
+open — an explicit button cost every new user a step before mail could arrive. It stays idempotent
+(`user_id` is UNIQUE), and a taken or invalid handle comes back as a `conflict` the user resolves in
+the Inbox settings popover, where the copy button and the "assistant answers email" toggle live.
 
 ### How a reply finds its thread
 
@@ -362,6 +368,15 @@ enforces.
 The send result is checked and a failure **throws** (502, "stored but NOT delivered"), for the same
 reason the WhatsApp relay does: a stored message with a cleared composer and no delivery is
 indistinguishable from success from the operator's side.
+
+- **Recipients.** A reply goes to the customer's `Reply-To` when their last email set one, else to
+  the sender. Inbound mail stores every `To`/`Cc`/`Reply-To` (`email_to_all`, `email_cc`,
+  `email_reply_to`), so **Reply all** copies in everyone on that email except our own mailbox and
+  the thread's tagged address. Cc/Bcc are validated before the message is stored (400 on a bad
+  address, at most 20) and recorded on the outgoing row.
+- **Attachments** are read back from storage and sent as files (25 MB total); a file that cannot be
+  read refuses the send rather than delivering the text without it.
+- **A first email** (`compose_email`) goes out with its subject as typed, not `Re:`.
 
 ---
 
