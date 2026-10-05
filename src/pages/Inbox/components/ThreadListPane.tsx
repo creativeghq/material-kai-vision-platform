@@ -7,6 +7,9 @@ import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { Input } from '@/components/core/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Checkbox } from '@/components/core/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
+import { labelDot } from '../inboxFormat';
 import { FilterBar } from '@/components/core/filters';
 import { inboxSourceMeta, inboxThreadSource, SOURCE_FILTER_ORDER } from '../inboxSource';
 import { type InboxThreadStatus } from '@/services/inboxApi';
@@ -50,6 +53,13 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     nextCursor,
     loadingMore,
     loadMoreThreads,
+    selectedIds,
+    toggleSelected,
+    clearSelection,
+    setSelectedIds,
+    runBulkAction,
+    bulkBusy,
+    wsLabels,
     sourceCounts,
     threadDisplayName,
   } = s;
@@ -112,6 +122,39 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
         {/* Status tabs (Open / Follow-up / Done) narrow the working set; they are hidden in the
             Unread / Archived views, where status is not the axis. The filter bar stays put in
             every view — it is what carries the Unread toggle. */}
+        {selectedIds.size > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <Checkbox
+              aria-label="Select every conversation shown"
+              checked={selectedIds.size === visibleThreads.length ? true : 'indeterminate'}
+              onCheckedChange={(v) => setSelectedIds(v === true ? new Set(visibleThreads.map((t) => t.id)) : new Set())}
+            />
+            <span className="font-medium tabular-nums mr-1">{selectedIds.size} selected</span>
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('read')}>Mark read</Button>
+            {statusTab === 'closed' && view === 'all'
+              ? <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('open')}>Reopen</Button>
+              : <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('done')}>Done</Button>}
+            {wsLabels.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy}>Label</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {wsLabels.map((l) => (
+                    <DropdownMenuItem key={l.id} onSelect={() => runBulkAction('label', l.id)}>
+                      <span className={`w-2 h-2 rounded-full mr-2 ${labelDot(l.color)}`} />{l.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {view !== 'archived' && (
+              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('archive')}>Archive</Button>
+            )}
+            {bulkBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+            <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={clearSelection}>Clear</Button>
+          </div>
+        ) : (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {view === 'all' ? (
             <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as InboxThreadStatus)}>
@@ -134,6 +177,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             className="justify-end"
           />
         </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {loadingThreads ? (
@@ -174,11 +218,15 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               const assignee = (t.assignees ?? [])[0]?.name ?? null;
               const orderPending = (t.metadata as { order_intake?: { status?: string } } | null)
                 ?.order_intake?.status === 'pending_review';
+              const selected = selectedIds.has(t.id);
               return (
+                <div key={t.id} className="group relative">
+                <span className={`absolute left-1 top-1/2 -translate-y-1/2 z-10 ${selectedIds.size > 0 || selected ? 'flex' : 'hidden md:group-hover:flex'}`}>
+                  <Checkbox aria-label={`Select ${name}`} checked={selected} onCheckedChange={() => toggleSelected(t.id)} />
+                </span>
                 <button
-                  key={t.id}
-                  onClick={() => openThread(t.id)}
-                  className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
+                  onClick={() => (selectedIds.size > 0 ? toggleSelected(t.id) : openThread(t.id))}
+                  className={`w-full text-left ${selectedIds.size > 0 ? 'pl-8 pr-4' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${selected ? 'bg-primary/[0.06]' : ''} ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
                 >
                   <div className="relative shrink-0 mt-0.5">
                     <ThreadAvatar thread={t} name={name} className="h-9 w-9" showMood />
@@ -236,6 +284,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                     </div>
                   </div>
                 </button>
+                </div>
               );
             })}
           </div>

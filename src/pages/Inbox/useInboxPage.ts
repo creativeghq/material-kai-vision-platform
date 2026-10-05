@@ -18,6 +18,7 @@ import { ParticipantLabel } from './components/InboxPrimitives';
 import { emailReplyRecipients, splitAddresses } from './emailRecipients';
 import { modeChannels, modeSources, parseInboxMode, type InboxFolder, type InboxMode } from './inboxModes';
 import { NONE_VALUE } from '@/components/core/filters';
+import { bulkSummary, runBulk } from './inboxBulk';
 
 
 
@@ -37,6 +38,8 @@ export function useInboxPage() {
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState('');
   const [serverSearch, setServerSearch] = useState('');
@@ -250,6 +253,45 @@ export function useInboxPage() {
       if (!opts?.silent) setLoadingThreads(false);
     }
   }, [listRequest, toast]);
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }, []);
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+  useEffect(() => { setSelectedIds(new Set()); }, [listRequest]);
+
+  const runBulkAction = useCallback(async (action: 'read' | 'done' | 'open' | 'archive' | 'label', labelId?: string) => {
+    const byId = new Map(threads.map((t) => [t.id, t]));
+    const onThread = (id: string) => (byId.get(id)?.assignees ?? []).some((a) => a.user_id === myUserId);
+    const ids = action === 'read' ? [...selectedIds].filter(onThread) : [...selectedIds];
+    const skipped = selectedIds.size - ids.length;
+    if (bulkBusy || !selectedIds.size) return;
+    if (!ids.length) {
+      toast({ title: 'Nothing to mark read', description: 'You are not on any of these conversations, so they have no read state for you.' });
+      return;
+    }
+    setBulkBusy(true);
+    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Archived', label: 'Labelled' } as const;
+    try {
+      const r = await runBulk(ids, (id) => {
+        if (action === 'read') return inboxApi.markRead(id);
+        if (action === 'done') return inboxApi.setStatus(id, 'closed');
+        if (action === 'open') return inboxApi.setStatus(id, 'open');
+        if (action === 'archive') return inboxApi.archiveThread(id);
+        const current = (byId.get(id)?.labels ?? []).map((l) => l.id);
+        return current.includes(labelId as string) ? Promise.resolve() : inboxApi.setThreadLabels(id, [...current, labelId as string]);
+      });
+      const summary = bulkSummary(verbs[action], r);
+      const skipNote = skipped ? `${skipped} skipped: you are not on them.` : undefined;
+      toast({
+        title: summary.title,
+        description: [summary.description, skipNote].filter(Boolean).join(' ') || undefined,
+        variant: summary.failed ? 'destructive' : undefined,
+      });
+      setSelectedIds(new Set(r.failed.map((f) => f.id)));
+      await loadThreads({ silent: true });
+    } finally { setBulkBusy(false); }
+  }, [selectedIds, bulkBusy, threads, myUserId, toast, loadThreads]);
 
   const loadMoreThreads = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -858,6 +900,12 @@ export function useInboxPage() {
     nextCursor,
     loadingMore,
     loadMoreThreads,
+    selectedIds,
+    toggleSelected,
+    clearSelection,
+    setSelectedIds,
+    runBulkAction,
+    bulkBusy,
     unreadOnly,
     setUnreadOnly,
     setLabelFilter,
