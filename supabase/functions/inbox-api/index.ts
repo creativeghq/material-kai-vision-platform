@@ -1144,6 +1144,32 @@ async function resumeStoredMessage(
 }
 
 /** Persist a message, bump the thread, fan out the channel relay + the in-app bell. */
+const EMAIL_ATTACHMENT_LIMIT_BYTES = 25 * 1024 * 1024;
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
+/** Reads a message's stored files for an email send; refuses rather than send a reply short of a file. */
+async function emailAttachmentsFor(db: DbClient, attachments: Attachment[]): Promise<Array<{ filename: string; content: string }>> {
+  const out: Array<{ filename: string; content: string }> = [];
+  let total = 0;
+  for (const att of attachments) {
+    const name = att.name || att.storage_object_path.split('/').pop() || 'attachment';
+    const { data, error } = await db.storage.from(att.storage_bucket || ATTACHMENT_BUCKET).download(att.storage_object_path);
+    if (error || !data) throw new HttpError(502, `Message stored but NOT delivered: "${name}" could not be read to attach.`);
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    total += bytes.length;
+    if (total > EMAIL_ATTACHMENT_LIMIT_BYTES) {
+      throw new HttpError(413, 'Message stored but NOT delivered: attachments exceed 25 MB for one email.');
+    }
+    out.push({ filename: name, content: bytesToBase64(bytes) });
+  }
+  return out;
+}
+
 async function insertMessageAndNotify(
   db: DbClient,
   opts: {
@@ -1309,7 +1335,8 @@ async function insertMessageAndNotify(
   // own bubble, the composer clears — and the customer is never sent anything. Same failure the
   // WhatsApp branch above was fixed for, so it is built the same way: send, CHECK the result, and
   // fail loudly rather than leave a delivered-looking message that never left.
-  if (thread.channel === 'email' && (messageType === 'text' || messageType === 'agent') && (body || cards.length)) {
+  if (thread.channel === 'email' && (messageType === 'text' || messageType === 'agent')
+      && (body || cards.length || attachments.length > 0)) {
     const meta = (thread.metadata as Json) || {};
     const toAddress = String(meta.email_from || '');
     const ourMailbox = String(meta.email_to || '');
@@ -1360,6 +1387,10 @@ async function insertMessageAndNotify(
 
       const subjectBase = String(thread.subject || 'Your message');
       const subject = /^re:/i.test(subjectBase) ? subjectBase : `Re: ${subjectBase}`;
+      const emailAttachments = await emailAttachmentsFor(db, attachments);
+      const text = cards.length
+        ? buildEmailCardsText(cards, body)
+        : (body ?? `Attached: ${emailAttachments.map((a) => a.filename).join(', ')}`);
 
       let sendErr: string | null = null;
       try {
@@ -1378,8 +1409,9 @@ async function insertMessageAndNotify(
             // accident. With cards the HTML is built by `buildEmailCardsHtml`, which runs every
             // field — the member's text included — through the canonical escaper, and the text
             // part lists the same cards so a text-only client loses nothing.
-            text: cards.length ? buildEmailCardsText(cards, body) : body,
+            text,
             ...(cards.length ? { html: buildEmailCardsHtml(cards, body) } : {}),
+            ...(emailAttachments.length ? { attachments: emailAttachments } : {}),
             replyTo: buildReplyToAddress(ourMailbox, threadId),
             headers,
             emailType: 'agent_reply',
