@@ -33,7 +33,9 @@ const FORMAT_KEY = 'inbox.composer.formatBar';
 const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
 
 function readFormatPref(): boolean {
-  try { return localStorage.getItem(FORMAT_KEY) !== '0'; } catch { return true; }
+  let stored: string | null = null;
+  try { stored = localStorage.getItem(FORMAT_KEY); } catch { /* per-viewer convenience only */ }
+  return stored !== '0';
 }
 
 export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
