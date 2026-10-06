@@ -781,8 +781,9 @@ export const createConvertQuoteToOrderTool = (
         auth: { persistSession: false },
       });
       if (q.status !== 'accepted') {
-        const { error: accErr } = await asUser.from('quotes').update({ status: 'accepted' }).eq('id', input.quote_id);
+        const { data: accepted, error: accErr } = await asUser.from('quotes').update({ status: 'accepted' }).eq('id', input.quote_id).select('id');
         if (accErr) return JSON.stringify({ success: false, error: `Could not accept the quote: ${accErr.message}` });
+        if (!accepted?.length) return JSON.stringify({ success: false, error: 'You are not allowed to accept this quote, so no order was created.' });
       }
       const { data: orderId, error } = await asUser.rpc('generate_order_from_quote', { p_quote_id: input.quote_id });
       if (error) return JSON.stringify({ success: false, error: error.message });

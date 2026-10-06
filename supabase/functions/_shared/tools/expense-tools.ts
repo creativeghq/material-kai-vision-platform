@@ -731,9 +731,9 @@ export const createMydataExpensesTool = (
 
 // ───────────────────────────── pay_bill_via_revolut ─────────────────────────────
 
-/** Same bill + amount ⇒ same key, so a second approval of one payment replays instead of paying twice. */
-async function payoutRequestId(billId: string, amount: number): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`agent-payout:${billId}:${amount.toFixed(2)}`)));
+/** Same bill + amount + attempt ⇒ same key: a second approval replays; a payout that failed or was cancelled starts a new attempt. */
+async function payoutRequestId(billId: string, amount: number, attempt: number): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`agent-payout:${billId}:${amount.toFixed(2)}:${attempt}`)));
   const h = Array.from(digest.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
@@ -794,6 +794,15 @@ export const createPayBillViaRevolutTool = (userId: string, workspaceId: string,
       return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user\'s approval to prepare this payment. Do not retry.' });
     }
 
+    const { data: prior } = await sb.from('payout_instructions').select('state, amount')
+      .eq('workspace_id', workspaceId).eq('supplier_bill_id', bill.id);
+    const sameAmount = ((prior ?? []) as Array<{ state: string; amount: number }>).filter((p) => Math.abs(Number(p.amount) - pay) < 0.005);
+    const live = sameAmount.find((p) => !['failed', 'rejected', 'cancelled', 'declined', 'reverted'].includes(String(p.state)));
+    if (live) {
+      return JSON.stringify({ success: true, mode: 'draft', duplicate: true, state: live.state, message: `A ${pay.toFixed(2)} ${currency} payment for this bill already exists (${live.state}). Approve or cancel it in Revolut; it was not created twice.` });
+    }
+    const attempt = sameAmount.length;
+
     if (!bank.revolut_counterparty_id) {
       const cp = await callRevolut('create-counterparty', workspaceId, { crm_bank_account_id: bank.id }, jwt);
       if (!cp.ok) return JSON.stringify({ success: false, error: `Revolut refused the supplier account: ${cp.error}` });
@@ -805,13 +814,15 @@ export const createPayBillViaRevolutTool = (userId: string, workspaceId: string,
       currency,
       reference: String(bill.supplier_bill_number ?? '').slice(0, 140),
       supplier_bill_id: bill.id,
-      request_id: await payoutRequestId(bill.id, pay),
+      request_id: await payoutRequestId(bill.id, pay, attempt),
       mode: 'draft',
     }, jwt);
     if (!out.ok) return JSON.stringify({ success: false, error: out.error });
     return JSON.stringify({
       success: true, mode: 'draft', draft_id: out.data.draft_id ?? null, duplicate: out.data.duplicate ?? false,
-      message: `Draft payment of ${pay.toFixed(2)} ${currency} created in Revolut${out.data.duplicate ? ' (it already existed — not created twice)' : ''}. Approve it in the Revolut app; when it executes, the bill settles itself from the bank feed.`,
+      message: out.data.duplicate
+        ? 'This payment was already submitted (not created twice). Check Revolut for the draft.'
+        : `Draft payment of ${pay.toFixed(2)} ${currency} created in Revolut. Approve it in the Revolut app; when it executes, the bill settles itself from the bank feed.`,
     });
   }, {
     name: 'pay_bill_via_revolut',

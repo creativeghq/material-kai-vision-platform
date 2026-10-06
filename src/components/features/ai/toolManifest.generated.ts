@@ -1047,6 +1047,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'payee', type: 'string', optional: true, description: 'Override the supplier name read off the document.' },
       { name: 'paid', type: 'boolean', optional: true, description: 'Already paid (records the payment). Default false: an open payable.' },
       { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+      { name: 'scanned', type: 'object', optional: true, description: 'Do NOT set — the approval card replays the figures it showed.' },
     ],
   },
   {

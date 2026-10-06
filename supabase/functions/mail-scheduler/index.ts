@@ -175,7 +175,7 @@ async function stampSync(db: Db, accountId: string, historyId: string | null, er
 async function fireReminders(db: Db): Promise<{ fired: number; cleared: number }> {
   const now = new Date().toISOString();
   const { data, error } = await db.from('mail_thread_index')
-    .select('id, gmail_thread_id, workspace_id, remind_at, remind_note, remind_if_no_reply, remind_user_id, subject, mail_accounts!inner(id, email, display_name, status)')
+    .select('id, gmail_thread_id, workspace_id, remind_at, remind_note, remind_if_no_reply, remind_user_id, remind_set_at, subject, mail_accounts!inner(id, email, display_name, status)')
     .lte('remind_at', now).limit(BATCH);
   if (error) throw new HttpError(500, `reminder scan failed: ${error.message}`);
   let fired = 0;
@@ -191,13 +191,15 @@ async function fireReminders(db: Db): Promise<{ fired: number; cleared: number }
         const t = await gmailFetch(token, `/threads/${row.gmail_thread_id}?format=metadata&metadataHeaders=From`);
         const msgs = (t.messages ?? []) as Array<Record<string, unknown>>;
         const last = msgs[msgs.length - 1];
-        replied = !!last && parseAddress(gmailHeader(last, 'From')).address !== String(row.mail_accounts.email).toLowerCase();
+        const setAt = row.remind_set_at ? Date.parse(row.remind_set_at) : 0;
+        replied = !!last && parseAddress(gmailHeader(last, 'From')).address !== String(row.mail_accounts.email).toLowerCase()
+          && Number(last.internalDate ?? 0) > setAt;
       } catch (e) {
         console.error('[mail-scheduler] reminder check failed; reminding anyway', row.id, (e as Error).message);
       }
     }
     if (replied) { cleared++; continue; }
-    if (!row.remind_user_id) continue;
+    if (!row.remind_user_id) { console.error('[mail-scheduler] reminder with no owner dropped', row.id); continue; }
     await emitFlowEvent('inbox.follow_up_due', {
       type: 'inbox.follow_up_due',
       workspace_id: row.workspace_id,

@@ -129,14 +129,12 @@ async function verifyTrashState(token: string, threadId: string, wantTrash: bool
   }
 }
 
-/** Our own facts about a binned thread go with it, or it stays listed here after Gmail dropped it. */
+/** A binned thread must not wake or ring later; its CRM link, assignee and receipts stay so a restore loses nothing. */
 async function forgetThread(db: Db, accountId: string, threadId: string): Promise<void> {
-  const [idx, trk] = await Promise.all([
-    db.from('mail_thread_index').delete().eq('account_id', accountId).eq('gmail_thread_id', threadId),
-    db.from('mail_open_tracking').delete().eq('account_id', accountId).eq('gmail_thread_id', threadId),
-  ]);
-  if (idx.error) console.error('[gmail-api] could not clear the thread index', threadId, idx.error.message);
-  if (trk.error) console.error('[gmail-api] could not clear open tracking', threadId, trk.error.message);
+  const { error } = await db.from('mail_thread_index')
+    .update({ snoozed_until: null, remind_at: null, remind_note: null, remind_if_no_reply: false, remind_user_id: null, remind_set_at: null })
+    .eq('account_id', accountId).eq('gmail_thread_id', threadId);
+  if (error) console.error('[gmail-api] could not clear the binned thread timers', threadId, error.message);
 }
 
 Deno.serve(withApiLogging('gmail-api', async (req) => {
@@ -460,7 +458,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const threadId = String(body.thread_id ?? '');
       if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
       if (body.at == null) {
-        await upsertIndex(db, account, threadId, { remind_at: null, remind_note: null, remind_if_no_reply: false, remind_user_id: null, reminded_at: null });
+        await upsertIndex(db, account, threadId, { remind_at: null, remind_note: null, remind_if_no_reply: false, remind_user_id: null, reminded_at: null, remind_set_at: null });
         return json({ ok: true, remind_at: null });
       }
       const at = new Date(String(body.at));
@@ -470,7 +468,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       }
       await upsertIndex(db, account, threadId, {
         remind_at: at.toISOString(), remind_note: typeof body.note === 'string' ? body.note.slice(0, 500) || null : null,
-        remind_if_no_reply: body.if_no_reply === true, remind_user_id: userId, reminded_at: null,
+        remind_if_no_reply: body.if_no_reply === true, remind_user_id: userId, reminded_at: null, remind_set_at: new Date().toISOString(),
         ...(typeof body.subject === 'string' ? { subject: body.subject.slice(0, 300) } : {}),
       });
       return json({ ok: true, remind_at: at.toISOString() });

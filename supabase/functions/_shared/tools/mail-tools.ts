@@ -33,7 +33,7 @@ export type MailRef =
   | { source: 'gmail'; accountId: string; threadId: string };
 export type AttachmentRef =
   | { source: 'inbox'; threadId: string; messageId: string; index: number }
-  | { source: 'gmail'; accountId: string; messageId: string; attachmentId: string };
+  | { source: 'gmail'; accountId: string; messageId: string; index: number };
 
 /** `inbox:<thread>` or `gmail:<account>:<thread>` — the one handle every mail tool takes. */
 export function parseMailRef(ref: string): MailRef | null {
@@ -43,7 +43,7 @@ export function parseMailRef(ref: string): MailRef | null {
   return null;
 }
 
-/** `inbox:<thread>:<message>:<index>` or `gmail:<account>:<message>:<attachmentId>`. */
+/** `inbox:<thread>:<message>:<index>` or `gmail:<account>:<message>:<index>` — by position, since Gmail reissues attachment ids. */
 export function parseAttachmentRef(ref: string): AttachmentRef | null {
   const parts = String(ref ?? '').trim().split(':');
   const [src, a, b] = parts;
@@ -51,8 +51,8 @@ export function parseAttachmentRef(ref: string): AttachmentRef | null {
   if (src === 'inbox' && UUID.test(a ?? '') && UUID.test(b ?? '') && /^\d{1,3}$/.test(rest)) {
     return { source: 'inbox', threadId: a, messageId: b, index: Number(rest) };
   }
-  if (src === 'gmail' && UUID.test(a ?? '') && GMAIL_ID.test(b ?? '') && /^[A-Za-z0-9_-]{1,2000}$/.test(rest)) {
-    return { source: 'gmail', accountId: a, messageId: b, attachmentId: rest };
+  if (src === 'gmail' && UUID.test(a ?? '') && GMAIL_ID.test(b ?? '') && /^\d{1,3}$/.test(rest)) {
+    return { source: 'gmail', accountId: a, messageId: b, index: Number(rest) };
   }
   return null;
 }
@@ -97,29 +97,22 @@ async function gmailAccounts(ctx: Ctx): Promise<Array<{ id: string; email: strin
 async function fetchAttachment(ctx: Ctx, ref: AttachmentRef): Promise<{ ok: true; filename: string; mime: string; base64: string } | { ok: false; error: string }> {
   if (ref.source === 'gmail') {
     if (!ctx.isOperator) return { ok: false, error: OPERATOR_ONLY };
-    const meta = await callFn('gmail-api', 'attachment', { account_id: ref.accountId, message_id: ref.messageId, attachment_id: ref.attachmentId }, ctx.jwt);
-    if (!meta.ok) return { ok: false, error: meta.error ?? 'Could not fetch the attachment' };
-    const info = await gmailAttachmentInfo(ctx, ref);
-    return { ok: true, filename: info.filename, mime: info.mime, base64: String(meta.data?.data_base64 ?? '') };
+    const list = await callFn('gmail-api', 'message_attachments', { account_id: ref.accountId, message_id: ref.messageId }, ctx.jwt);
+    if (!list.ok) return { ok: false, error: list.error ?? 'Could not read the message' };
+    const att = ((list.data?.attachments ?? []) as Array<{ attachmentId: string; filename: string; mimeType: string }>)[ref.index];
+    if (!att) return { ok: false, error: 'No attachment at that position on that message' };
+    const bytes = await callFn('gmail-api', 'attachment', { account_id: ref.accountId, message_id: ref.messageId, attachment_id: att.attachmentId }, ctx.jwt);
+    if (!bytes.ok) return { ok: false, error: bytes.error ?? 'Could not fetch the attachment' };
+    return { ok: true, filename: att.filename || 'attachment', mime: att.mimeType || 'application/octet-stream', base64: String(bytes.data?.data_base64 ?? '') };
   }
   const r = await callFn('inbox-api', 'get_attachment', { thread_id: ref.threadId, message_id: ref.messageId, attachment_index: ref.index }, ctx.jwt);
   if (!r.ok) return { ok: false, error: r.error ?? 'Could not fetch the attachment' };
   return { ok: true, filename: String(r.data?.filename ?? 'attachment'), mime: String(r.data?.content_type ?? 'application/octet-stream'), base64: String(r.data?.data_base64 ?? '') };
 }
 
-/** Gmail's attachment endpoint returns bytes only; the name and type live on the message. */
-async function gmailAttachmentInfo(ctx: Ctx, ref: Extract<AttachmentRef, { source: 'gmail' }>): Promise<{ filename: string; mime: string }> {
-  const fallback = { filename: 'attachment', mime: 'application/octet-stream' };
-  const t = await callFn('gmail-api', 'message_attachments', { account_id: ref.accountId, message_id: ref.messageId }, ctx.jwt);
-  if (!t.ok) return fallback;
-  const att = ((t.data?.attachments ?? []) as Array<{ attachmentId: string; filename: string; mimeType: string }>)
-    .find((a) => a.attachmentId === ref.attachmentId);
-  return att ? { filename: att.filename || 'attachment', mime: att.mimeType || fallback.mime } : fallback;
-}
-
 function attachmentRefsFor(source: 'inbox' | 'gmail', scope: string, messageId: string, list: Array<Record<string, unknown>>) {
   return list.map((a, i) => ({
-    attachment_ref: source === 'gmail' ? `gmail:${scope}:${messageId}:${a.attachmentId}` : `inbox:${scope}:${messageId}:${i}`,
+    attachment_ref: `${source}:${scope}:${messageId}:${i}`,
     filename: String(a.filename ?? a.name ?? 'attachment'),
     type: String(a.mimeType ?? a.content_type ?? a.type ?? ''),
     size: Number(a.size ?? 0) || null,
@@ -216,7 +209,7 @@ export const createMailReadTool = (ctx: Ctx) =>
       });
     }
 
-    const r = await callFn('inbox-api', 'get_thread', { thread_id: r0.threadId }, ctx.jwt);
+    const r = await callFn('inbox-api', 'get_thread', { thread_id: r0.threadId, peek: true }, ctx.jwt);
     if (!r.ok) return fail(r.error ?? 'Could not read the conversation');
     const thread = r.data?.thread ?? {};
     const msgs = ((r.data?.messages ?? []) as Array<Record<string, any>>).filter((m) => m.message_type !== 'system');
@@ -265,6 +258,10 @@ export const createMailAttachmentTool = (ctx: Ctx) =>
     const db = svcClient();
     const debit = await debitExternalServiceCredits(db, ctx.userId, 'mail-attachment-read', 'mail_attachment_read', 1, { mime: file.mime, bytes, source: ref.source }, ctx.workspaceId);
     if (!debit.success) return fail(debit.error ?? 'Insufficient credits to read the attachment.');
+    const refund = (why: string) => db.rpc('refund_credits', {
+      p_user_id: ctx.userId, p_amount: debit.credits_debited, p_operation_type: 'mail_attachment_read_refund',
+      p_description: `Refund — ${why}`, p_metadata: { source: ref.source }, p_workspace_id: ctx.workspaceId,
+    }).then(() => {}, () => {});
     try {
       const block = file.mime.toLowerCase() === 'application/pdf'
         ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.base64 } }
@@ -279,15 +276,12 @@ export const createMailAttachmentTool = (ctx: Ctx) =>
         // Booked by the per-document `mail-attachment-read` debit above.
         costLoggedByCaller: true,
       });
-      if (res.stop_reason === 'refusal') return fail('The reader declined this document.');
+      if (res.stop_reason === 'refusal') { await refund('the reader declined the document'); return fail('The reader declined this document. You were not charged.'); }
       const text = (res.content ?? []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n').trim();
-      if (!text) return fail('The reader returned nothing for this document.');
+      if (!text) { await refund('the reader returned nothing'); return fail('The reader returned nothing for this document. You were not charged.'); }
       return ok({ filename: file.filename, type: file.mime, text: wrapUntrusted('attachment', text, 20000), credits_debited: debit.credits_debited });
     } catch (e) {
-      await db.rpc('refund_credits', {
-        p_user_id: ctx.userId, p_amount: debit.credits_debited, p_operation_type: 'mail_attachment_read_refund',
-        p_description: 'Refund — attachment could not be read', p_metadata: { source: ref.source }, p_workspace_id: ctx.workspaceId,
-      }).then(() => {}, () => {});
+      await refund('attachment could not be read');
       return fail(`Could not read the attachment: ${(e as Error).message}`);
     }
   }, {
@@ -317,8 +311,8 @@ async function scanBill(ctx: Ctx, file: { filename: string; mime: string; base64
 // ── mail_book_bill ───────────────────────────────────────────────────────────────────
 
 export const createMailBookBillTool = (ctx: Ctx) =>
-  tool(async ({ attachment_ref, category, payee, paid, confirm }: {
-    attachment_ref: string; category: string; payee?: string; paid?: boolean; confirm?: boolean;
+  tool(async ({ attachment_ref, category, payee, paid, confirm, scanned }: {
+    attachment_ref: string; category: string; payee?: string; paid?: boolean; confirm?: boolean; scanned?: Record<string, any>;
   }) => {
     const ref = parseAttachmentRef(attachment_ref);
     if (!ref) return fail('attachment_ref must be a value mail_read returned.');
@@ -328,22 +322,38 @@ export const createMailBookBillTool = (ctx: Ctx) =>
     if (denied) return denied;
     const file = await fetchAttachment(ctx, ref);
     if (!file.ok) return fail(file.error);
-    const scan = await scanBill(ctx, file);
-    if (!scan.ok) return fail(scan.error);
-    const f = scan.fields;
+    // The approval card replays the figures it showed, so the bill books exactly what was approved and is scanned (and charged) once.
+    let f: Record<string, any>;
+    if (confirm === true && scanned && Number(scanned.total_gross) > 0) {
+      f = scanned;
+    } else {
+      const scan = await scanBill(ctx, file);
+      if (!scan.ok) return fail(scan.error);
+      f = scan.fields;
+    }
     const total = Number(f.total_gross ?? 0);
     const supplier = (payee ?? f.vendor ?? '').trim();
     if (!(total > 0)) return fail('No total could be read off this document; book it by hand with record_expense.');
     if (!supplier) return fail('No supplier name could be read; pass payee.');
 
     if (confirm !== true) {
-      return ask(ctx, 'mail_book_bill', { attachment_ref, category, payee: supplier, paid: !!paid },
+      const approved = {
+        total_gross: total, vat_amount: f.vat_amount ?? null, currency: f.currency ?? null, doc_date: f.doc_date ?? null,
+        document_number: f.document_number ?? null, vendor: supplier, foots: f.foots ?? null, confidence: f.confidence ?? null,
+      };
+      return ask(ctx, 'mail_book_bill', { attachment_ref, category, payee: supplier, paid: !!paid, scanned: approved },
         `Book ${total} ${f.currency ?? 'EUR'} from ${supplier} as a supplier bill?`,
         `${file.filename}: invoice ${f.document_number ?? '—'} dated ${f.doc_date ?? '—'}, VAT ${f.vat_amount ?? '—'}, category ${category}${paid ? ', marked paid' : ', left open in Payables'}. The file is attached to the bill.`
           + (f.foots === false ? ' Warning: the printed net + VAT do not add up to the printed total.' : ''),
         false);
     }
 
+    if (f.document_number) {
+      const { data: dup } = await svcClient().from('supplier_bills').select('id, total')
+        .eq('workspace_id', ctx.workspaceId).eq('supplier_bill_number', String(f.document_number).slice(0, 60)).limit(5);
+      const same = ((dup ?? []) as Array<{ id: string; total: number }>).find((b) => Math.abs(Number(b.total) - total) < 0.01);
+      if (same) return JSON.stringify({ success: true, already_booked: true, bill_id: same.id, message: `Invoice ${f.document_number} (${total}) is already booked as a bill. Not booked again.` });
+    }
     const result = JSON.parse(await recordExpense(ctx.userId, ctx.workspaceId, {
       amount: total, category, payee: supplier, vat_amount: f.vat_amount ?? undefined, currency: f.currency ?? undefined,
       expense_date: f.doc_date ?? undefined, paid: !!paid, bill_number: f.document_number ?? undefined,
@@ -374,8 +384,16 @@ export const createMailBookBillTool = (ctx: Ctx) =>
       payee: z.string().optional().describe('Override the supplier name read off the document.'),
       paid: z.boolean().optional().describe('Already paid (records the payment). Default false: an open payable.'),
       confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
+      scanned: z.record(z.any()).optional().describe('Do NOT set — the approval card replays the figures it showed.'),
     }),
   });
+
+/** Same thread + same text ⇒ same token, so inbox-api resumes a retried send instead of storing a second message. */
+async function replyToken(threadId: string, body: string): Promise<string> {
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`agent-reply:${threadId}:${body.trim()}`)));
+  const h = Array.from(d.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
 
 // ── mail_reply ───────────────────────────────────────────────────────────────────────
 
@@ -394,6 +412,10 @@ export const createMailReplyTool = (ctx: Ctx) =>
       const msgs = (t.data?.messages ?? []) as Array<Record<string, any>>;
       const last = [...msgs].reverse().find((m) => String(m.from?.address ?? '').toLowerCase() !== me) ?? msgs[msgs.length - 1];
       if (!last) return fail('That thread has no message to answer.');
+      const norm = (x: unknown) => String(x ?? '').replace(/\s+/g, ' ').trim();
+      if (confirm === true && msgs.some((m) => String(m.from?.address ?? '').toLowerCase() === me && norm(m.text).startsWith(norm(body).slice(0, 200)))) {
+        return JSON.stringify({ success: true, sent: true, already_sent: true, message: 'This reply is already in the thread. Not sent again.' });
+      }
       const to = [String(last.reply_to || last.from?.address || '')].filter(Boolean);
       const cc = reply_all
         ? [...new Set([...(last.to ?? []), ...(last.cc ?? [])].map((a: any) => String(a.address ?? '').toLowerCase()).filter((a: string) => a && a !== me && !to.includes(a)))]
@@ -410,7 +432,7 @@ export const createMailReplyTool = (ctx: Ctx) =>
     if (confirm !== true) {
       return ask(ctx, 'mail_reply', { ref, body, reply_all: !!reply_all }, 'Send this reply to the customer?', `"${body.slice(0, 300)}" — they receive it immediately on the conversation's channel.`);
     }
-    const s = await callFn('inbox-api', 'send_message', { thread_id: r0.threadId, body, message_type: 'text' }, ctx.jwt);
+    const s = await callFn('inbox-api', 'send_message', { thread_id: r0.threadId, body, message_type: 'text', client_token: await replyToken(r0.threadId, body) }, ctx.jwt);
     return s.ok ? JSON.stringify({ success: true, sent: true, message_id: s.data?.message?.id }) : fail(s.error ?? 'Send failed');
   }, {
     name: 'mail_reply',
