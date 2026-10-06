@@ -10,6 +10,8 @@ export interface AgentTurn {
   operatorInstruction?: string;
   threadId?: string | null;
   agentId?: string;
+  /** An unattended Inbox auto-reply, which may hand the thread to a person. */
+  autoReply?: boolean;
 }
 
 export type AgentTurnResult = { ok: true; text: string } | { ok: false; status: number; error: string };
@@ -28,25 +30,37 @@ export async function runAgentTurn(turn: AgentTurn): Promise<AgentTurnResult> {
       user_id: turn.userId,
       messages: [{ role: 'user', content: turn.transcript }],
       ...(turn.operatorInstruction ? { operator_instruction: turn.operatorInstruction } : {}),
+      ...(turn.autoReply ? { inbox_auto_reply: true } : {}),
       conversation_id: null,
     }),
   });
   if (!resp.ok) return { ok: false, status: resp.status, error: (await resp.text()).slice(0, 300) };
-  return { ok: true, text: readFinalText(await resp.text()) };
+  const final = readFinalResult(await resp.text());
+  if (final.failed) return { ok: false, status: 503, error: final.text.slice(0, 300) || 'agent-chat returned no final result' };
+  return { ok: true, text: final.text };
 }
 
-/** The final answer in agent-chat's NDJSON stream; empty when the turn produced none. */
-export function readFinalText(raw: string): string {
+/**
+ * The final answer in agent-chat's NDJSON stream. A failed turn still streams 200 with its
+ * operator-facing error as `text` ("the provider account is out of credit"), so `failed` must be
+ * checked before the text is ever used as a reply to anyone.
+ */
+export function readFinalResult(raw: string): { text: string; failed: boolean } {
   let text = '';
+  let failed = true;
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const chunk = JSON.parse(trimmed) as { type?: string; text?: string };
-      if (chunk.type === 'final_result') text = String(chunk.text || '');
+      const chunk = JSON.parse(trimmed) as { type?: string; text?: string; failed?: boolean; error?: boolean };
+      if (chunk.type === 'final_result') {
+        text = String(chunk.text || '');
+        failed = chunk.failed === true || chunk.error === true;
+      }
     } catch {
       continue;
     }
   }
-  return text.trim();
+  // No final_result at all is a cut stream, not a considered silence.
+  return { text: text.trim(), failed };
 }

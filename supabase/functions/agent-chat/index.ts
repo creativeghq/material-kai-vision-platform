@@ -1573,6 +1573,8 @@ async function executeAgent(
   /** Aborted when the client disconnects (#352 A16). Checked between steps by the graph. */
   abortSignal?: AbortSignal,
   clientTimezone?: string | null,
+  /** An unattended Inbox auto-reply: binds the handoff tool. Secret-level callers only. */
+  inboxAutoReply = false,
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -1667,6 +1669,8 @@ async function executeAgent(
   // is not representable in anything the customer can type.
   let customerAccountScope: { workspaceId: string; contactId: string; companyId: string | null; publicAppUrl: string } | null = null;
   let customerPublicThread = false;
+  let customerThreadFactsBlock = '';
+  let customerThreadWorkspace: string | null = null;
   if (forCustomer && customerThreadId) {
     try {
       const { data: threadRow } = await supabase
@@ -1689,6 +1693,50 @@ async function executeAgent(
       // tools answer about the same party the member sees.
       const { threadCustomerParty } = await import('../_shared/inbox-customer-party.ts');
       const party = await threadCustomerParty(supabase, customerThreadId);
+      customerThreadWorkspace = threadWorkspace;
+
+      try {
+        const { formatThreadFacts } = await import('../_shared/inbox-conversation.ts');
+        const partyOr = [party.contactId && `customer_contact_id.eq.${party.contactId}`, party.companyId && `customer_company_id.eq.${party.companyId}`]
+          .filter(Boolean).join(',');
+        const [{ data: firstMsg }, { data: contactRow }, { data: companyRow }, { data: quoted }, { data: invoiced }] = await Promise.all([
+          supabase.from('inbox_messages').select('sender_participant_id, metadata')
+            .eq('thread_id', customerThreadId).in('message_type', ['text', 'agent']).is('deleted_at', null)
+            .order('created_at', { ascending: true }).limit(1).maybeSingle(),
+          party.contactId
+            ? supabase.from('crm_contacts').select('is_supplier').eq('id', party.contactId).maybeSingle()
+            : Promise.resolve({ data: null }),
+          party.companyId
+            ? supabase.from('crm_companies').select('is_supplier').eq('id', party.companyId).maybeSingle()
+            : Promise.resolve({ data: null }),
+          partyOr
+            ? supabase.from('quotes').select('id').eq('workspace_id', threadWorkspace).or(partyOr).limit(1).maybeSingle()
+            : Promise.resolve({ data: null }),
+          partyOr
+            ? supabase.from('invoices').select('id').eq('workspace_id', threadWorkspace).or(partyOr).limit(1).maybeSingle()
+            : Promise.resolve({ data: null }),
+        ]);
+        const first = firstMsg as { sender_participant_id?: string | null; metadata?: { direction?: string } | null } | null;
+        let firstSenderType: string | null = null;
+        if (first?.sender_participant_id) {
+          const { data: sp } = await supabase.from('inbox_participants')
+            .select('participant_type').eq('id', first.sender_participant_id).maybeSingle();
+          firstSenderType = (sp as { participant_type?: string } | null)?.participant_type ?? null;
+        }
+        const dir = first?.metadata?.direction;
+        // `is_client` defaults TRUE on every contact, so only an explicit supplier flag or a real quote or invoice counts.
+        customerThreadFactsBlock = formatThreadFacts({
+          channel: t.channel || 'unknown',
+          openedBy: !first ? 'unknown'
+            : (firstSenderType === 'member' || firstSenderType === 'agent' || dir === 'outgoing') ? 'us'
+            : (firstSenderType === 'customer' || dir === 'incoming') ? 'them' : 'unknown',
+          counterparty: (contactRow as { is_supplier?: boolean } | null)?.is_supplier || (companyRow as { is_supplier?: boolean } | null)?.is_supplier
+            ? 'supplier'
+            : quoted || invoiced ? 'customer' : 'unknown',
+        });
+      } catch (factsErr) {
+        console.warn('[agent-chat] thread facts unavailable:', factsErr instanceof Error ? factsErr.message : factsErr);
+      }
 
       // Withheld entirely on a public thread. Refusing in the prompt is not enough while the tool
       // is still callable — a balance is one sentence away from being published under a post.
@@ -1897,6 +1945,7 @@ async function executeAgent(
       );
     }
     systemPrompt += customerAudienceGuardrails({ publicThread: customerPublicThread });
+    systemPrompt += customerThreadFactsBlock;
   }
 
   // Situational context and long-term memory are independent lookups, fetched concurrently.
@@ -3295,6 +3344,16 @@ async function executeAgent(
     }
   }
 
+  // Only on an unattended auto-reply: on a member's "Draft with AI" the member IS the person.
+  if (forCustomer && customerThreadId && customerThreadWorkspace && inboxAutoReply) {
+    try {
+      const { createInboxHandoffTool } = await import('../_shared/inbox-handoff.ts');
+      mergeTools([createInboxHandoffTool(supabase, { workspaceId: customerThreadWorkspace, threadId: customerThreadId })] as any[]);
+    } catch (handoffErr) {
+      console.warn('⚠️ Could not register the inbox handoff tool:', handoffErr);
+    }
+  }
+
   // Startup registration — build the initially-selected toolset on the live list.
   mergeTools(await registerTools(new Set(config.tools)));
 
@@ -3900,7 +3959,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Initialize runtime on first real request (not OPTIONS)
     await initRuntime();
 
-    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null, client_context: bodyClientContext = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null, client_context: bodyClientContext = null, inbox_auto_reply: bodyInboxAutoReply = false } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -4362,6 +4421,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               customerThreadId, // scopes the account tools — read from the THREAD, never the message
               abortController.signal, // fires when the client goes away (#352 A16)
               typeof bodyClientContext?.timezone === 'string' ? bodyClientContext.timezone : null,
+              audience === 'customer' && bodyInboxAutoReply === true,
             );
             if (finalResult) {
             }

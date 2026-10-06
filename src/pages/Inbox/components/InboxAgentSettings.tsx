@@ -76,7 +76,8 @@ export const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ wo
                       under the business's name and a sent message cannot be unsent. */}
                   <div className="text-xs text-muted-foreground">
                     The assistant answers first, on its own, on every new customer conversation —
-                    including WhatsApp numbers and social DMs. Off unless you turn it on.
+                    WhatsApp, social DMs, and email to addresses that have “Assistant answers email”
+                    on. Off unless you turn it on.
                   </div>
                 </div>
                 <Switch
@@ -257,7 +258,8 @@ export const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ works
             <div>
               <Label className="text-sm">Assistant answers email</Label>
               <div className="text-xs text-muted-foreground">
-                Replies to mail sent here without waiting for you.
+                Answers new mail sent here without waiting for you, when the workspace’s
+                auto-respond is on. Any single conversation can also be handed to it from its menu.
               </div>
             </div>
             <Switch checked={address.auto_reply_enabled} onCheckedChange={toggleAutoReply} />

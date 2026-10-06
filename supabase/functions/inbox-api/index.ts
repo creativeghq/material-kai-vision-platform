@@ -70,6 +70,7 @@ import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { escapeLike } from '../_shared/searchFold.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
+import { handoffSince, stripQuotedEmail, TRANSCRIPT_MESSAGE_MAX } from '../_shared/inbox-conversation.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
 import { withTrackingPixel } from '../_shared/mail-tracking.ts';
@@ -323,12 +324,9 @@ async function workspaceOwner(db: DbClient, workspaceId: string): Promise<string
 
 type InboxAgentSettings = { autoRespond: boolean; allowAccountData: boolean };
 
-/**
- * Per-workspace inbox-agent config at `workspaces.settings.inbox_agent`. Both default ON so the
- * assistant works platform-wide out of the box: `auto_respond` makes it first-respond on new
- * customer threads, `allow_account_data` lets it answer the customer's OWN account/billing
- * questions. A workspace opts out by setting either to `false`.
- */
+const AGENT_NO_CREDITS = 'agent_no_credits';
+
+/** Per-workspace inbox-agent config: `auto_respond` defaults OFF, `allow_account_data` ON. */
 async function inboxAgentSettings(db: DbClient, workspaceId: string): Promise<InboxAgentSettings> {
   // Delegated, not restated. This was the fourth hand-written copy of `auto_respond !== false`
   // and they have to agree: the WhatsApp webhook decides whether a thread is BORN handed to the
@@ -439,7 +437,7 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
     // Recent conversation (exclude private notes), newest first — used for the guard and transcript.
     const { data: history } = await db
       .from('inbox_messages')
-      .select('body, message_type, sender_participant_id, metadata')
+      .select('body, message_type, sender_participant_id, metadata, created_at')
       .eq('thread_id', threadId)
       .is('deleted_at', null)
       .neq('message_type', 'note')
@@ -447,6 +445,7 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
       .limit(20);
     const rows = (history || []) as Array<{
       body: string | null; message_type: string; sender_participant_id: string | null; metadata: Json | null;
+      created_at: string;
     }>;
 
     // Loop / human-takeover guard: only answer when the most recent message is a fresh inbound
@@ -477,7 +476,29 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
     try {
       replyText = await buildAgentDraft(db, thread, { userId: owner, task: 'inbox_agent_reply' });
     } catch (draftErr) {
+      // Visible to the team (a system row is never relayed), so a dead assistant is not mistaken for a quiet one.
+      const reason = draftErr instanceof Error ? draftErr.message : String(draftErr);
+      const { error: noteErr } = await db.from('inbox_messages').insert({
+        thread_id: threadId,
+        message_type: 'system',
+        body: reason.startsWith(AGENT_NO_CREDITS)
+          ? 'The assistant could not answer this message (not enough credits) — it needs a person.'
+          : 'The assistant could not answer this message — it needs a person.',
+        metadata: { agent_reply_error: reason.slice(0, 300) },
+      });
+      if (noteErr) console.error('[inbox-api] could not record the failed agent reply:', noteErr.message);
       throw draftErr;
+    }
+
+    // A member may have taken over, or the turn handed off, while it ran. Once the thread is not
+    // `active`, only this turn's own handoff with send_reply=true lets the text out.
+    const fresh = await getThreadOrThrow(db, threadId);
+    if (fresh.agent_state !== 'active') {
+      const { data: since } = await db.from('inbox_messages')
+        .select('message_type, created_at, metadata')
+        .eq('thread_id', threadId).eq('message_type', 'system').gte('created_at', latest.created_at);
+      const handoff = handoffSince((since || []) as Array<{ message_type: string; created_at: string; metadata: unknown }>, latest.created_at);
+      if (!handoff?.send_reply) return;
     }
     if (!replyText) return;
 
@@ -566,7 +587,15 @@ async function buildTranscript(
   };
 
   return rows.slice().reverse().map((m) => {
-    const raw = (m.body || '').trim();
+    const meta = (m.metadata || {}) as { channel?: string; direction?: string };
+    let raw = (m.body || '').trim();
+    let quotedNote = '';
+    if (meta.channel === 'email' && meta.direction === 'incoming') {
+      const stripped = stripQuotedEmail(raw);
+      raw = stripped.text;
+      if (stripped.quoted) quotedNote = ' [earlier messages they quoted are omitted]';
+    }
+    if (raw.length > TRANSCRIPT_MESSAGE_MAX) raw = `${raw.slice(0, TRANSCRIPT_MESSAGE_MAX)} [… cut, message continues]`;
     const cards = offered(m.metadata);
     let body = raw;
     if (!raw) {
@@ -575,7 +604,7 @@ async function buildTranscript(
       body = '[sent a file or media that did not reach us in a readable form — these are NOT their '
         + 'words, so do not quote them back or argue about them]';
     }
-    return `${speaker(m)}: ${body}${cards}${files(m.attachments)}`;
+    return `${speaker(m)}: ${body}${quotedNote}${cards}${files(m.attachments)}`;
   }).join('\n');
 }
 
@@ -618,8 +647,11 @@ async function buildAgentDraft(
     body: string | null; message_type: string; attachments: Json | null; sender_participant_id: string | null;
     metadata: Json | null;
   }>;
-  const transcript = await buildTranscript(db, threadId, rows);
-  if (!transcript.trim()) return '';
+  const messages = await buildTranscript(db, threadId, rows);
+  if (!messages.trim()) return '';
+  const transcript = thread.channel === 'email' && thread.subject
+    ? `Subject: ${String(thread.subject).slice(0, 200)}\n${messages}`
+    : messages;
 
   /** Tell the assistant how this customer sounds, using the SAME reading the drawer shows. */
   let agentInput = transcript;
@@ -668,11 +700,13 @@ async function buildAgentDraft(
     userId: billedTo.userId ?? null,
     transcript: agentInput,
     operatorInstruction: billedTo.operatorInstruction,
+    autoReply: billedTo.task === 'inbox_agent_reply',
   });
   if (!turn.ok) {
     // 402 is the credit gate: leave it for a human, which the caller reads from an empty draft.
     if (turn.status === 402) {
       console.log(`[inbox-api] agent reply skipped on ${threadId}: insufficient credits`);
+      if (billedTo.task === 'inbox_agent_reply') throw new Error(`${AGENT_NO_CREDITS}: workspace credits exhausted`);
       return '';
     }
     throw new Error(`agent-chat ${turn.status}: ${turn.error}`);
@@ -1401,8 +1435,15 @@ async function insertMessageAndNotify(
       const ourMessageId = buildOutboundMessageId(threadId, messageId, domain);
       const headers: Record<string, string> = { 'Message-ID': `<${ourMessageId}>` };
       if (inboundId) {
+        const { data: chainRows } = await db.from('inbox_messages')
+          .select('metadata')
+          .eq('thread_id', threadId).neq('id', messageId).not('metadata->>email_message_id', 'is', null)
+          .order('created_at', { ascending: false }).limit(20);
+        const chain = ((chainRows || []) as Array<{ metadata?: { email_message_id?: string } }>)
+          .map((r) => r.metadata?.email_message_id).filter((id): id is string => !!id).reverse();
+        if (!chain.includes(inboundId)) chain.push(inboundId);
         headers['In-Reply-To'] = `<${inboundId}>`;
-        headers['References'] = `<${inboundId}>`;
+        headers['References'] = chain.map((id) => `<${id}>`).join(' ');
       }
       // An assistant-authored reply is marked as automated so a customer's autoresponder does not
       // ping-pong with ours. A finance document must NEVER carry these (guarded by

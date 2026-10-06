@@ -66,9 +66,9 @@ export function fenceCustomerMessage(rawTranscript: string): string {
     transcript,
     '<<<CUSTOMER_CONVERSATION_END>>>',
     '',
-    'Write the next reply to send to the other party. Reply with the message text only — no',
-    'preamble, no explanation of what you are about to do, no sign-off block, and never a',
-    'description of your own tool calls.',
+    'Write the next reply to send to the other party, shaped for the channel this conversation is',
+    'on. Reply with the message text only — no preamble, no explanation of what you are about to',
+    'do, and never a description of your own tool calls.',
   ].join('\n');
 }
 

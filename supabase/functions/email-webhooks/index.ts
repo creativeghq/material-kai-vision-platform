@@ -275,9 +275,10 @@ async function handleInbound(
 
     await logInbound(db, { ...logBase, outcome: 'routed_inbox', threadId });
 
-    // Hand off to the single agent/intake chokepoint, exactly as zernio-webhook-handler does.
-    // Best-effort: a failure here leaves a delivered thread for a human, never loses the mail.
-    if (autoReplyAllowed) {
+    // Hand off to the single agent/intake chokepoint, exactly as zernio-webhook-handler does. The
+    // THREAD's agent_state decides, so a conversation a member handed to the assistant is answered
+    // even when the address does not auto-engage new mail. Automated mail never reaches it.
+    if (!automated && !platformSender) {
       await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/inbox-api`, {
         method: 'POST',
         headers: {
