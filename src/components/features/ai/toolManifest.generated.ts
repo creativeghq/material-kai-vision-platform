@@ -1232,6 +1232,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'doc_id', type: 'string', optional: true, description: 'suggest_edit: the doc UUID to revise.' },
       { name: 'proposed_content', type: 'string', optional: true, description: 'suggest_edit: the full proposed markdown.' },
       { name: 'reason', type: 'string', optional: true, description: 'suggest_edit: why (optional).' },
+      { name: 'template_id', type: 'string', optional: true, description: 'create: the template (from document_templates) this doc was filled from.' },
+      { name: 'skip_template', type: 'boolean', optional: true, description: 'create: true only after the user chose not to use the matching template.' },
     ],
   },
   {

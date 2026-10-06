@@ -1,6 +1,7 @@
 /** Docs module agent tools: search_workspace_docs, manage_docs, document_templates. */
 
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../flow-events.ts';
+import { matchTemplates } from '../template-match.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -69,17 +70,45 @@ export const createDocsSearchTool = (workspaceId: string) => {
  */
 export const createManageDocsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) => {
   return tool(
-    async ({ action, title, content, category, tags, status, doc_id, proposed_content, reason }: any) => {
+    async ({ action, title, content, category, tags, status, doc_id, proposed_content, reason, template_id, skip_template }: any) => {
       try {
         if (action === 'create') {
           if (!title || !content) return JSON.stringify({ success: false, error: 'create needs title and content.' });
+          const docTags = Array.isArray(tags) ? tags.map(String) : [];
+          const cat = await resolveTemplateCategory(workspaceId);
+          if (template_id) {
+            const tpl = cat.ok
+              ? (await supabase.from('kb_docs').select('id, title')
+                .eq('id', String(template_id)).eq('workspace_id', workspaceId).eq('category_id', cat.id).maybeSingle()).data
+              : null;
+            if (!tpl) return JSON.stringify({ success: false, status: 'not_a_template', error: 'template_id is not one of our templates — call document_templates action="list".' });
+            docTags.push(`template: ${tpl.title}`);
+          } else if (!skip_template && cat.ok) {
+            const { data: kept } = await supabase.from('kb_docs').select('id, title, summary')
+              .eq('workspace_id', workspaceId).eq('category_id', cat.id).eq('status', 'published');
+            const fits = matchTemplates([title, category, ...docTags].filter(Boolean).join(' '), kept ?? []);
+            if (fits.length) {
+              const names = fits.map((t) => `"${t.title}"`).join(', ');
+              const templates = fits.map((t) => ({ template_id: t.id, title: t.title, summary: t.summary || null }));
+              onChunk?.({
+                type: 'document_templates_list', category: cat.name, templates,
+                note: `We keep a template that fits this document: ${names}.`, timestamp: Date.now(),
+              });
+              return JSON.stringify({
+                success: false, status: 'template_available', templates,
+                error: `Nothing saved yet — we keep a template that fits: ${names}. Say whether to build on it or write from scratch.`,
+                next: 'Ask the user whether to build this on the template. Yes → document_templates action="read", fill it, '
+                  + 'then create again with template_id. No → create again with skip_template=true.',
+              });
+            }
+          }
           const st = status === 'draft' ? 'draft' : 'published';
           const { data, error } = await supabase.from('workspace_docs').insert({
             workspace_id: workspaceId,
             title: String(title),
             content_markdown: String(content),
             category: category ? String(category) : null,
-            tags: Array.isArray(tags) ? tags.map(String) : [],
+            tags: docTags,
             status: st,
             created_by: userId,
             updated_by: userId,
@@ -141,7 +170,9 @@ export const createManageDocsTool = (userId: string, workspaceId: string, onChun
       name: 'manage_docs',
       description:
         "Author this workspace's internal documentation. create → write a new doc (published by default; "
-        + 'set status="draft" to keep it private). suggest_edit → propose a revision to an existing doc '
+        + 'set status="draft" to keep it private). BEFORE drafting a new doc, call document_templates action="list" and, '
+        + 'if one fits, offer to build on it; create refuses with status="template_available" when a kept template matches '
+        + 'the title and neither template_id nor skip_template is given. suggest_edit → propose a revision to an existing doc '
         + '(doc_id + proposed_content) for the owner to accept/reject. Use search_workspace_docs first to '
         + 'find the doc_id. These write to the same docs the team edits on the Docs page.',
       schema: z.object({
@@ -154,6 +185,8 @@ export const createManageDocsTool = (userId: string, workspaceId: string, onChun
         doc_id: z.string().optional().describe('suggest_edit: the doc UUID to revise.'),
         proposed_content: z.string().optional().describe('suggest_edit: the full proposed markdown.'),
         reason: z.string().optional().describe('suggest_edit: why (optional).'),
+        template_id: z.string().optional().describe('create: the template (from document_templates) this doc was filled from.'),
+        skip_template: z.boolean().optional().describe('create: true only after the user chose not to use the matching template.'),
       }),
     },
   );
@@ -269,7 +302,8 @@ export const createDocumentTemplatesTool = (workspaceId: string, onChunk?: (c: a
         + 'Use this whenever the user asks for a document we have a template for — an audit, a checklist, a report, a standard form — '
         + 'instead of writing one from memory. list → what templates exist. read → ONE template whole, plus the fields it asks you to fill '
         + '(knowledge_base_search returns ranked excerpts, which is the wrong shape for a form you have to complete end to end). '
-        + 'Fill it in, then save the result with manage_docs action="create". If the category is missing or empty, say so — never pass off an invented template as ours.',
+        + 'Also call list before writing ANY new document, and offer to build on a template that fits. '
+        + 'Fill it in, then save the result with manage_docs action="create" and its template_id. If the category is missing or empty, say so — never pass off an invented template as ours.',
       schema: z.object({
         action: z.enum(['list', 'read']).default('list').describe('list: what templates exist. read: fetch one whole to fill in.'),
         template_id: z.string().optional().describe('read: the template_id from a list result.'),

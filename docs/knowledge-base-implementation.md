@@ -378,6 +378,7 @@ through the `document_templates` tool (`_shared/tools/docs-tools.ts`), bound in 
 - `list` — the published templates in that category. **An empty category returns `status:'no_templates'`, never an empty list**, so "we keep no template for this" cannot read as "the search missed it".
 - `read` — ONE template whole, plus `fields_to_fill` (every distinct `{{placeholder}}` in the body). `knowledge_base_search` returns ranked *excerpts*, which is the wrong shape for a form that has to be completed end to end — that is why this is a separate tool rather than a search with a category filter.
 - The tool writes nothing. The finished document is saved by `manage_docs action='create'` into `workspace_docs`, so there is still one writer for team documents.
+- `manage_docs create` checks for a template first: when a kept template's title matches the new doc (`_shared/template-match.ts`), it saves nothing and returns `status:'template_available'` so the agent offers to build on it. It writes only with `template_id` (the doc is tagged `template: <title>`) or `skip_template: true` after the user declines.
 
 The category is addressed by slug, falling back to a name match on `audits%templates%`; when neither
 resolves, the tool returns `status:'category_missing'` naming where an admin creates it. Access is
