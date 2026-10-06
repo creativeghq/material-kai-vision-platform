@@ -57,6 +57,7 @@ import { statusTone } from '@/utils/statusTone';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import { getErrorMessage } from '@/core/errors/utils';
 import { cn } from '@/lib/utils';
 import {
   HubEmptyState,
@@ -243,8 +244,8 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
       // on every read, so the key was shown in full every time. It is true now (#390).
       setNewlyCreatedKey((key as { plaintextOnce?: string }).plaintextOnce ?? null);
       toast.success('API key generated. Copy it now — it won\'t be shown in full again.');
-    } catch {
-      toast.error('Failed to generate API key');
+    } catch (err) {
+      toast.error(`Failed to generate API key: ${getErrorMessage(err)}`);
     } finally {
       setGeneratingKey(false);
     }
@@ -255,8 +256,8 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
       await apiGatewayService.revokeApiKey(id);
       setApiKeys((prev) => prev.map((k) => k.id === id ? { ...k, is_active: false } : k));
       toast.success('API key revoked');
-    } catch {
-      toast.error('Failed to revoke key');
+    } catch (err) {
+      toast.error(`Failed to revoke key: ${getErrorMessage(err)}`);
     }
   };
 

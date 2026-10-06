@@ -15,6 +15,7 @@ import { ChangelogList } from './ChangelogList';
 import { ApplyForRoleCard } from './ApplyForRoleCard';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import { getErrorMessage } from '@/core/errors/utils';
 
 const stripeService = new StripeService();
 
@@ -124,8 +125,8 @@ export const SubscriptionTab: React.FC = () => {
       // every read, so the key was shown in full every time. It is true now (#390).
       setNewlyCreatedKey((key as { plaintextOnce?: string }).plaintextOnce ?? null);
       toast({ title: 'API Key Created', description: 'Copy it now — it won\'t be shown in full again.' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to generate API key.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Failed to generate API key', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setGeneratingKey(false);
     }
@@ -136,8 +137,8 @@ export const SubscriptionTab: React.FC = () => {
       await apiGatewayService.revokeApiKey(id);
       setApiKeys((prev) => prev.map((k) => k.id === id ? { ...k, is_active: false } : k));
       toast({ title: 'Key Revoked', description: 'The API key has been deactivated.' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to revoke key.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Failed to revoke key', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
