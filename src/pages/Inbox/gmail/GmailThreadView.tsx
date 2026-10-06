@@ -21,13 +21,8 @@ import { GmailThreadFacts } from './GmailThreadFacts';
 import { GmailTaskDialog } from './GmailTaskDialog';
 import { AttachmentCards, MailAvatar, PersonChip, RecipientInput, base64ToBlob } from './mailParts';
 import { AttachmentActionsProvider } from '../components/AttachmentActions';
+import { fileToAttachment } from '../composerAttachments';
 
-export async function fileToAttachment(file: File) {
-  const buf = new Uint8Array(await file.arrayBuffer());
-  let bin = '';
-  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-  return { filename: file.name, content_type: file.type || 'application/octet-stream', data_base64: btoa(bin) };
-}
 
 const stamp = (iso: string | null) => (iso ? `${formatDate(iso)} ${formatTime(iso)}` : '—');
 const who = (a: GmailAddress) => a.name || a.address || 'Unknown';

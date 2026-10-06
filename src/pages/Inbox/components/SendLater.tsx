@@ -26,23 +26,25 @@ export function sendLaterPresets(now = new Date()): Array<{ label: string; at: D
   ];
 }
 
-const stamp = (d: Date | string) => {
+export const stamp = (d: Date | string) => {
   const iso = typeof d === 'string' ? d : d.toISOString();
   return `${formatDate(iso)} ${formatTime(iso)}`;
 };
 
-export const SendLaterMenu: React.FC<{ disabled?: boolean; onPick: (at: Date) => void }> = ({ disabled, onPick }) => {
+export const SendAtPicker: React.FC<{ disabled?: boolean; onPick: (at: Date) => void; onCancel: () => void }> = ({ disabled, onPick, onCancel }) => {
   const [custom, setCustom] = useState('');
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Input type="datetime-local" value={custom} onChange={(e) => setCustom(e.target.value)} className="h-8 text-xs w-48" aria-label="Send at" />
+      <Button size="sm" variant="outline" disabled={!custom || disabled} onClick={() => { onCancel(); onPick(new Date(custom)); }}>Schedule</Button>
+      <button type="button" title="Cancel" onClick={onCancel} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+    </span>
+  );
+};
+
+export const SendLaterMenu: React.FC<{ disabled?: boolean; onPick: (at: Date) => void }> = ({ disabled, onPick }) => {
   const [customOpen, setCustomOpen] = useState(false);
-  if (customOpen) {
-    return (
-      <span className="inline-flex items-center gap-1">
-        <Input type="datetime-local" value={custom} onChange={(e) => setCustom(e.target.value)} className="h-8 text-xs w-48" aria-label="Send at" />
-        <Button size="sm" variant="outline" disabled={!custom || disabled} onClick={() => { setCustomOpen(false); onPick(new Date(custom)); }}>Schedule</Button>
-        <button type="button" title="Cancel" onClick={() => setCustomOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
-      </span>
-    );
-  }
+  if (customOpen) return <SendAtPicker disabled={disabled} onPick={onPick} onCancel={() => setCustomOpen(false)} />;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

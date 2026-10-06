@@ -21,6 +21,7 @@ import { NONE_VALUE } from '@/components/core/filters';
 import { bulkSummary, runBulk } from './inboxBulk';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { useTrackOpens, type MailOpens } from './components/OpenTracking';
+import { encodeAttachments } from './composerAttachments';
 
 
 
@@ -116,7 +117,7 @@ export function useInboxPage() {
   /** Focused after "Add text to note" fills the box — the point is to type the thought next. */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const [sending, setSending] = useState(false);
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
   /** The message being answered. WhatsApp renders it as the quoted block above our reply. */
   const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
   const [aiDrafting, setAiDrafting] = useState(false);
@@ -647,33 +648,41 @@ export function useInboxPage() {
     () => (activeThread?.channel === 'email' ? emailReplyRecipients(messages, activeThread.metadata as Record<string, unknown> | null) : null),
     [activeThread, messages],
   );
-  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); setTemplateOpen(false); setEmailPreview(false); }, [activeId]);
+  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); setTemplateOpen(false); setEmailPreview(false); setAttachments([]); }, [activeId]);
   const replyAll = useCallback(() => {
     if (!emailRecipients?.replyAllCc.length) return;
     setEmailCc((cur) => [...new Set([...splitAddresses(cur), ...emailRecipients.replyAllCc])].join(', '));
     setEmailCopiesOpen(true);
   }, [emailRecipients]);
 
-  const send = useCallback(async () => {
-    if (!activeId || (!draft.trim() && !attachment && pendingCards.length === 0)) return;
+  const resetComposer = useCallback(() => {
+    sendToken.current = null;
+    setDraft('');
+    setAttachments([]);
+    setPendingCards([]);
+    setSlashMenu(null);
+    setReplyTo(null);
+    setAiDraftShown(false);
+    setEmailCc('');
+    setEmailBcc('');
+    setEmailCopiesOpen(false);
+    setEmailPreview(false);
+  }, []);
+
+  const send = useCallback(async (): Promise<boolean> => {
+    if (!activeId || (!draft.trim() && !attachments.length && pendingCards.length === 0)) return false;
     // Re-entrancy guard, on a ref rather than the `sending` state.
-    if (sendInFlight.current) return;
+    if (sendInFlight.current) return false;
     sendInFlight.current = true;
     setSending(true);
     if (!sendToken.current) sendToken.current = crypto.randomUUID();
     try {
-      let attachments;
-      if (attachment) {
-        const buf = new Uint8Array(await attachment.arrayBuffer());
-        let bin = '';
-        for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-        attachments = [{ filename: attachment.name, content_type: attachment.type || 'application/octet-stream', data_base64: btoa(bin) }];
-      }
+      const encoded = attachments.length ? await encodeAttachments(attachments) : undefined;
       const tracked = isEmailReply && trackOpens;
       const sent = await inboxApi.sendMessage({
         thread_id: activeId,
         body: draft.trim() || undefined,
-        attachments,
+        attachments: encoded,
         message_type: isNote ? 'note' : 'text',
         // A private note quotes nothing on the platform — there is no platform message to quote.
         reply_to_message_id: !isNote && replyTo ? replyTo.id : undefined,
@@ -685,55 +694,54 @@ export function useInboxPage() {
       });
       if (tracked && sent?.message?.id) setMessageOpens((cur) => ({ ...cur, [sent.message.id]: { count: 0, first_opened_at: null, last_opened_at: null } }));
       sendToken.current = null;
-      setDraft('');
-      setAttachment(null);
-      setPendingCards([]);
-      setSlashMenu(null);
-      setReplyTo(null);
-      setAiDraftShown(false);
-      setEmailCc('');
-      setEmailBcc('');
-      setEmailCopiesOpen(false);
-      setEmailPreview(false);
+      resetComposer();
       // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
       if (!isNote && isMember && activeThread?.agent_state === 'active') {
         setActiveThread((t) => (t ? { ...t, agent_state: 'paused' } : t));
       }
+      return true;
     } catch (e) {
       toast({ title: 'Send failed', description: (e as Error).message, variant: 'destructive' });
+      return false;
     } finally {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachment, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast]);
+  }, [activeId, draft, attachments, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer]);
+
+  const sendAndClose = useCallback(async () => {
+    const threadId = activeId;
+    if (!threadId || !(await send())) return;
+    try {
+      await inboxApi.setStatus(threadId, 'closed');
+      setActiveThread((t) => (t && t.id === threadId ? { ...t, status: 'closed' } : t));
+      void loadThreads({ silent: true });
+    } catch (e) {
+      toast({ title: 'Sent, but not marked done', description: (e as Error).message, variant: 'destructive' });
+    }
+  }, [activeId, send, loadThreads, toast]);
 
   const [showScheduled, setShowScheduled] = useState(false);
   const scheduleSend = useCallback(async (sendAt: Date) => {
-    if (!activeId || isNote || (!draft.trim() && !attachment)) return;
+    if (!activeId || isNote || (!draft.trim() && !attachments.length)) return;
     if (pendingCards.length) {
       toast({ title: 'Catalog cards cannot be scheduled', description: 'Send them now, or remove them to schedule the text.', variant: 'destructive' });
       return;
     }
     setSending(true);
     try {
-      let attachments;
-      if (attachment) {
-        const buf = new Uint8Array(await attachment.arrayBuffer());
-        let bin = '';
-        for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-        attachments = [{ filename: attachment.name, content_type: attachment.type || 'application/octet-stream', data_base64: btoa(bin) }];
-      }
+      const encoded = attachments.length ? await encodeAttachments(attachments) : undefined;
       await inboxApi.scheduleMessage({
-        thread_id: activeId, send_at: sendAt.toISOString(), body: draft.trim() || undefined, attachments,
+        thread_id: activeId, send_at: sendAt.toISOString(), body: draft.trim() || undefined, attachments: encoded,
         reply_to_message_id: replyTo ? replyTo.id : undefined,
         ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc), track_opens: trackOpens } : {}),
       });
       toast({ title: 'Scheduled', description: `It goes out ${formatDate(sendAt.toISOString())} ${formatTime(sendAt.toISOString())}.` });
-      setDraft(''); setAttachment(null); setReplyTo(null); setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false);
+      resetComposer();
     } catch (e) {
       toast({ title: 'Could not schedule', description: (e as Error).message, variant: 'destructive' });
     } finally { setSending(false); }
-  }, [activeId, isNote, draft, attachment, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast]);
+  }, [activeId, isNote, draft, attachments, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   // The steer, when the member typed one, tells it WHAT the reply should do.
@@ -1057,8 +1065,8 @@ export function useInboxPage() {
     composerRef,
     sending,
     setSending,
-    attachment,
-    setAttachment,
+    attachments,
+    setAttachments,
     replyTo,
     setReplyTo,
     isEmailReply,
@@ -1114,6 +1122,8 @@ export function useInboxPage() {
     stickToBottom,
     scrollToBottom,
     send,
+    sendAndClose,
+    discardDraft: resetComposer,
     aiSuggest,
     chooseSlashCommand,
     togglePendingCard,

@@ -1,89 +1,110 @@
-import React from 'react';
-import { Send, Loader2, Paperclip, StickyNote, X, MessagesSquare, Reply, ReplyAll, Sparkles, ShoppingCart, AlertTriangle, Package, Wrench } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  Loader2, Paperclip, StickyNote, X, MessagesSquare, Reply, ReplyAll, Sparkles, ShoppingCart, AlertTriangle,
+  Package, Wrench, ChevronDown, Type, Trash2, FileText, Image as ImageIcon,
+} from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
 import { Label } from '@/components/core/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { slashCommandMatches, slashTokenAtCaret } from '../inboxSlashCommands';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { CatalogPicker, EmojiPicker, SlashCommandMenu } from './ComposerPickers';
 import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
-import { SendLaterMenu } from './SendLater';
+import { SendSplitButton } from './SendSplitButton';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
 import { useFileDrop } from '../useFileDrop';
 import { TrackOpensToggle } from './OpenTracking';
 import { RewriteMenu } from './AssistTools';
+import { addComposerFiles, composerTakesFiles } from '../composerAttachments';
+import { formatBytes } from '../gmail/mailParts';
 import { inboxApi } from '@/services/inboxApi';
 import type { InboxPageState } from '../useInboxPage';
 
+const CHANNEL_LABEL: Record<string, string> = { whatsapp: 'WhatsApp', email: 'Email', social: 'Social', internal: 'Team chat' };
+const FORMAT_KEY = 'inbox.composer.formatBar';
+const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
+
+function readFormatPref(): boolean {
+  try { return localStorage.getItem(FORMAT_KEY) !== '0'; } catch { return true; }
+}
 
 export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
   const {
-    activeId,
-    labels,
-    activeThread,
-    waWindow,
-    draft,
-    setDraft,
-    isNote,
-    setIsNote,
-    composerRef,
-    sending,
-    attachment,
-    setAttachment,
-    replyTo,
-    setReplyTo,
-    isEmailReply,
-    emailRecipients,
-    emailCc,
-    setEmailCc,
-    emailBcc,
-    setEmailBcc,
-    emailCopiesOpen,
-    trackOpens,
-    setTrackOpens,
-    setEmailCopiesOpen,
-    replyAll,
-    templateOpen,
-    setTemplateOpen,
-    scheduleSend,
-    emailPreview,
-    setEmailPreview,
-    openThread,
-    threadDisplayName,
-    aiDrafting,
-    aiDraftShown,
-    setAiDraftShown,
-    draftSteer,
-    setDraftSteer,
-    draftSteerOpen,
-    setDraftSteerOpen,
-    pendingCards,
-    setPendingCards,
-    slashMenu,
-    setSlashMenu,
-    isMember,
-    waBlocked,
-    send,
-    aiSuggest,
-    chooseSlashCommand,
-    togglePendingCard,
+    activeId, labels, activeThread, waWindow, draft, setDraft, isNote, setIsNote, composerRef, sending,
+    attachments, setAttachments, replyTo, setReplyTo, isEmailReply, emailRecipients, emailCc, setEmailCc,
+    emailBcc, setEmailBcc, emailCopiesOpen, trackOpens, setTrackOpens, setEmailCopiesOpen, replyAll,
+    templateOpen, setTemplateOpen, scheduleSend, emailPreview, setEmailPreview, openThread, threadDisplayName,
+    aiDrafting, aiDraftShown, setAiDraftShown, draftSteer, setDraftSteer, draftSteerOpen, setDraftSteerOpen,
+    pendingCards, setPendingCards, slashMenu, setSlashMenu, isMember, waBlocked, send, sendAndClose,
+    discardDraft, aiSuggest, chooseSlashCommand, togglePendingCard,
   } = s;
-  const { dragging, dropProps } = useFileDrop((files) => setAttachment(files[0]));
+  const { toast } = useToast();
+  const [formatOpen, setFormatOpen] = useState(readFormatPref);
+  const takesFiles = composerTakesFiles(activeThread.channel, isNote);
+  const addFiles = (incoming: File[]) => {
+    if (!takesFiles || !incoming.length) return;
+    const { files, refused } = addComposerFiles(attachments, incoming);
+    setAttachments(files);
+    if (refused) toast({ title: 'Some files were not attached', description: refused, variant: 'destructive' });
+  };
+  const { dragging, dropProps } = useFileDrop(addFiles);
+  useEffect(() => {
+    if (takesFiles || !attachments.length) return;
+    setAttachments([]);
+    toast({ title: 'Files removed', description: 'A social reply carries text only. Attach files to a private note instead.' });
+  }, [takesFiles, attachments.length, setAttachments, toast]);
+
+  const meta = activeThread.metadata as Record<string, unknown> | null;
+  const isPublicComment = activeThread.channel === 'social' && meta?.social_kind === 'comments';
+  // Email is written in paragraphs, so Enter is a new line there and only Mod+Enter sends.
+  const enterSends = !(activeThread.channel === 'email' && !isNote);
+  const hasContent = !!draft.trim() || attachments.length > 0 || pendingCards.length > 0;
+  const canSend = !sending && !waBlocked && hasContent;
+  const dirty = hasContent || !!replyTo;
+
+  const toggleFormat = () => {
+    if (formatOpen) setEmailPreview(false);
+    setFormatOpen((v) => {
+      try { localStorage.setItem(FORMAT_KEY, v ? '0' : '1'); } catch { /* per-viewer convenience only */ }
+      return !v;
+    });
+  };
+  const discard = () => {
+    if (draft.trim().length > 80 && !window.confirm('Discard this reply? The text will be lost.')) return;
+    discardDraft();
+    composerRef.current?.focus();
+  };
+  const toNote = () => { setIsNote(true); setPendingCards([]); setSlashMenu(null); };
+
+  const recipient = isNote
+    ? <span className="text-warning">Only your team sees this</span>
+    : isEmailReply && emailRecipients
+      ? (
+        <span className="min-w-0 truncate">
+          <span className="text-muted-foreground">To </span>
+          <span className="font-medium text-foreground">{emailRecipients.to || '—'}</span>
+          {emailRecipients.from && <span className="text-muted-foreground"> · from {emailRecipients.from}</span>}
+        </span>
+      )
+      : (
+        <span className="min-w-0 truncate text-muted-foreground">
+          to <span className="font-medium text-foreground">{threadDisplayName(activeThread)}</span>
+          {' · '}{CHANNEL_LABEL[activeThread.channel] ?? activeThread.channel}
+        </span>
+      );
+
   return (
-    <div {...dropProps} className={`border-t border-hairline bg-surface-sunken p-3 space-y-2 shrink-0${dragging ? ' ring-2 ring-primary/40' : ''}`}>
-      {/* A comment reply is PUBLIC. Nothing else about the composer says so, and the
-          same box is used for private DMs one filter click away — an operator who
-          assumes private has already published the mistake by the time they find out. */}
-      {activeThread.channel === 'social'
-        && (activeThread.metadata as Record<string, unknown> | null)?.social_kind === 'comments'
-        && !isNote && (
+    <div {...dropProps} className="border-t border-hairline bg-surface-sunken p-3 space-y-2 shrink-0">
+      {isPublicComment && !isNote && (
         <div className="text-xs bg-pink-500/10 dark:bg-pink-500/15 border border-pink-500/25 dark:border-pink-500/30 text-pink-700 dark:text-pink-300 rounded-sm px-3 py-2 flex items-start gap-1.5">
           <MessagesSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
-            This posts publicly as a reply under your {String((activeThread.metadata as Record<string, unknown> | null)?.platform ?? 'social')} post,
+            This posts publicly as a reply under your {String(meta?.platform ?? 'social')} post,
             visible to everyone. Keep order details and personal information out of it.
           </span>
         </div>
@@ -91,14 +112,6 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
 
       {activeThread.channel === 'whatsapp' && waWindow && !waWindow.open && !isNote && (
         <div className="text-xs bg-[hsl(var(--warning-bg))] border border-warning/25 text-warning rounded-sm px-3 py-2">
-          {/*
-            * SAY WHAT THIS IS BASED ON, AND WHAT STILL WORKS.
-            * The old copy asserted "the 24-hour reply window has closed" and stopped
-            * there. The operator who reported this had sent a message from their
-            * handset twenty minutes earlier and watched it get read, so the banner read
-            * as flatly false — and the reason it is not is an asymmetry nothing on
-            * screen mentioned.
-            */}
           {waWindow.last_inbound_at ? (
             <>
               WhatsApp 24-hour reply window has closed — this customer last wrote on{' '}
@@ -136,47 +149,209 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
           onSent={() => { setTemplateOpen(false); openThread(activeId); }}
         />
       )}
-      {isMember && (
-        <div className="flex items-center gap-2">
-          {/* Reply / Private note is a MODE, not an action, so it is a segmented
-              control rather than two filled buttons — the composer already has one
-              solid button and it is Send. Getting this wrong publishes an internal
-              note to a customer, so the selected mode is stated in words and the
-              note mode carries its colour through to the textarea below. */}
-          <div className="inline-flex rounded-sm border border-hairline overflow-hidden bg-card">
-            <button
-              onClick={() => setIsNote(false)}
-              aria-pressed={!isNote}
-              className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 transition-colors ${!isNote ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-surface-hover'}`}
-            >
-              <Send className="w-3 h-3" /> Reply
-            </button>
-            <button
-              // A private note relays nowhere, so it carries no cards for a customer.
-              onClick={() => { setIsNote(true); setPendingCards([]); setSlashMenu(null); }}
-              aria-pressed={isNote}
-              className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 border-l border-hairline transition-colors ${isNote ? 'bg-[hsl(var(--warning-bg))] text-warning' : 'text-muted-foreground hover:bg-surface-hover'}`}
-            >
-              <StickyNote className="w-3 h-3" /> Private note
+      {!aiDraftShown && !isNote && activeThread.agent_state === 'suggesting' && activeThread.agent_draft_error && (
+        <div className="flex items-start gap-2 text-xs bg-[hsl(var(--warning-bg))] text-warning rounded-sm px-3 py-2">
+          <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" />
+          <span>The assistant could not draft a reply here: {activeThread.agent_draft_error}</span>
+        </div>
+      )}
+      {!aiDraftShown && !isNote && activeThread.agent_draft && activeThread.agent_draft_is_current === false && (
+        <div className="flex items-start gap-2 text-xs bg-card text-muted-foreground rounded-sm px-3 py-2">
+          <Sparkles className="w-3.5 h-3.5 mt-px shrink-0" />
+          <span>A draft was written here, then they wrote again — it answered the earlier message, so it was set aside.</span>
+        </div>
+      )}
+
+      <div className={`relative rounded-sm border transition-shadow focus-within:ring-[3px] ${
+        isNote ? 'border-warning/40 bg-[hsl(var(--warning-bg))] focus-within:ring-warning/20' : 'border-hairline bg-card focus-within:border-primary focus-within:ring-primary/20'
+      }${dragging && takesFiles ? ' ring-2 ring-primary/40' : ''}`}>
+        {dragging && takesFiles && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-card/90 text-sm text-primary pointer-events-none">
+            <Paperclip className="w-4 h-4 mr-1.5" /> Drop files to attach
+          </div>
+        )}
+
+        {/* Reply vs note is stated in words: sending a note to a customer is the costly mistake here. */}
+        {isMember && (
+          <div className="flex items-center gap-2 px-2 py-1.5 border-b border-hairline text-xs">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className={`inline-flex items-center gap-1 rounded-sm px-1.5 py-1 font-semibold hover:bg-surface-hover ${isNote ? 'text-warning' : 'text-foreground'}`}>
+                  {isNote ? <StickyNote className="w-3.5 h-3.5" /> : <Reply className="w-3.5 h-3.5" />}
+                  {isNote ? 'Private note' : 'Reply'}
+                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem onSelect={() => setIsNote(false)}>
+                  <Reply className="w-4 h-4 mr-2" /> Reply
+                </DropdownMenuItem>
+                {activeThread.channel === 'email' && !!emailRecipients?.replyAllCc.length && (
+                  <DropdownMenuItem onSelect={() => { setIsNote(false); replyAll(); }} title={emailRecipients.replyAllCc.join(', ')}>
+                    <ReplyAll className="w-4 h-4 mr-2" /> Reply all ({emailRecipients.replyAllCc.length})
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={toNote}>
+                  <StickyNote className="w-4 h-4 mr-2" /> Private note
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {recipient}
+            {isEmailReply && (
+              <span className="ml-auto flex items-center gap-1.5 shrink-0">
+                <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} className="h-6" />
+                {!emailCopiesOpen && (
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setEmailCopiesOpen(true)}>Cc / Bcc</Button>
+                )}
+              </span>
+            )}
+          </div>
+        )}
+
+        {isEmailReply && emailCopiesOpen && (
+          <div className="grid grid-cols-[2.5rem_1fr] items-center gap-1.5 px-3 py-1.5 border-b border-hairline text-xs">
+            <Label htmlFor="inbox-cc" className="text-xs text-muted-foreground">Cc</Label>
+            <Input id="inbox-cc" value={emailCc} onChange={(e) => setEmailCc(e.target.value)} placeholder="name@company.com, …" className="h-7 text-xs" />
+            <Label htmlFor="inbox-bcc" className="text-xs text-muted-foreground">Bcc</Label>
+            <Input id="inbox-bcc" value={emailBcc} onChange={(e) => setEmailBcc(e.target.value)} placeholder="name@company.com, …" className="h-7 text-xs" />
+          </div>
+        )}
+
+        {aiDraftShown && !isNote && (
+          <div className="flex items-center justify-between gap-2 text-xs bg-primary/10 text-primary px-3 py-1.5 border-b border-primary/20">
+            <span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI draft — review and edit before you send.</span>
+            <button onClick={() => { setDraft(''); setAiDraftShown(false); }} className="inline-flex items-center gap-1 hover:underline shrink-0">
+              <X className="w-3 h-3" /> Reject
             </button>
           </div>
-          {!isNote && (
+        )}
+
+        {replyTo && (
+          <div className="flex items-start gap-2 mx-3 mt-2 rounded-sm border-l-2 border-primary bg-surface-sunken px-2.5 py-1.5">
+            <Reply className="w-3 h-3 mt-0.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 text-[11px]">
+              <span className="block text-muted-foreground">
+                Replying to {labels.get(replyTo.sender_participant_id ?? '')?.label ?? 'this message'}
+              </span>
+              <span className="block truncate">{replyTo.body || (replyTo.attachments?.length ? 'Attachment' : '—')}</span>
+            </span>
+            <button onClick={() => setReplyTo(null)} className="shrink-0 hover:text-foreground" title="Cancel reply">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {isEmailReply && formatOpen && (
+          <div className="px-2 pt-1.5">
+            <EmailFormatBar textareaRef={composerRef} value={draft} onChange={setDraft} preview={emailPreview} onPreview={setEmailPreview} />
+          </div>
+        )}
+
+        <div className="relative">
+          {slashMenu && isMember && activeId && (
+            <div className="absolute bottom-full left-0 mb-2 z-20 w-full max-w-md">
+              {slashMenu.mode === 'commands' ? (
+                <SlashCommandMenu query={slashMenu.query} onChoose={chooseSlashCommand} onClose={() => setSlashMenu(null)} />
+              ) : (
+                <CatalogPicker
+                  threadId={activeId}
+                  kind={slashMenu.kind}
+                  picked={pendingCards}
+                  onKind={(kind) => setSlashMenu({ mode: 'picker', kind })}
+                  onToggle={togglePendingCard}
+                  onClose={() => { setSlashMenu(null); composerRef.current?.focus(); }}
+                />
+              )}
+            </div>
+          )}
+          {isEmailReply && emailPreview ? (
+            <div className="p-3"><EmailPreview value={draft} onEdit={() => setEmailPreview(false)} /></div>
+          ) : (
+            <Textarea
+              ref={composerRef}
+              resize="none"
+              value={draft}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDraft(v);
+                // A slash command is `/product` at the START of a line under the caret; a slash anywhere else is text.
+                const tok = isMember && !isNote ? slashTokenAtCaret(v, e.target.selectionStart ?? v.length) : null;
+                if (tok) setSlashMenu({ mode: 'commands', ...tok });
+                else if (slashMenu?.mode === 'commands') setSlashMenu(null);
+              }}
+              onPaste={(e) => {
+                const files = Array.from(e.clipboardData?.files ?? []);
+                // Office copies a PNG rendition alongside the text; that is a text paste.
+                if (!files.length || !takesFiles || e.clipboardData.types.includes('text/plain')) return;
+                e.preventDefault();
+                addFiles(files);
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (slashMenu?.mode === 'commands') {
+                  if (e.key === 'Escape') { e.preventDefault(); setSlashMenu(null); return; }
+                  if (e.key === 'Enter' || e.key === 'Tab') {
+                    const first = slashCommandMatches(slashMenu.query)[0];
+                    if (first) { e.preventDefault(); chooseSlashCommand(first.kind); return; }
+                  }
+                }
+                if (e.key !== 'Enter') return;
+                const mod = e.metaKey || e.ctrlKey;
+                if (mod && e.shiftKey && isMember) { e.preventDefault(); if (canSend) void sendAndClose(); return; }
+                if (mod || (enterSends && !e.shiftKey)) { e.preventDefault(); if (canSend) void send(); }
+              }}
+              placeholder={
+                isNote ? 'Write a private note — only your team sees this…'
+                  : waBlocked ? 'Reply window closed — template required'
+                    : isMember ? 'Write a reply… type /product or /service to suggest one'
+                      : 'Type a message…'
+              }
+              className="min-h-[76px] max-h-[40vh] [field-sizing:content] border-0 bg-transparent px-3 py-2.5 hover:border-0 focus-visible:ring-0 focus-visible:border-0"
+              disabled={waBlocked}
+            />
+          )}
+        </div>
+
+        {(attachments.length > 0 || pendingCards.length > 0) && (
+          <div className="flex flex-wrap gap-1.5 px-3 pb-2">
+            {attachments.map((f, i) => (
+              <span key={`${f.name}-${f.size}-${f.lastModified}`} className="inline-flex items-center gap-1.5 rounded-sm border border-hairline bg-surface-sunken px-1.5 py-1 text-xs">
+                {f.type.startsWith('image/') ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> : <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+                <span className="max-w-[12rem] truncate">{f.name}</span>
+                <span className="text-muted-foreground tabular-nums">{formatBytes(f.size)}</span>
+                <button onClick={() => setAttachments(attachments.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-foreground" title="Remove">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            {pendingCards.map((c) => (
+              <span key={c.product_id} className="inline-flex items-center gap-1.5 rounded-sm border border-hairline bg-surface-sunken pl-1 pr-1.5 py-1 text-xs">
+                {c.image_url
+                  ? <img src={c.image_url} alt="" className="h-5 w-5 rounded-xs object-cover" />
+                  : (c.kind === 'service' ? <Wrench className="h-3.5 w-3.5 text-muted-foreground" /> : <Package className="h-3.5 w-3.5 text-muted-foreground" />)}
+                <span className="max-w-[14rem] truncate">{c.name}</span>
+                <button onClick={() => togglePendingCard(c)} className="text-muted-foreground hover:text-foreground" title="Remove">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-0.5 px-1.5 py-1.5 border-t border-hairline">
+          {isMember && !isNote && (
             <Popover open={draftSteerOpen} onOpenChange={setDraftSteerOpen}>
               <PopoverTrigger asChild>
                 <Button
-                  variant="secondary" size="sm"
+                  variant="ghost" size="sm"
                   disabled={aiDrafting || waBlocked}
                   title="Let the assistant draft a reply you can edit before sending (1 credit)"
-                  className="ml-auto h-8"
+                  className="h-8 px-2 text-xs gap-1 text-primary"
                 >
-                  {aiDrafting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1.5" />} Draft with AI
+                  {aiDrafting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Suggest reply
                 </Button>
               </PopoverTrigger>
-              {/* The steer is optional: Draft with nothing typed is the old one-click
-                  behaviour. With one, the assistant is told what the reply should DO —
-                  "offer the oak decking", "say it ships Monday" — which it otherwise
-                  cannot know from the transcript alone. */}
-              <PopoverContent align="end" className="w-80 p-3 space-y-2">
+              <PopoverContent align="start" className="w-80 p-3 space-y-2">
                 <Label htmlFor="inbox-draft-steer" className="text-xs">What should the reply do? (optional)</Label>
                 <Textarea
                   id="inbox-draft-steer"
@@ -197,134 +372,10 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
               </PopoverContent>
             </Popover>
           )}
-        </div>
-      )}
-      {/* Why there is no draft waiting. An empty composer on a `suggesting` thread is
-          indistinguishable from nobody having written in, which is the whole reason the
-          reason gets stored rather than logged. */}
-      {!aiDraftShown && !isNote && activeThread?.agent_state === 'suggesting'
-        && activeThread?.agent_draft_error && (
-        <div className="flex items-start gap-2 text-xs bg-[hsl(var(--warning-bg))] text-warning rounded-sm px-3 py-2">
-          <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" />
-          <span>The assistant could not draft a reply here: {activeThread.agent_draft_error}</span>
-        </div>
-      )}
-      {/* A draft that was overtaken by a newer customer message. It answers the previous
-          question, so it is never loaded — but vanishing without a word reads as the
-          assistant having done nothing. */}
-      {!aiDraftShown && !isNote && activeThread?.agent_draft
-        && activeThread?.agent_draft_is_current === false && (
-        <div className="flex items-start gap-2 text-xs bg-surface-sunken text-muted-foreground rounded-sm px-3 py-2">
-          <Sparkles className="w-3.5 h-3.5 mt-px shrink-0" />
-          <span>A draft was written here, then they wrote again — it answered the earlier message, so it was set aside.</span>
-        </div>
-      )}
-      {aiDraftShown && !isNote && (
-        <div className="flex items-center justify-between gap-2 text-xs bg-primary/10 border border-primary/25 text-primary rounded-sm px-3 py-2">
-          <span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI draft — review and edit before you send.</span>
-          <button onClick={() => { setDraft(''); setAiDraftShown(false); }} className="inline-flex items-center gap-1 hover:underline shrink-0">
-            <X className="w-3 h-3" /> Reject
-          </button>
-        </div>
-      )}
-      {replyTo && (
-        <div className="flex items-start gap-2 mb-2 rounded-sm border-l-2 border-primary bg-surface-sunken px-2.5 py-1.5">
-          <Reply className="w-3 h-3 mt-0.5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1 text-[11px]">
-            <span className="block text-muted-foreground">
-              Replying to {labels.get(replyTo.sender_participant_id ?? '')?.label ?? 'this message'}
-            </span>
-            <span className="block truncate">
-              {replyTo.body || (replyTo.attachments?.length ? 'Attachment' : '—')}
-            </span>
-          </span>
-          <button onClick={() => setReplyTo(null)} className="shrink-0 hover:text-foreground" title="Cancel reply">
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-      {isEmailReply && emailRecipients && (
-        <div className="space-y-1.5 text-xs">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-muted-foreground">To</span>
-            <span className="font-medium">{emailRecipients.to || '—'}</span>
-            {emailRecipients.from && <span className="text-muted-foreground">from {emailRecipients.from}</span>}
-            <span className="ml-auto flex items-center gap-2">
-              <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} className="h-6" />
-              {emailRecipients.replyAllCc.length > 0 && (
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={replyAll} title={emailRecipients.replyAllCc.join(', ')}>
-                  <ReplyAll className="h-3.5 w-3.5" /> Reply all ({emailRecipients.replyAllCc.length})
-                </Button>
-              )}
-              {!emailCopiesOpen && (
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setEmailCopiesOpen(true)}>Cc / Bcc</Button>
-              )}
-            </span>
-          </div>
-          <EmailFormatBar textareaRef={composerRef} value={draft} onChange={setDraft} preview={emailPreview} onPreview={setEmailPreview} />
-          {emailPreview && <EmailPreview value={draft} onEdit={() => setEmailPreview(false)} />}
-          {emailCopiesOpen && (
-            <div className="grid grid-cols-[2.5rem_1fr] items-center gap-1.5">
-              <Label htmlFor="inbox-cc" className="text-xs text-muted-foreground">Cc</Label>
-              <Input id="inbox-cc" value={emailCc} onChange={(e) => setEmailCc(e.target.value)} placeholder="name@company.com, …" className="h-7 text-xs" />
-              <Label htmlFor="inbox-bcc" className="text-xs text-muted-foreground">Bcc</Label>
-              <Input id="inbox-bcc" value={emailBcc} onChange={(e) => setEmailBcc(e.target.value)} placeholder="name@company.com, …" className="h-7 text-xs" />
-            </div>
-          )}
-        </div>
-      )}
-      {attachment && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Paperclip className="w-3 h-3" /> {attachment.name}
-          <button onClick={() => setAttachment(null)} className="hover:text-foreground"><X className="w-3 h-3" /></button>
-        </div>
-      )}
-      {/* The cards queued for this send. What the customer gets is resolved on send —
-          the chip shows the list price for orientation, the card shows THEIR price. */}
-      {pendingCards.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {pendingCards.map((c) => (
-            <span key={c.product_id} className="inline-flex items-center gap-1.5 rounded-sm border border-hairline bg-card pl-1 pr-1.5 py-1 text-xs">
-              {c.image_url
-                ? <img src={c.image_url} alt="" className="h-5 w-5 rounded-xs object-cover" />
-                : (c.kind === 'service' ? <Wrench className="h-3.5 w-3.5 text-muted-foreground" /> : <Package className="h-3.5 w-3.5 text-muted-foreground" />)}
-              <span className="max-w-[14rem] truncate">{c.name}</span>
-              <button onClick={() => togglePendingCard(c)} className="text-muted-foreground hover:text-foreground" title="Remove">
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="relative">
-        {/* `/product` and `/service`: the command list while the token is typed, the
-            picker once one is chosen. Anchored above the composer so it never covers
-            the words being written. */}
-        {slashMenu && isMember && activeId && (
-          <div className="absolute bottom-full left-0 mb-2 z-20 w-full max-w-md">
-            {slashMenu.mode === 'commands' ? (
-              <SlashCommandMenu query={slashMenu.query} onChoose={chooseSlashCommand} onClose={() => setSlashMenu(null)} />
-            ) : (
-              <CatalogPicker
-                threadId={activeId}
-                kind={slashMenu.kind}
-                picked={pendingCards}
-                onKind={(kind) => setSlashMenu({ mode: 'picker', kind })}
-                onToggle={togglePendingCard}
-                onClose={() => { setSlashMenu(null); composerRef.current?.focus(); }}
-              />
-            )}
-          </div>
-        )}
-        <div className="flex items-end gap-2">
-          <div className="shrink-0">
-            <EmojiPicker
-              disabled={waBlocked}
-              onPick={(e) => setDraft((d) => d + e)}
-            />
-          </div>
           {isMember && !isNote && (
-            <div className="shrink-0">
+            <>
+              <RewriteMenu text={draft} disabled={waBlocked} onReplace={setDraft}
+                run={async (mode, text) => (await inboxApi.assist(activeThread.id, mode, { text })).text} />
               <ComposerInsertMenu
                 workspaceId={activeThread.workspace_id}
                 currentText={draft}
@@ -332,65 +383,60 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 recipient={{ name: threadDisplayName(activeThread), email: emailRecipients?.to ?? null }}
                 onInsert={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))}
               />
-              <RewriteMenu text={draft} disabled={waBlocked} onReplace={setDraft}
-                run={async (mode, text) => (await inboxApi.assist(activeThread.id, mode, { text })).text} />
-            </div>
+              <span className="mx-1 h-4 w-px bg-hairline" aria-hidden />
+            </>
           )}
-          <label className="cursor-pointer p-2.5 rounded-sm hover:bg-surface-hover shrink-0">
-            <Paperclip className="w-4 h-4 text-muted-foreground" />
-            {/* `accept` names what the channel can actually carry, so the picker does not
-                offer a file the send will reject. */}
-            <input
-              type="file" className="hidden"
-              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-              onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
-            />
-          </label>
+          {isEmailReply && (
+            <button type="button" onClick={toggleFormat} aria-pressed={formatOpen} title={formatOpen ? 'Hide formatting' : 'Show formatting'}
+              className={`p-2 rounded-sm hover:bg-surface-hover ${formatOpen ? 'text-foreground bg-surface-hover' : 'text-muted-foreground'}`}>
+              <Type className="w-4 h-4" />
+            </button>
+          )}
+          <EmojiPicker disabled={waBlocked} onPick={(e) => setDraft((d) => d + e)} />
+          {takesFiles && (
+            <label className={`p-2 rounded-sm hover:bg-surface-hover ${waBlocked ? 'opacity-40 pointer-events-none' : 'cursor-pointer'}`} title="Attach files (or paste / drop them)">
+              <Paperclip className="w-4 h-4 text-muted-foreground" />
+              <input
+                type="file" multiple className="hidden"
+                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }}
+              />
+            </label>
+          )}
           {isMember && !isNote && (
             <button
               type="button"
               onClick={() => setSlashMenu((m) => (m?.mode === 'picker' ? null : { mode: 'picker', kind: 'product' }))}
               disabled={waBlocked}
-              className="p-2.5 rounded-sm hover:bg-surface-hover shrink-0 disabled:opacity-50"
+              className="p-2 rounded-sm hover:bg-surface-hover disabled:opacity-40"
               title="Suggest a product or service (or type /product, /service)"
               aria-pressed={slashMenu?.mode === 'picker'}
             >
               <ShoppingCart className="w-4 h-4 text-muted-foreground" />
             </button>
           )}
-          <Textarea
-            ref={composerRef}
-            value={draft}
-            onChange={(e) => {
-              const v = e.target.value;
-              setDraft(v);
-              // A slash command is `/`, `/pro`, `/product` at the START of a line, under
-              // the caret. A slash anywhere else is a slash (a URL, "and/or"). The token's
-              // range is kept so choosing a command removes exactly that text.
-              const tok = isMember && !isNote ? slashTokenAtCaret(v, e.target.selectionStart ?? v.length) : null;
-              if (tok) setSlashMenu({ mode: 'commands', ...tok });
-              else if (slashMenu?.mode === 'commands') setSlashMenu(null);
-            }}
-            onKeyDown={(e) => {
-              if (slashMenu?.mode === 'commands') {
-                if (e.key === 'Escape') { e.preventDefault(); setSlashMenu(null); return; }
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  const first = slashCommandMatches(slashMenu.query)[0];
-                  if (first) { e.preventDefault(); chooseSlashCommand(first.kind); return; }
-                }
-              }
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked && !sending) send(); }
-            }}
-            placeholder={isNote ? 'Write a private note (only your team sees this)…' : waBlocked ? 'Reply window closed — template required' : isMember ? 'Type a message… (/product, /service to suggest one)' : 'Type a message…'}
-            className={`flex-1 min-h-[44px] max-h-32 resize-none bg-card ${isNote ? 'border-warning/40 focus-visible:ring-warning/30' : ''}`}
-            disabled={waBlocked}
-          />
-          {isMember && !isNote && !waBlocked && (
-            <SendLaterMenu disabled={sending || (!draft.trim() && !attachment)} onPick={(d) => { void scheduleSend(d); }} />
-          )}
-          <Button className="h-9 w-9 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment && pendingCards.length === 0)}>
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </Button>
+
+          <span className="ml-auto flex items-center gap-1.5">
+            <span className="hidden xl:inline text-[11px] text-muted-foreground">
+              {enterSends ? 'Enter to send · Shift+Enter for a new line' : `${MOD_KEY}+Enter to send`}
+            </span>
+            {dirty && (
+              <button type="button" onClick={discard} title="Discard this reply"
+                className="p-2 rounded-sm text-muted-foreground hover:text-destructive hover:bg-surface-hover">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <SendSplitButton
+              label={isNote ? 'Add note' : 'Send'}
+              sending={sending}
+              disabled={!canSend}
+              modKey={MOD_KEY}
+              onSend={() => { void send(); }}
+              onSendAndClose={isMember ? () => { void sendAndClose(); } : undefined}
+              onSchedule={isMember && !isNote && !waBlocked ? (d) => { void scheduleSend(d); } : undefined}
+              scheduleBlockedReason={pendingCards.length ? 'Catalog cards cannot be scheduled — send now, or remove them first.' : null}
+            />
+          </span>
         </div>
       </div>
     </div>

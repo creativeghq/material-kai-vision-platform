@@ -866,7 +866,9 @@ async function uploadAttachment(
     };
   }
   if (!att.data_base64) throw new HttpError(400, 'attachment requires storage_object_path or data_base64');
-  const bytes = Uint8Array.from(atob(att.data_base64), (c) => c.charCodeAt(0));
+  const bin = atob(att.data_base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   const safeName = (att.filename || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `inbox/${threadId}/${crypto.randomUUID()}-${safeName}`;
   const { error } = await db.storage
@@ -888,9 +890,22 @@ async function normalizeAttachments(
   raw: unknown,
 ): Promise<Attachment[]> {
   if (!Array.isArray(raw) || raw.length === 0) return [];
-  const out: Attachment[] = [];
-  for (const a of raw) out.push(await uploadAttachment(db, threadId, a as never));
-  return out;
+  return Promise.all(raw.map((a) => uploadAttachment(db, threadId, a as never)));
+}
+
+const MAX_ATTACHMENTS = 10;
+/** ~20 MB of files once base64-encoded; the composer enforces the same ceiling. */
+const MAX_ATTACHMENT_BASE64 = 28 * 1024 * 1024;
+
+/** A social reply relays text only, so a file on one would be stored and never delivered. */
+function assertAttachmentsAllowed(thread: Record<string, unknown>, messageType: string, raw: unknown): void {
+  if (!Array.isArray(raw) || raw.length === 0) return;
+  if (raw.length > MAX_ATTACHMENTS) throw new HttpError(400, `Up to ${MAX_ATTACHMENTS} files per message.`);
+  if (thread.channel === 'social' && messageType !== 'note') {
+    throw new HttpError(400, 'A social reply carries text only. Attach files to a private note instead.');
+  }
+  const size = raw.reduce((n: number, a) => n + String((a as { data_base64?: unknown })?.data_base64 ?? '').length, 0);
+  if (size > MAX_ATTACHMENT_BASE64) throw new HttpError(413, 'Attachments exceed 20 MB for one message.');
 }
 
 /** The client's picks (a kind and a product id each) → cards the customer can be shown. */
@@ -1007,31 +1022,29 @@ async function whatsAppLegsFor(
   cards: InboxCard[],
   attachments: Attachment[],
 ): Promise<WhatsAppLeg[]> {
-  // Attachments live in a PRIVATE bucket as bucket + object path (never a persisted URL —
-  // storage convention #7), so the relay needs a freshly signed one. Zernio accepts a single
-  // attachment per message; extras stay visible in the inbox transcript.
-  let attachmentUrl: string | undefined;
-  let attachmentType: 'image' | 'video' | 'audio' | 'file' | undefined;
-  const first = attachments[0];
-  if (first?.storage_bucket && first?.storage_object_path) {
+  // Private bucket, so each file needs a freshly signed URL. Zernio carries ONE attachment per
+  // send, so every file is its own leg; the text rides on the first file WhatsApp can caption.
+  const stored = attachments.filter((att) => att?.storage_bucket && att?.storage_object_path);
+  const files: WhatsAppLeg[] = await Promise.all(stored.map(async (att) => {
     const { data: signed, error: signErr } = await db.storage
-      .from(first.storage_bucket)
-      .createSignedUrl(first.storage_object_path, 60 * 60 * 24);
+      .from(String(att.storage_bucket))
+      .createSignedUrl(String(att.storage_object_path), 60 * 60 * 24);
     if (signErr || !signed?.signedUrl) {
       throw new HttpError(502, `Message stored but its attachment could not be prepared for WhatsApp: ${signErr?.message ?? 'no signed url'}`);
     }
-    attachmentUrl = signed.signedUrl;
-    const ct = String(first.content_type || '');
-    attachmentType = ct.startsWith('image/') ? 'image'
+    const ct = String(att.content_type || '');
+    const attachmentType: WhatsAppLeg['attachmentType'] = ct.startsWith('image/') ? 'image'
       : ct.startsWith('video/') ? 'video'
       : ct.startsWith('audio/') ? 'audio'
       : 'file';
-  }
-  if (!cards.length) return [{ message: body ?? undefined, attachmentUrl, attachmentType }];
-  return [
-    ...buildWhatsAppCardMessages(cards, body),
-    ...(attachmentUrl ? [{ attachmentUrl, attachmentType }] : []),
-  ];
+    return { attachmentUrl: signed.signedUrl, attachmentType };
+  }));
+  if (cards.length) return [...buildWhatsAppCardMessages(cards, body), ...files];
+  if (!body) return files.length ? files : [{}];
+  const carrier = files.findIndex((f) => f.attachmentType !== 'audio');
+  if (carrier < 0) return [{ message: body }, ...files];
+  return files.map((f, i) => (i === carrier ? { message: body, ...f } : f))
+    .sort((x, y) => Number(!!y.message) - Number(!!x.message));
 }
 
 async function relayWhatsAppLegs(
@@ -2029,6 +2042,7 @@ async function handleJwtAction(
       if (messageType === 'note' && !access.isMember) {
         throw new HttpError(403, 'Only members may leave private notes');
       }
+      assertAttachmentsAllowed(thread, messageType, payload.attachments);
       const body = payload.body != null ? String(payload.body) : null;
       // WhatsApp: freeform replies only inside Meta's 24h service window. Notes (internal) exempt.
       // Checked FIRST — it is the cheap refusal, and everything below (uploads, card pricing) is
@@ -2146,6 +2160,7 @@ async function handleJwtAction(
       const copies = thread.channel === 'email'
         ? cleanEmailCopies({ cc: payload.email_cc, bcc: payload.email_bcc }, [])
         : { cc: [], bcc: [] };
+      assertAttachmentsAllowed(thread, 'text', payload.attachments);
       const attachments = await normalizeAttachments(db, threadId, payload.attachments);
       if (!body && attachments.length === 0) throw new HttpError(400, 'Write a message or attach a file');
       const { data, error } = await db.from('mail_scheduled_sends').insert({

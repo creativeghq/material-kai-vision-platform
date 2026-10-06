@@ -228,10 +228,11 @@ describe('one press, one message', () => {
     // send. A ref, not the `sending` state — the state read from that closure is stale, which is
     // exactly what let the second call through.
     expect(inboxPage).toMatch(/sendInFlight/);
-    expect(inboxPage).toMatch(/if \(sendInFlight\.current\) return;/);
+    expect(inboxPage).toMatch(/if \(sendInFlight\.current\) return false;/);
     expect(inboxPage).toMatch(/sendInFlight\.current = false;/);
     // And the keyboard path, which was the one with no guard at all.
-    expect(inboxPage).toMatch(/!waBlocked && !sending\) send\(\)/);
+    expect(inboxPage).toMatch(/const canSend = !sending && !waBlocked && hasContent;/);
+    expect(inboxPage).toMatch(/if \(canSend\) void send\(\)/);
   });
 });
 
