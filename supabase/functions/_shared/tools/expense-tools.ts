@@ -97,12 +97,18 @@ async function resolveFilingTarget(
 }
 
 // ───────────────────────────── record_expense ─────────────────────────────
-export const createRecordExpenseTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
-  tool(async ({ amount, category, payee, description, vat_amount, currency, expense_date, paid, trip, property }: {
-    amount: number; category: string; payee: string; description?: string;
-    vat_amount?: number; currency?: string; expense_date?: string; paid?: boolean;
-    trip?: string; property?: string;
-  }) => {
+export interface RecordExpenseArgs {
+  amount: number; category: string; payee: string; description?: string;
+  vat_amount?: number; currency?: string; expense_date?: string; paid?: boolean;
+  trip?: string; property?: string; bill_number?: string;
+}
+
+/** The one agent-side bill writer: record_expense and the mail toolkit's mail_book_bill both call it. */
+export async function recordExpense(
+  userId: string, workspaceId: string, args: RecordExpenseArgs, onChunk?: (c: any) => void,
+): Promise<string> {
+  const { amount, category, payee, description, vat_amount, currency, expense_date, paid, trip, property, bill_number } = args;
+  {
     const denied = await moduleGate(workspaceId, 'sales-finance');
     if (denied) return denied;
     try {
@@ -135,7 +141,7 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
       const billIns = await sb.from('supplier_bills').insert({
         workspace_id: workspaceId,
         supplier_company_id: pay.id,
-        supplier_bill_number: description?.trim()?.slice(0, 60) || null,
+        supplier_bill_number: bill_number?.trim()?.slice(0, 60) || description?.trim()?.slice(0, 60) || null,
         currency: cur,
         subtotal_net: net,
         vat_amount: vat,
@@ -198,7 +204,11 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
     } catch (e: any) {
       return JSON.stringify({ success: false, error: e?.message || 'Could not record expense' });
     }
-  }, {
+  }
+}
+
+export const createRecordExpenseTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
+  tool(async (args: RecordExpenseArgs) => recordExpense(userId, workspaceId, args, onChunk), {
     name: 'record_expense',
     description: 'Record a business operating expense (rent, utilities, fees…) as a categorized supplier bill. Creates the category and payee by name if they do not exist. Leave it as an open payable (default) or mark it paid. Optionally file it against an existing trip/monthly expense card or a building — those are looked up, never created. Use when the user says e.g. "record 500 euro rent to Acme for June", "log the electricity bill, paid", or "put the Athens hotel on my June expense card".',
     schema: z.object({
@@ -716,5 +726,99 @@ export const createMydataExpensesTool = (
       from: z.string().optional().describe('Earliest issue date, YYYY-MM-DD.'),
       to: z.string().optional().describe('Latest issue date, YYYY-MM-DD.'),
       limit: z.number().optional().describe('How many to return (default 25, max 200)'),
+    }),
+  });
+
+// ───────────────────────────── pay_bill_via_revolut ─────────────────────────────
+
+/** Same bill + amount ⇒ same key, so a second approval of one payment replays instead of paying twice. */
+async function payoutRequestId(billId: string, amount: number): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`agent-payout:${billId}:${amount.toFixed(2)}`)));
+  const h = Array.from(digest.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+async function callRevolut(action: string, workspaceId: string, extra: Record<string, unknown>, jwt: string | undefined) {
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/revolut-api`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt ?? ''}` },
+    body: JSON.stringify({ action, workspace_id: workspaceId, ...extra }),
+  });
+  const data = await resp.json().catch(() => ({})) as Record<string, any>;
+  return { ok: resp.ok, status: resp.status, data, error: resp.ok ? null : String(data?.error ?? `revolut-api ${resp.status}`) };
+}
+
+export const createPayBillViaRevolutTool = (userId: string, workspaceId: string, jwt: string | undefined, onChunk?: (c: any) => void) =>
+  tool(async ({ bill_id, amount, confirm }: { bill_id: string; amount?: number; confirm?: boolean }) => {
+    const denied = await moduleGate(workspaceId, 'banking-revolut');
+    if (denied) return denied;
+    if (!jwt) return JSON.stringify({ success: false, error: 'Paying through Revolut needs a signed-in user.' });
+    const sb = svc();
+    const { data: bill } = await sb.from('supplier_bills')
+      .select('id, workspace_id, supplier_bill_number, supplier_name, supplier_company_id, supplier_contact_id, amount_due, currency')
+      .eq('id', bill_id).maybeSingle();
+    if (!bill || bill.workspace_id !== workspaceId) return JSON.stringify({ success: false, error: 'No such bill in this workspace.' });
+    const due = Number(bill.amount_due ?? 0);
+    if (!(due > 0)) return JSON.stringify({ success: false, error: 'That bill has nothing left to pay.' });
+    const pay = amount != null ? Number(amount) : due;
+    if (!(pay > 0) || pay > due + 0.005) return JSON.stringify({ success: false, error: `Amount must be between 0 and the ${due.toFixed(2)} still due.` });
+    const currency = String(bill.currency ?? 'EUR').toUpperCase();
+
+    let bq = sb.from('crm_bank_accounts')
+      .select('id, bank_name, account_holder, iban, revolut_counterparty_id')
+      .eq('workspace_id', workspaceId).not('iban', 'is', null).order('is_primary', { ascending: false }).limit(1);
+    bq = bill.supplier_company_id ? bq.eq('company_id', bill.supplier_company_id) : bq.eq('contact_id', bill.supplier_contact_id ?? '00000000-0000-0000-0000-000000000000');
+    const { data: banks } = await bq;
+    const bank = (banks ?? [])[0];
+    if (!bank) return JSON.stringify({ success: false, error: `There is no IBAN on file for ${bill.supplier_name ?? 'this supplier'}. Add one on their CRM page first.` });
+
+    const acc = await callRevolut('accounts', workspaceId, {}, jwt);
+    if (!acc.ok) return JSON.stringify({ success: false, error: acc.error });
+    const pockets = (acc.data.accounts ?? []) as Array<{ id: string; currency: string; balance?: number; name?: string }>;
+    const pocket = pockets.find((p) => String(p.currency).toUpperCase() === currency);
+    if (!pocket) return JSON.stringify({ success: false, error: `No Revolut ${currency} account to pay from.` });
+
+    const iban = String(bank.iban ?? '');
+    const masked = iban.length > 8 ? `${iban.slice(0, 4)}…${iban.slice(-4)}` : iban;
+    if (confirm !== true) {
+      onChunk?.({
+        type: 'action_confirmation',
+        tool: 'pay_bill_via_revolut',
+        input: { bill_id, amount: pay },
+        title: `Prepare a ${pay.toFixed(2)} ${currency} Revolut payment?`,
+        summary: `To ${bank.account_holder || bill.supplier_name || 'the supplier'} (${masked}) for bill ${bill.supplier_bill_number ?? bill_id}. This creates a DRAFT in Revolut; the money moves only when you approve it in the Revolut app.`,
+        danger: true,
+        toolkit_id: 'expenses',
+        timestamp: Date.now(),
+      });
+      return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user\'s approval to prepare this payment. Do not retry.' });
+    }
+
+    if (!bank.revolut_counterparty_id) {
+      const cp = await callRevolut('create-counterparty', workspaceId, { crm_bank_account_id: bank.id }, jwt);
+      if (!cp.ok) return JSON.stringify({ success: false, error: `Revolut refused the supplier account: ${cp.error}` });
+    }
+    const out = await callRevolut('send-payment', workspaceId, {
+      crm_bank_account_id: bank.id,
+      source_revolut_account_id: pocket.id,
+      amount: pay,
+      currency,
+      reference: String(bill.supplier_bill_number ?? '').slice(0, 140),
+      supplier_bill_id: bill.id,
+      request_id: await payoutRequestId(bill.id, pay),
+      mode: 'draft',
+    }, jwt);
+    if (!out.ok) return JSON.stringify({ success: false, error: out.error });
+    return JSON.stringify({
+      success: true, mode: 'draft', draft_id: out.data.draft_id ?? null, duplicate: out.data.duplicate ?? false,
+      message: `Draft payment of ${pay.toFixed(2)} ${currency} created in Revolut${out.data.duplicate ? ' (it already existed — not created twice)' : ''}. Approve it in the Revolut app; when it executes, the bill settles itself from the bank feed.`,
+    });
+  }, {
+    name: 'pay_bill_via_revolut',
+    description: 'Prepare a REAL bank payment for an existing supplier bill through the workspace\'s Revolut Business account. Creates a Revolut DRAFT only (the operator approves it in the Revolut app), to the supplier\'s IBAN on file, from the Revolut account in the bill\'s currency, and asks the user to Approve first. Use after the bill exists (record_expense or mail_book_bill return its bill_id). To merely MARK a bill paid that was settled some other way, use pay_expense instead.',
+    schema: z.object({
+      bill_id: z.string().uuid().describe('The supplier bill to pay.'),
+      amount: z.number().positive().optional().describe('Pay part of it. Defaults to the full amount still due.'),
+      confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
     }),
   });

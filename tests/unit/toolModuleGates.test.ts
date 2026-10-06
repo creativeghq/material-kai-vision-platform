@@ -1,6 +1,6 @@
 /** A paid module is enforced where the tool runs, not where the nav tile is drawn (#395). */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -13,6 +13,17 @@ const manifestSrc = read('src/components/features/ai/toolManifest.generated.ts')
 const slugsIn = (src: string) =>
   new Set([...src.matchAll(/moduleSlug: '([a-z0-9-]+)'/g)].map((m) => m[1]));
 
+/** A `src/modules/<slug>` whose definition registers a nav item has a page of its own (e.g. Revolut's settings). */
+function registryModulesWithAPage(): string[] {
+  const dir = join(ROOT, 'src/modules');
+  return readdirSync(dir).filter((d) => {
+    const idx = join(dir, d, 'index.ts');
+    const man = join(dir, d, 'manifest.json');
+    return existsSync(idx) && existsSync(man) && /navItems: \[\s*\{/.test(readFileSync(idx, 'utf8'));
+  }).map((d) => String(JSON.parse(readFileSync(join(dir, d, 'manifest.json'), 'utf8')).slug ?? ''))
+    .filter(Boolean);
+}
+
 /**
  * Slugs the PAGE-gating surfaces use. The agent catalog may not invent a module: a slug no page
  * knows is either a typo or a feature with no home, and both render as "permanently unavailable".
@@ -21,6 +32,7 @@ const pageSlugs = new Set<string>([
   ...slugsIn(read('src/config/nav-items.ts')),
   ...slugsIn(read('src/config/capabilities.ts')),
   ...slugsIn(read('src/config/launcher-sections.ts')),
+  ...registryModulesWithAPage(),
 ]);
 
 /**

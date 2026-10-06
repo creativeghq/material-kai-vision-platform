@@ -744,3 +744,58 @@ export const createRaiseQuoteRequestTool = (
     },
   );
 };
+
+// ── convert_quote_to_order — the agent's half of "create an order" ────────────────────────────
+
+export const createConvertQuoteToOrderTool = (
+  userId: string,
+  workspaceId: string,
+  jwt: string | undefined,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async (input: { quote_id: string; confirm?: boolean }) => {
+      const denied = await moduleGate(workspaceId, 'quotes');
+      if (denied) return denied;
+      if (!jwt) return JSON.stringify({ success: false, error: 'Creating an order needs a signed-in user.' });
+      const sb = svcClient();
+      const { data: q } = await sb.from('quotes')
+        .select('id, workspace_id, name, quote_number, status, currency, grand_total, total_items')
+        .eq('id', input.quote_id).maybeSingle();
+      if (!q || q.workspace_id !== workspaceId) return JSON.stringify({ success: false, error: 'No such quote in this workspace.' });
+      if (input.confirm !== true) {
+        onChunk?.({
+          type: 'action_confirmation',
+          tool: 'convert_quote_to_order',
+          input: { quote_id: input.quote_id },
+          title: `Turn quote ${q.quote_number ?? q.name ?? ''} into an order?`,
+          summary: `${q.total_items ?? 0} line(s), ${q.grand_total ?? 0} ${q.currency ?? 'EUR'}. This marks the quote accepted, which creates the sales order and its draft pre-invoice, exactly as accepting it in Sales does.`,
+          danger: true,
+          toolkit_id: 'quotes',
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user\'s approval to create the order. Do not retry.' });
+      }
+      const asUser = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+        auth: { persistSession: false },
+      });
+      if (q.status !== 'accepted') {
+        const { error: accErr } = await asUser.from('quotes').update({ status: 'accepted' }).eq('id', input.quote_id);
+        if (accErr) return JSON.stringify({ success: false, error: `Could not accept the quote: ${accErr.message}` });
+      }
+      const { data: orderId, error } = await asUser.rpc('generate_order_from_quote', { p_quote_id: input.quote_id });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      if (!orderId) return JSON.stringify({ success: false, error: 'The quote was accepted but no order came back. Open it in Sales to check.' });
+      return JSON.stringify({ success: true, order_id: orderId, message: `Order created from quote ${q.quote_number ?? q.name ?? ''}.` });
+    },
+    {
+      name: 'convert_quote_to_order',
+      description: 'Turn an existing quote into a sales order (accepts it; the order and its draft pre-invoice are created by the platform). Asks the user to Approve first. This is how the agent "creates an order": build the quote with create_quote (lines from the customer\'s email, attachment or message), then convert it.',
+      schema: z.object({
+        quote_id: z.string().uuid().describe('The quote to convert (create_quote or list_my_quotes return it).'),
+        confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
+      }),
+    },
+  );
+};

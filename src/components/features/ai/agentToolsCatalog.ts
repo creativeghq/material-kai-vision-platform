@@ -238,6 +238,41 @@ const KAI_TOOLS: AgentToolEntry[] = [
 
   // ── Customer Inbox (module + entitlement gated; customer-facing reply confirm-gated) ──
   {
+    id: 'mail_search', name: 'Search mail', category: 'Mail', moduleSlug: 'inbox',
+    desc: 'Find threads across the workspace Inbox (email, WhatsApp, social) and, for the platform operator, Gmail.',
+    examples: ['Find the email from Keros about the June invoice', 'Unread emails with attachments this week'],
+  },
+  {
+    id: 'mail_read', name: 'Read a thread', category: 'Mail', moduleSlug: 'inbox',
+    desc: 'Read a found thread — senders, dates, bodies and every attached file.',
+    examples: ['Open that email and tell me what they want'],
+  },
+  {
+    id: 'mail_attachment', name: 'Read an attachment', category: 'Mail', moduleSlug: 'inbox',
+    desc: 'Transcribe a PDF, image or text attachment, or read a supplier invoice into bill fields.',
+    examples: ['What does the PDF they sent say?', 'Read the invoice attached to that email'],
+  },
+  {
+    id: 'mail_book_bill', name: 'Book bill from email', category: 'Mail', moduleSlug: 'inbox',
+    desc: 'Book an emailed supplier invoice as a bill, with the file attached (asks to Approve first).',
+    examples: ['Book the invoice from that email as a supplier bill'],
+  },
+  {
+    id: 'mail_reply', name: 'Reply to mail', category: 'Mail', moduleSlug: 'inbox',
+    desc: 'Reply from Gmail or on the Inbox conversation\'s channel (asks to Approve first).',
+    examples: ['Reply that we will deliver on Friday'],
+  },
+  {
+    id: 'mail_update', name: 'Tidy a thread', category: 'Mail', moduleSlug: 'inbox',
+    desc: 'Archive, mark read, star, label, done, delete (Gmail Bin, verified) or restore.',
+    examples: ['Archive that thread', 'Delete the spam from that sender'],
+  },
+  {
+    id: 'mail_sender_to_crm', name: 'Add sender to CRM', category: 'Mail', moduleSlug: 'inbox',
+    desc: 'Add whoever wrote a thread to the CRM (reuses an existing contact) and link the thread.',
+    examples: ['Add the sender of that email to the CRM'],
+  },
+  {
     id: 'manage_inbox', name: 'Inbox', category: 'Inbox',
     moduleSlug: 'inbox',
     desc: 'List customer conversations, reply to one (a customer-facing reply asks for Approve/Decline first), or ask a question of a spreadsheet a customer or supplier sent.',
@@ -428,6 +463,16 @@ const KAI_TOOLS: AgentToolEntry[] = [
       'Create a quote: Tagina 75 sqm at €34/sqm and Keros 18 sqm at €15/sqm',
       'Make a quote for these products for the customer',
     ],
+  },
+  {
+    id: 'pay_bill_via_revolut', name: 'Pay bill via Revolut', category: 'Finance', moduleSlug: 'banking-revolut',
+    desc: 'Prepare a Revolut payment for a supplier bill — a draft you approve in the Revolut app (asks to Approve first).',
+    examples: ['Pay the Vodafone bill through Revolut'],
+  },
+  {
+    id: 'convert_quote_to_order', name: 'Quote → Order', category: 'Quotes',
+    desc: 'Turn a quote into a sales order and its draft pre-invoice, exactly as accepting it in Sales does (asks to Approve first).',
+    examples: ['Turn that quote into an order'],
   },
   {
     id: 'raise_quote_request', name: 'Raise Quote Request', category: 'Quotes',
@@ -1704,6 +1749,33 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'mail',
+    name: 'Mail',
+    description: 'Work your mail end to end: find an email, read it and its attachments, then act — book the invoice and prepare its payment, build a quote and turn it into an order, add the sender to the CRM, reply or tidy up. Every write asks to Approve first. Gmail is for the platform operator only.',
+    icon: 'Mail',
+    moduleSlug: 'inbox',
+    tool_ids: ['mail_search', 'mail_read', 'mail_attachment', 'mail_book_bill', 'mail_reply', 'mail_update', 'mail_sender_to_crm'],
+    quick_starts: [
+      {
+        label: 'Find an email', description: 'Search the Inbox (and Gmail)', icon: 'Search',
+        prompt: 'Help me find an email.',
+        promptTemplate: 'Find the emails about {{query}} in {{source}}.',
+        form: [
+          { key: 'query', label: 'Sender, subject or words', kind: 'text', required: true },
+          // mail_search.source — Gmail is refused server-side for anyone but the platform operator.
+          { key: 'source', label: 'Mailbox', kind: 'select', default: 'all', options: [
+            { value: 'all', label: 'All mailboxes' },
+            { value: 'inbox', label: 'Workspace Inbox' },
+            { value: 'gmail', label: 'Gmail (operator)' },
+          ] },
+        ],
+      },
+      { label: 'Book an emailed invoice', description: 'Invoice attachment → supplier bill → payment', icon: 'Receipt', prompt: 'Find the latest invoice emailed to us, book it as a supplier bill and prepare the payment.' },
+      { label: 'Email → order', description: 'Read an order from an email and make the quote and order', icon: 'ShoppingCart', prompt: 'Read the order in the latest customer email and turn it into a quote, then an order.' },
+      { label: 'Unread with files', description: 'What arrived with attachments', icon: 'Inbox', prompt: 'Show my unread emails that have attachments.' },
+    ],
+  },
+  {
     id: 'reviews',
     name: 'Reviews',
     description: 'List reviews written about you and post a public reply (a reply asks to Approve first).',
@@ -1822,7 +1894,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // operator root. None of its four tools has an `AgentToolEntry` either, so the command palette
     // did not list them individually — Expenses was unreachable from both browse surfaces.
     moduleSlug: 'sales-finance',
-    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses'],
+    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'],
     quick_starts: [
       {
         label: 'Recent expenses', description: 'What we have booked', icon: 'ListChecks',
@@ -2798,7 +2870,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // The guard could not see it either: toolModuleGates builds its checklist FROM the declared
     // slugs, so a missing one removes the tool from what is checked instead of failing.
     moduleSlug: 'quotes',
-    tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'],
+    tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request', 'convert_quote_to_order'],
     quick_starts: [
       {
         label: 'New quote', description: 'Create a quote from products', icon: 'Plus',
@@ -3667,7 +3739,7 @@ export const ALWAYS_ON_TOOLKIT_IDS = TOOLKITS.filter((t) => t.alwaysOn).map((t) 
 export const TOOLKIT_HUB: Record<string, HubId> = {
   // Marketing
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
-  'email-marketing': 'marketing', messaging: 'service', inbox: 'service', reviews: 'service',
+  'email-marketing': 'marketing', messaging: 'service', inbox: 'service', mail: 'service', reviews: 'service',
   'price-monitoring': 'sales',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',

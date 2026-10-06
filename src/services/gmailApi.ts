@@ -52,8 +52,8 @@ export const gmailApi = {
     call<{ id: string; account_email: string; messages: GmailMessage[] }>('thread', { account_id, thread_id, mark_read }),
   attachment: (account_id: string, message_id: string, attachment_id: string) =>
     call<{ data_base64: string; size: number | null }>('attachment', { account_id, message_id, attachment_id }),
-  modify: (input: { account_id: string; thread_id: string; add?: string[]; remove?: string[]; trash?: boolean }) =>
-    call<{ ok: boolean }>('modify', input),
+  modify: (input: { account_id: string; thread_id: string; add?: string[]; remove?: string[]; trash?: boolean; untrash?: boolean }) =>
+    call<{ ok: boolean; verified?: boolean; detail?: string }>('modify', input),
   snoozed: (account_id: string) =>
     call<{ threads: GmailThreadRow[]; next_page_token: null; estimate: number }>('snoozed', { account_id }),
   threadMeta: (account_id: string, thread_id: string, sender?: string | null) =>

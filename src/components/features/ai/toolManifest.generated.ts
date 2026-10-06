@@ -405,6 +405,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'convert_quote_to_order',
+    file: 'supabase/functions/_shared/tools/quote-tools.ts',
+    factory: 'createConvertQuoteToOrderTool',
+    description: 'Turn an existing quote into a sales order (accepts it; the order and its draft pre-invoice are created by the platform).',
+    params: [
+      { name: 'quote_id', type: 'string', optional: false, description: 'The quote to convert (create_quote or list_my_quotes return it).' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
     name: 'create_catalog',
     file: 'supabase/functions/_shared/tools/catalog-tools.ts',
     factory: 'createCreateCatalogTool',
@@ -1017,6 +1027,84 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'mail_attachment',
+    file: 'supabase/functions/_shared/tools/mail-tools.ts',
+    factory: 'createMailAttachmentTool',
+    description: 'Read a file attached to an email or message.',
+    params: [
+      { name: 'attachment_ref', type: 'string', optional: false, description: 'From mail_read.' },
+      { name: 'mode', type: 'enum', enum: ['read', 'bill_fields'], optional: true, description: 'read = transcribe; bill_fields = invoice fields.' },
+    ],
+  },
+  {
+    name: 'mail_book_bill',
+    file: 'supabase/functions/_shared/tools/mail-tools.ts',
+    factory: 'createMailBookBillTool',
+    description: 'Book a supplier invoice that arrived as an email attachment: reads it (supplier, number, date, net, VAT, total), records the supplier bill through the same writer as record_expense, and attaches the file to it. Asks t…',
+    params: [
+      { name: 'attachment_ref', type: 'string', optional: false, description: 'The invoice file, from mail_read.' },
+      { name: 'category', type: 'string', optional: false, description: 'Expense category, e.g. "Utilities", "Materials". Created if new.' },
+      { name: 'payee', type: 'string', optional: true, description: 'Override the supplier name read off the document.' },
+      { name: 'paid', type: 'boolean', optional: true, description: 'Already paid (records the payment). Default false: an open payable.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
+    name: 'mail_read',
+    file: 'supabase/functions/_shared/tools/mail-tools.ts',
+    factory: 'createMailReadTool',
+    description: 'Read a thread found by mail_search: senders, dates, bodies and an `attachment_ref` for every file.',
+    params: [
+      { name: 'ref', type: 'string', optional: false, description: 'The thread ref from mail_search.' },
+    ],
+  },
+  {
+    name: 'mail_reply',
+    file: 'supabase/functions/_shared/tools/mail-tools.ts',
+    factory: 'createMailReplyTool',
+    description: 'Reply on a thread from mail_search — by email from the connected Gmail account, or on the Inbox conversation\'s own channel (email, WhatsApp…).',
+    params: [
+      { name: 'ref', type: 'string', optional: false, description: 'The thread ref.' },
+      { name: 'body', type: 'string', optional: false, description: 'The reply text. **bold**, *italic* and - lists render in email.' },
+      { name: 'reply_all', type: 'boolean', optional: true, description: 'Gmail: copy everyone else on the last message.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
+    name: 'mail_search',
+    file: 'supabase/functions/_shared/tools/mail-tools.ts',
+    factory: 'createMailSearchTool',
+    description: 'Find email/message threads across the workspace Inbox (email, WhatsApp, social) and, for the platform operator, their Gmail.',
+    params: [
+      { name: 'source', type: 'enum', enum: ['all', 'inbox', 'gmail'], optional: true, description: 'Which mailbox. Default all. Gmail is operator-only.' },
+      { name: 'query', type: 'string', optional: true, description: 'Words, a sender, a subject or an invoice number.' },
+      { name: 'unread_only', type: 'boolean', optional: true, description: 'Only unread threads.' },
+      { name: 'with_attachments', type: 'boolean', optional: true, description: 'Only threads that carry a file.' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max threads (default 15, max 50).' },
+    ],
+  },
+  {
+    name: 'mail_sender_to_crm',
+    file: 'supabase/functions/_shared/tools/mail-tools.ts',
+    factory: 'createMailSenderToCrmTool',
+    description: 'Add the person who wrote a thread to the CRM and link the thread to them.',
+    params: [
+      { name: 'ref', type: 'string', optional: false, description: 'The thread ref.' },
+    ],
+  },
+  {
+    name: 'mail_update',
+    file: 'supabase/functions/_shared/tools/mail-tools.ts',
+    factory: 'createMailUpdateTool',
+    description: 'Tidy a thread: archive, mark read, star, add a label (Gmail), done / reopen, delete or restore.',
+    params: [
+      { name: 'ref', type: 'string', optional: false, description: 'The thread ref.' },
+      { name: 'action', type: 'enum', enum: ['archive', 'mark_read', 'star', 'add_label', 'delete', 'restore', 'done', 'reopen'], optional: false },
+      { name: 'label', type: 'string', optional: true, description: 'add_label: an existing Gmail label name.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
     name: 'manage_appointments',
     file: 'supabase/functions/_shared/tools/appointments-tools.ts',
     factory: 'createManageAppointmentsTool',
@@ -1375,6 +1463,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'limit', type: 'number', optional: true, description: 'Maximum number of results to return' },
       { name: 'aspect', type: 'enum', enum: ['color', 'texture', 'style', 'material'], optional: true, description: 'Bias results toward one aspect when the user asks for similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for a normal all-round search.' },
       { name: 'search_spec', type: 'object', optional: true, description: 'Structured interpretation of the search query across dimensions — always provide this for transparency' },
+    ],
+  },
+  {
+    name: 'pay_bill_via_revolut',
+    file: 'supabase/functions/_shared/tools/expense-tools.ts',
+    factory: 'createPayBillViaRevolutTool',
+    description: 'Prepare a REAL bank payment for an existing supplier bill through the workspace\'s Revolut Business account.',
+    params: [
+      { name: 'bill_id', type: 'string', optional: false, description: 'The supplier bill to pay.' },
+      { name: 'amount', type: 'number', optional: true, description: 'Pay part of it. Defaults to the full amount still due.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
     ],
   },
   {

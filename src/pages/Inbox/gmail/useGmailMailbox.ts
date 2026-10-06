@@ -169,8 +169,8 @@ export function useGmailMailbox() {
   const modify = useCallback(async (threadId: string, change: { add?: string[]; remove?: string[]; trash?: boolean }, done: string) => {
     if (!account) return;
     try {
-      await gmailApi.modify({ account_id: account.id, thread_id: threadId, ...change });
-      toast({ title: done });
+      const r = await gmailApi.modify({ account_id: account.id, thread_id: threadId, ...change });
+      toast({ title: done, ...(r.detail ? { description: r.detail } : {}) });
       const leavesView = change.trash || (change.remove ?? []).includes(labelId);
       if (leavesView) {
         setThreads((cur) => cur.filter((t) => t.id !== threadId));

@@ -92,6 +92,8 @@ const OPTIONS_EXEMPT = new Set([
   // product row, a sourcing option set. A quick-start would have to ask for a UUID.
   'update_finding', 'seo_onpage_issues', 'track_product_mentions', 'track_product_prices',
   'create_purchase_order', 'read_document_section',
+  // A thread or attachment ref from mail_search / mail_read: the action and mode only mean something on one.
+  'mail_update', 'mail_attachment',
   // Driven by an attached image or a guided wizard, not by a field form.
   'visual_search', 'generate_presentation_sheet',
   // Same shape: its `room` / `furnitureStyle` enums are the VirtualStagingModal's two

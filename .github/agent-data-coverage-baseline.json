@@ -12,6 +12,7 @@
     "customer_360",
     "debit_credits",
     "delete_simple_flow",
+    "generate_order_from_quote",
     "get_configured_product_price",
     "get_cooccurring_products",
     "get_customer_health",

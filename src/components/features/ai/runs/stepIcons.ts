@@ -42,6 +42,7 @@ const CATEGORY_ICON: Record<string, string> = {
   'Finance': 'Wallet',
   'Generation': 'ImageIcon',
   'Inbox': 'Inbox',
+  'Mail': 'Mail',
   'Job Research': 'Briefcase',
   'Mentions': 'Megaphone',
   'Messaging': 'Send',

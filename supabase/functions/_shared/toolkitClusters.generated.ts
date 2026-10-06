@@ -57,6 +57,9 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'inbox': {
     tool_ids: ['manage_inbox'],
   },
+  'mail': {
+    tool_ids: ['mail_search', 'mail_read', 'mail_attachment', 'mail_book_bill', 'mail_reply', 'mail_update', 'mail_sender_to_crm'],
+  },
   'reviews': {
     tool_ids: ['manage_reviews'],
   },
@@ -73,7 +76,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
   },
   'expenses': {
-    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses'],
+    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'],
   },
   'company-assets': {
     tool_ids: ['manage_company_assets'],
@@ -139,7 +142,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['assess_property', 'get_property_assessment', 'list_assessment_actions', 'apply_assessment_action'],
   },
   'quotes': {
-    tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'],
+    tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request', 'convert_quote_to_order'],
   },
   'presentation-sheets': {
     tool_ids: ['generate_presentation_sheet'],

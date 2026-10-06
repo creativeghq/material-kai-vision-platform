@@ -2264,6 +2264,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "profile_contact",
           "link_preview",
           "enrich_attachments",
+          "get_attachment",
           "ask_spreadsheet",
           "pin_message",
           "star_message",
@@ -2600,7 +2601,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       },
       "attachment_index": {
         "type": "integer",
-        "description": "Which attachment on that message (0-based). Default: the first spreadsheet"
+        "description": "Position on the message, 0-based. Default 0"
       },
       "pinned": {
         "type": "boolean",

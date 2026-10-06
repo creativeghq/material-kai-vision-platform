@@ -35,6 +35,8 @@ function srcFiles(): string[] {
     }
   };
   walk(join(ROOT, 'src'));
+  // The agent chat is a screen too: its tools call inbox-api as the signed-in user.
+  walk(join(ROOT, 'supabase', 'functions', '_shared', 'tools'));
   // The thin wrapper file is not a caller of itself.
   return out.filter((p) => !p.endsWith(join('src', 'services', 'inboxApi.ts').replace(/\//g, sep)));
 }

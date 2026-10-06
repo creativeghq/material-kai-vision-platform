@@ -1088,6 +1088,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_contracts',
       // Customer Inbox (module + entitlement gated; customer-facing reply is confirm-gated)
       'manage_inbox',
+      'mail_search', 'mail_read', 'mail_attachment', 'mail_book_bill', 'mail_reply', 'mail_update', 'mail_sender_to_crm',
       // Reviews (module-gated; per-user via RLS; public reply is confirm-gated)
       'manage_reviews',
       // Appointments / meetings (crm module + entitlement gated; per-user via RLS; 0 cr)
@@ -1130,7 +1131,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'assess_property', 'get_property_assessment',
       'list_assessment_actions', 'apply_assessment_action',
       // Quotes (all users; 0 cr — creates real quotes + branded PDF, opens on canvas)
-      'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
+      'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request', 'convert_quote_to_order',
       // Generation / design (so JARVIS handles 3D renders, lighting, and VR inline —
       // no "switch to another agent". Interior-designer remains the specialist.)
       // generate_gemini + virtual_staging are instantiated by the `generate_3d` branch
@@ -1156,7 +1157,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
-      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments',
+      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'pay_bill_via_revolut',
       // The myDATA/ΑΑΔΕ expenses feed itself — a much larger set than what we have booked.
       'list_mydata_expenses',
       // Company assets register (vehicles/phones/cards/laptops) shared with Finance + HR; 0 cr — DB-only
@@ -1377,7 +1378,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'find_records',
       'discover_platform_api', 'call_platform_api',
       'discover_platform_data', 'call_platform_rpc',
-      'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
+      'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request', 'convert_quote_to_order',
       // The verdict half of the same flow: Trinity quotes, so Trinity must be able to find out
       // whether there is a price to quote before it says one out loud.
       'price_my_spec',
@@ -1406,7 +1407,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
       'manage_finance',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L)
-      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments',
+      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'pay_bill_via_revolut',
       // The myDATA/ΑΑΔΕ expenses feed itself — a much larger set than what we have booked.
       'list_mydata_expenses',
       // Contracts & e-signature (finance/legal domain)
@@ -1442,6 +1443,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_messaging',
       // …and the customer Inbox — list conversations + reply (customer-facing reply is confirm-gated)
       'manage_inbox',
+      'mail_search', 'mail_read', 'mail_attachment', 'mail_book_bill', 'mail_reply', 'mail_update', 'mail_sender_to_crm',
       // …and professional reviews — list + public reply (reply is confirm-gated)
       'manage_reviews',
     ],
@@ -2107,7 +2109,7 @@ async function executeAgent(
   const needsStock = config.tools.includes('manage_stock');
   const needsRealEstate = config.tools.includes('manage_real_estate');
   const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health', 'manage_counterparty_bank_account'].includes(t));
-  const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'].includes(t));
+  const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request', 'convert_quote_to_order'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
@@ -2712,6 +2714,18 @@ async function executeAgent(
     tools.push(createManageInboxTool(userId, workspaceId, userJwt, onChunk));
   }
 
+  // Mail toolkit: the Inbox for members, plus Gmail when the caller is the platform operator.
+  const mailToolIds = config.tools.filter((t: string) => t.startsWith('mail_'));
+  if (mailToolIds.length) {
+    try {
+      const mailMod = await import('../_shared/tools/mail-tools.ts');
+      const isOperator = await isPlatformOperator(supabase, userId);
+      tools.push(...mailMod.createMailTools({ userId, workspaceId, jwt: userJwt, isOperator, onChunk }, mailToolIds));
+    } catch (e) {
+      console.error('[agent-chat] mail toolkit failed to load', e);
+    }
+  }
+
   // Reviews (module-gated; per-user via RLS; public reply is confirm-gated)
   if (config.tools.includes('manage_reviews') && createManageReviewsTool) {
     tools.push(createManageReviewsTool(userId, workspaceId, userJwt, onChunk));
@@ -2765,6 +2779,9 @@ async function executeAgent(
   // server-derived. Creates first-class quotes visible in the Quotes module.)
   if (config.tools.includes('create_quote') && createCreateQuoteTool) {
     tools.push(createCreateQuoteTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('convert_quote_to_order') && quotesMod?.createConvertQuoteToOrderTool) {
+    tools.push(quotesMod.createConvertQuoteToOrderTool(userId, workspaceId, userJwt, onChunk));
   }
   if (config.tools.includes('generate_quote_pdf') && createGenerateQuotePdfTool) {
     tools.push(createGenerateQuotePdfTool(userId, workspaceId, userJwt, onChunk));
@@ -2906,12 +2923,13 @@ async function executeAgent(
   }
 
   // Business operating expenses → categorized supplier bill (Payables/AP + P&L). 0 cr, DB-only.
-  if (config.tools.some((t: string) => ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses'].includes(t))) {
+  if (config.tools.some((t: string) => ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'].includes(t))) {
     try {
       const expMod = await import('../_shared/tools/expense-tools.ts');
       if (config.tools.includes('record_expense')) tools.push(expMod.createRecordExpenseTool(userId, workspaceId, onChunk));
       if (config.tools.includes('list_recent_expenses')) tools.push(expMod.createListExpensesTool(userId, workspaceId, onChunk));
       if (config.tools.includes('pay_expense')) tools.push(expMod.createPayExpenseTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('pay_bill_via_revolut')) tools.push(expMod.createPayBillViaRevolutTool(userId, workspaceId, userJwt, onChunk));
       if (config.tools.includes('get_expense_payments')) tools.push(expMod.createGetExpensePaymentsTool(userId, workspaceId, onChunk));
       if (config.tools.includes('list_mydata_expenses')) {
         // The myDATA feed and our own expense ledger both answer to the word "expenses", and they

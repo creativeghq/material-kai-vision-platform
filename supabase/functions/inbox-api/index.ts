@@ -1170,6 +1170,8 @@ function pgrstQuote(value: string): string {
   return `"${value.replace(/["\\]/g, '\\$&')}"`;
 }
 
+const ATTACHMENT_READ_LIMIT = 10 * 1024 * 1024;
+
 type MessageOpens = Record<string, { count: number; first_opened_at: string | null; last_opened_at: string | null }>;
 
 /** Read receipts for tracked emails — staff only; a customer never sees whether they were tracked. */
@@ -3525,6 +3527,39 @@ async function handleJwtAction(
         ok: true,
         results,
         attachments: (after as { attachments?: unknown } | null)?.attachments ?? [],
+      });
+    }
+
+    /* get_attachment — one stored attachment's bytes, for members (the agent's mail toolkit reads it). */
+    case 'get_attachment': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      const index = Number.isInteger(payload.attachment_index) ? Number(payload.attachment_index) : 0;
+      if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      const { data: msg } = await db.from('inbox_messages')
+        .select('id, attachments').eq('id', messageId).eq('thread_id', threadId).is('deleted_at', null).maybeSingle();
+      const list = Array.isArray((msg as { attachments?: unknown } | null)?.attachments)
+        ? (msg as { attachments: Array<Record<string, unknown>> }).attachments : [];
+      const att = list[index];
+      if (!att) throw new HttpError(404, 'No attachment at that position on that message');
+      const bucket = typeof att.storage_bucket === 'string' ? att.storage_bucket : '';
+      const path = typeof att.storage_object_path === 'string' ? att.storage_object_path : '';
+      if (!bucket || !path) throw new HttpError(409, 'That attachment was never downloaded into storage');
+      const { data: blob, error: dlErr } = await db.storage.from(bucket).download(path);
+      if (dlErr || !blob) throw new HttpError(502, `Could not read the attachment: ${dlErr?.message ?? 'empty'}`);
+      if (blob.size > ATTACHMENT_READ_LIMIT) throw new HttpError(413, 'That attachment is larger than 10 MB');
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return json({
+        filename: String(att.name || path.split('/').pop() || 'attachment'),
+        content_type: String(att.content_type || att.mime_type || att.type || blob.type || 'application/octet-stream'),
+        size: bytes.length,
+        data_base64: btoa(bin),
       });
     }
 

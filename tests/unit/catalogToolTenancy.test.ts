@@ -140,7 +140,7 @@ describe('#395 — an expense whose payment failed is still an expense', () => {
   it('the payment leg is reported, not thrown', () => {
     // Throwing rejected the whole call for a bill that exists, and the obvious next turn books
     // the cost and the cash-out twice. Same defect as #351 C3, on the agent surface.
-    const fn = expenseTools.slice(expenseTools.indexOf('export const createRecordExpenseTool'), expenseTools.indexOf('// ───────────────────────────── pay_expense'));
+    const fn = expenseTools.slice(expenseTools.indexOf('export async function recordExpense'), expenseTools.indexOf('// ───────────────────────────── pay_expense'));
     expect(fn).toMatch(/let paymentError: string \| null = null;/);
     expect(fn).toMatch(/catch \(payErr: any\)/);
     expect(fn).toMatch(/const reallyPaid = Boolean\(paid\) && !paymentError;/);

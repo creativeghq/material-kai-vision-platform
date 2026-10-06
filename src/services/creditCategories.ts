@@ -79,7 +79,7 @@ export function creditOperationCategory(op: string | null | undefined): CreditSp
   if (startsWith('job_research')) return 'Job Research';
   if (startsWith('price', 'public_price', 'market')) return 'Price Monitoring';
 
-  if (is('email_contacts_sync') || startsWith('inbox_')) return 'Inbox & Email';
+  if (is('email_contacts_sync') || startsWith('inbox_') || startsWith('mail_')) return 'Inbox & Email';
   if (is('phone_number_monthly') || startsWith('messaging_')) return 'Messaging';
   if (startsWith('flow_')) return 'Automations';
   if (startsWith('crm_')) return 'CRM';

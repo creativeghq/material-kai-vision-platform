@@ -2970,6 +2970,7 @@
       "threads",
       "thread",
       "attachment",
+      "message_attachments",
       "modify",
       "send",
       "schedule",
@@ -3021,7 +3022,9 @@
       "at",
       "note",
       "if_no_reply",
-      "track_opens"
+      "track_opens",
+      "untrash",
+      "via"
     ],
     "response": "{ configured, accounts } | { auth_url } | { labels } | { threads, next_page_token } | { id, messages } | { data_base64 } | { ok, message_id, thread_id }"
   },
@@ -9125,6 +9128,29 @@
           }
         ],
         "response": "{ok, results: [{index, family, wrote: 'transcript'|'document'|'none', status: 'ok'|'failed'|'skipped'|'already'|'none', transcript?, document?}], attachments}"
+      },
+      {
+        "name": "get_attachment",
+        "summary": "One stored attachment of a message as base64, for members (the agent mail toolkit reads it to transcribe or book it). 10 MB cap; 409 when the file was never downloaded into storage",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "message_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "attachment_index",
+            "required": false,
+            "type": "integer",
+            "desc": "Position on the message, 0-based. Default 0"
+          }
+        ],
+        "response": "{filename, content_type, size, data_base64}"
       },
       {
         "name": "ask_spreadsheet",

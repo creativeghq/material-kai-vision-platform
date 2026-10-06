@@ -266,7 +266,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
         <span className="ml-auto" />
         <ToolButton icon={MailOpen} label="Unread" onClick={() => modify(openId, { add: ['UNREAD'] }, 'Marked unread')} />
         <ToolButton icon={Archive} label="Archive" onClick={() => modify(openId, { remove: ['INBOX'] }, 'Archived')} />
-        <ToolButton icon={Trash2} label="Delete" onClick={() => modify(openId, { trash: true }, 'Moved to trash')} />
+        <ToolButton icon={Trash2} label="Delete" onClick={() => modify(openId, { trash: true }, 'Moved to the Bin')} />
       </div>
 
       {taskOpen && account && (

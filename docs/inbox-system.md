@@ -408,7 +408,27 @@ A person connects their own Gmail with the platform's one Google OAuth client (`
 
 "Track opens" on any email composer (Gmail compose and reply, Inbox compose and email replies, scheduled sends included; the choice is remembered per browser) adds a 1×1 pixel served by the public [`mail-track`](../supabase/functions/mail-track/index.ts) function. `mail_open_tracking` holds one row per tracked send, and its id is the pixel token, an unguessable UUID. The row is written **before** the send. If that write fails, the mail goes out untracked rather than with a pixel that points nowhere. `mail-track` answers the same GIF for every request and counts only through the service-role `mail_track_open` RPC, which ignores hits in the first 5 seconds. **Our own views never fire our own pixel**: `gmail-api` strips it from the HTML it returns, and Inbox cards render the stored body, not the sent HTML. Receipts ("Opened 3× · last …" or "No open recorded yet") show on our own messages, to members only; a customer projection never carries `message_opens`. The count is approximate and the UI says so. Apple Mail privacy prefetch and Gmail's image proxy can register an open nobody made, image blocking hides a real one, and the sender viewing their copy in Gmail's own web client counts.
 
-Deliberately not built: permanent delete (`gmail.modify` can trash but not purge; purging needs the full `https://mail.google.com/` scope, a heavier verification for little gain), Outlook (no customer has asked; the mail tables carry a `provider` column so it can be added beside Gmail), and Pub/Sub push (polling shared mailboxes every minute is enough, and needs no Google Cloud topic). `gmail-api` is `userJwt`, so it is outside the agent's generic API reach by construction.
+Deliberately not built: permanent delete (`gmail.modify` can trash but not purge; purging needs the full `https://mail.google.com/` scope, a heavier verification for little gain), Outlook (no customer has asked; the mail tables carry a `provider` column so it can be added beside Gmail), and Pub/Sub push (polling shared mailboxes every minute is enough, and needs no Google Cloud topic). `gmail-api` is `userJwt`, so it is outside the agent's generic API reach by construction; the agent reaches it only through the mail toolkit below.
+
+**Operator only.** `gmail-api` refuses every user action (403) unless `isPlatformOperator(caller)`. The OAuth callback is exempt: it carries the signed state minted by an operator's `connect`.
+
+**Delete is verified.** `modify` with `trash` (or `untrash`) reads the thread back and reports success only when Gmail shows every message in (or out of) the Bin. Otherwise it returns 502 naming how many messages are off. A verified delete also removes our own copies: the `mail_thread_index` row and its open-tracking rows. Every attempt writes a `mail_delete_log` row (who, mailbox, thread, level, `verified`, detail, `via` app or agent), readable by the person who did it and by platform admins.
+
+### The agent's mail toolkit (`_shared/tools/mail-tools.ts`)
+
+One surface over both mailboxes, so the internal Inbox and Gmail behave the same for the agent. A thread is a `ref`: `inbox:<thread>` or `gmail:<account>:<thread>`. An attachment is an `attachment_ref` that `mail_read` returns. Gmail paths are refused unless agent-chat bound the toolkit with `isOperator` from `isPlatformOperator` (server-side, never from the request), and `gmail-api` refuses again on its own.
+
+| Tool | Does | Asks to Approve |
+|---|---|---|
+| `mail_search` | Threads across the Inbox and (operator) every connected Gmail account | — |
+| `mail_read` | Messages and attachment refs; bodies wrapped as untrusted data | — |
+| `mail_attachment` | `read` transcribes a PDF or image (`mail_attachment_read` prompt, per-document `mail-attachment-read` price, debited before the call, refunded on failure); `bill_fields` runs `scan-receipt` | — |
+| `mail_book_bill` | Scan, then `recordExpense` (the same writer as `record_expense`), then attach the file to the bill | yes |
+| `mail_reply` | Gmail send in the thread, or Inbox `send_message` on its channel | yes |
+| `mail_update` | archive / read / star / label / done / reopen / delete / restore; an Inbox "delete" archives | Gmail delete/restore |
+| `mail_sender_to_crm` | Gmail `create_contact` or Inbox `create_contact_from_thread` (reuses a contact by email/phone) | — |
+
+They chain into tools elsewhere: `pay_bill_via_revolut` (Expenses) prepares a Revolut **draft** for a bill. It is never a direct send; the money moves when someone approves it in Revolut, and the idempotency key derived from bill + amount makes a second approval replay rather than pay twice. `convert_quote_to_order` (Quotes) marks a quote accepted as the user, so `tg_quote_accepted_create_order` creates the order and pre-invoice exactly as Sales does. JARVIS's prompt row carries the chaining playbook (email → bill → payment, email → quote → order). Guarded by [tests/unit/agentMailToolkit.test.ts](../tests/unit/agentMailToolkit.test.ts).
 
 ---
 

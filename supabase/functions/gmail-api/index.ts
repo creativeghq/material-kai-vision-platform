@@ -1,7 +1,7 @@
 /** gmail-api — a person's own Gmail, live: connect, browse, read, reply, label. Gmail stays the source of truth. */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isPlatformOperator, isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -113,6 +113,32 @@ const withPhoto = (photos: Map<string, string>) => (a: { name: string | null; ad
 
 const SYSTEM_LABELS = ['INBOX', 'STARRED', 'SNOOZED', 'SENT', 'DRAFT', 'IMPORTANT', 'SPAM', 'TRASH'];
 
+/** Read the thread back: a delete is reported only when Gmail itself shows every message in (or out of) the Bin. */
+async function verifyTrashState(token: string, threadId: string, wantTrash: boolean): Promise<{ verified: boolean; detail: string; subject: string | null }> {
+  try {
+    const t = await gmailFetch(token, `/threads/${threadId}?format=metadata&metadataHeaders=Subject`);
+    const msgs = (t.messages ?? []) as Array<Record<string, unknown>>;
+    if (!msgs.length) return { verified: false, detail: 'Gmail returned the thread with no messages', subject: null };
+    const off = msgs.filter((m) => ((m.labelIds ?? []) as string[]).includes('TRASH') !== wantTrash).length;
+    const subject = gmailHeader(msgs[0], 'Subject') || null;
+    return off === 0
+      ? { verified: true, detail: `${msgs.length} message(s) ${wantTrash ? 'in the Bin; Gmail erases them after 30 days' : 'restored'}`, subject }
+      : { verified: false, detail: `${off} of ${msgs.length} message(s) ${wantTrash ? 'are still outside the Bin' : 'are still in the Bin'}`, subject };
+  } catch (e) {
+    return { verified: false, detail: `could not read the thread back: ${(e as Error).message}`, subject: null };
+  }
+}
+
+/** Our own facts about a binned thread go with it, or it stays listed here after Gmail dropped it. */
+async function forgetThread(db: Db, accountId: string, threadId: string): Promise<void> {
+  const [idx, trk] = await Promise.all([
+    db.from('mail_thread_index').delete().eq('account_id', accountId).eq('gmail_thread_id', threadId),
+    db.from('mail_open_tracking').delete().eq('account_id', accountId).eq('gmail_thread_id', threadId),
+  ]);
+  if (idx.error) console.error('[gmail-api] could not clear the thread index', threadId, idx.error.message);
+  if (trk.error) console.error('[gmail-api] could not clear open tracking', threadId, trk.error.message);
+}
+
 Deno.serve(withApiLogging('gmail-api', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
@@ -181,6 +207,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
   const auth = await authenticate(req, { requireUser: true });
   if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
   const userId = auth.userId;
+  if (!(await isPlatformOperator(db, userId))) throw new HttpError(403, 'Gmail is available to the platform operator only.');
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
   const action = String(body.action ?? '');
 
@@ -330,15 +357,34 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       return json({ data_base64: data + '='.repeat((4 - (data.length % 4)) % 4), size: a.size ?? null });
     }
 
+    case 'message_attachments': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const token = await accessTokenFor(db, account);
+      const messageId = String(body.message_id ?? '');
+      if (!/^[0-9a-f]+$/i.test(messageId)) throw new HttpError(400, 'message_id is required');
+      const m = await gmail(token, `/messages/${messageId}?format=full`);
+      return json({ attachments: parseGmailPayload(m.payload as GmailPart).attachments });
+    }
+
     case 'modify': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const token = await accessTokenFor(db, account);
       const threadId = String(body.thread_id ?? '');
       if (!/^[0-9a-f]+$/i.test(threadId)) throw new HttpError(400, 'thread_id is required');
       const labelList = (v: unknown) => (Array.isArray(v) ? v.map(String).filter((x) => /^[A-Za-z0-9_-]{1,64}$/.test(x)).slice(0, 20) : []);
-      if (body.trash === true) {
-        await gmail(token, `/threads/${threadId}/trash`, { method: 'POST' });
-        return json({ ok: true });
+      if (body.trash === true || body.untrash === true) {
+        const restoring = body.untrash === true;
+        await gmail(token, `/threads/${threadId}/${restoring ? 'untrash' : 'trash'}`, { method: 'POST' });
+        const check = await verifyTrashState(token, threadId, !restoring);
+        if (check.verified && !restoring) await forgetThread(db, account.id, threadId);
+        const { error: logErr } = await db.from('mail_delete_log').insert({
+          workspace_id: account.workspace_id, user_id: userId, source: 'gmail', account_id: account.id,
+          thread_ref: threadId, subject: check.subject, level: restoring ? 'restore' : 'trash',
+          verified: check.verified, detail: check.detail, via: body.via === 'agent' ? 'agent' : 'app',
+        });
+        if (logErr) console.error('[gmail-api] delete log write failed', threadId, logErr.message);
+        if (!check.verified) throw new HttpError(502, `Gmail accepted the request but the thread is not ${restoring ? 'out of' : 'in'} the Bin: ${check.detail}`);
+        return json({ ok: true, verified: true, detail: check.detail });
       }
       await gmail(token, `/threads/${threadId}/modify`, {
         method: 'POST',
