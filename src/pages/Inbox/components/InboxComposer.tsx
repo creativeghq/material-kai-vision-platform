@@ -23,6 +23,9 @@ import { RewriteMenu } from './AssistTools';
 import { addComposerFiles, composerTakesFiles } from '../composerAttachments';
 import { formatBytes } from '../gmail/mailParts';
 import { inboxApi } from '@/services/inboxApi';
+import { ComposerSettingsPopover } from './ComposerSettingsPopover';
+import { useReplyAutocomplete } from '../useReplyAutocomplete';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import type { InboxPageState } from '../useInboxPage';
 
 const CHANNEL_LABEL: Record<string, string> = { whatsapp: 'WhatsApp', email: 'Email', social: 'Social', internal: 'Team chat' };
@@ -41,7 +44,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     templateOpen, setTemplateOpen, scheduleSend, emailPreview, setEmailPreview, openThread, threadDisplayName,
     aiDrafting, aiDraftShown, setAiDraftShown, draftSteer, setDraftSteer, draftSteerOpen, setDraftSteerOpen,
     pendingCards, setPendingCards, slashMenu, setSlashMenu, isMember, waBlocked, send, sendAndClose,
-    discardDraft, aiSuggest, chooseSlashCommand, togglePendingCard,
+    discardDraft, aiSuggest, chooseSlashCommand, togglePendingCard, composerSettings, includeSignature, setIncludeSignature,
   } = s;
   const { toast } = useToast();
   const [formatOpen, setFormatOpen] = useState(readFormatPref);
@@ -53,6 +56,15 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     if (refused) toast({ title: 'Some files were not attached', description: refused, variant: 'destructive' });
   };
   const { dragging, dropProps } = useFileDrop(addFiles);
+  const [scrolled, setScrolled] = useState(false);
+  const { suggestion, dismiss } = useReplyAutocomplete({
+    optedIn: composerSettings.settings.autocomplete_enabled,
+    enabled: isMember && !isNote && !waBlocked && !emailPreview && !slashMenu,
+    threadId: activeId,
+    draft,
+    textareaRef: composerRef,
+  });
+  const signature = composerSettings.settings.email_signature.trim();
   useEffect(() => {
     if (takesFiles || !attachments.length) return;
     setAttachments([]);
@@ -267,10 +279,18 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
           {isEmailReply && emailPreview ? (
             <div className="p-3"><EmailPreview value={draft} onEdit={() => setEmailPreview(false)} /></div>
           ) : (
+            <div className="relative">
+            {suggestion && !scrolled && (
+              <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden px-3 py-2.5 text-sm whitespace-pre-wrap break-words">
+                <span className="invisible">{draft}</span>
+                <span className="text-muted-foreground/70">{suggestion}</span>
+              </div>
+            )}
             <Textarea
               ref={composerRef}
               resize="none"
               value={draft}
+              onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 0)}
               onChange={(e) => {
                 const v = e.target.value;
                 setDraft(v);
@@ -295,6 +315,8 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
                     if (first) { e.preventDefault(); chooseSlashCommand(first.kind); return; }
                   }
                 }
+                if (suggestion && e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); setDraft(draft + suggestion); dismiss(); return; }
+                if (suggestion && e.key === 'Escape') { e.preventDefault(); dismiss(); return; }
                 if (e.key !== 'Enter') return;
                 const mod = e.metaKey || e.ctrlKey;
                 if (mod && e.shiftKey && isMember) { e.preventDefault(); if (canSend) void sendAndClose(); return; }
@@ -309,8 +331,18 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
               className="min-h-[76px] max-h-[40vh] [field-sizing:content] border-0 bg-transparent px-3 py-2.5 hover:border-0 focus-visible:ring-0 focus-visible:border-0"
               disabled={waBlocked}
             />
+            </div>
           )}
         </div>
+
+        {isEmailReply && signature && !emailPreview && (
+          <div className="mx-3 mb-2 flex items-start gap-2 rounded-sm border-l-2 border-hairline pl-2.5">
+            <Checkbox id="inbox-include-signature" checked={includeSignature} onCheckedChange={(v) => setIncludeSignature(v === true)} className="mt-0.5" aria-label="Include my signature" />
+            <label htmlFor="inbox-include-signature" className={`min-w-0 flex-1 text-xs whitespace-pre-wrap ${includeSignature ? 'text-muted-foreground' : 'text-muted-foreground/50 line-through'}`}>
+              {signature}
+            </label>
+          </div>
+        )}
 
         {(attachments.length > 0 || pendingCards.length > 0) && (
           <div className="flex flex-wrap gap-1.5 px-3 pb-2">
@@ -416,9 +448,12 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
             </button>
           )}
 
+          {isMember && <ComposerSettingsPopover settings={composerSettings.settings} save={composerSettings.save} />}
+
           <span className="ml-auto flex items-center gap-1.5">
             <span className="hidden xl:inline text-[11px] text-muted-foreground">
-              {enterSends ? 'Enter to send · Shift+Enter for a new line' : `${MOD_KEY}+Enter to send`}
+              {suggestion ? 'Tab to accept · Esc to dismiss'
+                : enterSends ? 'Enter to send · Shift+Enter for a new line' : `${MOD_KEY}+Enter to send`}
             </span>
             {dirty && (
               <button type="button" onClick={discard} title="Discard this reply"

@@ -8165,6 +8165,42 @@
         "response": "{data: thread}"
       },
       {
+        "name": "set_assignee",
+        "summary": "Give a conversation one owner (a teammate in the workspace), or clear it; records a timeline event and notifies the new owner",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "user_id",
+            "type": "string (uuid) | null",
+            "required": false,
+            "desc": "The teammate to assign; null or absent unassigns"
+          }
+        ],
+        "response": "{ok, assigned_user_id, assignee_name}"
+      },
+      {
+        "name": "complete_reply",
+        "summary": "Paid inline autocomplete: a short continuation of the reply being typed. Refused unless the caller enabled autocomplete in inbox_composer_settings; debits credits before the model call",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "desc": "The reply so far (last 2000 characters are used)"
+          }
+        ],
+        "response": "{completion}"
+      },
+      {
         "name": "set_agent",
         "summary": "Assign/unassign the AI agent to a thread (takeover)",
         "params": [

@@ -11922,6 +11922,38 @@ export type Database = {
           },
         ]
       }
+      inbox_composer_settings: {
+        Row: {
+          autocomplete_enabled: boolean
+          email_signature: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          autocomplete_enabled?: boolean
+          email_signature?: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          autocomplete_enabled?: boolean
+          email_signature?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_composer_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_drafts: {
         Row: {
           body: string
@@ -12273,6 +12305,8 @@ export type Database = {
           agent_draft_for_message_id: string | null
           agent_id: string | null
           agent_state: string
+          assigned_at: string | null
+          assigned_user_id: string | null
           archived_at: string | null
           channel: Database["public"]["Enums"]["inbox_channel"]
           created_at: string
@@ -12300,6 +12334,8 @@ export type Database = {
           agent_draft_for_message_id?: string | null
           agent_id?: string | null
           agent_state?: string
+          assigned_at?: string | null
+          assigned_user_id?: string | null
           archived_at?: string | null
           channel?: Database["public"]["Enums"]["inbox_channel"]
           created_at?: string
@@ -12327,6 +12363,8 @@ export type Database = {
           agent_draft_for_message_id?: string | null
           agent_id?: string | null
           agent_state?: string
+          assigned_at?: string | null
+          assigned_user_id?: string | null
           archived_at?: string | null
           channel?: Database["public"]["Enums"]["inbox_channel"]
           created_at?: string

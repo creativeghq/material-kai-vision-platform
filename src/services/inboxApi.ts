@@ -78,12 +78,13 @@ export interface InboxThread {
   needs_reply?: boolean | null;
   /** Labels assigned to this thread (returned by list_threads). */
   labels?: InboxLabel[];
-  /**
-   * Human assignees — active `member` participants, resolved to names by list_threads.
-   * Assignment is a participant row rather than a column on the thread, so this is the only
-   * place the mailbox list learns who owns a conversation.
-   */
+  /** Teammates on the thread (active `member` participants): who can see it, not who owns it. */
   assignees?: InboxThreadAssignee[];
+  /** The ONE teammate who owns the conversation. Set only through `setAssignee`. */
+  assigned_user_id?: string | null;
+  assigned_at?: string | null;
+  /** Resolved by list_threads; absent from get_thread. */
+  assignee_name?: string | null;
   /**
    * The active customer participant this thread is WITH, derived server-side by `list_threads` /
    * `get_thread`. It is the seed for that person's character avatar everywhere the inbox draws
@@ -391,6 +392,17 @@ export interface InboxThreadContext {
   meetings?: Array<{ id: string; subject: string; meeting_at: string; location: string | null; status: string }>;
   appointments?: Array<{ id: string; service_name: string | null; appointment_date: string; appointment_time: string | null; status: string }>;
   tasks?: Array<{ id: string; project_id: string; title: string; status: string; due_date: string | null; priority: string | null }>;
+  /** The same customer's other conversations in this workspace, newest first. */
+  conversations?: InboxRecentConversation[];
+}
+
+export interface InboxRecentConversation {
+  id: string;
+  subject: string | null;
+  channel: InboxChannel;
+  status: InboxThreadStatus;
+  last_message_at: string;
+  last_message_preview: string | null;
 }
 
 /**
@@ -681,6 +693,14 @@ export const inboxApi = {
   },
   setStatus(thread_id: string, status: InboxThreadStatus) {
     return call<{ ok: boolean }>('set_status', { thread_id, status });
+  },
+  /** Give the conversation one owner, or clear it (`user_id: null`). */
+  setAssignee(thread_id: string, user_id: string | null) {
+    return call<{ ok: boolean; assigned_user_id: string | null; assignee_name?: string | null }>('set_assignee', { thread_id, user_id });
+  },
+  /** Paid inline autocomplete; refused unless the caller turned it on in inbox_composer_settings. */
+  completeReply(thread_id: string, text: string) {
+    return call<{ completion: string }>('complete_reply', { thread_id, text });
   },
   /** React to a message, or clear our reaction (`emoji: null`). One per person per message. */
   reactMessage(thread_id: string, message_id: string, emoji: string | null) {

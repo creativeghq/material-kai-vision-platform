@@ -31,6 +31,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     backToList,
     isMember,
     loadThreads,
+    assignToMe,
     openThread,
     messageMoods,
     context,
@@ -53,6 +54,8 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     pinnedMessage,
   } = s;
   const showMemberControls = isMember && !!activeThread;
+  // Only the newest handoff of an unowned thread offers "Assign to me"; older cards are history.
+  const lastHandoffId = [...messages].reverse().find((m) => m.message_type === 'system' && (m.metadata as Record<string, unknown> | null)?.agent_handoff)?.id ?? null;
   const isEmail = activeThread?.channel === 'email';
   const [openMail, setOpenMail] = useState<Set<string>>(new Set());
   useEffect(() => { setOpenMail(new Set()); }, [activeId]);
@@ -302,6 +305,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 mood={messageMoods[m.id]}
                 isCustomerThread={activeThread.thread_type !== 'internal'}
                 workspaceId={activeThread.workspace_id}
+                onTakeOver={isMember && myUserId && !activeThread.assigned_user_id && m.id === lastHandoffId ? () => { void assignToMe(); } : undefined}
                 onAttachmentsRepaired={() => { void openThread(activeThread.id); }}
                 onReplyTo={(msg) => setReplyTo(msg)}
                 onReact={async (msg, emoji) => {

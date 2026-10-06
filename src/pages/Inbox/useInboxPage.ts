@@ -22,6 +22,7 @@ import { bulkSummary, runBulk } from './inboxBulk';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { useTrackOpens, type MailOpens } from './components/OpenTracking';
 import { encodeAttachments } from './composerAttachments';
+import { useComposerSettings, withSignature } from './useComposerSettings';
 
 
 
@@ -269,7 +270,7 @@ export function useInboxPage() {
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
   useEffect(() => { setSelectedIds(new Set()); }, [listRequest]);
 
-  const runBulkAction = useCallback(async (action: 'read' | 'done' | 'open' | 'archive' | 'label', labelId?: string) => {
+  const runBulkAction = useCallback(async (action: 'read' | 'done' | 'open' | 'archive' | 'label' | 'assign_me', labelId?: string) => {
     const byId = new Map(threads.map((t) => [t.id, t]));
     const onThread = (id: string) => (byId.get(id)?.assignees ?? []).some((a) => a.user_id === myUserId);
     const ids = action === 'read' ? [...selectedIds].filter(onThread) : [...selectedIds];
@@ -280,13 +281,14 @@ export function useInboxPage() {
       return;
     }
     setBulkBusy(true);
-    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Archived', label: 'Labelled' } as const;
+    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Archived', label: 'Labelled', assign_me: 'Assigned to you' } as const;
     try {
       const r = await runBulk(ids, (id) => {
         if (action === 'read') return inboxApi.markRead(id);
         if (action === 'done') return inboxApi.setStatus(id, 'closed');
         if (action === 'open') return inboxApi.setStatus(id, 'open');
         if (action === 'archive') return inboxApi.archiveThread(id);
+        if (action === 'assign_me') return myUserId ? inboxApi.setAssignee(id, myUserId) : Promise.reject(new Error('Not signed in'));
         const current = (byId.get(id)?.labels ?? []).map((l) => l.id);
         return current.includes(labelId as string) ? Promise.resolve() : inboxApi.setThreadLabels(id, [...current, labelId as string]);
       });
@@ -644,6 +646,10 @@ export function useInboxPage() {
   }, [draft, emailCc, emailBcc, activeId, myUserId, isNote, isMember, aiDraftShown]);
 
   const isEmailReply = activeThread?.channel === 'email' && isMember && !isNote;
+  const composerSettings = useComposerSettings(activeThread?.workspace_id, myUserId);
+  const [includeSignature, setIncludeSignature] = useState(true);
+  useEffect(() => { setIncludeSignature(true); }, [activeId]);
+  const signature = isEmailReply && includeSignature ? composerSettings.settings.email_signature : '';
   const emailRecipients = useMemo(
     () => (activeThread?.channel === 'email' ? emailReplyRecipients(messages, activeThread.metadata as Record<string, unknown> | null) : null),
     [activeThread, messages],
@@ -654,6 +660,19 @@ export function useInboxPage() {
     setEmailCc((cur) => [...new Set([...splitAddresses(cur), ...emailRecipients.replyAllCc])].join(', '));
     setEmailCopiesOpen(true);
   }, [emailRecipients]);
+
+  const assignToMe = useCallback(async () => {
+    const threadId = activeId;
+    if (!threadId || !myUserId) return;
+    try {
+      await inboxApi.setAssignee(threadId, myUserId);
+      setActiveThread((t) => (t && t.id === threadId ? { ...t, assigned_user_id: myUserId } : t));
+      void openThread(threadId);
+      void loadThreads({ silent: true });
+    } catch (e) {
+      toast({ title: 'Could not assign', description: (e as Error).message, variant: 'destructive' });
+    }
+  }, [activeId, myUserId, openThread, loadThreads, toast]);
 
   const resetComposer = useCallback(() => {
     sendToken.current = null;
@@ -681,7 +700,7 @@ export function useInboxPage() {
       const tracked = isEmailReply && trackOpens;
       const sent = await inboxApi.sendMessage({
         thread_id: activeId,
-        body: draft.trim() || undefined,
+        body: (isNote ? draft.trim() : withSignature(draft.trim(), signature)) || undefined,
         attachments: encoded,
         message_type: isNote ? 'note' : 'text',
         // A private note quotes nothing on the platform — there is no platform message to quote.
@@ -707,7 +726,7 @@ export function useInboxPage() {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachments, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer]);
+  }, [activeId, draft, attachments, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, signature]);
 
   const sendAndClose = useCallback(async () => {
     const threadId = activeId;
@@ -732,7 +751,7 @@ export function useInboxPage() {
     try {
       const encoded = attachments.length ? await encodeAttachments(attachments) : undefined;
       await inboxApi.scheduleMessage({
-        thread_id: activeId, send_at: sendAt.toISOString(), body: draft.trim() || undefined, attachments: encoded,
+        thread_id: activeId, send_at: sendAt.toISOString(), body: withSignature(draft.trim(), signature) || undefined, attachments: encoded,
         reply_to_message_id: replyTo ? replyTo.id : undefined,
         ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc), track_opens: trackOpens } : {}),
       });
@@ -741,7 +760,7 @@ export function useInboxPage() {
     } catch (e) {
       toast({ title: 'Could not schedule', description: (e as Error).message, variant: 'destructive' });
     } finally { setSending(false); }
-  }, [activeId, isNote, draft, attachments, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer]);
+  }, [activeId, isNote, draft, attachments, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, signature]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   // The steer, when the member typed one, tells it WHAT the reply should do.
@@ -1124,6 +1143,10 @@ export function useInboxPage() {
     send,
     sendAndClose,
     discardDraft: resetComposer,
+    composerSettings,
+    includeSignature,
+    setIncludeSignature,
+    assignToMe,
     aiSuggest,
     chooseSlashCommand,
     togglePendingCard,

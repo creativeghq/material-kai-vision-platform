@@ -72,18 +72,18 @@ export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] =
       fields: [
         {
           key: 'assignee', type: 'multi', label: 'Assigned to',
-          description: 'Team members on the conversation. Unassigned means nobody has picked it up.',
+          description: 'Who owns the conversation. Unassigned means nobody has picked it up.',
           options: [
             { value: NONE_VALUE, label: 'Unassigned' },
-            ...optionsFromRows(threads, (t: InboxThread) => (t.assignees ?? []).map((a) => a.name)),
+            ...optionsFromRows(threads, (t: InboxThread) => (t.assignee_name ? [t.assignee_name] : [])),
           ],
-          accessor: (t: InboxThread) => (t.assignees ?? []).map((a) => a.name),
+          accessor: (t: InboxThread) => (t.assignee_name ? [t.assignee_name] : []),
         },
         ...(myUserId ? [{
           key: 'mine', type: 'bool' as const, label: 'Just mine',
-          description: 'Conversations you are on, regardless of who else is.',
+          description: 'Conversations assigned to you.',
           trueLabel: 'Assigned to me', falseLabel: 'Not mine',
-          accessor: (t: InboxThread) => (t.assignees ?? []).some((a) => a.user_id === myUserId),
+          accessor: (t: InboxThread) => t.assigned_user_id === myUserId,
         }] : []),
       ],
     },

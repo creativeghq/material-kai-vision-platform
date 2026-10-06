@@ -158,6 +158,7 @@ const InboxPage: React.FC = () => {
                 // Approving writes a `system` message onto the thread; reopen so the transcript
                 // shows it without the member having to click away and back.
                 onIntakeChanged={() => { void openThread(activeThread.id); }}
+                onOpenThread={(id) => { setShowDetails(false); void openThread(id); }}
               />
             </div>
           </SheetContent>

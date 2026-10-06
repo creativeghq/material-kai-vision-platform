@@ -7,6 +7,7 @@ import { askJarvisAboutThreadPrompt } from '../inboxFormat';
 import { InboxAgentSettingsButton } from './InboxAgentSettings';
 import { LabelAssignButton } from './InboxLabels';
 import { FollowUpButton } from './FollowUpButton';
+import { AssigneePicker } from './AssigneePicker';
 import type { InboxPageState } from '../useInboxPage';
 
 
@@ -25,6 +26,7 @@ export const ConversationActions: React.FC<{ s: InboxPageState }> = ({ s }) => {
     archiveActive,
     restoreActive,
     activeThreadLabels,
+    myUserId,
   } = s;
   return isMember && activeThread ? (
     <>
@@ -115,6 +117,17 @@ export const ConversationActions: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <Link2 className="w-4 h-4" />
         </Button>
       )}
+      <AssigneePicker
+        threadId={activeThread.id}
+        workspaceId={activeThread.workspace_id}
+        assignedUserId={activeThread.assigned_user_id}
+        myUserId={myUserId}
+        onAssigned={(uid) => {
+          setActiveThread({ ...activeThread, assigned_user_id: uid });
+          void openThread(activeThread.id);
+          loadThreads({ silent: true });
+        }}
+      />
       <Button variant="outline" size="icon" className="h-9 w-9" title="Add a teammate" onClick={() => setShowAdd(true)}>
         <UserPlus className="w-4 h-4" />
       </Button>

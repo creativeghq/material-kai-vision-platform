@@ -2222,6 +2222,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "link_company_to_thread",
           "promote_thread",
           "set_status",
+          "set_assignee",
+          "complete_reply",
           "set_agent",
           "get_agent_settings",
           "set_agent_settings",
@@ -2390,6 +2392,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "status": {
         "type": "string"
       },
+      "text": {
+        "type": "string",
+        "description": "The reply so far (last 2000 characters are used)"
+      },
       "agent_id": {
         "type": "string"
       },
@@ -2498,10 +2504,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "question": {
         "type": "string",
         "description": "For ask"
-      },
-      "text": {
-        "type": "string",
-        "description": "The draft, for rewrite / shorten / formal"
       },
       "template_id": {
         "type": "string",

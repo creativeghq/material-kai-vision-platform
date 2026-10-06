@@ -640,6 +640,9 @@ export async function deliverToInbox(
         agent_state: autoRespond ? 'active' : 'off',
         agent_id: autoRespond ? (address.agent_ref || 'kai') : null,
         last_message_at: new Date().toISOString(),
+        // Mail addressed to a person is theirs to answer.
+        assigned_user_id: address.user_id,
+        assigned_at: new Date().toISOString(),
       })
       .select('id')
       .single();

@@ -44,8 +44,8 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
   } = s;
   const unfiltered = !assignmentView && !sourceFilter && !String(query ?? '').trim();
   const more = nextCursor ? '+' : '';
-  const mineCount = unfiltered ? `${threads.filter((t) => (t.assignees ?? []).some((a) => a.user_id === myUserId)).length}${more}` : undefined;
-  const unassignedCount = unfiltered ? `${threads.filter((t) => !(t.assignees ?? []).length).length}${more}` : undefined;
+  const mineCount = unfiltered ? `${threads.filter((t) => t.assigned_user_id === myUserId).length}${more}` : undefined;
+  const unassignedCount = unfiltered ? `${threads.filter((t) => !t.assigned_user_id).length}${more}` : undefined;
   const { toast } = useToast();
   const [address, setAddress] = useState<string | null>(null);
   useEffect(() => {

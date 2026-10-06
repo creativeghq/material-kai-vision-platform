@@ -9,8 +9,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/core/ui/avatar
 import { Separator } from '@/components/core/ui/separator';
 import { inboxHireOrder, inboxRequestedServices, inboxThreadSource } from '../inboxSource';
 import { formatDate } from '@/utils/datetime';
-import type { InboxThread, InboxMessage, InboxParticipant, InboxThreadContext } from '@/services/inboxApi';
-import { avatarTint, castAvatarSrc, initials, money } from '../inboxFormat';
+import type { InboxThread, InboxMessage, InboxParticipant, InboxThreadContext, InboxRecentConversation } from '@/services/inboxApi';
+import { avatarTint, castAvatarSrc, initials, money, timeAgo } from '../inboxFormat';
 import { ParticipantLabel, Row, SectionTitle, SourceTag, ThreadAvatar } from './InboxPrimitives';
 import { KitchenEstimatePanel, OrderIntakePanel } from './OrderIntakePanel';
 import { ConversationMoodPanel } from './ConversationMoodPanel';
@@ -27,7 +27,8 @@ export const DetailsRail: React.FC<{
   isMember: boolean;
   messages?: InboxMessage[];
   onIntakeChanged?: () => void;
-}> = ({ thread, context, participants, labels, isMember, messages = [], onIntakeChanged }) => {
+  onOpenThread?: (threadId: string) => void;
+}> = ({ thread, context, participants, labels, isMember, messages = [], onIntakeChanged, onOpenThread }) => {
   // A channel tab only where there IS a channel identity distinct from the CRM one. An internal
   // or email thread has nothing to put in it, and an empty tab is worse than no tab.
   const hasChannelIdentity = thread.channel === 'whatsapp' || thread.channel === 'social';
@@ -47,8 +48,10 @@ export const DetailsRail: React.FC<{
 
   // Information block: who's handling it + status (real data, no fabricated priority/response-rate).
   const agentActive = thread.agent_state === 'active';
-  const firstMember = participants.find((p) => p.participant_type === 'member' && p.status === 'active');
-  const assignee = agentActive ? 'AI Assistant' : (firstMember ? (labels.get(firstMember.id)?.label || 'Team') : 'Unassigned');
+  const owner = thread.assigned_user_id ? participants.find((p) => p.user_id === thread.assigned_user_id) : undefined;
+  const assignee = agentActive ? 'AI Assistant'
+    : thread.assigned_user_id ? (thread.assignee_name || (owner ? labels.get(owner.id)?.label : null) || 'Assigned') : 'Unassigned';
+  const conversations = context?.conversations ?? [];
   const statusLabel = thread.status === 'snoozed' ? 'Follow-up' : thread.status === 'closed' ? 'Done' : 'Open';
   void subtitle;
 
@@ -267,6 +270,8 @@ export const DetailsRail: React.FC<{
             )}
           </div>
 
+          <RecentConversations rows={conversations} onOpen={onOpenThread} />
+
           {/* Quotes */}
           <div className="p-5 border-b border-hairline">
             <SectionTitle icon={<FileText className="h-4 w-4" />} count={quotes.length}>Quotes</SectionTitle>
@@ -305,8 +310,9 @@ export const DetailsRail: React.FC<{
             )}
           </div>
         </>
-      ) : (
-        /* Internal thread (or no linked contact): show participants + thread meta. */
+      ) : (<>
+        {conversations.length > 0 && <RecentConversations rows={conversations} onOpen={onOpenThread} />}
+        {/* Internal thread (or no linked contact): show participants + thread meta. */}
         <div className="p-5 border-b border-hairline">
           <SectionTitle icon={<Users className="h-4 w-4" />} count={participants.filter((p) => p.status === 'active').length}>Participants</SectionTitle>
           <div className="space-y-1.5">
@@ -337,7 +343,7 @@ export const DetailsRail: React.FC<{
             </p>
           )}
         </div>
-      )}
+      </>)}
 
       {/* Conversation meta — always shown at the bottom */}
       <Separator className="bg-hairline" />
@@ -383,3 +389,33 @@ export const DetailsRail: React.FC<{
     </div>
   );
 };
+
+const CHANNEL_ICON: Record<string, React.ElementType> = { email: Mail, whatsapp: MessageSquare, social: MessagesSquare, internal: Users };
+const STATUS_BADGE = { open: { label: 'Open', variant: 'info' }, snoozed: { label: 'Follow-up', variant: 'warning' }, closed: { label: 'Done', variant: 'success' } } as const;
+
+const RecentConversations: React.FC<{ rows: InboxRecentConversation[]; onOpen?: (id: string) => void }> = ({ rows, onOpen }) => (
+  <div className="p-5 border-b border-hairline">
+    <SectionTitle icon={<MessagesSquare className="h-4 w-4" />} count={rows.length}>Recent conversations</SectionTitle>
+    {rows.length === 0 ? (
+      <div className="text-xs text-muted-foreground">No other conversations with them yet.</div>
+    ) : (
+      <div className="space-y-1.5">
+        {rows.map((c) => {
+          const Icon = CHANNEL_ICON[c.channel] ?? MessageSquare;
+          const status = STATUS_BADGE[c.status] ?? STATUS_BADGE.open;
+          return (
+            <button key={c.id} type="button" onClick={() => onOpen?.(c.id)} disabled={!onOpen}
+              className="w-full text-left rounded-sm border border-hairline bg-card px-2.5 py-2 hover:bg-surface-hover transition-colors">
+              <div className="flex items-center gap-2">
+                <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="flex-1 min-w-0 truncate text-sm font-medium">{c.subject || c.last_message_preview || 'Conversation'}</span>
+                <Badge variant={status.variant}>{status.label}</Badge>
+              </div>
+              <div className="mt-0.5 pl-5 text-[11px] text-muted-foreground">{timeAgo(c.last_message_at)}</div>
+            </button>
+          );
+        })}
+      </div>
+    )}
+  </div>
+);

@@ -8,6 +8,7 @@ import { statusTone } from '@/utils/statusTone';
 import { Input } from '@/components/core/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Checkbox } from '@/components/core/ui/checkbox';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
 import { labelDot } from '../inboxFormat';
 import { FilterBar } from '@/components/core/filters';
@@ -153,6 +154,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('assign_me')}>Assign to me</Button>
             {view !== 'archived' && (
               <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('archive')}>Archive</Button>
             )}
@@ -219,11 +221,8 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               const name = threadDisplayName(t);
               const active = activeId === t.id;
               const source = inboxThreadSource(t);
-              // Who is on it, printed after the source — the pairing an operator triages by
-              // ("Email · Cody Wilson"). Unassigned is STATED, not left blank: a thread
-              // nobody has picked up and one whose assignee simply did not render look
-              // identical when the answer is an empty string.
-              const assignee = (t.assignees ?? [])[0]?.name ?? null;
+              // Unassigned is STATED, not left blank: blank also reads as "did not render".
+              const assignee = t.assigned_user_id ? (t.assignee_name ?? 'Assigned') : null;
               const orderPending = (t.metadata as { order_intake?: { status?: string } } | null)
                 ?.order_intake?.status === 'pending_review';
               const selected = selectedIds.has(t.id);
@@ -266,9 +265,14 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                           <Paperclip className="w-3 h-3" />Files
                         </span>
                       )}
-                      <span className="text-[11px] text-muted-foreground truncate max-w-[9rem]">
-                        {assignee ?? 'Unassigned'}
-                      </span>
+                      {assignee ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80 truncate max-w-[9rem]" title={`Assigned to ${assignee}`}>
+                          <UserAvatar userId={t.assigned_user_id} name={assignee} className="h-4 w-4 text-[8px]" />
+                          <span className="truncate">{assignee}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">Unassigned</span>
+                      )}
                       {t.status !== 'open' && !t.archived_at && <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status}</span>}
                       {t.agent_state === 'active' && (
                         <span className="inline-flex items-center gap-1 text-[11px] leading-none text-primary"><Bot className="w-3 h-3" />AI</span>

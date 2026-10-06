@@ -70,6 +70,7 @@ import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { escapeLike } from '../_shared/searchFold.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
+import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { handoffSince, stripQuotedEmail, TRANSCRIPT_MESSAGE_MAX } from '../_shared/inbox-conversation.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
@@ -842,6 +843,60 @@ async function assertCanAddParticipant(
   }
 
   throw new HttpError(400, `Unknown participant type: ${target.type}`);
+}
+
+async function displayName(db: DbClient, userId: string): Promise<string> {
+  const { data } = await db.from('user_profiles').select('full_name, email').eq('user_id', userId).maybeSingle();
+  const p = data as { full_name?: string | null; email?: string | null } | null;
+  return p?.full_name || p?.email || 'A teammate';
+}
+
+/** A timeline event: never relayed, never moves the thread (the state trigger skips system rows). */
+async function recordThreadEvent(db: DbClient, threadId: string, body: string, event: Record<string, unknown>): Promise<void> {
+  const { error } = await db.from('inbox_messages').insert({ thread_id: threadId, message_type: 'system', body, metadata: { event } });
+  if (error) console.error('[inbox-api] thread event not recorded (non-fatal):', error.message);
+}
+
+const UNASSIGNABLE_ROLES = new Set(['client']);
+const RECENT_CONVERSATION_LIMIT = 6;
+const AUTOCOMPLETE_PER_MINUTE = 20;
+
+/** The same customer's other conversations in this workspace, newest first. */
+async function recentConversations(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  contactId: string | null,
+  userId: string,
+  operator: boolean,
+): Promise<Array<Record<string, unknown>>> {
+  const workspaceId = String(thread.workspace_id);
+  const ids = new Set<string>();
+  if (contactId) {
+    const { data } = await db.from('inbox_participants').select('thread_id, inbox_threads!inner(workspace_id)')
+      .eq('contact_id', contactId).eq('participant_type', 'customer').eq('inbox_threads.workspace_id', workspaceId)
+      .order('joined_at', { ascending: false }).limit(50);
+    for (const r of (data || []) as Array<{ thread_id: string }>) ids.add(r.thread_id);
+  }
+  const email = String((thread.metadata as Record<string, unknown> | null)?.email_from ?? '').trim();
+  const ors: string[] = [];
+  if (ids.size) ors.push(`id.in.(${[...ids].join(',')})`);
+  if (email) ors.push(`metadata->>email_from.eq.${pgrstQuote(email)}`);
+  if (!ors.length) return [];
+  const { data, error } = await db.from('inbox_threads')
+    .select('id, subject, channel, status, last_message_at, last_message_preview')
+    .eq('workspace_id', workspaceId).neq('id', String(thread.id)).is('archived_at', null)
+    .in('thread_type', ['customer', 'upstream'])
+    .or(ors.join(','))
+    .order('last_message_at', { ascending: false }).limit(RECENT_CONVERSATION_LIMIT);
+  if (error) { console.warn('[inbox-api] recent conversations unavailable:', error.message); return []; }
+  const rows = (data || []) as Array<Record<string, unknown>>;
+  if (operator || !rows.length) return rows;
+  const role = await callerRoleInWorkspace(db, userId, workspaceId);
+  if (role && BUSINESS_ROLES.has(role)) return rows;
+  const { data: mine } = await db.from('inbox_participants').select('thread_id')
+    .eq('user_id', userId).eq('status', 'active').in('thread_id', rows.map((r) => String(r.id)));
+  const visible = new Set(((mine || []) as Array<{ thread_id: string }>).map((r) => r.thread_id));
+  return rows.filter((r) => visible.has(String(r.id)));
 }
 
 /** Upload a base64 attachment to the private inbox prefix; returns the stored reference. */
@@ -2518,8 +2573,128 @@ async function handleJwtAction(
       const access = await resolveThreadAccess(db, userId, thread, operator);
       assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may change status');
-      await db.from('inbox_threads').update({ status }).eq('id', threadId);
+      const { error: statusErr } = await db.from('inbox_threads').update({ status }).eq('id', threadId);
+      if (statusErr) throw new HttpError(500, `Could not change status: ${statusErr.message}`);
+      if (status !== thread.status && (status === 'closed' || thread.status === 'closed')) {
+        const actor = await displayName(db, userId);
+        await recordThreadEvent(db, threadId, status === 'closed' ? `${actor} marked this done` : `${actor} reopened this conversation`,
+          { kind: 'status', status, actor_user_id: userId });
+      }
       return json({ ok: true });
+    }
+
+    case 'set_assignee': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may assign a conversation');
+      const target = payload.user_id ? String(payload.user_id) : null;
+      const workspaceId = String(thread.workspace_id);
+      if (target) {
+        const role = await callerRoleInWorkspace(db, target, workspaceId);
+        if (!role || UNASSIGNABLE_ROLES.has(role)) throw new HttpError(404, 'That teammate is not in this workspace');
+      }
+      if ((thread.assigned_user_id ?? null) === target) return json({ ok: true, assigned_user_id: target });
+
+      // Access first, ownership second: a failure between the two leaves a visible thread with
+      // no owner (retryable), never an owner who cannot open what they own.
+      if (target) {
+        const { data: row } = await db.from('inbox_participants').select('id, status')
+          .eq('thread_id', threadId).eq('user_id', target).maybeSingle();
+        const existing = row as { id: string; status: string } | null;
+        if (existing?.status !== 'active') {
+          // Same rules as add_participant: assigning must not be a side door into a thread.
+          await assertCanAddParticipant(db, {
+            operator, callerRole: await callerRoleInWorkspace(db, userId, workspaceId), thread,
+            target: { type: 'member', user_id: target },
+          });
+        }
+        const { error: partErr } = existing
+          ? (existing.status === 'active' ? { error: null } : await db.from('inbox_participants').update({ status: 'active' }).eq('id', existing.id))
+          : await db.from('inbox_participants').insert({
+            thread_id: threadId, participant_type: 'member', user_id: target, workspace_id: workspaceId,
+            thread_role: 'participant', added_by: userId,
+          });
+        if (partErr) throw new HttpError(500, `Could not give them access to the conversation: ${partErr.message}`);
+      }
+      const { error: upErr } = await db.from('inbox_threads')
+        .update({ assigned_user_id: target, assigned_at: target ? new Date().toISOString() : null }).eq('id', threadId);
+      if (upErr) throw new HttpError(500, `Could not assign: ${upErr.message}`);
+      const [actor, assignee] = await Promise.all([displayName(db, userId), target ? displayName(db, target) : Promise.resolve(null)]);
+      await recordThreadEvent(db, threadId,
+        !target ? `${actor} unassigned this conversation` : target === userId ? `${actor} took this conversation` : `${actor} assigned this to ${assignee}`,
+        { kind: 'assigned', actor_user_id: userId, assignee_user_id: target });
+      if (target && target !== userId) {
+        await emitFlowEvent('inbox.thread_assigned', {
+          user_id: target, workspace_id: workspaceId, type: 'inbox_assigned',
+          title: `${actor} assigned you a conversation`,
+          body: (thread.subject as string) || (thread.last_message_preview as string) || 'Conversation',
+          action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
+        }).catch(() => {});
+      }
+      return json({ ok: true, assigned_user_id: target, assignee_name: assignee });
+    }
+
+    case 'complete_reply': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may use autocomplete');
+      const workspaceId = String(thread.workspace_id);
+      const text = typeof payload.text === 'string' ? payload.text.slice(-2000) : '';
+      if (text.trim().length < 12) return json({ completion: '' });
+      const { data: pref } = await db.from('inbox_composer_settings').select('autocomplete_enabled')
+        .eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle();
+      if (!(pref as { autocomplete_enabled?: boolean } | null)?.autocomplete_enabled) {
+        throw new HttpError(403, 'Autocomplete is off. Turn it on from the reply box settings.');
+      }
+      const { data: history, error: histErr } = await db.from('inbox_messages')
+        .select('body, message_type, attachments, sender_participant_id, metadata')
+        .eq('thread_id', threadId).is('deleted_at', null).neq('message_type', 'note')
+        .order('created_at', { ascending: false }).limit(12);
+      if (histErr) throw new HttpError(500, `Could not read the conversation: ${histErr.message}`);
+      const transcript = await buildTranscript(db, threadId, (history || []) as Parameters<typeof buildTranscript>[2]);
+      const system = await loadPrompt(db, 'tool', 'inbox_autocomplete');
+      // Invariant 10: rate-limit and pay before the model call.
+      const { data: withinLimit, error: limitErr } = await db.rpc('consume_user_rate_limit', {
+        p_user_id: userId, p_bucket: 'inbox-autocomplete', p_limit: AUTOCOMPLETE_PER_MINUTE, p_window_seconds: 60,
+      });
+      if (limitErr) throw new HttpError(503, 'Autocomplete is unavailable right now.');
+      if (withinLimit === false) return json({ completion: '', rate_limited: true });
+      const debit = await debitExternalServiceCredits(db, userId, 'inbox-autocomplete', 'inbox_autocomplete', 1, { thread_id: threadId }, workspaceId);
+      if (!debit.success) throw new HttpError(402, debit.error ?? 'Not enough credits for autocomplete.');
+      const refund = () => refundCredits(db, userId, workspaceId, debit.credits_debited, 'inbox_autocomplete', { thread_id: threadId });
+      let raw = '';
+      try {
+        const res = await callClaudeMessages({
+          model: 'claude-haiku-4-5',
+          max_tokens: 60,
+          temperature: 0.3,
+          system,
+          messages: [{
+            role: 'user',
+            content: `${wrapUntrusted('conversation', transcript, 6000)}\n\nThe reply so far (written by our team member):\n<reply>\n${text}\n</reply>\n\nContinue the reply.`,
+          }],
+        }, {
+          task: 'inbox_autocomplete', userId, workspaceId, timeoutMs: 15_000,
+          // Booked by the per-suggestion `inbox-autocomplete` debit above.
+          costLoggedByCaller: true,
+        });
+        if (res.stop_reason === 'refusal') { await refund(); return json({ completion: '' }); }
+        raw = (res.content ?? []).filter((c: { type: string }) => c.type === 'text').map((c: { text?: string }) => c.text ?? '').join('');
+      } catch (e) {
+        await refund();
+        throw new HttpError(502, `Autocomplete failed: ${(e as Error).message}`);
+      }
+      if (!raw.trim()) { await refund(); return json({ completion: '' }); }
+      let completion = raw.replace(/\s+$/, '').replace(/^(\s*)["“]/, '$1').replace(/["”]$/, '').slice(0, 240);
+      // The prompt asks for a leading space unless the reply ends mid-word; never two spaces.
+      if (/\s$/.test(text)) completion = completion.replace(/^\s+/, '');
+      return json({ completion });
     }
 
     case 'set_agent': {
@@ -2534,12 +2709,7 @@ async function handleJwtAction(
       assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may hand a thread to the agent');
       const agentId = String(payload.agent_id || thread.agent_id || DEFAULT_INBOX_AGENT_ID);
-      // Every write here was unchecked while the handler returned { ok: true }. The
-      // consequence was specific and bad: if the thread update failed, the UI flipped to
-      // "Handled by: AI Assistant" while agent_state was unchanged — and maybeRunAgentReply's
-      // `if (thread.agent_state !== 'active') return` then silently declined to answer a
-      // conversation the operator believed the AI owned. remove_participant, in this same
-      // file, has always done `if (error) throw`.
+      // Checked: a failed write must not read as "Handled by: AI Assistant" while nothing changed.
       const { error: threadErr } = await db.from('inbox_threads')
         .update({ agent_state: state, agent_id: agentId }).eq('id', threadId);
       if (threadErr) throw new HttpError(500, `Could not change agent state: ${threadErr.message}`);
@@ -2576,6 +2746,7 @@ async function handleJwtAction(
           : state === 'suggesting'
             ? 'The AI assistant will draft replies here for the team to review.'
             : 'Conversation handed to the AI assistant, which will reply directly.',
+        metadata: { event: { kind: 'agent_state', state, actor_user_id: userId } },
       });
       if (noteErr) console.error('[inbox-api] set_agent system note failed (non-fatal):', noteErr.message);
       return json({ ok: true, agent_state: state });
@@ -2746,10 +2917,9 @@ async function handleJwtAction(
         }
       }
 
-      // Attach the human assignees (active `user` participants) for the same threads. Assignment
-      // is modelled as a participant row, not a column on the thread, so the mailbox list had no
-      // way to show or filter by who owns a conversation without this second round trip.
+      // The teammates on each thread (who can see it); the ONE owner is `assigned_user_id`.
       const assigneesByThread = new Map<string, Array<{ user_id: string; name: string; thread_role: string }>>();
+      const assigneeNameById = new Map<string, string>();
       // ...and the COUNTERPARTY, from the same rows — see `counterpartyParticipantId`. The list
       // row draws that person's face, and it has to be the face the open thread draws.
       const counterpartyByThread = new Map<string, string>();
@@ -2803,8 +2973,10 @@ async function handleJwtAction(
         }
         const partRows = allRows.filter((p) => p.participant_type === 'member' && p.user_id) as
           Array<{ user_id: string; thread_id: string; thread_role: string }>;
-        const assigneeIds = [...new Set(partRows.map((p) => p.user_id))];
-        const nameById = new Map<string, string>();
+        const assignedIds = ((threads || []) as Array<Record<string, unknown>>).map((t) => t.assigned_user_id)
+          .filter((v): v is string => typeof v === 'string');
+        const assigneeIds = [...new Set([...partRows.map((p) => p.user_id), ...assignedIds])];
+        const nameById = assigneeNameById;
         if (assigneeIds.length) {
           const { data: profiles } = await db.from('user_profiles')
             .select('user_id, full_name, email').in('user_id', assigneeIds);
@@ -2861,6 +3033,7 @@ async function handleJwtAction(
           needs_reply: rs ? rs.waiting_on === 'us' : null,
           labels: labelsByThread.get(id) || [],
           assignees: assigneesByThread.get(id) || [],
+          assignee_name: t.assigned_user_id ? (assigneeNameById.get(String(t.assigned_user_id)) ?? null) : null,
           counterparty_participant_id: counterpartyByThread.get(id) ?? null,
           counterparty_avatar_slot: avatarSlotByThread.get(id) ?? null,
           has_attachments: withFiles.has(id),
@@ -3355,8 +3528,9 @@ async function handleJwtAction(
       // A business line has no named person, and that is a complete party — returning nothing for
       // it hid the company somebody had just filed, left the "Find the business" button on screen,
       // and put a second paid research run one click away.
+      const conversationsP = recentConversations(db, thread, contactId, userId, operator);
       if (!contactId && !party.companyId) {
-        return json({ contact: null, company: null, quotes: [], projects: [], invoices: [], orders: [], metrics: null });
+        return json({ contact: null, company: null, quotes: [], projects: [], invoices: [], orders: [], metrics: null, conversations: await conversationsP });
       }
 
       const { data: contact } = contactId
@@ -3469,6 +3643,7 @@ async function handleJwtAction(
       return json({
         contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, orders, metrics,
         deals: dealsRes.data ?? [], meetings: meetingsRes.data ?? [], appointments: apptsRes.data ?? [], tasks: tasksRes.data ?? [],
+        conversations: await conversationsP,
       });
     }
 

@@ -18,6 +18,7 @@ import { inboxApi, signInboxAttachment, type InboxThread, type InboxMessage, typ
 import { avatarTint, castAvatarSrc, initials } from '../inboxFormat';
 import { DeliveryState, ParticipantLabel, SourceTag } from './InboxPrimitives';
 import { AttachmentView } from './AttachmentView';
+import { ThreadEventCard, classifyThreadEvent } from './ThreadEventCard';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Message bubble
@@ -369,10 +370,12 @@ export const MessageBubble: React.FC<{
   mood?: string | null;
   /** The thread's workspace, for the expense a classified supplier invoice can become. */
   workspaceId?: string;
+  /** Offered on a handoff event when the caller does not already own the conversation. */
+  onTakeOver?: () => void;
 }> = ({
   m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onReplyTo, onReact,
   onPrivateReply, onToggleHidden, mood, onForward, onTogglePin, onToggleStar, starred,
-  onAddToNote, onDelete, workspaceId,
+  onAddToNote, onDelete, workspaceId, onTakeOver,
 }) => {
   const { toast } = useToast();
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -416,6 +419,8 @@ export const MessageBubble: React.FC<{
   const isForwarded = !!meta.forwarded_from;
   const displayLabel = info?.label ?? externalAuthor ?? undefined;
 
+  const event = isSystem ? classifyThreadEvent(m) : null;
+  if (event) return <ThreadEventCard m={m} event={event} onTakeOver={onTakeOver} />;
   if (isSystem) {
     return (
       <div className="flex justify-center my-1.5">
