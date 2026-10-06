@@ -43,7 +43,23 @@ export function feedUrl(token: string): string {
   return `${base.replace(/\/$/, '')}/functions/v1/product-feed?token=${encodeURIComponent(token)}`;
 }
 
+export interface PublishCoverage { priced: number; published: number }
+
 export const productFeedsService = {
+  /**
+   * Priced products vs those published to the storefront. A feed lists only the published
+   * ones by default, so "5,000 products, 0 listed" is a correct and completely silent state.
+   */
+  async publishCoverage(workspaceId: string): Promise<PublishCoverage> {
+    const [all, pub] = await Promise.all([
+      supabase.from('product_prices').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId),
+      supabase.from('product_prices').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId).eq('storefront_published', true),
+    ]);
+    return { priced: all.count ?? 0, published: pub.count ?? 0 };
+  },
+
   async list(workspaceId: string): Promise<ProductFeed[]> {
     const { data, error } = await supabase.from('product_feeds').select(COLUMNS)
       .eq('workspace_id', workspaceId).order('created_at');

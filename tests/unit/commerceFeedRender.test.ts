@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   renderGoogleFeed, renderSkroutzFeed, renderBestPriceFeed, escapeXml, stripHtml, feedGaps, gapSummary,
+  stockState,
   type FeedProduct,
 } from '../../supabase/functions/_shared/commerce/feed-render';
 
@@ -85,6 +86,36 @@ describe('BestPrice is a third dialect, not the Skroutz one renamed', () => {
     const xml = renderBestPriceFeed([{ ...FULL, barcode: null, weight_kg: null }], new Date());
     expect(xml).not.toContain('<ean>');
     expect(xml).not.toContain('<weight>');
+  });
+});
+
+describe('"nobody has counted this" is not "none left"', () => {
+  it('reads an absent warehouse row as on order, and a counted zero as out of stock', () => {
+    expect(stockState({ ...FULL, quantity: null })).toBe('on_order');
+    expect(stockState({ ...FULL, quantity: 0 })).toBe('out_of_stock');
+    expect(stockState({ ...FULL, quantity: 5 })).toBe('in_stock');
+  });
+
+  it('Google gets backorder for on-order — a distinct value from out of stock', () => {
+    const onOrder = renderGoogleFeed([{ ...FULL, quantity: null }], { title: 'T', link: 'l' });
+    expect(onOrder).toContain('<g:availability>backorder</g:availability>');
+    expect(renderGoogleFeed([{ ...FULL, quantity: 0 }], { title: 'T', link: 'l' }))
+      .toContain('<g:availability>out of stock</g:availability>');
+  });
+
+  it('Skroutz omits <quantity> when uncounted rather than claiming zero', () => {
+    expect(renderSkroutzFeed([{ ...FULL, quantity: null }], new Date())).not.toContain('<quantity>');
+    expect(renderSkroutzFeed([{ ...FULL, quantity: 0 }], new Date())).toContain('<quantity>0</quantity>');
+  });
+
+  it('BestPrice omits <stock> when uncounted — Y/N cannot say "not counted"', () => {
+    expect(renderBestPriceFeed([{ ...FULL, quantity: null }], new Date())).not.toContain('<stock>');
+    expect(renderBestPriceFeed([{ ...FULL, quantity: 0 }], new Date())).toContain('<stock>N</stock>');
+  });
+
+  it('an uncounted product still states a delivery expectation, not an empty availability', () => {
+    expect(renderBestPriceFeed([{ ...FULL, quantity: null }], new Date()))
+      .toContain('<availability>Κατόπιν παραγγελίας</availability>');
   });
 });
 

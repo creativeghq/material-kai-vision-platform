@@ -83,6 +83,9 @@ const TARGET_FIELDS: Array<{ value: string; label: string; required: boolean }> 
   { value: 'material', label: 'Material', required: false },
   { value: 'images', label: 'Image URLs', required: false },
   { value: 'external_sku', label: 'SKU / External ID', required: false },
+  { value: 'mpn', label: 'MPN (manufacturer part number)', required: false },
+  { value: 'barcode', label: 'Barcode / EAN', required: false },
+  { value: 'weight', label: 'Weight (kg)', required: false },
 ];
 
 // Targets that, when mapped, count as "auto-mapped" so we can collapse them.

@@ -1107,6 +1107,12 @@ const ATTRIBUTE_TARGET_FIELDS = [
   'designer', 'collection', 'finish', 'material',
 ];
 
+// Real `products` columns, not facets: they go top-level ONLY, never into the metadata blob
+// the canonicalizer whitelists. Skroutz and BestPrice both make MPN mandatory and drop a
+// product missing one silently, per product, so with no target for it the operator's only
+// option was `metadata` — which stores the value and leaves the column NULL.
+const COLUMN_TARGET_FIELDS = ['mpn', 'barcode', 'weight'];
+
 // `external_sku` is special — Python's re-import dedup reads from
 // product_data.product_id / product_data.sku / metadata.product_id
 // (data_import_service.py:628-631). We mirror to all three so an operator
@@ -1119,6 +1125,7 @@ const SKU_TARGET = 'external_sku';
 const ALL_RESOLVABLE_TARGETS = [
   ...STRUCTURAL_TARGET_FIELDS,
   ...ATTRIBUTE_TARGET_FIELDS,
+  ...COLUMN_TARGET_FIELDS,
   SKU_TARGET,
 ];
 
@@ -1211,6 +1218,7 @@ function buildProductWithMappings(
     const isKnownTarget =
       STRUCTURAL_TARGET_FIELDS.includes(target) ||
       ATTRIBUTE_TARGET_FIELDS.includes(target) ||
+      COLUMN_TARGET_FIELDS.includes(target) ||
       target === SKU_TARGET ||
       target === 'images';
     if (!isKnownTarget) {
@@ -1296,6 +1304,9 @@ function buildProductWithMappings(
   // text embedding concat. Indexed assignment keeps the typed ProductData
   // interface above unchanged while still landing the keys in the JSON shape.
   for (const target of ATTRIBUTE_TARGET_FIELDS) {
+    if (resolved[target]) (product as Record<string, any>)[target] = resolved[target];
+  }
+  for (const target of COLUMN_TARGET_FIELDS) {
     if (resolved[target]) (product as Record<string, any>)[target] = resolved[target];
   }
   // SKU also mirrored to top-level product_id + sku for dedup paths 1 and 2.

@@ -36,9 +36,25 @@ function money(n: number): string {
   return (Math.round(n * 100) / 100).toFixed(2);
 }
 
-function availability(p: FeedProduct): string {
-  return p.in_stock ? 'Άμεσα διαθέσιμο' : 'Κατόπιν παραγγελίας';
+export type StockState = 'in_stock' | 'on_order' | 'out_of_stock';
+
+/**
+ * A product with NO warehouse row is not out of stock — nobody has counted it. Most of a
+ * supplier catalogue is made to order, so collapsing the two drops the whole catalogue from
+ * the feed and reports the same 200 either way.
+ */
+export function stockState(p: FeedProduct): StockState {
+  if (p.quantity === null) return 'on_order';
+  return p.quantity > 0 ? 'in_stock' : 'out_of_stock';
 }
+
+function availability(p: FeedProduct): string {
+  return stockState(p) === 'in_stock' ? 'Άμεσα διαθέσιμο' : 'Κατόπιν παραγγελίας';
+}
+
+const GOOGLE_AVAILABILITY: Record<StockState, string> = {
+  in_stock: 'in stock', on_order: 'backorder', out_of_stock: 'out of stock',
+};
 
 export function renderGoogleFeed(products: readonly FeedProduct[], meta: { title: string; link: string }): string {
   const items = products.map((p) => `    <item>
@@ -47,7 +63,7 @@ export function renderGoogleFeed(products: readonly FeedProduct[], meta: { title
       <description>${escapeXml(stripHtml(p.description, 5000))}</description>
       <link>${escapeXml(p.link)}</link>
       ${p.image ? `<g:image_link>${escapeXml(p.image)}</g:image_link>` : ''}
-      <g:availability>${p.in_stock ? 'in stock' : 'out of stock'}</g:availability>
+      <g:availability>${GOOGLE_AVAILABILITY[stockState(p)]}</g:availability>
       <g:price>${money(p.price_gross)} ${escapeXml(p.currency)}</g:price>
       ${p.brand ? `<g:brand>${escapeXml(p.brand)}</g:brand>` : ''}
       ${p.mpn ? `<g:mpn>${escapeXml(p.mpn)}</g:mpn>` : ''}
@@ -82,8 +98,7 @@ export function renderSkroutzFeed(products: readonly FeedProduct[], now: Date): 
       <mpn>${escapeXml(p.mpn ?? '')}</mpn>
       <ean>${escapeXml(p.barcode ?? '')}</ean>
       <availability>${availability(p)}</availability>
-      <quantity>${p.quantity ?? 0}</quantity>
-      <description>${escapeXml(stripHtml(p.description, 10000))}</description>
+${p.quantity === null ? '' : `      <quantity>${p.quantity}</quantity>\n`}      <description>${escapeXml(stripHtml(p.description, 10000))}</description>
 ${p.weight_kg ? `      <weight>${money(p.weight_kg)}</weight>\n` : ''}    </product>`).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -107,8 +122,7 @@ export function renderBestPriceFeed(products: readonly FeedProduct[], now: Date)
       <brand>${escapeXml(p.brand ?? '')}</brand>
       <mpn>${escapeXml(p.mpn ?? '')}</mpn>
 ${p.barcode ? `      <ean>${escapeXml(p.barcode)}</ean>\n` : ''}      <availability>${availability(p)}</availability>
-      <stock>${p.in_stock ? 'Y' : 'N'}</stock>
-${p.weight_kg ? `      <weight>${money(p.weight_kg)}</weight>\n` : ''}    </product>`).join('\n');
+${p.quantity === null ? '' : `      <stock>${p.quantity > 0 ? 'Y' : 'N'}</stock>\n`}${p.weight_kg ? `      <weight>${money(p.weight_kg)}</weight>\n` : ''}    </product>`).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <store>

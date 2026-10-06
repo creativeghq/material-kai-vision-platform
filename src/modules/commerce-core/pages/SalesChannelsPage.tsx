@@ -26,7 +26,7 @@ import {
   storeConnectionsService, webhookUrl, type StoreConnection, type StoreSyncLogRow,
 } from '@/services/commerce/storeConnectionsService';
 import {
-  productFeedsService, feedUrl, FEED_FORMATS, type ProductFeed, type FeedFormat,
+  productFeedsService, feedUrl, FEED_FORMATS, type ProductFeed, type FeedFormat, type PublishCoverage,
 } from '@/services/commerce/productFeedsService';
 import { PayoutsCard } from '@/modules/commerce-core/components/PayoutsCard';
 import { SkroutzQueueCard } from '@/modules/commerce-core/components/SkroutzQueueCard';
@@ -101,6 +101,7 @@ export default function SalesChannelsPage() {
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const [feedEditing, setFeedEditing] = useState<string | null>(null);
   const [storefrontOpen, setStorefrontOpen] = useState<boolean | null>(null);
+  const [coverage, setCoverage] = useState<PublishCoverage | null>(null);
   const [rotateCreds, setRotateCreds] = useState<Record<string, string>>({});
   const [rotateSecret, setRotateSecret] = useState('');
 
@@ -121,16 +122,18 @@ export default function SalesChannelsPage() {
     if (!ws) return;
     setLoading(true);
     try {
-      const [conns, entries, feedRows, store] = await Promise.all([
+      const [conns, entries, feedRows, store, cover] = await Promise.all([
         storeConnectionsService.list(ws),
         storeConnectionsService.syncLog(ws),
         productFeedsService.list(ws),
         storefrontService.getConfig(ws),
+        productFeedsService.publishCoverage(ws),
       ]);
       setRows(conns);
       setLog(entries);
       setFeeds(feedRows);
       setStorefrontOpen(store.enabled);
+      setCoverage(cover);
     } catch (err) {
       toast({ title: 'Could not load sales channels', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     } finally {
@@ -442,6 +445,18 @@ export default function SalesChannelsPage() {
                     marketplace would import offers that all land on <em>This store is not open</em>. The feed
                     refuses to build until you open it, at{' '}
                     <Link className="underline" to={financeTabUrl(FINANCE_TAB.settings)}>Finance → Settings</Link>.
+                  </span>
+                </p>
+              )}
+              {coverage && coverage.priced > 0 && coverage.published === 0 && (
+                <p className="flex items-start gap-2 rounded-sm border border-hairline bg-surface-sunken p-2 text-xs text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    {coverage.priced} priced product{coverage.priced === 1 ? '' : 's'}, none published
+                    to the storefront — so a feed lists nothing and still returns a healthy 200.
+                    Publish them at{' '}
+                    <Link className="underline" to={financeTabUrl(FINANCE_TAB.settings)}>Finance → Settings</Link>,
+                    or let a feed list unpublished products in <em>Choose what it lists</em>.
                   </span>
                 </p>
               )}

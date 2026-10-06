@@ -4,7 +4,8 @@ import { grossFromNet } from '../_shared/money.ts';
 import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
 import { imageFromMetadata } from '../_shared/product-media.ts';
 import {
-  renderGoogleFeed, renderSkroutzFeed, renderBestPriceFeed, gapSummary, escapeXml, type FeedProduct,
+  renderGoogleFeed, renderSkroutzFeed, renderBestPriceFeed, gapSummary, stockState, escapeXml,
+  type FeedProduct,
 } from '../_shared/commerce/feed-render.ts';
 
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
@@ -131,7 +132,11 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
     };
   });
 
-  const listed = feed.include_out_of_stock ? products : products.filter((p) => p.in_stock);
+  // Only a COUNTED zero is withheld. A product nobody has stocked is on order, not absent —
+  // dropping those empties the feed for any catalogue that is sold to order.
+  const listed = feed.include_out_of_stock
+    ? products
+    : products.filter((p) => stockState(p) !== 'out_of_stock');
 
   const now = new Date();
   const body = feed.format === 'skroutz'
