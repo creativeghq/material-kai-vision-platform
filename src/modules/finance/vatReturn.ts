@@ -158,8 +158,18 @@ export function residualVerdict(residual: number | null | undefined): {
   };
 }
 
-/** Monthly first (the Φ.2 is moving to monthly); quarters stay for businesses not moved yet. */
-export function vatPeriodPresets(today: Date): Array<{ key: string; label: string; from: string; to: string }> {
+export const VAT_FILING_FREQUENCIES = ['monthly', 'quarterly'] as const;
+export type VatFilingFrequency = typeof VAT_FILING_FREQUENCIES[number];
+
+export const VAT_FILING_FREQUENCY_LABEL: Record<VatFilingFrequency, string> = {
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+};
+
+/** The business's own filing period comes first; the other kind stays offered below it. */
+export function vatPeriodPresets(
+  today: Date, frequency: VatFilingFrequency = 'monthly',
+): Array<{ key: string; label: string; from: string; to: string }> {
   const iso = (y: number, m: number, d: number) =>
     `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   const monthEnd = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
@@ -186,14 +196,23 @@ export function vatPeriodPresets(today: Date): Array<{ key: string; label: strin
   const monthName = (offset: number) =>
     new Date(y, m + offset, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
-  return [
+  const quarterName = (offset: number) => {
+    const s = new Date(y, Math.floor(m / 3) * 3 + offset * 3, 1);
+    return `Q${Math.floor(s.getMonth() / 3) + 1} ${s.getFullYear()}`;
+  };
+
+  const months = [
     { key: 'last_month', label: `${monthName(-1)} (last month)`, ...month(-1) },
     { key: 'month_minus_2', label: monthName(-2), ...month(-2) },
     { key: 'month_minus_3', label: monthName(-3), ...month(-3) },
     { key: 'this_month', label: `${monthName(0)} (so far)`, ...month(0) },
-    { key: 'last_quarter', label: 'Last quarter (quarterly filers)', ...quarter(-1) },
-    { key: 'this_quarter', label: 'This quarter (quarterly filers)', ...quarter(0) },
   ];
+  const quarters = [
+    { key: 'last_quarter', label: `${quarterName(-1)} (last quarter)`, ...quarter(-1) },
+    { key: 'quarter_minus_2', label: quarterName(-2), ...quarter(-2) },
+    { key: 'this_quarter', label: `${quarterName(0)} (so far)`, ...quarter(0) },
+  ];
+  return frequency === 'quarterly' ? [...quarters, ...months] : [...months, ...quarters];
 }
 
 export const VAT_PERIOD_STATUS_LABEL: Record<string, string> = {

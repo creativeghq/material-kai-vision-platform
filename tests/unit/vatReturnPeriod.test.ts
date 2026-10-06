@@ -195,6 +195,19 @@ describe('the period presets are whole months, because the book is', () => {
     expect(p.slice(1, 3).map((x) => x.from)).toEqual(['2026-08-01', '2026-07-01']);
   });
 
+  it('a quarterly filer opens on the last finished quarter, months still offered', () => {
+    const p = vatPeriodPresets(new Date(2026, 9, 6), 'quarterly');
+    expect(p[0]).toMatchObject({ key: 'last_quarter', from: '2026-07-01', to: '2026-09-30' });
+    expect(p[1]).toMatchObject({ from: '2026-04-01', to: '2026-06-30' });
+    expect(p.some((x) => x.key === 'last_month')).toBe(true);
+  });
+
+  it('quarterly presets cross the year boundary with the right labels', () => {
+    const p = vatPeriodPresets(new Date(2026, 0, 15), 'quarterly');
+    expect(p[0]).toMatchObject({ label: 'Q4 2025 (last quarter)', from: '2025-10-01', to: '2025-12-31' });
+    expect(p[1]).toMatchObject({ label: 'Q3 2025', from: '2025-07-01', to: '2025-09-30' });
+  });
+
   it('a February end is the real one, not a 30th', () => {
     const mar = vatPeriodPresets(new Date(2026, 2, 3));
     expect(mar.find((p) => p.key === 'last_month')!.to).toBe('2026-02-28');

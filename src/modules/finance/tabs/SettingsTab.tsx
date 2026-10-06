@@ -17,6 +17,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
 import { EDITABLE_SETTING_KEYS } from './settingsKeys';
+import { VAT_FILING_FREQUENCIES, VAT_FILING_FREQUENCY_LABEL } from '@/modules/finance/vatReturn';
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 import { PaymentProvidersCard } from '@/modules/payments/components/PaymentProvidersCard';
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
@@ -545,6 +546,25 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               <MoneyInput value={settings.default_vat_rate} displayDecimals={null}
                 onValueChange={(v) => set('default_vat_rate', v ?? 0)} />
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="vat-filing-frequency">VAT return (Φ.2) filing</Label>
+            <Select value={settings.vat_filing_frequency}
+              onValueChange={(v) => {
+                const f = VAT_FILING_FREQUENCIES.find((x) => x === v);
+                if (f) set('vat_filing_frequency', f);
+              }}>
+              <SelectTrigger id="vat-filing-frequency"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {VAT_FILING_FREQUENCIES.map((f) => (
+                  <SelectItem key={f} value={f}>{VAT_FILING_FREQUENCY_LABEL[f]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              How often this business files its VAT return. The VAT Return page opens on your last finished period, and the &ldquo;VAT return ready&rdquo; reminder is sent once per period.
+            </p>
           </div>
 
           <div className="space-y-1">

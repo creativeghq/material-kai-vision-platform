@@ -23,13 +23,13 @@ import { aadeVerdict } from '@/modules/finance/pnlStatus';
 import {
   sortVatReturnLines, vatReturnLineLabel, vatPayableLabel, vatDifferenceLines,
   residualVerdict, vatPeriodPresets, worseAadeStatus, type VatReturnSnapshot,
-  VAT_PERIOD_STATUS_LABEL, PREFILL_STATUS_LABEL,
+  VAT_PERIOD_STATUS_LABEL, PREFILL_STATUS_LABEL, type VatFilingFrequency,
 } from '@/modules/finance/vatReturn';
 
 const HOW_IT_WORKS: Array<{ title: string; body: string }> = [
   {
     title: 'Pick the period you declare',
-    body: 'The Φ.2 is moving to monthly filing, so the page opens on last month and offers the three months before it. Quarterly presets remain for businesses not moved yet. ΑΑΔΕ keeps its book by month, so a part-month cannot be compared.',
+    body: 'The page opens on your last finished filing period, monthly or quarterly as set in Finance → Settings → General. The other kind of period stays in the list. ΑΑΔΕ keeps its book by month, so a part-month cannot be compared.',
   },
   {
     title: 'Read the three figures',
@@ -62,10 +62,12 @@ const Figure: React.FC<{ value: number | null | undefined; status?: string; clas
   return <span className={`tabular-nums ${className ?? ''}`}>{formatMoney(value)}</span>;
 };
 
-export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+export const VatReturnPanel: React.FC<{ workspaceId: string; filingFrequency: VatFilingFrequency | null }> = ({
+  workspaceId, filingFrequency,
+}) => {
   const { toast } = useToast();
   const { isWorkspaceManager } = usePermissions();
-  const presets = React.useMemo(() => vatPeriodPresets(new Date()), []);
+  const presets = React.useMemo(() => vatPeriodPresets(new Date(), filingFrequency ?? 'monthly'), [filingFrequency]);
   const [range, setRange] = React.useState({ from: presets[0].from, to: presets[0].to });
   const [snap, setSnap] = React.useState<VatReturnSnapshot | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -204,6 +206,14 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       </CardHeader>
 
       <CardContent className="space-y-5 pt-5">
+        {filingFrequency == null && (
+          <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Your filing frequency could not be read from Finance → Settings, so monthly periods are
+            listed first. Pick a quarter below if you file quarterly.
+          </p>
+        )}
+
         <Collapsible className="rounded-md border border-hairline">
           <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 p-3 text-left text-sm font-medium">
             How this works
@@ -213,7 +223,7 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
             <ol className="space-y-2">
               {HOW_IT_WORKS.map((s, i) => (
                 <li key={s.title} className="flex gap-3 text-xs">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-sunken font-medium tabular-nums">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-surface-sunken font-medium tabular-nums">
                     {i + 1}
                   </span>
                   <span>
@@ -224,8 +234,9 @@ export const VatReturnPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
               ))}
             </ol>
             <p className="text-xs text-muted-foreground">
-              The &ldquo;VAT return ready&rdquo; notification is sent once per month, as soon as
-              ΑΑΔΕ&apos;s book for a finished month has both sides. Its amount is ΑΑΔΕ&apos;s figure,
+              The &ldquo;VAT return ready&rdquo; notification is sent once per filing period
+              ({filingFrequency === 'quarterly' ? 'quarter' : 'month'}), as soon as ΑΑΔΕ&apos;s
+              book has both sides for every month in it. Its amount is ΑΑΔΕ&apos;s figure,
               so it can differ from yours until the differences below are cleared.
             </p>
           </CollapsibleContent>

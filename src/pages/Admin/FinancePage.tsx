@@ -287,12 +287,14 @@ const FinancePage: React.FC = () => {
   /** Expense whose document metadata is being edited (backfill Bill #, dates, category). */
   const [editBillId, setEditBillId] = useState<string | null>(null);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
+  const [settingsSettled, setSettingsSettled] = useState(false);
 
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
 
   useEffect(() => {
     if (!workspaceId) return;
-    void financeService.getSettings(workspaceId).then(setSettings).catch(() => { /* ignore */ });
+    void financeService.getSettings(workspaceId).then(setSettings).catch(() => { /* ignore */ })
+      .finally(() => setSettingsSettled(true));
   }, [workspaceId]);
 
   useEffect(() => { if (workspaceId) void loadAll(workspaceId); }, [workspaceId]);
@@ -1374,7 +1376,13 @@ const FinancePage: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="vat_return" className="space-y-4">
-            {workspaceId && <VatReturnPanel workspaceId={workspaceId} />}
+            {workspaceId && settingsSettled && (
+              <VatReturnPanel
+                key={settings?.vat_filing_frequency ?? 'unknown'}
+                workspaceId={workspaceId}
+                filingFrequency={settings?.vat_filing_frequency ?? null}
+              />
+            )}
           </TabsContent>
 
           {/* ─────────── myDATA BOOK (read-only AADE mirror) ─────────── */}

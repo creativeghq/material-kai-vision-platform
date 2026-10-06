@@ -34,6 +34,7 @@ export const EDITABLE_SETTING_KEYS = [
   'negative_margin_policy',
   'sales_can_see_cost',
   'trip_expense_reimbursement_mode',
+  'vat_filing_frequency',
   // The five that were missing. The Digest panel has edited them all along.
   'digest_enabled',
   'digest_frequency',

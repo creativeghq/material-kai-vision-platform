@@ -709,6 +709,7 @@ export interface PnlRow {
 // `@/modules/finance/pnlStatus`, so a card can read the verdict without pulling this service.
 export type { PnlAadeStatus, PnlBooksStatus } from '@/modules/finance/pnlStatus';
 import type { PnlAadeStatus, PnlBooksStatus } from '@/modules/finance/pnlStatus';
+import type { VatFilingFrequency } from '@/modules/finance/vatReturn';
 
 /**
  * The period P&L. Three facts that are never merged: what OUR documents say, what AADE holds
@@ -3436,6 +3437,7 @@ export interface FinanceSettings {
   invoice_show_previous_balance: boolean;
   /** How an approved trip card posts to the ledger: planned_payment (auto-reimburse) | none. */
   trip_expense_reimbursement_mode: 'planned_payment' | 'none';
+  vat_filing_frequency: VatFilingFrequency;
   updated_at: string;
 }
 
@@ -3772,7 +3774,7 @@ const _financeServiceV2 = {
       'negative_margin_policy','sales_can_see_cost',
       'invoice_template_id','invoice_template_colors','default_invoice_notes',
       'invoice_show_pay_link','invoice_show_previous_balance',
-      'trip_expense_reimbursement_mode',
+      'trip_expense_reimbursement_mode', 'vat_filing_frequency',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];
     }

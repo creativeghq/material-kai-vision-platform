@@ -8768,6 +8768,7 @@ export type Database = {
           statement_template_footer_path: string | null
           statements_enabled: boolean
           trip_expense_reimbursement_mode: string
+          vat_filing_frequency: string
           updated_at: string
           warehouse_autosync_mode: string
           workspace_id: string
@@ -8884,6 +8885,7 @@ export type Database = {
           statement_template_footer_path?: string | null
           statements_enabled?: boolean
           trip_expense_reimbursement_mode?: string
+          vat_filing_frequency?: string
           updated_at?: string
           warehouse_autosync_mode?: string
           workspace_id: string
@@ -9000,6 +9002,7 @@ export type Database = {
           statement_template_footer_path?: string | null
           statements_enabled?: boolean
           trip_expense_reimbursement_mode?: string
+          vat_filing_frequency?: string
           updated_at?: string
           warehouse_autosync_mode?: string
           workspace_id?: string
