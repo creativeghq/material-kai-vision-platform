@@ -63,13 +63,6 @@ export interface CreditSpendSummary {
   by_category: CreditSpendCategory[];
 }
 
-export interface DebitResult {
-  success: boolean;
-  new_balance: number;
-  transaction_id?: string;
-  error_message?: string;
-}
-
 export interface GrantResult {
   success: boolean;
   new_balance: number;
@@ -171,32 +164,6 @@ export const creditsAPI = {
     if (error) throw error;
 
     return { data: data || [], count: count || 0 };
-  },
-
-  /**
-   * Debit credits from user account
-   * This should only be called by backend services, not directly from frontend
-   */
-  async debitCredits(
-    amount: number,
-    operationType: string,
-    description?: string,
-    metadata?: any,
-  ): Promise<DebitResult> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase.rpc('debit_user_credits', {
-      p_user_id: user.id,
-      p_amount: amount,
-      p_operation_type: operationType,
-      p_description: description,
-      p_metadata: metadata,
-    });
-
-    if (error) throw error;
-
-    return data[0];
   },
 
   /**

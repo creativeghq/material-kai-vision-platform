@@ -98,9 +98,6 @@
       "previewSend",
       "publicUrlFor"
     ],
-    "src/services/credits.service.ts": [
-      "debitCredits"
-    ],
     "src/services/crm.service.ts": [
       "bulkLinkContacts",
       "createCheckoutSession",
