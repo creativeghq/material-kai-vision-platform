@@ -22,7 +22,7 @@ import { bulkSummary, runBulk } from './inboxBulk';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { useTrackOpens, type MailOpens } from './components/OpenTracking';
 import { encodeAttachments } from './composerAttachments';
-import { useComposerSettings, withSignature } from './useComposerSettings';
+import { useComposerSettings } from './useComposerSettings';
 
 
 
@@ -665,7 +665,6 @@ export function useInboxPage() {
   const composerSettings = useComposerSettings(activeThread?.workspace_id, myUserId);
   const [includeSignature, setIncludeSignature] = useState(true);
   useEffect(() => { setIncludeSignature(true); }, [activeId]);
-  const signature = isEmailReply && includeSignature ? composerSettings.settings.email_signature : '';
   const emailRecipients = useMemo(
     () => (activeThread?.channel === 'email' ? emailReplyRecipients(messages, activeThread.metadata as Record<string, unknown> | null) : null),
     [activeThread, messages],
@@ -716,7 +715,7 @@ export function useInboxPage() {
       const tracked = isEmailReply && trackOpens;
       const sent = await inboxApi.sendMessage({
         thread_id: activeId,
-        body: (isNote ? draft.trim() : withSignature(draft.trim(), signature)) || undefined,
+        body: draft.trim() || undefined,
         attachments: encoded,
         message_type: isNote ? 'note' : 'text',
         // A private note quotes nothing on the platform — there is no platform message to quote.
@@ -726,6 +725,7 @@ export function useInboxPage() {
         client_token: sendToken.current ?? undefined,
         ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc) } : {}),
         ...(tracked ? { track_opens: true } : {}),
+        ...(isEmailReply && includeSignature ? { include_signature: true } : {}),
       });
       if (tracked && sent?.message?.id) setMessageOpens((cur) => ({ ...cur, [sent.message.id]: { count: 0, first_opened_at: null, last_opened_at: null } }));
       sendToken.current = null;
@@ -742,7 +742,7 @@ export function useInboxPage() {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachments, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, signature]);
+  }, [activeId, draft, attachments, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, includeSignature]);
 
   const sendAndClose = useCallback(async () => {
     const threadId = activeId;
@@ -769,16 +769,16 @@ export function useInboxPage() {
     try {
       const encoded = attachments.length ? await encodeAttachments(attachments) : undefined;
       await inboxApi.scheduleMessage({
-        thread_id: activeId, send_at: sendAt.toISOString(), body: withSignature(draft.trim(), signature) || undefined, attachments: encoded,
+        thread_id: activeId, send_at: sendAt.toISOString(), body: draft.trim() || undefined, attachments: encoded,
         reply_to_message_id: replyTo ? replyTo.id : undefined,
-        ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc), track_opens: trackOpens } : {}),
+        ...(isEmailReply ? { email_cc: splitAddresses(emailCc), email_bcc: splitAddresses(emailBcc), track_opens: trackOpens, include_signature: includeSignature } : {}),
       });
       toast({ title: 'Scheduled', description: `It goes out ${formatDate(sendAt.toISOString())} ${formatTime(sendAt.toISOString())}.` });
       resetComposer();
     } catch (e) {
       toast({ title: 'Could not schedule', description: (e as Error).message, variant: 'destructive' });
     } finally { setSending(false); }
-  }, [activeId, isNote, draft, attachments, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, signature]);
+  }, [activeId, isNote, draft, attachments, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, includeSignature]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   // The steer, when the member typed one, tells it WHAT the reply should do.

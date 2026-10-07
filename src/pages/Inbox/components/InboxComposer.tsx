@@ -24,6 +24,7 @@ import { addComposerFiles, composerTakesFiles } from '../composerAttachments';
 import { formatBytes } from '../gmail/mailParts';
 import { inboxApi } from '@/services/inboxApi';
 import { ComposerSettingsPopover } from './ComposerSettingsPopover';
+import { signaturePreviewText } from '../useComposerSettings';
 import { useReplyAutocomplete } from '../useReplyAutocomplete';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import type { InboxPageState } from '../useInboxPage';
@@ -66,7 +67,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     draft,
     textareaRef: composerRef,
   });
-  const signature = composerSettings.settings.email_signature.trim();
+  const signature = signaturePreviewText(composerSettings.settings);
   useEffect(() => {
     if (takesFiles || !attachments.length) return;
     setAttachments([]);

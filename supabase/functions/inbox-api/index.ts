@@ -75,6 +75,7 @@ import { handoffSince, stripQuotedEmail, TRANSCRIPT_MESSAGE_MAX } from '../_shar
 import { escapeHtml } from '../_shared/html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
 import { withTrackingPixel } from '../_shared/mail-tracking.ts';
+import { normalizeSignatureCard, renderSignatureHtml, renderSignatureText } from '../_shared/emailSignature.generated.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
@@ -1443,6 +1444,21 @@ async function messageOpens(db: DbClient, messageIds: string[]): Promise<Message
   return out;
 }
 
+async function loadEmailSignature(db: DbClient, userId: string, workspaceId: string): Promise<{ text: string; html: string } | null> {
+  const { data, error } = await db.from('inbox_composer_settings')
+    .select('email_signature, signature_card').eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle();
+  if (error) {
+    console.error('[inbox-api] signature not loaded, sending unsigned', error.message);
+    return null;
+  }
+  const card = normalizeSignatureCard(data?.signature_card);
+  if (card) return { text: renderSignatureText(card), html: renderSignatureHtml(card, escapeHtml) };
+  const plain = String(data?.email_signature ?? '').trim();
+  return plain
+    ? { text: plain, html: `<div style="white-space:pre-wrap;margin-top:18px;color:#555">-- \n${escapeHtml(plain)}</div>` }
+    : null;
+}
+
 async function insertMessageAndNotify(
   db: DbClient,
   opts: {
@@ -1466,6 +1482,8 @@ async function insertMessageAndNotify(
     clientToken?: string | null;
     emailCopies?: { cc: string[]; bcc: string[] };
     trackOpens?: boolean;
+    /** Append the sender's saved signature to an outgoing email; the stored body stays unsigned. */
+    signature?: boolean;
   },
 ): Promise<Record<string, unknown>> {
   const { thread, senderParticipantId, body, attachments, messageType, replyToWamid, replyToMessageId } = opts;
@@ -1672,10 +1690,16 @@ async function insertMessageAndNotify(
 
       const subjectBase = String(thread.subject || 'Your message');
       const subject = !lastInbound || /^re:/i.test(subjectBase) ? subjectBase : `Re: ${subjectBase}`;
-      const emailAttachments = await emailAttachmentsFor(db, attachments);
-      const text = cards.length
+      const [emailAttachments, signature] = await Promise.all([
+        emailAttachmentsFor(db, attachments),
+        opts.signature && opts.senderUserId
+          ? loadEmailSignature(db, opts.senderUserId, String(thread.workspace_id))
+          : Promise.resolve(null),
+      ]);
+      const unsignedText = cards.length
         ? buildEmailCardsText(cards, body)
         : (body ?? `Attached: ${emailAttachments.map((a) => a.filename).join(', ')}`);
+      const text = signature ? `${unsignedText}\n\n-- \n${signature.text}` : unsignedText;
 
       let trackId: string | null = null;
       if (opts.trackOpens && opts.senderUserId) {
@@ -1686,9 +1710,12 @@ async function insertMessageAndNotify(
         });
         if (trackErr) { console.error('[inbox-api] open tracking unavailable, sending untracked', trackErr.message); trackId = null; }
       }
-      const markupHtml = cards.length
+      const bodyHtml = cards.length
         ? buildEmailCardsHtml(cards, body)
         : hasEmailMarkup(body) ? renderEmailMarkup(String(body), escapeHtml) : null;
+      const markupHtml = signature
+        ? `${bodyHtml ?? `<div style="white-space:pre-wrap">${escapeHtml(unsignedText)}</div>`}${signature.html}`
+        : bodyHtml;
       const html = trackId ? withTrackingPixel(markupHtml, text, trackId) : markupHtml;
 
       let sendErr: string | null = null;
@@ -1735,6 +1762,7 @@ async function insertMessageAndNotify(
           // Stored so a reply quoting this Message-ID threads via ladder step 1.
           email_message_id: ourMessageId,
           email_to: toAddress,
+          ...(signature ? { email_signature: signature.text } : {}),
           ...(copies.cc.length ? { email_cc: copies.cc } : {}),
           ...(copies.bcc.length ? { email_bcc: copies.bcc } : {}),
           delivery_status: sendErr ? 'relay_failed' : 'sent',
@@ -2325,6 +2353,7 @@ async function handleJwtAction(
         clientToken,
         emailCopies,
         trackOpens: payload.track_opens === true,
+        signature: access.isMember && messageType !== 'note' && payload.include_signature === true,
       });
       if (messageType !== 'note') {
         const { error: draftErr } = await db.from('inbox_drafts').delete().eq('user_id', userId).eq('thread_id', threadId);
@@ -2372,6 +2401,7 @@ async function handleJwtAction(
         user_id: userId, workspace_id: String(thread.workspace_id), kind: 'inbox', inbox_thread_id: threadId,
         payload: {
           body, attachments, email_cc: copies.cc, email_bcc: copies.bcc, track_opens: payload.track_opens === true,
+          include_signature: payload.include_signature === true,
           ...(payload.reply_to_message_id ? { reply_to_message_id: String(payload.reply_to_message_id) } : {}),
         },
         send_at: sendAt.toISOString(),
@@ -4691,6 +4721,7 @@ async function handleJwtAction(
           senderParticipantId: (creatorP as { id: string }).id,
           body, attachments, messageType: 'text', senderUserId: userId, senderLabel: 'You',
           emailCopies, trackOpens: payload.track_opens === true,
+          signature: payload.include_signature !== false,
         });
       } catch (e) {
         if (e instanceof HttpError && e.status === 502) return json({ thread_id: threadId, delivery_error: e.message });
@@ -6318,6 +6349,7 @@ async function handler(req: Request): Promise<Response> {
     return handleJwtAction(db, String(row.user_id), 'send_message', {
       thread_id: row.inbox_thread_id, body: p.body ?? undefined, attachments: p.attachments ?? [],
       email_cc: p.email_cc ?? [], email_bcc: p.email_bcc ?? [], track_opens: p.track_opens === true,
+      include_signature: p.include_signature === true,
       ...(p.reply_to_message_id ? { reply_to_message_id: p.reply_to_message_id } : {}),
       client_token: row.id,
     });
@@ -6362,6 +6394,7 @@ async function handler(req: Request): Promise<Response> {
       messageType: 'text',
       senderUserId,
       senderLabel: 'Follow-up sent',
+      signature: true,
     });
     return json({ ok: true, message_id: (msg as { id?: string }).id ?? null });
   }

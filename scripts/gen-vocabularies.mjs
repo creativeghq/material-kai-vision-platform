@@ -15,6 +15,10 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/emailMarkup.generated.ts',
   ],
   [
+    'src/utils/emailSignature.ts',
+    'supabase/functions/_shared/emailSignature.generated.ts',
+  ],
+  [
     'src/modules/finance/invoice-templates/templateRegistry.ts',
     'supabase/functions/_shared/finance/invoiceTemplates.generated.ts',
   ],

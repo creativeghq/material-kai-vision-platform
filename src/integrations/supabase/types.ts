@@ -11926,6 +11926,7 @@ export type Database = {
         Row: {
           autocomplete_enabled: boolean
           email_signature: string
+          signature_card: Json | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -11933,6 +11934,7 @@ export type Database = {
         Insert: {
           autocomplete_enabled?: boolean
           email_signature?: string
+          signature_card?: Json | null
           updated_at?: string
           user_id: string
           workspace_id: string
@@ -11940,6 +11942,7 @@ export type Database = {
         Update: {
           autocomplete_enabled?: boolean
           email_signature?: string
+          signature_card?: Json | null
           updated_at?: string
           user_id?: string
           workspace_id?: string

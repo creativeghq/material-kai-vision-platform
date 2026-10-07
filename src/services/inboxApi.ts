@@ -612,7 +612,7 @@ export const inboxApi = {
   },
   scheduleMessage(input: {
     thread_id: string; send_at: string; body?: string; attachments?: AttachmentInput[];
-    email_cc?: string[]; email_bcc?: string[]; reply_to_message_id?: string; track_opens?: boolean;
+    email_cc?: string[]; email_bcc?: string[]; reply_to_message_id?: string; track_opens?: boolean; include_signature?: boolean;
   }) {
     return call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule_message', input);
   },
@@ -621,7 +621,7 @@ export const inboxApi = {
   },
   composeEmail(input: {
     workspace_id: string; to: string; subject: string; body?: string; contact_id?: string;
-    email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[]; track_opens?: boolean;
+    email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[]; track_opens?: boolean; include_signature?: boolean;
   }) {
     return call<{ thread_id: string; delivery_error: string | null }>('compose_email', input);
   },
@@ -675,6 +675,7 @@ export const inboxApi = {
     email_cc?: string[];
     email_bcc?: string[];
     track_opens?: boolean;
+    include_signature?: boolean;
   }) {
     return call<{ message: InboxMessage }>('send_message', input);
   },

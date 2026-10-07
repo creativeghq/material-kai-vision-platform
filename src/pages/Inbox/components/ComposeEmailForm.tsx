@@ -3,6 +3,7 @@ import { Loader2, Paperclip, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -42,6 +43,7 @@ export const ComposeEmailForm: React.FC<{
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [trackOpens, setTrackOpens] = useTrackOpens();
+  const [includeSignature, setIncludeSignature] = useState(true);
   const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
   const [preview, setPreview] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -90,6 +92,7 @@ export const ComposeEmailForm: React.FC<{
         email_bcc: splitAddresses(bcc),
         attachments: attachments.length ? attachments : undefined,
         ...(trackOpens ? { track_opens: true } : {}),
+        include_signature: includeSignature,
       });
       if (res.delivery_error) {
         toast({ title: 'Saved, but the email was NOT sent', description: res.delivery_error, variant: 'destructive' });
@@ -142,6 +145,10 @@ export const ComposeEmailForm: React.FC<{
           <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
           <ComposerInsertMenu workspaceId={workspaceId} currentText={body} recipient={{ email: to.trim() || null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
           <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} />
+          <label htmlFor="compose-include-signature" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Checkbox id="compose-include-signature" checked={includeSignature} onCheckedChange={(v) => setIncludeSignature(v === true)} />
+            Add my signature
+          </label>
         </div>
         {preview
           ? <EmailPreview value={body} onEdit={() => setPreview(false)} />
