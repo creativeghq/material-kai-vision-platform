@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Download, Loader2, Paperclip, Search } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Paperclip, Search } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Badge } from '@/components/core/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { downloadCSV } from '@/components/analytics/shared/analyticsUtils';
@@ -31,7 +30,8 @@ function dayStart(day: string, plusDays = 0): string | null {
 
 const who = (h: InboxMessageHit) => h.thread_subject || h.contact_phone || h.email_from || 'Conversation';
 
-export const MessageSearchDialog: React.FC<{
+/** The Inbox view for finding messages: it takes the place of the list and the conversation. */
+export const MessageSearchPanel: React.FC<{
   workspaceId: string;
   labels: InboxLabel[];
   initialChannels?: string[];
@@ -110,12 +110,14 @@ export const MessageSearchDialog: React.FC<{
   const chip = (on: boolean) => `h-7 px-2.5 rounded-sm border text-xs ${on ? 'border-primary/50 bg-primary/[0.08] text-primary' : 'border-hairline text-muted-foreground hover:text-foreground'}`;
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl h-[85vh] flex flex-col gap-3">
-        <DialogHeader>
-          <DialogTitle>Search Messages</DialogTitle>
-          <DialogDescription>Every message that matches, newest first. Open one to jump to its conversation.</DialogDescription>
-        </DialogHeader>
+    <section className="dashboard-card md:col-span-9 lg:col-span-10 flex-1 min-h-0 flex flex-col gap-3 overflow-hidden p-4">
+        <div className="flex items-start justify-between gap-3 shrink-0">
+          <div>
+            <h2 className="text-base font-semibold font-sans">Search Messages</h2>
+            <p className="text-xs text-muted-foreground">Every message that matches, newest first. Open one to jump to its conversation.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={onClose}><ArrowLeft className="w-3.5 h-3.5" />Conversations</Button>
+        </div>
 
         <div className="space-y-2 shrink-0">
           <div className="relative">
@@ -218,7 +220,6 @@ export const MessageSearchDialog: React.FC<{
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+    </section>
   );
 };

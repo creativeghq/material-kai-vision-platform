@@ -758,6 +758,7 @@ export function useInboxPage() {
 
   const [showScheduled, setShowScheduled] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
+  useEffect(() => { setShowMessageSearch(false); }, [view, mode, labelIds.length, assignmentView]);
   const scheduleSend = useCallback(async (sendAt: Date) => {
     if (!activeId || isNote || (!draft.trim() && !attachments.length)) return;
     if (pendingCards.length) {

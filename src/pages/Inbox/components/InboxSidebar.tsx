@@ -29,6 +29,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     assignmentView,
     setAssignmentView,
     setShowScheduled,
+    showMessageSearch,
     setShowMessageSearch,
     threads,
     myUserId,
@@ -125,7 +126,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <NavRow icon={<FilePen className="w-4 h-4 shrink-0" />} label="Drafts" active={view === 'drafts'} onClick={() => goToView('drafts')} />
           <NavRow icon={<Send className="w-4 h-4 shrink-0" />} label="Sent" active={view === 'sent'} onClick={() => goToView('sent')} />
           <NavRow icon={<CalendarClock className="w-4 h-4 shrink-0" />} label="Scheduled" active={false} onClick={() => setShowScheduled(true)} />
-          <NavRow icon={<TextSearch className="w-4 h-4 shrink-0" />} label="Search messages" active={false} onClick={() => setShowMessageSearch(true)} />
+          <NavRow icon={<TextSearch className="w-4 h-4 shrink-0" />} label="Search messages" active={showMessageSearch} onClick={() => setShowMessageSearch(!showMessageSearch)} />
           <NavRow icon={<Archive className="w-4 h-4 shrink-0" />} label="Archived" active={view === 'archived'} onClick={() => goToView('archived')} />
         </nav>
 

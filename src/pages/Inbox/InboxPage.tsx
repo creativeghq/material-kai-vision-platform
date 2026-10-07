@@ -15,7 +15,7 @@ import { InboxSidebar } from './components/InboxSidebar';
 import { ConversationActions } from './components/ConversationActions';
 import { GmailInbox } from './gmail/GmailInbox';
 import { ScheduledDialog } from './components/SendLater';
-import { MessageSearchDialog } from './components/MessageSearchDialog';
+import { MessageSearchPanel } from './components/MessageSearchPanel';
 
 const InboxPage: React.FC = () => {
   const s = useInboxPage();
@@ -82,9 +82,18 @@ const InboxPage: React.FC = () => {
         <InboxSidebar s={s} />
 
         {/* ── Column 1 · Message list ── */}
-        <ThreadListPane s={s} />
-
-        <ConversationPane s={s} />
+        {showMessageSearch && activeWorkspaceId ? (
+          <MessageSearchPanel
+            workspaceId={activeWorkspaceId}
+            labels={wsLabels}
+            initialChannels={mode === 'whatsapp' ? ['whatsapp'] : []}
+            onOpenThread={(id) => { setShowMessageSearch(false); void openThread(id); }}
+            onClose={() => setShowMessageSearch(false)}
+          />
+        ) : (<>
+          <ThreadListPane s={s} />
+          <ConversationPane s={s} />
+        </>)}
         </>)}
 
         {/*
@@ -97,15 +106,6 @@ const InboxPage: React.FC = () => {
       </div>
 
       {showScheduled && <ScheduledDialog onClose={() => setShowScheduled(false)} />}
-      {showMessageSearch && activeWorkspaceId && (
-        <MessageSearchDialog
-          workspaceId={activeWorkspaceId}
-          labels={wsLabels}
-          initialChannels={mode === 'whatsapp' ? ['whatsapp'] : []}
-          onOpenThread={(id) => { setShowMessageSearch(false); void openThread(id); }}
-          onClose={() => setShowMessageSearch(false)}
-        />
-      )}
       {showNew && activeWorkspaceId && (
         <NewThreadDialog
           workspaceId={activeWorkspaceId}
