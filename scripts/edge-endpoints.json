@@ -1915,6 +1915,12 @@
             "desc": "Page size, 1-60 (default 24)."
           },
           {
+            "name": "product_ids",
+            "type": "string",
+            "required": false,
+            "desc": "Comma-separated product ids a widget was set up with (Product in Place, #474). Intersected with the key scope, so it can only narrow."
+          },
+          {
             "name": "offset",
             "type": "number",
             "required": false,
@@ -2079,6 +2085,11 @@
           }
         ],
         "response": "{ok:true, available:boolean, reason?:string, image_url?:string}"
+      },
+      {
+        "name": "form_config",
+        "summary": "The Turnstile site key a widget needs to draw its bot challenge before the visitor reaches request_quote, the only action that writes.",
+        "params": []
       },
       {
         "name": "scenes",

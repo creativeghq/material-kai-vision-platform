@@ -21,18 +21,13 @@ import { sessionId } from './embedSession';
 // — and importing them is what stops the widget growing a second opinion about what
 // "natural daylight" means.
 import { LIGHTING_PRESETS } from '@/components/features/lighting/lightingPresets';
-// Registers `<materialkai-builder>` in the same bundle. They ship together because the builder's
-// success case IS the product widget — an exact match mounts one — and because splitting them
-// would give a merchant two script tags to get right for one feature.
+// Every embed element ships in this one bundle: a merchant learns one script tag, and which element
+// they place is a choice about their page, not an install decision.
 import './materialkai-builder';
-// And `<materialkai-configurator>` (#382). Same bundle for the same reason: a merchant learns one
-// script tag, and which element they place is a choice about their page, not an install decision.
 import './materialkai-configurator';
-// And `<materialkai-assistant>` (#382 Phase 3) — the platform's tools as buttons. Same bundle,
-// same reason: one script tag, and which element a merchant places is a choice about their page.
 import './materialkai-assistant';
-// #447 — the deterministic surface visualizer, on the merchant's own page.
 import './materialkai-visualizer';
+import './materialkai-place';
 
 interface EmbedModel {
   format: string;
@@ -553,11 +548,7 @@ export class MaterialKaiProduct extends HTMLElement {
    */
   private emitAddToCart() {
     if (!this.product) return;
-    // The chosen options travel WITH the handoff. Without them a configured item reaches the
-    // merchant's cart indistinguishable from an unconfigured one, and the person picking the order
-    // has no idea which fabric was chosen. Both shapes are sent: readable labels for line-item
-    // properties (what a Shopify cart displays and a picker reads), and the ids for anything that
-    // needs to reconstruct the configuration exactly.
+    // Options travel with the handoff, as labels for the cart and as ids to rebuild the configuration.
     const options: Record<string, string> = {};
     for (const g of this.product.options ?? []) {
       const v = g.values.find((x) => x.id === this.selection[g.id]);

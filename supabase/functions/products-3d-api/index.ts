@@ -42,6 +42,7 @@ const EMBED_EVENT_TYPES = [
   // #447. These three are ALSO in manufacturer_analytics_events_event_type_check; adding one here
   // alone passes this gate and dies on a 23514 the beacon never reports.
   'embed_visualize_surface', 'embed_visualizer_share', 'embed_visualizer_quote',
+  'embed_place_product', 'embed_place_quote',
 ];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -361,8 +362,14 @@ Deno.serve(withApiLogging((req) => {
     // The key's scope and the caller's only_3d are both id restrictions; `null` from either means
     // "did not restrict". Intersecting them keeps the scope authoritative — a caller cannot widen
     // past it, only narrow further.
+    // A widget pre-picked by the merchant names its products; the key's scope still caps them.
+    const pickedRaw = String(params.product_ids ?? '').trim();
+    const pickedIds = pickedRaw
+      ? pickedRaw.split(',').map((v) => v.trim()).filter((v) => UUID_RE.test(v)).slice(0, MAX_LIMIT)
+      : null;
+
     const restrictIds = intersectIdFilters(
-      await scopeRestriction(supabase, auth.ctx), modelledIds, matchedIds,
+      await scopeRestriction(supabase, auth.ctx), modelledIds, matchedIds, pickedIds,
     );
     if (restrictIds !== null && restrictIds.length === 0) {
       return embedJson({ ok: true, products: [] }, 200, cors);
@@ -995,6 +1002,11 @@ Deno.serve(withApiLogging((req) => {
   }
 
   // ── #447 surface visualizer ──────────────────────────────────────────────────────────────────
+  if (action === 'form_config') {
+    const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY').catch(() => ({ value: null })))?.value ?? null;
+    return embedJson({ ok: true, turnstile_site_key: siteKey }, 200, cors);
+  }
+
   if (action === 'scenes') {
     // A workspace scene is a photo somebody UPLOADED, often a customer's own room, and this is an
     // anonymous surface handing out permanent public URLs. The platform library is embeddable by

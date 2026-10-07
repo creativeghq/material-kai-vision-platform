@@ -30,6 +30,8 @@ const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_visualize_surface', 'Surfaces rendered'],
   ['embed_visualizer_share', 'Renders shared'],
   ['embed_visualizer_quote', 'Quotes from a render'],
+  ['embed_place_product', 'Products placed in a photo'],
+  ['embed_place_quote', 'Quotes from a placed photo'],
 ];
 
 const DEFAULT_RATE = 60;

@@ -1,7 +1,7 @@
 import { escapeHtml } from '@/utils/escapeHtml';
 import type { EmbedKey, EmbedReadiness } from '@/services/embedKeysService';
 
-export type EmbedWidgetId = 'builder' | 'product' | 'visualizer' | 'configurator' | 'assistant';
+export type EmbedWidgetId = 'builder' | 'product' | 'place' | 'visualizer' | 'configurator' | 'assistant';
 
 export interface EmbedWidgetDef {
   id: EmbedWidgetId;
@@ -22,6 +22,12 @@ export const EMBED_WIDGETS: EmbedWidgetDef[] = [
     tag: 'materialkai-product',
     title: 'Single product',
     summary: 'One product with its price, photos or 3D model and AR, for a page that is already about it.',
+  },
+  {
+    id: 'place',
+    tag: 'materialkai-place',
+    title: 'Product in place',
+    summary: 'Visitors take a photo of their space, or upload one, and place your products on it — move, resize, rotate — then add to cart or ask for a quote. The photo never leaves their device.',
   },
   {
     id: 'visualizer',
@@ -51,7 +57,7 @@ export function widgetDef(id: EmbedWidgetId): EmbedWidgetDef {
 export function widgetsForKey(key: Pick<EmbedKey, 'key_kind' | 'scope_type' | 'tools_enabled'>): EmbedWidgetId[] {
   if (key.key_kind === 'tools') return ['assistant'];
   const out: EmbedWidgetId[] = [];
-  if (key.scope_type !== 'blueprints') out.push('builder', 'product', 'visualizer');
+  if (key.scope_type !== 'blueprints') out.push('builder', 'product', 'place', 'visualizer');
   if (key.scope_type === 'all' || key.scope_type === 'blueprints') out.push('configurator');
   if (key.tools_enabled) out.push('assistant');
   return out;
@@ -61,6 +67,8 @@ export interface WidgetOptions {
   productId?: string | null;
   blueprintId?: string | null;
   sceneId?: string | null;
+  /** Product in place: the merchant's pre-picked set. Empty means every published product. */
+  productIds?: string[];
 }
 
 /** The attributes the element reads; a required id nobody picked yet stays a visible placeholder. */
@@ -70,6 +78,7 @@ export function widgetAttributes(apiKey: string, widget: EmbedWidgetId, opts: Wi
   if ((widget === 'builder' || widget === 'visualizer') && opts.productId) attrs.push(['product-id', opts.productId]);
   if (widget === 'visualizer' && opts.sceneId) attrs.push(['scene-id', opts.sceneId]);
   if (widget === 'configurator') attrs.push(['blueprint', opts.blueprintId || 'BLUEPRINT_ID']);
+  if (widget === 'place' && opts.productIds?.length) attrs.push(['product-ids', opts.productIds.join(',')]);
   return attrs;
 }
 
@@ -101,6 +110,7 @@ export function widgetReadiness(widget: EmbedWidgetId, r: EmbedReadiness | null)
   switch (widget) {
     case 'builder':
     case 'product':
+    case 'place':
       return r.publishedProducts > 0
         ? { state: 'ready', note: `${r.publishedProducts} published ${r.publishedProducts === 1 ? 'product' : 'products'}` }
         : { state: 'needs_setup', note: 'No products published yet. You can publish them in the next step.' };

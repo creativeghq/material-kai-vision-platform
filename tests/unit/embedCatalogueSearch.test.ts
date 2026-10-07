@@ -34,7 +34,7 @@ describe('the embed catalogue search does not hand raw input to PostgREST', () =
 
   it('the search narrows the same id intersection the key scope already applies', () => {
     expect(code, 'a caller must not be able to widen past their embed key scope')
-      .toMatch(/intersectIdFilters\(\s*await scopeRestriction\([^)]*\), modelledIds, matchedIds,?\s*\)/);
+      .toMatch(/intersectIdFilters\(\s*await scopeRestriction\([^)]*\), modelledIds, matchedIds,(?: pickedIds,)?\s*\)/);
   });
 });
 

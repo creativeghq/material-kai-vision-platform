@@ -17,14 +17,15 @@
 
   <div class="callout"><p><strong>See it running:</strong> <a href="embed-demo.html">a live demo page</a> — a real product, a real 3D model, real prices, and a compatibility rule you can trigger.</p></div>
 
-  <h2>Five tags, one script</h2>
-  <p>One <code>&lt;script&gt;</code> registers all five. Which one you place is a decision about <em>your page</em>, not an installation step — you never load a second file, and you can put more than one on a site.</p>
+  <h2>Six tags, one script</h2>
+  <p>One <code>&lt;script&gt;</code> registers all six. Which one you place is a decision about <em>your page</em>, not an installation step — you never load a second file, and you can put more than one on a site.</p>
 
   <div class="table-wrap"><table>
     <thead><tr><th>Tag</th><th>The question it answers</th><th>Needs</th></tr></thead>
     <tbody>
       <tr><td><code>&lt;materialkai-builder&gt;</code></td><td>“Show me this product” — or, with no <code>product-id</code>, “what have you got like this?”</td><td>A catalogue key</td></tr>
       <tr><td><code>&lt;materialkai-configurator&gt;</code></td><td>“Let me build something that isn't in your catalogue yet.”</td><td>A catalogue key + a published configurator</td></tr>
+      <tr><td><code>&lt;materialkai-place&gt;</code></td><td>“What would this look like in <em>my</em> room?” — on a photo the visitor takes.</td><td>A catalogue key + published products with a picture</td></tr>
       <tr><td><code>&lt;materialkai-visualizer&gt;</code></td><td>“What would this tile look like in a room — and how much do I order?”</td><td>A catalogue key + published products with a size</td></tr>
       <tr><td><code>&lt;materialkai-assistant&gt;</code></td><td>“Work something out for me” — a sizer, a cost comparison, a search.</td><td>A tools key</td></tr>
       <tr><td><code>&lt;materialkai-product&gt;</code></td><td>The 3D viewer on its own. The builder mounts this internally.</td><td>A catalogue key</td></tr>
@@ -106,6 +107,15 @@
   <div class="callout"><p><strong>Scope a key to specific configurators.</strong> When you create a key you can restrict it to <strong>configurators</strong> instead of products — useful when a partner's site should be able to open your kitchen planner and nothing else. A key scoped to products or categories sees <em>no</em> configurators at all: it's a key about products.</p></div>
 
   <div class="callout warn"><p><strong>A configurator has to be published for embedding</strong> — separately from being active internally, and for the same reason products have an online-store switch. An unpublished one returns the same “not found” as an id that never existed, so nobody can discover what you're still working on by guessing.</p></div>
+
+  <h2>Letting a visitor place a product in their own room</h2>
+  <p><code>&lt;materialkai-place&gt;</code> asks the visitor to <strong>take a photo</strong> of their space (on a phone it opens the back camera) or <strong>upload one</strong>, then shows your products beside it. A tap places one on the photo; they drag it into position, drag the corner (or pinch) to resize, rotate with two fingers, flip it, and place as many as they like. From there they can <strong>save the picture</strong>, <strong>add a product to the cart</strong>, or <strong>ask for a quote</strong> listing what they placed.</p>
+  <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
+
+&lt;materialkai-place api-key="mk_embed_…" product-ids="ID-1,ID-2"&gt;&lt;/materialkai-place&gt;</code></pre>
+  <p>Leave out <code>product-ids</code> to offer every published product with a picture. The Add widget flow writes the list for you when you tick products.</p>
+  <div class="callout"><p><strong>The visitor's photo never leaves their device.</strong> It is a picture of somebody's home, so it is drawn and combined in their own browser and never uploaded — not to you, not to us. A quote request lists the products they placed, not the photo.</p></div>
+  <div class="callout warn"><p><strong>Products photographed on a plain background work best.</strong> Those are cut out automatically and get a soft floor shadow. A product shown in a room photo can't be separated from its background, so it is placed as the whole picture, and the widget says so. Add to cart fires the same <code>materialkai:add-to-cart</code> event as the other widgets.</p></div>
 
   <h2>Letting a visitor see a tile in a room</h2>
   <p><code>&lt;materialkai-visualizer&gt;</code> lays one of your published products on a room photo at its real size, in the pattern the visitor picks (stack bond, offset, diagonal, herringbone, basket weave), with the joint width they choose. Under the picture it states the surface area, the pieces, the cutting allowance and the <strong>boxes to order</strong> of that exact product.</p>
@@ -267,6 +277,7 @@
 
   <p>For the other tags:</p>
   <ul class="feat">
+    <li><code>&lt;materialkai-place&gt;</code> needs published products with a picture — ideally a cut-out or a shot on a plain background.</li>
     <li><code>&lt;materialkai-visualizer&gt;</code> needs published products with a recorded size and a photo or tile texture, and a cutting allowance per pattern for the order quantity.</li>
     <li><code>&lt;materialkai-configurator&gt;</code> needs a <strong>blueprint published for embedding</strong> — no products, no 3D models. It prices what you'd build, not what you stock.</li>
     <li><code>&lt;materialkai-assistant&gt;</code> needs a key created as <strong>the free tools</strong> rather than <em>my catalogue</em>. Nothing else — it serves none of your catalogue, so there is nothing to publish first.</li>

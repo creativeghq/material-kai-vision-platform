@@ -36,6 +36,7 @@ export const EmbedWidgetPreview: React.FC<Props> = ({ apiKey, widget, options })
   const [error, setError] = useState<string | null>(null);
   const complete = widgetIsComplete(widget, options);
   const { productId, blueprintId, sceneId } = options;
+  const productIds = (options.productIds ?? []).join(',');
 
   useEffect(() => {
     const node = host.current;
@@ -46,7 +47,7 @@ export const EmbedWidgetPreview: React.FC<Props> = ({ apiKey, widget, options })
       .then(() => {
         if (cancelled) return;
         const el = document.createElement(widgetDef(widget).tag);
-        for (const [k, v] of widgetAttributes(apiKey, widget, { productId, blueprintId, sceneId })) el.setAttribute(k, v);
+        for (const [k, v] of widgetAttributes(apiKey, widget, { productId, blueprintId, sceneId, productIds: productIds ? productIds.split(',') : [] })) el.setAttribute(k, v);
         node.replaceChildren(el);
         setState('ready');
       })
@@ -59,7 +60,7 @@ export const EmbedWidgetPreview: React.FC<Props> = ({ apiKey, widget, options })
       cancelled = true;
       node.replaceChildren();
     };
-  }, [apiKey, widget, productId, blueprintId, sceneId, complete]);
+  }, [apiKey, widget, productId, blueprintId, sceneId, productIds, complete]);
 
   if (!complete) {
     return (

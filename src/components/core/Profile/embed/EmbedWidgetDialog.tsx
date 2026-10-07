@@ -124,7 +124,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
   );
 
   useEffect(() => {
-    if (!open || step !== 'content' || !widget || !['builder', 'product', 'visualizer'].includes(widget)) return;
+    if (!open || step !== 'content' || !widget || !['builder', 'product', 'place', 'visualizer'].includes(widget)) return;
     let cancelled = false;
     const t = setTimeout(() => {
       listEmbedProducts(workspaceId, productTerm, productScope)
@@ -210,6 +210,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
     const scope: { scope_type: EmbedScopeType; scope_values: string[] } =
       widget === 'configurator' ? { scope_type: 'blueprints', scope_values: [options.blueprintId as string] }
         : widget === 'builder' ? { scope_type: form.scopeType, scope_values: form.scopeValues }
+          : widget === 'place' && options.productIds?.length ? { scope_type: 'products', scope_values: options.productIds }
           : { scope_type: 'all', scope_values: [] };
     setSaving(true);
     try {
@@ -250,7 +251,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
 
   const publishedProducts = (products ?? []).filter((p) => p.storefront_published);
 
-  const renderProductList = (mode: 'publish' | 'pick-one' | 'pick-optional') => (
+  const renderProductList = (mode: 'publish' | 'pick-one' | 'pick-optional' | 'pick-many') => (
     <div className="space-y-2">
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -272,7 +273,18 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
           const selected = options.productId === p.product_id;
           return (
             <div key={p.product_id} className={`flex items-center gap-3 px-3 py-2 ${selected ? 'bg-primary/[0.08]' : ''}`}>
-              {mode !== 'publish' && (
+              {mode === 'pick-many' && (
+                <Checkbox
+                  aria-label={`Offer ${p.name}`}
+                  checked={!!options.productIds?.includes(p.product_id)}
+                  disabled={!p.storefront_published}
+                  onCheckedChange={() => setOptions((o) => {
+                    const ids = o.productIds ?? [];
+                    return { ...o, productIds: ids.includes(p.product_id) ? ids.filter((v) => v !== p.product_id) : [...ids, p.product_id] };
+                  })}
+                />
+              )}
+              {(mode === 'pick-one' || mode === 'pick-optional') && (
                 <input
                   type="radio"
                   name="embed-product"
@@ -449,6 +461,25 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
         );
       case 'product':
         return <div className="space-y-2"><Label>The product it shows</Label>{renderProductList('pick-one')}</div>;
+      case 'place':
+        return (
+          <div className="space-y-2">
+            <Label>Products visitors can place</Label>
+            <p className="text-xs text-muted-foreground">
+              Tick the ones to offer, or tick none to offer every published product with a picture. Products photographed
+              on a plain background are cut out automatically; others are shown as they are.
+            </p>
+            {renderProductList('pick-many')}
+            {!!options.productIds?.length && (
+              <p className="text-xs text-muted-foreground">
+                {options.productIds.length} picked.{' '}
+                <button type="button" className="text-primary underline underline-offset-2" onClick={() => setOptions((o) => ({ ...o, productIds: [] }))}>
+                  Offer all instead
+                </button>
+              </p>
+            )}
+          </div>
+        );
       case 'visualizer':
         return (
           <div className="space-y-5">
