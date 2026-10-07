@@ -3,6 +3,7 @@
 // Shared with <materialkai-configurator>: Cloudflare's script defines a global, so the page
 // gets exactly one loader (#382).
 import { loadTurnstile, type TurnstileApi } from './turnstileLoader';
+import { brandStyle, loadBrandFonts } from './theme';
 
 interface SpecValue { value: string; in_catalog: boolean }
 interface SpecFacet { facet_key: string; label: string; in_catalog_count: number; values: SpecValue[] }
@@ -16,73 +17,46 @@ interface ResolveResult {
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
-const STYLE = `
-:host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
-.viewport { position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden;
-            background:#f4f2ef; margin-bottom:14px; }
-.viewport img { width:100%; height:100%; object-fit:contain; display:block; }
-/* A matched product is not a picture — it is the whole product widget, with its finishes and its
-   cart button. Squeezed into the square frame those sit below the clip and the visitor gets a
-   model they cannot configure or buy, which is the one thing an exact match is FOR. */
+const STYLE = brandStyle(`
+.viewport { position:relative; width:100%; aspect-ratio:1/1; border-radius:var(--mk-radius); overflow:hidden;
+            background:var(--mk-muted); margin-bottom:16px; }
+.viewport img { width:100%; height:100%; object-fit:contain; display:block; mix-blend-mode:multiply; }
 .viewport[data-mode="product"] { aspect-ratio:auto; overflow:visible; background:transparent; }
 .viewport materialkai-product { display:block; width:100%; }
 .viewport[data-mode="shelf"] { background:transparent; aspect-ratio:auto; overflow:visible; }
-.shelf { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; }
-.shelfSearch { margin-bottom:8px; }
-.shelfNote { font-size:12px; opacity:.75; padding:6px 2px; }
-.shelfItem { font:inherit; display:grid; gap:5px; padding:6px; border:1px solid #e3ddd2; border-radius:9px;
-             background:#fff; color:inherit; cursor:pointer; text-align:left; font-size:12px; }
-.shelfItem img { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:6px; display:block; }
-.genTag { position:absolute; left:8px; bottom:8px; font-size:11px; padding:3px 8px; border-radius:999px;
-          background:rgba(28,26,30,.72); color:#fff; }
-.vEmpty { position:absolute; inset:0; display:grid; place-items:center; font-size:13px; color:#8b857f; }
-.step { display:flex; align-items:center; gap:8px; padding-bottom:14px; }
-.dot { width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
-       font-size:11px; font-weight:700; background:#eae4d8; color:#6b6560; }
-.dot[data-on="1"] { background:#1c1a1e; color:#fff; }
-.rule { flex:1; height:1px; background:#e3ddd2; }
-h3 { font-size:15px; margin:0 0 3px; font-weight:650; }
-p.hint { margin:0 0 14px; font-size:13px; color:#6b6560; line-height:1.5; }
-.facet { padding-bottom:14px; }
-.facet > .lbl { font-size:12px; color:#6b6560; padding-bottom:6px; }
+.shelf { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:10px; }
+.shelfSearch { margin-bottom:10px; }
+.shelfNote { font-size:12px; color:var(--mk-ink-2); padding:6px 2px; }
+.shelfItem { font:inherit; display:grid; gap:7px; padding:8px; border:1px solid var(--mk-line); border-radius:var(--mk-radius);
+             background:var(--mk-surface); color:inherit; cursor:pointer; text-align:left; font-size:12.5px;
+             transition:transform .15s ease, border-color .15s ease; }
+.shelfItem:hover { transform:translateY(-2px); border-color:var(--mk-line-strong); }
+.shelfItem img { width:100%; aspect-ratio:1/1; object-fit:contain; border-radius:10px; display:block; background:var(--mk-muted); mix-blend-mode:multiply; }
+.genTag { position:absolute; left:10px; bottom:10px; font-size:11px; padding:4px 10px; border-radius:999px;
+          background:oklch(18% .025 55 / .72); color:oklch(98.5% .008 85); backdrop-filter:blur(6px); }
+.vEmpty { position:absolute; inset:0; display:grid; place-items:center; font-size:13px; color:var(--mk-ink-2); }
+.step { display:flex; align-items:center; gap:8px; padding-bottom:16px; }
+.dot { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:600;
+       background:var(--mk-muted); color:var(--mk-ink-2); border:1px solid var(--mk-line); }
+.dot[data-on="1"] { background:var(--mk-accent); color:var(--mk-accent-ink); border-color:var(--mk-accent); }
+.rule { flex:1; height:1px; background:var(--mk-line); }
+p.hint { margin:0 0 16px; font-size:14px; line-height:1.55; }
+.facet { padding-bottom:16px; }
+.facet > .lbl { font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--mk-ink-2); padding-bottom:8px; }
 .opts { display:flex; flex-wrap:wrap; gap:6px; }
-.opt { font:inherit; font-size:13px; padding:5px 11px; border-radius:999px; border:1px solid #d9d4cd;
-       background:#fff; color:inherit; cursor:pointer; }
-.opt[aria-pressed="true"] { border-color:#1c1a1e; box-shadow:inset 0 0 0 1px #1c1a1e; }
-.opt .tick { color:#2f7d50; font-size:10px; margin-left:5px; }
-button.go { font:inherit; font-size:14px; padding:9px 18px; border-radius:999px; border:1px solid #1c1a1e;
-            background:#1c1a1e; color:#fff; cursor:pointer; }
-button.go:disabled { opacity:.45; cursor:default; }
-button.ghost { font:inherit; font-size:13px; padding:8px 14px; border-radius:999px;
-               border:1px solid #d9d4cd; background:#fff; color:inherit; cursor:pointer; }
-.row { display:flex; gap:8px; align-items:center; padding-top:6px; }
-.card { border:1px solid #e3ddd2; border-radius:10px; padding:14px; background:#fff; }
-.price { font-size:22px; font-weight:700; }
-.name { font-size:14px; font-weight:600; }
-.muted { font-size:12px; color:#6b6560; }
-label.f { display:block; padding-bottom:9px; }
-label.f > span { display:block; font-size:12px; color:#6b6560; padding-bottom:4px; }
-input, textarea { font:inherit; font-size:14px; width:100%; padding:8px 10px; border-radius:7px;
-                  border:1px solid #d9d4cd; background:#fff; color:inherit; box-sizing:border-box; }
-textarea { min-height:70px; resize:vertical; }
+.opt .tick { color:var(--mk-ok); font-size:10px; margin-left:5px; }
+.row { display:flex; gap:10px; align-items:center; padding-top:8px; flex-wrap:wrap; }
+.card { padding:18px; }
+.price { font-family:var(--mk-display); font-size:30px; font-variant-numeric:tabular-nums; }
+.name { font-size:15px; font-weight:500; }
+.muted { font-size:12px; }
+label.f { display:block; padding-bottom:10px; }
+label.f > span { display:block; padding-bottom:5px; }
+textarea { min-height:80px; resize:vertical; }
 .near { display:flex; flex-direction:column; gap:6px; padding-top:8px; }
-.near .n { display:flex; justify-content:space-between; gap:10px; font-size:13px;
-           border:1px solid #e3ddd2; border-radius:7px; padding:8px 10px; }
-.ok { color:#2f7d50; font-size:13px; }
-.err { color:#a3341f; font-size:13px; }
-@media (prefers-color-scheme: dark) {
-  :host { color:#f2eef2; }
-  .dot { background:#2c2833; color:#a9a2ad; } .dot[data-on="1"] { background:#f2eef2; color:#221f26; }
-  .viewport { background:#252030; } .vEmpty { color:#8b8394; }
-  .shelfItem { background:#2c2833; border-color:#3d3745; }
-  .rule, .card, .near .n { border-color:#3d3745; } .card, .opt, input, textarea, button.ghost { background:#2c2833; }
-  .opt, button.ghost, input, textarea { border-color:#3d3745; color:#f2eef2; }
-  .opt[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
-  button.go { background:#f2eef2; color:#221f26; border-color:#f2eef2; }
-  p.hint, .muted, .facet > .lbl, label.f > span { color:#a9a2ad; }
-  .err { color:#f08a72; } .ok { color:#4fbe7e; }
-}
-`;
+.near .n { display:flex; justify-content:space-between; gap:10px; font-size:13px; border:1px solid var(--mk-line);
+           border-radius:var(--mk-radius-sm); padding:10px 12px; background:var(--mk-surface); }
+`);
 
 export class MaterialKaiBuilder extends HTMLElement {
   private root: ShadowRoot;
@@ -126,6 +100,7 @@ export class MaterialKaiBuilder extends HTMLElement {
   }
 
   connectedCallback() {
+    loadBrandFonts();
     // DEEP-LINK MODE (#341 join 6). `<materialkai-builder product-id="…">` is the same entry with
     // the first question already answered — the visitor arrived on a page about one product, so
     // asking "what are you after" would be pretending not to know.

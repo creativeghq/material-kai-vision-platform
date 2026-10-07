@@ -1,6 +1,7 @@
 /** `<materialkai-assistant>` — the platform's tools on a merchant's page (#382 Phase 3). */
 import { formatMoney } from '@/utils/decimal';
 import { referralLink } from './appOrigin';
+import { brandStyle, loadBrandFonts } from './theme';
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
@@ -17,48 +18,24 @@ interface PublicToolInfo { name: string; label: string; writes: boolean; fields?
 /** What the assistant said about the last result, if the key may spend on that. */
 interface AskState { asking: boolean; answer: string | null; pending: boolean }
 
-const STYLE = `
-:host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
-.card { border:1px solid #e3ddd2; border-radius:12px; padding:16px; background:#fff; display:grid; gap:14px; }
-h3 { font-size:15px; margin:0; font-weight:650; }
-p.hint { margin:0; font-size:13px; color:#6b6560; line-height:1.5; }
+const STYLE = brandStyle(`
+.card { padding:22px; display:grid; gap:16px; }
+p.hint { margin:0; font-size:14px; line-height:1.55; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; }
-button.act { font:inherit; font-size:13px; padding:7px 14px; border-radius:999px; border:1px solid #d9d4cd;
-             background:#fff; color:inherit; cursor:pointer; }
-button.act[aria-pressed="true"] { border-color:#1c1a1e; box-shadow:inset 0 0 0 1px #1c1a1e; }
-button.act:disabled { opacity:.5; cursor:default; }
-.form { display:grid; gap:8px; }
-label.f { display:grid; gap:4px; font-size:12px; color:#6b6560; }
-input, textarea { font:inherit; font-size:14px; padding:8px 10px; border-radius:7px; border:1px solid #d9d4cd;
-                  background:#fff; color:inherit; box-sizing:border-box; width:100%; }
-button.go { font:inherit; font-size:14px; padding:9px 18px; border-radius:999px; border:1px solid #1c1a1e;
-            background:#1c1a1e; color:#fff; cursor:pointer; justify-self:start; }
-button.go:disabled { opacity:.45; cursor:default; }
-.result { border-top:1px solid #e3ddd2; padding-top:12px; display:grid; gap:8px; }
-.headline { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
-.sub { font-size:13px; color:#6b6560; }
-ul.rows { list-style:none; margin:0; padding:0; display:grid; gap:5px; }
-ul.rows li { display:flex; justify-content:space-between; gap:10px; font-size:13px; }
-ul.rows .n { font-variant-numeric:tabular-nums; color:#6b6560; }
-.kv { display:grid; gap:3px; font-size:12.5px; }
+.form { display:grid; gap:10px; }
+button.go { justify-self:start; }
+.result { border-top:1px solid var(--mk-line); padding-top:16px; display:grid; gap:10px; animation:mk-in .25s ease both; }
+.headline { font-family:var(--mk-display); font-size:34px; line-height:1.05; font-variant-numeric:tabular-nums; }
+.sub { font-size:13px; }
+ul.rows { list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+ul.rows li { display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding-bottom:6px; border-bottom:1px solid var(--mk-line); }
+ul.rows .n { font-variant-numeric:tabular-nums; color:var(--mk-ink-2); }
+.kv { display:grid; gap:4px; font-size:13px; }
 .kv div { display:flex; justify-content:space-between; gap:10px; }
-.kv .k { color:#6b6560; }
-.err { font-size:13px; color:#a3341f; margin:0; }
-.attrib { margin:0; font-size:11px; color:#8b857f; }
+.kv .k { color:var(--mk-ink-2); }
+.attrib { margin:0; font-size:11px; color:var(--mk-ink-2); }
 .attrib a { color:inherit; }
-.ok { font-size:13px; color:#2f7d50; margin:0; }
-@media (prefers-color-scheme: dark) {
-  :host { color:#f2eef2; }
-  .card { background:#2c2833; border-color:#3d3745; }
-  p.hint, .sub, ul.rows .n, .kv .k, label.f { color:#a9a2ad; }
-  button.act, input, textarea { background:#221f26; border-color:#3d3745; color:#f2eef2; }
-  button.act[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
-  button.go { background:#f2eef2; color:#221f26; border-color:#f2eef2; }
-  .result { border-color:#3d3745; }
-  .err { color:#f08a72; } .ok { color:#4fbe7e; }
-  .attrib { color:#8b8394; }
-}
-`;
+`);
 
 export class MaterialKaiAssistant extends HTMLElement {
   private root: ShadowRoot;
@@ -86,6 +63,7 @@ export class MaterialKaiAssistant extends HTMLElement {
   }
 
   connectedCallback() {
+    loadBrandFonts();
     this.render();
     this.observer = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) {

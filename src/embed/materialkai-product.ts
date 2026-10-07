@@ -28,6 +28,7 @@ import './materialkai-configurator';
 import './materialkai-assistant';
 import './materialkai-visualizer';
 import './materialkai-place';
+import { brandStyle, loadBrandFonts } from './theme';
 
 interface EmbedModel {
   format: string;
@@ -91,52 +92,33 @@ const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 // imports of its own, so a React-free bundle can take it as-is. tests/unit/moneyPrimitives.test.ts
 // caught the local `money()` this file started with; it was the 40th copy of that same function.
 
-const STYLE = `
-:host { display:block; position:relative; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
-.frame { position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; background:#f4f2ef; }
+const STYLE = brandStyle(`
+:host { position:relative; }
+.frame { position:relative; width:100%; aspect-ratio:1/1; border-radius:var(--mk-radius); overflow:hidden; background:var(--mk-muted); }
 canvas { display:block; width:100%; height:100%; touch-action:none; }
-.meta { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:10px 2px 0; }
-.name { font-size:15px; font-weight:600; }
-.price { font-size:15px; font-weight:600; white-space:nowrap; }
-.actions { display:flex; gap:8px; padding-top:10px; }
+.meta { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:14px 2px 0; }
+.name { font-size:15px; font-weight:500; }
+.price { font-family:var(--mk-display); font-size:24px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.actions { display:flex; flex-wrap:wrap; gap:8px; padding-top:12px; }
 button, a.btn {
-  font:inherit; font-size:14px; padding:8px 16px; border-radius:999px; border:1px solid #d9d4cd;
-  background:#fff; color:inherit; cursor:pointer; text-decoration:none; display:inline-flex;
-  align-items:center; gap:6px;
+  display:inline-flex; align-items:center; gap:6px; font-size:13.5px; min-height:38px; padding:7px 16px;
+  border-radius:999px; border:1px solid var(--mk-line-strong); background:transparent; color:var(--mk-ink);
+  cursor:pointer; text-decoration:none;
 }
-button.primary { background:#1c1a1e; color:#fff; border-color:#1c1a1e; }
-button:disabled { opacity:.5; cursor:default; }
-.overlay {
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  padding:16px; text-align:center; font-size:14px; color:#6b6560; background:#f4f2ef;
-}
-.fallback { width:100%; height:100%; object-fit:contain; }
-.options { display:flex; flex-direction:column; gap:10px; padding-top:12px; }
-.optgroup > .optlabel { font-size:12px; color:#6b6560; padding-bottom:5px; }
+button.primary { gap:12px; padding:7px 7px 7px 20px; min-height:44px; border:0; background:var(--mk-accent); color:var(--mk-accent-ink); font-weight:500; }
+button.primary::after { content:'\\2192'; display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--mk-ink); color:var(--mk-paper); }
+.overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px;
+           text-align:center; font-size:14px; color:var(--mk-ink-2); background:var(--mk-muted); }
+.fallback { width:100%; height:100%; object-fit:contain; mix-blend-mode:multiply; }
+.options { display:flex; flex-direction:column; gap:12px; padding-top:14px; }
+.optgroup > .optlabel { font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--mk-ink-2); padding-bottom:7px; }
 .swatches { display:flex; flex-wrap:wrap; gap:6px; }
-.swatch {
-  font:inherit; font-size:13px; padding:5px 11px; border-radius:999px;
-  border:1px solid #d9d4cd; background:#fff; color:inherit; cursor:pointer;
-  display:inline-flex; align-items:center; gap:6px;
-}
-.swatch[aria-pressed="true"] { border-color:#1c1a1e; box-shadow:inset 0 0 0 1px #1c1a1e; }
-.dot { width:13px; height:13px; border-radius:50%; border:1px solid rgba(0,0,0,.18); }
-.delta { font-size:11px; color:#6b6560; }
+.swatch { min-height:34px; padding:5px 12px; }
+.dot { width:14px; height:14px; border-radius:50%; border:1px solid oklch(18% .025 55 / .18); }
+.delta { font-size:11px; color:var(--mk-ink-2); }
 .violations { display:flex; flex-direction:column; gap:4px; padding-top:10px; }
-.violation { margin:0; font-size:12px; color:#a3341f; }
-@media (prefers-color-scheme: dark) {
-  .optgroup > .optlabel, .delta { color:#a9a2ad; }
-  .violation { color:#f08a72; }
-  .swatch { background:#2c2833; border-color:#3d3745; color:#f2eef2; }
-  .swatch[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
-}
-@media (prefers-color-scheme: dark) {
-  :host { color:#f2eef2; }
-  .frame, .overlay { background:#221f26; color:#a9a2ad; }
-  button, a.btn { background:#2c2833; border-color:#3d3745; color:#f2eef2; }
-  button.primary { background:#f2eef2; color:#221f26; border-color:#f2eef2; }
-}
-`;
+.violation { margin:0; font-size:12px; color:var(--mk-danger); }
+`);
 
 export class MaterialKaiProduct extends HTMLElement {
   static get observedAttributes() { return ['product-id', 'api-key', 'api-base', 'autorotate']; }
@@ -180,6 +162,7 @@ export class MaterialKaiProduct extends HTMLElement {
   }
 
   connectedCallback() {
+    loadBrandFonts();
     this.renderShell();
     // Defer everything expensive until the widget is actually near the viewport.
     this.observer = new IntersectionObserver((entries) => {

@@ -2,6 +2,7 @@
 import { formatMoney } from '@/utils/decimal';
 import { trackEmbedEvent } from './embedSession';
 import { loadTurnstile } from './turnstileLoader';
+import { brandStyle, loadBrandFonts } from './theme';
 import {
   cutoutStudioBackground, handlePoint, hitItem, itemHeight, topItemAt, type PlacedItem,
 } from './placeGeometry';
@@ -9,6 +10,7 @@ import {
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 const PHOTO_MAX_SIDE = 1600;
 const SPRITE_MAX_SIDE = 900;
+const LAND_MS = 260;
 
 interface ShelfProduct {
   id: string;
@@ -26,52 +28,88 @@ interface Sprite {
   tainted: boolean;
 }
 
-const STYLE = `
-:host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
-.wrap { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); }
-@media (min-width:720px) { .wrap { grid-template-columns:minmax(0,1fr) 240px; } }
+const STYLE = brandStyle(`
+.root { display:grid; gap:18px; animation:mk-in .35s ease both; }
+.head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.head .t { display:grid; gap:10px; }
+.hero { position:relative; overflow:hidden; display:grid; gap:24px; align-items:center; grid-template-columns:minmax(0,1fr);
+        min-height:400px; padding:clamp(24px,5vw,56px); border-radius:var(--mk-radius);
+        background:radial-gradient(120% 90% at 85% 10%, var(--mk-accent-soft), transparent 60%), var(--mk-muted);
+        border:1px solid var(--mk-line); transition:border-color .2s ease, background .2s ease; }
+.hero.drag { border-color:var(--mk-accent); background:var(--mk-accent-soft); }
+@media (min-width:760px) { .hero { grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); } }
+.hero .copy { display:grid; gap:18px; justify-items:start; }
+.hero .mk-title { font-size:clamp(36px,5vw,58px); }
+.show { position:relative; height:300px; display:none; }
+@media (min-width:760px) { .show { display:block; } }
+.show .frame { position:absolute; inset:8% 6% 14% 10%; border-radius:var(--mk-radius);
+               background:linear-gradient(180deg, var(--mk-surface) 0 58%, var(--mk-line) 58% 100%); border:1px solid var(--mk-line); }
+.show img { position:absolute; object-fit:contain; object-position:bottom; mix-blend-mode:multiply; }
+.show .a { left:16%; bottom:16%; width:38%; height:56%; }
+.show .b { left:52%; bottom:18%; width:30%; height:42%; }
+.show .c { left:70%; bottom:14%; width:18%; height:64%; }
+.show .sel { position:absolute; left:50%; bottom:16%; width:34%; height:46%; border:1.5px dashed var(--mk-ink-2);
+             border-radius:4px; animation:mk-in .6s .2s ease both; }
+.show .sel::after { content:''; position:absolute; right:-8px; bottom:-8px; width:14px; height:14px; border-radius:50%;
+                    background:var(--mk-accent); border:2px solid var(--mk-ink); }
+:host([theme="dark"]) .show .frame { background:linear-gradient(180deg, oklch(94% .01 85) 0 58%, oklch(84% .02 78) 58% 100%); }
+.hero p.lead { margin:0; max-width:460px; font-size:15px; line-height:1.6; color:var(--mk-ink-2); }
+.hero .row { display:flex; gap:10px; flex-wrap:wrap; }
+.hero .privacy { font-size:12px; color:var(--mk-ink-2); display:flex; align-items:center; gap:8px; margin:0; }
+.hero .privacy::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--mk-ok); }
+.peek { display:flex; gap:8px; margin-top:6px; }
+.peek img { width:56px; height:56px; object-fit:contain; border-radius:12px; background:var(--mk-surface);
+            border:1px solid var(--mk-line); padding:4px; }
+.peek span { align-self:center; font-size:12px; color:var(--mk-ink-2); }
 .stage { position:relative; }
-canvas { display:block; width:100%; height:auto; border-radius:10px; border:1px solid #e3ddd2; background:#f6f3ee; touch-action:none; }
-.empty { display:grid; place-items:center; gap:10px; text-align:center; border:1px dashed #d9d4cd; border-radius:10px;
-         padding:36px 16px; background:#faf8f5; }
-.empty p { margin:0; font-size:13px; color:#6b6560; max-width:340px; }
-.side { display:grid; gap:11px; align-content:start; }
-.lbl { font-size:12px; color:#6b6560; display:block; }
-.shelf { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; max-height:300px; overflow-y:auto; }
-.card { font:inherit; display:grid; gap:4px; padding:6px; border:1px solid #e3ddd2; border-radius:8px; background:#fff;
-        color:inherit; cursor:pointer; text-align:left; }
-.card img { width:100%; aspect-ratio:1; object-fit:contain; background:#f6f3ee; border-radius:5px; }
-.card span { font-size:11px; line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-.card b { font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
-.row { display:flex; gap:6px; flex-wrap:wrap; }
-button.act { font:inherit; font-size:13px; padding:7px 12px; border-radius:7px; border:1px solid #d9d4cd;
-             background:#fff; color:inherit; cursor:pointer; }
-button.go { font:inherit; font-size:13px; padding:8px 15px; border-radius:7px; border:1px solid #1c1a1e;
-            background:#1c1a1e; color:#fff; cursor:pointer; }
-button:disabled { opacity:.55; cursor:default; }
-.sel { border:1px solid #e3ddd2; border-radius:8px; padding:9px 10px; background:#faf8f5; display:grid; gap:7px; }
-.sel h4 { margin:0; font-size:12px; font-weight:650; }
-.hint, .note { font-size:11px; color:#6b6560; margin:0; line-height:1.45; }
-.quote { display:grid; gap:7px; border-top:1px solid #e3ddd2; padding-top:10px; }
-label.f { display:grid; gap:3px; font-size:12px; color:#6b6560; }
-input[type="text"], input[type="email"] { font:inherit; font-size:13px; padding:6px 8px; border-radius:7px;
-  border:1px solid #d9d4cd; background:#fff; color:inherit; width:100%; box-sizing:border-box; }
-.state { font-size:13px; color:#6b6560; padding:16px 0; }
-.state:empty { display:none; }
-.err { font-size:12px; color:#a3341f; margin:0; }
-.ok { font-size:12px; color:#2f7d50; margin:0; }
-input[type="file"] { display:none; }
-@media (prefers-color-scheme: dark) {
-  :host { color:#f2eef2; }
-  canvas, .empty, .sel, .card img { background:#2c2833; border-color:#3d3745; }
-  .card, button.act, input[type="text"], input[type="email"] { background:#221f26; border-color:#3d3745; color:#f2eef2; }
-  .lbl, .hint, .note, .state, .empty p { color:#a9a2ad; }
-  .quote { border-color:#3d3745; }
-  .err { color:#f08a72; }
-  .ok { color:#4fbe7e; }
-  button.go { background:#f2eef2; color:#221f26; border-color:#f2eef2; }
+canvas { display:block; width:100%; height:auto; border-radius:var(--mk-radius); background:var(--mk-muted);
+         touch-action:none; cursor:grab; }
+canvas:active { cursor:grabbing; }
+.tag { position:absolute; left:14px; top:14px; display:flex; gap:8px; align-items:baseline; padding:7px 14px;
+       border-radius:999px; background:oklch(18% .025 55 / .72); color:oklch(98.5% .008 85); font-size:13px;
+       backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); max-width:calc(100% - 28px); }
+.tag b { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tag i { font-style:normal; opacity:.75; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.tools { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:2px; padding:5px;
+         border-radius:999px; background:oklch(18% .025 55 / .78); backdrop-filter:blur(10px);
+         -webkit-backdrop-filter:blur(10px); box-shadow:0 10px 30px oklch(18% .025 55 / .25); animation:mk-in .2s ease both; }
+.tools button { min-width:38px; height:38px; padding:0 12px; border-radius:999px; border:0; background:transparent;
+                color:oklch(98.5% .008 85); cursor:pointer; font-size:13px; display:grid; place-items:center; }
+.tools button:hover { background:oklch(98.5% .008 85 / .12); }
+.tools .sep { width:1px; margin:8px 3px; background:oklch(98.5% .008 85 / .2); }
+.shelfHead { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.shelfHead span { font-size:12px; color:var(--mk-ink-2); }
+.shelf { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(132px,160px); gap:10px; overflow-x:auto;
+         padding:2px 2px 8px; scroll-snap-type:x mandatory; scrollbar-width:thin; }
+.pc { font:inherit; display:grid; gap:8px; padding:8px; border:1px solid var(--mk-line); border-radius:var(--mk-radius);
+      background:var(--mk-surface); color:var(--mk-ink); cursor:pointer; text-align:left; scroll-snap-align:start;
+      transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.pc:hover { transform:translateY(-2px); border-color:var(--mk-line-strong); box-shadow:0 8px 22px oklch(18% .025 55 / .08); }
+.pc .im { aspect-ratio:1; border-radius:10px; background:var(--mk-muted); display:grid; place-items:center; overflow:hidden; }
+:host([theme="dark"]) .pc .im, :host([theme="dark"]) .peek img { background:oklch(95% .01 85); }
+.pc img, .peek img { mix-blend-mode:multiply; }
+:host([theme="dark"]) .peek img { mix-blend-mode:normal; }
+.pc img { width:88%; height:88%; object-fit:contain; }
+.pc .nm { font-size:12.5px; line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.pc .pr { font-family:var(--mk-display); font-size:17px; font-variant-numeric:tabular-nums; }
+.pc .add { font-size:11px; color:var(--mk-ink-2); letter-spacing:.14em; text-transform:uppercase; }
+.bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+       border-top:1px solid var(--mk-line); padding-top:16px; }
+.bar .l, .bar .r { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.hint { font-size:12px; margin:0; }
+.quote { display:grid; gap:12px; max-width:520px; padding:20px; border:1px solid var(--mk-line); border-radius:var(--mk-radius);
+         background:var(--mk-surface); animation:mk-in .25s ease both; }
+.quote .grid { display:grid; gap:10px; grid-template-columns:1fr 1fr; }
+@media (max-width:620px) {
+  .quote .grid { grid-template-columns:1fr; }
+  .tools { position:static; transform:none; margin:10px auto 0; width:max-content; max-width:100%; overflow-x:auto; }
+  .tools button { min-width:36px; padding:0 9px; }
+  .tag { left:10px; top:10px; font-size:12px; padding:6px 12px; }
 }
-`;
+.state { padding:6px 0 0; }
+.state:empty { display:none; }
+input[type="file"] { display:none; }
+`);
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -92,15 +130,15 @@ function loadImage(url: string, cors: boolean): Promise<HTMLImageElement> {
 
 export class MaterialKaiPlace extends HTMLElement {
   private root: ShadowRoot;
-  private stage: HTMLDivElement;
+  private body: HTMLDivElement;
   private canvas: HTMLCanvasElement;
-  private side: HTMLDivElement;
-  private status: HTMLDivElement;
+  private status: HTMLParagraphElement;
 
   private products: ShelfProduct[] = [];
   private sprites = new Map<string, Sprite>();
   private photo: HTMLCanvasElement | null = null;
   private items: PlacedItem[] = [];
+  private landing = new Map<number, number>();
   private selectedUid: number | null = null;
   private nextUid = 1;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -121,15 +159,10 @@ export class MaterialKaiPlace extends HTMLElement {
     this.root = this.attachShadow({ mode: 'open' });
     const style = el('style');
     style.textContent = STYLE;
-    this.stage = el('div', 'stage');
+    this.body = el('div', 'root');
     this.canvas = el('canvas');
-    this.side = el('div', 'side');
-    this.status = el('div', 'state', 'Loading…');
-    const wrap = el('div', 'wrap');
-    const left = el('div');
-    left.append(this.stage, this.status);
-    wrap.append(left, this.side);
-    this.root.append(style, wrap);
+    this.status = el('p', 'state', 'Loading…');
+    this.root.append(style, this.body, this.status);
     this.bindPointer();
   }
 
@@ -142,6 +175,7 @@ export class MaterialKaiPlace extends HTMLElement {
   }
 
   connectedCallback() {
+    loadBrandFonts();
     this.observer = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) {
         this.observer?.disconnect();
@@ -196,45 +230,204 @@ export class MaterialKaiPlace extends HTMLElement {
       return;
     }
     this.status.textContent = '';
-    this.renderStage();
-    this.renderSide();
+    this.render();
   }
 
-  private photoInputs(): HTMLDivElement {
+  private fileInput(camera: boolean): HTMLInputElement {
+    const input = el('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    if (camera) input.setAttribute('capture', 'environment');
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (file) void this.usePhoto(file);
+      input.value = '';
+    });
+    return input;
+  }
+
+  private photoButtons(primaryLabel: string): HTMLDivElement {
     const row = el('div', 'row');
-    const mk = (label: string, camera: boolean, primary: boolean) => {
-      const input = el('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      if (camera) input.setAttribute('capture', 'environment');
-      input.addEventListener('change', () => {
-        const file = input.files?.[0];
-        if (file) void this.usePhoto(file);
-        input.value = '';
-      });
-      const btn = el('button', primary ? 'go' : 'act', label);
-      btn.type = 'button';
-      btn.addEventListener('click', () => input.click());
-      row.append(input, btn);
-    };
-    mk('Take a photo', true, true);
-    mk('Upload a photo', false, false);
+    const camera = this.fileInput(true);
+    const upload = this.fileInput(false);
+    const take = el('button', 'go', primaryLabel);
+    take.type = 'button';
+    take.addEventListener('click', () => camera.click());
+    const pick = el('button', 'act', 'Upload a photo');
+    pick.type = 'button';
+    pick.addEventListener('click', () => upload.click());
+    row.append(camera, upload, take, pick);
     return row;
   }
 
-  private renderStage() {
-    if (!this.photo) {
-      const empty = el('div', 'empty');
-      empty.append(
-        el('p', undefined, 'Take a photo of your space, or upload one, then place our products in it.'),
-        this.photoInputs(),
-        el('p', undefined, 'Your photo stays on your device. It is not uploaded.'),
-      );
-      this.stage.replaceChildren(empty);
-      return;
+  private render() {
+    if (!this.photo) { this.renderHero(); return; }
+    const parts: HTMLElement[] = [];
+
+    const head = el('div', 'head');
+    const t = el('div', 't');
+    t.append(el('p', 'mk-eyebrow', 'Product in place'));
+    const title = el('h3');
+    title.append('Your space, ', Object.assign(el('em'), { textContent: 'our pieces.' }));
+    t.append(title);
+    const change = el('div', 'row');
+    const camera = this.fileInput(true);
+    const upload = this.fileInput(false);
+    const newPhoto = el('button', 'act', 'New photo');
+    newPhoto.type = 'button';
+    newPhoto.addEventListener('click', () => (matchMedia('(pointer: coarse)').matches ? camera : upload).click());
+    change.append(camera, upload, newPhoto);
+    head.append(t, change);
+    parts.push(head);
+
+    const stage = el('div', 'stage');
+    stage.append(this.canvas);
+    const sel = this.selected;
+    const selProduct = this.productOf(sel);
+    if (sel && selProduct) {
+      const tag = el('div', 'tag');
+      tag.append(el('b', undefined, selProduct.name));
+      const price = formatMoney(selProduct.price, selProduct.currency, { fallback: '' });
+      const size = selProduct.widthM ? `${Math.round(selProduct.widthM * 100)} cm wide` : '';
+      const meta = [price, size].filter(Boolean).join(' · ');
+      if (meta) tag.append(el('i', undefined, meta));
+      stage.append(tag, this.toolbar(sel));
     }
-    this.stage.replaceChildren(this.canvas);
+    parts.push(stage);
+
+    const shelfHead = el('div', 'shelfHead');
+    shelfHead.append(el('p', 'mk-eyebrow', 'Tap a piece to place it'), el('span', undefined, `${this.products.length} pieces`));
+    parts.push(shelfHead, this.shelf());
+
+    const bar = el('div', 'bar');
+    const left = el('div', 'l');
+    left.append(el('p', 'hint', this.items.length
+      ? 'Drag to move. Pinch or drag the round corner to resize; two fingers rotate.'
+      : 'Pick a piece below to place it in your photo.'));
+    const right = el('div', 'r');
+    if (this.items.length > 0) {
+      const tainted = this.items.some((i) => this.sprites.get(i.productId)?.tainted);
+      const save = el('button', 'act', 'Save image');
+      save.type = 'button';
+      save.disabled = tainted;
+      save.title = tainted ? 'One of these product pictures cannot be saved into an image.' : '';
+      save.addEventListener('click', () => this.saveImage());
+      const ask = el('button', 'act', this.sent ? 'Request sent' : 'Ask for a quote');
+      ask.type = 'button';
+      ask.disabled = this.sent;
+      ask.addEventListener('click', () => { this.asking = !this.asking; this.render(); });
+      right.append(save, ask);
+      if (selProduct) {
+        const cart = el('button', 'go', 'Add to cart');
+        cart.type = 'button';
+        cart.addEventListener('click', () => this.emitAddToCart(selProduct));
+        right.append(cart);
+      }
+    }
+    bar.append(left, right);
+    parts.push(bar);
+
+    if (this.asking && !this.sent) parts.push(this.quoteForm());
+    if (this.sent) parts.push(el('p', 'ok', 'Thank you — we have your request and the pieces you placed.'));
+
+    this.body.replaceChildren(...parts);
     this.paint(true);
+    if (this.asking && !this.sent) this.mountChallenge();
+  }
+
+  private renderHero() {
+    const hero = el('div', 'hero');
+    const copy = el('div', 'copy');
+    copy.append(el('p', 'mk-eyebrow', 'Product in place'));
+    const title = el('h2', 'mk-title');
+    title.append('See it in ', Object.assign(el('em'), { textContent: 'your' }), ' space.');
+    copy.append(
+      title,
+      el('p', 'lead', 'Take a photo of your room, or upload one, then place our pieces in it — move them, size them, turn them until it looks right.'),
+      this.photoButtons('Take a photo'),
+    );
+    const peek = el('div', 'peek');
+    for (const p of this.products.slice(0, 4)) {
+      const img = el('img');
+      img.src = p.image;
+      img.alt = '';
+      img.loading = 'lazy';
+      peek.append(img);
+    }
+    if (this.products.length > 4) peek.append(el('span', undefined, `+${this.products.length - 4} more`));
+    copy.append(peek, el('p', 'privacy', 'Your photo stays on your device — it is never uploaded.'));
+    const show = el('div', 'show');
+    show.setAttribute('aria-hidden', 'true');
+    show.append(el('div', 'frame'));
+    this.products.slice(0, 3).forEach((p, i) => {
+      const img = el('img', ['a', 'b', 'c'][i]);
+      img.src = p.image;
+      img.alt = '';
+      show.append(img);
+    });
+    if (this.products.length > 1) show.append(el('div', 'sel'));
+    hero.append(copy, show);
+
+    hero.addEventListener('dragover', (e) => { e.preventDefault(); hero.classList.add('drag'); });
+    hero.addEventListener('dragleave', () => hero.classList.remove('drag'));
+    hero.addEventListener('drop', (e) => {
+      e.preventDefault();
+      hero.classList.remove('drag');
+      const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('image/'));
+      if (file) void this.usePhoto(file);
+    });
+    this.body.replaceChildren(hero);
+  }
+
+  private shelf(): HTMLDivElement {
+    const shelf = el('div', 'shelf');
+    for (const p of this.products) {
+      const card = el('button', 'pc');
+      card.type = 'button';
+      const im = el('div', 'im');
+      const img = el('img');
+      img.src = p.image;
+      img.alt = '';
+      img.loading = 'lazy';
+      im.append(img);
+      card.append(im, el('span', 'nm', p.name));
+      const price = formatMoney(p.price, p.currency, { fallback: '' });
+      if (price) card.append(el('span', 'pr', price));
+      card.append(el('span', 'add', '+ Place'));
+      card.addEventListener('click', () => void this.place(p));
+      shelf.append(card);
+    }
+    return shelf;
+  }
+
+  private toolbar(sel: PlacedItem): HTMLDivElement {
+    const bar = el('div', 'tools');
+    const btn = (label: string, title: string, fn: () => void) => {
+      const b = el('button', undefined, label);
+      b.type = 'button';
+      b.title = title;
+      b.setAttribute('aria-label', title);
+      b.addEventListener('click', fn);
+      bar.append(b);
+    };
+    const sep = () => bar.append(el('span', 'sep'));
+    btn('−', 'Smaller', () => this.adjust((i) => { i.w = Math.max(24, i.w * 0.9); }));
+    btn('+', 'Bigger', () => this.adjust((i) => { i.w *= 1.1; }));
+    sep();
+    btn('↺', 'Rotate left', () => this.adjust((i) => { i.rot -= Math.PI / 24; }));
+    btn('↻', 'Rotate right', () => this.adjust((i) => { i.rot += Math.PI / 24; }));
+    btn('⇋', 'Flip', () => this.adjust((i) => { i.flip = !i.flip; }));
+    sep();
+    btn('Front', 'Bring to front', () => {
+      this.items = [...this.items.filter((i) => i.uid !== sel.uid), sel];
+      this.paint(true);
+    });
+    btn('✕', 'Remove', () => {
+      this.items = this.items.filter((i) => i.uid !== sel.uid);
+      this.selectedUid = null;
+      this.render();
+    });
+    return bar;
   }
 
   private async usePhoto(file: File) {
@@ -255,9 +448,8 @@ export class MaterialKaiPlace extends HTMLElement {
       this.photo = c;
       this.canvas.width = c.width;
       this.canvas.height = c.height;
-      this.status.textContent = this.items.length ? '' : 'Now pick a product to place it.';
-      this.renderStage();
-      this.renderSide();
+      this.status.textContent = '';
+      this.render();
     } catch {
       this.status.textContent = 'That photo could not be opened. Try a JPEG or PNG.';
     } finally {
@@ -310,17 +502,31 @@ export class MaterialKaiPlace extends HTMLElement {
     if (!sprite) { this.status.textContent = `The picture of ${product.name} could not be loaded.`; return; }
     const w = Math.min(this.photo.width * 0.32, this.photo.height * 0.5 * sprite.aspect);
     const h = w / sprite.aspect;
+    const offset = (this.items.length % 4) * this.photo.width * 0.04;
     const item: PlacedItem = {
-      uid: this.nextUid++, productId: product.id, cx: this.photo.width / 2,
+      uid: this.nextUid++, productId: product.id, cx: this.photo.width / 2 + offset,
       cy: Math.min(this.photo.height * 0.62, this.photo.height - h / 2 - this.photo.height * 0.04),
       w, aspect: sprite.aspect, rot: 0, flip: false,
     };
     this.items.push(item);
     this.selectedUid = item.uid;
-    this.status.textContent = sprite.cut ? '' : 'This picture has a background we could not remove; it is shown as it is.';
-    this.paint(true);
-    this.renderSide();
+    this.status.textContent = sprite.cut ? '' : `${product.name} has a photo background we could not remove, so it is shown as it is.`;
+    this.render();
+    this.animateLanding(item.uid);
     this.report('embed_place_product');
+  }
+
+  private animateLanding(uid: number) {
+    const start = performance.now();
+    this.landing.set(uid, 0);
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / LAND_MS);
+      this.landing.set(uid, t);
+      this.paint(true);
+      if (t < 1) requestAnimationFrame(tick);
+      else this.landing.delete(uid);
+    };
+    requestAnimationFrame(tick);
   }
 
   private get selected(): PlacedItem | null {
@@ -339,17 +545,21 @@ export class MaterialKaiPlace extends HTMLElement {
     for (const item of this.items) {
       const sprite = this.sprites.get(item.productId);
       if (!sprite) continue;
+      const land = this.landing.get(item.uid);
+      const ease = land === undefined ? 1 : 1 - (1 - land) ** 3;
       const h = itemHeight(item);
       ctx.save();
-      ctx.translate(item.cx, item.cy);
+      ctx.globalAlpha = ease;
+      ctx.translate(item.cx, item.cy + (1 - ease) * h * 0.06);
       ctx.rotate(item.rot);
+      ctx.scale(0.94 + 0.06 * ease, 0.94 + 0.06 * ease);
       if (sprite.cut) {
         ctx.save();
         ctx.translate(0, h / 2);
         ctx.scale(1, 0.16);
         const g = ctx.createRadialGradient(0, 0, 0, 0, 0, item.w / 2);
-        g.addColorStop(0, 'rgba(0,0,0,0.32)');
-        g.addColorStop(1, 'rgba(0,0,0,0)');
+        g.addColorStop(0, 'rgba(20,14,8,0.34)');
+        g.addColorStop(1, 'rgba(20,14,8,0)');
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(0, 0, item.w / 2, 0, Math.PI * 2);
@@ -367,18 +577,23 @@ export class MaterialKaiPlace extends HTMLElement {
       ctx.save();
       ctx.translate(sel.cx, sel.cy);
       ctx.rotate(sel.rot);
-      ctx.setLineDash([6 * unit, 4 * unit]);
-      ctx.lineWidth = 1.5 * unit;
-      ctx.strokeStyle = '#ffffff';
+      ctx.setLineDash([5 * unit, 5 * unit]);
+      ctx.lineWidth = 1.4 * unit;
+      ctx.strokeStyle = 'rgba(255,250,240,0.95)';
+      ctx.shadowColor = 'rgba(20,14,8,0.35)';
+      ctx.shadowBlur = 4 * unit;
       ctx.strokeRect(-sel.w / 2, -h / 2, sel.w, h);
       ctx.restore();
       const hp = handlePoint(sel);
       ctx.beginPath();
-      ctx.arc(hp.x, hp.y, 9 * unit, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
+      ctx.arc(hp.x, hp.y, 10 * unit, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgb(212,190,150)';
+      ctx.shadowColor = 'rgba(20,14,8,0.35)';
+      ctx.shadowBlur = 6 * unit;
       ctx.fill();
-      ctx.lineWidth = 2 * unit;
-      ctx.strokeStyle = '#1c1a1e';
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2.5 * unit;
+      ctx.strokeStyle = 'rgb(38,28,20)';
       ctx.stroke();
     }
   }
@@ -407,7 +622,7 @@ export class MaterialKaiPlace extends HTMLElement {
       const unit = Math.max(c.width, c.height) / 600;
       if (sel) {
         const hp = handlePoint(sel);
-        if (Math.hypot(p.x - hp.x, p.y - hp.y) <= 18 * unit) {
+        if (Math.hypot(p.x - hp.x, p.y - hp.y) <= 20 * unit) {
           this.gesture = {
             kind: 'scale', uid: sel.uid, startW: sel.w, startRot: sel.rot, offX: 0, offY: 0,
             startDist: Math.hypot(p.x - sel.cx, p.y - sel.cy), startAngle: 0,
@@ -416,6 +631,7 @@ export class MaterialKaiPlace extends HTMLElement {
         }
       }
       const hit = sel && hitItem(sel, p.x, p.y) ? sel : topItemAt(this.items, p.x, p.y);
+      const changed = (hit?.uid ?? null) !== this.selectedUid;
       if (hit) {
         this.selectedUid = hit.uid;
         this.gesture = {
@@ -426,8 +642,8 @@ export class MaterialKaiPlace extends HTMLElement {
         this.selectedUid = null;
         this.gesture = null;
       }
-      this.paint(true);
-      this.renderSide();
+      if (changed) this.render();
+      else this.paint(true);
     });
     c.addEventListener('pointermove', (e) => {
       if (!this.pointers.has(e.pointerId)) return;
@@ -462,84 +678,6 @@ export class MaterialKaiPlace extends HTMLElement {
     if (!sel) return;
     fn(sel);
     this.paint(true);
-  }
-
-  private renderSide() {
-    const parts: HTMLElement[] = [];
-    if (this.photo) {
-      const change = el('div', 'row');
-      change.append(this.photoInputs());
-      parts.push(change);
-    }
-
-    parts.push(el('span', 'lbl', this.photo ? 'Pick a product to place it' : 'Products'));
-    const shelf = el('div', 'shelf');
-    for (const p of this.products) {
-      const card = el('button', 'card');
-      card.type = 'button';
-      const img = el('img');
-      img.src = p.image;
-      img.alt = '';
-      img.loading = 'lazy';
-      card.append(img, el('span', undefined, p.name));
-      const price = formatMoney(p.price, p.currency, { fallback: '' });
-      if (price) card.append(el('b', undefined, price));
-      card.addEventListener('click', () => void this.place(p));
-      shelf.append(card);
-    }
-    parts.push(shelf);
-
-    const sel = this.selected;
-    const selProduct = this.productOf(sel);
-    if (sel && selProduct) {
-      const box = el('div', 'sel');
-      box.append(el('h4', undefined, selProduct.name));
-      if (selProduct.widthM) box.append(el('p', 'note', `Real width: ${Math.round(selProduct.widthM * 100)} cm`));
-      const row = el('div', 'row');
-      const btn = (label: string, fn: () => void) => {
-        const b = el('button', 'act', label);
-        b.type = 'button';
-        b.addEventListener('click', fn);
-        row.append(b);
-      };
-      btn('Smaller', () => this.adjust((i) => { i.w = Math.max(24, i.w * 0.9); }));
-      btn('Bigger', () => this.adjust((i) => { i.w *= 1.1; }));
-      btn('↺', () => this.adjust((i) => { i.rot -= Math.PI / 24; }));
-      btn('↻', () => this.adjust((i) => { i.rot += Math.PI / 24; }));
-      btn('Flip', () => this.adjust((i) => { i.flip = !i.flip; }));
-      btn('Remove', () => {
-        this.items = this.items.filter((i) => i.uid !== sel.uid);
-        this.selectedUid = null;
-        this.paint(true);
-        this.renderSide();
-      });
-      box.append(row);
-      const cart = el('button', 'go', 'Add to cart');
-      cart.type = 'button';
-      cart.addEventListener('click', () => this.emitAddToCart(selProduct));
-      box.append(cart);
-      parts.push(box);
-    }
-
-    if (this.items.length > 0) {
-      parts.push(el('p', 'hint', 'Drag to move. Drag the round corner, or pinch, to resize. Two fingers also rotate.'));
-      const actions = el('div', 'row');
-      const tainted = this.items.some((i) => this.sprites.get(i.productId)?.tainted);
-      const save = el('button', 'act', 'Save image');
-      save.type = 'button';
-      save.disabled = tainted;
-      save.title = tainted ? 'One of these product pictures cannot be saved into an image.' : '';
-      save.addEventListener('click', () => this.saveImage());
-      const ask = el('button', 'act', 'Ask for a quote');
-      ask.type = 'button';
-      ask.addEventListener('click', () => { this.asking = !this.asking; this.renderSide(); });
-      actions.append(save, ask);
-      parts.push(actions);
-      if (this.asking && !this.sent) parts.push(this.quoteForm());
-      if (this.sent) parts.push(el('p', 'ok', 'Thank you — we have your request and the products you placed.'));
-    }
-    this.side.replaceChildren(...parts);
-    if (this.asking && !this.sent) this.mountChallenge();
   }
 
   private saveImage() {
@@ -582,18 +720,24 @@ export class MaterialKaiPlace extends HTMLElement {
 
   private quoteForm(): HTMLDivElement {
     const form = el('div', 'quote');
-    const field = (label: string, type: string, key: 'name' | 'email' | 'message') => {
-      const wrap = el('label', 'f', label);
+    const title = el('h3');
+    title.append('Ask for a ', Object.assign(el('em'), { textContent: 'quote' }));
+    form.append(title, el('p', 'hint', 'We will send prices for the pieces you placed. Your photo is not sent.'));
+    const grid = el('div', 'grid');
+    const field = (label: string, type: string, key: 'name' | 'email' | 'message', host: HTMLElement) => {
+      const wrap = el('label', 'f');
+      wrap.append(el('span', undefined, label));
       const input = el('input');
       input.type = type;
       input.value = this.formValues[key];
       input.addEventListener('input', () => { this.formValues[key] = input.value; });
       wrap.append(input);
-      form.append(wrap);
+      host.append(wrap);
     };
-    field('Name', 'text', 'name');
-    field('Email', 'email', 'email');
-    field('Anything we should know (optional)', 'text', 'message');
+    field('Name', 'text', 'name', grid);
+    field('Email', 'email', 'email', grid);
+    form.append(grid);
+    field('Anything we should know (optional)', 'text', 'message', form);
     const holder = el('div');
     form.append(holder);
     this.challengeHost = this.siteKey ? holder : null;
@@ -672,7 +816,7 @@ export class MaterialKaiPlace extends HTMLElement {
       this.asking = false;
       this.report('embed_place_quote');
       this.dispatchEvent(new CustomEvent('materialkai:quote-request', { bubbles: true, composed: true, detail: { spec } }));
-      this.renderSide();
+      this.render();
     } catch {
       this.setError('That did not send. Please try again.');
       this.sending = false;

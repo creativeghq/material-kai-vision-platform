@@ -15,6 +15,7 @@ import { tileFormatM, packCoverageM2 } from '@/components/features/roomplanner/s
 import { trackEmbedEvent } from './embedSession';
 import { appOrigin } from './appOrigin';
 import { loadTurnstile } from './turnstileLoader';
+import { brandStyle, loadBrandFonts } from './theme';
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
@@ -51,51 +52,27 @@ interface PickerProduct {
   face: EmbedFace;
 }
 
-const STYLE = `
-:host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
-.wrap { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); }
-@media (min-width:720px) { .wrap { grid-template-columns:minmax(0,1fr) 230px; } }
-canvas { display:block; width:100%; height:auto; border-radius:10px; border:1px solid #e3ddd2; background:#f6f3ee; }
-.side { display:grid; gap:11px; align-content:start; }
-.lbl { font-size:12px; color:#6b6560; padding-bottom:4px; display:block; }
-select, input { font:inherit; font-size:13px; padding:6px 8px; border-radius:7px; border:1px solid #d9d4cd;
-                background:#fff; color:inherit; width:100%; box-sizing:border-box; }
-input[type="range"] { padding:0; }
-.swatches { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; align-items:center; }
-.sw { width:20px; height:20px; border-radius:4px; border:1px solid #d9d4cd; cursor:pointer; padding:0; }
-.sw[aria-pressed="true"] { border-color:#1c1a1e; box-shadow:inset 0 0 0 1px #1c1a1e; }
-.cov { border:1px solid #e3ddd2; border-radius:8px; padding:9px 10px; background:#faf8f5; display:grid; gap:2px; }
-.cov h4 { margin:0 0 3px; font-size:11px; font-weight:650; }
-.cr { display:flex; justify-content:space-between; gap:10px; font-size:12px; }
-.cr .k { color:#6b6560; }
+const STYLE = brandStyle(`
+.wrap { display:grid; gap:18px; grid-template-columns:minmax(0,1fr); }
+@media (min-width:760px) { .wrap { grid-template-columns:minmax(0,1fr) 260px; } }
+canvas { display:block; width:100%; height:auto; border-radius:var(--mk-radius); background:var(--mk-muted); }
+.side { display:grid; gap:14px; align-content:start; }
+.lbl { font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--mk-ink-2); padding-bottom:7px; display:block; }
+select, input { padding:8px 10px; font-size:13.5px; }
+.swatches { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; align-items:center; }
+.sw { width:24px; height:24px; border-radius:7px; border:1px solid var(--mk-line-strong); cursor:pointer; padding:0; }
+.sw[aria-pressed="true"] { border-color:var(--mk-ink); box-shadow:0 0 0 2px var(--mk-accent-soft); }
+.cov { border:1px solid var(--mk-line); border-radius:var(--mk-radius); padding:14px; background:var(--mk-surface); display:grid; gap:4px; }
+.cov h4 { margin:0 0 6px; font-family:var(--mk-display); font-weight:400; font-size:19px; }
+.cr { display:flex; justify-content:space-between; gap:10px; font-size:13px; }
+.cr .k { color:var(--mk-ink-2); }
 .cr .v { font-variant-numeric:tabular-nums; font-weight:500; }
-.gap { font-size:11px; color:#8a5a12; margin:4px 0 0; line-height:1.45; }
-.warn { font-size:11px; color:#8a5a12; margin:4px 0 0; line-height:1.45; }
-.row { display:flex; gap:6px; flex-wrap:wrap; }
-button.act { font:inherit; font-size:13px; padding:7px 13px; border-radius:7px; border:1px solid #d9d4cd;
-             background:#fff; color:inherit; cursor:pointer; }
-button.go { font:inherit; font-size:13px; padding:8px 15px; border-radius:7px; border:1px solid #1c1a1e;
-            background:#1c1a1e; color:#fff; cursor:pointer; }
-button:disabled { opacity:.55; cursor:default; }
-.quote { display:grid; gap:7px; border-top:1px solid #e3ddd2; padding-top:10px; }
-label.f { display:grid; gap:3px; font-size:12px; color:#6b6560; }
-.state { font-size:13px; color:#6b6560; padding:16px 0; }
-.err { font-size:12px; color:#a3341f; margin:0; }
-.ok { font-size:12px; color:#2f7d50; margin:0; }
-@media (prefers-color-scheme: dark) {
-  :host { color:#f2eef2; }
-  canvas { background:#2c2833; border-color:#3d3745; }
-  .lbl, .cr .k, .state { color:#a9a2ad; }
-  select, input, button.act, .sw { background:#221f26; border-color:#3d3745; color:#f2eef2; }
-  .cov { background:#2c2833; border-color:#3d3745; }
-  .quote { border-color:#3d3745; }
-  .gap, .warn { color:#e0b062; }
-  .err { color:#f08a72; }
-  .ok { color:#4fbe7e; }
-  button.go { background:#f2eef2; color:#221f26; border-color:#f2eef2; }
-  .sw[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
-}
-`;
+.gap, .warn { font-size:12px; color:oklch(52% .1 70); margin:6px 0 0; line-height:1.5; }
+:host([theme="dark"]) .gap, :host([theme="dark"]) .warn { color:oklch(80% .1 75); }
+.row { display:flex; gap:8px; flex-wrap:wrap; }
+.quote { display:grid; gap:10px; border-top:1px solid var(--mk-line); padding-top:14px; }
+.state { padding:16px 0; }
+`);
 
 const GROUT_SWATCHES = ['#b8b4ad', '#e8e4dc', '#8a857c', '#5a564f', '#2b2926'];
 
@@ -179,6 +156,7 @@ export class MaterialKaiVisualizer extends HTMLElement {
   }
 
   connectedCallback() {
+    loadBrandFonts();
     // Moving an element in the DOM disconnects and reconnects it. Leaving `disposed` set made a
     // widget that was ever detached permanently dead.
     this.disposed = false;
