@@ -2222,6 +2222,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "link_company_to_thread",
           "promote_thread",
           "set_status",
+          "search_messages",
+          "label_counts",
           "set_assignee",
           "complete_reply",
           "set_agent",
@@ -2392,6 +2394,41 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "status": {
         "type": "string"
       },
+      "q": {
+        "type": "string",
+        "description": "Words in the message body"
+      },
+      "channels": {
+        "type": "array",
+        "description": "whatsapp | email | social | internal"
+      },
+      "direction": {
+        "type": "string",
+        "description": "Received from the customer, or sent by us (one of: 'in' | 'out')"
+      },
+      "from": {
+        "type": "string",
+        "description": "string (ISO datetime)"
+      },
+      "to": {
+        "type": "string",
+        "description": "Exclusive upper bound (string (ISO datetime))"
+      },
+      "label_ids": {
+        "type": "string",
+        "description": "Only conversations carrying any of these labels (string[] (uuid))"
+      },
+      "has_attachments": {
+        "type": "boolean"
+      },
+      "before": {
+        "type": "string",
+        "description": "next_cursor from the previous page"
+      },
+      "limit": {
+        "type": "number",
+        "description": "1-200, default 50"
+      },
       "text": {
         "type": "string",
         "description": "The reply so far (last 2000 characters are used)"
@@ -2405,25 +2442,9 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "allow_account_data": {
         "type": "boolean"
       },
-      "label_ids": {
-        "type": "array",
-        "description": "Conversations carrying any of these labels"
-      },
       "search": {
         "type": "string",
         "description": "Text in the subject, sender, number or any message (not private notes)"
-      },
-      "limit": {
-        "type": "number",
-        "description": "Page size, 1–200 (default 100)"
-      },
-      "before": {
-        "type": "string",
-        "description": "next_cursor from the previous page"
-      },
-      "channels": {
-        "type": "array",
-        "description": "Only these channels (internal, whatsapp, email, social)"
       },
       "folder": {
         "type": "string",
@@ -2476,10 +2497,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "label_id": {
         "type": "string",
         "description": "Label to update (string (uuid))"
-      },
-      "to": {
-        "type": "string",
-        "description": "Recipient email address"
       },
       "email_cc": {
         "type": "array",

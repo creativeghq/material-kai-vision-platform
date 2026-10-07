@@ -15,6 +15,7 @@ import { InboxSidebar } from './components/InboxSidebar';
 import { ConversationActions } from './components/ConversationActions';
 import { GmailInbox } from './gmail/GmailInbox';
 import { ScheduledDialog } from './components/SendLater';
+import { MessageSearchDialog } from './components/MessageSearchDialog';
 
 const InboxPage: React.FC = () => {
   const s = useInboxPage();
@@ -24,6 +25,9 @@ const InboxPage: React.FC = () => {
     setMode,
     showScheduled,
     setShowScheduled,
+    showMessageSearch,
+    setShowMessageSearch,
+    wsLabels,
     isPlatformOperator,
     threads,
     allWorkspaces,
@@ -93,6 +97,15 @@ const InboxPage: React.FC = () => {
       </div>
 
       {showScheduled && <ScheduledDialog onClose={() => setShowScheduled(false)} />}
+      {showMessageSearch && activeWorkspaceId && (
+        <MessageSearchDialog
+          workspaceId={activeWorkspaceId}
+          labels={wsLabels}
+          initialChannels={mode === 'whatsapp' ? ['whatsapp'] : []}
+          onOpenThread={(id) => { setShowMessageSearch(false); void openThread(id); }}
+          onClose={() => setShowMessageSearch(false)}
+        />
+      )}
       {showNew && activeWorkspaceId && (
         <NewThreadDialog
           workspaceId={activeWorkspaceId}

@@ -35153,6 +35153,14 @@ export type Database = {
       }
     }
     Functions: {
+      whatsapp_audience_preview: {
+        Args: { p_workspace_id: string; p_filter: Json }
+        Returns: Json
+      }
+      create_whatsapp_campaign: {
+        Args: { p_workspace_id: string; p_name: string; p_template_id: string; p_channel_id: string; p_filter: Json; p_scheduled_at?: string | null }
+        Returns: Json
+      }
       mydata_tax_payable_delta: {
         Args: { p_tax_type: number; p_tax_amount: number; p_reduces_payable: boolean }
         Returns: number

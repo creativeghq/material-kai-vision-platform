@@ -68,7 +68,7 @@ import { defaultVatPercent, resolveLinePrice } from '../_shared/order-intake/pri
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
-import { escapeLike } from '../_shared/searchFold.ts';
+import { escapeLike, foldForSearch } from '../_shared/searchFold.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { handoffSince, stripQuotedEmail, TRANSCRIPT_MESSAGE_MAX } from '../_shared/inbox-conversation.ts';
@@ -303,6 +303,18 @@ async function whatsappWindow(
   if (!last) return { open: false, last_inbound_at: null, expires_at: null, source };
   const expires = new Date(new Date(last).getTime() + 24 * 3600 * 1000);
   return { open: expires > new Date(), last_inbound_at: last, expires_at: expires.toISOString(), source };
+}
+
+function labelRulePatch(payload: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const words = (v: unknown, max: number) => (Array.isArray(v) ? [...new Set(v.map((x) => String(x).trim()).filter(Boolean))].slice(0, max) : []);
+  if (payload.auto_keywords !== undefined) out.auto_keywords = words(payload.auto_keywords, 30).map((w) => w.slice(0, 60));
+  if (payload.auto_channels !== undefined) out.auto_channels = words(payload.auto_channels, 6).filter((c) => INBOX_CHANNELS.has(c));
+  if (payload.ai_instruction !== undefined) {
+    const t = typeof payload.ai_instruction === 'string' ? payload.ai_instruction.trim().slice(0, 500) : '';
+    out.ai_instruction = t || null;
+  }
+  return out;
 }
 
 async function getThreadOrThrow(db: DbClient, threadId: string) {
@@ -897,6 +909,143 @@ async function recentConversations(
     .eq('user_id', userId).eq('status', 'active').in('thread_id', rows.map((r) => String(r.id)));
   const visible = new Set(((mine || []) as Array<{ thread_id: string }>).map((r) => r.thread_id));
   return rows.filter((r) => visible.has(String(r.id)));
+}
+
+interface AutoLabelRule { id: string; name: string; auto_keywords: string[] | null; auto_channels: string[] | null; ai_instruction: string | null }
+
+const AUTO_LABEL_TOOL = {
+  name: 'apply_labels',
+  description: 'The labels that clearly apply to this conversation.',
+  input_schema: {
+    type: 'object',
+    properties: { label_ids: { type: 'array', items: { type: 'string' }, description: 'Ids from the list; empty when none apply.' } },
+    required: ['label_ids'],
+  },
+};
+const AUTO_LABEL_AI_EVERY_MS = 24 * 60 * 60 * 1000;
+
+function keywordHit(foldedText: string, keyword: string): boolean {
+  const k = foldForSearch(keyword).trim();
+  if (!k) return false;
+  const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'u').test(foldedText);
+}
+
+/** Keyword rules on every new customer message; AI-described labels at most daily (billed to the owner). Adds only. */
+async function maybeAutoLabel(db: DbClient, threadId: string): Promise<void> {
+  try {
+    const thread = await getThreadOrThrow(db, threadId);
+    if (thread.thread_type === 'internal') return;
+    const workspaceId = String(thread.workspace_id);
+    const { data: ruleRows } = await db.from('inbox_labels')
+      .select('id, name, auto_keywords, auto_channels, ai_instruction').eq('workspace_id', workspaceId);
+    const rules = ((ruleRows || []) as AutoLabelRule[])
+      .filter((l) => !l.auto_channels?.length || l.auto_channels.includes(String(thread.channel)));
+    if (!rules.some((l) => l.auto_keywords?.length || l.ai_instruction?.trim())) return;
+
+    const [{ data: parts }, { data: recent }, { data: onThread }] = await Promise.all([
+      db.from('inbox_participants').select('id, participant_type').eq('thread_id', threadId),
+      db.from('inbox_messages').select('id, body, created_at, sender_participant_id, message_type')
+        .eq('thread_id', threadId).is('deleted_at', null).in('message_type', ['text', 'agent'])
+        .order('created_at', { ascending: false }).limit(20),
+      db.from('inbox_thread_labels').select('label_id').eq('thread_id', threadId),
+    ]);
+    const typeById = new Map(((parts || []) as Array<{ id: string; participant_type: string }>).map((p) => [p.id, p.participant_type]));
+    const msgs = (recent || []) as Array<{ id: string; body: string | null; created_at: string; sender_participant_id: string | null; message_type: string }>;
+    const inbound = msgs.filter((m) => m.message_type === 'text'
+      && (!m.sender_participant_id || typeById.get(m.sender_participant_id) === 'customer'));
+    const latest = inbound[0];
+    if (!latest?.body?.trim()) return;
+    const have = new Set(((onThread || []) as Array<{ label_id: string }>).map((r) => r.label_id));
+
+    const add = new Map<string, string>();
+    // An email reply quotes our own earlier text; only the customer's new words count.
+    const ownWords = thread.channel === 'email' ? stripQuotedEmail(latest.body) : latest.body;
+    const text = foldForSearch(ownWords);
+    for (const l of rules) {
+      if (have.has(l.id)) continue;
+      const hit = (l.auto_keywords ?? []).find((k) => keywordHit(text, k));
+      if (hit) add.set(l.id, `keyword "${hit}"`);
+    }
+
+    const aiRules = rules.filter((l) => l.ai_instruction?.trim() && !have.has(l.id) && !add.has(l.id));
+    let owner: string | null = null;
+    if (aiRules.length) {
+      // The claim is the throttle AND the race guard: two messages at once classify once.
+      const due = new Date(Date.now() - AUTO_LABEL_AI_EVERY_MS).toISOString();
+      const { data: claimed } = await db.from('inbox_threads')
+        .update({ auto_label_checked_at: new Date().toISOString() })
+        .eq('id', threadId).or(`auto_label_checked_at.is.null,auto_label_checked_at.lt.${due}`)
+        .select('id');
+      if ((claimed as unknown[] | null)?.length) owner = await workspaceOwner(db, workspaceId);
+    }
+    if (owner) {
+      const debit = await debitExternalServiceCredits(db, owner, 'inbox-autolabel', 'inbox_autolabel', 1, { thread_id: threadId }, workspaceId);
+      if (debit.success) {
+        const refund = () => refundCredits(db, owner, workspaceId, debit.credits_debited, 'inbox_autolabel', { thread_id: threadId });
+        try {
+          const transcript = msgs.slice(0, 12).reverse()
+            .map((m) => `${!m.sender_participant_id || typeById.get(m.sender_participant_id) === 'customer' ? 'Customer' : 'Us'}: ${m.body ?? ''}`)
+            .join('\n');
+          const labelList = aiRules.map((l) => `- id ${l.id} · ${l.name}: ${l.ai_instruction}`).join('\n');
+          const res = await callClaudeMessages({
+            model: 'claude-haiku-4-5',
+            max_tokens: 200,
+            system: await loadPrompt(db, 'tool', 'inbox_auto_label'),
+            tools: [AUTO_LABEL_TOOL],
+            // Invariant 9: the verdict writes labels, so it arrives as a forced tool call, never parsed prose.
+            tool_choice: { type: 'tool', name: AUTO_LABEL_TOOL.name },
+            messages: [{ role: 'user', content: `Labels:\n${labelList}\n\n${wrapUntrusted('conversation', transcript, 6000)}` }],
+          }, {
+            task: 'inbox_autolabel', userId: owner, workspaceId, timeoutMs: 20_000,
+            // Booked by the per-classification `inbox-autolabel` debit above.
+            costLoggedByCaller: true,
+          });
+          const call = (res.content ?? []).find((c: { type: string; name?: string }) => c.type === 'tool_use' && c.name === AUTO_LABEL_TOOL.name) as
+            { input?: { label_ids?: unknown } } | undefined;
+          if (res.stop_reason === 'refusal' || !call) await refund();
+          else {
+            const allowed = new Map(aiRules.map((l) => [l.id, l]));
+            for (const id of Array.isArray(call.input?.label_ids) ? call.input.label_ids.map(String) : []) {
+              if (allowed.has(id)) add.set(id, 'the assistant');
+            }
+          }
+        } catch (e) {
+          await refund();
+          console.warn('[inbox-api] auto-label classification failed (non-fatal):', (e as Error).message);
+        }
+      }
+    }
+    if (!add.size) return;
+
+    // Only rows THIS run inserted are announced: a concurrent run may already have added the same label.
+    const { data: inserted, error: insErr } = await db.from('inbox_thread_labels')
+      .upsert([...add.keys()].map((label_id) => ({ thread_id: threadId, label_id, created_by: null })), { onConflict: 'thread_id,label_id', ignoreDuplicates: true })
+      .select('label_id');
+    if (insErr) { console.warn('[inbox-api] auto-labels not written:', insErr.message); return; }
+    const ids = ((inserted || []) as Array<{ label_id: string }>).map((r) => r.label_id);
+    if (!ids.length) return;
+    const nameOf = new Map(rules.map((l) => [l.id, l.name]));
+    const names = ids.map((id) => nameOf.get(id) ?? 'label');
+    await recordThreadEvent(db, threadId,
+      `Labelled ${names.join(', ')} automatically (${[...new Set(ids.map((id) => add.get(id)))].join(', ')})`,
+      { kind: 'labeled', label_ids: ids, source: 'auto' });
+    await emitFlowEvent('inbox.thread_labeled', {
+      workspace_id: workspaceId,
+      user_id: owner ?? (await workspaceOwner(db, workspaceId)),
+      type: 'inbox_labeled',
+      title: `Conversation labeled ${names.join(', ')}`,
+      body: (thread.subject as string) || 'Conversation',
+      action_url: `/inbox?thread=${threadId}`,
+      thread_id: threadId,
+      label_ids: ids,
+      label_names: names,
+      all_label_ids: [...have, ...ids],
+      source: 'auto',
+    }).catch(() => {});
+  } catch (e) {
+    console.warn('[inbox-api] auto-label skipped (non-fatal):', (e as Error).message);
+  }
 }
 
 /** Upload a base64 attachment to the private inbox prefix; returns the stored reference. */
@@ -2189,6 +2338,7 @@ async function handleJwtAction(
         // Intake FIRST, so the proposal exists before the assistant answers and the reply can
         // acknowledge the order rather than contradict it. No-op unless the workspace opted in.
         await maybeRunOrderIntake(db, threadId);
+        runInBackground(maybeAutoLabel(db, threadId), `inbox-autolabel:${threadId}`);
         // A customer (claimed-account) message lets the agent take first crack. No-op unless the
         // thread is agent-active; maybeRunAgentReply gates + bills internally.
         await maybeRunAgentReply(db, threadId);
@@ -4162,13 +4312,67 @@ async function handleJwtAction(
       return json({ ok: true });
     }
 
+    case 'search_messages': {
+      const workspaceId = String(payload.workspace_id || '');
+      if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
+      const role = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && !role) throw new HttpError(403, 'You are not a member of that workspace');
+      const strings = (v: unknown) => (Array.isArray(v) ? v.map(String).filter(Boolean) : []);
+      const when = (v: unknown) => {
+        if (typeof v !== 'string' || !v) return null;
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+      };
+      const cursor = parseThreadCursor(payload.before);
+      const q = typeof payload.q === 'string' ? payload.q.trim().slice(0, 100) : '';
+      const direction = payload.direction === 'in' || payload.direction === 'out' ? payload.direction : null;
+      const limit = Math.min(Math.max(Number(payload.limit) || 50, 1), 200);
+      const { data, error } = await db.rpc('inbox_search_messages', {
+        p_workspace_id: workspaceId,
+        p_user_id: userId,
+        p_business: operator || (!!role && BUSINESS_ROLES.has(role)),
+        p_q: q || null,
+        p_channels: strings(payload.channels).filter((c) => INBOX_CHANNELS.has(c)),
+        p_direction: direction,
+        p_from: when(payload.from),
+        p_to: when(payload.to),
+        p_label_ids: strings(payload.label_ids),
+        p_has_attachments: payload.has_attachments === true,
+        p_before_at: cursor?.at ?? null,
+        p_before_id: cursor?.id ?? null,
+        p_limit: limit + 1,
+      });
+      if (error) throw new HttpError(500, `Search failed: ${error.message}`);
+      const rows = (data || []) as Array<{ message_id: string; created_at: string }>;
+      const page = rows.slice(0, limit);
+      const last = page[page.length - 1];
+      return json({
+        messages: page,
+        next_cursor: rows.length > limit && last ? `${last.created_at}|${last.message_id}` : null,
+      });
+    }
+
+    case 'label_counts': {
+      const workspaceId = String(payload.workspace_id || '');
+      if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
+      const role = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && !role) throw new HttpError(403, 'You are not a member of that workspace');
+      const { data, error } = await db.rpc('inbox_label_counts', {
+        p_workspace_id: workspaceId, p_user_id: userId, p_business: operator || (!!role && BUSINESS_ROLES.has(role)),
+      });
+      if (error) throw new HttpError(500, `Could not count labels: ${error.message}`);
+      const counts: Record<string, number> = {};
+      for (const r of (data || []) as Array<{ label_id: string; open_count: number }>) counts[r.label_id] = r.open_count;
+      return json({ counts });
+    }
+
     case 'list_labels': {
       const workspaceId = String(payload.workspace_id || '');
       if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
       const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
       if (!operator && !callerRole) throw new HttpError(403, 'You are not a member of that workspace');
       const { data: labels } = await db.from('inbox_labels')
-        .select('id, name, color, created_at')
+        .select('id, name, color, created_at, auto_keywords, auto_channels, ai_instruction')
         .eq('workspace_id', workspaceId)
         .order('name', { ascending: true });
       return json({ labels: labels || [] });
@@ -4184,8 +4388,8 @@ async function handleJwtAction(
         throw new HttpError(403, 'Only a workspace owner or admin may manage labels');
       }
       const { data: label, error } = await db.from('inbox_labels')
-        .insert({ workspace_id: workspaceId, name, color, created_by: userId })
-        .select('id, name, color, created_at').single();
+        .insert({ workspace_id: workspaceId, name, color, created_by: userId, ...labelRulePatch(payload) })
+        .select('id, name, color, created_at, auto_keywords, auto_channels, ai_instruction').single();
       if (error) {
         if ((error as { code?: string }).code === '23505') throw new HttpError(409, 'A label with that name already exists');
         throw new HttpError(500, error.message);
@@ -4206,8 +4410,9 @@ async function handleJwtAction(
       const patch: Record<string, unknown> = {};
       if (payload.name != null) patch.name = String(payload.name).trim();
       if (payload.color != null) patch.color = String(payload.color);
+      Object.assign(patch, labelRulePatch(payload));
       const { data: label, error } = await db.from('inbox_labels').update(patch).eq('id', labelId)
-        .select('id, name, color, created_at').single();
+        .select('id, name, color, created_at, auto_keywords, auto_channels, ai_instruction').single();
       if (error) throw new HttpError(500, error.message);
       return json({ label });
     }
@@ -4557,12 +4762,7 @@ async function handleJwtAction(
       if (!access.isMember) throw new HttpError(403, 'Only thread members may draft AI replies');
       const workspaceId = String(thread.workspace_id);
 
-      // No flat debit + refund pair here either. Same reason as the auto-reply path: the draft is
-      // now a real JARVIS turn, agent-chat meters it against `userId` in `agent_usage_logs` and
-      // refuses up front with a 402 when they cannot pay. Charging a fixed fee on top would bill
-      // the same reply into two ledgers that then disagree.
-      // What the MEMBER wants the reply to do ("offer the oak decking", "say the order ships
-      // Monday").
+      // No debit here: agent-chat meters the turn in agent_usage_logs; a fee on top would bill it twice.
       const instruction = typeof payload.instruction === 'string' ? payload.instruction.trim().slice(0, OPERATOR_INSTRUCTION_MAX) : '';
       const draft = await buildAgentDraft(db, thread, {
         userId, task: 'inbox_agent_suggest', operatorInstruction: instruction || undefined,
@@ -5225,6 +5425,7 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
       });
       // #342: read any order out of the conversation before the assistant answers it.
       await maybeRunOrderIntake(db, String(thread.id));
+      runInBackground(maybeAutoLabel(db, String(thread.id)), `inbox-autolabel:${String(thread.id)}`);
       // Phase-2: auto-reply if the thread is handed to the agent.
       await maybeRunAgentReply(db, String(thread.id));
       return json({ message: { id: (msg as { id: string }).id, created_at: (msg as { created_at: string }).created_at } });
@@ -6228,6 +6429,7 @@ async function handler(req: Request): Promise<Response> {
     runInBackground(
       (async () => {
         await maybeRunOrderIntake(db, threadId);
+        await maybeAutoLabel(db, threadId);
         await maybeRunAgentReply(db, threadId);
       })(),
       `inbox-agent-reply:${threadId}`,

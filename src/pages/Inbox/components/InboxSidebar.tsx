@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, UserRound, UserX, Copy, FileText } from 'lucide-react';
+import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { inboxApi } from '@/services/inboxApi';
 import { visibleModes, modeSources } from '../inboxModes';
@@ -18,6 +18,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     activeWorkspaceId,
     activeWorkspace,
     wsLabels,
+    labelCounts,
     canManageLabels,
     labelIds,
     setLabelFilter,
@@ -28,6 +29,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     assignmentView,
     setAssignmentView,
     setShowScheduled,
+    setShowMessageSearch,
     threads,
     myUserId,
     nextCursor,
@@ -123,6 +125,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <NavRow icon={<FilePen className="w-4 h-4 shrink-0" />} label="Drafts" active={view === 'drafts'} onClick={() => goToView('drafts')} />
           <NavRow icon={<Send className="w-4 h-4 shrink-0" />} label="Sent" active={view === 'sent'} onClick={() => goToView('sent')} />
           <NavRow icon={<CalendarClock className="w-4 h-4 shrink-0" />} label="Scheduled" active={false} onClick={() => setShowScheduled(true)} />
+          <NavRow icon={<TextSearch className="w-4 h-4 shrink-0" />} label="Search messages" active={false} onClick={() => setShowMessageSearch(true)} />
           <NavRow icon={<Archive className="w-4 h-4 shrink-0" />} label="Archived" active={view === 'archived'} onClick={() => goToView('archived')} />
         </nav>
 
@@ -219,6 +222,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
               icon={<span className={`w-2 h-2 rounded-full shrink-0 ${labelDot(l.color)}`} />}
               label={l.name}
               dense
+              count={labelCounts ? String(labelCounts[l.id] ?? 0) : undefined}
               active={labelIds.includes(l.id)}
               onClick={() => setLabelFilter(labelIds.length === 1 && labelIds[0] === l.id ? null : l.id)}
             />

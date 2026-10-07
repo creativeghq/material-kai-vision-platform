@@ -303,12 +303,13 @@ class MessagingCampaignService {
   /**
    * Get messaging campaigns
    */
-  async getCampaigns(channelType?: MessagingChannelType): Promise<MessagingCampaign[]> {
+  async getCampaigns(channelType?: MessagingChannelType, workspaceId?: string | null): Promise<MessagingCampaign[]> {
     let query = supabase
       .from('campaigns')
       .select('*')
       .eq('channel_type', 'whatsapp')
       .order('created_at', { ascending: false });
+    if (workspaceId) query = query.eq('workspace_id', workspaceId);
 
     if (channelType) {
       query = query.eq('channel_type', channelType);

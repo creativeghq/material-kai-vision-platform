@@ -8165,6 +8165,82 @@
         "response": "{data: thread}"
       },
       {
+        "name": "search_messages",
+        "summary": "Message-level search in one workspace: one row per matching message (newest first) with its conversation, sender and direction",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "q",
+            "type": "string",
+            "required": false,
+            "desc": "Words in the message body"
+          },
+          {
+            "name": "channels",
+            "type": "string[]",
+            "required": false,
+            "desc": "whatsapp | email | social | internal"
+          },
+          {
+            "name": "direction",
+            "type": "'in' | 'out'",
+            "required": false,
+            "desc": "Received from the customer, or sent by us"
+          },
+          {
+            "name": "from",
+            "type": "string (ISO datetime)",
+            "required": false
+          },
+          {
+            "name": "to",
+            "type": "string (ISO datetime)",
+            "required": false,
+            "desc": "Exclusive upper bound"
+          },
+          {
+            "name": "label_ids",
+            "type": "string[] (uuid)",
+            "required": false,
+            "desc": "Only conversations carrying any of these labels"
+          },
+          {
+            "name": "has_attachments",
+            "type": "boolean",
+            "required": false
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "required": false,
+            "desc": "next_cursor from the previous page"
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "1-200, default 50"
+          }
+        ],
+        "response": "{messages, next_cursor}"
+      },
+      {
+        "name": "label_counts",
+        "summary": "Open (not done, not archived) conversations per label, as the caller can see them",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{counts: {label_id: number}}"
+      },
+      {
         "name": "set_assignee",
         "summary": "Give a conversation one owner (a teammate in the workspace), or clear it; records a timeline event and notifies the new owner",
         "params": [

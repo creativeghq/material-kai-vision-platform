@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Bot, CheckCircle2, Hand, RotateCcw, UserCheck } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle2, Hand, RotateCcw, Tag, UserCheck } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { formatTime } from '@/utils/datetime';
 import type { InboxMessage } from '@/services/inboxApi';
@@ -29,6 +29,7 @@ export function classifyThreadEvent(m: InboxMessage): ThreadEvent | null {
     case 'status': return event.status === 'closed'
       ? { icon: CheckCircle2, tone: 'success', title: body }
       : { icon: RotateCcw, tone: 'neutral', title: body };
+    case 'labeled': return { icon: Tag, tone: 'neutral', title: body };
     case 'agent_state': return { icon: Bot, tone: event.state === 'off' ? 'neutral' : 'primary', title: body };
     default: return null;
   }

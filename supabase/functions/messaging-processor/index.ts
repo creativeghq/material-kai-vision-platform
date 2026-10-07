@@ -68,7 +68,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
     const { data: activeCampaigns } = await supabase
       .from('campaigns')
       .select(`
-        id, name, channel_type, messaging_template_id, messaging_channel_id, created_by,
+        id, name, channel_type, messaging_template_id, messaging_channel_id, created_by, workspace_id,
         template:messaging_templates(*),
         channel:messaging_channels(*)
       `)
@@ -183,7 +183,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
           const priced = await priceWhatsAppMessage(supabase, {
             to: recipient.phone_number,
             isTemplate: true,
-            category: (campaign as { template_category?: string } | null)?.template_category as never ?? null,
+            category: ((template as { category?: string } | null)?.category ?? null) as never,
           });
           const debit = await debitExternalServiceCredits(
             supabase, ownerId, priced.serviceKey, 'messaging_campaign_whatsapp', 1,

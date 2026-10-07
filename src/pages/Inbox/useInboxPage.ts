@@ -353,6 +353,22 @@ export function useInboxPage() {
     } catch { setCanManageLabels(false); }
   }, [activeWorkspaceId]);
   useEffect(() => { loadLabels(); }, [loadLabels]);
+  // Server-side, so a count covers every open conversation, not the loaded page. Refreshed with the list.
+  const [labelCounts, setLabelCounts] = useState<Record<string, number> | null>(null);
+  const hasLabels = wsLabels.length > 0;
+  // What the counts depend on: which conversations carry which labels, and which are done. Not reads.
+  const labelSignature = useMemo(
+    () => threads.map((t) => `${t.id}:${t.status}:${(t.labels ?? []).map((l) => l.id).join(',')}`).join('|'),
+    [threads],
+  );
+  useEffect(() => {
+    if (!activeWorkspaceId || !hasLabels) { setLabelCounts(null); return; }
+    let live = true;
+    inboxApi.labelCounts(activeWorkspaceId)
+      .then(({ counts }) => { if (live) setLabelCounts(counts); })
+      .catch(() => { if (live) setLabelCounts(null); });
+    return () => { live = false; };
+  }, [activeWorkspaceId, hasLabels, labelSignature]);
   // A label the filter points at may be deleted — clear a dangling filter.
   useEffect(() => {
     if (!wsLabels.length || !labelIds.length) return;
@@ -741,6 +757,7 @@ export function useInboxPage() {
   }, [activeId, send, loadThreads, toast]);
 
   const [showScheduled, setShowScheduled] = useState(false);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
   const scheduleSend = useCallback(async (sendAt: Date) => {
     if (!activeId || isNote || (!draft.trim() && !attachments.length)) return;
     if (pendingCards.length) {
@@ -1102,6 +1119,8 @@ export function useInboxPage() {
     scheduleSend,
     showScheduled,
     setShowScheduled,
+    showMessageSearch,
+    setShowMessageSearch,
     emailPreview,
     setEmailPreview,
     aiDrafting,
@@ -1131,6 +1150,7 @@ export function useInboxPage() {
     loadThreads,
     avatarSyncDone,
     loadLabels,
+    labelCounts,
     openThread,
     messageMoods,
     listRef,

@@ -31,3 +31,8 @@ export function parseCsv(text: string): Record<string, string>[] {
     .filter((r) => r.some((c) => c.trim() !== ''))
     .map((r) => Object.fromEntries(header.map((h, i) => [h, (r[i] ?? '').trim()])));
 }
+
+export function neutralizeCsvFormula(value: unknown): string {
+  const s = String(value ?? '');
+  return /^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+([.,]\d+)?$/.test(s) ? `'${s}` : s;
+}

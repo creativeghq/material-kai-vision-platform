@@ -1,3 +1,4 @@
+import { neutralizeCsvFormula } from '@/utils/csv';
 // ── Pure utility functions (no React, no components) ──────────
 
 /** Formats a quotes-to-saves ratio as a percentage string, or '—' when no saves. */
@@ -64,8 +65,9 @@ export function forecastWeeks(thisWeek: number, growthPct: number, n: number): n
 }
 
 export function downloadCSV(filename: string, rows: string[][]): void {
-  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
+  const csv = rows.map((r) => r.map((c) => `"${neutralizeCsvFormula(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  // BOM: without it Excel reads UTF-8 as the local code page and Greek turns to mojibake.
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = filename; a.click(); URL.revokeObjectURL(a.href);
 }

@@ -27,6 +27,41 @@ export interface InboxLabel {
   name: string;
   color: string;
   created_at?: string;
+  auto_keywords?: string[];
+  /** Empty = every channel. */
+  auto_channels?: string[];
+  ai_instruction?: string | null;
+}
+
+export type InboxLabelRules = Pick<InboxLabel, 'auto_keywords' | 'auto_channels' | 'ai_instruction'>;
+
+export interface InboxMessageHit {
+  message_id: string;
+  thread_id: string;
+  created_at: string;
+  body: string | null;
+  message_type: string;
+  direction: 'in' | 'out';
+  sender_name: string;
+  attachment_count: number;
+  thread_subject: string | null;
+  thread_channel: InboxChannel;
+  thread_status: InboxThreadStatus;
+  contact_phone: string | null;
+  email_from: string | null;
+}
+
+export interface InboxMessageSearch {
+  workspace_id: string;
+  q?: string;
+  channels?: string[];
+  direction?: 'in' | 'out' | null;
+  from?: string | null;
+  to?: string | null;
+  label_ids?: string[];
+  has_attachments?: boolean;
+  before?: string | null;
+  limit?: number;
 }
 
 export interface InboxThread {
@@ -814,11 +849,19 @@ export const inboxApi = {
   listLabels(workspace_id: string) {
     return call<{ labels: InboxLabel[] }>('list_labels', { workspace_id });
   },
-  createLabel(workspace_id: string, name: string, color: string) {
-    return call<{ label: InboxLabel }>('create_label', { workspace_id, name, color });
+  createLabel(workspace_id: string, name: string, color: string, rules?: InboxLabelRules) {
+    return call<{ label: InboxLabel }>('create_label', { workspace_id, name, color, ...rules });
   },
-  updateLabel(label_id: string, changes: { name?: string; color?: string }) {
+  updateLabel(label_id: string, changes: { name?: string; color?: string } & InboxLabelRules) {
     return call<{ label: InboxLabel }>('update_label', { label_id, ...changes });
+  },
+  /** Open (not done, not archived) conversations per label, as the caller can see them. */
+  labelCounts(workspace_id: string) {
+    return call<{ counts: Record<string, number> }>('label_counts', { workspace_id });
+  },
+  /** Message-level search: one row per matching message, newest first. */
+  searchMessages(params: InboxMessageSearch) {
+    return call<{ messages: InboxMessageHit[]; next_cursor: string | null }>('search_messages', { ...params });
   },
   deleteLabel(label_id: string) {
     return call<{ ok: boolean }>('delete_label', { label_id });

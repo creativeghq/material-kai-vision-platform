@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Send, Calendar, Users, Play, Pause, Trash2, MessageCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { WhatsAppCampaignDialog } from './WhatsAppCampaignDialog';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -22,16 +23,19 @@ export const MessagingCampaignsTab: React.FC = () => {
   const [campaigns, setCampaigns] = useState<MessagingCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [creating, setCreating] = useState(false);
+  const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
 
   useEffect(() => {
     loadCampaigns();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the workspace changes
+  }, [activeWorkspaceId]);
 
   const loadCampaigns = async () => {
     try {
       setLoading(true);
-      const data = await messagingCampaignService.getCampaigns();
+      const data = await messagingCampaignService.getCampaigns(undefined, activeWorkspaceId);
       setCampaigns(data);
       // Cancelling a campaign can shrink the list — don't strand the user on a now-empty page.
       setPage((p) => clampPage(p, data.length));
@@ -139,30 +143,25 @@ export const MessagingCampaignsTab: React.FC = () => {
           title="Messaging Campaigns"
           subtitle="Create and manage WhatsApp campaigns"
           actions={
-            <Button disabled>
+            <Button onClick={() => setCreating(true)} disabled={!activeWorkspaceId}>
               <Plus className="h-4 w-4 mr-2" />
               Create campaign
             </Button>
           }
         />
-        <p className="-mt-4 text-sm text-muted-foreground">
-          Note: Create messaging campaigns from the main Campaigns tab with channel type selection.
-        </p>
       </div>
+      {creating && activeWorkspaceId && (
+        <WhatsAppCampaignDialog workspaceId={activeWorkspaceId} onClose={() => setCreating(false)} onCreated={() => { void loadCampaigns(); }} />
+      )}
 
       {/* Campaigns List */}
       {campaigns.length === 0 ? (
         <div className="dashboard-card">
-          {/*
-            This tab's own "Create campaign" button is permanently disabled — messaging campaigns
-            are authored on the Email page's Campaigns tab, where the channel is chosen. So the
-            way out of this empty screen is a link there, not a create action that cannot fire.
-          */}
           <HubEmptyState
             icon={Send}
-            title="No messaging campaigns yet"
-            description="WhatsApp campaigns are created on the Campaigns tab, where you pick the channel to send on. They appear here once they exist."
-            action={<Button asChild size="sm"><Link to="/emails">Go to Campaigns</Link></Button>}
+            title="No WhatsApp campaigns yet"
+            description="Send an approved template to a segment: people with an inbox label, a CRM category or tag, or everyone who has messaged you on WhatsApp."
+            action={<Button size="sm" onClick={() => setCreating(true)} disabled={!activeWorkspaceId}>Create campaign</Button>}
           />
         </div>
       ) : (

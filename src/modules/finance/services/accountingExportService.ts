@@ -4,6 +4,7 @@
  * into their accounting suite (Epsilon / Softone / Megasoft all ingest CSV with a column map),
  * plus a myDATA-classification summary for the VAT return.
  */
+import { neutralizeCsvFormula } from '@/utils/csv';
 import { supabase } from '@/integrations/supabase/client';
 import { round2 } from '@/utils/decimal';
 
@@ -208,13 +209,13 @@ export const accountingExportService = {
 
 // ── CSV helpers ────────────────────────────────────────────────────────────
 function csvCell(v: any): string {
-  const s = String(v ?? '');
+  const s = neutralizeCsvFormula(v);
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 export function toCsv(headers: string[], rows: (string | number)[][]): string {
   // Prefix BOM so Excel (the tool most Greek accountants open these in) reads UTF-8 + Greek.
   const lines = [headers, ...rows].map((r) => r.map(csvCell).join(','));
-  return '﻿' + lines.join('\r\n');
+  return '\uFEFF' + lines.join('\r\n');
 }
 export function downloadCsv(filename: string, csv: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });

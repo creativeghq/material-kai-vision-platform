@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Plus, Loader2, Tag, Trash2, Check } from 'lucide-react';
+import { Plus, Loader2, Tag, Trash2, Check, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { inboxApi, LABEL_COLORS, type InboxLabel } from '@/services/inboxApi';
+import { LabelRulesDialog, labelHasRules } from './LabelRulesDialog';
 
 /** Sidebar label management (owner/admin): create, recolor, delete workspace labels. */
 /** Shared workspace-label CRUD (create / recolor / delete) with busy state + toast-on-error, used by
@@ -39,6 +40,7 @@ export const LabelManagerPopover: React.FC<{
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(LABEL_COLORS[0].key);
+  const [rulesFor, setRulesFor] = useState<InboxLabel | null>(null);
   const { busy, create: createLabel, recolor, remove } = useLabelCrud(workspaceId, onChanged);
 
   const create = async () => {
@@ -47,7 +49,8 @@ export const LabelManagerPopover: React.FC<{
     if (await createLabel(name, newColor)) setNewName('');
   };
 
-  return (
+  return (<>
+    {rulesFor && <LabelRulesDialog label={rulesFor} onClose={() => setRulesFor(null)} onSaved={onChanged} />}
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {trigger ?? (
@@ -59,7 +62,7 @@ export const LabelManagerPopover: React.FC<{
       <PopoverContent align="start" className="w-72 p-0">
         <div className="p-3 border-b border-border">
           <div className="text-sm font-medium">Manage labels</div>
-          <div className="text-xs text-muted-foreground">Create, recolor, or delete workspace labels.</div>
+          <div className="text-xs text-muted-foreground">Create, recolor or delete labels. <Zap className="inline w-3 h-3" /> applies one automatically.</div>
         </div>
         <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5">
           {labels.length === 0 ? (
@@ -85,6 +88,13 @@ export const LabelManagerPopover: React.FC<{
                 </PopoverContent>
               </Popover>
               <span className="text-sm flex-1 truncate">{l.name}</span>
+              <button
+                onClick={() => { setOpen(false); setRulesFor(l); }}
+                className={`shrink-0 ${labelHasRules(l) ? 'text-primary' : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground'}`}
+                title={labelHasRules(l) ? 'Auto-applied — edit the rule' : 'Apply this label automatically'}
+              >
+                <Zap className="w-3.5 h-3.5" />
+              </button>
               <button onClick={() => remove(l.id)} disabled={busy} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive shrink-0" title="Delete">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -118,7 +128,7 @@ export const LabelManagerPopover: React.FC<{
         </div>
       </PopoverContent>
     </Popover>
-  );
+  </>);
 };
 
 /** Assign/unassign labels on the open thread; owner/admin can also create/delete workspace labels. */
