@@ -48,6 +48,10 @@ function telHref(phone: string): string | null {
   return digits.replace(/\D/g, '').length >= 6 ? `tel:${digits}` : null;
 }
 
+export function signatureDocument(html: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:16px;background:#fff">${html}</body></html>`;
+}
+
 export const CONFIDENTIALITY_NOTE =
   'This email and any attachments are confidential and intended only for the named recipient. '
   + 'If you received it in error, please let the sender know and delete it.';

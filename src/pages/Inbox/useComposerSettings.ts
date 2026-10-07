@@ -26,22 +26,26 @@ export function useComposerSettings(workspaceId: string | null | undefined, user
     setLoaded(false);
     if (!workspaceId || !userId) return;
     let live = true;
-    void supabase.from('inbox_composer_settings')
-      .select('email_signature, signature_card, autocomplete_enabled')
-      .eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle()
-      .then(({ data, error }) => {
-        if (!live) return;
-        if (error) console.warn('[inbox] composer settings not loaded', error.message);
-        if (data) {
-          setSettings({
+    const load = () => {
+      void supabase.from('inbox_composer_settings')
+        .select('email_signature, signature_card, autocomplete_enabled')
+        .eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle()
+        .then(({ data, error }) => {
+          if (!live) return;
+          if (error) console.warn('[inbox] composer settings not loaded', error.message);
+          else setSettings(data ? {
             email_signature: data.email_signature ?? '',
             signature_card: normalizeSignatureCard(data.signature_card),
             autocomplete_enabled: !!data.autocomplete_enabled,
-          });
-        }
-        setLoaded(true);
-      });
-    return () => { live = false; };
+          } : DEFAULTS);
+          setLoaded(true);
+        });
+    };
+    load();
+    // The signature is edited in Profile, often in another tab.
+    const onFocus = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => { live = false; document.removeEventListener('visibilitychange', onFocus); };
   }, [workspaceId, userId]);
 
   const save = useCallback(async (patch: Partial<ComposerSettings>): Promise<string | null> => {

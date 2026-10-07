@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Checkbox } from '@/components/core/ui/checkbox';
@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { escapeHtml } from '@/utils/escapeHtml';
-import { normalizeSignatureCard, renderSignatureHtml, type SignatureCard } from '@/utils/emailSignature';
+import { normalizeSignatureCard, renderSignatureHtml, signatureDocument, type SignatureCard } from '@/utils/emailSignature';
 
 const EMPTY: SignatureCard = {
   name: '', title: '', company: '', phone: '', email: '', website: '', address: '', tagline: '', logo_url: '', confidentiality: false,
@@ -32,7 +32,10 @@ export const SignatureDesignerDialog: React.FC<{
 }> = ({ open, onOpenChange, initial, onSave }) => {
   const [card, setCard] = useState<SignatureCard>(initial ?? EMPTY);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (open) setCard(initial ?? EMPTY); }, [open, initial]);
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
+  // Reset only when the dialog OPENS; a parent re-render must not wipe what is being typed.
+  useEffect(() => { if (open) setCard(initialRef.current ?? EMPTY); }, [open]);
 
   const normalized = useMemo(() => normalizeSignatureCard(card), [card]);
   const previewHtml = useMemo(() => (normalized ? renderSignatureHtml(normalized, escapeHtml) : ''), [normalized]);
@@ -78,7 +81,7 @@ export const SignatureDesignerDialog: React.FC<{
               ? (
                 <iframe
                   title="Signature preview" sandbox=""
-                  srcDoc={`<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:16px;background:#fff">${previewHtml}</body></html>`}
+                  srcDoc={signatureDocument(previewHtml)}
                   className="h-64 w-full rounded-sm border border-hairline bg-white"
                 />
               )

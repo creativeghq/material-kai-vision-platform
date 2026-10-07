@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { User, Pencil, Save, Loader2, X, Camera, Globe, MapPin, Building2, Briefcase, Eye, EyeOff, Plus, Trash2, Copy, Check, Star, Tag, ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink, BarChart2, Users, Calendar, Grid3x3, Mail, MessageCircle, FileText, Sparkles, Layers, Wrench, BadgeCheck } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { User, Pencil, Save, Loader2, X, Globe, MapPin, Building2, Briefcase, Eye, Plus, Trash2, Check, Star, Tag, ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink, BarChart2, Calendar, Grid3x3, Mail, MessageCircle, FileText, Sparkles, Layers, Wrench, BadgeCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -7,9 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { useModule } from '@/modules/_core';
-import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/core/ui/avatar';
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/core/ui/command';
@@ -24,6 +22,10 @@ import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
 import { MarketplaceParticipationCard } from '@/components/core/Profile/MarketplaceParticipationCard';
 import { SupplierIdentityClaimCard } from '@/components/core/Profile/SupplierIdentityClaimCard';
+import { ProfileHero, type ProfileHeroStat, type ProfileStrengthItem } from '@/components/core/Profile/ProfileHero';
+import { EmailSignatureCard } from '@/components/core/Profile/EmailSignatureCard';
+import { useComposerSettings } from '@/pages/Inbox/useComposerSettings';
+import type { SignatureCard } from '@/utils/emailSignature';
 import { formatNumber, formatMoney } from '@/utils/decimal';
 import { HubEmptyState } from '@/components/core/hub';
 import { MoneyInput } from '@/components/core/ui/money-input';
@@ -367,7 +369,7 @@ function ServiceForm({
     setForm((p) => ({ ...p, previous_work: p.previous_work?.filter((_, idx) => idx !== i) }));
 
   return (
-    <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
+    <div className="rounded-sm border bg-muted/20 p-4 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label htmlFor="profiletab-service-name" className="text-xs text-muted-foreground">Service name *</label>
@@ -455,7 +457,7 @@ function ServiceCard({
   const hasDetails = service.description || (service.previous_work?.length ?? 0) > 0;
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden">
+    <div className="rounded-sm border bg-card overflow-hidden">
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -529,7 +531,10 @@ export const ProfileTab: React.FC = () => {
   const { toast } = useToast();
   // A service belongs to the business that invoices it, so the profile lists services of the
   // ACTIVE workspace; the public page shows every workspace's listings for this member.
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
+  const composer = useComposerSettings(activeWorkspaceId, user?.id ?? null);
+  const [signatureDesignerOpen, setSignatureDesignerOpen] = useState(false);
+  const [business, setBusiness] = useState<{ name: string; website: string; logoUrl: string }>({ name: '', website: '', logoUrl: '' });
   const handleQuota = useQuotaErrorHandler();
 
   const [personal, setPersonal] = useState<PersonalData>(EMPTY_PERSONAL);
@@ -601,6 +606,23 @@ export const ProfileTab: React.FC = () => {
     if (!user) return;
     void loadServices();
   }, [user, activeWorkspaceId]);
+
+  useEffect(() => {
+    setBusiness({ name: '', website: '', logoUrl: '' });
+    if (!activeWorkspaceId) return;
+    let live = true;
+    void supabase.from('finance_settings').select('business_name, business_website, business_logo_path')
+      .eq('workspace_id', activeWorkspaceId).maybeSingle()
+      .then(({ data }) => {
+        if (!live || !data) return;
+        setBusiness({
+          name: data.business_name ?? '',
+          website: data.business_website ?? '',
+          logoUrl: data.business_logo_path ? supabase.storage.from('generation-images').getPublicUrl(data.business_logo_path).data.publicUrl : '',
+        });
+      });
+    return () => { live = false; };
+  }, [activeWorkspaceId]);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -959,83 +981,64 @@ export const ProfileTab: React.FC = () => {
     ...moodboards.map((m) => ({ value: m.id, label: m.title })),
   ];
 
+  const phoneNumber = parsePhone(personal.phone).number.trim() ? personal.phone.trim() : '';
+  const signatureDefaults = useMemo<SignatureCard>(() => ({
+    name: personal.full_name, title: '', company: personal.company || business.name,
+    phone: phoneNumber, email: user?.email ?? '',
+    website: (personal.website_url || business.website).replace(/^https?:\/\//i, '').replace(/\/$/, ''),
+    address: personal.location, tagline: '', logo_url: business.logoUrl, confidentiality: false,
+  }), [personal, business, phoneNumber, user?.email]);
+
+  const strength: ProfileStrengthItem[] = [
+    { key: 'photo', label: 'Photo', done: !!personal.avatar_url },
+    { key: 'name', label: 'Name', done: !!personal.full_name.trim() },
+    { key: 'role', label: 'Professional type', done: !!personal.professional_type },
+    { key: 'phone', label: 'Phone', done: !!phoneNumber },
+    { key: 'location', label: 'Location', done: !!personal.location.trim() },
+    { key: 'bio', label: 'Bio', done: !!personal.bio.trim() },
+    { key: 'services', label: 'A service', done: services.length > 0 },
+    { key: 'skills', label: 'Skills', done: skillTags.length > 0 },
+    { key: 'signature', label: 'Email signature', done: !!composer.settings.signature_card || !!composer.settings.email_signature.trim() },
+  ];
+
+  const jumpTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const fixStrength = (key: string) => {
+    if (key === 'photo') { fileInputRef.current?.click(); return; }
+    if (key === 'services') { setAddingService(true); setEditingServiceId(null); jumpTo('profile-services'); return; }
+    if (key === 'skills') { setAddingSkill(true); jumpTo('profile-skills'); return; }
+    if (key === 'signature') { setSignatureDesignerOpen(true); return; }
+    setPersonalForm({ ...personal }); setEditingPersonal(true); jumpTo('profile-about');
+  };
+
+  const heroStats: ProfileHeroStat[] = isPublic ? [
+    { label: 'Profile visits', value: profileViews },
+    { label: 'Followers', value: analytics.followers },
+    { label: 'Hire requests', value: analytics.hireRequestsTotal, hint: analytics.hireRequestsUnread ? `${analytics.hireRequestsUnread} unread` : undefined },
+    { label: 'Reviews', value: analytics.reviewsCount, hint: analytics.reviewsCount ? `${analytics.reviewsAvg.toFixed(1)} ★ average` : undefined },
+  ] : [];
+
   return (
     <div className="space-y-6">
-
-      {/* Who you are, and the page that publishes it. The avatar, the name and the switch that
-          makes them public were three separate cards with an app theme picker between them. */}
-      <Card className={`rounded-2xl border-2 transition-colors ${isPublic ? 'border-primary/30' : ''}`}>
-        <CardContent className="space-y-4 pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="relative group shrink-0">
-                <Avatar className="h-16 w-16">
-                  {personal.avatar_url && <AvatarImage src={personal.avatar_url} alt="Profile" />}
-                  <AvatarFallback className="bg-primary/20 text-xl font-semibold text-primary">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  {uploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-              </button>
-              <div className="min-w-0">
-                <p className="truncate text-lg font-semibold">{personal.full_name || 'No name set'}</p>
-                <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
-                {personal.company && <p className="truncate text-sm text-muted-foreground">{personal.company}</p>}
-                {personal.professional_type && (
-                  <Badge className="mt-1 text-xs bg-primary/10 text-primary border-primary/20">
-                    {PROFESSIONAL_TYPE_LABELS[personal.professional_type]}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                {isPublic && (
-                  <>
-                    <Button size="sm" variant="outline" asChild className="gap-1.5">
-                      <Link to={`/u/${user?.id}`} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        Preview
-                      </Link>
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
-                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copied ? 'Copied!' : 'Copy link'}
-                    </Button>
-                  </>
-                )}
-                <Switch id="visibility" checked={isPublic} onCheckedChange={handleVisibilityToggle} />
-                <Label htmlFor="visibility" className="cursor-pointer text-sm">{isPublic ? 'Public' : 'Private'}</Label>
-              </div>
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {isPublic ? <Eye className="h-3.5 w-3.5 shrink-0 text-primary" /> : <EyeOff className="h-3.5 w-3.5 shrink-0" />}
-                {isPublic ? 'Anyone can discover and view your profile.' : 'Only you can see your profile.'}
-              </p>
-            </div>
-          </div>
-
-          {isPublic && realEstateEnabled && (
-            <div className="flex items-center justify-between gap-3 border-t border-hairline pt-4">
-              <div>
-                <p className="text-sm font-medium">Show property listings</p>
-                <p className="text-xs text-muted-foreground">Display your live real-estate listings as a “Listings” tab on your public profile.</p>
-              </div>
-              <Switch checked={showListings} onCheckedChange={async (v) => { setShowListings(v); await patch({ show_listings: v }); }} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+      <ProfileHero
+        userId={user?.id} name={personal.full_name} email={user?.email ?? ''} initials={initials}
+        avatarUrl={personal.avatar_url}
+        roleLabel={personal.professional_type ? PROFESSIONAL_TYPE_LABELS[personal.professional_type] : null}
+        company={personal.company} location={personal.location} website={personal.website_url} bio={personal.bio}
+        uploading={uploading} onPickAvatar={() => fileInputRef.current?.click()}
+        isPublic={isPublic} onTogglePublic={(v) => { void handleVisibilityToggle(v); }}
+        copied={copied} onCopyLink={copyLink}
+        strength={strength} onFix={fixStrength} stats={heroStats}
+      />
 
       {/* Records on the left; the short settings panels stack beside them from `xl:`. */}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <div className="min-w-0 space-y-6">
-      <Card className="rounded-2xl">
+      <Card id="profile-about" className="scroll-mt-20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />Personal Information
+              <User className="h-4 w-4 text-primary" />About you
             </CardTitle>
             {!editingPersonal ? (
               <Button size="sm" onClick={() => { setPersonalForm({ ...personal }); setEditingPersonal(true); }}>
@@ -1088,26 +1091,30 @@ export const ProfileTab: React.FC = () => {
               </Field>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-y-6 gap-x-8">
-              <FieldDisplay label="Full Name" value={personal.full_name} />
-              <FieldDisplay label="Email Address" value={user?.email || ''} />
-              <FieldDisplay label="Professional Type" value={personal.professional_type ? PROFESSIONAL_TYPE_LABELS[personal.professional_type] : ''} />
-              <FieldDisplay label="Phone Number" value={personal.phone} />
-              <FieldDisplay label="Company" value={personal.company} />
-              <FieldDisplay label="Location" value={personal.location} />
-              <FieldDisplay label="Website" value={personal.website_url} />
-              <FieldDisplay label="Address" value={personal.address} />
-              <FieldDisplay label="Bio" value={personal.bio} />
-            </div>
+            <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
+              <FieldDisplay icon={User} label="Full name" value={personal.full_name} />
+              <FieldDisplay icon={Mail} label="Email" value={user?.email || ''} />
+              <FieldDisplay icon={Briefcase} label="Professional type" value={personal.professional_type ? PROFESSIONAL_TYPE_LABELS[personal.professional_type] : ''} />
+              <FieldDisplay icon={MessageCircle} label="Phone" value={phoneNumber} />
+              <FieldDisplay icon={Building2} label="Company" value={personal.company} />
+              <FieldDisplay icon={MapPin} label="Location" value={personal.location} />
+              <FieldDisplay icon={Globe} label="Website" value={personal.website_url} />
+              <FieldDisplay icon={Grid3x3} label="Address" value={personal.address} />
+              <FieldDisplay icon={FileText} label="Bio" value={personal.bio} className="sm:col-span-2" />
+            </dl>
           )}
         </CardContent>
       </Card>
 
-      {/* Business — Solo vs Business entity + linked crm_companies row */}
+      <EmailSignatureCard
+        settings={composer.settings} loaded={composer.loaded} save={composer.save}
+        defaults={signatureDefaults} workspaceName={activeWorkspace?.name ?? null}
+        designerOpen={signatureDesignerOpen} onDesignerOpenChange={setSignatureDesignerOpen}
+      />
+
       <BusinessSection />
 
-      {/* Services */}
-      <Card className="rounded-2xl">
+      <Card id="profile-services" className="scroll-mt-20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -1161,7 +1168,7 @@ export const ProfileTab: React.FC = () => {
             />
           )}
           {unlistedWorkspaceServices.length > 0 && (
-            <div className="rounded-xl border border-dashed p-3 space-y-2">
+            <div className="rounded-sm border border-dashed p-3 space-y-2">
               <p className="text-xs text-muted-foreground">
                 Already under Finance → Settings → Services, not on your profile yet:
               </p>
@@ -1187,10 +1194,20 @@ export const ProfileTab: React.FC = () => {
       </div>
 
       <div className="grid min-w-0 content-start gap-6 lg:grid-cols-2 xl:grid-cols-1">
+        {isPublic && realEstateEnabled && (
+          <Card>
+            <CardContent className="flex items-center justify-between gap-3 pt-6">
+              <div>
+                <p className="text-sm font-medium">Show property listings</p>
+                <p className="text-xs text-muted-foreground">Adds your live listings as a Listings tab on your public page.</p>
+              </div>
+              <Switch checked={showListings} onCheckedChange={async (v) => { setShowListings(v); await patch({ show_listings: v }); }} aria-label="Show property listings" />
+            </CardContent>
+          </Card>
+        )}
         <MarketplaceParticipationCard />
         <SupplierIdentityClaimCard />
-        {/* Skill Tags */}
-        <Card className="rounded-2xl">
+        <Card id="profile-skills" className="scroll-mt-20">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" />Skills & Expertise</CardTitle>
@@ -1221,30 +1238,14 @@ export const ProfileTab: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Brand ambassadorships moved to their OWN tab (Profile → Ambassador). What lived here
-            was a list of brand names with nowhere to say what the person promotes each brand FOR,
-            which is the only part a visitor is looking for. The pointer stays because this is the
-            card people knew it by. */}
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" />Brands you represent
-              </CardTitle>
-              <Button size="sm" variant="outline" asChild>
-                <Link to="/profile?tab=ambassador">
-                  <BadgeCheck className="h-3.5 w-3.5 mr-1.5" />Open Ambassador
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Brand ambassadorships — which brands you represent, in which categories, and whether the
-              brand has confirmed it — are managed on the Ambassador tab.
-            </p>
-          </CardContent>
-        </Card>
+        <Link to="/profile?tab=ambassador" className="panel-interactive flex items-center gap-3 rounded-md border border-hairline bg-card p-4">
+          <BadgeCheck className="h-5 w-5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Brands you represent</p>
+            <p className="text-xs text-muted-foreground">Which brands, in which categories, and whether each confirmed it.</p>
+          </div>
+          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
 
 
         {/* Supplier Verification — gated on professional_type='supplier'. The
@@ -1252,7 +1253,7 @@ export const ProfileTab: React.FC = () => {
             user-facing label is "Supplier" since the merge of
             brand/manufacturer/supplier → supplier. */}
         {personal.professional_type === 'supplier' && (
-          <Card className="rounded-2xl">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-primary" />Supplier Verification
@@ -1260,7 +1261,7 @@ export const ProfileTab: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               {factoryVerified ? (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-green-500/10 border border-green-500/30">
+                <div className="flex items-center gap-3 p-3 rounded-sm bg-green-500/10 border border-green-500/30">
                   <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
                     <Check className="h-4 w-4 text-green-600" />
                   </div>
@@ -1275,7 +1276,7 @@ export const ProfileTab: React.FC = () => {
                   </Badge>
                 </div>
               ) : regRequest ? (
-                <div className={`p-3 rounded-xl border ${
+                <div className={`p-3 rounded-sm border ${
                   regRequest.status === 'pending'
                     ? 'bg-amber-500/10 border-amber-500/30'
                     : regRequest.status === 'approved'
@@ -1296,7 +1297,7 @@ export const ProfileTab: React.FC = () => {
                   )}
                 </div>
               ) : showRegForm ? (
-                <form onSubmit={submitRegistration} className="rounded-xl border p-4 space-y-3 bg-muted/20">
+                <form onSubmit={submitRegistration} className="rounded-sm border p-4 space-y-3 bg-muted/20">
                   <div className="space-y-1.5">
                     <label htmlFor="profiletab-company-name" className="text-xs text-muted-foreground">Company name *</label>
                     <Input id="profiletab-company-name"
@@ -1364,7 +1365,7 @@ export const ProfileTab: React.FC = () => {
         )}
 
         {/* Featured Moodboard */}
-        <Card className="rounded-2xl h-full">
+        <Card className="h-full">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2"><Star className="h-4 w-4 text-primary" />Featured Moodboard</CardTitle>
@@ -1399,7 +1400,7 @@ export const ProfileTab: React.FC = () => {
 
         {/* Profile Analytics */}
         {isPublic && (
-        <Card className="rounded-2xl h-full">
+        <Card className="h-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart2 className="h-4 w-4 text-primary" />Profile Analytics</CardTitle>
           </CardHeader>
@@ -1410,58 +1411,54 @@ export const ProfileTab: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Visibility</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                <p className="text-[11px] font-semibold text-muted-foreground">Visibility</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2">
                   {[
-                    { icon: Eye,     label: 'Profile visits', value: profileViews },
-                    { icon: Users,   label: 'Followers',      value: analytics.followers },
                     { icon: Grid3x3, label: 'Board visits',   value: analytics.totalMoodboardViews },
                   ].map(({ icon: Icon, label, value }) => (
-                    <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
-                      <div className="flex items-center justify-center gap-1 leading-none">
-                        <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
-                        <span className="text-xs font-semibold tabular-nums">{formatNumber(value)}</span>
+                    <div key={label} className="rounded-sm border border-hairline bg-surface-sunken p-2">
+                      <div className="flex items-center gap-1.5 leading-none">
+                        <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-base font-semibold tabular-nums">{formatNumber(value)}</span>
                       </div>
-                      <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 truncate">{label}</p>
                     </div>
                   ))}
                 </div>
 
-                <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Inbound</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                <p className="text-[11px] font-semibold text-muted-foreground">Inbound</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2">
                   {[
-                    { icon: Mail,     label: 'Hire reqs',  value: analytics.hireRequestsTotal,      badge: analytics.hireRequestsUnread > 0 ? analytics.hireRequestsUnread : null,   badgeClass: 'bg-primary text-primary-foreground' },
                     { icon: Calendar, label: 'Appts',      value: analytics.appointmentsTotal,      badge: analytics.appointmentsPending > 0 ? analytics.appointmentsPending : null, badgeClass: 'bg-amber-100 text-amber-700' },
                     { icon: FileText, label: 'Quote reqs', value: analytics.moodboardQuoteRequests, badge: null, badgeClass: '' },
-                    { icon: Star,     label: `Reviews${analytics.reviewsCount > 0 ? ` ${analytics.reviewsAvg.toFixed(1)}★` : ''}`, value: analytics.reviewsCount, badge: null, badgeClass: '' },
                   ].map(({ icon: Icon, label, value, badge, badgeClass }) => (
-                    <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
-                      <div className="flex items-center justify-center gap-1 leading-none">
-                        <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
-                        <span className="text-xs font-semibold tabular-nums">{formatNumber(value)}</span>
+                    <div key={label} className="rounded-sm border border-hairline bg-surface-sunken p-2">
+                      <div className="flex items-center gap-1.5 leading-none">
+                        <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-base font-semibold tabular-nums">{formatNumber(value)}</span>
                         {badge !== null && (
                           <span className={`text-[8px] font-medium rounded-full px-1 leading-[14px] ${badgeClass}`}>{badge}</span>
                         )}
                       </div>
-                      <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 truncate">{label}</p>
                     </div>
                   ))}
                 </div>
 
-                <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Content</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                <p className="text-[11px] font-semibold text-muted-foreground">Content</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2">
                   {[
                     { icon: FileText,      label: 'Quotes',    value: analytics.quotesCreated },
                     { icon: Sparkles,      label: 'VR worlds', value: analytics.vrWorldsCreated },
                     { icon: Layers,        label: 'Projects',  value: analytics.projectsCreated },
                     { icon: MessageCircle, label: 'Comments',  value: analytics.moodboardComments },
                   ].map(({ icon: Icon, label, value }) => (
-                    <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
-                      <div className="flex items-center justify-center gap-1 leading-none">
-                        <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
-                        <span className="text-xs font-semibold tabular-nums">{formatNumber(value)}</span>
+                    <div key={label} className="rounded-sm border border-hairline bg-surface-sunken p-2">
+                      <div className="flex items-center gap-1.5 leading-none">
+                        <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-base font-semibold tabular-nums">{formatNumber(value)}</span>
                       </div>
-                      <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 truncate">{label}</p>
                     </div>
                   ))}
                 </div>
@@ -1487,11 +1484,14 @@ function Field({ label, children, className = '' }: { label: React.ReactNode; ch
   );
 }
 
-function FieldDisplay({ label, value }: { label: string; value: string }) {
+function FieldDisplay({ icon: Icon, label, value, className = '' }: { icon: React.ElementType; label: string; value: string; className?: string }) {
   return (
-    <div className="space-y-1">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium">{value || '—'}</p>
+    <div className={`flex min-w-0 gap-3 ${className}`}>
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 space-y-0.5">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className="whitespace-pre-wrap break-words text-sm font-medium">{value || '—'}</dd>
+      </div>
     </div>
   );
 }
