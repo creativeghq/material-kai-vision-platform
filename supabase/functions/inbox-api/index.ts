@@ -1379,7 +1379,7 @@ async function emailAttachmentsFor(db: DbClient, attachments: Attachment[]): Pro
 }
 
 const EMAIL_COPY_LIMIT = 20;
-const EMAIL_ADDRESS = /^[^s@<>,;]+@[^s@<>,;]+.[^s@<>,;]+$/;
+const EMAIL_ADDRESS = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 
 /** CC/BCC as the member typed them → bare, deduped addresses; refuses a malformed one rather than drop it. */
 function cleanEmailCopies(raw: { cc?: unknown; bcc?: unknown } | undefined, exclude: string[]): { cc: string[]; bcc: string[] } {
