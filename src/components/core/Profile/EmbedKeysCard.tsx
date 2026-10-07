@@ -1,50 +1,25 @@
-/**
- * Profile → Keys → Embed: create and manage the publishable keys a workspace pastes into its own
- * website (#321 M1, #258).
- *
- * The origin list is the primary control here, so it is a required field rather than an advanced
- * option: the column shipped with a `['*']` default and no code that read it, which meant a key
- * would have worked from any site on the internet. Creating a key now forces the choice, and the
- * wildcard is spelled out as a warning rather than offered as a checkbox with a neutral label.
- */
+/** Profile → Keys → Website Embed: the widgets on a workspace's own websites, and their keys. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Code2, Copy, Loader2, Plus, Trash2, Globe, AlertTriangle, Sparkles, KeyRound } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
-import { MoneyInput } from '@/components/core/ui/money-input';
-import { Label } from '@/components/core/ui/label';
-import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/core/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/core/ui/alert-dialog';
-import { Checkbox } from '@/components/core/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import {
-  embedKeysService, normalizeOriginList, isWildcardOriginList,
-  listScopeCategories, searchScopeProducts, listScopeBlueprints,
-  MAX_RATE_LIMIT_PER_MINUTE, DEFAULT_GENERATION_DAILY_CAP, MAX_GENERATION_DAILY_CAP,
-  DEFAULT_DAILY_USD_CAP, MAX_DAILY_USD_CAP,
-  type EmbedKey, type EmbedScopeType, type EmbedScopeOption, type EmbedKeyKind,
-  type EmbedAnalyticsSummary,
+  embedKeysService, isWildcardOriginList, DEFAULT_GENERATION_DAILY_CAP,
+  type EmbedKey, type EmbedAnalyticsSummary,
 } from '@/services/embedKeysService';
+import { supabaseConfig } from '@/config/apis/supabaseConfig';
+import { HubEmptyState } from '@/components/core/hub';
+import { EmbedWidgetDialog } from '@/components/core/Profile/embed/EmbedWidgetDialog';
+import { EMBED_WIDGETS, widgetsForKey } from '@/components/core/Profile/embed/embedWidgets';
 
-/**
- * What the widget emits, in the order a visit produces them.
- *
- * THE THIRD OF THREE PLACES an event type has to appear: the widget emits it, the endpoint's
- * allowlist accepts it, and this list displays it. Miss the second and the beacon is refused with a
- * 400 it swallows; miss this one and the rows are written and shown to nobody. Both read as zero,
- * from opposite ends. `embed_configure` was missing from the last two until #341.
- */
+/** Event types the widgets emit; the endpoint's allowlist must accept each one too. */
 const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_view', 'Views'],
   ['embed_model_load', '3D loads'],
@@ -56,53 +31,25 @@ const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_visualizer_share', 'Renders shared'],
   ['embed_visualizer_quote', 'Quotes from a render'],
 ];
-import { supabaseConfig } from '@/config/apis/supabaseConfig';
-import { HubEmptyState } from '@/components/core/hub';
 
 const DEFAULT_RATE = 60;
 
-/** What a key is limited to, in the row summary. Counts, not ids — ids mean nothing at a glance. */
+/** What a key is limited to, in the row summary. */
 function scopeLabel(key: EmbedKey): string {
+  if (key.key_kind === 'tools') return 'Calculators only';
   const n = key.scope_values?.length ?? 0;
   if (key.scope_type === 'categories') return `${n} ${n === 1 ? 'category' : 'categories'}`;
   if (key.scope_type === 'products') return `${n} ${n === 1 ? 'product' : 'products'}`;
-  if (key.scope_type === 'blueprints') return `${n} ${n === 1 ? 'configurator' : 'configurators'}`;
+  if (key.scope_type === 'blueprints') return `${n} ${n === 1 ? 'blueprint' : 'blueprints'}`;
   return 'Everything published';
 }
 
-/** The snippet a tenant copies into their own site. */
-function usageSnippet(key: EmbedKey): string {
-  const base = window.location.origin;
-  const tag = `<script src="${base}/embed/materialkai-product.js" defer></script>`;
-  const apiKey = key.api_key;
-
-  if (key.key_kind === 'tools') {
-    return `${tag}
-
-<!-- The calculators, as buttons. Serves none of your catalogue; every
-     enquiry they produce lands in this workspace. -->
-<materialkai-assistant api-key="${apiKey}"></materialkai-assistant>`;
-  }
-
-  if (key.scope_type === 'blueprints') {
-    const only = key.scope_values?.length === 1 ? key.scope_values[0] : 'BLUEPRINT_ID';
-    return `${tag}
-
-<!-- Lets a visitor build something you don't stock, and prices it live. -->
-<materialkai-configurator api-key="${apiKey}" blueprint="${only}"></materialkai-configurator>`;
-  }
-
-  return `${tag}
-
-<!-- Asks the visitor what they are after, prices it if you stock it,
-     and captures the request if you don't. -->
-<materialkai-builder api-key="${apiKey}"></materialkai-builder>
-
-<!-- Or pin it to one product, for a page that is already about that product: -->
-<materialkai-builder api-key="${apiKey}" product-id="PRODUCT_ID"></materialkai-builder>`;
+function servesLabel(key: EmbedKey): string {
+  const ids = widgetsForKey(key);
+  return EMBED_WIDGETS.filter((w) => ids.includes(w.id)).map((w) => w.title).join(', ');
 }
 
-/** For anyone wiring their own storefront instead of using the tag. */
+/** For anyone wiring their own storefront instead of using a widget. */
 function apiSnippet(apiKey: string): string {
   const base = supabaseConfig.projectUrl.replace(/\/$/, '');
   return `fetch("${base}/functions/v1/products-3d-api?action=list&only_3d=true&key=${apiKey}")
@@ -115,67 +62,15 @@ export const EmbedKeysCard: React.FC = () => {
   const { toast } = useToast();
   const [keys, setKeys] = useState<EmbedKey[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [dialog, setDialog] = useState<{ open: boolean; key: EmbedKey | null }>({ open: false, key: null });
   const [pendingDelete, setPendingDelete] = useState<EmbedKey | null>(null);
   const [analytics, setAnalytics] = useState<EmbedAnalyticsSummary | null>(null);
-
-  const [form, setForm] = useState({
-    name: '', origins: '', rate: DEFAULT_RATE, allowAny: false,
-    scopeType: 'all' as EmbedScopeType, scopeValues: [] as string[],
-    allowGeneration: false, dailyCap: DEFAULT_GENERATION_DAILY_CAP,
-    kind: 'catalog' as EmbedKeyKind, paidTools: false, usdCap: DEFAULT_DAILY_USD_CAP,
-  });
-
-  // Scope pickers. Categories are a short fixed list (a global taxonomy, ~a dozen entries), so they
-  // load once as checkboxes; products are unbounded per workspace, so they type-ahead.
-  const [categories, setCategories] = useState<EmbedScopeOption[]>([]);
-  // Blueprints are workspace-owned and few (a workspace has a handful, not a catalogue), so they
-  // load once as checkboxes like categories rather than type-ahead like products.
-  const [blueprints, setBlueprints] = useState<EmbedScopeOption[]>([]);
-  const [productTerm, setProductTerm] = useState('');
-  const [productHits, setProductHits] = useState<EmbedScopeOption[]>([]);
-  // Labels for already-chosen products, so a selection stays readable after the search box clears.
-  const [chosenProducts, setChosenProducts] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!creating || form.scopeType !== 'categories' || categories.length) return;
-    listScopeCategories().then(setCategories).catch(() => setCategories([]));
-  }, [creating, form.scopeType, categories.length]);
-
-  useEffect(() => {
-    if (!creating || form.scopeType !== 'blueprints' || !activeWorkspaceId || blueprints.length) return;
-    listScopeBlueprints(activeWorkspaceId).then(setBlueprints).catch(() => setBlueprints([]));
-  }, [creating, form.scopeType, activeWorkspaceId, blueprints.length]);
-
-  useEffect(() => {
-    if (!creating || form.scopeType !== 'products' || !activeWorkspaceId) return;
-    let cancelled = false;
-    const t = setTimeout(() => {
-      searchScopeProducts(activeWorkspaceId, productTerm)
-        .then((hits) => { if (!cancelled) setProductHits(hits); })
-        .catch(() => { if (!cancelled) setProductHits([]); });
-    }, 250);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [creating, form.scopeType, productTerm, activeWorkspaceId]);
-
-  const toggleScopeValue = (option: EmbedScopeOption) => {
-    setForm((f) => ({
-      ...f,
-      scopeValues: f.scopeValues.includes(option.id)
-        ? f.scopeValues.filter((v) => v !== option.id)
-        : [...f.scopeValues, option.id],
-    }));
-    setChosenProducts((prev) => ({ ...prev, [option.id]: option.label }));
-  };
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
       setKeys(await embedKeysService.list(activeWorkspaceId));
-      // Telemetry is best-effort: a key list that renders without its usage numbers is still
-      // useful, and a failure here must not hide the keys themselves.
       embedKeysService.analytics(activeWorkspaceId, 30)
         .then(setAnalytics)
         .catch(() => setAnalytics(null));
@@ -192,75 +87,6 @@ export const EmbedKeysCard: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const resetForm = () => {
-    setForm({
-      name: '', origins: '', rate: DEFAULT_RATE, allowAny: false, scopeType: 'all', scopeValues: [],
-      kind: 'catalog', paidTools: false, usdCap: DEFAULT_DAILY_USD_CAP,
-      allowGeneration: false, dailyCap: DEFAULT_GENERATION_DAILY_CAP,
-    });
-    setProductTerm('');
-    setProductHits([]);
-    setChosenProducts({});
-  };
-
-  const handleCreate = async () => {
-    if (!activeWorkspaceId) return;
-    const origins = form.allowAny ? ['*'] : normalizeOriginList(form.origins);
-    if (!form.name.trim()) {
-      toast({ title: 'Name the key', description: 'So you can tell it apart later.', variant: 'destructive' });
-      return;
-    }
-    if (origins.length === 0) {
-      toast({
-        title: 'Add at least one website',
-        description: 'A key with no allowed origin cannot be used from any browser.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    // The CHECK rejects a scoped key with an empty list, and a key that serves nothing is a
-    // support ticket rather than a configuration — catch it here with a sentence instead of a
-    // constraint error.
-    if (form.kind !== 'tools' && form.scopeType !== 'all' && form.scopeValues.length === 0) {
-      toast({
-        title: form.scopeType === 'categories'
-          ? 'Pick at least one category'
-          : form.scopeType === 'blueprints' ? 'Pick at least one configurator' : 'Pick at least one product',
-        description: 'A limited key with nothing selected would return an empty catalog.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setSaving(true);
-    try {
-      await embedKeysService.create(activeWorkspaceId, {
-        key_name: form.name,
-        allowed_origins: origins,
-        rate_limit_per_minute: form.rate,
-        key_kind: form.kind,
-        tools_enabled: form.kind === 'tools',
-        paid_tools_enabled: form.paidTools,
-        daily_usd_cap: form.usdCap,
-        scope_type: form.scopeType,
-        scope_values: form.scopeValues,
-        allow_generation: form.allowGeneration,
-        generation_daily_cap: form.dailyCap,
-      });
-      toast({ title: 'Embed key created' });
-      setCreating(false);
-      resetForm();
-      await load();
-    } catch (err) {
-      toast({
-        title: 'Could not create the key',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleToggle = async (key: EmbedKey, isActive: boolean) => {
     try {
       await embedKeysService.update(key.id, { is_active: isActive });
@@ -274,13 +100,6 @@ export const EmbedKeysCard: React.FC = () => {
     }
   };
 
-  /**
-   * Turn AI impressions on or off for one key.
-   *
-   * Separate from `handleToggle` deliberately: that switch decides whether the key WORKS, this one
-   * decides whether it may SPEND. Collapsing them into one row of switches would make the
-   * expensive one look like the cheap one.
-   */
   const handleGenerationToggle = async (key: EmbedKey, allow: boolean) => {
     try {
       await embedKeysService.update(key.id, { allow_generation: allow });
@@ -328,24 +147,20 @@ export const EmbedKeysCard: React.FC = () => {
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-base">
               <Code2 className="h-4 w-4 text-primary" />
-              Embed keys
+              Website widgets
             </CardTitle>
             <CardDescription>
-              Show your products and 3D models on your own website. These keys are meant to be public —
-              they go straight into your page source — so what protects them is the list of websites
-              allowed to use them, not secrecy. Only products you have published to your online store
-              are ever served.
+              Put a product finder, a single product, the tile visualizer, a configurator or the
+              calculators on your own website. Each widget has a public key that only works on the
+              websites you list, and only published products are ever shown.
             </CardDescription>
           </div>
-          <Button size="sm" className="shrink-0" onClick={() => setCreating(true)}>
-            <Plus />New key
+          <Button size="sm" className="shrink-0" onClick={() => setDialog({ open: true, key: null })}>
+            <Plus />Add widget
           </Button>
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {/* Usage, next to the keys that produce it — "is my embed actually live?" is the first
-              question after pasting the snippet, and until now nothing in the platform answered it
-              even though the events were being recorded. */}
           {analytics && analytics.total > 0 && (
             <div className="rounded-md border border-border/60 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -360,9 +175,6 @@ export const EmbedKeysCard: React.FC = () => {
                   </div>
                 ))}
               </div>
-              {/* What it COST, next to what it did. `visualize` is the only action on the embed
-                  that spends credits, and it is triggered by strangers — so a merchant who cannot
-                  see this number is running an open tab they never get shown. */}
               {analytics.generation?.count > 0 && (
                 <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-border/60 pt-3">
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -402,9 +214,9 @@ export const EmbedKeysCard: React.FC = () => {
           ) : keys.length === 0 ? (
             <HubEmptyState
               icon={KeyRound}
-              title="No embed keys yet"
-              description="An embed key lets your own website show this catalog — the planner, the product grid, the lead form — scoped to exactly the origins you allow."
-              action={<Button size="sm" onClick={() => setCreating(true)}><Plus /> New key</Button>}
+              title="No widgets yet"
+              description="Pick a widget, choose what it shows, preview it here, and copy the code into your website."
+              action={<Button size="sm" onClick={() => setDialog({ open: true, key: null })}><Plus />Add widget</Button>}
             />
           ) : (
             keys.map((key) => {
@@ -421,10 +233,8 @@ export const EmbedKeysCard: React.FC = () => {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {scopeLabel(key)}
+                        {servesLabel(key)} · {scopeLabel(key)}
                         {' · '}{key.rate_limit_per_minute ?? DEFAULT_RATE} requests/min
-                        {/* Counts every call the key made, including ones the quota refused —
-                            "served" would overstate it. */}
                         {key.usage_count ? ` · ${key.usage_count} requests` : ' · never used'}
                       </p>
                     </div>
@@ -455,8 +265,8 @@ export const EmbedKeysCard: React.FC = () => {
                       <Copy className="h-3.5 w-3.5 mr-1" />Copy
                     </Button>
                     <Button size="sm" variant="outline" className="shrink-0"
-                      onClick={() => copy(usageSnippet(key), 'Embed snippet')}>
-                      Embed code
+                      onClick={() => setDialog({ open: true, key })}>
+                      Get code
                     </Button>
                     <Button size="sm" variant="ghost" className="shrink-0"
                       onClick={() => copy(apiSnippet(key.api_key), 'API snippet')}>
@@ -464,8 +274,6 @@ export const EmbedKeysCard: React.FC = () => {
                     </Button>
                   </div>
 
-                  {/* The spend switch, kept apart from the on/off switch above: that one decides
-                      whether the key works, this one decides whether it may cost money. */}
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2">
                     <div className="flex items-start gap-2 min-w-0">
                       <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -509,11 +317,6 @@ export const EmbedKeysCard: React.FC = () => {
             })
           )}
 
-          {/* Where the copied code actually goes. "Embed code" hands over a snippet and then the
-              platform stops talking, which is fine for a hand-written page and not fine for the
-              two places most people are: Shopify and WordPress both need it pasted somewhere
-              non-obvious, and Shopify additionally needs the .myshopify.com preview domain on the
-              key or it works live and looks broken the whole time you are setting it up. */}
           {keys.length > 0 && (
             <p className="text-xs text-muted-foreground">
               Paste the snippet anywhere in your site's HTML. On <strong>Shopify</strong>, use{' '}
@@ -534,289 +337,15 @@ export const EmbedKeysCard: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={creating} onOpenChange={(o) => { setCreating(o); if (!o) resetForm(); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New embed key</DialogTitle>
-            <DialogDescription>
-              One key per site is easiest to manage — you can disable a single site later without
-              touching the others.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="embed-key-name">Name</Label>
-              <Input
-                id="embed-key-name"
-                placeholder="Main website"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="embed-key-origins">Websites allowed to use this key</Label>
-              <Textarea
-                id="embed-key-origins"
-                rows={3}
-                placeholder={'https://www.acme.com\nhttps://*.acme.com'}
-                value={form.origins}
-                disabled={form.allowAny}
-                onChange={(e) => setForm((f) => ({ ...f, origins: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                One per line. `https://*.acme.com` covers every subdomain. Remember to add your
-                staging domain if you test there.
-              </p>
-            </div>
-
-            <div className="flex items-start gap-3 rounded-md border border-border/60 p-3">
-              <Switch
-                id="embed-key-any"
-                checked={form.allowAny}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, allowAny: v }))}
-              />
-              <div className="space-y-0.5">
-                <Label htmlFor="embed-key-any" className="text-sm">Allow any website</Label>
-                <p className="text-xs text-muted-foreground">
-                  Only for a catalog you want partners to embed anywhere. Your published products
-                  become readable from any site on the internet.
-                </p>
-              </div>
-            </div>
-
-            {/*
-              WHAT THE KEY GRANTS, asked before what it is scoped to — they are different questions
-              and the second one is meaningless for a tools key. An architect embedding a heat-pump
-              sizer has no catalogue to slice, and asking them to pick one is how a form teaches
-              somebody that a product is not for them.
-            */}
-            <div className="space-y-2">
-              <Label>What this key is for</Label>
-              <RadioGroup
-                className="space-y-1.5"
-                value={form.kind}
-                onValueChange={(v) => setForm((f) => ({
-                  ...f, kind: v as EmbedKeyKind, scopeValues: [], scopeType: 'all',
-                }))}
-              >
-                {([
-                  ['catalog', 'My catalogue', 'Show your published products, 3D models or configurators on your own site.'],
-                  ['tools', 'The free tools', 'A calculator or sizer on your site. Serves none of your catalogue — and every enquiry it produces lands in this workspace.'],
-                ] as const).map(([value, title, help]) => (
-                  <label
-                    key={value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
-                      form.kind === value ? 'border-primary' : 'border-border/60'
-                    }`}
-                  >
-                    <RadioGroupItem value={value} id={`embed-kind-${value}`} className="mt-1" />
-                    <span className="space-y-0.5">
-                      <span className="block text-sm font-medium">{title}</span>
-                      <span className="block text-xs text-muted-foreground">{help}</span>
-                    </span>
-                  </label>
-                ))}
-              </RadioGroup>
-            </div>
-
-            <div className={`space-y-2 ${form.kind === 'tools' ? 'hidden' : ''}`}>
-              <Label>What this key can show</Label>
-              <RadioGroup
-                className="space-y-1.5"
-                value={form.scopeType}
-                onValueChange={(v) => setForm((f) => ({ ...f, scopeType: v as EmbedScopeType, scopeValues: [] }))}
-              >
-                {([
-                  ['all', 'Everything published', 'Every product published to your online store, and every configurator you have published.'],
-                  ['categories', 'Only certain categories', 'Good for a partner who should see one range.'],
-                  ['products', 'Only specific products', 'The tightest option — an exact list.'],
-                  ['blueprints', 'Only configurators', 'A key for your kitchen or project configurator. Serves no products at all.'],
-                ] as [EmbedScopeType, string, string][]).map(([value, label, hint]) => (
-                  <label
-                    key={value}
-                    htmlFor={`embed-scope-${value}`}
-                    className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
-                      form.scopeType === value ? 'border-primary' : 'border-border/60'
-                    }`}
-                  >
-                    <RadioGroupItem value={value} id={`embed-scope-${value}`} className="mt-1" />
-                    <span className="space-y-0.5">
-                      <span className="block text-sm">{label}</span>
-                      <span className="block text-xs text-muted-foreground">{hint}</span>
-                    </span>
-                  </label>
-                ))}
-              </RadioGroup>
-
-              {form.scopeType === 'categories' && (
-                <div className="max-h-44 space-y-1.5 overflow-y-auto rounded-md border border-border/60 p-3">
-                  {categories.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Loading categories…</p>
-                  ) : categories.map((c) => (
-                    <label key={c.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={form.scopeValues.includes(c.id)}
-                        onCheckedChange={() => toggleScopeValue(c)}
-                      />
-                      <span>{c.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {form.scopeType === 'products' && (
-                <div className="space-y-2 rounded-md border border-border/60 p-3">
-                  <Input
-                    placeholder="Search your products…"
-                    value={productTerm}
-                    onChange={(e) => setProductTerm(e.target.value)}
-                  />
-                  <div className="max-h-36 space-y-1.5 overflow-y-auto">
-                    {productHits.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {productTerm ? 'No products match.' : 'No products in this workspace yet.'}
-                      </p>
-                    ) : productHits.map((p) => (
-                      <label key={p.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={form.scopeValues.includes(p.id)}
-                          onCheckedChange={() => toggleScopeValue(p)}
-                        />
-                        <span className="truncate">{p.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {form.scopeValues.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Selected: {form.scopeValues.map((id) => chosenProducts[id] ?? id).join(', ')}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {form.scopeType === 'blueprints' && (
-                <div className="space-y-2 rounded-md border border-border/60 p-3">
-                  {blueprints.length === 0 ? (
-                    // Not a loading state and not an error — most workspaces genuinely have none
-                    // yet. The way out is on another screen, so it is a LINK rather than a
-                    // sentence describing where to go: telling someone with nothing to select to
-                    // navigate somewhere by name is the actionless empty state this platform
-                    // ratchets down, and it is worst exactly here, on day one of a workspace.
-                    <p className="text-xs text-muted-foreground">
-                      No configurators yet.{' '}
-                      <Link to="/blueprints" className="text-primary underline underline-offset-2">
-                        Build one
-                      </Link>
-                      , then publish it for the web.
-                    </p>
-                  ) : blueprints.map((b) => (
-                    <label key={b.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={form.scopeValues.includes(b.id)}
-                        onCheckedChange={() => toggleScopeValue(b)}
-                      />
-                      <span className="truncate">{b.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="embed-key-rate">Requests per minute</Label>
-              <Input
-                id="embed-key-rate"
-                type="number"
-                min={1}
-                max={MAX_RATE_LIMIT_PER_MINUTE}
-                value={form.rate}
-                onChange={(e) => setForm((f) => ({ ...f, rate: Number(e.target.value) }))}
-              />
-            </div>
-
-            {/*
-              Tools that cost money, and the ONE budget everything spendable on this key draws on.
-              Phrased as a cost rather than a feature, and off by default: the free calculators work
-              without this, so a merchant can decline it and still have a working widget.
-            */}
-            <div className="space-y-1.5 rounded-md border border-border/60 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-0.5">
-                  <Label htmlFor="embed-key-paid-tools" className="text-sm">Tools that cost money</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Catalogue search and the written answers. The calculators are free and always
-                    work; these bill per use and are triggered by your visitors, not by you.
-                  </p>
-                </div>
-                <Switch
-                  id="embed-key-paid-tools"
-                  checked={form.paidTools}
-                  onCheckedChange={(v) => setForm((f) => ({ ...f, paidTools: v }))}
-                />
-              </div>
-              <div className="space-y-1.5 pt-1">
-                <Label htmlFor="embed-key-usd">Most per day (USD)</Label>
-                <MoneyInput
-                  id="embed-key-usd"
-                  value={form.usdCap}
-                  // The ceiling moved off the native `max` attribute, which a text-mode input has
-                  // no equivalent for — clamped here so it is still enforced.
-                  onValueChange={(v) => setForm((f) => ({ ...f, usdCap: Math.min(MAX_DAILY_USD_CAP, Math.max(0, v ?? 0)) }))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  One ceiling for everything this key can spend in a day. Roughly a hundred written
-                  answers at $0.50. Once it is reached the widget quietly stops offering them; the
-                  free tools keep working.
-                </p>
-              </div>
-            </div>
-
-            {/* The only control here that spends money. Off by default and phrased as a cost, not
-                as a feature — a merchant should be able to decline it without reading the docs. */}
-            <div className="space-y-1.5 rounded-md border border-border/60 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-0.5">
-                  <Label htmlFor="embed-key-generation" className="flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5" />AI impressions
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    When a visitor specifies something you don't stock, the spec builder can draw an
-                    impression of it instead of showing nothing. Each one costs credits from this
-                    workspace and is triggered by the visitor, not by you.
-                  </p>
-                </div>
-                <Switch
-                  id="embed-key-generation"
-                  checked={form.allowGeneration}
-                  onCheckedChange={(v) => setForm((f) => ({ ...f, allowGeneration: v }))}
-                />
-              </div>
-              {form.allowGeneration && (
-                <div className="space-y-1.5 pt-1">
-                  <Label htmlFor="embed-key-cap">Most per day</Label>
-                  <Input
-                    id="embed-key-cap"
-                    type="number"
-                    min={1}
-                    max={MAX_GENERATION_DAILY_CAP}
-                    value={form.dailyCap}
-                    onChange={(e) => setForm((f) => ({ ...f, dailyCap: Number(e.target.value) }))}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Create key
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {activeWorkspaceId && (
+        <EmbedWidgetDialog
+          open={dialog.open}
+          onOpenChange={(open) => setDialog((d) => ({ ...d, open }))}
+          workspaceId={activeWorkspaceId}
+          existingKey={dialog.key}
+          onSaved={() => void load()}
+        />
+      )}
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <AlertDialogContent>

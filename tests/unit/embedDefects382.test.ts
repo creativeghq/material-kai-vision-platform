@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { blankComments } from '../helpers/stripComments';
+import { widgetsForKey, widgetSnippet } from '@/components/core/Profile/embed/embedWidgets';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => blankComments(readFileSync(join(ROOT, p), 'utf8'));
@@ -109,40 +110,38 @@ describe('4. scene settings reach the embed', () => {
  * only render nothing — on their own site, with nothing here saying why.
  */
 describe('5. the embed snippet matches the key it was copied from', () => {
-  const card = read('src/components/core/Profile/EmbedKeysCard.tsx');
-  const snippet = card.slice(card.indexOf('function usageSnippet'), card.indexOf('function apiSnippet'));
+  const base = { tools_enabled: false };
 
-  it('takes the key, not just its secret — it cannot branch on what it never receives', () => {
-    expect(snippet).toMatch(/function usageSnippet\(key: EmbedKey\)/);
-    expect(card).toContain('usageSnippet(key)');
+  it('a tools key serves the calculators and nothing else', () => {
+    expect(widgetsForKey({ ...base, key_kind: 'tools', scope_type: 'all' })).toEqual(['assistant']);
   });
 
-  it('a tools key gets the assistant, which is the only tag it can serve', () => {
-    expect(snippet).toMatch(/key\.key_kind === 'tools'/);
-    expect(snippet).toContain('<materialkai-assistant');
+  it('a blueprint-scoped key serves the configurator and no product widget', () => {
+    expect(widgetsForKey({ ...base, key_kind: 'catalog', scope_type: 'blueprints' })).toEqual(['configurator']);
   });
 
-  it('a blueprint-scoped key gets the configurator', () => {
-    expect(snippet).toMatch(/key\.scope_type === 'blueprints'/);
-    expect(snippet).toContain('<materialkai-configurator');
+  it('a product-scoped key is never offered the configurator', () => {
+    expect(widgetsForKey({ ...base, key_kind: 'catalog', scope_type: 'products' })).not.toContain('configurator');
   });
 
-  it('and pastes a real blueprint id when the key names exactly one', () => {
-    // A placeholder here is a second trip to go and look the id up, for a key that already knows it.
-    expect(snippet).toMatch(/scope_values\?\.length === 1/);
+  it('the snippet names the tag and the id the visitor needs', () => {
+    const code = widgetSnippet('https://app.example', 'mk_embed_x', 'configurator', { blueprintId: 'bp-1' });
+    expect(code).toContain('<materialkai-configurator api-key="mk_embed_x" blueprint="bp-1">');
+    expect(code).toContain('src="https://app.example/embed/materialkai-product.js"');
   });
 
-  it('every other key still gets the builder', () => {
-    expect(snippet).toContain('<materialkai-builder');
+  it('the visualizer snippet carries a pinned room and product', () => {
+    const code = widgetSnippet('https://a', 'k', 'visualizer', { sceneId: 's1', productId: 'p1' });
+    expect(code).toContain('<materialkai-visualizer api-key="k" product-id="p1" scene-id="s1">');
   });
 
-  it('the key row type carries key_kind, so the branch is a union rather than a cast', () => {
-    // `EmbedKey` is the generated row type, and the generator has not run since these columns
-    // landed. Without the widening the branch above is a type error, and the tempting fix is
-    // `(key as any).key_kind` — which compiles, and silently accepts any string forever.
-    const service = read('src/services/embedKeysService.ts');
-    expect(service).toMatch(/export type EmbedKey = Tables<'material_kai_keys'> & \{/);
-    expect(service).toMatch(/key_kind: EmbedKeyKind/);
-    expect(card).not.toMatch(/key as any|as unknown as EmbedKey/);
+  it('a required id nobody picked stays a visible placeholder, never an empty attribute', () => {
+    expect(widgetSnippet('https://a', 'k', 'product')).toContain('product-id="PRODUCT_ID"');
+  });
+
+  it('the card offers code through the widget flow, not a hand-written tag per key', () => {
+    const card = read('src/components/core/Profile/EmbedKeysCard.tsx');
+    expect(card).toContain('EmbedWidgetDialog');
+    expect(card).not.toMatch(/<materialkai-/);
   });
 });

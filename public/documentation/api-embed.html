@@ -13,18 +13,19 @@
   <div class="routes"><span class="badge route">/functions/v1/products-3d-api</span></div>
   <p class="lead">Show your products — in <strong>3D</strong>, in <strong>AR</strong>, with <strong>configurable finishes</strong> — on your own website. Two lines of HTML, or the JSON API underneath if you'd rather build your own.</p>
 
-  <div class="callout"><p><strong>Where:</strong> create a key at <strong>Profile → Keys → Website Embed</strong>. Keys are per workspace, so any admin can manage them and they outlive whoever created one.</p></div>
+  <div class="callout"><p><strong>Where:</strong> <strong>Profile → Keys → Website Embed → Add widget</strong>. Pick the widget, choose what it shows (publishing products, blueprints or room photos right there if they aren't yet), list the websites it may run on, then see it working in a live preview and copy the code. An existing key's <strong>Get code</strong> button offers every widget that key can serve. Keys are per workspace, so any admin can manage them and they outlive whoever created one.</p></div>
 
   <div class="callout"><p><strong>See it running:</strong> <a href="embed-demo.html">a live demo page</a> — a real product, a real 3D model, real prices, and a compatibility rule you can trigger.</p></div>
 
-  <h2>Four tags, one script</h2>
-  <p>One <code>&lt;script&gt;</code> registers all four. Which one you place is a decision about <em>your page</em>, not an installation step — you never load a second file, and you can put more than one on a site.</p>
+  <h2>Five tags, one script</h2>
+  <p>One <code>&lt;script&gt;</code> registers all five. Which one you place is a decision about <em>your page</em>, not an installation step — you never load a second file, and you can put more than one on a site.</p>
 
   <div class="table-wrap"><table>
     <thead><tr><th>Tag</th><th>The question it answers</th><th>Needs</th></tr></thead>
     <tbody>
       <tr><td><code>&lt;materialkai-builder&gt;</code></td><td>“Show me this product” — or, with no <code>product-id</code>, “what have you got like this?”</td><td>A catalogue key</td></tr>
       <tr><td><code>&lt;materialkai-configurator&gt;</code></td><td>“Let me build something that isn't in your catalogue yet.”</td><td>A catalogue key + a published configurator</td></tr>
+      <tr><td><code>&lt;materialkai-visualizer&gt;</code></td><td>“What would this tile look like in a room — and how much do I order?”</td><td>A catalogue key + published products with a size</td></tr>
       <tr><td><code>&lt;materialkai-assistant&gt;</code></td><td>“Work something out for me” — a sizer, a cost comparison, a search.</td><td>A tools key</td></tr>
       <tr><td><code>&lt;materialkai-product&gt;</code></td><td>The 3D viewer on its own. The builder mounts this internally.</td><td>A catalogue key</td></tr>
     </tbody>
@@ -105,6 +106,14 @@
   <div class="callout"><p><strong>Scope a key to specific configurators.</strong> When you create a key you can restrict it to <strong>configurators</strong> instead of products — useful when a partner's site should be able to open your kitchen planner and nothing else. A key scoped to products or categories sees <em>no</em> configurators at all: it's a key about products.</p></div>
 
   <div class="callout warn"><p><strong>A configurator has to be published for embedding</strong> — separately from being active internally, and for the same reason products have an online-store switch. An unpublished one returns the same “not found” as an id that never existed, so nobody can discover what you're still working on by guessing.</p></div>
+
+  <h2>Letting a visitor see a tile in a room</h2>
+  <p><code>&lt;materialkai-visualizer&gt;</code> lays one of your published products on a room photo at its real size, in the pattern the visitor picks (stack bond, offset, diagonal, herringbone, basket weave), with the joint width they choose. Under the picture it states the surface area, the pieces, the cutting allowance and the <strong>boxes to order</strong> of that exact product.</p>
+  <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
+
+&lt;materialkai-visualizer api-key="mk_embed_…"&gt;&lt;/materialkai-visualizer&gt;</code></pre>
+  <p>Add <code>product-id</code> to open it on one product, and <code>scene-id</code> to open it on one room photo. Without them the visitor chooses.</p>
+  <div class="callout warn"><p><strong>A number it cannot stand behind is withheld, not guessed.</strong> The box count needs the product's size and pack size, and the order quantity needs a <strong>cutting allowance</strong> for the pattern, which you set per workspace (in the Add widget flow, or on the Visualizer page). Until you set one, the widget says so instead of ordering at a rate nobody chose. Your own room photos stay private until you mark them <strong>shared on websites</strong>; the platform's photos are always available.</p></div>
 
   <h2>The tools, as buttons</h2>
   <p><code>&lt;materialkai-assistant&gt;</code> puts the calculators on your page: size a heat pump, compare heating costs, estimate a kitchen, price a spec, search materials. It needs a <strong>tools key</strong> (chosen when you create one) and serves <em>none</em> of your catalogue — but every enquiry it produces lands in your workspace.</p>
@@ -256,8 +265,9 @@
   </ul>
   <p>Without a model the widget falls back to the product's photo, so it's still worth embedding before your 3D work is finished.</p>
 
-  <p>For the other two tags:</p>
+  <p>For the other tags:</p>
   <ul class="feat">
+    <li><code>&lt;materialkai-visualizer&gt;</code> needs published products with a recorded size and a photo or tile texture, and a cutting allowance per pattern for the order quantity.</li>
     <li><code>&lt;materialkai-configurator&gt;</code> needs a <strong>blueprint published for embedding</strong> — no products, no 3D models. It prices what you'd build, not what you stock.</li>
     <li><code>&lt;materialkai-assistant&gt;</code> needs a key created as <strong>the free tools</strong> rather than <em>my catalogue</em>. Nothing else — it serves none of your catalogue, so there is nothing to publish first.</li>
   </ul>

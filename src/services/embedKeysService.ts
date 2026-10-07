@@ -7,7 +7,7 @@ import type { Tables } from '@/integrations/supabase/types';
 
 // Re-exported so callers have one import for "embed keys", while the helpers themselves stay in a
 // module with no client import — see the header of src/utils/embedOrigins.ts.
-export { normalizeOriginList, isWildcardOriginList } from '@/utils/embedOrigins';
+export { normalizeOriginList, isWildcardOriginList, originListAllows } from '@/utils/embedOrigins';
 
 /** A key row. */
 export type EmbedKey = Tables<'material_kai_keys'> & {
@@ -51,6 +51,8 @@ export interface EmbedKeyInput {
    * calculator must not be able to start spending because somebody pressed a different button.
    */
   paid_tools_enabled?: boolean;
+  /** May visitors ask for a result to be explained in words? Draws on `daily_usd_cap`. */
+  chat_enabled?: boolean;
   description?: string | null;
   /** Browser origins allowed to use the key. `['*']` = any site. Empty = no browser may use it. */
   allowed_origins: string[];
@@ -58,15 +60,7 @@ export interface EmbedKeyInput {
   scope_type: EmbedScopeType;
   /** Category, product or blueprint ids per `scope_type`. Must be empty iff scope_type is 'all'. */
   scope_values: string[];
-  /**
-   * May this key spend credits on an AI impression when the catalog cannot satisfy a spec?
-   *
-   * Default false, and it stayed false for every key ever created through this UI — because the
-   * column had no control. The spec builder's "see it" stage was therefore off for every merchant
-   * who did not go into the database by hand, which is all of them. The default stays false: a
-   * merchant who never asked cannot be billed, and a leaked key cannot be turned into a spending
-   * endpoint. But it now has to be a CHOICE rather than an absence.
-   */
+  /** May this key spend credits on an AI impression? Default false: a leaked key must not become a spending endpoint. */
   allow_generation?: boolean;
   /** Per-key ceiling on those generations per day. Meaningless while `allow_generation` is false. */
   generation_daily_cap?: number;
@@ -103,23 +97,12 @@ export async function listScopeCategories(): Promise<EmbedScopeOption[]> {
   return (data ?? []).map((c) => ({ id: c.id, label: c.display_name || c.name }));
 }
 
-/** Type-ahead over the workspace's own products, for an explicit product allowlist. */
-export async function searchScopeProducts(workspaceId: string, term: string): Promise<EmbedScopeOption[]> {
-  const q = term.trim();
-  let query = supabase
-    .from('products')
-    .select('id, name')
-    .eq('workspace_id', workspaceId)
-    .order('name', { ascending: true })
-    .limit(20);
-  if (q) query = query.ilike('name', `%${q}%`);
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []).map((p) => ({ id: p.id, label: p.name ?? '(unnamed)' }));
+export interface EmbedBlueprintOption extends EmbedScopeOption {
+  published: boolean;
 }
 
 /** The workspace's own configurators, for a blueprint-scoped key (#382 Phase 1). */
-export async function listScopeBlueprints(workspaceId: string): Promise<EmbedScopeOption[]> {
+export async function listScopeBlueprints(workspaceId: string): Promise<EmbedBlueprintOption[]> {
   const { data, error } = await supabase
     .from('blueprints')
     .select('id, title, is_embed_published')
@@ -128,12 +111,83 @@ export async function listScopeBlueprints(workspaceId: string): Promise<EmbedSco
     .order('title', { ascending: true })
     .limit(100);
   if (error) throw error;
-  return (data ?? []).map((b) => ({
-    id: b.id,
-    // The published state is part of the label, because a key scoped to an unpublished blueprint
-    // serves nothing and looks identical to one that works.
-    label: b.is_embed_published ? b.title : `${b.title} (not published)`,
-  }));
+  return (data ?? []).map((b) => ({ id: b.id, label: b.title, published: !!b.is_embed_published }));
+}
+
+async function countRows(query: PromiseLike<{ count: number | null; error: unknown }>): Promise<number> {
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** What each widget would have to show today, counted rather than fetched. */
+export interface EmbedReadiness {
+  publishedProducts: number;
+  blueprints: number;
+  publishedBlueprints: number;
+  scenes: number;
+  wastagePatterns: number;
+}
+
+export interface EmbedProductOption {
+  product_id: string;
+  name: string;
+  price: number | null;
+  currency: string;
+  storefront_published: boolean;
+}
+
+/**
+ * Priced products for the widget pickers, searched on the server. `scope` narrows to what an
+ * existing key can serve, so a picked product is never one the key would 404.
+ */
+export async function listEmbedProducts(
+  workspaceId: string,
+  term: string,
+  scope?: { type: EmbedScopeType; values: string[] } | null,
+): Promise<EmbedProductOption[]> {
+  let query = supabase
+    .from('product_prices')
+    .select('product_id, list_price, currency, storefront_published, product:products!inner(name, category_id)')
+    .eq('workspace_id', workspaceId)
+    .not('list_price', 'is', null)
+    .order('storefront_published', { ascending: false })
+    .order('product_id')
+    .limit(50);
+  const q = term.trim();
+  if (q) query = query.ilike('product.name', `%${q}%`);
+  if (scope?.type === 'products') query = query.in('product_id', scope.values);
+  if (scope?.type === 'categories') query = query.in('product.category_id', scope.values);
+  const { data, error } = await query;
+  if (error) throw error;
+  return ((data ?? []) as unknown as Array<{
+    product_id: string; list_price: number | string | null; currency: string | null;
+    storefront_published: boolean | null; product: { name: string | null } | null;
+  }>)
+    .map((r) => ({
+      product_id: r.product_id,
+      name: r.product?.name ?? '(unnamed)',
+      price: r.list_price != null ? Number(r.list_price) : null,
+      currency: r.currency ?? 'EUR',
+      storefront_published: !!r.storefront_published,
+    }))
+    .sort((a, b) => Number(b.storefront_published) - Number(a.storefront_published) || a.name.localeCompare(b.name));
+}
+
+export async function embedReadiness(workspaceId: string): Promise<EmbedReadiness> {
+  const [publishedProducts, blueprints, publishedBlueprints, scenes, wastagePatterns] = await Promise.all([
+    countRows(supabase.from('product_prices').select('product_id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId).eq('storefront_published', true).not('list_price', 'is', null)),
+    countRows(supabase.from('blueprints').select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId).eq('status', 'active')),
+    countRows(supabase.from('blueprints').select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId).eq('status', 'active').eq('is_embed_published', true)),
+    countRows(supabase.from('visualizer_scenes').select('id', { count: 'exact', head: true })
+      .or(`workspace_id.is.null,and(workspace_id.eq.${workspaceId},is_embeddable.is.true)`)),
+    countRows(supabase.from('surface_pattern_wastage').select('pattern', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)),
+  ]);
+  return { publishedProducts, blueprints, publishedBlueprints, scenes, wastagePatterns };
 }
 
 /** Sensible ceiling for a per-key quota — high enough for a busy shop, low enough to be a cap. */
@@ -249,6 +303,7 @@ export const embedKeysService = {
         key_kind: input.key_kind ?? 'catalog',
         tools_enabled: input.key_kind === 'tools' ? true : (input.tools_enabled ?? false),
         paid_tools_enabled: input.paid_tools_enabled ?? false,
+        chat_enabled: input.chat_enabled ?? false,
         daily_usd_cap: clampUsdCap(input.daily_usd_cap),
         allow_generation: input.allow_generation ?? false,
         generation_daily_cap: clampDailyCap(input.generation_daily_cap),

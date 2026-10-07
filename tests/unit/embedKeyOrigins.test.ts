@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { isOriginAllowed, embedCorsHeaders } from '../../supabase/functions/_shared/cors';
 import { intersectIdFilters } from '../../supabase/functions/_shared/embed-key';
-import { normalizeOriginList, isWildcardOriginList } from '@/utils/embedOrigins';
+import { normalizeOriginList, isWildcardOriginList, originListAllows } from '@/utils/embedOrigins';
 
 const req = (origin?: string | null) =>
   new Request('https://example.supabase.co/functions/v1/products-3d-api', {
@@ -155,4 +155,20 @@ describe('what the tenant types is what the edge accepts', () => {
     expect(isOriginAllowed('https://anything.example', normalizeOriginList('*'))).toBe(true);
     expect(isWildcardOriginList(normalizeOriginList('https://a.com'))).toBe(false);
   });
+});
+
+describe('the app decides "can this key preview here" exactly as the edge does', () => {
+  const LISTS: string[][] = [
+    ['*'], ['https://app.example.com'], ['https://*.example.com'], ['*.example.com'], ['example.com'],
+    ['http://*.example.com'], ['https://other.com'], [], ['https://app.example.com/'],
+  ];
+  const ORIGINS = ['https://app.example.com', 'http://app.example.com', 'https://example.com', 'https://evil-example.com'];
+
+  for (const list of LISTS) {
+    for (const origin of ORIGINS) {
+      it(`${JSON.stringify(list)} vs ${origin}`, () => {
+        expect(originListAllows(list, origin)).toBe(isOriginAllowed(origin, list));
+      });
+    }
+  }
 });

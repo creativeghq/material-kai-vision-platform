@@ -953,6 +953,11 @@ Deno.serve(withApiLogging((req) => {
     const { data: published } = await publishedQuery().eq('product_id', productId).maybeSingle();
     if (!published) return embedJson({ error: 'Product not found' }, 404, cors);
 
+    // The merchant previewing in the app is not a visitor; counting it would report a widget live
+    // on no website.
+    const appOrigin = new URL(Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').origin;
+    if (req.headers.get('Origin') === appOrigin) return embedJson({ ok: true, recorded: false, preview: true }, 200, cors);
+
     // session_id is NOT NULL and a uuid. A caller-supplied value that isn't one would fail the
     // insert, so anything unparseable is replaced rather than rejected — an analytics event is
     // never worth failing the visitor's page over.

@@ -81,16 +81,11 @@ export async function authenticateEmbedKey(
   const key = readEmbedKey(req);
   if (!key) return { ok: false, response: readableRefusal(req, 'Missing embed key', 401) };
 
-  // Compares the presented key against the stored value, and that is CORRECT here.
-  //
-  // #390 briefly hashed these and it was reverted: an embed key is public by construction
-  // — it ships in the merchant's page source as `api-key="mk_embed_…"` — and is bounded
-  // by `allowed_origins`, not by secrecy. Hashing costs the read-back the product needs
-  // and buys nothing, because the value is already on the page. The partner keys in
-  // `public.api_keys` are the opposite case and ARE hashed; see `verify_api_key`.
+  // Plaintext compare is correct: an embed key ships in the merchant's page source and is bounded by
+  // `allowed_origins`, not secrecy (#390 hashed it and was reverted). Partner `api_keys` ARE hashed.
   const { data: row, error } = await supabase
     .from('material_kai_keys')
-    .select('id, workspace_id, is_active, expires_at, allowed_origins, rate_limit_per_minute, scope_type, scope_values')
+    .select('id, workspace_id, is_active, expires_at, allowed_origins, rate_limit_per_minute, scope_type, scope_values, key_kind')
     .eq('api_key', key)
     .maybeSingle();
 
@@ -128,6 +123,8 @@ export async function authenticateEmbedKey(
     };
   }
 
+  // A tools key serves no catalogue, and its stored scope is 'all' — so it must not reach scoping as 'all'.
+  const toolsKey = row.key_kind === 'tools';
   return {
     ok: true,
     ctx: {
@@ -135,10 +132,10 @@ export async function authenticateEmbedKey(
       workspaceId: row.workspace_id as string,
       // Default to the most restrictive reading of a missing value. A row that somehow carries no
       // scope_type is a bug, and an unrecognised one must not fall through to "serve everything".
-      scopeType: (['all', 'categories', 'products', 'blueprints'] as const).includes(row.scope_type as EmbedScopeType)
+      scopeType: toolsKey ? 'products' : (['all', 'categories', 'products', 'blueprints'] as const).includes(row.scope_type as EmbedScopeType)
         ? (row.scope_type as EmbedScopeType)
         : 'products',
-      scopeValues: (row.scope_values as string[] | null) ?? [],
+      scopeValues: toolsKey ? [] : (row.scope_values as string[] | null) ?? [],
       cors,
     },
   };

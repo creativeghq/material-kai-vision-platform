@@ -160,3 +160,17 @@ describe('the form is built from the schema, never from a list beside it', () =>
     expect(widget).not.toContain("'radiators'");
   });
 });
+
+describe('a free-tools key reads none of the catalogue', () => {
+  const auth = blankComments(read('supabase/functions/_shared/embed-key.ts'));
+
+  it('the key row read includes key_kind, so the kind can be enforced at all', () => {
+    expect(auth).toMatch(/\.select\('[^']*\bkey_kind\b[^']*'\)/);
+  });
+
+  it('a tools key reaches scoping as an empty product list, never as its stored scope of all', () => {
+    expect(auth).toMatch(/toolsKey = row\.key_kind === 'tools'/);
+    expect(auth).toMatch(/scopeType: toolsKey \? 'products'/);
+    expect(auth).toMatch(/scopeValues: toolsKey \? \[\]/);
+  });
+});
