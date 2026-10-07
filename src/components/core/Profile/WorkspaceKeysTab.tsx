@@ -26,6 +26,7 @@ import { ShippingCredentialsCard } from '@/modules/stock/components/ShippingCred
 import { EmbedKeysCard } from '@/components/core/Profile/EmbedKeysCard';
 import { useModule } from '@/modules/_core';
 import { isAdmin } from '@/auth/roles';
+import { HubTabNav } from '@/components/core/hub';
 
 interface ConnState {
   social: number;
@@ -111,7 +112,7 @@ export const WorkspaceKeysTab: React.FC = () => {
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
 
-  // Sidebar sections — HR / Shipping only show when their module is enabled.
+  // HR / Shipping only show when their module is enabled.
   const sections = useMemo(
     () => ([
       { id: 'finance' as const, label: 'Finance & Tax', icon: Landmark, available: true },
@@ -268,7 +269,7 @@ export const WorkspaceKeysTab: React.FC = () => {
             <SectionHead
               icon={Code2}
               title="Website Embed"
-              description="Publishable keys that let your own website show your published products and their 3D models."
+              description="Widgets for your own website: a product finder, a single product, the tile visualizer, a configurator or the calculators."
             />
             <EmbedKeysCard />
           </>
@@ -278,42 +279,16 @@ export const WorkspaceKeysTab: React.FC = () => {
 
   return (
     <div className="space-y-5">
-
-      <div className="flex flex-col gap-6 md:flex-row">
-        {/* Sidebar — horizontal scroll on mobile, left column on desktop */}
-        <nav
-          className="flex gap-1 overflow-x-auto pb-1 md:w-56 md:shrink-0 md:flex-col md:overflow-visible md:pb-0"
-          aria-label="Key sections"
-        >
-          {sections.map((s) => {
-            const Icon = s.icon;
-            const isActive = s.id === active;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setActive(s.id)}
-                aria-current={isActive ? 'page' : undefined}
-                className={`flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{s.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Content pane */}
-        <section className="min-w-0 flex-1 space-y-4">
-          {/* One rule, above every section — see ByokRuleNote (#360 CB-1/CB-2). */}
-          <ByokRuleNote />
-          {renderSection(active)}
-        </section>
-      </div>
+      <HubTabNav
+        aria-label="Key sections"
+        items={sections.map((s) => ({ id: s.id, label: s.label, icon: s.icon }))}
+        activeId={active}
+        onSelect={(id) => setActive(id as SectionId)}
+      />
+      <section className="min-w-0 space-y-4">
+        <ByokRuleNote />
+        {renderSection(active)}
+      </section>
     </div>
   );
 };

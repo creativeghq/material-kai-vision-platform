@@ -346,7 +346,10 @@ describe('a rail never contains another rail', () => {
   const sources = new Map<string, string>();
   for (const f of walkTs(SRC)) sources.set(f, readFileSync(f, 'utf8'));
 
-  const isRail = (src: string) => src.includes('section-rail') || rendersTag(src, 'HubSideNav');
+  /** A `<nav>` that stacks at any breakpoint is a hand-built rail — Profile → Keys had one. */
+  const HAND_ROLLED_RAIL = /<nav\b[^>]*className=[^>]*\bflex-col\b/;
+  const isRail = (src: string) =>
+    src.includes('section-rail') || rendersTag(src, 'HubSideNav') || HAND_ROLLED_RAIL.test(src);
 
   function resolveImport(spec: string, from: string): string | null {
     let base: string;
@@ -370,6 +373,12 @@ describe('a rail never contains another rail', () => {
     return false;
   }
 
+  /** `{ keys: KeysTab, ... }` — a section map renders its components without a JSX tag. */
+  function passedAsValue(src: string, name: string): boolean {
+    if (!/^[A-Z]/.test(name)) return false;
+    return new RegExp(`(?:[:=?]|=>)\\s*${name}\\s*[,}\\n)]`).test(src);
+  }
+
   function rendered(f: string): Map<string, string> {
     const src = sources.get(f) ?? '';
     const out = new Map<string, string>();
@@ -378,7 +387,7 @@ describe('a rail never contains another rail', () => {
       if (!target) continue;
       for (const raw of m[1].split(',')) {
         const name = raw.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()!.trim();
-        if (name && rendersTag(src, name)) out.set(name, target);
+        if (name && (rendersTag(src, name) || passedAsValue(src, name))) out.set(name, target);
       }
     }
     return out;
@@ -401,6 +410,17 @@ describe('a rail never contains another rail', () => {
     'src/modules/crm/pages/CompanyDetailPage.tsx -> <CompanyMarketTab>',
     'src/modules/crm/pages/ContactDetailPage.tsx -> <PartyWorkTab>',
   ]);
+
+  it('recognises a hand-built rail, not only the shared components', () => {
+    expect(HAND_ROLLED_RAIL.test('<nav className="flex gap-1 md:w-56 md:flex-col" aria-label="Key sections">')).toBe(true);
+    expect(HAND_ROLLED_RAIL.test('<nav className="flex gap-1 overflow-x-auto" aria-label="Breadcrumb">')).toBe(false);
+  });
+
+  it('follows a component passed as a value, not only one written as a tag', () => {
+    expect(passedAsValue('const SECTIONS = { keys: KeysTab, team: TeamTab };', 'KeysTab')).toBe(true);
+    expect(passedAsValue('const Section = SECTIONS[id] ?? KeysTab\n', 'KeysTab')).toBe(true);
+    expect(passedAsValue('import { KeysTab } from "./x";', 'KeysTab')).toBe(false);
+  });
 
   it('finds the rails to check', () => {
     const rails = [...sources].filter(([, s]) => isRail(s));
