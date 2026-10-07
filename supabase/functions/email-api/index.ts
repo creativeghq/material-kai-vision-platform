@@ -702,8 +702,9 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
         // THE one place a brand shell is applied. 112 of the last 113 sends carried raw HTML and
         // no template, so a layout attached to `email_templates` would dress almost nothing.
+        // A conversation reply is a personal email; the sender's signature carries the identity.
         let layoutSource = 'none';
-        if (htmlBody) {
+        if (htmlBody && body.emailType !== 'agent_reply') {
           try {
             const wrapped = wrapInLayout(htmlBody, {
               layoutHtml: sender.layoutHtml,

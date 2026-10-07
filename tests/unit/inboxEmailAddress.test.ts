@@ -4,6 +4,14 @@ import { describe, expect, it } from 'vitest';
 const src = readFileSync('supabase/functions/inbox-api/index.ts', 'utf8');
 const literal = /const EMAIL_ADDRESS = \/(.+)\/;/.exec(src)?.[1];
 
+describe('an Inbox conversation email', () => {
+  it('is not dressed in the brand shell, so a reply reads as a personal email', () => {
+    const api = readFileSync('supabase/functions/email-api/index.ts', 'utf8');
+    expect(api).toMatch(/if \(htmlBody && body\.emailType !== 'agent_reply'\) \{\s*try \{\s*const wrapped = wrapInLayout\(/);
+    expect(src).toMatch(/emailType: 'agent_reply'/);
+  });
+});
+
 describe('inbox-api EMAIL_ADDRESS', () => {
   it('is the regex it reads as, not one with its backslashes eaten', () => {
     expect(literal).toBeDefined();
