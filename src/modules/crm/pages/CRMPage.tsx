@@ -250,7 +250,7 @@ export const CRMManagement: React.FC = () => {
   };
 
   const loadCategories = async () => {
-    try { setCategories(await crmCategoriesService.list()); }
+    try { setCategories(await crmCategoriesService.list(activeWorkspaceId)); }
     catch (error: any) { console.error('Error loading categories:', error); }
   };
 
@@ -347,9 +347,11 @@ export const CRMManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    loadRoles(); loadCategories(); loadCompanyLookup();
+    loadRoles(); loadCompanyLookup();
     if (canAdminUsers) loadUsers(); else setLoadingUsers(false);
   }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadCategories(); }, [activeWorkspaceId]);
 
   // Re-fetch whenever the page or any server-side filter changes.
   useEffect(() => { loadContacts(); }, [loadContacts]);
@@ -418,6 +420,12 @@ export const CRMManagement: React.FC = () => {
   const assignableCategoryOptions: Option[] = useMemo(
     () => categories
       .filter((c) => c.is_active && isHandAssignableKind(c.kind))
+      .map((c) => ({ value: c.id, label: c.name })),
+    [categories]);
+  // A workspace's own categories hold contacts and companies only — never platform users.
+  const userAssignableCategoryOptions: Option[] = useMemo(
+    () => categories
+      .filter((c) => c.is_active && !c.workspace_id && isHandAssignableKind(c.kind))
       .map((c) => ({ value: c.id, label: c.name })),
     [categories]);
 
@@ -576,7 +584,7 @@ export const CRMManagement: React.FC = () => {
     { key: 'role', label: 'Set account tier', placeholder: 'Pick a tier', options: roleOptions },
     { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
     { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
-    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
+    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: userAssignableCategoryOptions },
   ];
   /*
    * No "Professional type" on contacts or companies. `profession` on those two tables is the

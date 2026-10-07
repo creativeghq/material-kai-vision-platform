@@ -43,7 +43,8 @@ export const WhatsAppCampaignDialog: React.FC<{ workspaceId: string; onClose: ()
           .eq('channel_type', 'whatsapp').neq('is_active', false),
         supabase.from('messaging_templates').select('id, name').eq('workspace_id', workspaceId).eq('channel_type', 'whatsapp')
           .eq('approval_status', 'approved').neq('is_active', false).not('whatsapp_template_name', 'is', null).order('name'),
-        supabase.from('crm_categories').select('id, name, kind').eq('is_active', true).order('name'),
+        supabase.from('crm_categories').select('id, name, kind').eq('is_active', true)
+          .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`).order('name'),
       ]);
       const chRows = (ch.data ?? []).map((c) => ({ id: c.id, name: c.display_name || c.sender_id || 'WhatsApp number' }));
       setChannels(chRows);

@@ -4074,6 +4074,7 @@ export type Database = {
           slug: string
           source_value: string | null
           updated_at: string
+          workspace_id: string | null
         }
         Insert: {
           color_hex?: string | null
@@ -4089,6 +4090,7 @@ export type Database = {
           slug: string
           source_value?: string | null
           updated_at?: string
+          workspace_id?: string | null
         }
         Update: {
           color_hex?: string | null
@@ -4104,6 +4106,7 @@ export type Database = {
           slug?: string
           source_value?: string | null
           updated_at?: string
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -34301,6 +34304,7 @@ export type Database = {
           total_count: number | null
           updated_at: string | null
           user_count: number | null
+          workspace_id: string | null
         }
         Relationships: []
       }
@@ -38366,7 +38370,7 @@ export type Database = {
         }[]
       }
       list_crm_categories: {
-        Args: never
+        Args: { p_workspace_id?: string }
         Returns: {
           id: string
           kind: string

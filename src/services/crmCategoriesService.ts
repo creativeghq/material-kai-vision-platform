@@ -1,9 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-// The kind vocabulary + the hand-assignment rule live in a client-free module (see the note
-// there); re-exported here so every existing import site keeps working.
 export { AUTO_CATEGORY_KINDS, isHandAssignableKind } from './crmCategoryKinds';
-// Also imported: a re-export does not bind the name locally, and assertHandAssignable uses it.
 import { isHandAssignableKind } from './crmCategoryKinds';
 export type { CrmCategoryKind, CrmCategoryMemberKind } from './crmCategoryKinds';
 
@@ -20,6 +17,8 @@ export interface CrmCategory {
   icon: string | null;
   is_active: boolean;
   material_category_id: string | null;
+  /** NULL = platform taxonomy; set = this workspace's own custom list. */
+  workspace_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,10 +74,14 @@ export interface ResolvedRecipient {
 
 /** Every write here BINDS its error and throws (#389). */
 class CrmCategoriesService {
-  async list(): Promise<CrmCategorySummary[]> {
-    const { data, error } = await supabase
-      .from('crm_categories_summary')
-      .select('*')
+  /** Platform categories plus the given workspace's own. RLS already hides other tenants'; the
+   *  workspace filter keeps a member of two workspaces from seeing both lists at once. */
+  async list(workspaceId?: string | null): Promise<CrmCategorySummary[]> {
+    let query = supabase.from('crm_categories_summary').select('*');
+    query = workspaceId
+      ? query.or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+      : query.is('workspace_id', null);
+    const { data, error } = await query
       .order('kind', { ascending: true })
       .order('name', { ascending: true });
     if (error) throw error;
@@ -105,6 +108,7 @@ class CrmCategoriesService {
      * pick-one lead vocabularies). The auto kinds (professional_type / role /
      * employment) are owned by the resync RPC. */
     kind?: Extract<CrmCategoryKind, 'manual' | 'industry' | 'lead_status' | 'lead_source'>;
+    workspace_id?: string;
   }): Promise<CrmCategory> {
     const { data: { user } } = await supabase.auth.getUser();
     const slug = (input.slug || input.name).toLowerCase().trim()
@@ -121,8 +125,10 @@ class CrmCategoriesService {
         icon: input.icon ?? null,
         is_active: true,
         created_by: user?.id ?? null,
+        workspace_id: input.workspace_id ?? null,
       })
       .select('*').single();
+    if (error?.code === '23505') throw new Error(`A category named "${input.name}" already exists.`);
     if (error) throw error;
     return data as CrmCategory;
   }
@@ -308,7 +314,7 @@ class CrmCategoriesService {
   async listByKind(kind: CrmCategoryKind): Promise<CrmCategory[]> {
     const { data, error } = await supabase
       .from('crm_categories')
-      .select('id, slug, name, description, kind, source_value, color_hex, icon, is_active, created_at, updated_at')
+      .select('id, slug, name, description, kind, source_value, color_hex, icon, is_active, workspace_id, created_at, updated_at')
       .eq('kind', kind)
       .eq('is_active', true)
       .order('name', { ascending: true });

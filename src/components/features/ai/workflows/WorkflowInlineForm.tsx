@@ -4,7 +4,7 @@
  * field types (pdf_picker, category_picker, ...) call out to the right
  * Supabase tables to populate options.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, ArrowDownToLine, X } from 'lucide-react';
 import { getErrorMessage } from '@/core/errors/utils';
 import { catalogPublicPath } from '@/config/catalogPublicUrl';
@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import type { WorkflowFieldSchema } from './types';
 
 interface Props {
@@ -155,7 +156,7 @@ const FieldInput: React.FC<{
     case 'pdf_picker':
       return <RemoteOptionsPicker field={field} value={value} onChange={onChange} multi={field.multi ?? true} loader={loadCatalogSourcePdfs} />;
     case 'category_picker':
-      return <RemoteOptionsPicker field={field} value={value} onChange={onChange} multi={field.multi ?? true} loader={loadCrmCategories} />;
+      return <CrmCategoryPicker field={field} value={value} onChange={onChange} />;
     case 'product_picker':
       return <RemoteOptionsPicker field={field} value={value} onChange={onChange} multi={field.multi ?? false} loader={loadProducts} />;
     case 'catalog_picker':
@@ -278,10 +279,19 @@ async function loadCatalogSourcePdfs(): Promise<PickerOption[]> {
   }));
 }
 
-async function loadCrmCategories(): Promise<PickerOption[]> {
-  const { data, error } = await supabase
+const CrmCategoryPicker: React.FC<{ field: WorkflowFieldSchema; value: any; onChange: (v: any) => void }> = ({ field, value, onChange }) => {
+  const { activeWorkspaceId } = useWorkspace();
+  const loader = useCallback(() => loadCrmCategories(activeWorkspaceId), [activeWorkspaceId]);
+  return <RemoteOptionsPicker field={field} value={value} onChange={onChange} multi={field.multi ?? true} loader={loader} />;
+};
+
+async function loadCrmCategories(workspaceId: string | null): Promise<PickerOption[]> {
+  const base = supabase
     .from('crm_categories_summary')
-    .select('id, name, slug, total_count')
+    .select('id, name, slug, total_count');
+  const { data, error } = await (workspaceId
+    ? base.or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+    : base.is('workspace_id', null))
     .eq('is_active', true)
     .order('total_count', { ascending: false })
     .limit(50);

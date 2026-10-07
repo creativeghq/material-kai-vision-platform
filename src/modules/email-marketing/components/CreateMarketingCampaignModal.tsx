@@ -55,7 +55,7 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
       // the other.
       const [tpls, cats] = await Promise.allSettled([
         marketingService.listTemplates(workspaceId),
-        marketingService.listCategories(),
+        marketingService.listCategories(workspaceId),
       ]);
       if (tpls.status === 'fulfilled') setTemplates(tpls.value.filter((t) => t.is_active));
       if (cats.status === 'fulfilled') setCategories(cats.value);

@@ -47,13 +47,13 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
     (async () => {
       try {
         setLoadingCats(true);
-        const list = await crmCategoriesService.list();
+        const list = await crmCategoriesService.list(catalog.workspace_id);
         setCategories(list.filter((c) => c.is_active));
       } catch (err) {
         toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
       } finally { setLoadingCats(false); }
     })();
-  }, [open, catalog.title, toast]);
+  }, [open, catalog.title, catalog.workspace_id, toast]);
 
   const refreshPreview = useCallback(async (categoryIds: string[]) => {
     if (categoryIds.length === 0) {

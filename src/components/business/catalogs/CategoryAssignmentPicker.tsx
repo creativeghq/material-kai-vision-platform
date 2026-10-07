@@ -1,15 +1,16 @@
 /**
- * CategoryAssignmentPicker — embeddable component that lets an admin pick which
- * CRM categories a user / contact / company belongs to. Drops into the CRM
- * detail pages without the full Categories admin page.
+ * CategoryAssignmentPicker — which CRM categories a user / contact / company belongs to, as one
+ * colour-coded multi-select. Workspace owners/admins can create a category from inside it.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Tags } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { crmCategoriesService, type CrmCategorySummary, type CrmCategoryKind } from '@/services/crmCategoriesService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
 import { getErrorMessage } from '@/core/errors/utils';
+import { CategoryMultiSelect, type CategoryOption } from '@/components/business/crm/CategoryMultiSelect';
 
 type Target =
   | { kind: 'user'; id: string }
@@ -23,25 +24,34 @@ interface Props {
   bare?: boolean;
 }
 
-/** Kinds rendered here, in order. 'role' is intentionally excluded — role
- * categories are auto-synced from the account `roles` table (a platform-user
- * permission concept), so they don't belong on a contact/company. Industry +
- * lead_status/lead_source are excluded too (they have dedicated UIs). */
-const GROUPS: Array<{ key: Extract<CrmCategoryKind, 'manual' | 'professional_type'>; label: string }> = [
-  { key: 'manual', label: 'Custom' },
-  { key: 'professional_type', label: 'Professional type' },
-];
+/**
+ * What this picker owns. A workspace's own lists hold only its contacts/companies (RLS refuses a
+ * platform user), and role / employment / industry / lead kinds have their own UIs or are derived.
+ */
+function assignableHere(c: CrmCategorySummary, target: Target): boolean {
+  if (!c.is_active) return false;
+  if (c.workspace_id) return target.kind !== 'user';
+  if (c.kind === 'manual') return true;
+  return c.kind === 'professional_type' && target.kind !== 'user';
+}
+
+function groupLabel(c: CrmCategorySummary): string {
+  if (c.workspace_id) return 'Your categories';
+  return c.kind === 'professional_type' ? 'Professional type' : 'Platform lists';
+}
 
 export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, bare = false }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId, workspaceRole } = useWorkspace();
+  const canCreate = !!activeWorkspaceId && target.kind !== 'user'
+    && (workspaceRole === 'owner' || workspaceRole === 'admin');
+
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [memberOf, setMemberOf] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  // Depend on the primitive kind/id, NOT the `target` object — the parent passes a
-  // fresh object literal every render, which otherwise re-fires the load on every
-  // re-render (the visible "refresh each visit" flicker).
+  // Depend on the primitive kind/id, NOT the `target` object — the parent passes a fresh literal.
   const refreshMemberships = useCallback(async () => {
     const ids =
       target.kind === 'user'    ? await crmCategoriesService.listMembershipsForUser(target.id) :
@@ -54,50 +64,42 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, b
   const loadAll = useCallback(async () => {
     try {
       setLoading(true);
-      const list = await crmCategoriesService.list();
-      setCategories(list.filter((c) => c.is_active));
+      const list = await crmCategoriesService.list(activeWorkspaceId);
+      setCategories(list);
       await refreshMemberships();
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [refreshMemberships, toast]);
+  }, [activeWorkspaceId, refreshMemberships, toast]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  const grouped = useMemo(() => {
-    const out: Record<string, CrmCategorySummary[]> = { manual: [], professional_type: [], role: [] };
-    for (const c of categories) out[c.kind]?.push(c);
-    return out;
-  }, [categories]);
+  const assignable = useMemo(
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => categories.filter((c) => assignableHere(c, target))
+      .sort((a, b) => Number(!a.workspace_id) - Number(!b.workspace_id) || a.name.localeCompare(b.name)),
+    [categories, target.kind],
+  );
+  const options: CategoryOption[] = useMemo(
+    () => assignable.map((c) => ({ id: c.id, name: c.name, color_hex: c.color_hex, group: groupLabel(c) })),
+    [assignable],
+  );
 
-  const toggle = async (categoryId: string) => {
-    const cat = categories.find((c) => c.id === categoryId);
-    if (!cat) return;
-    // On platform users, professional_type / role are auto-synced → read-only here.
-    if (target.kind === 'user' && cat.kind !== 'manual') return;
-
-    const next = new Set(memberOf);
-    if (next.has(categoryId)) next.delete(categoryId); else next.add(categoryId);
+  const save = async (next: Set<string>, scope: CrmCategorySummary[]) => {
     setMemberOf(next);
     setSaving(true);
     try {
+      // ONLY what this picker renders: a full replace deletes what the supply picker just wrote.
+      const scopeIds = scope.map((c) => c.id);
+      const selected = scopeIds.filter((id) => next.has(id));
       if (target.kind === 'user') {
-        // Only manual memberships are hand-managed for users; auto rows stay put.
-        const manualIds = categories.filter((c) => c.kind === 'manual').map((c) => c.id);
-        await crmCategoriesService.setMembershipsForUser(target.id, manualIds.filter((id) => next.has(id)));
+        await crmCategoriesService.setMembershipsForUser(target.id, selected);
+      } else if (target.kind === 'contact') {
+        await crmCategoriesService.setContactMembershipsWithinScope(target.id, scopeIds, selected);
       } else {
-        // ONLY what this picker renders: a full replace deletes what the supply picker just wrote.
-        const scopeIds = categories
-          .filter((c) => GROUPS.some((g) => g.key === c.kind))
-          .map((c) => c.id);
-        const selected = scopeIds.filter((id) => next.has(id));
-        if (target.kind === 'contact') {
-          await crmCategoriesService.setContactMembershipsWithinScope(target.id, scopeIds, selected);
-        } else {
-          await crmCategoriesService.setCompanyMembershipsWithinScope(target.id, scopeIds, selected);
-        }
+        await crmCategoriesService.setCompanyMembershipsWithinScope(target.id, scopeIds, selected);
       }
     } catch (err) {
       toast({ title: 'Save failed', description: getErrorMessage(err), variant: 'destructive' });
@@ -105,59 +107,45 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, b
     } finally { setSaving(false); }
   };
 
-  // On a platform user, professional_type / role are derived from the account
-  // (role is set at signup/admin) — not assignable here, so users only get the
-  // Custom lists. Contacts & companies can be tagged with all three.
-  const hasAssignable = target.kind === 'user'
-    ? categories.some((c) => c.kind === 'manual')
-    : categories.some((c) => c.kind === 'manual' || c.kind === 'professional_type');
+  const toggle = (categoryId: string) => {
+    const next = new Set(memberOf);
+    if (next.has(categoryId)) next.delete(categoryId); else next.add(categoryId);
+    void save(next, assignable);
+  };
 
-  const body = (
-    <>
-        {loading ? (
-          <div className="flex items-center gap-2 py-3 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-          </div>
-        ) : !hasAssignable ? (
-          <div className="text-xs text-muted-foreground">
-            No categories yet.{' '}
-            <a href="/crm?tab=categories" className="text-primary hover:underline">Create some →</a>
-          </div>
-        ) : (
-          GROUPS.map(({ key, label }) => {
-            const list = grouped[key] ?? [];
-            if (list.length === 0) return null;
-            // Users don't get professional_type / role here — those come from the
-            // account (role set at signup) and have their own dropdowns on the page.
-            if (key !== 'manual' && target.kind === 'user') return null;
-            return (
-              <div key={key} className="space-y-2">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {list.map((c) => {
-                    const active = memberOf.has(c.id);
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => toggle(c.id)}
-                        disabled={saving}
-                        className={`px-3 py-1.5 text-xs flex items-center gap-1.5 transition border ${
-                          active ? 'bg-primary text-primary-foreground border-primary'
-                                 : 'border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {c.color_hex && <span className="w-2 h-2 rounded-full" style={{ background: c.color_hex }} />}
-                        {c.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })
-        )}
-    </>
+  const create = async (name: string, color: string): Promise<CategoryOption> => {
+    if (!activeWorkspaceId) throw new Error('No active workspace.');
+    const created = await crmCategoriesService.create({ name, color_hex: color, kind: 'manual', workspace_id: activeWorkspaceId });
+    const summary: CrmCategorySummary = {
+      ...created, user_count: 0, contact_count: 0, company_count: 0, total_count: 0,
+    };
+    setCategories((prev) => [...prev, summary]);
+    await save(new Set([...memberOf, created.id]), [...assignable, summary]);
+    toast({ title: 'Category created', description: name });
+    return { id: created.id, name: created.name, color_hex: created.color_hex, group: groupLabel(summary) };
+  };
+
+  const body = loading ? (
+    <div className="flex items-center gap-2 py-3 text-muted-foreground text-sm">
+      <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+    </div>
+  ) : (
+    <div className="space-y-2">
+      <CategoryMultiSelect
+        options={options}
+        value={assignable.filter((c) => memberOf.has(c.id)).map((c) => c.id)}
+        onToggle={toggle}
+        onCreate={canCreate ? create : undefined}
+        saving={saving}
+        placeholder={options.length === 0 && !canCreate ? 'No categories yet' : 'Add categories…'}
+      />
+      {options.length === 0 && !canCreate && (
+        <p className="text-xs text-muted-foreground">
+          Your workspace owner can create categories in{' '}
+          <a href="/crm?tab=categories" className="text-primary hover:underline">CRM → Categories</a>.
+        </p>
+      )}
+    </div>
   );
 
   if (bare) return <div className={cn('space-y-4', className)}>{body}</div>;
@@ -168,7 +156,6 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, b
         <CardTitle className="flex items-center gap-2">
           <Tags className="h-4 w-4" /> CRM Categories
         </CardTitle>
-        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
       </CardHeader>
       <CardContent className="space-y-4">{body}</CardContent>
     </Card>

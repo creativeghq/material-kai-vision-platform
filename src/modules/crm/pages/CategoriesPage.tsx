@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Tags, Plus, Trash2, Loader2, RefreshCw, Users, Building2, User as UserIcon,
-  Lock, Search, X, Package,
+  Lock, Search, X, Package, Pencil,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -29,6 +29,14 @@ import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
 import { CRM_CATEGORY_FILTERS } from './crmCategoryFilters';
 import { formatNumber } from '@/utils/decimal';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { CategoryColorPicker } from '@/components/business/crm/CategoryColorPicker';
+import { CategoryChip, CategoryDot } from '@/components/business/crm/CategoryMultiSelect';
+import { DEFAULT_CATEGORY_COLOR } from '@/components/business/crm/categoryColors';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/core/ui/table';
 
 const KIND_LABELS: Record<CrmCategoryKind, string> = {
   professional_type: 'Professional type',
@@ -70,7 +78,8 @@ const AUTO_SOURCE: Partial<Record<CrmCategoryKind, string>> = {
  * members dialog) and the member-count footer is hidden. */
 const VOCAB_KINDS: CrmCategoryKind[] = ['lead_status', 'lead_source'];
 
-export const CategoriesPanel: React.FC = () => {
+/** Platform taxonomy (workspace_id NULL): industries, lead vocabularies, derived lists. Operator only. */
+const PlatformCategoriesSection: React.FC = () => {
   const { toast } = useToast();
 
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
@@ -80,9 +89,9 @@ export const CategoriesPanel: React.FC = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
-  const [createColor, setCreateColor] = useState('#22c55e');
-  type CreatableKind = 'manual' | 'industry' | 'lead_status' | 'lead_source';
-  const [createKind, setCreateKind] = useState<CreatableKind>('manual');
+  const [createColor, setCreateColor] = useState(DEFAULT_CATEGORY_COLOR);
+  type CreatableKind = 'industry' | 'lead_status' | 'lead_source';
+  const [createKind, setCreateKind] = useState<CreatableKind>('industry');
 
   const [materialCats, setMaterialCats] = useState<Array<{ id: string; name: string; category_key: string }>>([]);
 
@@ -99,7 +108,7 @@ export const CategoriesPanel: React.FC = () => {
     try {
       setLoading(true);
       const [list, mats] = await Promise.all([
-        crmCategoriesService.list(),
+        crmCategoriesService.list(null),
         crmCategoriesService.listMaterialCategories(),
       ]);
       setCategories(list);
@@ -177,7 +186,7 @@ export const CategoriesPanel: React.FC = () => {
       });
       toast({ title: 'Category created' });
       setShowCreate(false);
-      setCreateName(''); setCreateDescription(''); setCreateColor('#22c55e'); setCreateKind('manual');
+      setCreateName(''); setCreateDescription(''); setCreateColor(DEFAULT_CATEGORY_COLOR); setCreateKind('industry');
       load();
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
@@ -188,7 +197,7 @@ export const CategoriesPanel: React.FC = () => {
     setEditing(c);
     setEditName(c.name);
     setEditDescription(c.description || '');
-    setEditColor(c.color_hex || '');
+    setEditColor(c.color_hex || DEFAULT_CATEGORY_COLOR);
     setEditActive(c.is_active);
     setEditMaterialId(c.material_category_id ?? null);
   };
@@ -232,12 +241,13 @@ export const CategoriesPanel: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="text-sm text-muted-foreground max-w-2xl space-y-1">
-          <p>Group platform users + CRM contacts + companies into lists — used by "Send to Customers" and other outreach. Every category here is fully editable: rename, recolour, toggle active, add/remove members, or delete.</p>
+          <h2 className="text-base font-sans font-semibold text-foreground">Platform categories</h2>
+          <p>Shared by every workspace and edited only by the platform operator: industries, lead status / source options, and the derived lists below.</p>
           <p className="text-xs">
             <b className="text-foreground">Access role</b>, <b className="text-foreground">Employment</b> and <b className="text-foreground">Professional type</b> lists are <i>derived</i> — their members come from
             {' '}<code className="text-foreground">workspace_members.role</code>, <code className="text-foreground">hr_employees</code> and <code className="text-foreground">user_profiles.professional_type</code> respectively, and re-sync on "Resync auto".
             That is how "who is a sales manager / an employee" is answered: you set it where it belongs (invite someone with that role, or hire them in HR) and the list follows.
-            You can still pin extra people onto a derived list by hand — manual rows survive resync. <b className="text-foreground">Custom</b> lists are entirely yours.
+            You can still pin extra people onto a derived list by hand — manual rows survive resync.
           </p>
         </div>
         <div className="flex gap-2">
@@ -253,11 +263,11 @@ export const CategoriesPanel: React.FC = () => {
             size="sm"
             onClick={() => {
               const kind = scopedFilterValue(values, 'kind');
-              setCreateKind((['manual', 'industry', 'lead_status', 'lead_source'] as CreatableKind[]).find((k) => k === kind) ?? 'manual');
+              setCreateKind((['industry', 'lead_status', 'lead_source'] as CreatableKind[]).find((k) => k === kind) ?? 'industry');
               setShowCreate(true);
             }}
           >
-            <Plus className="mr-2 h-4 w-4" /> New category
+            <Plus className="mr-2 h-4 w-4" /> New platform category
           </Button>
         </div>
       </div>
@@ -370,14 +380,13 @@ export const CategoriesPanel: React.FC = () => {
       {/* Create dialog */}
       <Dialog open={showCreate} onOpenChange={(v) => !v && setShowCreate(false)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New CRM Category</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New platform category</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Type</Label>
-              <Select value={createKind} onValueChange={(v) => setCreateKind(v as 'manual' | 'industry' | 'lead_status' | 'lead_source')}>
+              <Select value={createKind} onValueChange={(v) => setCreateKind(v as CreatableKind)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Custom list</SelectItem>
                   <SelectItem value="industry">Industry</SelectItem>
                   <SelectItem value="lead_status">Lead status</SelectItem>
                   <SelectItem value="lead_source">Lead source</SelectItem>
@@ -388,14 +397,12 @@ export const CategoriesPanel: React.FC = () => {
                   ? 'Industries are the taxonomy you assign to companies (multi-select on the company page).'
                   : createKind === 'lead_status'
                     ? 'Pick-one options for a contact’s Lead Status dropdown.'
-                    : createKind === 'lead_source'
-                      ? 'Pick-one options for a contact’s Lead Source dropdown.'
-                      : 'A free-form list you assign people / companies to.'}
+                    : 'Pick-one options for a contact’s Lead Source dropdown.'}
               </p>
             </div>
             <div className="space-y-1">
               <Label>Name *</Label>
-              <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder={createKind === 'industry' ? 'e.g. Hospitality, Retail, Architecture' : 'e.g. Newsletter VIPs'} />
+              <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder={createKind === 'industry' ? 'e.g. Hospitality, Retail, Architecture' : 'e.g. Referral'} />
             </div>
             <div className="space-y-1">
               <Label>Description</Label>
@@ -403,10 +410,7 @@ export const CategoriesPanel: React.FC = () => {
             </div>
             <div className="space-y-1">
               <Label>Color</Label>
-              <div className="flex items-center gap-2">
-                <Input type="color" value={createColor} onChange={(e) => setCreateColor(e.target.value)} className="w-16 h-9 p-1" />
-                <Input value={createColor} onChange={(e) => setCreateColor(e.target.value)} className="flex-1" />
-              </div>
+              <CategoryColorPicker value={createColor} onChange={setCreateColor} />
             </div>
           </div>
           <DialogFooter>
@@ -435,10 +439,7 @@ export const CategoriesPanel: React.FC = () => {
               </div>
               <div className="space-y-1">
                 <Label>Color</Label>
-                <div className="flex items-center gap-2">
-                  <Input type="color" value={editColor || '#888888'} onChange={(e) => setEditColor(e.target.value)} className="w-16 h-9 p-1" />
-                  <Input value={editColor || ''} onChange={(e) => setEditColor(e.target.value)} className="flex-1" placeholder="#22c55e" />
-                </div>
+                <CategoryColorPicker value={editColor} onChange={setEditColor} />
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <Checkbox id="active" checked={editActive} onCheckedChange={(v) => setEditActive(v === true)} />
@@ -498,6 +499,197 @@ export const CategoriesPanel: React.FC = () => {
   );
 };
 
+/** The active workspace's own categories. Owners and admins manage them; every member sees them. */
+const WorkspaceCategoriesSection: React.FC = () => {
+  const { toast } = useToast();
+  const { activeWorkspaceId, activeWorkspace, workspaceRole } = useWorkspace();
+  const canManage = workspaceRole === 'owner' || workspaceRole === 'admin';
+
+  const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState<{ id: string | null; name: string; description: string; color: string } | null>(null);
+  const [membersOpen, setMembersOpen] = useState<CrmCategorySummary | null>(null);
+
+  const load = useCallback(async () => {
+    if (!activeWorkspaceId) { setCategories([]); setLoading(false); return; }
+    try {
+      setLoading(true);
+      const list = await crmCategoriesService.list(activeWorkspaceId);
+      setCategories(list.filter((c) => c.workspace_id === activeWorkspaceId));
+    } catch (err) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [activeWorkspaceId, toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openCreate = () => setForm({ id: null, name: '', description: '', color: DEFAULT_CATEGORY_COLOR });
+  const openEdit = (c: CrmCategorySummary) =>
+    setForm({ id: c.id, name: c.name, description: c.description ?? '', color: c.color_hex || DEFAULT_CATEGORY_COLOR });
+
+  const handleSave = async () => {
+    if (!form || !form.name.trim() || !activeWorkspaceId) return;
+    setBusy(true);
+    try {
+      if (form.id) {
+        await crmCategoriesService.update(form.id, {
+          name: form.name.trim(), description: form.description.trim() || null, color_hex: form.color,
+        });
+      } else {
+        await crmCategoriesService.create({
+          name: form.name.trim(), description: form.description.trim() || undefined,
+          color_hex: form.color, kind: 'manual', workspace_id: activeWorkspaceId,
+        });
+      }
+      toast({ title: form.id ? 'Category updated' : 'Category created' });
+      setForm(null);
+      load();
+    } catch (err) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const handleDelete = async (c: CrmCategorySummary) => {
+    if (!window.confirm(`Delete "${c.name}"? The contacts and companies in it are kept; only the category goes.`)) return;
+    try {
+      await crmCategoriesService.remove(c.id);
+      toast({ title: 'Deleted' });
+      load();
+    } catch (err) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+    }
+  };
+
+  return (
+    <Card className="dashboard-card">
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2 text-base"><Tags className="h-4 w-4 text-muted-foreground" />Your categories</CardTitle>
+          <CardDescription>
+            Private to {activeWorkspace?.name ?? 'this workspace'}. Tag contacts and companies with them, filter the CRM by them, and send campaigns to them.
+            {!canManage && ' Only the workspace owner or an admin can create or change them.'}
+          </CardDescription>
+        </div>
+        {canManage && categories.length > 0 && (
+          <Button size="sm" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />New category</Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="flex items-center gap-2 py-10 justify-center text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading categories…
+          </div>
+        ) : categories.length === 0 ? (
+          <HubEmptyState
+            icon={Tags}
+            title="No categories yet"
+            description={canManage
+              ? 'Create colour-coded categories like "VIP", "Architects" or "Newsletter" and tag your contacts and companies with them.'
+              : 'Your workspace owner has not created any categories yet.'}
+            action={canManage ? <Button size="sm" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />New category</Button> : undefined}
+          />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead className="hidden md:table-cell">Description</TableHead>
+                <TableHead className="text-right">Contacts</TableHead>
+                <TableHead className="text-right">Companies</TableHead>
+                <TableHead className="w-[1%]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {categories.map((c) => (
+                <TableRow key={c.id} className="cursor-pointer" onClick={() => setMembersOpen(c)}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <CategoryChip name={c.name} color={c.color_hex} />
+                      {!c.is_active && <Lock className="h-3 w-3 text-muted-foreground" />}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    <span className="line-clamp-1">{c.description || '—'}</span>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatNumber(c.contact_count)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatNumber(c.company_count)}</TableCell>
+                  <TableCell>
+                    {canManage && (
+                      <div className="flex justify-end gap-1" role="presentation" onClick={(e) => e.stopPropagation()}>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleDelete(c)} aria-label={`Delete ${c.name}`}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={!!form} onOpenChange={(v) => !v && setForm(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{form?.id ? 'Edit category' : 'New category'}</DialogTitle></DialogHeader>
+          {form && (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Name *</Label>
+                <Input
+                  autoFocus
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleSave(); } }}
+                  placeholder="e.g. VIP customers"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Colour</Label>
+                <CategoryColorPicker value={form.color} onChange={(color) => setForm({ ...form, color })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Description</Label>
+                <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} placeholder="What this category is for" />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                Preview <CategoryChip name={form.name.trim() || 'Category'} color={form.color} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setForm(null)}>Cancel</Button>
+            <Button onClick={() => void handleSave()} disabled={busy || !form?.name.trim()}>
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {form?.id ? 'Save' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {membersOpen && (
+        <CategoryMembersDialog category={membersOpen} onClose={() => { setMembersOpen(null); load(); }} />
+      )}
+    </Card>
+  );
+};
+
+export const CategoriesPanel: React.FC = () => {
+  const { isPlatformOperator } = useWorkspace();
+  return (
+    <div className="space-y-8">
+      <WorkspaceCategoriesSection />
+      {isPlatformOperator && <PlatformCategoriesSection />}
+    </div>
+  );
+};
+
 const MiniStat: React.FC<{
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -515,6 +707,8 @@ const CategoryMembersDialog: React.FC<{
   category: CrmCategorySummary;
   onClose: () => void;
 }> = ({ category, onClose }) => {
+  // A workspace's own list holds only that workspace's contacts and companies.
+  const ws = category.workspace_id;
   const { toast } = useToast();
   const [members, setMembers] = useState<CrmCategoryMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -537,10 +731,14 @@ const CategoryMembersDialog: React.FC<{
     if (!q) return;
     setSearching(true);
     try {
+      const contacts = supabase.from('crm_contacts').select('id, name, email').ilike(CRM_SEARCH_COLUMN, foldedLike(q));
+      const companies = supabase.from('crm_companies').select('id, name, email').ilike(CRM_SEARCH_COLUMN, foldedLike(q));
       const [usersRes, contactsRes, companiesRes] = await Promise.all([
-        supabase.from('user_profiles').select('user_id, full_name, email').or(`email.ilike.%${q}%,full_name.ilike.%${q}%`).limit(10),
-        supabase.from('crm_contacts').select('id, name, email').ilike(CRM_SEARCH_COLUMN, foldedLike(q)).limit(10),
-        supabase.from('crm_companies').select('id, name, email').ilike(CRM_SEARCH_COLUMN, foldedLike(q)).limit(10),
+        ws
+          ? Promise.resolve({ data: [] as unknown[] })
+          : supabase.from('user_profiles').select('user_id, full_name, email').or(`email.ilike.%${q}%,full_name.ilike.%${q}%`).limit(10),
+        (ws ? contacts.eq('workspace_id', ws) : contacts).limit(10),
+        (ws ? companies.eq('workspace_id', ws) : companies).limit(10),
       ]);
       const out: typeof searchResults = [];
       for (const r of (usersRes.data || []) as any[]) {
@@ -589,7 +787,7 @@ const CategoryMembersDialog: React.FC<{
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {category.color_hex && <span className="w-3 h-3 rounded-full" style={{ background: category.color_hex }} />}
+            <CategoryDot color={category.color_hex} className="h-3 w-3" />
             {category.name}
             <Badge variant="outline">{members.length} members</Badge>
           </DialogTitle>
@@ -601,7 +799,7 @@ const CategoryMembersDialog: React.FC<{
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Search users, contacts, companies by name or email"
+              placeholder={ws ? 'Search contacts and companies by name or email' : 'Search users, contacts, companies by name or email'}
             />
             <Button onClick={handleSearch} disabled={searching || !searchQuery.trim()}>
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -630,7 +828,9 @@ const CategoryMembersDialog: React.FC<{
               <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
             ) : members.length === 0 ? (
               <div className="text-sm text-muted-foreground py-4 text-center">
-                No members yet. Search above to add users / contacts / companies, or click "Resync auto" on the categories page if this is a synced category.
+                {ws
+                  ? 'Nobody is in this category. Search above, or tag them from a contact or company page.'
+                  : 'No members yet. Search above to add users / contacts / companies, or click "Resync auto" on the categories page if this is a synced category.'}
               </div>
             ) : (
               <div className="space-y-1">
