@@ -42,6 +42,7 @@ interface FormState {
   kind: BankAccountKind;
   currency: string;
   iban: string;
+  bic: string;
   accountRef: string;
   openingBalance: string;
   isActive: boolean;
@@ -50,7 +51,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  name: '', kind: 'bank', currency: 'EUR', iban: '', accountRef: '',
+  name: '', kind: 'bank', currency: 'EUR', iban: '', bic: '', accountRef: '',
   openingBalance: '', isActive: true, showOnInvoice: false, notes: '',
 };
 
@@ -78,6 +79,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       kind: r.kind,
       currency: r.currency,
       iban: r.iban ?? '',
+      bic: r.bic ?? '',
       accountRef: r.account_ref ?? '',
       openingBalance: String(r.opening_balance ?? ''),
       isActive: r.is_active,
@@ -100,6 +102,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         // IBAN only applies to a bank account; a reference (card no. / account ref) to anything
         // but cash. Cash has neither — don't persist stale values if the kind was switched.
         iban: form.kind === 'bank' ? (form.iban.trim() || null) : null,
+        bic: form.kind === 'bank' ? (form.bic.trim().toUpperCase() || null) : null,
         accountRef: form.kind === 'cash' ? null : (form.accountRef.trim() || null),
         openingBalance: form.openingBalance.trim() === '' ? 0 : parseDecimalOr(form.openingBalance, 0),
         notes: form.notes.trim() || null,
@@ -107,7 +110,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       if (editing?.id) {
         await financeService.updateBankAccount(editing.id, {
           name: common.name, kind: common.kind, currency: common.currency,
-          iban: common.iban, account_ref: common.accountRef,
+          iban: common.iban, bic: common.bic, account_ref: common.accountRef,
           opening_balance: common.openingBalance, is_active: form.isActive,
           show_on_invoice: form.showOnInvoice, notes: common.notes,
         });
@@ -245,6 +248,12 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
               <div className="space-y-1">
                 <Label className="text-xs">IBAN</Label>
                 <Input className="h-9 text-sm" value={form.iban} onChange={(e) => patch('iban', normalizeIban(e.target.value))} placeholder="GR00 0000 0000 0000 0000 0000 000" />
+              </div>
+            )}
+            {form.kind === 'bank' && (
+              <div className="space-y-1">
+                <Label className="text-xs">BIC / SWIFT</Label>
+                <Input className="h-9 text-sm uppercase" value={form.bic} onChange={(e) => patch('bic', e.target.value.replace(/\s+/g, ''))} maxLength={11} placeholder="PIRBGRAA" />
               </div>
             )}
             {form.kind !== 'cash' && (

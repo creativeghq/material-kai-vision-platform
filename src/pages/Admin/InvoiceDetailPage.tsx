@@ -35,6 +35,7 @@ import { WholesaleCardNotice } from '@/modules/finance/components/WholesaleCardN
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
+import { PaymentProofsCard } from '@/modules/finance/components/PaymentProofsCard';
 import { formatDate } from '@/utils/datetime';
 
 
@@ -47,6 +48,8 @@ const InvoiceDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [proofForPayment, setProofForPayment] = useState<string | null>(null);
+  const [proofsReload, setProofsReload] = useState(0);
   const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
   const [returnFor, setReturnFor] = useState<{ id: string; number: string | null } | null>(null);
   const [payLink, setPayLink] = useState<string | null>(null);
@@ -499,6 +502,14 @@ const InvoiceDetailPage: React.FC = () => {
         ) : null;
       })()}
 
+      <PaymentProofsCard
+        invoiceId={invoice.id}
+        canManage={canEditProject}
+        outstanding={Number(invoice.amount_due) || 0}
+        reloadKey={proofsReload}
+        onRecordPayment={(proofId) => { setProofForPayment(proofId); setPaymentDialogOpen(true); }}
+      />
+
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle>Payments</CardTitle>
@@ -686,8 +697,16 @@ const InvoiceDetailPage: React.FC = () => {
         defaultAmount={Number(invoice.amount_due) || undefined}
         initialCounterparty={{ companyId: invoice.customer_company_id ?? null, contactId: invoice.customer_contact_id ?? null }}
         open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
-        onSaved={async () => { setPaymentDialogOpen(false); await load(); }}
+        onOpenChange={(v) => { setPaymentDialogOpen(v); if (!v) setProofForPayment(null); }}
+        onSaved={async (result) => {
+          setPaymentDialogOpen(false);
+          if (proofForPayment && result?.paymentId) {
+            await financeService.setPaymentProofStatus(proofForPayment, 'accepted').catch((err: Error) =>
+              toast({ title: 'Payment recorded, receipt not marked', description: err.message, variant: 'destructive' }));
+            setProofsReload((n) => n + 1);
+          }
+          await load();
+        }}
       />
       {/* The platform's one credit-note form, preset to this invoice — it credits per LINE with
           exact VAT, which the bespoke copy that used to live here could not do at all. */}

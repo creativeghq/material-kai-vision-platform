@@ -8217,6 +8217,7 @@ export type Database = {
       }
       finance_bank_accounts: {
         Row: {
+          bic: string | null
           account_ref: string | null
           created_at: string
           currency: string
@@ -8237,6 +8238,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          bic?: string | null
           account_ref?: string | null
           created_at?: string
           currency?: string
@@ -8257,6 +8259,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          bic?: string | null
           account_ref?: string | null
           created_at?: string
           currency?: string
@@ -12712,6 +12715,76 @@ export type Database = {
           },
           {
             foreignKeyName: "invoice_payment_intents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_payment_proofs: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          id: string
+          invoice_id: string
+          mime_type: string | null
+          note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          size_bytes: number | null
+          status: string
+          storage_bucket: string
+          storage_object_path: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          invoice_id: string
+          mime_type?: string | null
+          note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_bucket?: string
+          storage_object_path: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          invoice_id?: string
+          mime_type?: string | null
+          note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_bucket?: string
+          storage_object_path?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_payment_proofs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payment_proofs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ar_aging"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payment_proofs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -34927,6 +35000,7 @@ export type Database = {
       }
       vw_bank_account_balances: {
         Row: {
+          bic: string | null
           account_ref: string | null
           bank_account_id: string | null
           currency: string | null

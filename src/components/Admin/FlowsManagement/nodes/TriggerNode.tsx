@@ -122,6 +122,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'hr.ergani_filing_failed': Landmark,
   order_created: ShoppingCart,
   order_status_changed: Package,
+  payment_proof_submitted: Landmark,
   customer_credit_releasable: Coins,
   order_awaiting_invoice: ReceiptText,
   document_published: BookOpen,

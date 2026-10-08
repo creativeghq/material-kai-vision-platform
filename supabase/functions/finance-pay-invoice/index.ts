@@ -11,12 +11,8 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { dispatchToProvider, resolveWorkspacePaymentProviders } from '../_shared/payments/registry.ts';
 import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
-
-// Sales/Finance — create a Stripe Checkout session for an invoice.
-// Two entry modes:
-//   1. Authenticated admin/finance: body { invoice_id }
-//      Mints (or rotates) a pay_token first if missing; returns checkout URL + pay link.
-//   2.
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { decodeBase64 } from 'jsr:@std/encoding@^1/base64';
 
 /**
  * What the document IS at ΑΑΔΕ, shown on the public page next to what is owed. Read by the
@@ -76,6 +72,40 @@ interface PublicBody {
   provider?: string;
   /** 'card' (hosted redirect) or 'bank_reference' (Viva RF code). Defaults to 'card'. */
   method?: 'card' | 'bank_reference';
+  /** Bank-transfer receipt the payer uploads. The type is sniffed from the bytes, never trusted. */
+  upload_proof?: { file_base64: string; file_name?: string; note?: string };
+}
+
+const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+const PROOF_MAX_PER_INVOICE = 10;
+
+function sniffProof(b: Uint8Array): { mime: string; ext: string } | null {
+  const at = (i: number, sig: number[]) => sig.every((v, k) => b[i + k] === v);
+  if (at(0, [0x25, 0x50, 0x44, 0x46])) return { mime: 'application/pdf', ext: 'pdf' };
+  if (at(0, [0x89, 0x50, 0x4e, 0x47])) return { mime: 'image/png', ext: 'png' };
+  if (at(0, [0xff, 0xd8, 0xff])) return { mime: 'image/jpeg', ext: 'jpg' };
+  if (at(0, [0x52, 0x49, 0x46, 0x46]) && at(8, [0x57, 0x45, 0x42, 0x50])) return { mime: 'image/webp', ext: 'webp' };
+  if (at(4, [0x66, 0x74, 0x79, 0x70])) {
+    const brand = String.fromCharCode(...b.slice(8, 12));
+    if (/^(heic|heix|mif1|msf1)$/.test(brand)) return { mime: 'image/heic', ext: 'heic' };
+  }
+  return null;
+}
+
+/** The seller's accounts a customer may transfer to: active, shown on invoices, in the document's currency. */
+async function bankTransferDetails(supabase: any, workspaceId: string, currency: string) {
+  const [{ data: accts }, { data: fs }] = await Promise.all([
+    supabase.from('finance_bank_accounts')
+      .select('name, iban, bic, currency, is_default, sort_order')
+      .eq('workspace_id', workspaceId).eq('is_active', true).eq('show_on_invoice', true).eq('kind', 'bank')
+      .order('is_default', { ascending: false }).order('sort_order', { ascending: true }),
+    supabase.from('finance_settings').select('business_name').eq('workspace_id', workspaceId).maybeSingle(),
+  ]);
+  const accounts = ((accts ?? []) as any[])
+    .filter((a) => String(a.iban ?? '').trim() && (!a.currency || a.currency === currency))
+    .map((a) => ({ bank_name: a.name ?? null, iban: String(a.iban).replace(/\s+/g, ''), bic: a.bic ?? null }));
+  if (accounts.length === 0) return null;
+  return { beneficiary: (fs as any)?.business_name ?? null, accounts };
 }
 
 /**
@@ -357,6 +387,52 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     const MIN_CHARGE = 0.5;
     const minAmount = Math.max(depositAmount ?? amountDue, MIN_CHARGE);
 
+    if (pb.upload_proof) {
+      const up = pb.upload_proof;
+      if (typeof up.file_base64 !== 'string' || !up.file_base64) return json({ error: 'attach a file' }, 400);
+      if (up.file_base64.length > Math.ceil(PROOF_MAX_BYTES / 3) * 4 + 4) return json({ error: 'the file is larger than 5 MB' }, 413);
+      let bytes: Uint8Array;
+      try { bytes = decodeBase64(up.file_base64); } catch { return json({ error: 'the file could not be read' }, 400); }
+      if (bytes.length === 0) return json({ error: 'the file is empty' }, 400);
+      if (bytes.length > PROOF_MAX_BYTES) return json({ error: 'the file is larger than 5 MB' }, 413);
+      const kind = sniffProof(bytes);
+      if (!kind) return json({ error: 'upload a PDF or an image (JPG, PNG, WEBP, HEIC)' }, 415);
+      if (!(await bankTransferDetails(supabase, row.workspace_id, row.currency))) {
+        return json({ error: 'this seller does not take bank transfers' }, 409);
+      }
+      const { count, error: countErr } = await supabase.from('invoice_payment_proofs')
+        .select('id', { count: 'exact', head: true }).eq('invoice_id', row.invoice_id);
+      if (countErr) return json({ error: 'the upload is unavailable right now — please try again' }, 503);
+      if ((count ?? 0) >= PROOF_MAX_PER_INVOICE) return json({ error: 'too many receipts uploaded for this document — contact the seller' }, 429);
+
+      const path = `payment-proofs/${row.workspace_id}/${row.invoice_id}/${crypto.randomUUID()}.${kind.ext}`;
+      const { error: upErr } = await supabase.storage.from('pdf-documents')
+        .upload(path, bytes, { contentType: kind.mime, upsert: false });
+      if (upErr) return json({ error: 'the upload failed — please try again' }, 502);
+      const note = typeof up.note === 'string' ? up.note.trim().slice(0, 1000) : '';
+      const fileName = typeof up.file_name === 'string' ? up.file_name.trim().slice(0, 200) : null;
+      const { data: proof, error: insErr } = await supabase.from('invoice_payment_proofs').insert({
+        workspace_id: row.workspace_id, invoice_id: row.invoice_id,
+        storage_bucket: 'pdf-documents', storage_object_path: path,
+        file_name: fileName, mime_type: kind.mime, size_bytes: bytes.length, note: note || null,
+      }).select('id, created_at').single();
+      if (insErr || !proof) {
+        await supabase.storage.from('pdf-documents').remove([path]).catch(() => {});
+        if (insErr?.code === 'P0001') return json({ error: 'too many receipts uploaded for this document — contact the seller' }, 429);
+        return json({ error: 'the receipt could not be saved — please try again' }, 500);
+      }
+      try {
+        await emitFlowEventToWorkspaceRoles(row.workspace_id, ['owner', 'admin'], 'payment_proof_submitted', (uid) => ({
+          user_id: uid, type: 'payment_proof_submitted', workspace_id: row.workspace_id,
+          invoice_id: row.invoice_id, proof_id: (proof as any).id,
+          title: 'Bank transfer receipt received',
+          body: `${row.customer_display || 'A customer'} uploaded a transfer receipt for ${row.internal_number}.${note ? ` Note: ${note.slice(0, 200)}` : ''}`,
+          action_url: `/finance/invoices/${row.invoice_id}`,
+        }));
+      } catch { /* the receipt is stored and listed on the invoice; a missed bell is not worth failing it */ }
+      return json({ ok: true, proof: { id: (proof as any).id, created_at: (proof as any).created_at, file_name: fileName, status: 'submitted' } });
+    }
+
     if (pb.info_only) {
       // Delivery trail: this branch IS the /pay/:token page render — the customer
       // has the invoice open in front of them. Recorded here rather than on the
@@ -377,6 +453,14 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       });
       // Stripe is only genuinely available if the platform key exists too.
       const providers = available.filter((p) => p.slug !== 'stripe' || !!stripe);
+      const [bankTransfer, { data: lines }, { data: head }, { data: proofs }] = await Promise.all([
+        bankTransferDetails(supabase, row.workspace_id, row.currency),
+        supabase.from('invoice_items').select('description, sku, quantity, unit, unit_price, discounted_price, line_total')
+          .eq('invoice_id', row.invoice_id).order('added_at', { ascending: true }),
+        supabase.from('invoices').select('created_at, subtotal_net, vat_amount, total_withheld_amount, total_fees_amount, total_stamp_duty_amount, total_other_taxes_amount, total_deductions_amount').eq('id', row.invoice_id).maybeSingle(),
+        supabase.from('invoice_payment_proofs').select('id, created_at, file_name, status')
+          .eq('invoice_id', row.invoice_id).order('created_at', { ascending: false }),
+      ]);
 
       return json({
         ok: true,
@@ -402,6 +486,23 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
           label: p.label,
           methods: p.methods,
         })),
+        bank_transfer: bankTransfer,
+        created_at: (head as any)?.created_at ?? null,
+        subtotal_net: (head as any)?.subtotal_net != null ? Number((head as any).subtotal_net) : null,
+        vat_amount: (head as any)?.vat_amount != null ? Number((head as any).vat_amount) : null,
+        other_totals: {
+          withheld: Number((head as any)?.total_withheld_amount ?? 0),
+          fees: Number((head as any)?.total_fees_amount ?? 0),
+          stamp_duty: Number((head as any)?.total_stamp_duty_amount ?? 0),
+          other_taxes: Number((head as any)?.total_other_taxes_amount ?? 0),
+          deductions: Number((head as any)?.total_deductions_amount ?? 0),
+        },
+        lines: ((lines ?? []) as any[]).map((l) => ({
+          description: l.description, sku: l.sku ?? null, unit: l.unit ?? null,
+          quantity: Number(l.quantity), unit_price: Number(l.unit_price), line_total: Number(l.line_total),
+          discount: l.discounted_price != null ? Number(l.discounted_price) : null,
+        })),
+        proofs: proofs ?? [],
       });
     }
 

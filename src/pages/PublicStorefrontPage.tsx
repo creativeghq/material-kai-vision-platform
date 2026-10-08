@@ -91,8 +91,7 @@ const PublicStorefrontPage: React.FC = () => {
         { name: name.trim(), email: email.trim(), note: note.trim() || undefined },
         turnstileToken,
       );
-      // Hand off to the existing pay page → Stripe Connect checkout.
-      window.location.href = res.pay_url;
+      window.location.href = `${res.pay_url}?placed=1`;
     } catch (e: any) {
       setError(e?.message ?? 'Checkout failed. Please try again.');
       // A Turnstile token is single-use: whatever failed, the old one is now spent, so clear it
@@ -239,7 +238,7 @@ const PublicStorefrontPage: React.FC = () => {
                   {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Checkout · {money(total, currency)} <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
-                <p className="text-[11px] text-muted-foreground">Secure payment via Stripe. You&apos;ll be redirected to complete your purchase.</p>
+                <p className="text-[11px] text-muted-foreground">Next, choose how to pay — by card or by bank transfer, where the seller offers it.</p>
               </>
             )}
           </CardContent>

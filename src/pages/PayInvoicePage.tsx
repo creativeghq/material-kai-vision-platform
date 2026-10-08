@@ -1,16 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy, ShieldCheck, ExternalLink, Download, Ban } from 'lucide-react';
+import {
+  Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy, Check, ShieldCheck,
+  ExternalLink, Download, Ban, UploadCloud, Send, Paperclip, X,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Textarea } from '@/components/core/ui/textarea';
 import { MoneyInput } from '@/components/core/ui/money-input';
-import { financeService, formatMoney, type PublicFiscalRecord } from '@/modules/finance/services/financeService';
+import {
+  financeService, formatMoney, type PublicFiscalRecord, type PublicBankTransfer, type PublicPayLine, type PublicPaymentProof,
+  type PublicPayOtherTotals,
+} from '@/modules/finance/services/financeService';
 import { formatDate } from '@/utils/datetime';
 
-// Public, no-auth payment page reached from email links, "Pay now" buttons and the
-// public quote page. It VIEWS the document first (number, who it's for, what's due,
-// deposit terms) and only creates a Stripe Checkout session once the payer picks an
-// amount — the amount is always re-validated + clamped server-side.
+// Public, no-auth payment page reached from email links, "Pay now" buttons, the storefront and the
+// public quote page. The amount is always re-validated + clamped server-side.
 interface PayInfo {
   invoice_id: string;
   internal_number: string;
@@ -24,6 +30,12 @@ interface PayInfo {
   min_amount: number;
   max_amount: number;
   providers: ProviderOption[];
+  bank_transfer: PublicBankTransfer | null;
+  created_at: string | null;
+  subtotal_net: number | null;
+  vat_amount: number | null;
+  other_totals: PublicPayOtherTotals | null;
+  lines: PublicPayLine[];
 }
 
 interface ProviderOption {
@@ -32,21 +44,23 @@ interface ProviderOption {
   methods: Array<'card' | 'bank_reference'>;
 }
 
-/** One selectable way to pay = a (provider, method) pair. */
+/** One selectable way to pay. `transfer` is a plain IBAN transfer the seller confirms by hand. */
 interface PayOption {
   key: string;
-  provider: string;
-  method: 'card' | 'bank_reference';
+  provider: string | null;
+  method: 'card' | 'bank_reference' | 'transfer';
   label: string;
   hint: string;
 }
 
-function buildOptions(providers: ProviderOption[]): PayOption[] {
+const TRANSFER_KEY = 'transfer';
+const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+
+function buildOptions(providers: ProviderOption[], bankTransfer: PublicBankTransfer | null): PayOption[] {
   const out: PayOption[] = [];
   for (const p of providers) {
     for (const m of p.methods) {
-      // Revolut's hosted page fans out beyond cards (Revolut Pay, Apple/Google Pay,
-      // Pay by Bank) — describing it as just "Card" would under-sell it.
+      // Revolut's hosted page fans out beyond cards, so "Card" would under-sell it.
       const isRevolut = p.slug === 'revolut';
       out.push({
         key: `${p.slug}:${m}`,
@@ -54,7 +68,7 @@ function buildOptions(providers: ProviderOption[]): PayOption[] {
         method: m,
         label: m === 'card'
           ? (isRevolut ? 'Online payment — Revolut' : `Card — ${p.label}`)
-          : `Bank transfer — ${p.label}`,
+          : `Bank payment code — ${p.label}`,
         hint: m === 'card'
           ? (isRevolut
             ? 'Card, Revolut Pay, Apple/Google Pay or Pay by Bank — on Revolut’s secure page.'
@@ -63,8 +77,237 @@ function buildOptions(providers: ProviderOption[]): PayOption[] {
       });
     }
   }
+  if (bankTransfer) {
+    out.push({
+      key: TRANSFER_KEY,
+      provider: null,
+      method: 'transfer',
+      label: 'Direct bank transfer',
+      hint: 'Transfer to our bank account and upload the receipt here.',
+    });
+  }
   return out;
 }
+
+function formatIban(iban: string): string {
+  return iban.replace(/(.{4})/g, '$1 ').trim();
+}
+
+const CopyButton: React.FC<{ value: string; label: string }> = ({ value, label }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7 shrink-0"
+      aria-label={copied ? `${label} copied` : `Copy ${label}`}
+      title={copied ? 'Copied' : `Copy ${label}`}
+      onClick={() => {
+        if (!navigator.clipboard?.writeText) return;
+        navigator.clipboard.writeText(value).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }).catch(() => { /* clipboard refused — the value stays on screen to select by hand */ });
+      }}
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+    </Button>
+  );
+};
+
+const DetailRow: React.FC<{ label: string; value: string; copyValue?: string; mono?: boolean; strong?: boolean }> = ({
+  label, value, copyValue, mono, strong,
+}) => (
+  <div className="flex items-center justify-between gap-3 px-3 py-2">
+    <dt className="text-xs text-muted-foreground shrink-0">{label}</dt>
+    <dd className="flex min-w-0 items-center gap-1">
+      <span className={`text-right text-sm break-all ${mono ? 'font-mono tabular-nums' : ''} ${strong ? 'font-semibold' : ''}`}>{value}</span>
+      {copyValue && <CopyButton value={copyValue} label={label} />}
+    </dd>
+  </div>
+);
+
+const Panel: React.FC<{ title?: React.ReactNode; children: React.ReactNode; className?: string }> = ({ title, children, className }) => (
+  <section className={`rounded-md border border-hairline bg-card ${className ?? ''}`}>
+    {title && (
+      <h2 className="border-b border-hairline bg-surface-sunken px-4 py-2 font-sans text-xs font-semibold">{title}</h2>
+    )}
+    {children}
+  </section>
+);
+
+const proofStatusBadge = (status: PublicPaymentProof['status']) => {
+  if (status === 'accepted') return <Badge variant="success">Confirmed</Badge>;
+  if (status === 'rejected') return <Badge variant="error">Not accepted</Badge>;
+  return <Badge variant="warning">Awaiting confirmation</Badge>;
+};
+
+const BankTransferPanel: React.FC<{
+  bank: PublicBankTransfer;
+  reference: string;
+  amount: number;
+  currency: string;
+}> = ({ bank, reference, amount, currency }) => (
+  <Panel title={<span className="flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-primary" /> Bank transfer details</span>}>
+    <div className="space-y-3 p-4">
+      <p className="text-xs text-muted-foreground">
+        Transfer <strong className="text-foreground">{formatMoney(amount, currency)}</strong> to the account below and
+        put <strong className="text-foreground">{reference}</strong> in the transfer reference, so we can match it to your order.
+      </p>
+      {bank.accounts.map((a) => (
+        <div key={a.iban} className="rounded-md border border-hairline">
+          {a.bank_name && (
+            <div className="border-b border-hairline bg-surface-sunken px-3 py-1.5 text-xs font-semibold">{a.bank_name}</div>
+          )}
+          <dl className="divide-y divide-hairline">
+            {bank.beneficiary && <DetailRow label="Beneficiary" value={bank.beneficiary} copyValue={bank.beneficiary} strong />}
+            <DetailRow label="IBAN" value={formatIban(a.iban)} copyValue={a.iban} mono strong />
+            {a.bic && <DetailRow label="BIC / SWIFT" value={a.bic} copyValue={a.bic} mono />}
+          </dl>
+        </div>
+      ))}
+      <dl className="divide-y divide-hairline rounded-md border border-hairline">
+        <DetailRow label="Reference" value={reference} copyValue={reference} mono strong />
+        <DetailRow label="Amount" value={formatMoney(amount, currency)} copyValue={amount.toFixed(2)} mono strong />
+      </dl>
+    </div>
+  </Panel>
+);
+
+const ProofUploadPanel: React.FC<{
+  token: string;
+  proofs: PublicPaymentProof[];
+  onUploaded: (p: PublicPaymentProof) => void;
+}> = ({ token, proofs, onUploaded }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [note, setNote] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const pick = (f: File | null | undefined) => {
+    setErr(null);
+    setSent(false);
+    if (!f) return;
+    if (f.size > PROOF_MAX_BYTES) { setErr('That file is larger than 5 MB.'); return; }
+    if (!(f.type === 'application/pdf' || f.type.startsWith('image/') || /\.(pdf|jpe?g|png|webp|heic)$/i.test(f.name))) {
+      setErr('Upload a PDF or an image (JPG, PNG, WEBP, HEIC).');
+      return;
+    }
+    setFile(f);
+  };
+
+  const submit = async () => {
+    if (!file) { setErr('Choose the receipt file first.'); return; }
+    setBusy(true);
+    setErr(null);
+    try {
+      const proof = await financeService.uploadPaymentProof(token, file, note.trim());
+      onUploaded(proof);
+      setFile(null);
+      setNote('');
+      setSent(true);
+      if (inputRef.current) inputRef.current.value = '';
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel title={<span className="flex items-center gap-2"><UploadCloud className="h-3.5 w-3.5 text-primary" /> Upload proof of payment</span>}>
+      <div className="space-y-3 p-4">
+        <p className="text-xs text-muted-foreground">
+          Upload the receipt of your bank transfer so we can confirm your payment faster.
+        </p>
+
+        {proofs.length > 0 && (
+          <ul className="divide-y divide-hairline rounded-md border border-hairline text-sm">
+            {proofs.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{p.file_name || 'Receipt'}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{formatDate(p.created_at, { withTime: true })}</span>
+                </span>
+                {proofStatusBadge(p.status)}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {sent && (
+          <div className="flex items-start gap-2 rounded-md border border-hairline bg-surface-sunken p-3 text-sm">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            <span>Thank you — we received your receipt. You will hear from us once the transfer is confirmed.</span>
+          </div>
+        )}
+
+        <div>
+          <span className="mb-1 block text-xs font-medium">Receipt file</span>
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); pick(e.dataTransfer.files?.[0]); }}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${dragging ? 'border-primary bg-primary/[0.06]' : 'border-hairline bg-surface-sunken hover:border-primary/60'}`}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              className="sr-only"
+              accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,.heic"
+              onChange={(e) => pick(e.target.files?.[0])}
+            />
+            {file ? (
+              <span className="flex items-center gap-2 text-sm">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <span className="max-w-[16rem] truncate">{file.name}</span>
+                <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                <button
+                  type="button"
+                  aria-label="Remove file"
+                  className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => { e.preventDefault(); setFile(null); if (inputRef.current) inputRef.current.value = ''; }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ) : (
+              <>
+                <UploadCloud className="h-6 w-6 text-muted-foreground" />
+                <span className="text-sm">Drag the file here or <span className="text-primary underline">browse</span></span>
+                <span className="text-[11px] text-muted-foreground">JPG, PNG, PDF — up to 5 MB</span>
+              </>
+            )}
+          </label>
+        </div>
+
+        <div>
+          <label htmlFor="proof-note" className="mb-1 block text-xs font-medium">Note (optional)</label>
+          <Textarea
+            id="proof-note"
+            value={note}
+            maxLength={1000}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. transfer date, bank branch…"
+            className="min-h-[72px] text-sm"
+          />
+        </div>
+
+        {err && <p className="text-xs text-destructive">{err}</p>}
+
+        <Button onClick={() => void submit()} disabled={busy || !file}>
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+          Send proof of payment
+        </Button>
+      </div>
+    </Panel>
+  );
+};
 
 const FiscalRecordPanel: React.FC<{ fiscal: PublicFiscalRecord }> = ({ fiscal }) => {
   const rows: [string, string | null][] = [
@@ -108,13 +351,70 @@ const FiscalRecordPanel: React.FC<{ fiscal: PublicFiscalRecord }> = ({ fiscal })
   );
 };
 
+// myDATA header totals: withholdings and deductions reduce what is paid, the rest add to it.
+const OTHER_TOTAL_ROWS: Array<[keyof PublicPayOtherTotals, string, 1 | -1]> = [
+  ['withheld', 'Withholding tax', -1],
+  ['deductions', 'Deductions', -1],
+  ['fees', 'Fees', 1],
+  ['stamp_duty', 'Stamp duty', 1],
+  ['other_taxes', 'Other taxes', 1],
+];
+
+const OrderLinesPanel: React.FC<{ info: PayInfo }> = ({ info }) => {
+  if (info.lines.length === 0) return null;
+  return (
+    <Panel title="Order details">
+      <ul className="divide-y divide-hairline">
+        {info.lines.map((l, i) => (
+          <li key={i} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
+            <div className="min-w-0">
+              <p className="font-medium">{l.description}</p>
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {l.sku ? `${l.sku} · ` : ''}{l.quantity}{l.unit ? ` ${l.unit}` : ''} × {formatMoney(l.unit_price, info.currency)}
+                {l.discount ? ` − ${formatMoney(l.discount, info.currency)} discount` : ''}
+              </p>
+            </div>
+            <span className="shrink-0 tabular-nums">{formatMoney(l.line_total, info.currency)}</span>
+          </li>
+        ))}
+      </ul>
+      <dl className="divide-y divide-hairline border-t border-hairline text-sm">
+        {info.subtotal_net != null && (
+          <div className="flex justify-between px-4 py-2">
+            <dt className="text-muted-foreground">Net amount</dt>
+            <dd className="tabular-nums">{formatMoney(info.subtotal_net, info.currency)}</dd>
+          </div>
+        )}
+        {info.vat_amount != null && (
+          <div className="flex justify-between px-4 py-2">
+            <dt className="text-muted-foreground">VAT</dt>
+            <dd className="tabular-nums">{formatMoney(info.vat_amount, info.currency)}</dd>
+          </div>
+        )}
+        {info.other_totals && OTHER_TOTAL_ROWS.filter(([k]) => Math.abs(info.other_totals![k]) > 0.005).map(([k, label, sign]) => (
+          <div key={k} className="flex justify-between px-4 py-2">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="tabular-nums">{sign < 0 ? '− ' : ''}{formatMoney(info.other_totals![k], info.currency)}</dd>
+          </div>
+        ))}
+        <div className="flex justify-between px-4 py-2 font-semibold">
+          <dt>Total</dt>
+          <dd className="tabular-nums">{formatMoney(info.total, info.currency)}</dd>
+        </div>
+      </dl>
+    </Panel>
+  );
+};
+
 const PayInvoicePage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [search] = useSearchParams();
   const status = search.get('status'); // 'success' | 'cancelled' (redirect-back from the provider)
+  const justPlaced = search.get('placed') === '1';
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<PayInfo | null>(null);
+  const [proofs, setProofs] = useState<PublicPaymentProof[]>([]);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [fiscal, setFiscal] = useState<PublicFiscalRecord | null>(null);
   const [closed, setClosed] = useState<{ status: string; number: string } | null>(null);
@@ -136,14 +436,11 @@ const PayInvoicePage: React.FC = () => {
   const [choice, setChoice] = useState<'deposit' | 'full' | 'custom'>('full');
   const [custom, setCustom] = useState<number | null>(null);
   const [option, setOption] = useState<string | null>(null);
-  // Set when the buyer chose a bank-reference method: nothing to redirect to, we just
-  // show them the code to quote in their banking app.
   const [codeCopied, setCodeCopied] = useState(false);
   const [bankRef, setBankRef] = useState<{ rf_code: string; amount: number; currency: string } | null>(null);
 
-  // Load the document + payable options. No session, no side effects.
-  // Also runs for status=return (a provider whose redirect fires on EVERY outcome —
-  // Revolut): the server-resolved state decides what the buyer is told.
+  // Load the document + payable options. No session, no side effects. Also runs for
+  // status=return (Revolut redirects on EVERY outcome): the server state decides what we say.
   useEffect(() => {
     if (!token || (status && status !== 'return' && status !== 'success')) { setLoading(false); return; }
     void (async () => {
@@ -166,14 +463,20 @@ const PayInvoicePage: React.FC = () => {
           min_amount: Number(res.min_amount ?? 0),
           max_amount: Number(res.max_amount ?? 0),
           providers: (res.providers ?? []) as ProviderOption[],
+          bank_transfer: res.bank_transfer ?? null,
+          created_at: res.created_at ?? null,
+          subtotal_net: res.subtotal_net ?? null,
+          vat_amount: res.vat_amount ?? null,
+          other_totals: res.other_totals ?? null,
+          lines: res.lines ?? [],
         };
         setInfo(next);
+        setProofs(res.proofs ?? []);
         setChoice(next.deposit_amount != null ? 'deposit' : 'full');
         setCustom(next.deposit_amount ?? next.amount_due);
-        // Preselect the first available way to pay, so a single-option seller behaves
-        // exactly as before (one click → straight to checkout, no extra chooser step).
-        const opts = buildOptions(next.providers);
-        setOption(opts[0]?.key ?? null);
+        // A customer who already sent a receipt comes back to it, not to a card form.
+        const opts = buildOptions(next.providers, next.bank_transfer);
+        setOption((res.proofs?.length && next.bank_transfer) ? TRANSFER_KEY : (opts[0]?.key ?? null));
       } catch (err: any) {
         setError(err?.message ?? 'Failed to resolve payment link');
       } finally {
@@ -201,27 +504,25 @@ const PayInvoicePage: React.FC = () => {
       setError(`That's more than the ${formatMoney(info.amount_due, info.currency)} outstanding.`);
       return;
     }
-    const picked = buildOptions(info.providers).find((o) => o.key === option);
+    const picked = buildOptions(info.providers, info.bank_transfer).find((o) => o.key === option);
+    if (!picked || picked.method === 'transfer') return;
     try {
       setBusy(true);
       setError(null);
       const res = await financeService.resolvePayToken(token, {
         amount,
-        provider: picked?.provider,
-        method: picked?.method,
+        provider: picked.provider ?? undefined,
+        method: picked.method,
         successUrl: `${window.location.origin}/pay/${token}?status=success`,
         cancelUrl: `${window.location.origin}/pay/${token}?status=cancelled`,
       });
       if (res.error) { setError(res.error); return; }
-      // Bank reference: no redirect — the buyer pays from their own banking app and
-      // settlement reaches us later by webhook.
       if (res.payment_kind === 'bank_reference' && res.rf_code) {
         setBankRef({ rf_code: res.rf_code, amount, currency: info.currency });
         return;
       }
       if (res.checkout_url) {
-        // Keep the button disabled through the navigation - a slow redirect must not
-        // let an impatient double-click mint a second checkout session.
+        // Keep the button disabled through the navigation, so a double-click cannot mint a second session.
         window.location.href = res.checkout_url;
         return;
       }
@@ -241,8 +542,7 @@ const PayInvoicePage: React.FC = () => {
     </div>
   );
 
-  // Provider return (status=success from Stripe/Viva, status=return from Revolut):
-  // ONLY the server-verified state decides what we claim - a URL param is not a receipt.
+  // Provider return: ONLY the server-verified state decides what we claim — a URL param is not a receipt.
   if ((status === 'return' || status === 'success') && !loading) {
     if (alreadyPaid) {
       return shell(
@@ -300,8 +600,6 @@ const PayInvoicePage: React.FC = () => {
     );
   }
 
-  // Bank-reference result: the customer now goes to their own banking app. There is no
-  // redirect and no "success" leg — the payment lands asynchronously.
   if (bankRef) {
     return shell(
       <div>
@@ -376,152 +674,167 @@ const PayInvoicePage: React.FC = () => {
     );
   }
 
-  if (!info) return shell(null);
+  if (!info || !token) return shell(null);
 
   const partPaid = info.total > 0 && info.amount_due < info.total - 0.005;
   const canDeposit = info.deposit_amount != null;
-  const payOptions = buildOptions(info.providers);
+  const payOptions = buildOptions(info.providers, info.bank_transfer);
   const selected = payOptions.find((o) => o.key === option) ?? payOptions[0];
+  const isTransfer = selected?.method === 'transfer';
+  const docLabel = info.is_pre_invoice ? 'Order' : 'Invoice';
+  const radioClass = (on: boolean) =>
+    `rounded-md border px-3 py-2 text-sm text-left transition-colors ${on ? 'border-primary bg-primary/[0.08] font-medium' : 'border-hairline hover:bg-surface-sunken'}`;
 
-  return shell(
-    <div className="space-y-5">
-      <div className="flex items-start gap-3">
-        <FileText className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold leading-tight">
-            {info.is_pre_invoice ? 'Pre-invoice' : 'Invoice'} {info.internal_number}
-          </h1>
-          {info.customer_display && (
-            <p className="text-xs text-muted-foreground">For {info.customer_display}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border/60 divide-y divide-border/60 text-sm">
-        <div className="flex justify-between px-3 py-2">
-          <span className="text-muted-foreground">Document total</span>
-          <span className="tabular-nums">{formatMoney(info.total, info.currency)}</span>
-        </div>
-        {partPaid && (
-          <div className="flex justify-between px-3 py-2">
-            <span className="text-muted-foreground">Already paid</span>
-            <span className="tabular-nums">− {formatMoney(info.total - info.amount_due, info.currency)}</span>
+  return (
+    <div className="min-h-screen bg-background px-4 py-8">
+      <div className="mx-auto w-full max-w-xl space-y-4">
+        <Panel>
+          <div className="px-6 py-6 text-center">
+            {justPlaced ? (
+              <>
+                <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
+                <p className="mt-3 text-sm text-muted-foreground">Thank you — we have received your order.</p>
+              </>
+            ) : (
+              <FileText className="mx-auto h-8 w-8 text-primary" />
+            )}
+            <p className="mt-4 text-[11px] font-semibold text-muted-foreground">{docLabel} number</p>
+            <h1 className="font-sans text-2xl font-semibold tabular-nums">{info.internal_number}</h1>
           </div>
-        )}
-        <div className="flex justify-between px-3 py-2 font-semibold">
-          <span>Outstanding</span>
-          <span className="tabular-nums">{formatMoney(info.amount_due, info.currency)}</span>
-        </div>
-      </div>
+          <dl className="grid grid-cols-2 border-t border-hairline text-sm">
+            <div className="border-b border-r border-hairline px-4 py-3">
+              <dt className="text-[11px] font-semibold text-muted-foreground">Date</dt>
+              <dd className="mt-0.5 font-medium">{info.created_at ? formatDate(info.created_at) : '—'}</dd>
+            </div>
+            <div className="border-b border-hairline px-4 py-3">
+              <dt className="text-[11px] font-semibold text-muted-foreground">Customer</dt>
+              <dd className="mt-0.5 truncate font-medium">{info.customer_display || '—'}</dd>
+            </div>
+            <div className="border-r border-hairline px-4 py-3">
+              <dt className="text-[11px] font-semibold text-muted-foreground">Total</dt>
+              <dd className="mt-0.5 font-medium tabular-nums">{formatMoney(info.total, info.currency)}</dd>
+            </div>
+            <div className="px-4 py-3">
+              <dt className="text-[11px] font-semibold text-muted-foreground">{partPaid ? 'Outstanding' : 'To pay'}</dt>
+              <dd className="mt-0.5 font-semibold tabular-nums">{formatMoney(info.amount_due, info.currency)}</dd>
+            </div>
+          </dl>
+        </Panel>
 
-      {fiscal && <FiscalRecordPanel fiscal={fiscal} />}
-      <div>{downloadButton}</div>
+        <Panel title="Payment">
+          <div className="space-y-4 p-4">
+            <div className="space-y-2">
+              <span id="pay-amount-label" className="text-xs font-medium">How much would you like to pay?</span>
+              <div className="grid gap-2" role="radiogroup" aria-labelledby="pay-amount-label">
+                {canDeposit && (
+                  <button type="button" role="radio" aria-checked={choice === 'deposit'} onClick={() => setChoice('deposit')}
+                    className={`flex items-center justify-between ${radioClass(choice === 'deposit')}`}>
+                    <span>Deposit {info.deposit_pct != null && <span className="text-muted-foreground">({info.deposit_pct}%)</span>}</span>
+                    <span className="tabular-nums font-medium">{formatMoney(info.deposit_amount!, info.currency)}</span>
+                  </button>
+                )}
+                <button type="button" role="radio" aria-checked={choice === 'full'} onClick={() => setChoice('full')}
+                  className={`flex items-center justify-between ${radioClass(choice === 'full')}`}>
+                  <span>Pay in full</span>
+                  <span className="tabular-nums font-medium">{formatMoney(info.amount_due, info.currency)}</span>
+                </button>
+                <div
+                  role="radio"
+                  aria-checked={choice === 'custom'}
+                  tabIndex={0}
+                  onClick={() => setChoice('custom')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setChoice('custom'); } }}
+                  className={`flex cursor-pointer items-center justify-between ${radioClass(choice === 'custom')}`}
+                >
+                  <span>Another amount</span>
+                  {choice === 'custom' && (
+                    <span role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="w-32">
+                      <MoneyInput aria-label="Custom amount" className="h-8 text-right text-sm" value={custom} onValueChange={setCustom} onFocus={() => setChoice('custom')} />
+                    </span>
+                  )}
+                </div>
+              </div>
+              {info.min_amount > 0 && info.min_amount < info.amount_due - 0.005 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Minimum payable now: {formatMoney(info.min_amount, info.currency)}.
+                </p>
+              )}
+            </div>
 
-      <div className="space-y-2">
-        <span id="pay-amount-label" className="text-xs font-medium">How much would you like to pay?</span>
-        <div className="grid gap-2" role="radiogroup" aria-labelledby="pay-amount-label">
-          {canDeposit && (
-            <button
-              type="button"
-              role="radio"
-              aria-checked={choice === 'deposit'}
-              onClick={() => setChoice('deposit')}
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'deposit' ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
-            >
-              <span>Deposit {info.deposit_pct != null && <span className="text-muted-foreground">({info.deposit_pct}%)</span>}</span>
-              <span className="tabular-nums font-medium">{formatMoney(info.deposit_amount!, info.currency)}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={choice === 'full'}
-            onClick={() => setChoice('full')}
-            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'full' ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
-          >
-            <span>Pay in full</span>
-            <span className="tabular-nums font-medium">{formatMoney(info.amount_due, info.currency)}</span>
-          </button>
-          <div
-            role="radio"
-            aria-checked={choice === 'custom'}
-            tabIndex={0}
-            onClick={() => setChoice('custom')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setChoice('custom'); } }}
-            className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'custom' ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
-          >
-            <span>Another amount</span>
-            {choice === 'custom' && (
-              <span role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="w-32">
-                <MoneyInput aria-label="Custom amount" className="h-8 text-right text-sm" value={custom} onValueChange={setCustom} onFocus={() => setChoice('custom')} />
-              </span>
+            {payOptions.length > 1 && (
+              <div className="space-y-2">
+                <span id="pay-method-label" className="text-xs font-medium">How would you like to pay?</span>
+                <div className="grid gap-2" role="radiogroup" aria-labelledby="pay-method-label">
+                  {payOptions.map((o) => (
+                    <button key={o.key} type="button" role="radio" aria-checked={selected?.key === o.key}
+                      onClick={() => { setOption(o.key); setError(null); }} className={radioClass(selected?.key === o.key)}>
+                      <span className="flex items-center gap-2">
+                        {o.method === 'card'
+                          ? <CreditCard className="h-3.5 w-3.5 shrink-0" />
+                          : <Landmark className="h-3.5 w-3.5 shrink-0" />}
+                        {o.label}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{o.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {payOptions.length === 1 && isTransfer && (
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Landmark className="h-4 w-4 text-primary" /> Payment method: direct bank transfer
+              </p>
+            )}
+
+            {error && <p className="text-xs text-destructive">{error}</p>}
+
+            {payOptions.length === 0 ? (
+              <div className="rounded-md border border-hairline bg-surface-sunken p-3 text-center">
+                <p className="text-sm">Online payment isn&apos;t available yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The seller hasn&apos;t finished setting up a way to pay. Please contact them to arrange payment.
+                </p>
+              </div>
+            ) : !isTransfer && (
+              <>
+                <Button className="w-full" onClick={pay} disabled={busy}>
+                  {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    : selected?.method === 'bank_reference'
+                      ? <Landmark className="h-4 w-4 mr-2" />
+                      : <CreditCard className="h-4 w-4 mr-2" />}
+                  {selected?.method === 'bank_reference'
+                    ? `Get a code for ${formatMoney(chosenAmount() ?? 0, info.currency)}`
+                    : `Pay ${formatMoney(chosenAmount() ?? 0, info.currency)}`}
+                </Button>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  {selected?.method === 'bank_reference'
+                    ? `Secure payment via ${selected.label.split('—')[1]?.trim() || 'bank transfer'}. You'll get a code to use in your banking app.`
+                    : `Secure payment via ${selected?.label.split('—')[1]?.trim() || 'our provider'}. You'll be redirected to complete it.`}
+                </p>
+              </>
             )}
           </div>
-        </div>
-        {info.min_amount > 0 && info.min_amount < info.amount_due - 0.005 && (
-          <p className="text-[11px] text-muted-foreground">
-            Minimum payable now: {formatMoney(info.min_amount, info.currency)}.
-          </p>
+        </Panel>
+
+        {isTransfer && info.bank_transfer && (
+          <>
+            <BankTransferPanel
+              bank={info.bank_transfer}
+              reference={info.internal_number}
+              amount={chosenAmount() ?? info.amount_due}
+              currency={info.currency}
+            />
+            <ProofUploadPanel token={token} proofs={proofs} onUploaded={(p) => setProofs((xs) => [p, ...xs])} />
+          </>
         )}
+
+        <OrderLinesPanel info={info} />
+
+        {fiscal && <FiscalRecordPanel fiscal={fiscal} />}
+        <div className="flex justify-center">{downloadButton}</div>
       </div>
-
-      {/* Method chooser. Shown only when the seller genuinely offers more than one way
-          to pay — a single-option seller keeps the original one-click flow. */}
-      {payOptions.length > 1 && (
-        <div className="space-y-2">
-          <span id="pay-method-label" className="text-xs font-medium">How would you like to pay?</span>
-          <div className="grid gap-2" role="radiogroup" aria-labelledby="pay-method-label">
-            {payOptions.map((o) => (
-              <button
-                key={o.key}
-                type="button"
-                role="radio"
-                aria-checked={option === o.key}
-                onClick={() => setOption(o.key)}
-                className={`rounded-lg border px-3 py-2 text-sm text-left transition ${option === o.key ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
-              >
-                <span className="flex items-center gap-2">
-                  {o.method === 'card'
-                    ? <CreditCard className="h-3.5 w-3.5 shrink-0" />
-                    : <Landmark className="h-3.5 w-3.5 shrink-0" />}
-                  {o.label}
-                </span>
-                <span className="block text-[11px] text-muted-foreground mt-0.5">{o.hint}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {error && <p className="text-xs text-destructive">{error}</p>}
-
-      {payOptions.length === 0 ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-center">
-          <p className="text-sm">Online payment isn&apos;t available yet</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            The seller hasn&apos;t finished setting up a payment provider. Please contact
-            them to arrange payment.
-          </p>
-        </div>
-      ) : (
-        <>
-          <Button className="w-full" onClick={pay} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              : selected?.method === 'bank_reference'
-                ? <Landmark className="h-4 w-4 mr-2" />
-                : <CreditCard className="h-4 w-4 mr-2" />}
-            {selected?.method === 'bank_reference'
-              ? `Get a code for ${formatMoney(chosenAmount() ?? 0, info.currency)}`
-              : `Pay ${formatMoney(chosenAmount() ?? 0, info.currency)}`}
-          </Button>
-          <p className="text-[11px] text-muted-foreground text-center">
-            {selected?.method === 'bank_reference'
-              ? `Secure payment via ${selected.label.split('—')[1]?.trim() || 'bank transfer'}. You'll get a code to use in your banking app.`
-              : `Secure payment via ${selected?.label.split('—')[1]?.trim() || 'our provider'}. You'll be redirected to complete it.`}
-          </p>
-        </>
-      )}
-    </div>,
+    </div>
   );
 };
 

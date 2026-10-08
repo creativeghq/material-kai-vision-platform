@@ -6,6 +6,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 import { isValidIban, normalizeIban } from '@/utils/iban';
+import { fileToBase64 } from '@/services/receiptScanService';
 import { round2, extractNet, vatCategory } from '@/modules/finance/lib/vatMath';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { EmailSendError } from '@/modules/email/services/emailService';
@@ -221,6 +222,7 @@ export interface BankAccount {
   kind: BankAccountKind;
   currency: string;
   iban: string | null;
+  bic: string | null;
   account_ref: string | null;
   opening_balance: number;
   is_default: boolean;
@@ -239,6 +241,7 @@ export interface BankAccountBalance {
   kind: BankAccountKind;
   currency: string;
   iban: string | null;
+  bic: string | null;
   account_ref: string | null;
   is_active: boolean;
   is_default: boolean;
@@ -2081,7 +2084,7 @@ const _financeServiceCore = {
 
   async createBankAccount(input: {
     workspaceId: string; name: string; kind?: BankAccountKind; currency?: string;
-    iban?: string | null; accountRef?: string | null; openingBalance?: number;
+    iban?: string | null; bic?: string | null; accountRef?: string | null; openingBalance?: number;
     isDefault?: boolean; notes?: string | null; showOnInvoice?: boolean;
   }): Promise<BankAccount> {
     if (!input.name?.trim()) throw new Error('Account name is required');
@@ -2108,6 +2111,7 @@ const _financeServiceCore = {
       kind: input.kind ?? 'bank',
       currency: input.currency ?? 'EUR',
       iban: normalizeIban(input.iban) || null,
+      bic: input.bic?.trim().toUpperCase() || null,
       account_ref: input.accountRef ?? null,
       opening_balance: input.openingBalance ?? 0,
       is_default: makeDefault,
@@ -2119,7 +2123,7 @@ const _financeServiceCore = {
   },
 
   async updateBankAccount(id: string, patch: Partial<Pick<BankAccount,
-    'name' | 'kind' | 'currency' | 'iban' | 'account_ref' | 'opening_balance' | 'is_active' | 'show_on_invoice' | 'sort_order' | 'notes'>>): Promise<void> {
+    'name' | 'kind' | 'currency' | 'iban' | 'bic' | 'account_ref' | 'opening_balance' | 'is_active' | 'show_on_invoice' | 'sort_order' | 'notes'>>): Promise<void> {
     if (patch.iban !== undefined && !isValidIban(patch.iban)) {
       throw new Error('That IBAN fails its checksum — check it against the bank statement.');
     }
@@ -4274,6 +4278,13 @@ const _financeServiceV2 = {
     already_paid?: boolean;
     closed?: boolean;
     fiscal?: PublicFiscalRecord | null;
+    bank_transfer?: PublicBankTransfer | null;
+    created_at?: string | null;
+    subtotal_net?: number | null;
+    vat_amount?: number | null;
+    other_totals?: PublicPayOtherTotals;
+    lines?: PublicPayLine[];
+    proofs?: PublicPaymentProof[];
     error?: string;
   }> {
     const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
@@ -4289,6 +4300,38 @@ const _financeServiceV2 = {
     });
     if (error) throw await edgeError(error);
     return data as any;
+  },
+
+  async uploadPaymentProof(payToken: string, file: File, note?: string): Promise<PublicPaymentProof> {
+    const fileBase64 = await fileToBase64(file);
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
+      body: { pay_token: payToken, upload_proof: { file_base64: fileBase64, file_name: file.name, note: note || undefined } },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.proof) throw new Error(data?.error ?? 'The receipt could not be uploaded.');
+    return data.proof as PublicPaymentProof;
+  },
+
+  async listInvoicePaymentProofs(invoiceId: string): Promise<InvoicePaymentProof[]> {
+    const { data, error } = await supabase.from('invoice_payment_proofs')
+      .select('id, invoice_id, storage_bucket, storage_object_path, file_name, mime_type, size_bytes, note, status, reviewed_at, created_at')
+      .eq('invoice_id', invoiceId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as InvoicePaymentProof[];
+  },
+
+  async paymentProofUrl(proof: Pick<InvoicePaymentProof, 'storage_bucket' | 'storage_object_path'>): Promise<string> {
+    const { data, error } = await supabase.storage.from(proof.storage_bucket).createSignedUrl(proof.storage_object_path, 60 * 10);
+    if (error || !data?.signedUrl) throw new Error(error?.message ?? 'The receipt could not be opened.');
+    return data.signedUrl;
+  },
+
+  /** The reviewer and time are stamped by the table trigger, never sent from here. */
+  async setPaymentProofStatus(proofId: string, status: InvoicePaymentProof['status']): Promise<void> {
+    const { data, error } = await supabase.from('invoice_payment_proofs')
+      .update({ status }).eq('id', proofId).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('Only a workspace owner or admin can review payment receipts.');
   },
 
   async payTokenPdf(payToken: string): Promise<string> {
@@ -4365,6 +4408,47 @@ export {
 // module (guarded by tests/unit/vatMath.test.ts). Re-exported here so the components that
 // import them from this service keep working unchanged.
 export { round2, extractNet, vatCategory };
+
+export interface PublicBankTransfer {
+  beneficiary: string | null;
+  accounts: Array<{ bank_name: string | null; iban: string; bic: string | null }>;
+}
+
+export interface PublicPayLine {
+  description: string;
+  sku: string | null;
+  unit: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  /** Discount AMOUNT on the line, as stored on invoice_items.discounted_price. */
+  discount: number | null;
+}
+
+export interface PublicPayOtherTotals {
+  withheld: number;
+  fees: number;
+  stamp_duty: number;
+  other_taxes: number;
+  deductions: number;
+}
+
+export interface PublicPaymentProof {
+  id: string;
+  created_at: string;
+  file_name: string | null;
+  status: 'submitted' | 'accepted' | 'rejected';
+}
+
+export interface InvoicePaymentProof extends PublicPaymentProof {
+  invoice_id: string;
+  storage_bucket: string;
+  storage_object_path: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  note: string | null;
+  reviewed_at: string | null;
+}
 
 export interface PublicFiscalRecord {
   legal_number: string | null;
