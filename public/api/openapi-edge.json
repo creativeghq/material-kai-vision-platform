@@ -36401,6 +36401,11 @@
             "nullable": true,
             "description": "Postgres `text`"
           },
+          "bic": {
+            "type": "string",
+            "nullable": true,
+            "description": "BIC/SWIFT shown beside the IBAN on invoices and the public pay page. · Postgres `text`"
+          },
           "account_ref": {
             "type": "string",
             "nullable": true,
@@ -36500,6 +36505,11 @@
             "type": "string",
             "nullable": true,
             "description": "Postgres `text`"
+          },
+          "bic": {
+            "type": "string",
+            "nullable": true,
+            "description": "BIC/SWIFT shown beside the IBAN on invoices and the public pay page. · Postgres `text`"
           },
           "account_ref": {
             "type": "string",

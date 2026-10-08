@@ -58,6 +58,12 @@
           "nullable": true
         },
         {
+          "name": "bic",
+          "type": "text",
+          "nullable": true,
+          "description": "BIC/SWIFT shown beside the IBAN on invoices and the public pay page."
+        },
+        {
           "name": "account_ref",
           "type": "text",
           "nullable": true,
@@ -202,6 +208,12 @@
           "name": "iban",
           "type": "text",
           "nullable": true
+        },
+        {
+          "name": "bic",
+          "type": "text",
+          "nullable": true,
+          "description": "BIC/SWIFT shown beside the IBAN on invoices and the public pay page."
         },
         {
           "name": "account_ref",
