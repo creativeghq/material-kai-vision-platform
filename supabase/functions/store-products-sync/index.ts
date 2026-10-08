@@ -79,13 +79,13 @@ Deno.serve(withApiLogging('store-products-sync', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
-  const body = await req.json().catch(() => ({}));
-  const connectionId = String(body?.connection_id ?? '');
-  if (!connectionId) throw new HttpError(400, 'connection_id is required');
-
   const auth = await authenticate(req, { requireUser: true });
   const userId = getUserId(auth);
   if (!userId) throw new HttpError(401, 'Sign in first');
+
+  const body = await req.json().catch(() => ({}));
+  const connectionId = String(body?.connection_id ?? '');
+  if (!connectionId) throw new HttpError(400, 'connection_id is required');
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false },
