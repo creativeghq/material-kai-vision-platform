@@ -3340,6 +3340,28 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "product-cutouts",
+    "tag": "AI Generation",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Make background-removed product cut-outs for the Product in Place embed",
+    "description": "Product in Place (#474). action=prepare queues one cut-out per product image and works through pending ones at Replicate's pace (one create per ~11 s, ~95 s per call), 1 credit each, debited before the call and refunded on failure; the result must be a PNG with transparency. action=status reports them. The workspace is checked against the caller; products from another workspace are ignored.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "description": "prepare | status"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "product_ids": {
+        "type": "array",
+        "description": "Up to 60 product ids"
+      }
+    }
+  },
+  {
     "name": "product-datasheet-pdf",
     "tag": "Products",
     "methods": [

@@ -416,8 +416,19 @@ Deno.serve(withApiLogging((req) => {
       }
     }
 
-    // No post-filter on only_3d — the query above already restricted the rows, so a page is a
-    // full page.
+    const cutoutByProduct = new Map<string, string>();
+    if (ids.length) {
+      const { data: cutouts } = await supabase.from('product_cutouts')
+        .select('product_id, storage_bucket, storage_object_path')
+        .eq('workspace_id', workspaceId).eq('cache_status', 'ready').in('product_id', ids);
+      for (const c of (cutouts ?? []) as any[]) {
+        if (c.storage_object_path) {
+          cutoutByProduct.set(c.product_id, `${supabaseUrl}/storage/v1/object/public/${c.storage_bucket}/${c.storage_object_path}`);
+        }
+      }
+    }
+
+    // No post-filter on only_3d: the query already restricted the rows, so a page is a full page.
     const products = priced.map((r: any) => ({
       product_id: r.product_id,
       name: r.product.name,
@@ -427,6 +438,7 @@ Deno.serve(withApiLogging((req) => {
       price: grossFromNet(r.list_price, vatRate),
       currency: r.currency ?? 'EUR',
       images: imagesFromMetadata(r.product.metadata),
+      cutout_url: cutoutByProduct.get(r.product_id) ?? null,
       model_formats: formatsByProduct.get(r.product_id) ?? [],
       // Null means UNKNOWN, never a guessed size — a consumer that wants to place this at real
       // scale has to say out loud that it is assuming.

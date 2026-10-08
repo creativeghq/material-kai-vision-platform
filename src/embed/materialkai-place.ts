@@ -27,6 +27,7 @@ interface ShelfProduct {
   price: number | null;
   currency: string;
   image: string;
+  cutout: string | null;
   widthM: number | null;
   heightM: number | null;
 }
@@ -246,7 +247,9 @@ export class MaterialKaiPlace extends HTMLElement {
           name: String(p.name ?? ''),
           price: typeof p.price === 'number' ? p.price : null,
           currency: String(p.currency ?? 'EUR'),
-          image: Array.isArray(p.images) && typeof p.images[0] === 'string' ? p.images[0] : '',
+          image: typeof p.cutout_url === 'string' ? p.cutout_url
+            : Array.isArray(p.images) && typeof p.images[0] === 'string' ? p.images[0] : '',
+          cutout: typeof p.cutout_url === 'string' ? p.cutout_url : null,
           widthM: typeof p.width_m === 'number' ? p.width_m : null,
           heightM: typeof p.height_m === 'number' ? p.height_m : null,
         }))

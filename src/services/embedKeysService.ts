@@ -174,6 +174,27 @@ export async function listEmbedProducts(
     .sort((a, b) => Number(b.storefront_published) - Number(a.storefront_published) || a.name.localeCompare(b.name));
 }
 
+export interface ProductCutout {
+  product_id: string;
+  status: 'pending' | 'ready' | 'failed';
+  url: string | null;
+  error: string | null;
+}
+
+/** `prepare` makes cut-outs (1 credit each, a batch per call); `status` only reads them. */
+export async function productCutouts(
+  workspaceId: string,
+  productIds: string[],
+  action: 'prepare' | 'status',
+): Promise<{ cutouts: ProductCutout[]; no_image: string[] }> {
+  const { data, error } = await supabase.functions.invoke('product-cutouts', {
+    body: { action, workspace_id: workspaceId, product_ids: productIds.slice(0, 60) },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(String(data.error));
+  return { cutouts: (data?.cutouts ?? []) as ProductCutout[], no_image: (data?.no_image ?? []) as string[] };
+}
+
 export async function embedReadiness(workspaceId: string): Promise<EmbedReadiness> {
   const [publishedProducts, blueprints, publishedBlueprints, scenes, wastagePatterns] = await Promise.all([
     countRows(supabase.from('product_prices').select('product_id', { count: 'exact', head: true })

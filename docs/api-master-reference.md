@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (173)
+## 1. Supabase Edge Functions (174)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -62,6 +62,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-region-edit` | JWT | Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora |
 | `generate-virtual-staging` | JWT | AI virtual staging of an empty room via Replicate proplabs/virtual-staging |
 | `generate-vr-world` | JWT | Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble |
+| `product-cutouts` | JWT | Make background-removed product cut-outs for the Product in Place embed |
 
 **Social**
 

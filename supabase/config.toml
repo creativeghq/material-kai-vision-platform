@@ -256,6 +256,9 @@ verify_jwt = false
 [functions.generate-virtual-staging]
 verify_jwt = false
 
+[functions.product-cutouts]
+verify_jwt = false
+
 [functions.job-cleanup-cron]
 verify_jwt = false
 

@@ -97,7 +97,7 @@ export function creditOperationCategory(op: string | null | undefined): CreditSp
   if (is('virtual_staging') || startsWith('interior_')) return 'Interior Design';
   if (startsWith('gemini_')) return 'Image Generation';
   if (startsWith('vr_', 'worldlabs')) return '3D / VR Worlds';
-  if (is('image_segment', 'sam_segment', 'inpaint', 'region_edit')
+  if (is('image_segment', 'sam_segment', 'inpaint', 'region_edit', 'product_cutout')
     || startsWith('pbr', 'generate_pbr')) return 'Image & Material Tools';
   if (startsWith('presentation_sheet')) return 'Presentation Sheets';
   if (startsWith('ai_assessment')) return 'AI Assessment';

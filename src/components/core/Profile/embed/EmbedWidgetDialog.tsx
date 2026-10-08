@@ -17,11 +17,11 @@ import {
 } from '@/components/core/ui/dialog';
 import {
   embedKeysService, normalizeOriginList, listScopeCategories, listScopeBlueprints, embedReadiness,
-  listEmbedProducts, originListAllows,
+  listEmbedProducts, originListAllows, productCutouts,
   MAX_RATE_LIMIT_PER_MINUTE, DEFAULT_GENERATION_DAILY_CAP, MAX_GENERATION_DAILY_CAP,
   DEFAULT_DAILY_USD_CAP, MAX_DAILY_USD_CAP,
   type EmbedKey, type EmbedScopeType, type EmbedScopeOption, type EmbedBlueprintOption,
-  type EmbedProductOption, type EmbedReadiness,
+  type EmbedProductOption, type EmbedReadiness, type ProductCutout,
 } from '@/services/embedKeysService';
 import { storefrontService } from '@/modules/finance/services/storefrontService';
 import { visualizerService, type VisualizerScene } from '@/services/visualizerService';
@@ -76,6 +76,8 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
   const [scenes, setScenes] = useState<VisualizerScene[] | null>(null);
   const [categories, setCategories] = useState<EmbedScopeOption[]>([]);
   const [productTerm, setProductTerm] = useState('');
+  const [cutouts, setCutouts] = useState<ProductCutout[] | null>(null);
+  const [cutting, setCutting] = useState(false);
 
   const creating = !existingKey;
   const servable = useMemo(
@@ -251,6 +253,28 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
   };
 
   const publishedProducts = (products ?? []).filter((p) => p.storefront_published);
+  const cutoutTargets = options.productIds?.length ? options.productIds : publishedProducts.map((p) => p.product_id);
+  const cutoutKey = cutoutTargets.join(',');
+
+  useEffect(() => {
+    if (!open || step !== 'content' || widget !== 'place' || !cutoutKey) { setCutouts(null); return; }
+    let cancelled = false;
+    productCutouts(workspaceId, cutoutKey.split(','), 'status')
+      .then((r) => { if (!cancelled) setCutouts(r.cutouts); })
+      .catch(() => { if (!cancelled) setCutouts(null); });
+    return () => { cancelled = true; };
+  }, [open, step, widget, workspaceId, cutoutKey]);
+
+  const prepareCutouts = async () => {
+    setCutting(true);
+    try {
+      for (let round = 0; round < 12; round++) {
+        const r = await productCutouts(workspaceId, cutoutTargets, 'prepare');
+        setCutouts(r.cutouts);
+        if (!r.cutouts.some((c) => c.status === 'pending')) break;
+      }
+    } catch (e) { fail('Could not make the cut-outs', e); } finally { setCutting(false); }
+  };
 
   const renderProductList = (mode: 'publish' | 'pick-one' | 'pick-optional' | 'pick-many') => (
     <div className="space-y-2">
@@ -471,6 +495,21 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
               on a plain background are cut out automatically; others are shown as they are.
             </p>
             {renderProductList('pick-many')}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-hairline p-3">
+              <div className="space-y-0.5">
+                <Label>Clean cut-outs</Label>
+                <p className="text-xs text-muted-foreground">
+                  {cutoutTargets.length === 0
+                    ? 'Publish or pick products first.'
+                    : `${cutouts?.filter((c) => c.status === 'ready').length ?? 0} of ${cutoutTargets.length} ready`
+                      + (cutouts?.some((c) => c.status === 'failed') ? ` · ${cutouts.filter((c) => c.status === 'failed').length} failed` : '')
+                      + '. AI removes each photo’s background once, so pieces sit cleanly in any room. 1 credit per product.'}
+                </p>
+              </div>
+              <Button size="sm" variant="outline" disabled={cutting || cutoutTargets.length === 0} onClick={() => void prepareCutouts()}>
+                {cutting && <Loader2 className="animate-spin" />}{cutting ? 'Making cut-outs…' : 'Prepare cut-outs'}
+              </Button>
+            </div>
             <div className="space-y-2 rounded-md border border-hairline p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-0.5">

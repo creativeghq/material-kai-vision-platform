@@ -7754,6 +7754,101 @@
         }
       }
     },
+    "/product-cutouts": {
+      "post": {
+        "tags": [
+          "AI Generation"
+        ],
+        "summary": "Make background-removed product cut-outs for the Product in Place embed",
+        "operationId": "post_product_cutouts",
+        "description": "Product in Place (#474). action=prepare queues one cut-out per product image and works through pending ones at Replicate's pace (one create per ~11 s, ~95 s per call), 1 credit each, debited before the call and refunded on failure; the result must be a PNG with transparency. action=status reports them. The workspace is checked against the caller; products from another workspace are ignored.\n\n**Response:** (`application/json`)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "description": "prepare | status"
+                  },
+                  "workspace_id": {
+                    "type": "string"
+                  },
+                  "product_ids": {
+                    "type": "array",
+                    "description": "Up to 60 product ids"
+                  }
+                },
+                "required": [
+                  "action",
+                  "workspace_id",
+                  "product_ids"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/generate-virtual-staging": {
       "post": {
         "tags": [

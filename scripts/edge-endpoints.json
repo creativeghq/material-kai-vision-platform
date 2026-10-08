@@ -3645,6 +3645,55 @@
     }
   },
   {
+    "name": "product-cutouts",
+    "tag": "AI Generation",
+    "summary": "Make background-removed product cut-outs for the Product in Place embed",
+    "description": "Product in Place (#474). action=prepare queues one cut-out per product image and works through pending ones at Replicate's pace (one create per ~11 s, ~95 s per call), 1 credit each, debited before the call and refunded on failure; the result must be a PNG with transparency. action=status reports them. The workspace is checked against the caller; products from another workspace are ignored.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "description": "prepare | status"
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "product_ids": {
+          "type": "array",
+          "description": "Up to 60 product ids"
+        }
+      },
+      "required": [
+        "action",
+        "workspace_id",
+        "product_ids"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "ok": {
+          "type": "boolean"
+        },
+        "cutouts": {
+          "type": "array",
+          "description": "{product_id, status: pending|ready|failed, url, error}"
+        },
+        "no_image": {
+          "type": "array",
+          "description": "Product ids with no picture to cut out"
+        }
+      }
+    }
+  },
+  {
     "name": "generate-virtual-staging",
     "tag": "AI Generation",
     "summary": "AI virtual staging of an empty room via Replicate proplabs/virtual-staging",
