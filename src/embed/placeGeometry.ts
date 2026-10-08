@@ -10,6 +10,9 @@ export interface PlacedItem {
   aspect: number;
   rot: number;
   flip: boolean;
+  realWidthM?: number | null;
+  realHeightM?: number | null;
+  bias?: number;
 }
 
 export function itemHeight(item: PlacedItem): number {
@@ -111,4 +114,59 @@ export function cutoutStudioBackground(
   }
   if (maxX < 0) return whole;
   return { cut: true, box: { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 } };
+}
+
+export interface SpaceReading {
+  horizon_y: number;
+  scale_row_y: number;
+  scale_span_m: number;
+  floor_polygon: Array<{ x: number; y: number }>;
+  spots: Array<{ x: number; y: number }>;
+  confidence: 'high' | 'medium' | 'low';
+  scale_reference: string;
+}
+
+/** Image widths per metre at normalised row `y`; zero at or above the horizon, where nothing stands. */
+export function widthsPerMetre(space: SpaceReading, y: number): number {
+  const d = y - space.horizon_y;
+  const ref = space.scale_row_y - space.horizon_y;
+  if (d <= 0.005 || ref <= 0 || space.scale_span_m <= 0) return 0;
+  return (1 / space.scale_span_m) * (d / ref);
+}
+
+const UNIT_M: Record<string, number> = { mm: 0.001, cm: 0.01, m: 1, in: 0.0254, inch: 0.0254, ft: 0.3048 };
+
+function lengthM(value: unknown, unit: string): number | null {
+  if (typeof value === 'number') return value > 0 ? value * (UNIT_M[unit] ?? 0.01) : null;
+  if (typeof value !== 'string') return null;
+  const m = value.trim().toLowerCase().match(/^(\d+(?:[.,]\d+)?)\s*(mm|cm|m|in|inch|ft)?$/);
+  if (!m) return null;
+  const n = Number(m[1].replace(',', '.'));
+  return n > 0 ? n * (UNIT_M[m[2] ?? unit] ?? 0.01) : null;
+}
+
+/** A standing object's real width and height from its spec, or null. Bare numbers are centimetres. */
+export function objectSizeM(spec: { attributes?: unknown; metadata?: unknown }): { widthM: number | null; heightM: number | null } | null {
+  const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
+  const a = obj(spec.attributes);
+  const md = obj(spec.metadata);
+  const dims = obj(md.dimensions ?? a.dimensions);
+  const unitRaw = [a.dimension_unit, a.unit, md.dimension_unit, md.unit, dims.unit].find((u) => typeof u === 'string' && UNIT_M[(u as string).toLowerCase()]);
+  const unit = typeof unitRaw === 'string' ? unitRaw.toLowerCase() : 'cm';
+  let widthM = lengthM(a.width ?? md.width ?? dims.width, unit);
+  let heightM = lengthM(a.height ?? md.height ?? dims.height, unit);
+  const text = [md.dimensions, a.dimensions].find((v) => typeof v === 'string') as string | undefined;
+  if (text && (widthM === null || heightM === null)) {
+    const nums = [...text.matchAll(/(\d+(?:[.,]\d+)?)/g)].map((m) => Number(m[1].replace(',', '.')));
+    const u = text.toLowerCase().match(/\b(mm|cm|m|in|ft)\b/)?.[1] ?? unit;
+    const f = UNIT_M[u] ?? 0.01;
+    if (nums.length >= 2) {
+      widthM ??= nums[0] * f;
+      heightM ??= nums[nums.length - 1] * f;
+    }
+  }
+  const sane = (n: number | null) => (n !== null && n >= 0.03 && n <= 8 ? Math.round(n * 1000) / 1000 : null);
+  widthM = sane(widthM);
+  heightM = sane(heightM);
+  return widthM === null && heightM === null ? null : { widthM, heightM };
 }

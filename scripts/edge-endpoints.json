@@ -2087,6 +2087,19 @@
         "response": "{ok:true, available:boolean, reason?:string, image_url?:string}"
       },
       {
+        "name": "analyze_space",
+        "summary": "Product in Place (#474): POST one visitor room photo (image_base64, JPEG, under ~1.5 MB) and get back an AI reading of the floor — horizon row, real floor span at one row, the floor outline and free spots — so the widget can stand products on the floor at real size. Only for keys with paid tools enabled; spends against the key's daily USD budget, checked before the model call. The photo is processed in memory and never stored. Refusals answer 200 with available:false and a reason.",
+        "params": [
+          {
+            "name": "image_base64",
+            "type": "string",
+            "required": true,
+            "desc": "The room photo as base64 JPEG (data: prefix optional)."
+          }
+        ],
+        "response": "{ok:true, available:boolean, reason?:string, space?:{floor_visible, horizon_y, scale_row_y, scale_span_m, scale_reference, floor_polygon, spots, confidence}}"
+      },
+      {
         "name": "form_config",
         "summary": "The Turnstile site key a widget needs to draw its bot challenge before the visitor reaches request_quote, the only action that writes.",
         "params": []

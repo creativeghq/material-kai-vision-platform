@@ -157,11 +157,9 @@ export class MaterialKaiVisualizer extends HTMLElement {
 
   connectedCallback() {
     loadBrandFonts();
-    // Moving an element in the DOM disconnects and reconnects it. Leaving `disposed` set made a
-    // widget that was ever detached permanently dead.
+    // A moved element disconnects and reconnects; leaving `disposed` set killed it for good.
     this.disposed = false;
-    // Nothing loads until the widget is actually near the viewport: a merchant's page must not pay
-    // for a room photo the visitor never scrolls to.
+    // Load only near the viewport: the page must not pay for a photo nobody scrolls to.
     this.observer = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) {
         this.observer?.disconnect();
@@ -197,8 +195,7 @@ export class MaterialKaiVisualizer extends HTMLElement {
       const listRes = await fetch(
         `${this.apiBase}/functions/v1/products-3d-api?action=list&limit=24&key=${encodeURIComponent(key)}`,
       );
-      // A 500 parsed as `{products: undefined}` reads as an empty catalogue, and the visitor is
-      // told nothing has been published rather than that the load failed.
+      // A 500 parsed as `{products: undefined}` would read as "nothing published", not a failure.
       if (!listRes.ok) { this.fail('Could not load the catalogue.'); return; }
       const listBody = await listRes.json().catch(() => null);
       const listed = (listBody?.products ?? []) as Array<{ product_id: string; name: string }>;

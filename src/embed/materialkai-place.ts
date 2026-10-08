@@ -4,13 +4,22 @@ import { trackEmbedEvent } from './embedSession';
 import { loadTurnstile } from './turnstileLoader';
 import { brandStyle, loadBrandFonts } from './theme';
 import {
-  cutoutStudioBackground, handlePoint, hitItem, itemHeight, topItemAt, type PlacedItem,
+  cutoutStudioBackground, handlePoint, hitItem, itemHeight, objectSizeM, topItemAt, widthsPerMetre,
+  type PlacedItem, type SpaceReading,
 } from './placeGeometry';
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 const PHOTO_MAX_SIDE = 1600;
 const SPRITE_MAX_SIDE = 900;
 const LAND_MS = 260;
+const REVEAL_MS = 1400;
+const READ_MAX_SIDE = 1280;
+
+const READ_FAILED: Record<string, string> = {
+  no_floor: 'We could not find the floor in this photo. A wider shot that shows the floor works best.',
+  daily_cap: 'Room reading is resting for today. You can still place pieces by hand.',
+  not_configured: 'Room reading is not set up yet. You can still place pieces by hand.',
+};
 
 interface ShelfProduct {
   id: string;
@@ -19,6 +28,7 @@ interface ShelfProduct {
   currency: string;
   image: string;
   widthM: number | null;
+  heightM: number | null;
 }
 
 interface Sprite {
@@ -106,6 +116,23 @@ canvas:active { cursor:grabbing; }
   .tools button { min-width:36px; padding:0 9px; }
   .tag { left:10px; top:10px; font-size:12px; padding:6px 12px; }
 }
+.magic { position:relative; overflow:hidden; display:inline-flex; align-items:center; gap:8px; min-height:42px;
+         padding:8px 18px; border-radius:999px; border:0; cursor:pointer; font-size:14px; font-weight:500;
+         color:var(--mk-accent-ink); background:linear-gradient(110deg, var(--mk-accent) 0%, oklch(86% .06 85) 45%, var(--mk-accent) 90%);
+         background-size:220% 100%; animation:mk-sheen 3.2s ease-in-out infinite; }
+.magic:disabled { animation:none; }
+@keyframes mk-sheen { 0%,100% { background-position:100% 0; } 50% { background-position:0 0; } }
+.consent { font-size:11.5px; color:var(--mk-ink-2); margin:4px 0 0; max-width:340px; }
+.scan { position:absolute; inset:0; border-radius:var(--mk-radius); overflow:hidden; pointer-events:none;
+        background:oklch(18% .025 55 / .18); display:grid; place-items:center; }
+.scan::before { content:''; position:absolute; left:0; right:0; height:28%;
+                background:linear-gradient(180deg, transparent, oklch(86% .06 85 / .55), transparent);
+                animation:mk-scan 1.6s ease-in-out infinite; }
+@keyframes mk-scan { from { top:-30%; } to { top:100%; } }
+.scan span { position:relative; padding:9px 18px; border-radius:999px; background:oklch(18% .025 55 / .78);
+             color:oklch(98.5% .008 85); font-size:13px; letter-spacing:.04em; backdrop-filter:blur(8px); }
+.read { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--mk-ink-2); margin:0; }
+.read b { font-weight:500; color:var(--mk-ink); }
 .state { padding:6px 0 0; }
 .state:empty { display:none; }
 input[type="file"] { display:none; }
@@ -146,6 +173,12 @@ export class MaterialKaiPlace extends HTMLElement {
     offX: number; offY: number; startDist: number; startAngle: number } | null = null;
 
   private siteKey: string | null = null;
+  private placeAi = false;
+  private space: SpaceReading | null = null;
+  private reading: 'idle' | 'reading' | 'done' | 'failed' = 'idle';
+  private readNote = '';
+  private revealAt = 0;
+  private nextSpot = 0;
   private turnstileToken = '';
   private asking = false;
   private sending = false;
@@ -215,12 +248,18 @@ export class MaterialKaiPlace extends HTMLElement {
           currency: String(p.currency ?? 'EUR'),
           image: Array.isArray(p.images) && typeof p.images[0] === 'string' ? p.images[0] : '',
           widthM: typeof p.width_m === 'number' ? p.width_m : null,
+          heightM: typeof p.height_m === 'number' ? p.height_m : null,
         }))
         .filter((p) => p.image);
       fetch(`${this.apiBase}/functions/v1/products-3d-api?action=form_config&key=${encodeURIComponent(key)}`)
         .then((r) => r.json())
-        .then((b) => { this.siteKey = typeof b?.turnstile_site_key === 'string' ? b.turnstile_site_key : null; })
+        .then((b) => {
+          this.siteKey = typeof b?.turnstile_site_key === 'string' ? b.turnstile_site_key : null;
+          this.placeAi = b?.place_ai === true;
+          if (this.photo) this.render();
+        })
         .catch(() => { this.siteKey = null; });
+      void this.loadSizes(key);
     } catch {
       this.status.textContent = 'Could not reach the catalogue.';
       return;
@@ -231,6 +270,23 @@ export class MaterialKaiPlace extends HTMLElement {
     }
     this.status.textContent = '';
     this.render();
+  }
+
+  private async loadSizes(key: string) {
+    const ids = this.products.filter((p) => p.widthM === null && p.heightM === null).map((p) => p.id);
+    if (ids.length === 0) return;
+    try {
+      const res = await fetch(`${this.apiBase}/functions/v1/products-3d-api?action=faces`
+        + `&product_ids=${encodeURIComponent(ids.join(','))}&key=${encodeURIComponent(key)}`);
+      const body = await res.json().catch(() => null);
+      for (const f of (body?.faces ?? []) as Array<{ product_id: string; attributes?: unknown; metadata?: unknown }>) {
+        const size = objectSizeM(f);
+        const p = this.products.find((x) => x.id === f.product_id);
+        if (p && size) { p.widthM = size.widthM; p.heightM = size.heightM; }
+      }
+    } catch {
+      return;
+    }
   }
 
   private fileInput(camera: boolean): HTMLInputElement {
@@ -276,19 +332,45 @@ export class MaterialKaiPlace extends HTMLElement {
     const newPhoto = el('button', 'act', 'New photo');
     newPhoto.type = 'button';
     newPhoto.addEventListener('click', () => (matchMedia('(pointer: coarse)').matches ? camera : upload).click());
-    change.append(camera, upload, newPhoto);
+    change.append(camera, upload);
+    if (this.placeAi && this.reading !== 'done') {
+      const magic = el('button', 'magic', this.reading === 'reading' ? 'Reading your room…' : '\u2728 Place it for me');
+      magic.type = 'button';
+      magic.disabled = this.reading === 'reading';
+      magic.addEventListener('click', () => void this.analyseSpace());
+      change.append(magic);
+    }
+    change.append(newPhoto);
     head.append(t, change);
     parts.push(head);
+    if (this.placeAi && this.reading === 'idle') {
+      parts.push(el('p', 'consent', 'Place it for me sends this photo once for an AI reading of the floor and scale. It is not stored.'));
+    }
+    if (this.reading === 'done' && this.space) {
+      const read = el('p', 'read');
+      read.append('\u2728 ', Object.assign(el('b'), { textContent: 'Room read.' }),
+        ` Pieces now stand on the floor at real size and scale as you move them${this.space.confidence === 'low' ? ' — the scale is a rough guess for this photo' : ''}.`);
+      parts.push(read);
+    } else if (this.reading === 'failed' && this.readNote) {
+      parts.push(el('p', 'read', this.readNote));
+    }
 
     const stage = el('div', 'stage');
     stage.append(this.canvas);
+    if (this.reading === 'reading') {
+      const scan = el('div', 'scan');
+      scan.append(el('span', undefined, 'Reading your room…'));
+      stage.append(scan);
+    }
     const sel = this.selected;
     const selProduct = this.productOf(sel);
     if (sel && selProduct) {
       const tag = el('div', 'tag');
       tag.append(el('b', undefined, selProduct.name));
       const price = formatMoney(selProduct.price, selProduct.currency, { fallback: '' });
-      const size = selProduct.widthM ? `${Math.round(selProduct.widthM * 100)} cm wide` : '';
+      const size = selProduct.widthM
+        ? `${Math.round(selProduct.widthM * 100)} cm wide${this.space && sel.realWidthM ? ' · true to scale' : ''}`
+        : '';
       const meta = [price, size].filter(Boolean).join(' · ');
       if (meta) tag.append(el('i', undefined, meta));
       stage.append(tag, this.toolbar(sel));
@@ -411,8 +493,8 @@ export class MaterialKaiPlace extends HTMLElement {
       bar.append(b);
     };
     const sep = () => bar.append(el('span', 'sep'));
-    btn('−', 'Smaller', () => this.adjust((i) => { i.w = Math.max(24, i.w * 0.9); }));
-    btn('+', 'Bigger', () => this.adjust((i) => { i.w *= 1.1; }));
+    btn('−', 'Smaller', () => this.adjust((i) => { i.w = Math.max(24, i.w * 0.9); this.rebias(i); }));
+    btn('+', 'Bigger', () => this.adjust((i) => { i.w *= 1.1; this.rebias(i); }));
     sep();
     btn('↺', 'Rotate left', () => this.adjust((i) => { i.rot -= Math.PI / 24; }));
     btn('↻', 'Rotate right', () => this.adjust((i) => { i.rot += Math.PI / 24; }));
@@ -448,6 +530,10 @@ export class MaterialKaiPlace extends HTMLElement {
       this.photo = c;
       this.canvas.width = c.width;
       this.canvas.height = c.height;
+      this.space = null;
+      this.reading = 'idle';
+      this.readNote = '';
+      this.nextSpot = 0;
       this.status.textContent = '';
       this.render();
     } catch {
@@ -507,13 +593,89 @@ export class MaterialKaiPlace extends HTMLElement {
       uid: this.nextUid++, productId: product.id, cx: this.photo.width / 2 + offset,
       cy: Math.min(this.photo.height * 0.62, this.photo.height - h / 2 - this.photo.height * 0.04),
       w, aspect: sprite.aspect, rot: 0, flip: false,
+      realWidthM: product.widthM, realHeightM: product.heightM, bias: 1,
     };
+    const spot = this.space?.spots.length ? this.space.spots[this.nextSpot++ % this.space.spots.length] : null;
+    if (spot) {
+      item.cx = spot.x * this.photo.width;
+      this.standOn(item, spot.y * this.photo.height);
+    }
     this.items.push(item);
     this.selectedUid = item.uid;
     this.status.textContent = sprite.cut ? '' : `${product.name} has a photo background we could not remove, so it is shown as it is.`;
     this.render();
     this.animateLanding(item.uid);
     this.report('embed_place_product');
+  }
+
+  private realWidthPx(item: PlacedItem, footY: number): number | null {
+    if (!this.space || !this.photo) return null;
+    const pxPerM = widthsPerMetre(this.space, footY / this.photo.height) * this.photo.width;
+    if (pxPerM <= 0) return null;
+    if (item.realWidthM) return item.realWidthM * pxPerM;
+    if (item.realHeightM) return item.realHeightM * pxPerM * item.aspect;
+    return null;
+  }
+
+  /** Stand the item with its base on `footY`, resized to its real size there when that is known. */
+  private standOn(item: PlacedItem, footY: number) {
+    const minFoot = this.space && this.photo ? (this.space.horizon_y + 0.03) * this.photo.height : 0;
+    const foot = Math.max(footY, minFoot);
+    const real = this.realWidthPx(item, foot);
+    if (real) item.w = Math.max(16, real * (item.bias ?? 1));
+    item.cy = foot - itemHeight(item) / 2;
+  }
+
+  private rebias(item: PlacedItem) {
+    const real = this.realWidthPx(item, item.cy + itemHeight(item) / 2);
+    if (real) item.bias = item.w / real;
+  }
+
+  private async analyseSpace() {
+    const key = this.apiKey;
+    if (!key || !this.photo || this.reading === 'reading') return;
+    this.reading = 'reading';
+    this.render();
+    const scale = Math.min(1, READ_MAX_SIDE / Math.max(this.photo.width, this.photo.height));
+    const c = el('canvas');
+    c.width = Math.round(this.photo.width * scale);
+    c.height = Math.round(this.photo.height * scale);
+    c.getContext('2d')?.drawImage(this.photo, 0, 0, c.width, c.height);
+    const image = c.toDataURL('image/jpeg', 0.82).replace(/^data:image\/jpeg;base64,/, '');
+    try {
+      const res = await fetch(`${this.apiBase}/functions/v1/products-3d-api?action=analyze_space&key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: image }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.available || !body.space) {
+        this.reading = 'failed';
+        this.readNote = READ_FAILED[String(body?.reason)] ?? 'Room reading is not available right now. You can still place pieces by hand.';
+        this.render();
+        return;
+      }
+      this.space = body.space as SpaceReading;
+      this.reading = 'done';
+      this.revealAt = performance.now();
+      for (const item of this.items) this.standOn(item, item.cy + itemHeight(item) / 2);
+      this.render();
+      this.animateReveal();
+      if (this.items.length === 0 && this.products[0]) void this.place(this.products[0]);
+      this.report('embed_place_ai');
+    } catch {
+      this.reading = 'failed';
+      this.readNote = 'Room reading is not available right now. You can still place pieces by hand.';
+      this.render();
+    }
+  }
+
+  private animateReveal() {
+    const tick = (now: number) => {
+      this.paint(true);
+      if (now - this.revealAt < REVEAL_MS) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   private animateLanding(uid: number) {
@@ -542,6 +704,24 @@ export class MaterialKaiPlace extends HTMLElement {
     if (!ctx || !this.photo) return;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.drawImage(this.photo, 0, 0);
+    const revealT = this.space ? (performance.now() - this.revealAt) / REVEAL_MS : 1;
+    if (withChrome && this.space && revealT < 1 && this.space.floor_polygon.length >= 3) {
+      const a = Math.sin(Math.min(1, revealT) * Math.PI);
+      ctx.save();
+      ctx.beginPath();
+      this.space.floor_polygon.forEach((pt, i) => {
+        const x = pt.x * this.canvas.width;
+        const y = pt.y * this.canvas.height;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+      ctx.fillStyle = `rgba(212,190,150,${0.32 * a})`;
+      ctx.fill();
+      ctx.lineWidth = Math.max(2, this.canvas.width / 400);
+      ctx.strokeStyle = `rgba(255,248,232,${0.85 * a})`;
+      ctx.stroke();
+      ctx.restore();
+    }
     for (const item of this.items) {
       const sprite = this.sprites.get(item.productId);
       if (!sprite) continue;
@@ -655,13 +835,16 @@ export class MaterialKaiPlace extends HTMLElement {
       if (g.kind === 'move') {
         item.cx = p.x - g.offX;
         item.cy = p.y - g.offY;
+        if (this.space) this.standOn(item, item.cy + itemHeight(item) / 2);
       } else if (g.kind === 'scale' && g.startDist > 0) {
         item.w = Math.max(24, g.startW * (Math.hypot(p.x - item.cx, p.y - item.cy) / g.startDist));
+        this.rebias(item);
       } else if (g.kind === 'pinch' && this.pointers.size >= 2) {
         const [a, b] = [...this.pointers.values()];
         const d = Math.hypot(b.x - a.x, b.y - a.y);
         if (g.startDist > 0) item.w = Math.max(24, g.startW * (d / g.startDist));
         item.rot = g.startRot + (Math.atan2(b.y - a.y, b.x - a.x) - g.startAngle);
+        this.rebias(item);
       }
       this.paint(true);
     });
@@ -710,7 +893,7 @@ export class MaterialKaiPlace extends HTMLElement {
   }
 
   private report(eventType: string) {
-    const productId = this.selected?.productId ?? this.items[0]?.productId ?? null;
+    const productId = this.selected?.productId ?? this.items[0]?.productId ?? this.products[0]?.id ?? null;
     trackEmbedEvent({ apiBase: this.apiBase, apiKey: this.apiKey, productId, eventType });
   }
 

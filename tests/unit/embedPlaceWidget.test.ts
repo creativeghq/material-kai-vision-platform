@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 import { blankComments } from '../helpers/stripComments';
 import {
-  cutoutStudioBackground, handlePoint, hitItem, topItemAt, type PlacedItem,
+  cutoutStudioBackground, handlePoint, hitItem, objectSizeM, topItemAt, widthsPerMetre, type PlacedItem, type SpaceReading,
 } from '@/embed/placeGeometry';
+import { validatePlaceSpace } from '../../supabase/functions/_shared/place-space';
 import { widgetSnippet, widgetsForKey } from '@/components/core/Profile/embed/embedWidgets';
 
 const ROOT = join(__dirname, '..', '..');
@@ -95,14 +96,87 @@ describe('the widget the merchant pastes', () => {
     expect(read('src/embed/materialkai-product.ts')).toContain("import './materialkai-place'");
   });
 
-  it('never uploads the visitor photo: no request body carries it', () => {
+  it('sends the photo only from the explicit Place it for me action, and never stores it', () => {
     const widget = read('src/embed/materialkai-place.ts');
-    expect(widget).not.toMatch(/toDataURL|FormData/);
-    expect(widget).toMatch(/createObjectURL\(file\)/);
+    expect(widget).not.toMatch(/FormData/);
+    expect(widget.match(/toDataURL\(/g)?.length).toBe(1);
+    const analyse = widget.slice(widget.indexOf('private async analyseSpace('), widget.indexOf('private animateReveal('));
+    expect(analyse).toContain('toDataURL(');
+    expect(widget.match(/this\.analyseSpace\(\)/g)?.length).toBe(1);
+    expect(widget).toMatch(/magic\.addEventListener\('click', \(\) => void this\.analyseSpace\(\)\)/);
+    const api = read('supabase/functions/products-3d-api/index.ts');
+    const action = api.slice(api.indexOf("if (action === 'analyze_space')"), api.indexOf("if (action === 'scenes')"));
+    expect(action).not.toMatch(/storage|\.upload\(|\.insert\(/);
   });
 
   it('the endpoint narrows the listing to the picked set INSIDE the key scope', () => {
     const api = read('supabase/functions/products-3d-api/index.ts');
     expect(api).toMatch(/intersectIdFilters\(\s*await scopeRestriction\(supabase, auth\.ctx\), modelledIds, matchedIds, pickedIds,/);
+  });
+});
+
+describe('standing a piece on the floor at real size', () => {
+  const space: SpaceReading = {
+    horizon_y: 0.4, scale_row_y: 0.9, scale_span_m: 4, floor_polygon: [], spots: [], confidence: 'medium', scale_reference: '',
+  };
+
+  it('at the scale row, the image width is the stated span', () => {
+    expect(widthsPerMetre(space, 0.9)).toBeCloseTo(0.25);
+  });
+
+  it('halfway to the horizon a piece is drawn half as big — perspective, not a constant', () => {
+    expect(widthsPerMetre(space, 0.65)).toBeCloseTo(0.125);
+  });
+
+  it('nothing stands at or above the horizon', () => {
+    expect(widthsPerMetre(space, 0.4)).toBe(0);
+    expect(widthsPerMetre(space, 0.2)).toBe(0);
+  });
+});
+
+describe('a product’s real size from its spec', () => {
+  it('reads width and height, centimetres by default', () => {
+    expect(objectSizeM({ attributes: { width: 82, height: 75 } })).toEqual({ widthM: 0.82, heightM: 0.75 });
+  });
+
+  it('honours a stated unit and a "W x D x H" string', () => {
+    expect(objectSizeM({ metadata: { dimensions: '820 x 900 x 750 mm' } })).toEqual({ widthM: 0.82, heightM: 0.75 });
+    expect(objectSizeM({ attributes: { width: '1.6 m' } })).toEqual({ widthM: 1.6, heightM: null });
+  });
+
+  it('refuses sizes no piece of furniture has, instead of drawing a 60-metre sofa', () => {
+    expect(objectSizeM({ attributes: { width: 6000 } })).toBeNull();
+    expect(objectSizeM({})).toBeNull();
+  });
+});
+
+describe('the room reading Claude returns is checked before anything is placed with it', () => {
+  const good = {
+    floor_visible: true, horizon_y: 0.42, scale_row_y: 0.9, scale_span_m: 3.8, scale_reference: 'door',
+    floor_polygon: [{ x: 0, y: 0.6 }, { x: 1, y: 0.6 }, { x: 1, y: 1 }, { x: 0, y: 1.2 }],
+    spots: [{ x: 0.5, y: 0.8 }, { x: 0.5, y: 0.3 }], confidence: 'high',
+  };
+
+  it('accepts a sane reading, clamping points into the photo and dropping spots above the horizon', () => {
+    const space = validatePlaceSpace(good)!;
+    expect(space.floor_polygon[3]).toEqual({ x: 0, y: 1 });
+    expect(space.spots).toEqual([{ x: 0.5, y: 0.8 }]);
+  });
+
+  it('refuses a photo with no floor, a floor that recedes towards the camera, and an impossible span', () => {
+    expect(validatePlaceSpace({ ...good, floor_visible: false })).toBeNull();
+    expect(validatePlaceSpace({ ...good, horizon_y: 0.92 })).toBeNull();
+    expect(validatePlaceSpace({ ...good, scale_span_m: 120 })).toBeNull();
+    expect(validatePlaceSpace('{"floor_visible":true}')).toBeNull();
+  });
+
+  it('the endpoint constrains the reply with a schema and checks the key, the budget and refusals first', () => {
+    const api = read('supabase/functions/products-3d-api/index.ts');
+    const action = api.slice(api.indexOf("if (action === 'analyze_space')"), api.indexOf("if (action === 'scenes')"));
+    expect(action).toMatch(/format: \{ type: 'json_schema', schema: PLACE_SPACE_SCHEMA \}/);
+    expect(action.indexOf('paid_tools_enabled')).toBeLessThan(action.indexOf('callClaudeMessages'));
+    expect(action.indexOf('embed_spend_has_headroom')).toBeLessThan(action.indexOf('callClaudeMessages'));
+    expect(action).toMatch(/stop_reason === 'refusal'/);
+    expect(action).toMatch(/loadPrompt\(supabase, 'embed', 'embed_place_space'\)/);
   });
 });

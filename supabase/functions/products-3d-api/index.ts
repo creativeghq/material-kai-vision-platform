@@ -20,9 +20,16 @@ import { ANON_BLUEPRINT_ITEM_COLUMNS, foldItemPricingForAnon } from '../_shared/
 // ONE answer to "whose workspace is this", for the two paths a stranger can trigger: the AI
 // impression that spends credits, and the plan a configurator lead becomes (#382 Phase 4).
 import { resolveWorkspacePrincipal } from '../_shared/workspace-principal.ts';
+import { callClaudeMessages } from '../_shared/ai-client.ts';
+import { loadPrompt } from '../_shared/prompt-utils.ts';
+import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { PLACE_SPACE_SCHEMA, validatePlaceSpace } from '../_shared/place-space.ts';
 
 /** Page size ceiling — an embed grid is a shelf, not a catalog dump. */
 const MAX_LIMIT = 60;
+
+const PLACE_SPACE_MODEL = 'claude-opus-5-5';
+const PLACE_IMAGE_MAX_B64 = 2_000_000;
 
 /** Ceiling on the id list used to pre-filter `only_3d` requests. See the comment at its use. */
 const MAX_MODEL_ID_FILTER = 2000;
@@ -42,7 +49,7 @@ const EMBED_EVENT_TYPES = [
   // #447. These three are ALSO in manufacturer_analytics_events_event_type_check; adding one here
   // alone passes this gate and dies on a 23514 the beacon never reports.
   'embed_visualize_surface', 'embed_visualizer_share', 'embed_visualizer_quote',
-  'embed_place_product', 'embed_place_quote',
+  'embed_place_product', 'embed_place_quote', 'embed_place_ai',
 ];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -287,12 +294,8 @@ Deno.serve(withApiLogging((req) => {
   const url = new URL(req.url);
   let params: Record<string, any> = Object.fromEntries(url.searchParams.entries());
   if (req.method === 'POST') {
-    // A BODYLESS POST is legitimate and must not be an error: the analytics beacon sends
-    // `fetch(url, {method:'POST', keepalive:true})` with everything in the query string, and
-    // `req.json()` throws on an empty body. Treating that as malformed 400'd every single event
-    // — and the beacon swallows its own errors by design, so the metric would have sat at zero
-    // forever with nothing anywhere complaining. Only a body that is PRESENT and unparseable is
-    // a client error.
+    // A BODYLESS POST is legitimate (the analytics beacon sends one); only a present, unparseable
+    // body is a client error — 400ing it silently zeroed every embed metric.
     const raw = await req.text();
     if (raw.trim()) {
       try {
@@ -1004,7 +1007,77 @@ Deno.serve(withApiLogging((req) => {
   // ── #447 surface visualizer ──────────────────────────────────────────────────────────────────
   if (action === 'form_config') {
     const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY').catch(() => ({ value: null })))?.value ?? null;
-    return embedJson({ ok: true, turnstile_site_key: siteKey }, 200, cors);
+    const { data: keyRow } = await supabase.from('material_kai_keys')
+      .select('paid_tools_enabled, daily_usd_cap').eq('id', auth.ctx.keyId).maybeSingle();
+    const placeAi = keyRow?.paid_tools_enabled === true && Number(keyRow?.daily_usd_cap ?? 0) > 0;
+    return embedJson({ ok: true, turnstile_site_key: siteKey, place_ai: placeAi }, 200, cors);
+  }
+
+  if (action === 'analyze_space') {
+    if (req.method !== 'POST') return embedJson({ error: 'POST the photo' }, 405, cors);
+    const { data: keyRow } = await supabase.from('material_kai_keys')
+      .select('paid_tools_enabled, daily_usd_cap').eq('id', auth.ctx.keyId).maybeSingle();
+    if (keyRow?.paid_tools_enabled !== true) {
+      return embedJson({ ok: true, available: false, reason: 'not_enabled' }, 200, cors);
+    }
+    const image = typeof params.image_base64 === 'string' ? params.image_base64.replace(/^data:image\/jpeg;base64,/, '') : '';
+    if (!image || image.length > PLACE_IMAGE_MAX_B64 || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) {
+      return embedJson({ error: 'Send one JPEG photo under 1.5 MB' }, 400, cors);
+    }
+
+    const { data: headroom, error: capErr } = await supabase.rpc('embed_spend_has_headroom', {
+      p_key_id: auth.ctx.keyId, p_cap: keyRow.daily_usd_cap ?? 1,
+    });
+    if (capErr || headroom !== true) return embedJson({ ok: true, available: false, reason: 'daily_cap' }, 200, cors);
+
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt(supabase, 'embed', 'embed_place_space');
+    } catch (e) {
+      console.error('[products-3d-api] place prompt unavailable', e instanceof Error ? e.message : e);
+      return embedJson({ ok: true, available: false, reason: 'not_configured' }, 200, cors);
+    }
+
+    try {
+      const response = await callClaudeMessages({
+        model: PLACE_SPACE_MODEL,
+        max_tokens: 6000,
+        system: systemPrompt,
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: PLACE_SPACE_SCHEMA } },
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
+            { type: 'text', text: 'Measure the room in this photo.' },
+          ],
+        }],
+      }, { task: 'embed_place_space', workspaceId, timeoutMs: 90_000 });
+
+      const price = await resolveTokenPrice(supabase, PLACE_SPACE_MODEL);
+      const usd = price
+        ? (Number(response.usage?.input_tokens ?? 0) / 1_000_000) * price.input
+          + (Number(response.usage?.output_tokens ?? 0) / 1_000_000) * price.output
+        : Number(keyRow.daily_usd_cap ?? 1);
+      await supabase.rpc('embed_spend_record', { p_key_id: auth.ctx.keyId, p_usd: usd });
+
+      if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') {
+        return embedJson({ ok: true, available: false, reason: 'analysis_failed' }, 200, cors);
+      }
+      const text = (response.content ?? []).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('');
+      let parsed: unknown = null;
+      try { parsed = JSON.parse(text); } catch { parsed = null; }
+      const space = validatePlaceSpace(parsed);
+      if (!space) return embedJson({ ok: true, available: false, reason: 'no_floor' }, 200, cors);
+      return embedJson({ ok: true, available: true, space }, 200, cors);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('[products-3d-api] analyze_space failed', message);
+      void captureException(e instanceof Error ? e : new Error(message), {
+        tags: { function_name: 'products-3d-api', action: 'analyze_space' },
+        extra: { workspace_id: workspaceId, embed_key_id: auth.ctx.keyId },
+      });
+      return embedJson({ ok: true, available: false, reason: 'analysis_failed' }, 200, cors);
+    }
   }
 
   if (action === 'scenes') {

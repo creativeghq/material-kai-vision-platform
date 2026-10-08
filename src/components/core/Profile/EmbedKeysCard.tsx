@@ -32,6 +32,7 @@ const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_visualizer_quote', 'Quotes from a render'],
   ['embed_place_product', 'Products placed in a photo'],
   ['embed_place_quote', 'Quotes from a placed photo'],
+  ['embed_place_ai', 'Rooms read by AI'],
 ];
 
 const DEFAULT_RATE = 60;

@@ -55,7 +55,7 @@ const emptyForm = () => ({
   name: '', origins: '', allowAny: false, rate: 60,
   scopeType: 'all' as EmbedScopeType, scopeValues: [] as string[],
   allowGeneration: false, dailyCap: DEFAULT_GENERATION_DAILY_CAP,
-  chat: false, usdCap: DEFAULT_DAILY_USD_CAP,
+  chat: false, usdCap: DEFAULT_DAILY_USD_CAP, placeAi: true,
 });
 
 export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspaceId, existingKey, onSaved }) => {
@@ -219,6 +219,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
         key_kind: kind,
         tools_enabled: kind === 'tools',
         chat_enabled: widget === 'assistant' && form.chat,
+        paid_tools_enabled: widget === 'place' && form.placeAi,
         daily_usd_cap: form.usdCap,
         allowed_origins: origins,
         rate_limit_per_minute: form.rate,
@@ -470,6 +471,29 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
               on a plain background are cut out automatically; others are shown as they are.
             </p>
             {renderProductList('pick-many')}
+            <div className="space-y-2 rounded-md border border-hairline p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="embed-place-ai" className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" />Place it for me</Label>
+                  <p className="text-xs text-muted-foreground">
+                    The visitor taps one button and AI reads their room once: where the floor is and how big things are. Pieces then
+                    stand on the floor at their real size and shrink as they are moved back. A few US cents per room (an estimate until we
+                    have measured real rooms), from the daily budget below, triggered by your visitors. The photo is not stored.
+                  </p>
+                </div>
+                <Switch id="embed-place-ai" checked={form.placeAi} onCheckedChange={(v) => setForm((f) => ({ ...f, placeAi: v }))} />
+              </div>
+              {form.placeAi && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="embed-place-usd">Most per day (USD)</Label>
+                  <MoneyInput
+                    id="embed-place-usd"
+                    value={form.usdCap}
+                    onValueChange={(v) => setForm((f) => ({ ...f, usdCap: Math.min(MAX_DAILY_USD_CAP, Math.max(0, v ?? 0)) }))}
+                  />
+                </div>
+              )}
+            </div>
             {!!options.productIds?.length && (
               <p className="text-xs text-muted-foreground">
                 {options.productIds.length} picked.{' '}
