@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (174)
+## 1. Supabase Edge Functions (176)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -335,9 +335,11 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `product-feed` _(GET)_ | token | Serves a workspace's product catalogue as an XML feed for a marketplace importer. |
+| `product-from-url` | JWT | Read a product off its own web page and add it to the catalogue |
 | `store-document-writeback` | JWT | Hands the issued fiscal document back to the store the order came from. |
 | `store-orders-sync` | JWT | Pulls recent orders from a connected store to close the gap a missed webhook leaves. |
 | `store-orders-webhook` | storeWebhookSignature | Receives orders from a connected sales channel (Shopify, WooCommerce, generic). |
+| `store-products-sync` | JWT | Pull a Shopify/WooCommerce catalogue and link each item to a platform product |
 | `store-skroutz-orders` | JWT | Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document. |
 
 **Customs**

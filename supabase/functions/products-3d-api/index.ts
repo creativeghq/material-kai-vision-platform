@@ -348,9 +348,7 @@ Deno.serve(withApiLogging((req) => {
       matchedIds = [...new Set((hits ?? []).map((h: any) => h.id as string))];
     }
 
-    // Resolved to ids and filtered IN the query: filtering the page afterwards returns short
-    // pages a caller cannot tell from the end of the catalogue. Capped, so a very large
-    // catalogue degrades into a long URL rather than a failed request.
+    // Filter IN the query: a post-filtered page comes back short and reads as the end of the catalogue.
     let modelledIds: string[] | null = null;
     if (only3d) {
       const { data: modelled } = await supabase
@@ -428,6 +426,38 @@ Deno.serve(withApiLogging((req) => {
       }
     }
 
+    const buyByProduct = new Map<string, Record<string, string>>();
+    if (ids.length) {
+      const { data: refs } = await supabase.from('product_external_refs')
+        .select('product_id, source, external_product_id, external_variant_id, connection_id, created_at')
+        .eq('workspace_id', workspaceId).in('source', ['shopify', 'woocommerce']).in('product_id', ids)
+        .order('created_at', { ascending: true });
+      const connIds = [...new Set(((refs ?? []) as any[]).map((r) => r.connection_id).filter(Boolean))];
+      const { data: live } = connIds.length
+        ? await supabase.from('store_connections').select('id').in('id', connIds).eq('enabled', true)
+        : { data: [] };
+      const liveIds = new Set(((live ?? []) as any[]).map((c) => c.id));
+      for (const r of (refs ?? []) as any[]) {
+        if (!liveIds.has(r.connection_id)) continue;
+        const buy = buyByProduct.get(r.product_id) ?? {};
+        if (r.source === 'shopify' && r.external_variant_id && !buy.shopify_variant_id) buy.shopify_variant_id = String(r.external_variant_id);
+        if (r.source === 'woocommerce' && r.external_product_id && !buy.woocommerce_product_id) buy.woocommerce_product_id = String(r.external_product_id);
+        buyByProduct.set(r.product_id, buy);
+      }
+      const [{ data: storefront }, { data: ws }] = await Promise.all([
+        supabase.from('workspace_storefront').select('enabled').eq('workspace_id', workspaceId).maybeSingle(),
+        supabase.from('workspaces').select('slug').eq('id', workspaceId).maybeSingle(),
+      ]);
+      if (storefront?.enabled && ws?.slug) {
+        const app = new URL(Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').origin;
+        for (const id of ids) {
+          const buy = buyByProduct.get(id) ?? {};
+          buy.storefront_url = `${app}/store/${encodeURIComponent(ws.slug)}?product=${id}&add=1`;
+          buyByProduct.set(id, buy);
+        }
+      }
+    }
+
     // No post-filter on only_3d: the query already restricted the rows, so a page is a full page.
     const products = priced.map((r: any) => ({
       product_id: r.product_id,
@@ -439,6 +469,7 @@ Deno.serve(withApiLogging((req) => {
       currency: r.currency ?? 'EUR',
       images: imagesFromMetadata(r.product.metadata),
       cutout_url: cutoutByProduct.get(r.product_id) ?? null,
+      buy: buyByProduct.get(r.product_id) ?? {},
       model_formats: formatsByProduct.get(r.product_id) ?? [],
       // Null means UNKNOWN, never a guessed size — a consumer that wants to place this at real
       // scale has to say out loud that it is assuming.
@@ -1020,9 +1051,76 @@ Deno.serve(withApiLogging((req) => {
   if (action === 'form_config') {
     const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY').catch(() => ({ value: null })))?.value ?? null;
     const { data: keyRow } = await supabase.from('material_kai_keys')
-      .select('paid_tools_enabled, daily_usd_cap').eq('id', auth.ctx.keyId).maybeSingle();
+      .select('paid_tools_enabled, daily_usd_cap, allow_generation').eq('id', auth.ctx.keyId).maybeSingle();
     const placeAi = keyRow?.paid_tools_enabled === true && Number(keyRow?.daily_usd_cap ?? 0) > 0;
-    return embedJson({ ok: true, turnstile_site_key: siteKey, place_ai: placeAi }, 200, cors);
+    return embedJson({ ok: true, turnstile_site_key: siteKey, place_ai: placeAi, realism: keyRow?.allow_generation === true }, 200, cors);
+  }
+
+  if (action === 'realism') {
+    if (req.method !== 'POST') return embedJson({ error: 'POST the image' }, 405, cors);
+    const { data: keyRow } = await supabase.from('material_kai_keys')
+      .select('allow_generation, generation_daily_cap').eq('id', auth.ctx.keyId).maybeSingle();
+    if (!keyRow?.allow_generation) return embedJson({ ok: true, available: false, reason: 'not_enabled' }, 200, cors);
+    const image = typeof params.image_base64 === 'string' ? params.image_base64.replace(/^data:image\/jpeg;base64,/, '') : '';
+    if (!image || image.length > PLACE_IMAGE_MAX_B64 || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) {
+      return embedJson({ error: 'Send one JPEG under 1.5 MB' }, 400, cors);
+    }
+    const principal = await resolveWorkspacePrincipal(supabase, workspaceId);
+    if (!principal) return embedJson({ ok: true, available: false, reason: 'no_billable_owner' }, 200, cors);
+    const { data: slot, error: slotErr } = await supabase.rpc('consume_embed_generation_quota', {
+      p_key_id: auth.ctx.keyId, p_cap: (keyRow.generation_daily_cap as number | null) ?? 20,
+    });
+    if (slotErr || slot === false) return embedJson({ ok: true, available: false, reason: 'daily_cap' }, 200, cors);
+
+    let instruction: string;
+    try {
+      instruction = await loadPrompt(supabase, 'embed', 'embed_place_realism');
+    } catch (e) {
+      console.error('[products-3d-api] realism prompt unavailable', e instanceof Error ? e.message : e);
+      return embedJson({ ok: true, available: false, reason: 'not_configured' }, 200, cors);
+    }
+
+    const inputPath = `embed/realism/${crypto.randomUUID()}.jpg`;
+    const bytes = Uint8Array.from(atob(image), (c) => c.charCodeAt(0));
+    const { error: upErr } = await supabase.storage.from('generation-images').upload(inputPath, bytes, { contentType: 'image/jpeg' });
+    if (upErr) return embedJson({ ok: true, available: false, reason: 'generation_failed' }, 200, cors);
+    const publicPrefix = `${supabaseUrl}/storage/v1/object/public/generation-images/`;
+    let outputPath: string | null = null;
+    let jobId: string | null = null;
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/generate-interior-gemini`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+        body: JSON.stringify({
+          mode: 'image-edit',
+          reference_image_url: publicPrefix + inputPath,
+          edit_instruction: instruction,
+          user_id: principal,
+          workspace_id: workspaceId,
+          source: 'embed',
+          embed_key_id: auth.ctx.keyId,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      jobId = typeof body?.job_id === 'string' ? body.job_id : null;
+      const url: string | null = body?.image_url ?? null;
+      if (!res.ok || body?.success === false || !url) {
+        console.error('[products-3d-api] realism failed', res.status, JSON.stringify(body).slice(0, 200));
+        return embedJson({ ok: true, available: false, reason: 'generation_failed' }, 200, cors);
+      }
+      if (!url.startsWith(publicPrefix)) return embedJson({ ok: true, available: false, reason: 'generation_failed' }, 200, cors);
+      outputPath = url.slice(publicPrefix.length).split('?')[0];
+      const out = await fetch(url);
+      if (!out.ok) return embedJson({ ok: true, available: false, reason: 'generation_failed' }, 200, cors);
+      const buf = new Uint8Array(await out.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      const mime = out.headers.get('content-type') ?? 'image/png';
+      return embedJson({ ok: true, available: true, image: `data:${mime};base64,${btoa(bin)}` }, 200, cors);
+    } finally {
+      await supabase.storage.from('generation-images').remove([inputPath, ...(outputPath ? [outputPath] : [])]).catch(() => undefined);
+      if (jobId) await supabase.from('generation_3d').delete().eq('id', jobId);
+    }
   }
 
   if (action === 'analyze_space') {

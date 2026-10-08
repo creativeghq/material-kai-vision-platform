@@ -9,6 +9,7 @@ const SOURCE_TYPE_OPTIONS: FilterOption[] = [
   { value: 'pdf_processing', label: 'PDF processing' },
   { value: 'xml_import', label: 'XML import' },
   { value: 'web_scraping', label: 'Web scraping' },
+  { value: 'store_sync', label: 'Store sync' },
   { value: NONE_VALUE, label: 'Unknown' },
 ];
 

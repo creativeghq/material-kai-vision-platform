@@ -259,6 +259,12 @@ verify_jwt = false
 [functions.product-cutouts]
 verify_jwt = false
 
+[functions.store-products-sync]
+verify_jwt = false
+
+[functions.product-from-url]
+verify_jwt = false
+
 [functions.job-cleanup-cron]
 verify_jwt = false
 

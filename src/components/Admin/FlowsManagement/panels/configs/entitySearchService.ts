@@ -97,6 +97,8 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'generate-social-video', label: 'generate-social-video', sublabel: 'Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable)' },
   { id: 'generate-virtual-staging', label: 'generate-virtual-staging', sublabel: 'AI virtual staging of an empty room via Replicate proplabs/virtual-staging' },
   { id: 'product-cutouts', label: 'product-cutouts', sublabel: 'Background-removed product cut-outs for the Product in Place embed (Replicate, 1 credit each)' },
+  { id: 'store-products-sync', label: 'store-products-sync', sublabel: 'Pull a Shopify/WooCommerce catalogue and link each item to a platform product' },
+  { id: 'product-from-url', label: 'product-from-url', sublabel: 'Read a product off its own web page and add it to the catalogue' },
   { id: 'generate-vr-world', label: 'generate-vr-world', sublabel: 'Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble' },
   { id: 'gmail-api', label: 'gmail-api', sublabel: "A person's own Gmail, live: connect, browse, read, reply, label (per-user OAuth)" },
   { id: 'mail-scheduler', label: 'mail-scheduler', sublabel: 'Cron: wakes snoozed Gmail threads, rings reminders and delivers scheduled sends' },

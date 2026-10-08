@@ -32,6 +32,7 @@ export const PLATFORM_API_BLOCKED: readonly BlockedEndpoint[] = [
       + 'reviews each proposal in Finance → Spend; an agent call is that review skipped.',
   },
   { name: 'xml-import-orchestrator', reason: 'Bulk supplier import — creates and updates products at scale.' },
+  { name: 'store-products-sync', reason: 'Bulk store import — creates up to hundreds of draft products and links in one call.' },
   { name: 'crm-company-embedding-backfill', reason: 'Bulk embedding backfill over every company in the CRM.' },
   {
     name: 'supplier-einvoice-details',

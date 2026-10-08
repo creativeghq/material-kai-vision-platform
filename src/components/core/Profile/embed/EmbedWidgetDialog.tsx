@@ -33,6 +33,7 @@ import {
   type EmbedWidgetId, type WidgetOptions,
 } from './embedWidgets';
 import { EmbedWidgetPreview } from './EmbedWidgetPreview';
+import { PlaceSourcesPanel } from './PlaceSourcesPanel';
 
 type Step = 'widget' | 'content' | 'site' | 'code';
 
@@ -76,6 +77,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
   const [scenes, setScenes] = useState<VisualizerScene[] | null>(null);
   const [categories, setCategories] = useState<EmbedScopeOption[]>([]);
   const [productTerm, setProductTerm] = useState('');
+  const [productsVersion, setProductsVersion] = useState(0);
   const [cutouts, setCutouts] = useState<ProductCutout[] | null>(null);
   const [cutting, setCutting] = useState(false);
 
@@ -134,7 +136,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
         .catch((e) => { if (!cancelled) { setProducts([]); fail('Could not load products', e); } });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [open, step, widget, workspaceId, productTerm, productScope, fail]);
+  }, [open, step, widget, workspaceId, productTerm, productScope, productsVersion, fail]);
 
   const scopedBlueprints = useMemo(() => {
     if (!blueprints) return null;
@@ -489,6 +491,14 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
       case 'place':
         return (
           <div className="space-y-2">
+            <PlaceSourcesPanel
+              workspaceId={workspaceId}
+              onAdded={(id) => {
+                setProductsVersion((v) => v + 1);
+                setOptions((o) => ({ ...o, productIds: [...new Set([...(o.productIds ?? []), id])] }));
+              }}
+              onSynced={() => setProductsVersion((v) => v + 1)}
+            />
             <Label>Products visitors can place</Label>
             <p className="text-xs text-muted-foreground">
               Tick the ones to offer, or tick none to offer every published product with a picture. Products photographed

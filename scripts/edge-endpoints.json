@@ -2087,6 +2087,19 @@
         "response": "{ok:true, available:boolean, reason?:string, image_url?:string}"
       },
       {
+        "name": "realism",
+        "summary": "Product in Place (#474): POST the visitor's composite (image_base64, JPEG) and get back a version with the room's light and shadows matched, as an inline data URL. Needs allow_generation on the key and a slot of its daily generation cap, both checked before the generator runs; the instruction is the DB prompt embed/embed_place_realism; billed to the workspace like an AI impression. The uploaded composite, the generated image and its history row are deleted before the response returns.",
+        "params": [
+          {
+            "name": "image_base64",
+            "type": "string",
+            "required": true,
+            "desc": "The composite as base64 JPEG."
+          }
+        ],
+        "response": "{ok:true, available:boolean, reason?:string, image?:string}"
+      },
+      {
         "name": "analyze_space",
         "summary": "Product in Place (#474): POST one visitor room photo (image_base64, JPEG, under ~1.5 MB) and get back an AI reading of the floor — horizon row, real floor span at one row, the floor outline and free spots — so the widget can stand products on the floor at real size. Only for keys with paid tools enabled; spends against the key's daily USD budget, checked before the model call. The photo is processed in memory and never stored. Refusals answer 200 with available:false and a reason.",
         "params": [
@@ -3640,6 +3653,121 @@
         "job_id": {
           "type": "string",
           "description": "Present when delegated to generate-interior-video-v2 (veo-2)"
+        }
+      }
+    }
+  },
+  {
+    "name": "store-products-sync",
+    "tag": "Commerce",
+    "summary": "Pull a Shopify/WooCommerce catalogue and link each item to a platform product",
+    "description": "Product in Place selling (#474). Reads the connection's products (Shopify products.json up to 250 active; WooCommerce up to 300 published) and runs each through match_external_product. A match only gains a product_external_refs row - its price and details are never overwritten. A new item is created as an unpublished DRAFT with a NET list price (converted at the workspace VAT rate when the store shows prices with tax). The connection's workspace is checked against the caller (404 otherwise).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "connection_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_id"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "ok": {
+          "type": "boolean"
+        },
+        "scanned": {
+          "type": "number"
+        },
+        "created": {
+          "type": "number"
+        },
+        "linked": {
+          "type": "number"
+        },
+        "failed": {
+          "type": "number"
+        },
+        "errors": {
+          "type": "array"
+        }
+      }
+    }
+  },
+  {
+    "name": "product-from-url",
+    "tag": "Commerce",
+    "summary": "Read a product off its own web page and add it to the catalogue",
+    "description": "Product in Place (#474). action=read fetches the page through the SSRF guard and reads schema.org Product JSON-LD first, Open Graph second (no AI fallback); it also reports an existing catalogue product the page matches. action=create takes the confirmed fields: a match is linked instead of duplicated; otherwise a draft product is created with its dimensions (cm), a NET price from the price-with-VAT given, and an optional publish. The workspace is checked against the caller.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "description": "read | create"
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "price_gross": {
+          "type": "number"
+        },
+        "width_cm": {
+          "type": "number"
+        },
+        "height_cm": {
+          "type": "number"
+        },
+        "publish": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "action",
+        "workspace_id"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "ok": {
+          "type": "boolean"
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "product": {
+          "type": "object"
+        },
+        "existing_product_id": {
+          "type": "string"
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "existed": {
+          "type": "boolean"
         }
       }
     }

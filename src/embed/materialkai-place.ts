@@ -1,5 +1,7 @@
 /** `<materialkai-place>` (#474): products on the visitor's own photo, which is composited here and never uploaded. */
 import { formatMoney } from '@/utils/decimal';
+import { compareSurfaceFidelity } from '@/lib/surfaceRenderer/fidelity';
+import { raster, type Raster } from '@/lib/surfaceRenderer/render';
 import { trackEmbedEvent } from './embedSession';
 import { loadTurnstile } from './turnstileLoader';
 import { brandStyle, loadBrandFonts } from './theme';
@@ -28,6 +30,7 @@ interface ShelfProduct {
   currency: string;
   image: string;
   cutout: string | null;
+  buy: { shopify_variant_id?: string; woocommerce_product_id?: string; storefront_url?: string };
   widthM: number | null;
   heightM: number | null;
 }
@@ -136,6 +139,7 @@ canvas:active { cursor:grabbing; }
 .read b { font-weight:500; color:var(--mk-ink); }
 .state { padding:6px 0 0; }
 .state:empty { display:none; }
+.state a { color:var(--mk-ink); font-weight:500; text-underline-offset:3px; margin-left:4px; }
 input[type="file"] { display:none; }
 `);
 
@@ -180,6 +184,10 @@ export class MaterialKaiPlace extends HTMLElement {
   private readNote = '';
   private revealAt = 0;
   private nextSpot = 0;
+  private realismAllowed = false;
+  private realism: { state: 'idle' | 'working' | 'shown' | 'failed'; image: HTMLImageElement | null; after: boolean; note: string } = {
+    state: 'idle', image: null, after: true, note: '',
+  };
   private turnstileToken = '';
   private asking = false;
   private sending = false;
@@ -250,6 +258,7 @@ export class MaterialKaiPlace extends HTMLElement {
           image: typeof p.cutout_url === 'string' ? p.cutout_url
             : Array.isArray(p.images) && typeof p.images[0] === 'string' ? p.images[0] : '',
           cutout: typeof p.cutout_url === 'string' ? p.cutout_url : null,
+          buy: p.buy && typeof p.buy === 'object' ? p.buy as ShelfProduct['buy'] : {},
           widthM: typeof p.width_m === 'number' ? p.width_m : null,
           heightM: typeof p.height_m === 'number' ? p.height_m : null,
         }))
@@ -259,6 +268,7 @@ export class MaterialKaiPlace extends HTMLElement {
         .then((b) => {
           this.siteKey = typeof b?.turnstile_site_key === 'string' ? b.turnstile_site_key : null;
           this.placeAi = b?.place_ai === true;
+          this.realismAllowed = b?.realism === true;
           if (this.photo) this.render();
         })
         .catch(() => { this.siteKey = null; });
@@ -360,14 +370,14 @@ export class MaterialKaiPlace extends HTMLElement {
 
     const stage = el('div', 'stage');
     stage.append(this.canvas);
-    if (this.reading === 'reading') {
+    if (this.reading === 'reading' || this.realism.state === 'working') {
       const scan = el('div', 'scan');
-      scan.append(el('span', undefined, 'Reading your room…'));
+      scan.append(el('span', undefined, this.reading === 'reading' ? 'Reading your room…' : 'Making it realistic…'));
       stage.append(scan);
     }
     const sel = this.selected;
     const selProduct = this.productOf(sel);
-    if (sel && selProduct) {
+    if (sel && selProduct && this.realism.state !== 'shown') {
       const tag = el('div', 'tag');
       tag.append(el('b', undefined, selProduct.name));
       const price = formatMoney(selProduct.price, selProduct.currency, { fallback: '' });
@@ -381,7 +391,7 @@ export class MaterialKaiPlace extends HTMLElement {
     parts.push(stage);
 
     const shelfHead = el('div', 'shelfHead');
-    shelfHead.append(el('p', 'mk-eyebrow', 'Tap a piece to place it'), el('span', undefined, `${this.products.length} pieces`));
+    shelfHead.append(el('p', 'mk-eyebrow', 'Tap a piece to place it'), el('span', undefined, `${this.products.length} ${this.products.length === 1 ? 'piece' : 'pieces'}`));
     parts.push(shelfHead, this.shelf());
 
     const bar = el('div', 'bar');
@@ -402,15 +412,34 @@ export class MaterialKaiPlace extends HTMLElement {
       ask.disabled = this.sent;
       ask.addEventListener('click', () => { this.asking = !this.asking; this.render(); });
       right.append(save, ask);
+      if (this.realism.state === 'shown') {
+        const toggle = el('button', 'act', this.realism.after ? 'Show before' : 'Show after');
+        toggle.type = 'button';
+        toggle.addEventListener('click', () => { this.realism.after = !this.realism.after; this.render(); });
+        const back = el('button', 'act', 'Back to editing');
+        back.type = 'button';
+        back.addEventListener('click', () => { this.realism = { state: 'idle', image: null, after: true, note: '' }; this.render(); });
+        right.append(toggle, back);
+      } else if (this.realismAllowed) {
+        const magic = el('button', 'magic', this.realism.state === 'working' ? 'Making it realistic…' : '\u2728 Make it realistic');
+        magic.type = 'button';
+        magic.disabled = this.realism.state === 'working' || tainted;
+        magic.addEventListener('click', () => void this.makeRealistic());
+        right.append(magic);
+      }
       if (selProduct) {
         const cart = el('button', 'go', 'Add to cart');
         cart.type = 'button';
-        cart.addEventListener('click', () => this.emitAddToCart(selProduct));
+        cart.addEventListener('click', () => void this.emitAddToCart(selProduct));
         right.append(cart);
       }
     }
     bar.append(left, right);
     parts.push(bar);
+    if (this.realismAllowed && this.items.length > 0 && this.realism.state === 'idle') {
+      parts.push(el('p', 'consent', 'Make it realistic sends this picture once to an image AI to match the light and shadows. It is not kept.'));
+    }
+    if (this.realism.note) parts.push(el('p', 'read', this.realism.note));
 
     if (this.asking && !this.sent) parts.push(this.quoteForm());
     if (this.sent) parts.push(el('p', 'ok', 'Thank you — we have your request and the pieces you placed.'));
@@ -587,6 +616,7 @@ export class MaterialKaiPlace extends HTMLElement {
 
   private async place(product: ShelfProduct) {
     if (!this.photo) { this.status.textContent = 'Add a photo of your space first.'; return; }
+    if (this.realism.state === 'shown') this.realism = { state: 'idle', image: null, after: true, note: '' };
     const sprite = await this.spriteFor(product);
     if (!sprite) { this.status.textContent = `The picture of ${product.name} could not be loaded.`; return; }
     const w = Math.min(this.photo.width * 0.32, this.photo.height * 0.5 * sprite.aspect);
@@ -632,6 +662,71 @@ export class MaterialKaiPlace extends HTMLElement {
   private rebias(item: PlacedItem) {
     const real = this.realWidthPx(item, item.cy + itemHeight(item) / 2);
     if (real) item.bias = item.w / real;
+  }
+
+  private rasterOf(source: CanvasImageSource, w: number, h: number): Raster | null {
+    const c = el('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(source, 0, 0, w, h);
+    return raster(w, h, ctx.getImageData(0, 0, w, h).data);
+  }
+
+  private async makeRealistic() {
+    const key = this.apiKey;
+    if (!key || !this.photo || this.realism.state === 'working') return;
+    this.realism = { state: 'working', image: null, after: true, note: '' };
+    this.selectedUid = null;
+    this.render();
+    this.paint(false);
+    const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(this.canvas.width, this.canvas.height));
+    const c = el('canvas');
+    c.width = Math.round(this.canvas.width * scale);
+    c.height = Math.round(this.canvas.height * scale);
+    c.getContext('2d')?.drawImage(this.canvas, 0, 0, c.width, c.height);
+    const ours = this.rasterOf(c, c.width, c.height);
+    const failed = (note: string) => {
+      this.realism = { state: 'idle', image: null, after: true, note };
+      this.render();
+    };
+    try {
+      const res = await fetch(`${this.apiBase}/functions/v1/products-3d-api?action=realism&key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: c.toDataURL('image/jpeg', 0.85).replace(/^data:image\/jpeg;base64,/, '') }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.available || typeof body.image !== 'string') {
+        failed(body?.reason === 'daily_cap'
+          ? 'Realistic renders are resting for today. Your placement is unchanged.'
+          : 'A realistic render is not available right now. Your placement is unchanged.');
+        return;
+      }
+      const img = await loadImage(body.image, false);
+      const theirs = this.rasterOf(img, c.width, c.height);
+      const shifted = !!ours && !!theirs && this.items.some((item) => {
+        const h = itemHeight(item);
+        const x0 = (item.cx - item.w * 0.3) / this.photo!.width;
+        const x1 = (item.cx + item.w * 0.3) / this.photo!.width;
+        const y0 = (item.cy - h * 0.3) / this.photo!.height;
+        const y1 = (item.cy + h * 0.3) / this.photo!.height;
+        const quad = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }] as [
+          { x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+        return compareSurfaceFidelity(ours, theirs, quad).verdict === 'shifted';
+      });
+      this.realism = {
+        state: 'shown', image: img, after: !shifted,
+        note: shifted
+          ? 'The AI changed the colour of a piece, so we are showing your own placement. Use Show after to see its version anyway.'
+          : '\u2728 Light and shadows matched to your room. The pieces kept their real colours.',
+      };
+      this.render();
+      this.report('embed_place_ai');
+    } catch {
+      failed('A realistic render is not available right now. Your placement is unchanged.');
+    }
   }
 
   private async analyseSpace() {
@@ -705,6 +800,11 @@ export class MaterialKaiPlace extends HTMLElement {
   private paint(withChrome: boolean) {
     const ctx = this.canvas.getContext('2d');
     if (!ctx || !this.photo) return;
+    if (this.realism.state === 'shown' && this.realism.image && this.realism.after) {
+      ctx.drawImage(this.realism.image, 0, 0, this.canvas.width, this.canvas.height);
+      return;
+    }
+    if (this.realism.state === 'shown') withChrome = false;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.drawImage(this.photo, 0, 0);
     const revealT = this.space ? (performance.now() - this.revealAt) / REVEAL_MS : 1;
@@ -789,7 +889,7 @@ export class MaterialKaiPlace extends HTMLElement {
   private bindPointer() {
     const c = this.canvas;
     c.addEventListener('pointerdown', (e) => {
-      if (!this.photo) return;
+      if (!this.photo || this.realism.state === 'shown') return;
       const p = this.toCanvas(e);
       this.pointers.set(e.pointerId, p);
       c.setPointerCapture(e.pointerId);
@@ -879,7 +979,7 @@ export class MaterialKaiPlace extends HTMLElement {
     }, 'image/png');
   }
 
-  private emitAddToCart(product: ShelfProduct) {
+  private async emitAddToCart(product: ShelfProduct) {
     const detail = {
       type: 'materialkai:add-to-cart',
       product_id: product.id,
@@ -890,9 +990,53 @@ export class MaterialKaiPlace extends HTMLElement {
       options: {},
       option_value_ids: [],
     };
-    this.dispatchEvent(new CustomEvent('materialkai:add-to-cart', { detail, bubbles: true, composed: true }));
+    const event = new CustomEvent('materialkai:add-to-cart', { detail, bubbles: true, composed: true, cancelable: true });
+    const handledByPage = !this.dispatchEvent(event);
     if (window.parent !== window) window.parent.postMessage(detail, '*');
     this.report('embed_add_to_cart');
+    if (handledByPage) return;
+
+    const w = window as unknown as Record<string, unknown>;
+    try {
+      if (product.buy.shopify_variant_id && w.Shopify) {
+        const res = await fetch('/cart/add.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: [{ id: Number(product.buy.shopify_variant_id), quantity: 1, properties: { _materialkai_product_id: product.id } }] }),
+        });
+        if (!res.ok) throw new Error('cart refused');
+        document.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+        this.cartNote(`${product.name} is in your cart.`, '/cart');
+        return;
+      }
+      if (product.buy.woocommerce_product_id && (w.wc_add_to_cart_params || w.woocommerce_params)) {
+        const form = new URLSearchParams({ product_id: product.buy.woocommerce_product_id, quantity: '1' });
+        const res = await fetch('/?wc-ajax=add_to_cart', { method: 'POST', body: form });
+        if (!res.ok) throw new Error('cart refused');
+        const jq = w.jQuery as ((el: unknown) => { trigger: (e: string) => void }) | undefined;
+        jq?.(document.body).trigger('wc_fragment_refresh');
+        this.cartNote(`${product.name} is in your cart.`, '/cart');
+        return;
+      }
+    } catch {
+      this.cartNote('The cart did not accept it. Please try again, or ask for a quote.', null);
+      return;
+    }
+    if (product.buy.storefront_url) {
+      window.open(product.buy.storefront_url, '_blank', 'noopener');
+      return;
+    }
+    this.asking = true;
+    this.render();
+  }
+
+  private cartNote(message: string, href: string | null) {
+    this.status.replaceChildren(message);
+    if (href) {
+      const a = el('a', undefined, ' View cart');
+      a.href = href;
+      this.status.append(a);
+    }
   }
 
   private report(eventType: string) {

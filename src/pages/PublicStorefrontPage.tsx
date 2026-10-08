@@ -63,6 +63,12 @@ const PublicStorefrontPage: React.FC = () => {
     document.getElementById(`product-${highlightId}`)?.scrollIntoView({ block: 'center' });
   }, [highlightId, products]);
 
+  const addOnArrival = searchParams.get('add') === '1';
+  useEffect(() => {
+    if (!addOnArrival || !highlightId || !products.some((p) => p.product_id === highlightId)) return;
+    setCart((c) => (c[highlightId] ? c : { ...c, [highlightId]: 1 }));
+  }, [addOnArrival, highlightId, products]);
+
   const byId = useMemo(() => new Map(products.map((p) => [p.product_id, p])), [products]);
   const currency = products[0]?.currency ?? 'EUR';
   const cartLines = Object.entries(cart).filter(([, q]) => q > 0);

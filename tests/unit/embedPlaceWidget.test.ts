@@ -99,11 +99,16 @@ describe('the widget the merchant pastes', () => {
   it('sends the photo only from the explicit Place it for me action, and never stores it', () => {
     const widget = read('src/embed/materialkai-place.ts');
     expect(widget).not.toMatch(/FormData/);
-    expect(widget.match(/toDataURL\(/g)?.length).toBe(1);
+    expect(widget.match(/toDataURL\(/g)?.length).toBe(2);
+    const realism = widget.slice(widget.indexOf('private async makeRealistic('), widget.indexOf('private async analyseSpace('));
     const analyse = widget.slice(widget.indexOf('private async analyseSpace('), widget.indexOf('private animateReveal('));
+    expect(realism).toContain('toDataURL(');
     expect(analyse).toContain('toDataURL(');
     expect(widget.match(/this\.analyseSpace\(\)/g)?.length).toBe(1);
+    expect(widget.match(/this\.makeRealistic\(\)/g)?.length).toBe(1);
     expect(widget).toMatch(/magic\.addEventListener\('click', \(\) => void this\.analyseSpace\(\)\)/);
+    expect(widget).toMatch(/magic\.addEventListener\('click', \(\) => void this\.makeRealistic\(\)\)/);
+    expect(widget).toContain('Make it realistic sends this picture once');
     const api = read('supabase/functions/products-3d-api/index.ts');
     const action = api.slice(api.indexOf("if (action === 'analyze_space')"), api.indexOf("if (action === 'scenes')"));
     expect(action).not.toMatch(/storage|\.upload\(|\.insert\(/);
@@ -178,5 +183,24 @@ describe('the room reading Claude returns is checked before anything is placed w
     expect(action.indexOf('embed_spend_has_headroom')).toBeLessThan(action.indexOf('callClaudeMessages'));
     expect(action).toMatch(/stop_reason === 'refusal'/);
     expect(action).toMatch(/loadPrompt\(supabase, 'embed', 'embed_place_space'\)/);
+  });
+});
+
+describe('make it realistic keeps nothing of the visitor\u2019s home', () => {
+  const api = read('supabase/functions/products-3d-api/index.ts');
+  const action = api.slice(api.indexOf("if (action === 'realism')"), api.indexOf("if (action === 'analyze_space')"));
+
+  it('checks the key allows generation and has quota before any model work', () => {
+    const generator = action.indexOf('generate-interior-gemini');
+    expect(action.indexOf('allow_generation')).toBeLessThan(generator);
+    expect(action.indexOf("rpc('consume_embed_generation_quota'")).toBeLessThan(generator);
+    expect(action).toMatch(/loadPrompt\(supabase, 'embed', 'embed_place_realism'\)/);
+  });
+
+  it('fetches only our own storage, and always removes both images and the history row', () => {
+    expect(action).toMatch(/if \(!url\.startsWith\(publicPrefix\)\) return/);
+    const cleanup = action.slice(action.indexOf('} finally {'));
+    expect(cleanup).toMatch(/\.remove\(\[inputPath/);
+    expect(cleanup).toMatch(/from\('generation_3d'\)\.delete\(\)/);
   });
 });
