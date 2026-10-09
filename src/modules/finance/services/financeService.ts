@@ -4503,6 +4503,8 @@ export interface InvoicePaymentProof {
     bank_account_id: string | null;
   } | null;
   ai_error: string | null;
+  /** Set once the order completed: the file is deleted, the record stays. */
+  file_deleted_at: string | null;
   /** Derived: the payment booked from this receipt, if any. */
   payment_id: string | null;
   /** Derived: a bank-feed line settled money on this document. */

@@ -12724,6 +12724,7 @@ export type Database = {
       }
       invoice_payment_proofs: {
         Row: {
+          file_deleted_at: string | null
           ai_checked_at: string | null
           ai_checks: Json | null
           ai_error: string | null
@@ -12745,6 +12746,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          file_deleted_at?: string | null
           ai_checked_at?: string | null
           ai_checks?: Json | null
           ai_error?: string | null
@@ -12766,6 +12768,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          file_deleted_at?: string | null
           ai_checked_at?: string | null
           ai_checks?: Json | null
           ai_error?: string | null
@@ -37206,6 +37209,7 @@ export type Database = {
           ai_verdict: string | null
           bank_confirmed: boolean
           created_at: string
+          file_deleted_at: string | null
           file_name: string | null
           id: string
           invoice_id: string

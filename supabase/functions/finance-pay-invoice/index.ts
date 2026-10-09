@@ -152,7 +152,7 @@ async function handleProofAction(req: Request, supabase: any, body: ProofActionB
   if (typeof proofId !== 'string' || !proofId) return json({ error: 'proof_id required' }, 400);
 
   const { data: proof } = await supabase.from('invoice_payment_proofs')
-    .select('id, invoice_id, workspace_id, status').eq('id', proofId).maybeSingle();
+    .select('id, invoice_id, workspace_id, status, file_deleted_at').eq('id', proofId).maybeSingle();
   if (!proof) return json({ error: 'not found' }, 404);
   const { data: booked } = await supabase.from('payments').select('id')
     .eq('provider', 'bank_proof').eq('provider_ref', proof.id).maybeSingle();
@@ -164,6 +164,7 @@ async function handleProofAction(req: Request, supabase: any, body: ProofActionB
 
   if (body.recheck_proof) {
     if (booked || proof.status !== 'submitted') return json({ error: 'this receipt is already settled' }, 409);
+    if (proof.file_deleted_at) return json({ error: 'the receipt file was deleted when the order completed' }, 409);
     const { error: resetErr } = await supabase.from('invoice_payment_proofs').update({ ai_status: 'pending', ai_error: null }).eq('id', proof.id);
     if (resetErr) return json({ error: 'the receipt could not be re-checked right now' }, 500);
     await runPaymentProofCheck(supabase, proof.id, auth.userId);

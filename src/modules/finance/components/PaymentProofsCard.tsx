@@ -215,11 +215,15 @@ export const PaymentProofsCard: React.FC<{
                     {p.note && <p className="whitespace-pre-wrap text-xs">Customer note: {p.note}</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" disabled={busy}
-                      onClick={() => void run(p, async () => { window.open(await financeService.paymentProofUrl(p), '_blank', 'noopener'); }, 'Could not open the receipt')}>
-                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> View
-                    </Button>
-                    {canManage && open && (
+                    {p.file_deleted_at ? (
+                      <span className="text-xs text-muted-foreground">File deleted {formatDate(p.file_deleted_at)}, after the order completed</span>
+                    ) : (
+                      <Button variant="outline" size="sm" disabled={busy}
+                        onClick={() => void run(p, async () => { window.open(await financeService.paymentProofUrl(p), '_blank', 'noopener'); }, 'Could not open the receipt')}>
+                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> View
+                      </Button>
+                    )}
+                    {canManage && open && !p.file_deleted_at && (
                       <>
                         {outstanding > 0.005 && (
                           <Button variant="secondary" size="sm" disabled={busy} onClick={() => setConfirming(p)}>
