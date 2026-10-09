@@ -545,10 +545,8 @@ export const MessageBubble: React.FC<{
           )}
           {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
           {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> KAI assistant</div>}
-          {/* `[Unsupported message]` is the CHANNEL's placeholder for media, not something the
-              customer typed — shown raw it reads as a fault in their phone. We now fetch the file
-              from Zernio's attachment endpoint, so this only survives when that fetch has not
-              succeeded yet, and it says exactly that rather than telling anyone to give up. */}
+          {/* `[Unsupported message]` is WhatsApp's placeholder for content it did not forward, not
+              the customer's words. Reaching here means the live attachment fetch already failed. */}
           {emailHtml && !showPlain ? (
             <EmailHtmlView
               html={emailHtml}
@@ -558,7 +556,7 @@ export const MessageBubble: React.FC<{
           ) : m.body && (mediaPlaceholder ? (
             <div className="flex items-start gap-1.5 text-sm text-muted-foreground italic">
               <Paperclip className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>They sent a file. It has not been retrieved yet — re-run the import for this conversation to fetch it.</span>
+              <span>A file or message type WhatsApp did not pass on to us (often a view-once photo, a poll or a sticker). Open the chat on the phone to see it.</span>
             </div>
           ) : (
             <>

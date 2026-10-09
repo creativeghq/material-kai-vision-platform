@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Loader2, Paperclip, StickyNote, X, MessagesSquare, Reply, ReplyAll, Sparkles, ShoppingCart, AlertTriangle,
   Package, Wrench, ChevronDown, Type, Trash2, FileText, Image as ImageIcon,
@@ -27,6 +27,8 @@ import { ComposerSettingsPopover } from './ComposerSettingsPopover';
 import { signaturePreviewText } from '../useComposerSettings';
 import { useReplyAutocomplete } from '../useReplyAutocomplete';
 import { Checkbox } from '@/components/core/ui/checkbox';
+import { escapeHtml } from '@/utils/escapeHtml';
+import { renderSignatureHtml, signatureDocument } from '@/utils/emailSignature';
 import type { InboxPageState } from '../useInboxPage';
 
 const CHANNEL_LABEL: Record<string, string> = { whatsapp: 'WhatsApp', email: 'Email', social: 'Social', internal: 'Team chat' };
@@ -68,6 +70,8 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     textareaRef: composerRef,
   });
   const signature = signaturePreviewText(composerSettings.settings);
+  const signatureCard = composerSettings.settings.signature_card;
+  const signatureHtml = useMemo(() => (signatureCard ? renderSignatureHtml(signatureCard, escapeHtml) : ''), [signatureCard]);
   useEffect(() => {
     if (takesFiles || !attachments.length) return;
     setAttachments([]);
@@ -339,11 +343,18 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
         </div>
 
         {isEmailReply && signature && !emailPreview && (
-          <div className="mx-3 mb-2 flex items-start gap-2 rounded-sm border-l-2 border-hairline pl-2.5">
+          <div className="mx-3 mb-2 flex items-start gap-2">
             <Checkbox id="inbox-include-signature" checked={includeSignature} onCheckedChange={(v) => setIncludeSignature(v === true)} className="mt-0.5" aria-label="Include my signature" />
-            <label htmlFor="inbox-include-signature" className={`min-w-0 flex-1 text-xs whitespace-pre-wrap ${includeSignature ? 'text-muted-foreground' : 'text-muted-foreground/50 line-through'}`}>
-              {signature}
-            </label>
+            {signatureHtml ? (
+              <iframe
+                title="Email signature" sandbox="" srcDoc={signatureDocument(signatureHtml)}
+                className={`h-40 min-w-0 flex-1 rounded-sm border border-hairline bg-white ${includeSignature ? '' : 'opacity-40'}`}
+              />
+            ) : (
+              <label htmlFor="inbox-include-signature" className={`min-w-0 flex-1 text-xs whitespace-pre-wrap ${includeSignature ? 'text-muted-foreground' : 'text-muted-foreground/50 line-through'}`}>
+                {signature}
+              </label>
+            )}
           </div>
         )}
 
