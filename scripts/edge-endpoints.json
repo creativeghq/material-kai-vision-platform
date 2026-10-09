@@ -3022,7 +3022,10 @@
       "assist",
       "remind",
       "reminders",
-      "internal_modify"
+      "internal_modify",
+      "outreach",
+      "outreach_schedule",
+      "outreach_cancel"
     ],
     "request": [
       "workspace_id",
@@ -9141,6 +9144,19 @@
             "type": "string (uuid)",
             "required": true,
             "desc": "Thread the caller can access"
+          }
+        ],
+        "response": "{ok:true}"
+      },
+      {
+        "name": "delete_thread_forever",
+        "summary": "Permanently delete an archived thread now (owner/admin only).",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "An archived thread the caller can access"
           }
         ],
         "response": "{ok:true}"

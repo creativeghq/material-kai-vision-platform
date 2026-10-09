@@ -26,7 +26,7 @@ async function wakeSnoozes(db: Db): Promise<{ woken: number; failed: number }> {
   let failed = 0;
   for (const row of data ?? []) {
     const { data: claimed, error: claimErr } = await db.from('mail_thread_index')
-      .update({ snoozed_until: null, updated_at: now }).eq('id', row.id).eq('snoozed_until', row.snoozed_until).select('id');
+      .update({ snoozed_until: null, woken_at: now, updated_at: now }).eq('id', row.id).eq('snoozed_until', row.snoozed_until).select('id');
     if (claimErr || !claimed?.length) continue;
     const account = row.mail_accounts;
     try {
@@ -46,18 +46,29 @@ async function wakeSnoozes(db: Db): Promise<{ woken: number; failed: number }> {
   return { woken, failed };
 }
 
-async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number }> {
+/** Anyone wrote on the thread after `sinceMs`. Our own sends, from any alias, carry Gmail's SENT label. */
+async function repliedSince(db: Db, account: { id: string; email: string; display_name: string | null }, threadId: string, sinceMs: number): Promise<boolean> {
+  const token = await gmailAccessToken(db, account);
+  const t = await gmailFetch(token, `/threads/${threadId}?format=metadata&metadataHeaders=From`);
+  return ((t.messages ?? []) as Array<{ internalDate?: string; labelIds?: string[] }>).some((m) => {
+    const labels = m.labelIds ?? [];
+    return Number(m.internalDate ?? 0) > sinceMs && !labels.includes('SENT') && !labels.includes('DRAFT');
+  });
+}
+
+async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number; skipped: number }> {
   const now = new Date();
   const { data: due, error } = await db.from('mail_scheduled_sends')
     .select('id').eq('status', 'pending').lte('send_at', now.toISOString()).order('send_at').limit(BATCH);
   if (error) throw new HttpError(500, `scheduled scan failed: ${error.message}`);
   let sent = 0;
   let failed = 0;
+  let skipped = 0;
   for (const { id } of due ?? []) {
     const { data: rows, error: claimErr } = await db.from('mail_scheduled_sends')
       .update({ status: 'sending', claimed_at: new Date().toISOString() })
       .eq('id', id).eq('status', 'pending')
-      .select('id, kind, account_id, payload, user_id, workspace_id, mail_accounts(id, email, display_name, status)');
+      .select('id, kind, account_id, payload, user_id, workspace_id, created_at, if_no_reply, gmail_thread_id, mail_accounts(id, email, display_name, status)');
     if (claimErr || !rows?.length) continue;
     const row = rows[0];
     let result: Record<string, unknown> | null = null;
@@ -66,6 +77,17 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number 
       if (row.kind === 'gmail') {
         const account = row.mail_accounts;
         if (!account || account.status !== 'active') throw new Error('the Gmail account needs reconnecting');
+        if (row.if_no_reply && row.gmail_thread_id && await repliedSince(db, account, row.gmail_thread_id, Date.parse(row.created_at))) {
+          let cancelErr: { message: string } | null = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            ({ error: cancelErr } = await db.from('mail_scheduled_sends')
+              .update({ status: 'cancelled', error: 'They replied before it was due, so it was not sent.' }).eq('id', row.id));
+            if (!cancelErr) break;
+          }
+          if (cancelErr) console.error('[mail-scheduler] outreach cancel not recorded', row.id, cancelErr.message);
+          skipped++;
+          continue;
+        }
         result = await sendPreparedGmail(db, account, row.payload as PreparedGmailSend, { user_id: row.user_id, workspace_id: row.workspace_id });
       } else {
         const r = await fetch(`${SUPABASE_URL}/functions/v1/inbox-api`, {
@@ -86,7 +108,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number 
     if (doneErr) console.error('[mail-scheduler] outcome not recorded', row.id, doneErr.message);
     if (failure) failed++; else sent++;
   }
-  return { sent, failed };
+  return { sent, failed, skipped };
 }
 
 const SYNC_ACCOUNTS = 20;

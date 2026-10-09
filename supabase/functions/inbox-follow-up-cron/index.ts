@@ -84,10 +84,11 @@ Deno.serve(withApiLogging('inbox-follow-up-cron', async (req: Request) => {
 
   for (const row of rows) {
     let sendError: string | null = null;
+    let messageSent = false;
 
     if (row.follow_up_message && row.follow_up_set_by) {
       const res = await sendChase(row.thread_id, row.follow_up_message, row.follow_up_set_by);
-      if (res.ok) sent++;
+      if (res.ok) { sent++; messageSent = true; }
       else { sendError = res.error; sendFailed++; }
     } else if (row.follow_up_message && !row.follow_up_set_by) {
       // Scheduled by somebody whose record has since gone. The reminder still fires; the message
@@ -98,10 +99,11 @@ Deno.serve(withApiLogging('inbox-follow-up-cron', async (req: Request) => {
       remindedOnly++;
     }
 
-    /* Back to Open, whether or not the message went. */
+    /* Back to Open, whether or not the message went; a Boomerang (nothing sent) also returns to the top as unread. */
     await db.from('inbox_threads').update({
       status: 'open',
       follow_up_error: sendError,
+      ...(messageSent ? {} : { last_message_at: new Date().toISOString() }),
     }).eq('id', row.thread_id);
 
     if (row.follow_up_set_by) {

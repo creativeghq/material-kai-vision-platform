@@ -12,6 +12,7 @@ export interface GmailThreadMeta {
   assignee_user_id: string | null; snoozed_until: string | null;
   remind_at?: string | null; remind_note?: string | null; remind_if_no_reply?: boolean;
   shared: boolean; members: Array<{ user_id: string; name: string }>;
+  outreach?: Array<{ id: string; send_at: string }>;
 }
 export interface GmailLabel { id: string; name: string; type: 'system' | 'user'; unread: number; total: number; color: string | null }
 export interface GmailAddress { name: string | null; address: string | null; photo_url?: string | null }
@@ -20,7 +21,10 @@ export interface GmailThreadRow {
   unread: boolean; starred: boolean; message_count: number; label_ids: string[]; has_attachment?: boolean;
   contact_id: string | null; contact_name: string | null; assignee_user_id: string | null; snoozed_until: string | null;
   remind_at?: string | null; remind_note?: string | null;
+  woken_at?: string | null;
+  outreach?: GmailOutreach[];
 }
+export interface GmailOutreach { id: string; send_at: string; preview: string }
 export interface GmailAttachment { attachmentId: string; filename: string; mimeType: string; size: number }
 export interface GmailMessage {
   id: string; label_ids: string[]; date: string | null; from: GmailAddress; to: GmailAddress[]; cc: GmailAddress[]; reply_to: string | null;
@@ -68,6 +72,11 @@ export const gmailApi = {
     call<{ ok: boolean; remind_at: string | null }>('remind', input),
   reminders: (account_id: string) =>
     call<{ threads: GmailThreadRow[]; next_page_token: null; estimate: number }>('reminders', { account_id }),
+  outreachSchedule: (input: { account_id: string; thread_id: string; body: string; send_at: string }) =>
+    call<{ ok: boolean; outreach: { id: string; send_at: string }; to: string[] }>('outreach_schedule', input),
+  outreachCancel: (account_id: string, id: string) => call<{ ok: boolean }>('outreach_cancel', { account_id, id }),
+  outreach: (account_id: string) =>
+    call<{ threads: GmailThreadRow[]; next_page_token: null; estimate: number }>('outreach', { account_id }),
   assign: (account_id: string, thread_id: string, user_id: string | null) => call<{ ok: boolean }>('assign', { account_id, thread_id, user_id }),
   members: (account_id: string) => call<{ is_shared: boolean; member_ids: string[] }>('members', { account_id }),
   share: (account_id: string, is_shared: boolean, member_ids: string[]) =>

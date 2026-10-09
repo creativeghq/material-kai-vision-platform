@@ -56,6 +56,7 @@ export function useInboxPage() {
   const [folder, setFolder] = useState<InboxFolder | null>(null);
   const mode = parseInboxMode(searchParams.get('src'), isPlatformOperator);
   const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
+  const [followUpKind, setFollowUpKind] = useState<'boomerang' | 'outreach'>('boomerang');
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
   /** MY starred messages on the open thread. Personal — resolved for the caller by get_thread. */
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
@@ -219,7 +220,8 @@ export function useInboxPage() {
     ...(showArchived ? { archived: true } : {}),
     ...(labelIds.length ? { label_ids: labelIds } : {}),
     ...(serverSearch ? { search: serverSearch } : {}),
-  }), [channelFilter, mode, folder, allWorkspaces, isPlatformOperator, showArchived, labelIds, serverSearch]);
+    ...(!showArchived && !folder && !unreadOnly && statusTab === 'snoozed' ? { status: 'snoozed' as const, limit: 200 } : {}),
+  }), [channelFilter, mode, folder, allWorkspaces, isPlatformOperator, showArchived, labelIds, serverSearch, unreadOnly, statusTab]);
 
   const setMode = useCallback((next: InboxMode) => {
     setSearchParams((p) => { if (next === 'all') p.delete('src'); else p.set('src', next); return p; }, { replace: true });
@@ -227,13 +229,15 @@ export function useInboxPage() {
     if (sourceFilter && allowed && !allowed.includes(sourceFilter as never)) setSourceFilter(null);
   }, [setSearchParams, sourceFilter, setSourceFilter]);
 
-  type InboxView = 'all' | 'unread' | 'archived' | InboxFolder;
-  const view: InboxView = showArchived ? 'archived' : folder ?? (unreadOnly ? 'unread' : 'all');
+  type InboxView = 'all' | 'followup' | 'unread' | 'archived' | InboxFolder;
+  const view: InboxView = showArchived ? 'archived' : folder ?? (unreadOnly ? 'unread' : statusTab === 'snoozed' ? 'followup' : 'all');
   const goToView = useCallback((next: InboxView) => {
     setShowArchived(next === 'archived');
     setFolder(next === 'starred' || next === 'sent' || next === 'drafts' ? next : null);
     if ((next === 'unread') !== unreadOnly) setUnreadOnly(next === 'unread');
-  }, [unreadOnly, setUnreadOnly]);
+    if (next === 'followup') setStatusTab('snoozed');
+    else if (next === 'all' && statusTab === 'snoozed') setStatusTab('open');
+  }, [unreadOnly, setUnreadOnly, statusTab]);
 
   const assignmentView: 'mine' | 'unassigned' | null = filterValues.mine === true
     ? 'mine'
@@ -908,6 +912,16 @@ export function useInboxPage() {
     } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
   }, [activeThread, toast, loadThreads]);
 
+  const deleteForeverActive = useCallback(async () => {
+    if (!activeThread) return;
+    try {
+      await inboxApi.deleteThreadForever(activeThread.id);
+      toast({ title: 'Conversation deleted permanently' });
+      backToList();
+      loadThreads();
+    } catch (e) { toast({ title: 'Could not delete', description: (e as Error).message, variant: 'destructive' }); }
+  }, [activeThread, toast, backToList, loadThreads]);
+
   const visibleThreads = useMemo(() => {
     let list = matchedThreads;
     const q = query.trim().toLowerCase();
@@ -917,11 +931,25 @@ export function useInboxPage() {
     // in the filter matcher); Archived is its own view; otherwise the Open / Follow-up (snoozed) /
     // Done (closed) tab narrows the working set.
     if (!unreadOnly && !showArchived && !folder) list = list.filter((t) => t.status === statusTab);
+    if (view === 'followup') {
+      const due = (t: InboxThread) => (t.follow_up_at && !t.follow_up_fired_at ? Date.parse(t.follow_up_at) : Infinity);
+      list = list.filter((t) => (followUpKind === 'outreach') === !!(t.follow_up_message && !t.follow_up_fired_at))
+        .sort((a, b) => due(a) - due(b));
+    }
     return list;
-  }, [matchedThreads, query, serverSearch, unreadOnly, showArchived, folder, statusTab]);
+  }, [matchedThreads, query, serverSearch, unreadOnly, showArchived, folder, statusTab, view, followUpKind]);
+
+  const followUpCounts = useMemo(() => {
+    if (view !== 'followup') return null;
+    const outreach = matchedThreads.filter((t) => t.status === 'snoozed' && t.follow_up_message && !t.follow_up_fired_at).length;
+    return { outreach, boomerang: matchedThreads.filter((t) => t.status === 'snoozed').length - outreach };
+  }, [view, matchedThreads]);
 
   // Threads grouped into Today / Yesterday / This week / Earlier for the email-client day headers.
   const groupedThreads = useMemo(() => {
+    if (view === 'followup') {
+      return visibleThreads.length ? [[followUpKind === 'outreach' ? 'Sends next' : 'Comes back next', visibleThreads] as const] : [];
+    }
     const order = ['Today', 'Yesterday', 'This week', 'Earlier'];
     const buckets = new Map<string, InboxThread[]>();
     for (const t of visibleThreads) {
@@ -931,7 +959,7 @@ export function useInboxPage() {
       buckets.set(k, arr);
     }
     return order.filter((k) => buckets.has(k)).map((k) => [k, buckets.get(k)!] as const);
-  }, [visibleThreads]);
+  }, [visibleThreads, view, followUpKind]);
 
   // The open thread's labels (kept fresh from the list, which carries labels per thread).
   const activeThreadLabels = useMemo(
@@ -1039,6 +1067,9 @@ export function useInboxPage() {
     setShowArchived,
     statusTab,
     setStatusTab,
+    followUpKind,
+    setFollowUpKind,
+    followUpCounts,
     wsLabels,
     setWsLabels,
     starredIds,
@@ -1177,6 +1208,7 @@ export function useInboxPage() {
     addToNote,
     archiveActive,
     restoreActive,
+    deleteForeverActive,
     visibleThreads,
     groupedThreads,
     activeThreadLabels,

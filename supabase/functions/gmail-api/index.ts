@@ -132,9 +132,51 @@ async function verifyTrashState(token: string, threadId: string, wantTrash: bool
 /** A binned thread must not wake or ring later; its CRM link, assignee and receipts stay so a restore loses nothing. */
 async function forgetThread(db: Db, accountId: string, threadId: string): Promise<void> {
   const { error } = await db.from('mail_thread_index')
-    .update({ snoozed_until: null, remind_at: null, remind_note: null, remind_if_no_reply: false, remind_user_id: null, remind_set_at: null })
+    .update({ snoozed_until: null, remind_at: null, remind_note: null, remind_if_no_reply: false, remind_user_id: null, remind_set_at: null, woken_at: null })
     .eq('account_id', accountId).eq('gmail_thread_id', threadId);
   if (error) console.error('[gmail-api] could not clear the binned thread timers', threadId, error.message);
+  const { error: oErr } = await db.from('mail_scheduled_sends')
+    .update({ status: 'cancelled', error: 'The conversation was deleted, so it was not sent.' })
+    .eq('account_id', accountId).eq('gmail_thread_id', threadId).eq('if_no_reply', true).eq('status', 'pending');
+  if (oErr) console.error('[gmail-api] could not cancel the binned thread follow-ups', threadId, oErr.message);
+}
+
+const BOOMERANG_PIN_MS = 7 * 86_400_000;
+const LIST_META = '&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date';
+
+/** Woken Boomerangs still in the Inbox, merged in at their wake time so they sit on top the way Gmail shows a woken snooze. */
+async function withWokenOnTop(db: Db, token: string, accountId: string, threads: Array<Record<string, unknown>>) {
+  const { data, error } = await db.from('mail_thread_index').select('gmail_thread_id, woken_at')
+    .eq('account_id', accountId).gt('woken_at', new Date(Date.now() - BOOMERANG_PIN_MS).toISOString())
+    .order('woken_at', { ascending: false }).limit(PAGE_SIZE);
+  if (error) { console.error('[gmail-api] woken boomerangs unavailable', error.message); return { threads, woken: new Map<string, string>() }; }
+  const woken = new Map<string, string>((data ?? []).map((r: { gmail_thread_id: string; woken_at: string }) => [r.gmail_thread_id, r.woken_at]));
+  if (!woken.size) return { threads, woken };
+  const dateOf = (t: Record<string, unknown>) => {
+    const msgs = (t.messages ?? []) as Array<Record<string, unknown>>;
+    return Number(msgs[msgs.length - 1]?.internalDate ?? 0);
+  };
+  const oldest = threads.length >= PAGE_SIZE ? Math.min(...threads.map(dateOf)) : 0;
+  const have = new Set(threads.map((t) => String(t.id)));
+  const missing = [...woken.entries()].filter(([id, at]) => !have.has(id) && Date.parse(at) >= oldest).map(([id]) => id);
+  const extra = (await Promise.all(missing.map((id) => gmailFetch(token, `/threads/${id}?format=metadata${LIST_META}`).catch(() => null))))
+    .filter((t): t is Record<string, unknown> => !!t && ((t.messages ?? []) as Array<{ labelIds?: string[] }>).some((m) => (m.labelIds ?? []).includes('INBOX')));
+  const sortKey = (t: Record<string, unknown>) => Math.max(dateOf(t), Date.parse(woken.get(String(t.id)) ?? '') || 0);
+  return { threads: [...threads, ...extra].sort((a, b) => sortKey(b) - sortKey(a)), woken };
+}
+
+/** Who a follow-up on this thread goes to: the other side of its latest message. */
+function outreachRecipients(msgs: Array<Record<string, unknown>>, me: string): { to: string[]; cc: string[]; replyTo: string } {
+  const labelsOf = (m: Record<string, unknown>) => (m.labelIds ?? []) as string[];
+  const ours = new Set([me, ...msgs.filter((m) => labelsOf(m).includes('SENT')).map((m) => parseAddress(gmailHeader(m, 'From')).address?.toLowerCase() ?? '')]);
+  const list = (v: string) => parseAddressList(v).map((x) => x.address?.toLowerCase() ?? null).filter((a): a is string => !!a && !ours.has(a));
+  const last = [...msgs].reverse().find((m) => !labelsOf(m).includes('DRAFT'));
+  if (!last) throw new HttpError(400, 'This conversation has no messages to follow up on');
+  const fromMe = labelsOf(last).includes('SENT');
+  const to = fromMe ? list(gmailHeader(last, 'To')) : list(gmailHeader(last, 'Reply-To') || gmailHeader(last, 'From'));
+  const cc = fromMe ? list(gmailHeader(last, 'Cc')) : [];
+  if (!to.length) throw new HttpError(400, 'Could not tell who to follow up with on this conversation');
+  return { to: [...new Set(to)], cc: [...new Set(cc)].filter((a) => !to.includes(a)), replyTo: String(last.id) };
 }
 
 Deno.serve(withApiLogging('gmail-api', async (req) => {
@@ -277,9 +319,13 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       if (typeof body.q === 'string' && body.q.trim()) qs.set('q', body.q.trim().slice(0, 500));
       if (typeof body.page_token === 'string' && body.page_token) qs.set('pageToken', body.page_token);
       const list = await gmail(token, `/threads?${qs}`);
-      const ids = ((list.threads ?? []) as Array<{ id: string }>).map((t) => t.id);
-      const meta = '&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date';
-      const threads = await Promise.all(ids.map((id) => gmail(token, `/threads/${id}?format=metadata${meta}`)));
+      const pageIds = ((list.threads ?? []) as Array<{ id: string }>).map((t) => t.id);
+      const fetched = await Promise.all(pageIds.map((id) => gmail(token, `/threads/${id}?format=metadata${LIST_META}`)));
+      const firstInboxPage = labelId === 'INBOX' && !qs.has('q') && !qs.has('pageToken');
+      const { threads, woken } = firstInboxPage
+        ? await withWokenOnTop(db, token, account.id, fetched)
+        : { threads: fetched, woken: new Map<string, string>() };
+      const ids = threads.map((t) => String(t.id));
       const { error: usedErr } = await db.from('mail_accounts').update({ last_used_at: new Date().toISOString() }).eq('id', account.id);
       if (usedErr) console.error('[gmail-api] last_used_at not stamped', account.id, usedErr);
       const facts = await indexFacts(db, account.id, ids);
@@ -294,6 +340,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
           contact_name: (f?.crm_contacts as { name?: string } | null)?.name ?? null,
           assignee_user_id: f?.assignee_user_id ?? null,
           snoozed_until: f?.snoozed_until ?? null,
+          woken_at: woken.get(String(t.id)) ?? null,
         };
       });
       return json({ threads: rows, next_page_token: list.nextPageToken ?? null, estimate: list.resultSizeEstimate ?? null });
@@ -540,6 +587,10 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
           contact = { id: c.id, name: c.name, email: c.email, phone: c.phone, position: c.position, companies };
         }
       }
+      const { data: outreach, error: oErr } = await db.from('mail_scheduled_sends')
+        .select('id, send_at').eq('account_id', account.id).eq('gmail_thread_id', threadId).eq('if_no_reply', true).eq('status', 'pending')
+        .order('send_at').limit(5);
+      if (oErr) throw new HttpError(500, oErr.message);
       let members: Array<{ user_id: string; name: string }> = [];
       if (account.is_shared) {
         const { data: mem, error: memErr } = await db.from('mail_account_members').select('user_id').eq('account_id', account.id);
@@ -553,7 +604,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
         contact, contact_linked: !!row?.contact_id && !suggested, contact_suggested: suggested,
         assignee_user_id: row?.assignee_user_id ?? null, snoozed_until: row?.snoozed_until ?? null,
         remind_at: row?.remind_at ?? null, remind_note: row?.remind_note ?? null, remind_if_no_reply: row?.remind_if_no_reply ?? false,
-        shared: account.is_shared, members,
+        shared: account.is_shared, members, outreach: outreach ?? [],
       });
     }
 
@@ -602,6 +653,74 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       return json({ ok: true, contact_id: contactId, created });
     }
 
+    case 'outreach_schedule': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const threadId = String(body.thread_id ?? '');
+      if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
+      const text = String(body.body ?? '').trim();
+      if (!text) throw new HttpError(400, 'Write the follow-up message');
+      const sendAt = new Date(String(body.send_at ?? ''));
+      const now = Date.now();
+      if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() < now + 60_000 || sendAt.getTime() > now + 366 * 86_400_000) {
+        throw new HttpError(400, 'Pick a send time between a minute and a year from now');
+      }
+      const token = await accessTokenFor(db, account);
+      const t = await gmail(token, `/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Reply-To&metadataHeaders=Subject`);
+      const msgs = (t.messages ?? []) as Array<Record<string, unknown>>;
+      const who = outreachRecipients(msgs, account.email.toLowerCase());
+      const prepared = prepareGmailSend({ to: who.to, cc: who.cc, body: text, thread_id: threadId, reply_to_message_id: who.replyTo }, SCHEDULE_LIMIT_BYTES);
+      const subject = gmailHeader(msgs[0] ?? {}, 'Subject') || '(no subject)';
+      await upsertIndex(db, account, threadId, { subject: subject.slice(0, 300) });
+      const { data, error } = await db.from('mail_scheduled_sends').insert({
+        user_id: userId, workspace_id: account.workspace_id, kind: 'gmail', account_id: account.id,
+        payload: prepared, send_at: sendAt.toISOString(), gmail_thread_id: threadId, if_no_reply: true,
+        summary: `Follow-up: ${subject}`.slice(0, 200), recipients: prepared.to.join(', ').slice(0, 300),
+      }).select('id, send_at').single();
+      if (error) throw new HttpError(500, `Could not schedule the follow-up: ${error.message}`);
+      return json({ ok: true, outreach: data, to: prepared.to });
+    }
+
+    case 'outreach_cancel': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const id = String(body.id ?? '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, 'id is required');
+      const { data, error } = await db.from('mail_scheduled_sends').update({ status: 'cancelled', error: 'Cancelled before it was sent.' })
+        .eq('id', id).eq('account_id', account.id).eq('if_no_reply', true).eq('status', 'pending').select('id');
+      if (error) throw new HttpError(500, `Could not cancel: ${error.message}`);
+      if (!data?.length) throw new HttpError(409, 'It is already being sent, or was already cancelled.');
+      return json({ ok: true });
+    }
+
+    case 'outreach': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const token = await accessTokenFor(db, account);
+      const { data, error } = await db.from('mail_scheduled_sends').select('id, gmail_thread_id, send_at, summary, recipients, payload')
+        .eq('account_id', account.id).eq('if_no_reply', true).eq('status', 'pending').order('send_at').limit(200);
+      if (error) throw new HttpError(500, error.message);
+      const rows = (data ?? []) as Array<{ id: string; gmail_thread_id: string; send_at: string; summary: string | null; recipients: string | null; payload: { text?: string } }>;
+      const ids = [...new Set(rows.map((r) => r.gmail_thread_id))];
+      const fetched = await Promise.all(ids.map((id) => gmail(token, `/threads/${id}?format=metadata${LIST_META}`).catch(() => null)));
+      const byId = new Map(fetched.filter(Boolean).map((t) => [String((t as Record<string, unknown>).id), t as Record<string, unknown>]));
+      const facts = await indexFacts(db, account.id, ids);
+      return json({
+        threads: ids.map((id) => {
+          const f = facts.get(id);
+          const first = rows.find((r) => r.gmail_thread_id === id)!;
+          const fallback = {
+            id, subject: (first.summary ?? '').replace(/^Follow-up: /, '') || '(could not read this conversation from Gmail)',
+            from: { name: null, address: first.recipients }, participants: [first.recipients ?? ''], snippet: '', date: null,
+            unread: false, starred: false, message_count: 0, label_ids: [], has_attachment: false,
+          };
+          return {
+            ...(byId.has(id) ? listRow(byId.get(id)!) : fallback), contact_id: f?.contact_id ?? null, contact_name: (f?.crm_contacts as { name?: string } | null)?.name ?? null,
+            assignee_user_id: f?.assignee_user_id ?? null, snoozed_until: f?.snoozed_until ?? null,
+            outreach: rows.filter((r) => r.gmail_thread_id === id).map((r) => ({ id: r.id, send_at: r.send_at, preview: String(r.payload?.text ?? '').slice(0, 140) })),
+          };
+        }),
+        next_page_token: null, estimate: ids.length,
+      });
+    }
+
     case 'snooze': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const threadId = String(body.thread_id ?? '');
@@ -609,7 +728,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const token = await accessTokenFor(db, account);
       if (body.until == null) {
         await gmail(token, `/threads/${threadId}/modify`, { method: 'POST', body: JSON.stringify({ addLabelIds: ['INBOX'] }) });
-        await upsertIndex(db, account, threadId, { snoozed_until: null, snoozed_by: null });
+        await upsertIndex(db, account, threadId, { snoozed_until: null, snoozed_by: null, woken_at: new Date().toISOString() });
         return json({ ok: true, snoozed_until: null });
       }
       const until = new Date(String(body.until));
@@ -619,7 +738,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       }
       await gmail(token, `/threads/${threadId}/modify`, { method: 'POST', body: JSON.stringify({ removeLabelIds: ['INBOX'] }) });
       await upsertIndex(db, account, threadId, {
-        snoozed_until: until.toISOString(), snoozed_by: userId,
+        snoozed_until: until.toISOString(), snoozed_by: userId, woken_at: null,
         ...(typeof body.subject === 'string' ? { subject: body.subject.slice(0, 300) } : {}),
       });
       return json({ ok: true, snoozed_until: until.toISOString() });

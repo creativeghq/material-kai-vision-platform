@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText } from 'lucide-react';
+import { AlarmClock, Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { inboxApi } from '@/services/inboxApi';
 import { visibleModes, modeSources } from '../inboxModes';
@@ -114,6 +114,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
             count={view === 'all' ? threadTotal : null}
             onClick={() => goToView('all')}
           />
+          <NavRow icon={<AlarmClock className="w-4 h-4 shrink-0" />} label="Follow up" active={view === 'followup'} onClick={() => goToView('followup')} />
           <NavRow
             icon={<Mail className="w-4 h-4 shrink-0" />}
             label="Unread"

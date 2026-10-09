@@ -5202,6 +5202,21 @@ async function handleJwtAction(
       return json({ ok: true });
     }
 
+    case 'delete_thread_forever': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      const role = thread.workspace_id ? await callerRoleInWorkspace(db, userId, String(thread.workspace_id)) : null;
+      if (role !== 'owner' && role !== 'admin') throw new HttpError(403, 'Only an owner or admin of this workspace can delete a conversation permanently');
+      if (!thread.archived_at) throw new HttpError(409, 'Delete it first; a conversation is removed permanently only from Archived');
+      const { data: gone, error } = await db.from('inbox_threads').delete().eq('id', threadId).not('archived_at', 'is', null).select('id');
+      if (error) throw new HttpError(500, `Could not delete the conversation: ${error.message}`);
+      if (!gone?.length) throw new HttpError(409, 'The conversation was restored or already deleted');
+      return json({ ok: true });
+    }
+
     default:
       throw new HttpError(400, `Unknown action: ${action}`);
   }

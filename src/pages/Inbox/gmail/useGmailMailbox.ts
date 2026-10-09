@@ -8,6 +8,8 @@ import { gmailApi, type GmailLabel, type GmailMessage, type GmailThreadRow, type
 const ACCOUNT_KEY = 'inbox.gmail.account';
 export const SNOOZED_VIEW = '__snoozed';
 export const REMINDERS_VIEW = '__reminders';
+export const OUTREACH_VIEW = '__outreach';
+export const FOLLOW_UP_VIEWS = [SNOOZED_VIEW, OUTREACH_VIEW, REMINDERS_VIEW];
 
 const CALLBACK_MESSAGES: Record<string, { title: string; description?: string; bad?: boolean }> = {
   connected: { title: 'Gmail connected' },
@@ -118,6 +120,8 @@ export function useGmailMailbox() {
         ? await gmailApi.snoozed(account.id)
         : labelId === REMINDERS_VIEW && !appliedQuery
         ? await gmailApi.reminders(account.id)
+        : labelId === OUTREACH_VIEW && !appliedQuery
+        ? await gmailApi.outreach(account.id)
         : await gmailApi.threads({ account_id: account.id, label_id: appliedQuery ? undefined : labelId, q: appliedQuery || undefined });
       if (seq !== listSeq.current) return;
       setThreads(r.threads);

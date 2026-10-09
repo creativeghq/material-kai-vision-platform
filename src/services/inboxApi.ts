@@ -878,6 +878,9 @@ export const inboxApi = {
   restoreThread(thread_id: string) {
     return call<{ ok: boolean }>('restore_thread', { thread_id });
   },
+  deleteThreadForever(thread_id: string) {
+    return call<{ ok: boolean }>('delete_thread_forever', { thread_id });
+  },
 
   // ── AI "help me write" — a draft reply for a member to review/edit/send ──
   /**

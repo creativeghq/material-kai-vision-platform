@@ -2259,6 +2259,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "reject_intake",
           "archive_thread",
           "restore_thread",
+          "delete_thread_forever",
           "token_get_thread",
           "token_request_code",
           "token_verify_code",

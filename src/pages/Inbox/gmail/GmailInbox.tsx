@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { HubEmptyState } from '@/components/core/hub';
 import { gmailApi } from '@/services/gmailApi';
 import { timeAgo } from '../inboxFormat';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, formatTime } from '@/utils/datetime';
 import { visibleModes, type InboxMode } from '../inboxModes';
 import { NavRow, SidebarHeading } from '../components/InboxPrimitives';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
@@ -18,7 +18,13 @@ import { useFileDrop } from '../useFileDrop';
 import { TrackOpensToggle, useTrackOpens } from '../components/OpenTracking';
 import { GmailThreadView } from './GmailThreadView';
 import { fileToAttachment } from '../composerAttachments';
-import { REMINDERS_VIEW, SNOOZED_VIEW, useGmailMailbox, type GmailMailboxState } from './useGmailMailbox';
+import { FOLLOW_UP_VIEWS, OUTREACH_VIEW, REMINDERS_VIEW, SNOOZED_VIEW, useGmailMailbox, type GmailMailboxState } from './useGmailMailbox';
+
+const FOLLOW_UP_TABS = [
+  { id: SNOOZED_VIEW, label: 'Boomerang', empty: 'Nothing is away. Boomerang a conversation and it comes back to the top of the Inbox on the day you pick.' },
+  { id: OUTREACH_VIEW, label: 'Outreach', empty: 'No follow-ups waiting. Schedule one from a conversation and it is sent on the day you pick, unless they reply first.' },
+  { id: REMINDERS_VIEW, label: 'Reminders', empty: 'No reminders set.' },
+];
 import { GmailShareDialog } from './GmailShareDialog';
 import { MailAvatar, RecipientInput } from './mailParts';
 import { ScheduledDialog, SendLaterMenu } from '../components/SendLater';
@@ -26,8 +32,6 @@ import { ScheduledDialog, SendLaterMenu } from '../components/SendLater';
 const SYSTEM_ROWS: Array<{ id: string; label: string; icon: React.ElementType }> = [
   { id: 'INBOX', label: 'Inbox', icon: InboxIcon },
   { id: 'STARRED', label: 'Starred', icon: Star },
-  { id: SNOOZED_VIEW, label: 'Snoozed', icon: AlarmClock },
-  { id: REMINDERS_VIEW, label: 'Reminders', icon: BellRing },
   { id: 'DRAFT', label: 'Drafts', icon: FilePen },
   { id: 'SENT', label: 'Sent', icon: Send },
   { id: 'SPAM', label: 'Spam', icon: ShieldAlert },
@@ -119,6 +123,8 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
   const { accounts, account, configured } = g;
   const labelById = new Map(g.labels.map((l) => [l.id, l]));
   const userLabels = g.labels.filter((l) => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
+  const followUpView = FOLLOW_UP_VIEWS.includes(g.labelId);
+  const followUpTab = FOLLOW_UP_TABS.find((t) => t.id === g.labelId);
 
   const modeTabs = (
     <div role="tablist" aria-label="Inbox source" className="flex items-center gap-3 px-3 border-b border-hairline shrink-0">
@@ -182,11 +188,18 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
             {SYSTEM_ROWS.map(({ id, label, icon: Icon }) => {
               const l = labelById.get(id);
               return (
-                <NavRow key={id} icon={<Icon className="w-4 h-4 shrink-0" />} label={label}
-                  active={!g.appliedQuery && g.labelId === id}
-                  count={id === 'INBOX' && l?.unread ? String(l.unread) : id === 'DRAFT' && l?.total ? String(l.total) : null}
-                  emphasiseCount={id === 'INBOX'}
-                  onClick={() => { g.setQuery(''); g.setLabelId(id); }} />
+                <React.Fragment key={id}>
+                  <NavRow icon={<Icon className="w-4 h-4 shrink-0" />} label={label}
+                    active={!g.appliedQuery && g.labelId === id}
+                    count={id === 'INBOX' && l?.unread ? String(l.unread) : id === 'DRAFT' && l?.total ? String(l.total) : null}
+                    emphasiseCount={id === 'INBOX'}
+                    onClick={() => { g.setQuery(''); g.setLabelId(id); }} />
+                  {id === 'INBOX' && (
+                    <NavRow icon={<AlarmClock className="w-4 h-4 shrink-0" />} label="Follow up"
+                      active={!g.appliedQuery && followUpView}
+                      onClick={() => { g.setQuery(''); g.setLabelId(SNOOZED_VIEW); }} />
+                  )}
+                </React.Fragment>
               );
             })}
             <NavRow icon={<CalendarClock className="w-4 h-4 shrink-0" />} label="Scheduled" active={false} onClick={() => setShowScheduled(true)} />
@@ -218,6 +231,14 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
           </div>
           <Button size="icon" className="h-9 w-9 shrink-0 md:hidden" onClick={() => setComposing(true)} title="Compose"><Plus className="w-4 h-4" /></Button>
         </div>
+        {!g.appliedQuery && (
+          <div role="tablist" aria-label="Follow up" className={`${followUpView ? 'flex' : 'flex md:hidden'} items-center gap-3 px-3 border-b border-hairline text-xs`}>
+            <button role="tab" aria-selected={g.labelId === 'INBOX'} onClick={() => g.setLabelId('INBOX')} className="py-1.5 md:hidden">Inbox</button>
+            {FOLLOW_UP_TABS.map((t) => (
+              <button key={t.id} role="tab" aria-selected={g.labelId === t.id} onClick={() => g.setLabelId(t.id)} className="py-1.5">{t.label}</button>
+            ))}
+          </div>
+        )}
         {account?.is_shared && (
           <div role="tablist" aria-label="Assignment" className="flex items-center gap-3 px-3 border-b border-hairline text-xs">
             {(['all', 'mine', 'unassigned'] as const).map((k) => (
@@ -246,6 +267,8 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
             g.appliedQuery
               ? <HubEmptyState icon={Search} variant="filtered" title="Nothing matches" description={`Gmail found nothing for “${g.appliedQuery}”.`}
                 action={<Button size="sm" variant="outline" onClick={() => g.setQuery('')}>Clear search</Button>} />
+              : followUpTab
+              ? <HubEmptyState icon={AlarmClock} title={`No ${followUpTab.label.toLowerCase()}`} description={followUpTab.empty} />
               : <HubEmptyState icon={Mail} title="Nothing here" description="This folder is empty in Gmail." />
           ) : (
             <>
@@ -267,11 +290,17 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
                       {t.starred && <Star className="w-3.5 h-3.5 shrink-0 fill-current text-amber-700 dark:text-amber-300" />}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{t.snippet}</div>
-                    {(t.has_attachment || t.contact_name || t.snoozed_until || t.remind_at) && (
+                    {(t.has_attachment || t.contact_name || t.snoozed_until || t.remind_at || t.woken_at || t.outreach?.length) && (
                       <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
                         {t.has_attachment && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5"><Paperclip className="w-3 h-3" />Attachment</span>}
                         {t.contact_name && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 max-w-[12rem] truncate">CRM · {t.contact_name}</span>}
                         {t.snoozed_until && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5"><AlarmClock className="w-3 h-3" />{formatDate(t.snoozed_until)}</span>}
+                        {t.woken_at && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-foreground"><AlarmClock className="w-3 h-3" />Back · {timeAgo(t.woken_at)}</span>}
+                        {t.outreach?.map((o) => (
+                          <span key={o.id} className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 max-w-[16rem] truncate" title={o.preview}>
+                            <Send className="w-3 h-3" />Sends {formatDate(o.send_at)} {formatTime(o.send_at)} unless they reply
+                          </span>
+                        ))}
                         {t.remind_at && <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 max-w-[14rem] truncate"><BellRing className="w-3 h-3" />{formatDate(t.remind_at)}{t.remind_note ? ` · ${t.remind_note}` : ''}</span>}
                       </div>
                     )}

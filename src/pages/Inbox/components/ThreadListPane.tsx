@@ -1,5 +1,5 @@
 import React from 'react';
-import { Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
+import { AlarmClock, Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
 import { visibleModes, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
@@ -15,12 +15,14 @@ import { FilterBar } from '@/components/core/filters';
 import { inboxSourceMeta, inboxThreadSource, SOURCE_FILTER_ORDER } from '../inboxSource';
 import { type InboxThreadStatus } from '@/services/inboxApi';
 import { timeAgo } from '../inboxFormat';
+import { formatDate } from '@/utils/datetime';
 import { LabelChips, MobileChip, SourceWord, ThreadAvatar } from './InboxPrimitives';
 import type { InboxPageState } from '../useInboxPage';
 
 
 const EMPTY_VIEW = {
   all: { title: 'No conversations yet', description: 'Email, WhatsApp, social and enquiries from your public profile all land here, each tagged with where it came from.' },
+  followup: { title: 'Nothing to follow up', description: 'Use the clock on a conversation: Boomerang brings it back to the top on a day you pick, Automatic outreach sends your message then unless they reply first.' },
   archived: { title: 'Nothing archived', description: 'Deleted conversations rest here for 30 days before they are removed for good.' },
   starred: { title: 'Nothing starred', description: 'Star a message to keep its conversation here.' },
   sent: { title: 'Nothing sent yet', description: 'Conversations you have written in show up here.' },
@@ -37,6 +39,9 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     showArchived,
     statusTab,
     setStatusTab,
+    followUpKind,
+    setFollowUpKind,
+    followUpCounts,
     activeId,
     filterGroups,
     filterValues,
@@ -98,6 +103,9 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
         <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-0.5">
           <MobileChip active={view === 'all'} onClick={() => goToView('all')}>
             <InboxIcon className="w-3 h-3" />Inbox
+          </MobileChip>
+          <MobileChip active={view === 'followup'} onClick={() => goToView('followup')}>
+            <AlarmClock className="w-3 h-3" />Follow up
           </MobileChip>
           <MobileChip active={view === 'unread'} onClick={() => goToView('unread')}>
             <Mail className="w-3 h-3" />Unread
@@ -163,16 +171,32 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
           </div>
         ) : (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {view === 'all' ? (
-            <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as InboxThreadStatus)}>
+          {view === 'all' || view === 'followup' ? (
+            <div className="space-y-1.5">
+            <Tabs value={statusTab} onValueChange={(v) => {
+              if (v === 'snoozed') { goToView('followup'); return; }
+              goToView('all');
+              setStatusTab(v as InboxThreadStatus);
+            }}>
               {/* No active-state override: the underline treatment is global, on
                   [role="tab"] in index.css. A filled pill here would read as a button. */}
               <TabsList className="h-auto gap-3 bg-transparent p-0">
                 <TabsTrigger value="open" className="text-xs px-0 py-1">Open</TabsTrigger>
-                <TabsTrigger value="snoozed" className="text-xs px-0 py-1">Follow-up</TabsTrigger>
+                <TabsTrigger value="snoozed" className="text-xs px-0 py-1">Follow up</TabsTrigger>
                 <TabsTrigger value="closed" className="text-xs px-0 py-1">Done</TabsTrigger>
               </TabsList>
             </Tabs>
+            {view === 'followup' && (
+              <div role="tablist" aria-label="Follow-up kind" className="flex items-center gap-3 text-xs">
+                {(['boomerang', 'outreach'] as const).map((k) => (
+                  <button key={k} role="tab" aria-selected={followUpKind === k} onClick={() => setFollowUpKind(k)} className="py-1">
+                    {k === 'boomerang' ? 'Boomerang' : 'Automatic outreach'}
+                    {followUpCounts && <span className="text-muted-foreground tabular-nums"> {followUpCounts[k]}{nextCursor ? '+' : ''}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            </div>
           ) : <span />}
           <FilterBar
             groups={filterGroups}
@@ -273,7 +297,12 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                       ) : (
                         <span className="text-[11px] text-muted-foreground">Unassigned</span>
                       )}
-                      {t.status !== 'open' && !t.archived_at && <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status}</span>}
+                      {t.follow_up_at && !t.follow_up_fired_at ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80">
+                          {t.follow_up_message ? <Send className="w-3 h-3" /> : <AlarmClock className="w-3 h-3" />}
+                          {t.follow_up_message ? 'Sends' : 'Back'} {formatDate(t.follow_up_at)}
+                        </span>
+                      ) : t.status !== 'open' && !t.archived_at && <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status === 'snoozed' ? 'follow up' : t.status}</span>}
                       {t.agent_state === 'active' && (
                         <span className="inline-flex items-center gap-1 text-[11px] leading-none text-primary"><Bot className="w-3 h-3" />AI</span>
                       )}

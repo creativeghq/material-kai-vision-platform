@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlarmClock, BellRing, Building2, Loader2, UserPlus, UserRound, X } from 'lucide-react';
+import { BellRing, Building2, Loader2, UserPlus, UserRound, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { gmailApi, type GmailAddress, type GmailThreadMeta } from '@/services/gmailApi';
-import { SNOOZED_VIEW, type GmailMailboxState } from './useGmailMailbox';
+import { OUTREACH_VIEW, SNOOZED_VIEW, type GmailMailboxState } from './useGmailMailbox';
+import { FollowUpPopover } from '../components/FollowUpPopover';
 
 function at(daysAhead: number, hour: number): Date {
   const d = new Date();
@@ -16,25 +17,11 @@ function at(daysAhead: number, hour: number): Date {
   return d;
 }
 
-export function snoozePresets(now = new Date()): Array<{ label: string; at: Date }> {
-  const out: Array<{ label: string; at: Date }> = [];
-  const later = new Date(now);
-  later.setHours(later.getHours() + 3, 0, 0, 0);
-  if (later.getDate() === now.getDate() && later.getHours() <= 20) out.push({ label: 'Later today', at: later });
-  out.push({ label: 'Tomorrow morning', at: at(1, 8) });
-  const toMonday = ((8 - now.getDay()) % 7) || 7;
-  out.push({ label: 'Next week', at: at(toMonday, 8) });
-  out.push({ label: 'In a month', at: at(30, 8) });
-  return out;
-}
-
 export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string; subject: string; sender: GmailAddress | null }> = ({ g, threadId, subject, sender }) => {
   const { toast } = useToast();
   const { account } = g;
   const [meta, setMeta] = useState<GmailThreadMeta | null>(null);
   const [busy, setBusy] = useState(false);
-  const [custom, setCustom] = useState('');
-  const [customOpen, setCustomOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const [remindAt, setRemindAt] = useState('');
   const [remindNote, setRemindNote] = useState('');
@@ -50,12 +37,14 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
 
   useEffect(() => { setMeta(null); void load(); }, [load]);
 
-  const run = async (fn: () => Promise<unknown>, done: string) => {
+  const run = async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
-    try { await fn(); toast({ title: done }); await load(); } catch (e) {
+    try { await fn(); toast({ title: done }); await load(); return true; } catch (e) {
       toast({ title: 'That did not work', description: (e as Error).message, variant: 'destructive' });
+      return false;
     } finally { setBusy(false); }
   };
+  const orThrow = async (ok: Promise<boolean>) => { if (!(await ok)) throw new Error('not done'); };
 
   if (!account) return null;
   if (!meta) return <div className="px-4 py-2 border-b border-hairline text-xs text-muted-foreground"><Loader2 className="w-3.5 h-3.5 animate-spin inline" /></div>;
@@ -65,7 +54,7 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
     if (until && g.labelId === 'INBOX') g.dropThread(threadId);
     else if (!until && g.labelId === SNOOZED_VIEW) g.dropThread(threadId);
     else g.patchThread(threadId, { snoozed_until: until ? until.toISOString() : null });
-  }, until ? `Snoozed until ${formatDate(until.toISOString())} ${formatTime(until.toISOString())}` : 'Back in the inbox');
+  }, until ? `Boomerang set — back on top ${formatDate(until.toISOString())} ${formatTime(until.toISOString())}` : 'Back in the inbox');
 
   return (
     <div className="px-4 py-2 border-b border-hairline flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs shrink-0">
@@ -102,30 +91,22 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
         ) : <span className="text-muted-foreground">No sender to link</span>}
       </span>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="ghost" className="h-6 text-xs" disabled={busy}>
-            <AlarmClock className="w-3.5 h-3.5 mr-1" />
-            {meta.snoozed_until ? `Snoozed until ${formatDate(meta.snoozed_until)} ${formatTime(meta.snoozed_until)}` : 'Snooze'}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          {snoozePresets().map((p) => (
-            <DropdownMenuItem key={p.label} onSelect={() => snooze(p.at)}>
-              <span className="flex-1">{p.label}</span>
-              <span className="text-muted-foreground text-[11px]">{formatDate(p.at.toISOString())} {formatTime(p.at.toISOString())}</span>
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setCustomOpen(true)}>Pick a date and time…</DropdownMenuItem>
-          {meta.snoozed_until && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => snooze(null)}>Unsnooze now</DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <FollowUpPopover
+        compact
+        idPrefix={`gmail-followup-${threadId}`}
+        boomerangAt={meta.snoozed_until}
+        outreach={meta.outreach ?? []}
+        onBoomerang={(at) => orThrow(snooze(at))}
+        onClearBoomerang={() => orThrow(snooze(null))}
+        onOutreach={(at, message) => orThrow(run(async () => {
+          await gmailApi.outreachSchedule({ account_id: account.id, thread_id: threadId, body: message, send_at: at.toISOString() });
+          if (g.labelId === OUTREACH_VIEW) void g.loadThreads();
+        }, `Follow-up scheduled for ${formatDate(at.toISOString())} ${formatTime(at.toISOString())} — it sends unless they reply first`))}
+        onCancelOutreach={(id) => orThrow(run(async () => {
+          await gmailApi.outreachCancel(account.id, id);
+          if (g.labelId === OUTREACH_VIEW) void g.loadThreads();
+        }, 'Follow-up cancelled — it will not be sent'))}
+      />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -158,14 +139,6 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
           <Button size="sm" className="h-6 text-xs" disabled={!remindAt || busy}
             onClick={() => { setRemindOpen(false); void run(() => gmailApi.remind({ account_id: account.id, thread_id: threadId, at: new Date(remindAt).toISOString(), note: remindNote, subject }), 'Reminder set'); }}>Set</Button>
           <button type="button" title="Cancel" onClick={() => setRemindOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
-        </span>
-      )}
-
-      {customOpen && (
-        <span className="inline-flex items-center gap-1.5">
-          <Input type="datetime-local" value={custom} onChange={(e) => setCustom(e.target.value)} className="h-6 text-xs w-48" aria-label="Snooze until" />
-          <Button size="sm" className="h-6 text-xs" disabled={!custom || busy} onClick={() => { setCustomOpen(false); void snooze(new Date(custom)); }}>Snooze</Button>
-          <button type="button" title="Cancel" onClick={() => setCustomOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
         </span>
       )}
 

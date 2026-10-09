@@ -2,6 +2,7 @@ import React from 'react';
 import { UserPlus, Bot, CheckCircle2, ArchiveRestore, Trash2, Sparkles, Link2 } from 'lucide-react';
 import { marketplaceService } from '@/services/marketplaceService';
 import { Button } from '@/components/core/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/core/ui/alert-dialog';
 import { inboxApi, type InboxThread } from '@/services/inboxApi';
 import { askJarvisAboutThreadPrompt } from '../inboxFormat';
 import { InboxAgentSettingsButton } from './InboxAgentSettings';
@@ -25,6 +26,8 @@ export const ConversationActions: React.FC<{ s: InboxPageState }> = ({ s }) => {
     openThread,
     archiveActive,
     restoreActive,
+    deleteForeverActive,
+    activeWorkspaceId,
     activeThreadLabels,
     myUserId,
   } = s;
@@ -132,9 +135,34 @@ export const ConversationActions: React.FC<{ s: InboxPageState }> = ({ s }) => {
         <UserPlus className="w-4 h-4" />
       </Button>
       {activeThread.archived_at ? (
-        <Button variant="outline" size="sm" title="Restore this conversation" onClick={restoreActive}>
-          <ArchiveRestore className="w-4 h-4 mr-1.5" /> Restore
-        </Button>
+        <>
+          <Button variant="outline" size="sm" title="Restore this conversation" onClick={restoreActive}>
+            <ArchiveRestore className="w-4 h-4 mr-1.5" /> Restore
+          </Button>
+          {canManageLabels && activeThread.workspace_id === activeWorkspaceId && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" title="Delete this conversation permanently">
+                  <Trash2 className="w-4 h-4 mr-1.5" /> Delete forever
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this conversation permanently?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Every message, note and attachment in it is removed now and cannot be restored.
+                    {activeThread.channel === 'whatsapp' || activeThread.channel === 'email'
+                      ? ' It only leaves this Inbox: the other person still has their copy.' : ''}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => { void deleteForeverActive(); }}>Delete forever</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </>
       ) : (
         <Button
           variant="outline" size="icon"
