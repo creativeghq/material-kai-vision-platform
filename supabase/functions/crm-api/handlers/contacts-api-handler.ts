@@ -6,6 +6,7 @@ import { getCrmScope, scopeAllows, rowInScope, type CrmScope } from './_scope.ts
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import { foldForSearch, escapeLike } from '../../_shared/searchFold.ts';
 import { guardDuplicateParty } from './_partyDedupe.ts';
+import { noteMatchedTargetIds } from './_noteSearch.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -298,8 +299,10 @@ export async function handleContacts(req: Request): Promise<Response> {
         // which also keeps the term out of PostgREST's comma-delimited filter grammar. When the
         // attached-company clause IS needed, the term is quoted so a comma in a search
         // ("ΠΛΑΚΑΚΙΩΝ, ΠΛΑΚΟΛΙΘΩΝ") can't be read as the start of a second condition.
-        listQuery = companyContactIds.length > 0
-          ? listQuery.or(`search_fold.ilike.${quoteOrValue(`%${safe}%`)},id.in.(${companyContactIds.join(',')})`)
+        const noteContactIds = await noteMatchedTargetIds(supabase, 'contact', safe, scope, MAX_FILTER_IDS);
+        const extraIds = [...new Set([...companyContactIds, ...noteContactIds])];
+        listQuery = extraIds.length > 0
+          ? listQuery.or(`search_fold.ilike.${quoteOrValue(`%${safe}%`)},id.in.(${extraIds.join(',')})`)
           : listQuery.ilike('search_fold', `%${safe}%`);
       }
       if (companyName) {

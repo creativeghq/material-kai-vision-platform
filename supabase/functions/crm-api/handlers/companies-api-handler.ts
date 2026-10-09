@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, rowInScope, isUuid, type CrmScope } from './_scope.ts';
-import { pickContactFields, escapeLike, parseIdsParam } from './contacts-api-handler.ts';
+import { pickContactFields, escapeLike, parseIdsParam, quoteOrValue, MAX_FILTER_IDS } from './contacts-api-handler.ts';
+import { noteMatchedTargetIds } from './_noteSearch.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import { foldForSearch } from '../../_shared/searchFold.ts';
 // Generated mirror of src/services/crm/vatNormalize.ts — the receipt key (#353 CRM-7).
@@ -360,10 +361,13 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // Match the FOLDED haystack with a FOLDED term — `ilike` is case-insensitive but not
       // accent-insensitive, so "Καρέλης" never found "ΚΑΡΕΛΗΣ". `search_fold` is a generated
       // column (name + email + website) written by public.crm_fold(); foldForSearch() is its
-      // twin. One column replaces the three-way `.or()`, so the term no longer touches
-      // PostgREST's comma-delimited filter grammar at all.
+      // twin. A company whose CRM note matches is ORed in by id, with the term quoted.
       if (search) {
-        query = query.ilike('search_fold', `%${escapeLike(foldForSearch(search))}%`);
+        const safe = escapeLike(foldForSearch(search));
+        const noteIds = await noteMatchedTargetIds(supabase, 'company', safe, scope, MAX_FILTER_IDS);
+        query = noteIds.length > 0
+          ? query.or(`search_fold.ilike.${quoteOrValue(`%${safe}%`)},id.in.(${noteIds.join(',')})`)
+          : query.ilike('search_fold', `%${safe}%`);
       }
       if (ids) query = query.in('id', ids);
       if (profession) query = query.eq('profession', profession);
