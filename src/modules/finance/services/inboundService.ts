@@ -376,11 +376,17 @@ export const inboundService = {
    * any reason to think in. It used to order by `created_at` — when WE happened to poll the row
    * — and the two agreed by accident for as long as there was a single inlet fetching daily.
    */
-  async list(workspaceId: string, limit = INBOUND_LIST_LIMIT): Promise<{ rows: InboundDocument[]; total: number }> {
-    const { data, error, count } = await supabase
+  async list(
+    workspaceId: string,
+    { issuedFrom, issuedTo, limit = INBOUND_LIST_LIMIT }: { issuedFrom?: string; issuedTo?: string; limit?: number } = {},
+  ): Promise<{ rows: InboundDocument[]; total: number }> {
+    let query = supabase
       .from('inbound_documents')
       .select(this.LIST_COLUMNS, { count: 'exact' })
-      .eq('workspace_id', workspaceId)
+      .eq('workspace_id', workspaceId);
+    if (issuedFrom) query = query.gte('issue_date', issuedFrom);
+    if (issuedTo) query = query.lte('issue_date', issuedTo);
+    const { data, error, count } = await query
       // Nulls last: a document with no issue date is not the newest thing that ever happened.
       .order('issue_date', { ascending: false, nullsFirst: false })
       // Same-day documents fall back to arrival order, so the sort is total and paging is stable.

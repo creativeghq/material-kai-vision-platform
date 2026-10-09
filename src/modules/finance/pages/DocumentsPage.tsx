@@ -5,7 +5,7 @@
  * the shared 3-dots action menu. Delivery/goods-receipt notes (`delivery_notes`) and the
  * Expenses inbox (`inbound_documents`) are fully wired surfaces alongside invoices.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, ChevronRight, Send, Building2, CreditCard } from 'lucide-react';
 import { CardTerminalPaymentDialog } from '@/modules/finance/components/CardTerminalPaymentDialog';
@@ -62,7 +62,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, scopedFilterValue, useFilters } from '@/components/core/filters';
+import { FilterBar, scopedFilterValue, useFilters, type DateRangeValue } from '@/components/core/filters';
 import { buildDocumentFilters, type DocFilterType } from '@/modules/finance/components/documentFilters';
 import { formatDate } from '@/utils/datetime';
 import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
@@ -269,9 +269,16 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     }
   };
 
+  // The Expenses issue-date window, pushed into the fetch so the row cap applies INSIDE it.
+  const inboundRangeRef = useRef<{ issuedFrom?: string; issuedTo?: string }>({});
+  const inboundFetchSeq = useRef(0);
+  const inboundFetchedKey = useRef('');
+
   const load = async () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
+    const inboundSeq = ++inboundFetchSeq.current;
+    inboundFetchedKey.current = JSON.stringify(inboundRangeRef.current);
     try {
       // `.catch(() => [])` on five of these made a FAILED query indistinguishable from an empty
       // one: a payments query that errored rendered the same "No payments recorded." as a ledger
@@ -286,7 +293,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         // 200 silently hid older documents once a workspace crossed it.
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 1000 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
-        guard('expenses', inboundService.list(activeWorkspaceId), { rows: [] as InboundDocument[], total: 0 }),
+        guard('expenses', inboundService.list(activeWorkspaceId, inboundRangeRef.current), { rows: [] as InboundDocument[], total: 0 }),
         guard('payments', financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 1000 }), [] as any[]),
         guard('delivery_notes', deliveryNotesService.list(activeWorkspaceId), [] as any[]),
         guard('cheques', chequesService.list(activeWorkspaceId), [] as any[]),
@@ -310,8 +317,10 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       setSupplierCreditNotes(
         await financeService.listSupplierCreditNotes({ workspaceId: activeWorkspaceId }).catch(() => [] as SupplierCreditNote[]),
       );
-      setInbound(inb.rows);
-      setInboundTotal(inb.total);
+      if (inboundSeq === inboundFetchSeq.current) {
+        setInbound(inb.rows);
+        setInboundTotal(inb.total);
+      }
       setInboundLinks(links);
       setPayments(pmts);
       setDeliveryNotes(dns);
@@ -401,6 +410,28 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   }, [searchParams, setSearchParams, type, setFilterValues]);
   // A narrowed result set is a different list — restart at the first page.
   useEffect(() => { setPage(1); }, [filterValues]);
+
+  const issueWindow = type === 'expenses' ? (filterValues.issue_date as DateRangeValue | undefined) : undefined;
+  const issuedFrom = issueWindow?.from || undefined;
+  const issuedTo = issueWindow?.to || undefined;
+  useEffect(() => {
+    inboundRangeRef.current = { issuedFrom, issuedTo };
+    const key = JSON.stringify(inboundRangeRef.current);
+    if (!activeWorkspaceId || key === inboundFetchedKey.current) return;
+    inboundFetchedKey.current = key;
+    const seq = ++inboundFetchSeq.current;
+    inboundService.list(activeWorkspaceId, inboundRangeRef.current)
+      .then((res) => {
+        if (seq !== inboundFetchSeq.current) return;
+        setInbound(res.rows);
+        setInboundTotal(res.total);
+        setLoadErrors((prev) => { const next = { ...prev }; delete next.expenses; return next; });
+      })
+      .catch((e: any) => {
+        if (seq !== inboundFetchSeq.current) return;
+        setLoadErrors((prev) => ({ ...prev, expenses: e?.message ?? 'could not be loaded' }));
+      });
+  }, [activeWorkspaceId, issuedFrom, issuedTo]);
 
   const rows = activeRows as Invoice[];
   const filteredInbound = activeRows as InboundDocument[];
