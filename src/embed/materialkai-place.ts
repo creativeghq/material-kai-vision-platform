@@ -239,8 +239,9 @@ export class MaterialKaiPlace extends HTMLElement {
     const key = this.apiKey;
     if (!key) { this.status.textContent = 'This widget is missing its api-key.'; return; }
 
+    const fromStore = this.getAttribute('catalog') === 'store';
     const picked = (this.getAttribute('product-ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    const params = new URLSearchParams({ action: 'list', limit: '60', key });
+    const params = new URLSearchParams({ action: fromStore ? 'form_config' : 'list', limit: '60', key });
     if (picked.length) params.set('product_ids', picked.join(','));
     try {
       const res = await fetch(`${this.apiBase}/functions/v1/products-3d-api?${params}`);
@@ -272,17 +273,50 @@ export class MaterialKaiPlace extends HTMLElement {
           if (this.photo) this.render();
         })
         .catch(() => { this.siteKey = null; });
-      void this.loadSizes(key);
+      if (fromStore) this.products = await this.loadStoreProducts();
+      else void this.loadSizes(key);
     } catch {
       this.status.textContent = 'Could not reach the catalogue.';
       return;
     }
     if (this.products.length === 0) {
-      this.status.textContent = 'No product here has a picture to place yet.';
+      this.status.textContent = fromStore
+        ? 'This widget shows the products of the shop it sits on, and found none here.'
+        : 'No product here has a picture to place yet.';
       return;
     }
     this.status.textContent = '';
     this.render();
+  }
+
+  private async loadStoreProducts(): Promise<ShelfProduct[]> {
+    const w = window as unknown as { Shopify?: { currency?: { active?: string } } };
+    if (w.Shopify) {
+      const res = await fetch('/products.json?limit=60');
+      const body = await res.json().catch(() => null);
+      const currency = w.Shopify.currency?.active ?? 'EUR';
+      return ((body?.products ?? []) as Array<Record<string, any>>).map((p) => {
+        const variant = (p.variants ?? []).find((v: Record<string, any>) => v.available !== false) ?? p.variants?.[0];
+        return {
+          id: `shopify:${p.id}`, name: String(p.title ?? ''), price: variant ? Number(variant.price) : null, currency,
+          image: String(p.images?.[0]?.src ?? ''), cutout: null, widthM: null, heightM: null,
+          buy: variant ? { shopify_variant_id: String(variant.id) } : {},
+        };
+      }).filter((p) => p.image);
+    }
+    const res = await fetch('/wp-json/wc/store/v1/products?per_page=60');
+    if (!res.ok) return [];
+    const rows = await res.json().catch(() => null);
+    if (!Array.isArray(rows)) return [];
+    return (rows as Array<Record<string, any>>).map((p) => {
+      const minor = Number(p.prices?.currency_minor_unit ?? 2);
+      const price = Number(p.prices?.price);
+      return {
+        id: `woo:${p.id}`, name: String(p.name ?? ''), price: Number.isFinite(price) ? price / 10 ** minor : null,
+        currency: String(p.prices?.currency_code ?? 'EUR'), image: String(p.images?.[0]?.src ?? ''),
+        cutout: null, widthM: null, heightM: null, buy: { woocommerce_product_id: String(p.id) },
+      };
+    }).filter((p) => p.image);
   }
 
   private async loadSizes(key: string) {
@@ -1002,7 +1036,8 @@ export class MaterialKaiPlace extends HTMLElement {
         const res = await fetch('/cart/add.js', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [{ id: Number(product.buy.shopify_variant_id), quantity: 1, properties: { _materialkai_product_id: product.id } }] }),
+          body: JSON.stringify({ items: [{ id: Number(product.buy.shopify_variant_id), quantity: 1,
+            properties: /^[0-9a-f-]{36}$/i.test(product.id) ? { _materialkai_product_id: product.id } : {} }] }),
         });
         if (!res.ok) throw new Error('cart refused');
         document.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
@@ -1040,7 +1075,8 @@ export class MaterialKaiPlace extends HTMLElement {
   }
 
   private report(eventType: string) {
-    const productId = this.selected?.productId ?? this.items[0]?.productId ?? this.products[0]?.id ?? null;
+    const first = this.selected?.productId ?? this.items[0]?.productId ?? this.products[0]?.id ?? null;
+    const productId = first && /^[0-9a-f-]{36}$/i.test(first) ? first : null;
     trackEmbedEvent({ apiBase: this.apiBase, apiKey: this.apiKey, productId, eventType });
   }
 

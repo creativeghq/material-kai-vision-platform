@@ -204,3 +204,26 @@ describe('make it realistic keeps nothing of the visitor\u2019s home', () => {
     expect(cleanup).toMatch(/from\('generation_3d'\)\.delete\(\)/);
   });
 });
+
+describe('a shop’s products are read live from the shop, never copied to us', () => {
+  it('the snippet asks for the shop’s own products instead of a picked catalogue set', () => {
+    const code = widgetSnippet('https://a', 'k', 'place', { fromStore: true, productIds: ['p1'] });
+    expect(code).toContain('catalog="store"');
+    expect(code).not.toContain('product-ids');
+  });
+
+  it('the widget reads only the shop’s own public storefront endpoints', () => {
+    const widget = read('src/embed/materialkai-place.ts');
+    const loader = widget.slice(widget.indexOf('private async loadStoreProducts('), widget.indexOf('private async loadSizes('));
+    expect(loader).toContain("fetch('/products.json?limit=60')");
+    expect(loader).toContain("fetch('/wp-json/wc/store/v1/products?per_page=60')");
+    expect(loader).not.toMatch(/apiBase/);
+  });
+
+  it('nothing in the app calls the retired catalogue import', () => {
+    for (const f of ['src/services/embedKeysService.ts', 'src/services/commerce/storeConnectionsService.ts',
+      'src/components/core/Profile/embed/EmbedWidgetDialog.tsx']) {
+      expect(read(f)).not.toMatch(/store-products-sync|product-from-url/);
+    }
+  });
+});

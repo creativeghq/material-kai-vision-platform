@@ -33,7 +33,6 @@ import {
   type EmbedWidgetId, type WidgetOptions,
 } from './embedWidgets';
 import { EmbedWidgetPreview } from './EmbedWidgetPreview';
-import { PlaceSourcesPanel } from './PlaceSourcesPanel';
 
 type Step = 'widget' | 'content' | 'site' | 'code';
 
@@ -77,7 +76,6 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
   const [scenes, setScenes] = useState<VisualizerScene[] | null>(null);
   const [categories, setCategories] = useState<EmbedScopeOption[]>([]);
   const [productTerm, setProductTerm] = useState('');
-  const [productsVersion, setProductsVersion] = useState(0);
   const [cutouts, setCutouts] = useState<ProductCutout[] | null>(null);
   const [cutting, setCutting] = useState(false);
 
@@ -136,7 +134,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
         .catch((e) => { if (!cancelled) { setProducts([]); fail('Could not load products', e); } });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [open, step, widget, workspaceId, productTerm, productScope, productsVersion, fail]);
+  }, [open, step, widget, workspaceId, productTerm, productScope, fail]);
 
   const scopedBlueprints = useMemo(() => {
     if (!blueprints) return null;
@@ -491,14 +489,27 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
       case 'place':
         return (
           <div className="space-y-2">
-            <PlaceSourcesPanel
-              workspaceId={workspaceId}
-              onAdded={(id) => {
-                setProductsVersion((v) => v + 1);
-                setOptions((o) => ({ ...o, productIds: [...new Set([...(o.productIds ?? []), id])] }));
-              }}
-              onSynced={() => setProductsVersion((v) => v + 1)}
-            />
+            <Label>Products from</Label>
+            <RadioGroup
+              className="space-y-1.5"
+              value={options.fromStore ? 'store' : 'catalogue'}
+              onValueChange={(v) => setOptions((o) => ({ ...o, fromStore: v === 'store', productIds: [] }))}
+            >
+              {([
+                ['catalogue', 'Your MaterialsHub catalogue', 'Published products, with clean cut-outs and real sizes.'],
+                ['store', 'The shop this widget sits on', 'Shopify or WooCommerce: the shop’s own products, read live from the shop, and Add to cart puts them in its cart. Nothing is copied to us. The preview here cannot show them, because the app is not your shop.'],
+              ] as const).map(([value, title, help]) => (
+                <label key={value} className="flex cursor-pointer items-start gap-3 rounded-md border border-hairline p-3">
+                  <RadioGroupItem value={value} className="mt-1" />
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium">{title}</span>
+                    <span className="block text-xs text-muted-foreground">{help}</span>
+                  </span>
+                </label>
+              ))}
+            </RadioGroup>
+            {!options.fromStore && (
+              <>
             <Label>Products visitors can place</Label>
             <p className="text-xs text-muted-foreground">
               Tick the ones to offer, or tick none to offer every published product with a picture. Products photographed
@@ -520,6 +531,8 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
                 {cutting && <Loader2 className="animate-spin" />}{cutting ? 'Making cut-outs…' : 'Prepare cut-outs'}
               </Button>
             </div>
+              </>
+            )}
             <div className="space-y-2 rounded-md border border-hairline p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-0.5">

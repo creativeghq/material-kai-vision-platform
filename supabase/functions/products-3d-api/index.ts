@@ -428,22 +428,6 @@ Deno.serve(withApiLogging((req) => {
 
     const buyByProduct = new Map<string, Record<string, string>>();
     if (ids.length) {
-      const { data: refs } = await supabase.from('product_external_refs')
-        .select('product_id, source, external_product_id, external_variant_id, connection_id, created_at')
-        .eq('workspace_id', workspaceId).in('source', ['shopify', 'woocommerce']).in('product_id', ids)
-        .order('created_at', { ascending: true });
-      const connIds = [...new Set(((refs ?? []) as any[]).map((r) => r.connection_id).filter(Boolean))];
-      const { data: live } = connIds.length
-        ? await supabase.from('store_connections').select('id').in('id', connIds).eq('enabled', true)
-        : { data: [] };
-      const liveIds = new Set(((live ?? []) as any[]).map((c) => c.id));
-      for (const r of (refs ?? []) as any[]) {
-        if (!liveIds.has(r.connection_id)) continue;
-        const buy = buyByProduct.get(r.product_id) ?? {};
-        if (r.source === 'shopify' && r.external_variant_id && !buy.shopify_variant_id) buy.shopify_variant_id = String(r.external_variant_id);
-        if (r.source === 'woocommerce' && r.external_product_id && !buy.woocommerce_product_id) buy.woocommerce_product_id = String(r.external_product_id);
-        buyByProduct.set(r.product_id, buy);
-      }
       const [{ data: storefront }, { data: ws }] = await Promise.all([
         supabase.from('workspace_storefront').select('enabled').eq('workspace_id', workspaceId).maybeSingle(),
         supabase.from('workspaces').select('slug').eq('id', workspaceId).maybeSingle(),

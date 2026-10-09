@@ -132,21 +132,3 @@ export async function sendDocumentToStore(invoiceId: string): Promise<{ link: st
   if (!data?.ok) throw new Error(data?.error ?? 'The store did not accept the document.');
   return data as { link: string; number: string; platform: string };
 }
-
-export interface StoreProductsSyncResult {
-  scanned: number;
-  created: number;
-  linked: number;
-  failed: number;
-  errors: string[];
-  taxes_included: boolean;
-  currency: string;
-}
-
-/** Pull the store's products and link each to ours; new ones arrive as unpublished drafts (#474). */
-export async function syncStoreProducts(connectionId: string): Promise<StoreProductsSyncResult> {
-  const { data, error } = await supabase.functions.invoke('store-products-sync', { body: { connection_id: connectionId } });
-  if (error) throw error;
-  if (!data?.ok) throw new Error(data?.error ?? 'The store did not answer.');
-  return data as StoreProductsSyncResult;
-}

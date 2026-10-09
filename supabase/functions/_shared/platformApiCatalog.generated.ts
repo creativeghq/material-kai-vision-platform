@@ -3402,42 +3402,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
-    "name": "product-from-url",
-    "tag": "Commerce",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Read a product off its own web page and add it to the catalogue",
-    "description": "Product in Place (#474). action=read fetches the page through the SSRF guard and reads schema.org Product JSON-LD first, Open Graph second (no AI fallback); it also reports an existing catalogue product the page matches. action=create takes the confirmed fields: a match is linked instead of duplicated; otherwise a draft product is created with its dimensions (cm), a NET price from the price-with-V",
-    "fields": {
-      "action": {
-        "type": "string",
-        "description": "read | create"
-      },
-      "workspace_id": {
-        "type": "string"
-      },
-      "url": {
-        "type": "string"
-      },
-      "name": {
-        "type": "string"
-      },
-      "price_gross": {
-        "type": "number"
-      },
-      "width_cm": {
-        "type": "number"
-      },
-      "height_cm": {
-        "type": "number"
-      },
-      "publish": {
-        "type": "boolean"
-      }
-    }
-  },
-  {
     "name": "product-market-price",
     "tag": "Products",
     "methods": [
@@ -4349,20 +4313,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "discover_only": {
         "type": "boolean",
         "description": "Return the observed attribute keys without ingesting anything."
-      }
-    }
-  },
-  {
-    "name": "store-products-sync",
-    "tag": "Commerce",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Pull a Shopify/WooCommerce catalogue and link each item to a platform product",
-    "description": "Product in Place selling (#474). Reads the connection's products (Shopify products.json up to 250 active; WooCommerce up to 300 published) and runs each through match_external_product. A match only gains a product_external_refs row - its price and details are never overwritten. A new item is created as an unpublished DRAFT with a NET list price (converted at the workspace VAT rate when the store s",
-    "fields": {
-      "connection_id": {
-        "type": "string"
       }
     }
   },

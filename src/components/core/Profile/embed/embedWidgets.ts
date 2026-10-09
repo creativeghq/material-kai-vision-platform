@@ -69,6 +69,8 @@ export interface WidgetOptions {
   sceneId?: string | null;
   /** Product in place: the merchant's pre-picked set. Empty means every published product. */
   productIds?: string[];
+  /** Product in Place: read the products of the shop the widget sits on instead of the catalogue. */
+  fromStore?: boolean;
 }
 
 /** The attributes the element reads; a required id nobody picked yet stays a visible placeholder. */
@@ -78,7 +80,8 @@ export function widgetAttributes(apiKey: string, widget: EmbedWidgetId, opts: Wi
   if ((widget === 'builder' || widget === 'visualizer') && opts.productId) attrs.push(['product-id', opts.productId]);
   if (widget === 'visualizer' && opts.sceneId) attrs.push(['scene-id', opts.sceneId]);
   if (widget === 'configurator') attrs.push(['blueprint', opts.blueprintId || 'BLUEPRINT_ID']);
-  if (widget === 'place' && opts.productIds?.length) attrs.push(['product-ids', opts.productIds.join(',')]);
+  if (widget === 'place' && opts.fromStore) attrs.push(['catalog', 'store']);
+  else if (widget === 'place' && opts.productIds?.length) attrs.push(['product-ids', opts.productIds.join(',')]);
   return attrs;
 }
 

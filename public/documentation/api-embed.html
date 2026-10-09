@@ -117,13 +117,9 @@
   <h3>Make it realistic</h3>
   <p>With <strong>AI impressions</strong> switched on for the widget's key, a visitor who has placed pieces can press <strong>Make it realistic</strong>: an image AI matches the light, contact shadows, reflections and grain of their room, and shows the result with a before/after switch. Each piece's colour is measured before and after; if the AI changed one, the widget keeps the visitor's own placement and says so. It uses your AI-impression credits and daily cap. The picture is sent once, with a line saying so beside the button, and both the picture and the result are deleted as soon as the result is returned.</p>
 
-  <h3>Where the products come from, and where Add to cart goes</h3>
-  <ul class="feat">
-    <li><strong>Your catalogue</strong> — any published product with a picture.</li>
-    <li><strong>Your Shopify or WooCommerce store</strong> — in the Add widget flow, <strong>Sync products</strong> on a connected store links each store product to your catalogue. A product you already have is linked by its barcode, SKU or page address and never overwritten; a new one arrives as an unpublished draft with its price converted to net.</li>
-    <li><strong>A product page link</strong> — paste any product page; we read its name, price, pictures, SKU, barcode and size from the page's product data, you check and correct them, and it is added (or linked, if you already have it).</li>
-  </ul>
-  <p><strong>Add to cart</strong> fires <code>materialkai:add-to-cart</code> first; call <code>event.preventDefault()</code> to handle it yourself. Otherwise the widget puts the item in <strong>your own cart</strong> when it is running on your Shopify or WooCommerce store and the product is linked to it, opens it in your MaterialsHub online store when that is switched on, and otherwise offers a quote request.</p>
+  <h3>Products from your own shop, live</h3>
+  <p>On a Shopify or WooCommerce site, set <code>catalog="store"</code> and the widget reads the shop's own products straight from the shop — its public storefront data, the same the shop's pages use — so names, prices, photos and stock are always the shop's current ones and nothing is copied to us. <strong>Add to cart</strong> then puts the item in that shop's cart. Without it, the widget shows your MaterialsHub catalogue.</p>
+  <p><strong>Add to cart</strong> always fires <code>materialkai:add-to-cart</code> first; call <code>event.preventDefault()</code> to handle it yourself. Otherwise the widget uses the shop's cart when it is running on that shop, opens your MaterialsHub online store when that is switched on, and otherwise offers a quote request.</p>
 
   <h3>Clean cut-outs</h3>
   <p>Products photographed on a plain background are cut out in the visitor's browser. For every other photo, press <strong>Prepare cut-outs</strong> in the Add widget flow: AI removes each product photo's background once, the result is checked to really be transparent, and the widget uses it from then on. <strong>1 credit per product</strong>, charged before the work and refunded if it fails; a few hundred products take a while, because the image service accepts about one job every ten seconds.</p>

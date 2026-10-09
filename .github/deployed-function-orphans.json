@@ -10,6 +10,16 @@
       "reason": "One-shot diagnostic from 2026-08-30 that compared which Replicate credential the edge runtime resolves against the one on the MIVAA droplet. It answered its question (same token, fingerprint 8fecbec9, account `basilakis`) and was retired IN PLACE the same day: version 2 is an 11-line stub that answers 410 to everything, holds no secret, and whose own first comment reads 'RETIRED 2026-08-30 ... DELETE IT'. Recorded rather than deleted for the same reason as the entry above — see wayOut. It made every deploy report failure from 08:52 on 2026-08-30 while the deploy step itself kept succeeding, which also skipped `mark-deployed-functions` and left the `deployed/functions` marker stale, so each push redeployed all 134 functions instead of the changed ones.",
       "version": 2,
       "wayOut": "supabase functions delete tmp-replicate-fingerprint --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> tmp-replicate-fingerprint -> Delete. Needs a management token: the Supabase MCP surface can deploy a function but not delete one, and no SUPABASE_ACCESS_TOKEN or supabase CLI is available in the environment this was recorded from."
+    },
+    "store-products-sync": {
+      "reason": "Copied a merchant’s Shopify/WooCommerce catalogue into ours (#474). Withdrawn the next day as the wrong design: the widget reads the shop live and stores nothing of its catalogue. Version 3 is a 410 stub. No store was ever synced, so nothing was imported.",
+      "version": 3,
+      "wayOut": "supabase functions delete store-products-sync --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> store-products-sync -> Delete. Needs a management token, which this environment does not have."
+    },
+    "product-from-url": {
+      "reason": "Read a product off an arbitrary product page and created it in the catalogue (#474). Withdrawn with the store import. Version 2 is a 410 stub. Never used against a real workspace.",
+      "version": 2,
+      "wayOut": "supabase functions delete product-from-url --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> product-from-url -> Delete. Needs a management token, which this environment does not have."
     }
   }
 }
