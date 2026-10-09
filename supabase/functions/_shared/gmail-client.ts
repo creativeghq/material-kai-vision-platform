@@ -33,12 +33,42 @@ export async function gmailAccessToken(db: Db, account: GmailAccount): Promise<s
   }
 }
 
+const MAX_IN_FLIGHT = 4;
+const RETRIES = 3;
+const slots = new Map<string, { active: number; queue: Array<() => void> }>();
+
+async function withSlot<T>(token: string, fn: () => Promise<T>): Promise<T> {
+  let s = slots.get(token);
+  if (!s) slots.set(token, s = { active: 0, queue: [] });
+  if (s.active >= MAX_IN_FLIGHT) await new Promise<void>((res) => s!.queue.push(res));
+  else s.active++;
+  try {
+    return await fn();
+  } finally {
+    const next = s.queue.shift();
+    if (next) next();
+    else if (--s.active === 0) slots.delete(token);
+  }
+}
+
+function isRateLimited(status: number, j: Record<string, unknown>): boolean {
+  if (status === 429) return true;
+  const reasons = ((j.error as { errors?: Array<{ reason?: string }> } | undefined)?.errors ?? []).map((e) => e.reason);
+  return status === 403 && reasons.some((r) => r === 'rateLimitExceeded' || r === 'userRateLimitExceeded');
+}
+
 export async function gmailFetch(token: string, path: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
-  const r = await fetch(`${GMAIL}${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.headers ?? {}) },
-  });
-  const j = await r.json().catch(() => ({})) as Record<string, unknown>;
+  let r!: Response;
+  let j: Record<string, unknown> = {};
+  for (let attempt = 0; ; attempt++) {
+    r = await withSlot(token, () => fetch(`${GMAIL}${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.headers ?? {}) },
+    }));
+    j = await r.json().catch(() => ({})) as Record<string, unknown>;
+    if (r.ok || attempt >= RETRIES || !isRateLimited(r.status, j)) break;
+    await new Promise((res) => setTimeout(res, 400 * 2 ** attempt + Math.random() * 250));
+  }
   if (!r.ok) {
     const msg = (j.error as { message?: string } | undefined)?.message ?? `Gmail ${r.status}`;
     throw new HttpError(r.status === 404 ? 404 : r.status === 403 ? 403 : 502, msg);
