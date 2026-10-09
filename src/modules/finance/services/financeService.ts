@@ -4313,11 +4313,33 @@ const _financeServiceV2 = {
   },
 
   async listInvoicePaymentProofs(invoiceId: string): Promise<InvoicePaymentProof[]> {
-    const { data, error } = await supabase.from('invoice_payment_proofs')
-      .select('id, invoice_id, storage_bucket, storage_object_path, file_name, mime_type, size_bytes, note, status, reviewed_at, created_at')
-      .eq('invoice_id', invoiceId).order('created_at', { ascending: false });
+    const { data, error } = await supabase.rpc('get_invoice_payment_proofs', { p_invoice_id: invoiceId });
     if (error) throw error;
-    return (data ?? []) as InvoicePaymentProof[];
+    return (data ?? []) as unknown as InvoicePaymentProof[];
+  },
+
+  async pollPaymentProofs(payToken: string): Promise<PublicPaymentProof[]> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', { body: { pay_token: payToken, proofs_only: true } });
+    if (error) throw await edgeError(error);
+    return (data?.proofs ?? []) as PublicPaymentProof[];
+  },
+
+  /** Book the transfer a receipt shows. Issues a fully paid draft first; replay-safe per receipt. */
+  async confirmPaymentProof(proofId: string, input: { amount: number; paidOn: string; bankAccountId: string | null }): Promise<{
+    payment_id: string | null; duplicate: boolean; issued: { legal_number: string | null } | null; issue_error: string | null;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
+      body: { confirm_proof: { proof_id: proofId, amount: input.amount, paid_on: input.paidOn, bank_account_id: input.bankAccountId } },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.ok) throw new Error(data?.error ?? 'The payment could not be recorded.');
+    return data;
+  },
+
+  async recheckPaymentProof(proofId: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', { body: { recheck_proof: { proof_id: proofId } } });
+    if (error) throw await edgeError(error);
+    if (!data?.ok) throw new Error(data?.error ?? 'The receipt could not be checked.');
   },
 
   async paymentProofUrl(proof: Pick<InvoicePaymentProof, 'storage_bucket' | 'storage_object_path'>): Promise<string> {
@@ -4433,21 +4455,58 @@ export interface PublicPayOtherTotals {
   deductions: number;
 }
 
+/** What the customer sees of a receipt: a state, never the checks. */
 export interface PublicPaymentProof {
   id: string;
   created_at: string;
   file_name: string | null;
-  status: 'submitted' | 'accepted' | 'rejected';
+  state: 'checking' | 'checked' | 'received' | 'confirmed' | 'rejected';
 }
 
-export interface InvoicePaymentProof extends PublicPaymentProof {
+export type PaymentProofCheckKey = 'amount' | 'currency' | 'beneficiary_iban' | 'beneficiary_name' | 'reference' | 'date' | 'status' | 'tamper';
+
+export interface PaymentProofExtraction {
+  is_bank_transfer_receipt: boolean;
+  transfer_status: string;
+  amount: number | null;
+  currency: string | null;
+  transfer_date: string | null;
+  beneficiary_name: string | null;
+  beneficiary_iban: string | null;
+  payer_name: string | null;
+  payer_iban: string | null;
+  reference: string | null;
+  bank_name: string | null;
+  transaction_id: string | null;
+  legibility: string;
+  tamper_signals: string[];
+}
+
+export interface InvoicePaymentProof {
+  id: string;
   invoice_id: string;
+  created_at: string;
+  file_name: string | null;
   storage_bucket: string;
   storage_object_path: string;
   mime_type: string | null;
   size_bytes: number | null;
   note: string | null;
+  status: 'submitted' | 'accepted' | 'rejected';
   reviewed_at: string | null;
+  ai_status: 'pending' | 'checked' | 'failed' | 'skipped';
+  ai_verdict: 'matches' | 'review' | 'not_a_receipt' | 'unreadable' | null;
+  ai_extracted: PaymentProofExtraction | null;
+  ai_checks: {
+    checks: Array<{ key: PaymentProofCheckKey; result: 'ok' | 'warn' | 'fail' | 'missing'; detail: string }>;
+    amount_kind: 'full' | 'deposit' | 'partial' | 'over' | null;
+    bank_account_id: string | null;
+  } | null;
+  ai_error: string | null;
+  /** Derived: the payment booked from this receipt, if any. */
+  payment_id: string | null;
+  /** Derived: a bank-feed line settled money on this document. */
+  bank_confirmed: boolean;
 }
 
 export interface PublicFiscalRecord {

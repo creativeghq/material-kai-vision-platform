@@ -137,10 +137,17 @@ const Panel: React.FC<{ title?: React.ReactNode; children: React.ReactNode; clas
   </section>
 );
 
-const proofStatusBadge = (status: PublicPaymentProof['status']) => {
-  if (status === 'accepted') return <Badge variant="success">Confirmed</Badge>;
-  if (status === 'rejected') return <Badge variant="error">Not accepted</Badge>;
-  return <Badge variant="warning">Awaiting confirmation</Badge>;
+const PROOF_STATE: Record<PublicPaymentProof['state'], { label: string; variant: 'success' | 'error' | 'warning' | 'info' | 'neutral' }> = {
+  checking: { label: 'Checking…', variant: 'neutral' },
+  checked: { label: 'Receipt checked — waiting for the bank', variant: 'info' },
+  received: { label: 'Received — the seller will review it', variant: 'warning' },
+  confirmed: { label: 'Payment confirmed', variant: 'success' },
+  rejected: { label: 'Not accepted', variant: 'error' },
+};
+
+const proofStatusBadge = (state: PublicPaymentProof['state']) => {
+  const s = PROOF_STATE[state] ?? PROOF_STATE.received;
+  return <Badge variant={s.variant}>{state === 'checking' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}{s.label}</Badge>;
 };
 
 const BankTransferPanel: React.FC<{
@@ -234,7 +241,7 @@ const ProofUploadPanel: React.FC<{
                   <span className="truncate">{p.file_name || 'Receipt'}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">{formatDate(p.created_at, { withTime: true })}</span>
                 </span>
-                {proofStatusBadge(p.status)}
+                {proofStatusBadge(p.state)}
               </li>
             ))}
           </ul>
@@ -243,7 +250,7 @@ const ProofUploadPanel: React.FC<{
         {sent && (
           <div className="flex items-start gap-2 rounded-md border border-hairline bg-surface-sunken p-3 text-sm">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-            <span>Thank you — we received your receipt. You will hear from us once the transfer is confirmed.</span>
+            <span>Thank you — we received your receipt and are checking it. Your order is marked paid once the transfer reaches our bank.</span>
           </div>
         )}
 
@@ -484,6 +491,18 @@ const PayInvoicePage: React.FC = () => {
       }
     })();
   }, [token, status]);
+
+  const checking = proofs.some((p) => p.state === 'checking');
+  useEffect(() => {
+    if (!token || !checking) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (tries > 30) { clearInterval(timer); return; }
+      financeService.pollPaymentProofs(token).then(setProofs).catch(() => { /* keep the last known states */ });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [token, checking]);
 
   const chosenAmount = (): number | undefined => {
     if (!info) return undefined;

@@ -48,8 +48,6 @@ const InvoiceDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [proofForPayment, setProofForPayment] = useState<string | null>(null);
-  const [proofsReload, setProofsReload] = useState(0);
   const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
   const [returnFor, setReturnFor] = useState<{ id: string; number: string | null } | null>(null);
   const [payLink, setPayLink] = useState<string | null>(null);
@@ -60,7 +58,7 @@ const InvoiceDetailPage: React.FC = () => {
   const [projectSaving, setProjectSaving] = useState(false);
   // Attributing revenue to a job is a finance decision, gated the same way the project's own
   // Finance tab is. Everyone else sees the invoice without the control.
-  const { can } = usePermissions();
+  const { can, isWorkspaceManager } = usePermissions();
   const canEditProject = can('finance.manage');
 
   /**
@@ -504,10 +502,11 @@ const InvoiceDetailPage: React.FC = () => {
 
       <PaymentProofsCard
         invoiceId={invoice.id}
-        canManage={canEditProject}
+        workspaceId={invoice.workspace_id}
+        currency={invoice.currency}
+        canManage={isWorkspaceManager}
         outstanding={Number(invoice.amount_due) || 0}
-        reloadKey={proofsReload}
-        onRecordPayment={(proofId) => { setProofForPayment(proofId); setPaymentDialogOpen(true); }}
+        onChanged={() => void load()}
       />
 
       <Card>
@@ -697,16 +696,8 @@ const InvoiceDetailPage: React.FC = () => {
         defaultAmount={Number(invoice.amount_due) || undefined}
         initialCounterparty={{ companyId: invoice.customer_company_id ?? null, contactId: invoice.customer_contact_id ?? null }}
         open={paymentDialogOpen}
-        onOpenChange={(v) => { setPaymentDialogOpen(v); if (!v) setProofForPayment(null); }}
-        onSaved={async (result) => {
-          setPaymentDialogOpen(false);
-          if (proofForPayment && result?.paymentId) {
-            await financeService.setPaymentProofStatus(proofForPayment, 'accepted').catch((err: Error) =>
-              toast({ title: 'Payment recorded, receipt not marked', description: err.message, variant: 'destructive' }));
-            setProofsReload((n) => n + 1);
-          }
-          await load();
-        }}
+        onOpenChange={setPaymentDialogOpen}
+        onSaved={async () => { setPaymentDialogOpen(false); await load(); }}
       />
       {/* The platform's one credit-note form, preset to this invoice — it credits per LINE with
           exact VAT, which the bespoke copy that used to live here could not do at all. */}

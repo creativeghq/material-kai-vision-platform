@@ -12724,6 +12724,12 @@ export type Database = {
       }
       invoice_payment_proofs: {
         Row: {
+          ai_checked_at: string | null
+          ai_checks: Json | null
+          ai_error: string | null
+          ai_extracted: Json | null
+          ai_status: string
+          ai_verdict: string | null
           created_at: string
           file_name: string | null
           id: string
@@ -12739,6 +12745,12 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          ai_checked_at?: string | null
+          ai_checks?: Json | null
+          ai_error?: string | null
+          ai_extracted?: Json | null
+          ai_status?: string
+          ai_verdict?: string | null
           created_at?: string
           file_name?: string | null
           id?: string
@@ -12754,6 +12766,12 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          ai_checked_at?: string | null
+          ai_checks?: Json | null
+          ai_error?: string | null
+          ai_extracted?: Json | null
+          ai_status?: string
+          ai_verdict?: string | null
           created_at?: string
           file_name?: string | null
           id?: string
@@ -37175,6 +37193,31 @@ export type Database = {
           image_url: string
           page_number: number
           vision_model: string
+        }[]
+      }
+      get_invoice_payment_proofs: {
+        Args: { p_invoice_id: string }
+        Returns: {
+          ai_checked_at: string | null
+          ai_checks: Json | null
+          ai_error: string | null
+          ai_extracted: Json | null
+          ai_status: string
+          ai_verdict: string | null
+          bank_confirmed: boolean
+          created_at: string
+          file_name: string | null
+          id: string
+          invoice_id: string
+          mime_type: string | null
+          note: string | null
+          payment_id: string | null
+          reviewed_at: string | null
+          size_bytes: number | null
+          status: string
+          storage_bucket: string
+          storage_object_path: string
+          workspace_id: string
         }[]
       }
       get_import_job_stats: {

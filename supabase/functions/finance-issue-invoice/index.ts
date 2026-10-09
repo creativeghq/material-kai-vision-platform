@@ -11,6 +11,7 @@ import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteI
 import { emitDocumentIssued } from '../_shared/fiscal/document-issued.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import type { FiscalConnector, FiscalConnectorContext, FiscalInvoiceInput, FiscalSubmissionResult } from '../_shared/fiscal/types.ts';
+import { resolveBillingUser } from '../_shared/finance/billing-user.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 // Flow:
@@ -251,33 +252,6 @@ async function autoReceiptForConsumerQuote(supabase: any, invoiceId: string): Pr
 
 // `emitDocumentIssued` moved to `_shared/fiscal/document-issued.ts`: the online-payment path
 // (`record-payment.ts`) issues a paid draft and has to fire the same event.
-
-/**
- * Whose credits a SERVER-initiated transmission debits.
- *
- * A webhook has no user: `reserveTransmission` with a null user id transmits for FREE, which is
- * the operator-root exemption leaking to every tenant whose draft was paid online. The document
- * belongs to a workspace, so the workspace pays — through whoever created the invoice, else its
- * owner. Null only when the workspace has neither, in which case the caller's existing rule
- * (no user → no debit) applies and is logged as such.
- */
-async function resolveBillingUser(
-  supabase: any, workspaceId: string, documentId: string, table: DocumentTable = 'invoices',
-): Promise<string | null> {
-  const { data: doc } = await supabase.from(table).select('created_by').eq('id', documentId).maybeSingle();
-  if (doc?.created_by) return doc.created_by as string;
-  const { data: owner } = await supabase
-    .from('workspace_members')
-    .select('user_id')
-    .eq('workspace_id', workspaceId)
-    .eq('status', 'active')
-    .eq('role', 'owner')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!owner?.user_id) console.warn('[finance-issue-invoice] no billing user for workspace', workspaceId, '— transmission will not be debited');
-  return (owner?.user_id as string | undefined) ?? null;
-}
 
 /**
  * Is this user a FINANCE MANAGER (not just an allowed-in accountant) for the

@@ -64,13 +64,23 @@ runs:
 
 ## Matching ladder
 
-**Incoming** (`reconcileWorkspaceRevolut`), most→least certain:
+**Incoming** (`reconcileWorkspaceRevolut`), most→least certain. "Open" includes a DRAFT that has
+a pay link (storefront order, quote pre-invoice); `recordInvoicePayment` issues it before allocating
+when the transfer pays it in full.
 
 1. `reference` contains exactly one open invoice's `internal_number` → auto-match.
 2. Exactly one open invoice with cent-equal `amount_due` **and** a counterparty-name match
    (transliterated, so a Greek statement matches a Latin CRM name) → auto-match.
-3. Weaker signals → `suggested`, with candidate invoice ids, waiting in the review queue.
+3. Weaker signals → `suggested`, with candidate invoice ids, waiting in the review queue. An open
+   invoice with a pending customer transfer receipt (`invoice_payment_proofs`) whose AI-read
+   amount equals the line and whose payer matches the counterparty is ranked right after a
+   reference hit. It is NEVER an auto-match: the receipt is uploaded by an anonymous customer, so it
+   may name whoever it likes as the payer.
 4. Nothing → `unmatched` + one `bank_payment_unmatched` flow event, ever.
+
+A receipt confirmed by hand (`confirm_proof` in `finance-pay-invoice`) books a `bank_proof` payment
+dated on the transfer, into the account the receipt names, so the later feed line binds to it as
+`already_recorded` instead of booking the money twice.
 
 **Outgoing** (`reconcileOutgoingRevolut`) is auto-only and conservative: reference quotes exactly
 one open bill and the amount fits, or a unique cent-equal `amount_due` plus a supplier-name match.

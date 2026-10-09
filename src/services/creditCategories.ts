@@ -87,7 +87,7 @@ export function creditOperationCategory(op: string | null | undefined): CreditSp
   if (startsWith('real_estate_')) return 'Real Estate';
   if (startsWith('social_')) return 'Social Content';
 
-  if (is('scan') || startsWith('einvoice_', 'mydata_', 'aade_', 'expense_',
+  if (is('scan', 'payment_proof_check') || startsWith('einvoice_', 'mydata_', 'aade_', 'expense_',
     'order_intake_')) return 'Finance & Documents';
   if (is('visual_aspect_search') || startsWith('catalog_', 'xml_field_mapping',
     'ontology_propose', 'taric_')) return 'Catalog & Products';

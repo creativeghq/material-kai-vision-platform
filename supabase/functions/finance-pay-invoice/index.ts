@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isPlatformOperator, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -11,7 +11,10 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { dispatchToProvider, resolveWorkspacePaymentProviders } from '../_shared/payments/registry.ts';
 import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
-import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { recordInvoicePayment } from '../_shared/payments/record-payment.ts';
+import { runInBackground } from '../_shared/background.ts';
+import { runPaymentProofCheck } from '../_shared/payments/payment-proof-ai.ts';
+import { resolveBillingUser } from '../_shared/finance/billing-user.ts';
 import { decodeBase64 } from 'jsr:@std/encoding@^1/base64';
 
 /**
@@ -72,6 +75,7 @@ interface PublicBody {
   provider?: string;
   /** 'card' (hosted redirect) or 'bank_reference' (Viva RF code). Defaults to 'card'. */
   method?: 'card' | 'bank_reference';
+  proofs_only?: boolean;
   /** Bank-transfer receipt the payer uploads. The type is sniffed from the bytes, never trusted. */
   upload_proof?: { file_base64: string; file_name?: string; note?: string };
 }
@@ -121,6 +125,95 @@ interface OrderReturnBody {
 }
 
 
+interface ProofActionBody {
+  confirm_proof?: { proof_id: string; amount: number; paid_on: string; bank_account_id?: string | null };
+  recheck_proof?: { proof_id: string };
+}
+
+type PublicProofState = 'checking' | 'checked' | 'received' | 'confirmed' | 'rejected';
+
+/** What the CUSTOMER may see of a proof: a state, never the checks (they would teach a forger). */
+async function publicProofs(supabase: any, invoiceId: string) {
+  const { data } = await supabase.rpc('get_invoice_payment_proofs', { p_invoice_id: invoiceId });
+  return ((data ?? []) as any[]).map((p) => {
+    const state: PublicProofState = p.status === 'rejected' ? 'rejected'
+      : (p.status === 'accepted' || p.payment_id || p.bank_confirmed) ? 'confirmed'
+        : p.ai_status === 'pending' ? 'checking'
+          : p.ai_verdict === 'matches' ? 'checked'
+            : 'received';
+    return { id: p.id, created_at: p.created_at, file_name: p.file_name, state };
+  });
+}
+
+async function handleProofAction(req: Request, supabase: any, body: ProofActionBody): Promise<Response> {
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) return json({ error: auth.error ?? 'Unauthorized' }, 401);
+  const proofId = body.confirm_proof?.proof_id ?? body.recheck_proof?.proof_id;
+  if (typeof proofId !== 'string' || !proofId) return json({ error: 'proof_id required' }, 400);
+
+  const { data: proof } = await supabase.from('invoice_payment_proofs')
+    .select('id, invoice_id, workspace_id, status').eq('id', proofId).maybeSingle();
+  if (!proof) return json({ error: 'not found' }, 404);
+  const { data: booked } = await supabase.from('payments').select('id')
+    .eq('provider', 'bank_proof').eq('provider_ref', proof.id).maybeSingle();
+  // authenticate() hands back the SERVICE-ROLE client, so the manager test is explicit (owner/admin).
+  const { data: mem } = await supabase.from('workspace_members').select('role')
+    .eq('workspace_id', proof.workspace_id).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
+  const isManager = ['owner', 'admin'].includes(String((mem as any)?.role ?? '')) || await isPlatformOperator(supabase, auth.userId);
+  if (!isManager) return json({ error: 'not found' }, 404);
+
+  if (body.recheck_proof) {
+    if (booked || proof.status !== 'submitted') return json({ error: 'this receipt is already settled' }, 409);
+    const { error: resetErr } = await supabase.from('invoice_payment_proofs').update({ ai_status: 'pending', ai_error: null }).eq('id', proof.id);
+    if (resetErr) return json({ error: 'the receipt could not be re-checked right now' }, 500);
+    await runPaymentProofCheck(supabase, proof.id, auth.userId);
+    const { data: rows } = await supabase.rpc('get_invoice_payment_proofs', { p_invoice_id: proof.invoice_id });
+    return json({ ok: true, proof: ((rows ?? []) as any[]).find((r) => r.id === proof.id) ?? null });
+  }
+
+  const c = body.confirm_proof!;
+  // A replay after a lost response returns what was booked, before any check that the booking changed.
+  if (booked) return json({ ok: true, payment_id: booked.id, duplicate: true, issued: null, issue_error: null, proof_stamp_error: null });
+  if (proof.status === 'rejected') return json({ error: 'this receipt was rejected' }, 409);
+  const { data: inv } = await supabase.from('invoices')
+    .select('id, workspace_id, currency, amount_due, status').eq('id', proof.invoice_id).maybeSingle();
+  if (!inv || inv.workspace_id !== proof.workspace_id) return json({ error: 'not found' }, 404);
+  if (inv.status === 'void' || inv.status === 'credit_noted') return json({ error: 'this document is closed' }, 409);
+  const amount = Math.round(Number(c.amount) * 100) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) return json({ error: 'enter the amount received' }, 400);
+  if (amount > Number(inv.amount_due) + 0.005) return json({ error: 'that is more than is still owed on this document' }, 400);
+  if (typeof c.paid_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(c.paid_on)) return json({ error: 'enter the date the money arrived' }, 400);
+  if (new Date(`${c.paid_on}T00:00:00Z`).getTime() > Date.now() + 36 * 3600 * 1000) return json({ error: 'the payment date is in the future' }, 400);
+  let bankAccountId: string | null = null;
+  if (c.bank_account_id) {
+    const { data: acct } = await supabase.from('finance_bank_accounts')
+      .select('id').eq('id', c.bank_account_id).eq('workspace_id', inv.workspace_id).maybeSingle();
+    if (!acct) return json({ error: 'unknown bank account' }, 400);
+    bankAccountId = acct.id;
+  }
+
+  // providerRef = the proof id: a retry after a dropped response replays, it never books twice.
+  const res = await recordInvoicePayment(supabase, inv.id, {
+    provider: 'bank_proof',
+    providerRef: proof.id,
+    providerLabel: 'Bank transfer',
+    amount,
+    currency: String(inv.currency ?? 'EUR'),
+    method: 'bank_transfer',
+    bankAccountId,
+    paidAt: `${c.paid_on}T12:00:00Z`,
+    notes: 'Bank transfer, confirmed from the customer receipt',
+  });
+  if (!res.ok) return json({ error: res.error ?? 'the payment could not be recorded' }, 500);
+  const { error: stampErr } = await supabase.from('invoice_payment_proofs')
+    .update({ status: 'accepted', reviewed_by: auth.userId }).eq('id', proof.id);
+  return json({
+    ok: true, payment_id: res.paymentId ?? null, duplicate: !!res.duplicate,
+    issued: res.issued ?? null, issue_error: res.issue_error ?? null,
+    proof_stamp_error: stampErr?.message ?? null,
+  });
+}
+
 // PUBLIC_APP_URL is not a Stripe secret — keep it lazy locally.
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
 
@@ -144,13 +237,16 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 
-  let body: AdminBody | PublicBody | OrderReturnBody;
+  let body: AdminBody | PublicBody | OrderReturnBody | ProofActionBody;
   try {
     body = await req.json();
   } catch {
     return json({ error: 'invalid JSON body' }, 400);
   }
 
+  if ('confirm_proof' in body || 'recheck_proof' in body) {
+    return await handleProofAction(req, supabase, body as ProofActionBody);
+  }
   const isAdminMode = 'invoice_id' in body && body.invoice_id;
   const isPublicMode = 'pay_token' in body && body.pay_token;
   const isOrderReturnMode = 'order_code' in body && body.order_code;
@@ -204,10 +300,6 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       });
       if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
-      // Use the caller's JWT for the SELECT so RLS gates access. Customer-self path:
-      // the customer's auth user_id is linked to crm_contacts.user_id, the invoices
-      // SELECT policy allows workspace members; if the customer is also a workspace
-      // member, they read fine. If not, this errors out — by design.
       const { data: inv, error: invErr } = await auth.supabase
         .from('invoices')
         .select('*')
@@ -215,8 +307,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         .maybeSingle();
       if (invErr || !inv) return json({ error: 'invoice not found or not accessible' }, 404);
 
-      // authenticate() returns the SERVICE-ROLE client, so the SELECT
-      // above does NOT enforce RLS (the "caller's JWT gates access" comment was wrong).
+      // authenticate() returns the SERVICE-ROLE client, so the SELECT above does NOT enforce RLS.
       // Bind the caller to this invoice explicitly: an active member of its workspace
       // (or global admin), OR the linked customer (crm_contacts.user_id). 404 on
       // mismatch to avoid cross-tenant id enumeration.
@@ -335,6 +426,9 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     const row = (rows as any[])?.[0];
     if (!row) return json({ error: 'invalid pay link' }, 404);
     if (row.expired) return json({ error: 'pay link expired — ask the seller for a fresh one' }, 410);
+    if (pb.proofs_only) {
+      return json({ ok: true, proofs: await publicProofs(supabase, row.invoice_id), amount_due: Number(row.amount_due) });
+    }
     if (pb.pdf) {
       // The token decided WHICH invoice; nothing else from the caller reaches the renderer.
       const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/finance-invoice-pdf`, {
@@ -421,16 +515,9 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         if (insErr?.code === 'P0001') return json({ error: 'too many receipts uploaded for this document — contact the seller' }, 429);
         return json({ error: 'the receipt could not be saved — please try again' }, 500);
       }
-      try {
-        await emitFlowEventToWorkspaceRoles(row.workspace_id, ['owner', 'admin'], 'payment_proof_submitted', (uid) => ({
-          user_id: uid, type: 'payment_proof_submitted', workspace_id: row.workspace_id,
-          invoice_id: row.invoice_id, proof_id: (proof as any).id,
-          title: 'Bank transfer receipt received',
-          body: `${row.customer_display || 'A customer'} uploaded a transfer receipt for ${row.internal_number}.${note ? ` Note: ${note.slice(0, 200)}` : ''}`,
-          action_url: `/finance/invoices/${row.invoice_id}`,
-        }));
-      } catch { /* the receipt is stored and listed on the invoice; a missed bell is not worth failing it */ }
-      return json({ ok: true, proof: { id: (proof as any).id, created_at: (proof as any).created_at, file_name: fileName, status: 'submitted' } });
+      const billingUser = await resolveBillingUser(supabase, row.workspace_id, row.invoice_id);
+      await runInBackground(runPaymentProofCheck(supabase, (proof as any).id, billingUser));
+      return json({ ok: true, proof: { id: (proof as any).id, created_at: (proof as any).created_at, file_name: fileName, state: 'checking' } });
     }
 
     if (pb.info_only) {
@@ -453,13 +540,12 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       });
       // Stripe is only genuinely available if the platform key exists too.
       const providers = available.filter((p) => p.slug !== 'stripe' || !!stripe);
-      const [bankTransfer, { data: lines }, { data: head }, { data: proofs }] = await Promise.all([
+      const [bankTransfer, { data: lines }, { data: head }, proofs] = await Promise.all([
         bankTransferDetails(supabase, row.workspace_id, row.currency),
         supabase.from('invoice_items').select('description, sku, quantity, unit, unit_price, discounted_price, line_total')
           .eq('invoice_id', row.invoice_id).order('added_at', { ascending: true }),
         supabase.from('invoices').select('created_at, subtotal_net, vat_amount, total_withheld_amount, total_fees_amount, total_stamp_duty_amount, total_other_taxes_amount, total_deductions_amount').eq('id', row.invoice_id).maybeSingle(),
-        supabase.from('invoice_payment_proofs').select('id, created_at, file_name, status')
-          .eq('invoice_id', row.invoice_id).order('created_at', { ascending: false }),
+        publicProofs(supabase, row.invoice_id),
       ]);
 
       return json({
@@ -502,7 +588,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
           quantity: Number(l.quantity), unit_price: Number(l.unit_price), line_total: Number(l.line_total),
           discount: l.discounted_price != null ? Number(l.discounted_price) : null,
         })),
-        proofs: proofs ?? [],
+        proofs,
       });
     }
 

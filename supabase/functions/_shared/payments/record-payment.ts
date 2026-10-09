@@ -31,6 +31,8 @@ export interface PaymentSource {
    * settle later and leave it null. Drives the per-account running balance.
    */
   bankAccountId?: string | null;
+  /** When the money moved, if the source knows (a confirmed transfer receipt). Defaults to now. */
+  paidAt?: string | null;
 }
 
 export interface RecordResult {
@@ -181,7 +183,7 @@ export async function recordInvoicePayment(
       amount: src.amount,
       currency,
       method: src.method,
-      paid_at: new Date().toISOString(),
+      paid_at: src.paidAt ?? new Date().toISOString(),
       counterparty_contact_id: inv.customer_contact_id,
       counterparty_company_id: inv.customer_company_id,
       bank_account_id: src.bankAccountId ?? await providerBankAccountId(supabase, inv.workspace_id, src.provider),

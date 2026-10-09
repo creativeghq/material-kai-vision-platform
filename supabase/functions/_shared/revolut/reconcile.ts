@@ -35,7 +35,7 @@ interface OpenInvoice {
 }
 
 /** Case/diacritic/script-insensitive normal form for name comparison. */
-function nameKey(s: string | null | undefined): string {
+export function nameKey(s: string | null | undefined): string {
   if (!s) return '';
   return (transliterateToLatin(s) ?? s).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 }
@@ -78,7 +78,8 @@ async function loadOpenInvoices(service: any, workspaceId: string): Promise<Open
     .from('invoices')
     .select('id, internal_number, amount_due, currency, status, contact:crm_contacts!customer_contact_id(name), company:crm_companies!customer_company_id(name)')
     .eq('workspace_id', workspaceId)
-    .in('status', ['issued', 'partially_paid', 'overdue'])
+    // A draft with a pay link is payable; recordInvoicePayment issues it when paid in full.
+    .or('status.in.(issued,partially_paid,overdue),and(status.eq.draft,pay_token.not.is.null)')
     .gt('amount_due', 0);
   if (error) throw new Error(`open-invoice load failed: ${error.message}`);
   return (data ?? []).map((r: any) => ({
@@ -88,6 +89,32 @@ async function loadOpenInvoices(service: any, workspaceId: string): Promise<Open
     currency: String(r.currency ?? 'EUR').toUpperCase(),
     customer_name: nameKey(r.company?.name ?? r.contact?.name ?? ''),
   })).filter((i: OpenInvoice) => i.internal_number.length > 0);
+}
+
+async function loadProofClaims(
+  service: any, workspaceId: string, openInvoiceIds: string[],
+): Promise<Map<string, Array<{ amount: number; currency: string | null; payer: string }>>> {
+  if (openInvoiceIds.length === 0) return new Map();
+  const { data, error } = await service
+    .from('invoice_payment_proofs')
+    .select('invoice_id, ai_extracted')
+    .eq('workspace_id', workspaceId)
+    .in('invoice_id', openInvoiceIds)
+    .eq('ai_status', 'checked')
+    .in('ai_verdict', ['matches', 'review'])
+    .eq('status', 'submitted');
+  if (error) throw new Error(`payment-proof load failed: ${error.message}`);
+  const out = new Map<string, Array<{ amount: number; currency: string | null; payer: string }>>();
+  for (const r of (data ?? []) as any[]) {
+    const x = r.ai_extracted ?? {};
+    const amount = Number(x.amount);
+    const payer = nameKey(x.payer_name ?? '');
+    if (!(amount > 0) || payer.length < 4) continue;
+    const list = out.get(r.invoice_id) ?? [];
+    list.push({ amount, currency: typeof x.currency === 'string' ? x.currency.toUpperCase() : null, payer });
+    out.set(r.invoice_id, list);
+  }
+  return out;
 }
 
 export interface LegShape {
@@ -527,6 +554,9 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
 
   const shapes = await loadLegShapes(service, workspaceId, [...new Set<string>(lines.map((l: any) => String(l.transaction_id)))]);
   let invoices = await loadOpenInvoices(service, workspaceId);
+  let proofs = new Map<string, Array<{ amount: number; currency: string | null; payer: string }>>();
+  try { proofs = await loadProofClaims(service, workspaceId, invoices.map((i) => i.id)); }
+  catch (err) { result.errors.push(err instanceof Error ? err.message : String(err)); }
   const recipientId = await financeNotifyRecipient(service, workspaceId);
   if (!recipientId) {
     console.warn(`[revolut/reconcile] ${workspaceId}: no active member — unmatched-payment alerts cannot be delivered`);
@@ -599,6 +629,11 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     // 2/3. Amount and name signals.
     const byAmount = sameCurrency.filter((i) => centsEqual(i.amount_due, Number(tx.amount)));
     const byName = cpName ? sameCurrency.filter((i) => namesMatch(i.customer_name, cpName)) : [];
+    // A customer receipt for this amount from this payer. Customer-supplied, so it only RANKS a suggestion.
+    const byProof = cpName
+      ? sameCurrency.filter((i) => (proofs.get(i.id) ?? []).some((p) =>
+        centsEqual(p.amount, Number(tx.amount)) && (!p.currency || p.currency === txCurrency) && namesMatch(p.payer, cpName)))
+      : [];
 
     // A transaction split across several incoming legs cannot be auto-settled: this row
     // is a fragment of the payment, so its amount matches nothing and its reference
@@ -620,7 +655,7 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     }
 
     // Weak signals → review queue with candidates (number hits first, then name, then amount).
-    const candidates = [...new Set([...byNumber, ...byName, ...byAmount].map((i) => i.id))].slice(0, 5);
+    const candidates = [...new Set([...byNumber, ...byProof, ...byName, ...byAmount].map((i) => i.id))].slice(0, 5);
     if (candidates.length > 0) {
       const { error } = await service
         .from('revolut_bank_transactions')
