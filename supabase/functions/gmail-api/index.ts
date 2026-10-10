@@ -11,6 +11,8 @@ import {
 } from '../_shared/google-oauth.ts';
 import { parseAddress, parseAddressList, parseGmailPayload, type GmailPart } from '../_shared/mail-mime.ts';
 import { stripTrackingPixels } from '../_shared/mail-tracking.ts';
+import { AUTO_REPLY_GMAIL_HEADERS, isAutoReplyFromHeaderList } from '../_shared/mail-auto-reply.ts';
+import { parseOutreachSteps } from '../_shared/outreach-steps.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import {
@@ -26,7 +28,7 @@ const APP_URL = () => (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialsh
 const REDIRECT_URI = () => `${SUPABASE_URL}/functions/v1/gmail-api`;
 const SCOPE = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send openid email profile';
 const SCHEDULE_LIMIT_BYTES = 10 * 1024 * 1024;
-const ASSIST_MODES = new Set(['summary', 'draft', 'actions', 'ask', 'rewrite', 'shorten', 'formal']);
+const ASSIST_MODES = new Set(['summary', 'draft', 'actions', 'ask', 'rewrite', 'shorten', 'formal', 'followup']);
 const REWRITE_MODES = new Set(['rewrite', 'shorten', 'formal']);
 const PAGE_SIZE = 25;
 
@@ -136,7 +138,7 @@ async function forgetThread(db: Db, accountId: string, threadId: string): Promis
     .eq('account_id', accountId).eq('gmail_thread_id', threadId);
   if (error) console.error('[gmail-api] could not clear the binned thread timers', threadId, error.message);
   const { error: oErr } = await db.from('mail_scheduled_sends')
-    .update({ status: 'cancelled', error: 'The conversation was deleted, so it was not sent.' })
+    .update({ status: 'cancelled', cancel_reason: 'deleted', error: 'The conversation was deleted, so it was not sent.' })
     .eq('account_id', accountId).eq('gmail_thread_id', threadId).eq('if_no_reply', true).eq('status', 'pending');
   if (oErr) console.error('[gmail-api] could not cancel the binned thread follow-ups', threadId, oErr.message);
 }
@@ -177,6 +179,27 @@ function outreachRecipients(msgs: Array<Record<string, unknown>>, me: string): {
   const cc = fromMe ? list(gmailHeader(last, 'Cc')) : [];
   if (!to.length) throw new HttpError(400, 'Could not tell who to follow up with on this conversation');
   return { to: [...new Set(to)], cc: [...new Set(cc)].filter((a) => !to.includes(a)), replyTo: String(last.id) };
+}
+
+function validTimeZone(tz: string): string {
+  try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return tz; } catch { return 'UTC'; }
+}
+
+function bestSlot(stamps: number[], tz: string): { best_hour: number | null; best_dow: number | null; sample: number; basis: 'contact' | 'none' } {
+  if (stamps.length < 3) return { best_hour: null, best_dow: null, sample: stamps.length, basis: 'none' };
+  const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hourCycle: 'h23', weekday: 'short' });
+  const DOW: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  const hours = new Map<number, number>();
+  const days = new Map<number, number>();
+  for (const ms of stamps) {
+    const parts = fmt.formatToParts(new Date(ms));
+    const h = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+    const d = DOW[parts.find((p) => p.type === 'weekday')?.value ?? 'Mon'] ?? 1;
+    hours.set(h, (hours.get(h) ?? 0) + 1);
+    days.set(d, (days.get(d) ?? 0) + 1);
+  }
+  const top = (m: Map<number, number>) => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+  return { best_hour: top(hours), best_dow: top(days), sample: stamps.length, basis: 'contact' };
 }
 
 Deno.serve(withApiLogging('gmail-api', async (req) => {
@@ -588,8 +611,8 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
         }
       }
       const { data: outreach, error: oErr } = await db.from('mail_scheduled_sends')
-        .select('id, send_at').eq('account_id', account.id).eq('gmail_thread_id', threadId).eq('if_no_reply', true).eq('status', 'pending')
-        .order('send_at').limit(5);
+        .select('id, send_at, sequence_id, step, payload').eq('account_id', account.id).eq('gmail_thread_id', threadId).eq('if_no_reply', true).eq('status', 'pending')
+        .order('send_at').limit(10);
       if (oErr) throw new HttpError(500, oErr.message);
       let members: Array<{ user_id: string; name: string }> = [];
       if (account.is_shared) {
@@ -604,7 +627,9 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
         contact, contact_linked: !!row?.contact_id && !suggested, contact_suggested: suggested,
         assignee_user_id: row?.assignee_user_id ?? null, snoozed_until: row?.snoozed_until ?? null,
         remind_at: row?.remind_at ?? null, remind_note: row?.remind_note ?? null, remind_if_no_reply: row?.remind_if_no_reply ?? false,
-        shared: account.is_shared, members, outreach: outreach ?? [],
+        shared: account.is_shared, members,
+        outreach: ((outreach ?? []) as Array<{ id: string; send_at: string; sequence_id: string | null; step: number | null; payload: { text?: string } }>)
+          .map((o) => ({ id: o.id, send_at: o.send_at, sequence_id: o.sequence_id, step: o.step, preview: String(o.payload?.text ?? '').slice(0, 140) })),
       });
     }
 
@@ -657,35 +682,55 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const threadId = String(body.thread_id ?? '');
       if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
-      const text = String(body.body ?? '').trim();
-      if (!text) throw new HttpError(400, 'Write the follow-up message');
-      const sendAt = new Date(String(body.send_at ?? ''));
-      const now = Date.now();
-      if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() < now + 60_000 || sendAt.getTime() > now + 366 * 86_400_000) {
-        throw new HttpError(400, 'Pick a send time between a minute and a year from now');
-      }
+      const steps = parseOutreachSteps(body);
       const token = await accessTokenFor(db, account);
       const t = await gmail(token, `/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Reply-To&metadataHeaders=Subject`);
       const msgs = (t.messages ?? []) as Array<Record<string, unknown>>;
       const who = outreachRecipients(msgs, account.email.toLowerCase());
-      const prepared = prepareGmailSend({ to: who.to, cc: who.cc, body: text, thread_id: threadId, reply_to_message_id: who.replyTo }, SCHEDULE_LIMIT_BYTES);
       const subject = gmailHeader(msgs[0] ?? {}, 'Subject') || '(no subject)';
       await upsertIndex(db, account, threadId, { subject: subject.slice(0, 300) });
-      const { data, error } = await db.from('mail_scheduled_sends').insert({
-        user_id: userId, workspace_id: account.workspace_id, kind: 'gmail', account_id: account.id,
-        payload: prepared, send_at: sendAt.toISOString(), gmail_thread_id: threadId, if_no_reply: true,
-        summary: `Follow-up: ${subject}`.slice(0, 200), recipients: prepared.to.join(', ').slice(0, 300),
-      }).select('id, send_at').single();
+      const sequenceId = crypto.randomUUID();
+      const rows = steps.map((st, i) => {
+        const prepared = prepareGmailSend({ to: who.to, cc: who.cc, body: st.body, thread_id: threadId, reply_to_message_id: who.replyTo }, SCHEDULE_LIMIT_BYTES);
+        return {
+          user_id: userId, workspace_id: account.workspace_id, kind: 'gmail', account_id: account.id,
+          payload: prepared, send_at: st.sendAt, gmail_thread_id: threadId, if_no_reply: true,
+          sequence_id: sequenceId, step: i + 1,
+          summary: `Follow-up${steps.length > 1 ? ` ${i + 1}/${steps.length}` : ''}: ${subject}`.slice(0, 200), recipients: prepared.to.join(', ').slice(0, 300),
+        };
+      });
+      const { data, error } = await db.from('mail_scheduled_sends').insert(rows).select('id, send_at, step');
       if (error) throw new HttpError(500, `Could not schedule the follow-up: ${error.message}`);
-      return json({ ok: true, outreach: data, to: prepared.to });
+      return json({ ok: true, outreach: data, sequence_id: sequenceId, to: who.to });
+    }
+
+    case 'best_time': {
+      const account = await accountFor(db, userId, String(body.account_id ?? ''));
+      const threadId = String(body.thread_id ?? '');
+      if (!GMAIL_ID.test(threadId)) throw new HttpError(400, 'thread_id is required');
+      const tz = validTimeZone(String(body.tz ?? ''));
+      const token = await accessTokenFor(db, account);
+      const t = await gmail(token, `/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Reply-To`);
+      const who = outreachRecipients((t.messages ?? []) as Array<Record<string, unknown>>, account.email.toLowerCase());
+      const list = await gmail(token, `/messages?maxResults=30&q=${encodeURIComponent(`from:${who.to[0]}`)}`);
+      const ids = ((list.messages ?? []) as Array<{ id: string }>).map((m) => m.id);
+      const msgs = await Promise.all(ids.map((id) => gmail(token, `/messages/${id}?format=metadata${AUTO_REPLY_GMAIL_HEADERS}`).catch(() => null)));
+      const stamps = (msgs.filter(Boolean) as Array<Record<string, unknown>>)
+        .filter((m) => !isAutoReplyFromHeaderList(((m.payload as { headers?: Array<{ name: string; value: string }> } | undefined)?.headers) ?? []))
+        .map((m) => Number(m.internalDate ?? 0)).filter((n) => n > 0);
+      return json({ ...bestSlot(stamps, tz), who: who.to[0] });
     }
 
     case 'outreach_cancel': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const id = String(body.id ?? '');
-      if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, 'id is required');
-      const { data, error } = await db.from('mail_scheduled_sends').update({ status: 'cancelled', error: 'Cancelled before it was sent.' })
-        .eq('id', id).eq('account_id', account.id).eq('if_no_reply', true).eq('status', 'pending').select('id');
+      const sequenceId = String(body.sequence_id ?? '');
+      const UUID = /^[0-9a-f-]{36}$/i;
+      if (!UUID.test(id) && !UUID.test(sequenceId)) throw new HttpError(400, 'id or sequence_id is required');
+      let q = db.from('mail_scheduled_sends').update({ status: 'cancelled', cancel_reason: 'user', error: 'Cancelled before it was sent.' })
+        .eq('account_id', account.id).eq('if_no_reply', true).eq('status', 'pending');
+      q = UUID.test(sequenceId) ? q.eq('sequence_id', sequenceId) : q.eq('id', id);
+      const { data, error } = await q.select('id');
       if (error) throw new HttpError(500, `Could not cancel: ${error.message}`);
       if (!data?.length) throw new HttpError(409, 'It is already being sent, or was already cancelled.');
       return json({ ok: true });
@@ -694,10 +739,10 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
     case 'outreach': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const token = await accessTokenFor(db, account);
-      const { data, error } = await db.from('mail_scheduled_sends').select('id, gmail_thread_id, send_at, summary, recipients, payload')
+      const { data, error } = await db.from('mail_scheduled_sends').select('id, gmail_thread_id, send_at, summary, recipients, payload, sequence_id, step')
         .eq('account_id', account.id).eq('if_no_reply', true).eq('status', 'pending').order('send_at').limit(200);
       if (error) throw new HttpError(500, error.message);
-      const rows = (data ?? []) as Array<{ id: string; gmail_thread_id: string; send_at: string; summary: string | null; recipients: string | null; payload: { text?: string } }>;
+      const rows = (data ?? []) as Array<{ id: string; gmail_thread_id: string; send_at: string; summary: string | null; recipients: string | null; payload: { text?: string }; sequence_id: string | null; step: number | null }>;
       const ids = [...new Set(rows.map((r) => r.gmail_thread_id))];
       const fetched = await Promise.all(ids.map((id) => gmail(token, `/threads/${id}?format=metadata${LIST_META}`).catch(() => null)));
       const byId = new Map(fetched.filter(Boolean).map((t) => [String((t as Record<string, unknown>).id), t as Record<string, unknown>]));
@@ -714,7 +759,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
           return {
             ...(byId.has(id) ? listRow(byId.get(id)!) : fallback), contact_id: f?.contact_id ?? null, contact_name: (f?.crm_contacts as { name?: string } | null)?.name ?? null,
             assignee_user_id: f?.assignee_user_id ?? null, snoozed_until: f?.snoozed_until ?? null,
-            outreach: rows.filter((r) => r.gmail_thread_id === id).map((r) => ({ id: r.id, send_at: r.send_at, preview: String(r.payload?.text ?? '').slice(0, 140) })),
+            outreach: rows.filter((r) => r.gmail_thread_id === id).map((r) => ({ id: r.id, send_at: r.send_at, preview: String(r.payload?.text ?? '').slice(0, 140), sequence_id: r.sequence_id, step: r.step })),
           };
         }),
         next_page_token: null, estimate: ids.length,

@@ -16,6 +16,7 @@ import { DealDocumentsCard } from '@/modules/crm/components/DealDocumentsCard';
 import {
   dealsService, getDeal, type Deal, type DealStage, type DealType,
 } from '@/services/dealsService';
+import { FollowUpsCard } from '@/components/business/crm/FollowUpsCard';
 
 export const DealDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -169,6 +170,8 @@ export const DealDetailPage: React.FC = () => {
           />
 
           <DealTeamCard dealId={deal.id} workspaceId={activeWorkspaceId} />
+
+          <FollowUpsCard dealId={deal.id} />
 
           {deal.notes && (
             <Card>

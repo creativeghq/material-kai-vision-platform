@@ -7,6 +7,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { gmailAccessToken, gmailFetch, gmailHeader, sendPreparedGmail, type PreparedGmailSend } from '../_shared/gmail-client.ts';
 import { parseAddress } from '../_shared/mail-mime.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { AUTO_REPLY_GMAIL_HEADERS, isAutoReplyFromHeaderList } from '../_shared/mail-auto-reply.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -46,13 +47,47 @@ async function wakeSnoozes(db: Db): Promise<{ woken: number; failed: number }> {
   return { woken, failed };
 }
 
-/** Anyone wrote on the thread after `sinceMs`. Our own sends, from any alias, carry Gmail's SENT label. */
+/** They wrote on the thread after `sinceMs`. Our sends (any alias) carry SENT; an out-of-office is not an answer. */
 async function repliedSince(db: Db, account: { id: string; email: string; display_name: string | null }, threadId: string, sinceMs: number): Promise<boolean> {
   const token = await gmailAccessToken(db, account);
-  const t = await gmailFetch(token, `/threads/${threadId}?format=metadata&metadataHeaders=From`);
-  return ((t.messages ?? []) as Array<{ internalDate?: string; labelIds?: string[] }>).some((m) => {
+  const t = await gmailFetch(token, `/threads/${threadId}?format=metadata${AUTO_REPLY_GMAIL_HEADERS}`);
+  type Msg = { internalDate?: string; labelIds?: string[]; payload?: { headers?: Array<{ name: string; value: string }> } };
+  return ((t.messages ?? []) as Msg[]).some((m) => {
     const labels = m.labelIds ?? [];
-    return Number(m.internalDate ?? 0) > sinceMs && !labels.includes('SENT') && !labels.includes('DRAFT');
+    return Number(m.internalDate ?? 0) > sinceMs && !labels.includes('SENT') && !labels.includes('DRAFT')
+      && !isAutoReplyFromHeaderList(m.payload?.headers ?? []);
+  });
+}
+
+/** A reply ends the whole chain: this step and every later one still waiting. */
+async function cancelForReply(db: Db, id: string | null, sequenceId: string | null): Promise<void> {
+  const patch = { status: 'cancelled', cancel_reason: 'replied', error: 'They replied before it was due, so it was not sent.' };
+  for (let attempt = 0; id && attempt < 3; attempt++) {
+    const { error } = await db.from('mail_scheduled_sends').update(patch).eq('id', id);
+    if (!error) break;
+    if (attempt === 2) console.error('[mail-scheduler] outreach cancel not recorded', id, error.message);
+  }
+  if (!sequenceId) return;
+  const { error } = await db.from('mail_scheduled_sends').update(patch).eq('sequence_id', sequenceId).eq('status', 'pending');
+  if (error) console.error('[mail-scheduler] later steps not cancelled', sequenceId, error.message);
+}
+
+/** A follow-up that could not go out: the person who set it hears why, and a platform conversation comes back on top. */
+async function tellFollowUpFailed(db: Db, row: Record<string, unknown>, failure: string): Promise<void> {
+  if (row.kind === 'inbox' && row.inbox_thread_id) {
+    const { error } = await db.from('inbox_threads')
+      .update({ status: 'open', last_message_at: new Date().toISOString(), follow_up_error: failure.slice(0, 500) }).eq('id', row.inbox_thread_id);
+    if (error) console.error('[mail-scheduler] failed follow-up not surfaced', row.id, error.message);
+  }
+  await emitFlowEvent('inbox.follow_up_due', {
+    type: 'inbox_follow_up',
+    user_id: row.user_id,
+    workspace_id: row.workspace_id,
+    title: 'Your follow-up could not be sent',
+    body: `${String(row.summary ?? 'A follow-up')} — ${failure}`.slice(0, 500),
+    action_url: row.kind === 'inbox' ? `/inbox?thread=${row.inbox_thread_id}` : '/inbox?src=gmail',
+    ...(row.kind === 'inbox' ? { thread_id: row.inbox_thread_id } : { gmail_thread_id: row.gmail_thread_id, source: 'gmail' }),
+    error: failure,
   });
 }
 
@@ -68,7 +103,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
     const { data: rows, error: claimErr } = await db.from('mail_scheduled_sends')
       .update({ status: 'sending', claimed_at: new Date().toISOString() })
       .eq('id', id).eq('status', 'pending')
-      .select('id, kind, account_id, payload, user_id, workspace_id, created_at, if_no_reply, gmail_thread_id, mail_accounts(id, email, display_name, status)');
+      .select('id, kind, account_id, payload, user_id, workspace_id, created_at, if_no_reply, gmail_thread_id, inbox_thread_id, sequence_id, summary, mail_accounts(id, email, display_name, status)');
     if (claimErr || !rows?.length) continue;
     const row = rows[0];
     let result: Record<string, unknown> | null = null;
@@ -78,13 +113,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
         const account = row.mail_accounts;
         if (!account || account.status !== 'active') throw new Error('the Gmail account needs reconnecting');
         if (row.if_no_reply && row.gmail_thread_id && await repliedSince(db, account, row.gmail_thread_id, Date.parse(row.created_at))) {
-          let cancelErr: { message: string } | null = null;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            ({ error: cancelErr } = await db.from('mail_scheduled_sends')
-              .update({ status: 'cancelled', error: 'They replied before it was due, so it was not sent.' }).eq('id', row.id));
-            if (!cancelErr) break;
-          }
-          if (cancelErr) console.error('[mail-scheduler] outreach cancel not recorded', row.id, cancelErr.message);
+          await cancelForReply(db, row.id, row.sequence_id ?? null);
           skipped++;
           continue;
         }
@@ -106,6 +135,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
       ? { status: 'failed', error: failure.slice(0, 1000) }
       : { status: 'sent', sent_at: new Date().toISOString(), result, payload: { delivered: true } }).eq('id', row.id);
     if (doneErr) console.error('[mail-scheduler] outcome not recorded', row.id, doneErr.message);
+    if (failure && row.if_no_reply) await tellFollowUpFailed(db, row, failure);
     if (failure) failed++; else sent++;
   }
   return { sent, failed, skipped };
@@ -209,18 +239,22 @@ async function fireReminders(db: Db): Promise<{ fired: number; cleared: number }
     let replied = false;
     if (row.remind_if_no_reply && row.mail_accounts.status === 'active') {
       try {
-        const token = await gmailAccessToken(db, row.mail_accounts);
-        const t = await gmailFetch(token, `/threads/${row.gmail_thread_id}?format=metadata&metadataHeaders=From`);
-        const msgs = (t.messages ?? []) as Array<Record<string, unknown>>;
-        const last = msgs[msgs.length - 1];
-        const setAt = row.remind_set_at ? Date.parse(row.remind_set_at) : 0;
-        replied = !!last && parseAddress(gmailHeader(last, 'From')).address !== String(row.mail_accounts.email).toLowerCase()
-          && Number(last.internalDate ?? 0) > setAt;
+        replied = await repliedSince(db, row.mail_accounts, row.gmail_thread_id, row.remind_set_at ? Date.parse(row.remind_set_at) : 0);
       } catch (e) {
         console.error('[mail-scheduler] reminder check failed; reminding anyway', row.id, (e as Error).message);
       }
     }
     if (replied) { cleared++; continue; }
+    if (row.mail_accounts.status === 'active') {
+      try {
+        const token = await gmailAccessToken(db, row.mail_accounts);
+        await gmailFetch(token, `/threads/${row.gmail_thread_id}/modify`, { method: 'POST', body: JSON.stringify({ addLabelIds: ['INBOX', 'UNREAD'] }) });
+        const { error: wErr } = await db.from('mail_thread_index').update({ woken_at: now }).eq('id', row.id);
+        if (wErr) console.error('[mail-scheduler] reminder fired but not pinned on top', row.id, wErr.message);
+      } catch (e) {
+        console.error('[mail-scheduler] reminder fired but the thread was not brought back', row.id, (e as Error).message);
+      }
+    }
     if (!row.remind_user_id) { console.error('[mail-scheduler] reminder with no owner dropped', row.id); continue; }
     await emitFlowEvent('inbox.follow_up_due', {
       type: 'inbox.follow_up_due',
@@ -235,6 +269,39 @@ async function fireReminders(db: Db): Promise<{ fired: number; cleared: number }
     fired++;
   }
   return { fired, cleared };
+}
+
+const OUTCOME_BATCH = 15;
+const OUTCOME_RECHECK_MS = 6 * 3600 * 1000;
+
+/** Did a sent Gmail follow-up get an answer? Checked a few times over 30 days; the Inbox side is stamped by its trigger. */
+async function checkOutcomes(db: Db): Promise<{ checked: number; replied: number }> {
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const stale = new Date(Date.now() - OUTCOME_RECHECK_MS).toISOString();
+  const { data, error } = await db.from('mail_scheduled_sends')
+    .select('id, sent_at, gmail_thread_id, sequence_id, mail_accounts!inner(id, email, display_name, status)')
+    .eq('kind', 'gmail').eq('if_no_reply', true).eq('status', 'sent').is('replied_at', null).gt('sent_at', since)
+    .or(`outcome_checked_at.is.null,outcome_checked_at.lt.${stale}`)
+    .order('outcome_checked_at', { ascending: true, nullsFirst: true }).limit(OUTCOME_BATCH);
+  if (error) { console.error('[mail-scheduler] outcome scan failed', error.message); return { checked: 0, replied: 0 }; }
+  let replied = 0;
+  for (const row of data ?? []) {
+    let answered = false;
+    if (row.mail_accounts.status === 'active' && row.gmail_thread_id) {
+      try { answered = await repliedSince(db, row.mail_accounts, row.gmail_thread_id, Date.parse(row.sent_at)); } catch (e) {
+        console.error('[mail-scheduler] outcome check failed', row.id, (e as Error).message);
+      }
+    }
+    const now = new Date().toISOString();
+    const { error: upErr } = await db.from('mail_scheduled_sends')
+      .update({ outcome_checked_at: now, ...(answered ? { replied_at: now } : {}) }).eq('id', row.id);
+    if (upErr) console.error('[mail-scheduler] outcome not recorded', row.id, upErr.message);
+    if (answered) {
+      replied++;
+      if (row.sequence_id) await cancelForReply(db, null, row.sequence_id);
+    }
+  }
+  return { checked: data?.length ?? 0, replied };
 }
 
 async function failStalled(db: Db): Promise<number> {
@@ -254,6 +321,7 @@ Deno.serve(withApiLogging('mail-scheduler', async (req) => {
   const snoozes = await wakeSnoozes(db);
   const scheduled = await deliverScheduled(db);
   const reminders = await fireReminders(db);
+  const outcomes = await checkOutcomes(db);
   const sync = await syncHistory(db);
-  return json({ ok: true, stalled, snoozes, scheduled, reminders, sync });
+  return json({ ok: true, stalled, snoozes, scheduled, reminders, outcomes, sync });
 }));

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlarmClock, AlertTriangle, Archive, BellRing, CalendarClock, Users, FilePen, Inbox as InboxIcon, Loader2, Mail, Paperclip, Plus, Search, Send, ShieldAlert, Star, Tag, Trash2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
@@ -28,6 +28,11 @@ const FOLLOW_UP_TABS = [
 import { GmailShareDialog } from './GmailShareDialog';
 import { MailAvatar, RecipientInput } from './mailParts';
 import { ScheduledDialog, SendLaterMenu } from '../components/SendLater';
+import { FollowUpOnSend, applyGmailPlan, describePlan, remindAt, type SendFollowUpPlan } from '../components/FollowUpOnSend';
+import { WritingScore } from '../components/WritingScore';
+import { Checkbox } from '@/components/core/ui/checkbox';
+import { FollowUpStatsLine } from '../components/FollowUpStatsLine';
+import { BulkFollowUp } from '../components/BulkFollowUp';
 
 const SYSTEM_ROWS: Array<{ id: string; label: string; icon: React.ElementType }> = [
   { id: 'INBOX', label: 'Inbox', icon: InboxIcon },
@@ -50,18 +55,33 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const [trackOpens, setTrackOpens] = useTrackOpens();
+  const [followUp, setFollowUp] = useState<SendFollowUpPlan | null>(null);
   const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
   const send = async (sendAt?: Date) => {
     if (!g.account) return;
+    if (sendAt && followUp) {
+      toast({ title: 'Send now, or remove the follow-up', description: 'A follow-up starts when the message goes out, so it cannot be set on a message scheduled for later.', variant: 'destructive' });
+      return;
+    }
     setBusy(true);
     try {
       const input = {
         account_id: g.account.id, to, cc, bcc, subject, body, track_opens: trackOpens,
         attachments: files.length ? await Promise.all(files.map(fileToAttachment)) : undefined,
       };
-      if (sendAt) await gmailApi.schedule({ ...input, send_at: sendAt.toISOString() });
-      else await gmailApi.send(input);
-      toast({ title: sendAt ? 'Email scheduled' : 'Email sent' });
+      if (sendAt) {
+        await gmailApi.schedule({ ...input, send_at: sendAt.toISOString() });
+        toast({ title: 'Email scheduled' });
+      } else {
+        const sent = await gmailApi.send(input);
+        if (!followUp) toast({ title: 'Email sent' });
+        else {
+          await applyGmailPlan(g.account.id, sent.thread_id, followUp, subject).then(
+            () => toast({ title: `Email sent · ${describePlan(followUp)}` }),
+            (e: unknown) => toast({ title: 'Sent, but the follow-up was not set', description: (e as Error).message, variant: 'destructive' }),
+          );
+        }
+      }
       onClose();
       void g.loadThreads();
     } catch (e) {
@@ -105,6 +125,8 @@ const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <WritingScore body={body} subject={subject} className="mr-auto self-center" />
+          <FollowUpOnSend value={followUp} onChange={setFollowUp} />
           <SendLaterMenu disabled={busy || !to.length || !subject.trim() || (!body.trim() && !files.length)} onPick={(d) => { void send(d); }} />
           <Button onClick={() => { void send(); }} disabled={busy || !to.length || !subject.trim() || (!body.trim() && !files.length)}>
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
@@ -125,6 +147,31 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
   const userLabels = g.labels.filter((l) => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
   const followUpView = FOLLOW_UP_VIEWS.includes(g.labelId);
   const followUpTab = FOLLOW_UP_TABS.find((t) => t.id === g.labelId);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const { toast } = useToast();
+  useEffect(() => { setSelected(new Set()); }, [g.labelId, g.appliedQuery, account?.id]);
+  const toggle = (id: string) => setSelected((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const runBulk = async (what: SendFollowUpPlan | 'archive') => {
+    if (!account || !selected.size) return;
+    setBulkBusy(true);
+    const ids = [...selected];
+    const failed: string[] = [];
+    for (const id of ids) {
+      try {
+        if (what === 'archive') await gmailApi.modify({ account_id: account.id, thread_id: id, remove: ['INBOX'] });
+        else if (what.kind === 'remind') await gmailApi.snooze({ account_id: account.id, thread_id: id, until: remindAt(what.days).toISOString() });
+        else await applyGmailPlan(account.id, id, what);
+      } catch { failed.push(id); }
+    }
+    setBulkBusy(false);
+    const done = ids.length - failed.length;
+    toast(failed.length
+      ? { title: `${done} of ${ids.length} done — ${failed.length} failed`, description: 'The ones that failed are still selected.', variant: 'destructive' }
+      : { title: what === 'archive' ? `${done} archived` : `Follow-up set on ${done} conversation${done === 1 ? '' : 's'}` });
+    setSelected(new Set(failed));
+    void g.loadThreads();
+  };
 
   const modeTabs = (
     <div role="tablist" aria-label="Inbox source" className="flex items-center gap-3 px-3 border-b border-hairline shrink-0">
@@ -239,6 +286,16 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
             ))}
           </div>
         )}
+        {followUpView && !g.appliedQuery && <div className="px-3 py-1.5 border-b border-hairline"><FollowUpStatsLine refreshKey={g.threads.length} /></div>}
+        {selected.size > 0 && account && (
+          <div className="px-3 py-2 border-b border-hairline flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-medium tabular-nums mr-1">{selected.size} selected</span>
+            <BulkFollowUp disabled={bulkBusy} onPlan={(plan) => { void runBulk(plan); }} />
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => { void runBulk('archive'); }}>Archive</Button>
+            {bulkBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+            <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={() => setSelected(new Set())}>Clear</Button>
+          </div>
+        )}
         {account?.is_shared && (
           <div role="tablist" aria-label="Assignment" className="flex items-center gap-3 px-3 border-b border-hairline text-xs">
             {(['all', 'mine', 'unassigned'] as const).map((k) => (
@@ -273,8 +330,12 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
           ) : (
             <>
               {g.visibleThreads.map((t) => (
-                <button key={t.id} type="button" onClick={() => g.openThread(t.id)}
-                  className={`w-full text-left px-4 py-3 flex gap-3 border-b border-hairline border-l-2 transition-colors ${g.openId === t.id ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}>
+                <div key={t.id} className="group relative">
+                <span className={`absolute left-1 top-1/2 -translate-y-1/2 z-10 ${selected.size > 0 || selected.has(t.id) ? 'flex' : 'hidden md:group-hover:flex'}`}>
+                  <Checkbox aria-label={`Select ${t.subject}`} checked={selected.has(t.id)} onCheckedChange={() => toggle(t.id)} />
+                </span>
+                <button type="button" onClick={() => (selected.size > 0 ? toggle(t.id) : g.openThread(t.id))}
+                  className={`w-full text-left ${selected.size > 0 ? 'pl-8 pr-4' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-b border-hairline border-l-2 transition-colors ${g.openId === t.id ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}>
                   <MailAvatar name={t.from.name} email={t.from.address} photoUrl={t.from.photo_url} className="h-9 w-9 mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -306,6 +367,7 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
                     )}
                   </div>
                 </button>
+                </div>
               ))}
               {g.nextPageToken && (
                 <div className="p-3 flex justify-center">

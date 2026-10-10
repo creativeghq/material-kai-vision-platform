@@ -243,13 +243,35 @@ in the trigger above, so it works whatever channel they answer on.
 - The thread returns to Open **whether or not the message went**. A chase Meta refused needs
   somebody more than one that worked, not less — and `follow_up_fired_at` is already stamped, so
   leaving it parked would strand it having fired, never to fire again.
-- The UI calls the two shapes **Boomerang** (no message: out of the list, back on top on the day)
-  and **Automatic outreach** (the message). They share the one slot, so setting one replaces the
-  other. When nothing was sent the cron also bumps `last_message_at`, which is what puts the thread
-  back at the top of the list and makes it unread — exactly as a new message would.
+- **Boomerang** is this slot with no message: out of the list, back on top on the day. When nothing
+  was sent the cron also bumps `last_message_at`, which puts the thread back at the top and makes it
+  unread — exactly as a new message would.
+- **Automatic outreach** is a CHAIN of up to 5 replies in `mail_scheduled_sends` (`kind = 'inbox'`,
+  `if_no_reply`, one `sequence_id`, `step` 1..n), delivered by `mail-scheduler` through
+  `internal_scheduled_send`. `inbox_message_moves_thread_state` cancels every pending step
+  (`cancel_reason = 'replied'`) the moment the other side writes, and stamps `replied_at` on steps
+  sent in the last 30 days — that is the outcome the stats and the CRM card read. The older single
+  `follow_up_message` slot still fires for rows that have one; the UI no longer writes it.
+- **An automatic reply is not an answer.** Inbound email stamps `metadata.auto_reply` from
+  `_shared/mail-auto-reply.ts` (Auto-Submitted, Precedence, X-Autoreply/-Autorespond, and "Out of
+  office" / "Αυτόματη απάντηση" subjects), and the trigger skips those messages entirely.
+- **On WhatsApp** a step may carry an approved template (`payload.wa_template`): when the 24-hour
+  window is closed at send time it goes out as that template (billed like a manual one) instead of
+  failing. Without one, `outreach_schedule` warns at scheduling time.
+- **Timing** is decided in the browser (the only runtime that knows the operator's timezone):
+  working days 09:00–18:00 (`followUpTiming.ts`), and "their best time" from
+  `inbox_best_send_time(thread, tz)` — the hour and weekday the other side usually writes, from
+  their own messages, falling back to the workspace's customers below 3. **Follow up while
+  sending**: every composer has "if no reply" beside Send (Boomerang, or a chain), applied right
+  after the send succeeds. **Bulk**: select conversations → Follow up.
 - **Follow up** is a view, not a folder: Inbox → Follow up in the sidebar (and the Follow up tab /
-  mobile chip) lists `status = 'snoozed'`, fetched with `list_threads` `status` (200 a page; "Load older" for
-  more, and the counts read "N+" until every page is in), split into Boomerang / Automatic outreach and ordered by when each fires.
+  mobile chip) lists threads in `snoozed` OR with outreach pending (`list_threads` `follow_up`, 200
+  a page), split into Boomerang / Automatic outreach, ordered by when each fires, under a line from
+  `follow_up_stats(90)`: sent, got a reply, answered before the nudge. CRM contact (Activity) and
+  deal pages show the same through `crm_follow_ups` (INVOKER: you see your own outreach).
+- **Writing score** (`src/utils/emailScore.ts`, deterministic): length 50–125 words, 1–3
+  questions (a Greek `;` counts), sentence length, paragraph walls, a 3–6 word subject. Shown
+  beside Send in every email composer and on each outreach step.
 
 **On WhatsApp the automatic send usually cannot happen.** Meta accepts a freeform message only
 inside 24 hours of the customer's last one, and a follow-up is normally days away. That is said at
@@ -403,7 +425,7 @@ A person connects their own Gmail with the platform's one Google OAuth client (`
 - **Google setup (once, in the Google Cloud console of the existing client):** enable the Gmail API; add `https://<project>.supabase.co/functions/v1/gmail-api` as an authorised redirect URI; add the `gmail.modify` and `gmail.send` scopes to the consent screen. While the app is in Testing, only listed test users can connect; opening it to tenants needs Google verification and a CASA assessment for those restricted scopes.
 
 - **Our facts on a Gmail thread** live in `mail_thread_index`, never in Gmail: the CRM contact (matched by sender email, linked in one click, or "Add to CRM", which reuses a contact with that email before creating one), the assignee, and a snooze. Snooze (**Boomerang** in the UI) removes the INBOX label and records the time; `mail-scheduler` puts it back (INBOX + UNREAD) when due and stamps `woken_at`. Gmail itself still sorts the thread by its last message, so `threads` merges woken threads into the first Inbox page at `max(last message, woken_at)` for 7 days — the thread comes back on top, as Gmail's own snooze shows it.
-- **Automatic outreach** (`outreach_schedule`): a reply written now and queued in `mail_scheduled_sends` with `if_no_reply = true` and the `gmail_thread_id`, addressed to the other side of the thread's latest message. At send time `mail-scheduler` reads the thread and CANCELS the row ("They replied before it was due") if anyone but us wrote after it was created. Inbox → Follow up lists Boomerang / Outreach / Reminders.
+- **Automatic outreach** (`outreach_schedule`): a chain of up to 5 replies queued in `mail_scheduled_sends` with `if_no_reply`, the `gmail_thread_id` and one `sequence_id`, addressed to the other side of the thread's latest message. At send time `mail-scheduler` reads the thread and CANCELS the step and every later one if they wrote after it was set — our own sends carry Gmail's SENT label (any alias), and an out-of-office does not count. It re-checks sent steps for 30 days to stamp `replied_at`. A Gmail "remind if no reply" that fires also brings the thread back on top. `best_time` reads when that sender usually writes from their last 30 messages. Inbox → Follow up lists Boomerang / Outreach / Reminders.
 - **Shared mailboxes.** The owner marks a mailbox shared and picks active members of its workspace (`mail_account_members`). Members get it in their switcher, assign threads and filter All / Mine / Unassigned; settings and disconnect stay owner-only. Every RLS policy on the three mail tables goes through `mail_account_visible()`, so the policies cannot recurse into each other.
 - **Scheduled send** (Gmail replies, new Gmail emails, Inbox messages): `mail_scheduled_sends`, delivered by the `mail-scheduler` cron (every minute), which CLAIMS each row (`pending → sending`) before acting. Gmail sends replay the validated payload through `_shared/gmail-client.ts`; Inbox sends go through inbox-api `internal_scheduled_send`, which re-runs `send_message` as the person who scheduled it (access checked again, the row id as idempotency token). A row stuck in `sending` for 15 minutes is failed with "it may have gone", never resent. The owner can only cancel a pending row; the payload is not client-readable. Probe: `mail.scheduler_overdue` (critical).
 - **Rules are Flows.** For SHARED mailboxes only, `mail-scheduler` reads Gmail history and emits `mail.received` (sender, subject, snippet, thread, mailbox, CRM contact when known, the mailbox `workspace_id`). Personal mailboxes never emit: a workspace flow must not read one person's private mail. The tenant action `gmail_modify` ("Label / Archive Email") adds or removes labels by name (creating missing ones), archives, marks read or stars; flow-engine and gmail-api `internal_modify` both refuse anything but an active shared mailbox of the flow's own workspace. Default flow: the owner's bell rings when a known CRM contact writes; strangers stay quiet.

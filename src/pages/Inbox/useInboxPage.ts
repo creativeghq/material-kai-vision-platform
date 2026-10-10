@@ -13,6 +13,7 @@ import { useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
 import { channelForSource, inboxSourceKey, inboxThreadSource, type InboxSourceKey } from './inboxSource';
 import { inboxApi, signInboxAttachment, type InboxThread, type InboxMessage, type InboxParticipant, type WhatsAppWindow, type InboxThreadContext, type InboxLabel, type InboxThreadStatus, type InboxCatalogItem } from '@/services/inboxApi';
+import { applyPlatformPlan, describePlan, type SendFollowUpPlan } from './components/FollowUpOnSend';
 import { dayBucket } from './inboxFormat';
 import { ParticipantLabel } from './components/InboxPrimitives';
 import { emailReplyRecipients, splitAddresses } from './emailRecipients';
@@ -31,6 +32,17 @@ import { useComposerSettings } from './useComposerSettings';
 
 
 
+
+/** A conversation with automatic outreach waiting: a chain step, or the older single follow-up message. */
+function hasOutreach(t: InboxThread): boolean {
+  return (t.outreach?.length ?? 0) > 0 || (!!t.follow_up_message && !!t.follow_up_at && !t.follow_up_fired_at);
+}
+
+/** When this conversation's next follow-up happens, for ordering the Follow up view. */
+function followUpDue(t: InboxThread): number {
+  const next = t.outreach?.[0]?.send_at ?? (t.follow_up_at && !t.follow_up_fired_at ? t.follow_up_at : null);
+  return next ? Date.parse(next) : Infinity;
+}
 
 export function useInboxPage() {
   const { activeWorkspaceId, activeWorkspace, isPlatformOperator } = useWorkspace();
@@ -57,6 +69,7 @@ export function useInboxPage() {
   const mode = parseInboxMode(searchParams.get('src'), isPlatformOperator);
   const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
   const [followUpKind, setFollowUpKind] = useState<'boomerang' | 'outreach'>('boomerang');
+  const [sendFollowUp, setSendFollowUp] = useState<SendFollowUpPlan | null>(null);
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
   /** MY starred messages on the open thread. Personal — resolved for the caller by get_thread. */
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
@@ -220,7 +233,7 @@ export function useInboxPage() {
     ...(showArchived ? { archived: true } : {}),
     ...(labelIds.length ? { label_ids: labelIds } : {}),
     ...(serverSearch ? { search: serverSearch } : {}),
-    ...(!showArchived && !folder && !unreadOnly && statusTab === 'snoozed' ? { status: 'snoozed' as const, limit: 200 } : {}),
+    ...(!showArchived && !folder && !unreadOnly && statusTab === 'snoozed' ? { follow_up: true, limit: 200 } : {}),
   }), [channelFilter, mode, folder, allWorkspaces, isPlatformOperator, showArchived, labelIds, serverSearch, unreadOnly, statusTab]);
 
   const setMode = useCallback((next: InboxMode) => {
@@ -274,7 +287,7 @@ export function useInboxPage() {
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
   useEffect(() => { setSelectedIds(new Set()); }, [listRequest]);
 
-  const runBulkAction = useCallback(async (action: 'read' | 'done' | 'open' | 'archive' | 'label' | 'assign_me', labelId?: string) => {
+  const runBulkAction = useCallback(async (action: 'read' | 'done' | 'open' | 'archive' | 'label' | 'assign_me' | 'follow_up', labelId?: string, plan?: SendFollowUpPlan) => {
     const byId = new Map(threads.map((t) => [t.id, t]));
     const onThread = (id: string) => (byId.get(id)?.assignees ?? []).some((a) => a.user_id === myUserId);
     const ids = action === 'read' ? [...selectedIds].filter(onThread) : [...selectedIds];
@@ -285,13 +298,14 @@ export function useInboxPage() {
       return;
     }
     setBulkBusy(true);
-    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Archived', label: 'Labelled', assign_me: 'Assigned to you' } as const;
+    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Archived', label: 'Labelled', assign_me: 'Assigned to you', follow_up: 'Follow-up set' } as const;
     try {
       const r = await runBulk(ids, (id) => {
         if (action === 'read') return inboxApi.markRead(id);
         if (action === 'done') return inboxApi.setStatus(id, 'closed');
         if (action === 'open') return inboxApi.setStatus(id, 'open');
         if (action === 'archive') return inboxApi.archiveThread(id);
+        if (action === 'follow_up') return plan ? applyPlatformPlan(id, plan) : Promise.reject(new Error('No follow-up chosen'));
         if (action === 'assign_me') return myUserId ? inboxApi.setAssignee(id, myUserId) : Promise.reject(new Error('Not signed in'));
         const current = (byId.get(id)?.labels ?? []).map((l) => l.id);
         return current.includes(labelId as string) ? Promise.resolve() : inboxApi.setThreadLabels(id, [...current, labelId as string]);
@@ -673,7 +687,7 @@ export function useInboxPage() {
     () => (activeThread?.channel === 'email' ? emailReplyRecipients(messages, activeThread.metadata as Record<string, unknown> | null) : null),
     [activeThread, messages],
   );
-  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); setTemplateOpen(false); setEmailPreview(false); setAttachments([]); }, [activeId]);
+  useEffect(() => { setEmailCc(''); setEmailBcc(''); setEmailCopiesOpen(false); setTemplateOpen(false); setEmailPreview(false); setAttachments([]); setSendFollowUp(null); }, [activeId]);
   const replyAll = useCallback(() => {
     if (!emailRecipients?.replyAllCc.length) return;
     setEmailCc((cur) => [...new Set([...splitAddresses(cur), ...emailRecipients.replyAllCc])].join(', '));
@@ -734,6 +748,16 @@ export function useInboxPage() {
       if (tracked && sent?.message?.id) setMessageOpens((cur) => ({ ...cur, [sent.message.id]: { count: 0, first_opened_at: null, last_opened_at: null } }));
       sendToken.current = null;
       resetComposer();
+      if (sendFollowUp && !isNote) {
+        const plan = sendFollowUp;
+        setSendFollowUp(null);
+        try {
+          const warning = await applyPlatformPlan(activeId, plan);
+          toast(warning ? { title: 'Sent — follow-up set, but it may not send', description: warning } : { title: `Sent · ${describePlan(plan)}` });
+        } catch (e) {
+          toast({ title: 'Sent, but the follow-up was not set', description: (e as Error).message, variant: 'destructive' });
+        }
+      }
       // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
       if (!isNote && isMember && activeThread?.agent_state === 'active') {
         setActiveThread((t) => (t ? { ...t, agent_state: 'paused' } : t));
@@ -746,11 +770,13 @@ export function useInboxPage() {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachments, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, includeSignature]);
+  }, [activeId, draft, attachments, pendingCards, isNote, isMember, activeThread, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, includeSignature, sendFollowUp]);
 
   const sendAndClose = useCallback(async () => {
     const threadId = activeId;
+    const boomerang = sendFollowUp?.kind === 'remind';
     if (!threadId || !(await send())) return;
+    if (boomerang) { void loadThreads({ silent: true }); return; }
     try {
       await inboxApi.setStatus(threadId, 'closed');
       setActiveThread((t) => (t && t.id === threadId ? { ...t, status: 'closed' } : t));
@@ -758,13 +784,17 @@ export function useInboxPage() {
     } catch (e) {
       toast({ title: 'Sent, but not marked done', description: (e as Error).message, variant: 'destructive' });
     }
-  }, [activeId, send, loadThreads, toast]);
+  }, [activeId, send, loadThreads, toast, sendFollowUp]);
 
   const [showScheduled, setShowScheduled] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   useEffect(() => { setShowMessageSearch(false); }, [view, mode, labelIds.length, assignmentView]);
   const scheduleSend = useCallback(async (sendAt: Date) => {
     if (!activeId || isNote || (!draft.trim() && !attachments.length)) return;
+    if (sendFollowUp) {
+      toast({ title: 'Send now, or remove the follow-up', description: 'A follow-up starts when the message goes out, so it cannot be set on a message scheduled for later.', variant: 'destructive' });
+      return;
+    }
     if (pendingCards.length) {
       toast({ title: 'Catalog cards cannot be scheduled', description: 'Send them now, or remove them to schedule the text.', variant: 'destructive' });
       return;
@@ -782,7 +812,7 @@ export function useInboxPage() {
     } catch (e) {
       toast({ title: 'Could not schedule', description: (e as Error).message, variant: 'destructive' });
     } finally { setSending(false); }
-  }, [activeId, isNote, draft, attachments, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, includeSignature]);
+  }, [activeId, isNote, draft, attachments, pendingCards, replyTo, isEmailReply, emailCc, emailBcc, trackOpens, toast, resetComposer, includeSignature, sendFollowUp]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   // The steer, when the member typed one, tells it WHAT the reply should do.
@@ -930,19 +960,19 @@ export function useInboxPage() {
     // Folder + status semantics: Unread ignores status (the unread predicate itself already ran
     // in the filter matcher); Archived is its own view; otherwise the Open / Follow-up (snoozed) /
     // Done (closed) tab narrows the working set.
-    if (!unreadOnly && !showArchived && !folder) list = list.filter((t) => t.status === statusTab);
     if (view === 'followup') {
-      const due = (t: InboxThread) => (t.follow_up_at && !t.follow_up_fired_at ? Date.parse(t.follow_up_at) : Infinity);
-      list = list.filter((t) => (followUpKind === 'outreach') === !!(t.follow_up_message && !t.follow_up_fired_at))
-        .sort((a, b) => due(a) - due(b));
-    }
+      list = list.filter((t) => (followUpKind === 'outreach' ? hasOutreach(t) : t.status === 'snoozed' && !hasOutreach(t)))
+        .sort((a, b) => followUpDue(a) - followUpDue(b));
+    } else if (!unreadOnly && !showArchived && !folder) list = list.filter((t) => t.status === statusTab);
     return list;
   }, [matchedThreads, query, serverSearch, unreadOnly, showArchived, folder, statusTab, view, followUpKind]);
 
   const followUpCounts = useMemo(() => {
     if (view !== 'followup') return null;
-    const outreach = matchedThreads.filter((t) => t.status === 'snoozed' && t.follow_up_message && !t.follow_up_fired_at).length;
-    return { outreach, boomerang: matchedThreads.filter((t) => t.status === 'snoozed').length - outreach };
+    return {
+      outreach: matchedThreads.filter(hasOutreach).length,
+      boomerang: matchedThreads.filter((t) => t.status === 'snoozed' && !hasOutreach(t)).length,
+    };
   }, [view, matchedThreads]);
 
   // Threads grouped into Today / Yesterday / This week / Earlier for the email-client day headers.
@@ -1069,6 +1099,8 @@ export function useInboxPage() {
     setStatusTab,
     followUpKind,
     setFollowUpKind,
+    sendFollowUp,
+    setSendFollowUp,
     followUpCounts,
     wsLabels,
     setWsLabels,

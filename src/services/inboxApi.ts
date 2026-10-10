@@ -152,7 +152,13 @@ export interface InboxThread {
    */
   follow_up_error?: string | null;
   follow_up_fired_at?: string | null;
+  /** Automatic outreach steps still waiting to send (a reply cancels them). */
+  outreach?: InboxOutreachStep[];
 }
+
+export interface InboxOutreachStep { id: string; send_at: string; step: number | null; sequence_id: string | null; preview: string; wa_template?: boolean }
+export interface BestSendTime { best_hour: number | null; best_dow: number | null; sample: number; basis: string }
+export interface FollowUpStats { sent: number; replied_after: number; replied_before: number; pending: number; failed: number; cancelled: number }
 
 export interface InboxThreadAssignee {
   user_id: string;
@@ -616,7 +622,7 @@ export const inboxApi = {
   }) {
     return call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule_message', input);
   },
-  assist(thread_id: string, mode: 'summary' | 'actions' | 'ask' | 'rewrite' | 'shorten' | 'formal', extra?: { text?: string; question?: string }) {
+  assist(thread_id: string, mode: 'summary' | 'actions' | 'ask' | 'rewrite' | 'shorten' | 'formal' | 'followup', extra?: { text?: string; question?: string }) {
     return call<{ text: string; mode: string }>('assist', { thread_id, mode, ...(extra ?? {}) });
   },
   composeEmail(input: {
@@ -632,7 +638,7 @@ export const inboxApi = {
   listThreads(filters: {
     channel?: InboxChannel; thread_type?: InboxThreadType; status?: InboxThreadStatus;
     scope?: 'all'; archived?: boolean; label_ids?: string[]; search?: string; before?: string; limit?: number;
-    channels?: string[]; folder?: 'starred' | 'sent' | 'drafts';
+    channels?: string[]; folder?: 'starred' | 'sent' | 'drafts'; follow_up?: boolean;
   } = {}) {
     return call<{ threads: InboxThread[]; next_cursor: string | null }>('list_threads', filters);
   },
@@ -815,6 +821,23 @@ export const inboxApi = {
     return call<{ ok: boolean; follow_up_at: string; warning: string | null }>('set_follow_up', input);
   },
   /** Call it off. The thread returns to Open — Follow-up with no date is the state this removes. */
+  /** A chain of up to 5 follow-ups that send unless they reply first; on WhatsApp an approved template covers a closed window. */
+  outreachSchedule(input: { thread_id: string; steps: Array<{ body: string; send_at: string }>; wa_template?: { template_id: string; variables: Record<string, string> } }) {
+    return call<{ ok: boolean; sequence_id: string; warning: string | null }>('outreach_schedule', input);
+  },
+  outreachCancel(input: { id?: string; sequence_id?: string }) {
+    return call<{ ok: boolean; cancelled: number }>('outreach_cancel', input);
+  },
+  async bestSendTime(thread_id: string) {
+    const { data, error } = await supabase.rpc('inbox_best_send_time' as never, { p_thread_id: thread_id, p_tz: Intl.DateTimeFormat().resolvedOptions().timeZone } as never);
+    if (error) throw new Error(error.message);
+    return ((data as unknown as BestSendTime[] | null) ?? [])[0] ?? null;
+  },
+  async followUpStats(days = 90) {
+    const { data, error } = await supabase.rpc('follow_up_stats' as never, { p_days: days } as never);
+    if (error) throw new Error(error.message);
+    return ((data as unknown as FollowUpStats[] | null) ?? [])[0] ?? null;
+  },
   clearFollowUp(thread_id: string) {
     return call<{ ok: boolean }>('clear_follow_up', { thread_id });
   },

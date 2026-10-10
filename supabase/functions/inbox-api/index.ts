@@ -90,6 +90,7 @@ import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { getAgentSystemPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
+import { parseOutreachSteps } from '../_shared/outreach-steps.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -3050,6 +3051,7 @@ async function handleJwtAction(
       }
       if (typeFilter) q = q.eq('thread_type', typeFilter);
       if (statusFilter) q = q.eq('status', statusFilter);
+      if (payload.follow_up === true) q = q.or('status.eq.snoozed,has_pending_outreach.eq.true');
       // Archived (soft-deleted) threads live in their own view for the 30-day restore window.
       q = payload.archived === true ? q.not('archived_at', 'is', null) : q.is('archived_at', null);
       const labelIds = (Array.isArray(payload.label_ids) ? payload.label_ids : payload.label_id ? [payload.label_id] : [])
@@ -3197,6 +3199,20 @@ async function handleJwtAction(
         for (const r of (fileRows || []) as Array<{ thread_id: string }>) withFiles.add(r.thread_id);
       }
 
+      const outreachByThread = new Map<string, Array<Record<string, unknown>>>();
+      if (threadIds.length) {
+        const { data: oRows, error: oErr } = await db.from('mail_scheduled_sends')
+          .select('id, inbox_thread_id, send_at, step, sequence_id, summary, payload')
+          .in('inbox_thread_id', threadIds).eq('if_no_reply', true).eq('status', 'pending').order('send_at');
+        if (oErr) console.error('[inbox-api] pending follow-ups unavailable:', oErr.message);
+        for (const r of (oRows || []) as Array<Record<string, unknown>>) {
+          const list = outreachByThread.get(String(r.inbox_thread_id)) ?? [];
+          const p = (r.payload ?? {}) as Json;
+          list.push({ id: r.id, send_at: r.send_at, step: r.step, sequence_id: r.sequence_id, preview: String(p.body ?? r.summary ?? '').slice(0, 140), wa_template: !!p.wa_template });
+          outreachByThread.set(String(r.inbox_thread_id), list);
+        }
+      }
+
       const enriched = (threads || []).map((t: Record<string, unknown>) => {
         const id = String(t.id);
         // Threads visible only via workspace membership (not an explicit participant) start unread.
@@ -3217,6 +3233,7 @@ async function handleJwtAction(
           counterparty_participant_id: counterpartyByThread.get(id) ?? null,
           counterparty_avatar_slot: avatarSlotByThread.get(id) ?? null,
           has_attachments: withFiles.has(id),
+          outreach: outreachByThread.get(id) ?? [],
         };
       });
       return json({ threads: enriched, next_cursor: nextCursor });
@@ -4755,7 +4772,7 @@ async function handleJwtAction(
       const access = await resolveThreadAccess(db, userId, thread, operator);
       if (!access.isMember) throw new HttpError(404, 'Conversation not found');
       const mode = String(payload.mode || '');
-      if (!['summary', 'actions', 'ask', 'rewrite', 'shorten', 'formal'].includes(mode)) throw new HttpError(400, 'Unknown assist mode');
+      if (!['summary', 'actions', 'ask', 'rewrite', 'shorten', 'formal', 'followup'].includes(mode)) throw new HttpError(400, 'Unknown assist mode');
       const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 500) : '';
       const draftText = typeof payload.text === 'string' ? payload.text.trim().slice(0, 8000) : '';
       if (['rewrite', 'shorten', 'formal'].includes(mode) && !draftText) throw new HttpError(400, 'Write something first, then rewrite it');
@@ -5200,6 +5217,71 @@ async function handleJwtAction(
       await db.from('inbox_threads')
         .update({ archived_at: null, status: 'open' }).eq('id', threadId);
       return json({ ok: true });
+    }
+
+    case 'outreach_schedule': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      if (thread.archived_at) throw new HttpError(409, 'Restore the conversation before scheduling a follow-up');
+      const steps = parseOutreachSteps(payload);
+      const tpl = payload.wa_template as Json | undefined;
+      let waTemplate: { template_id: string; variables: Record<string, string> } | null = null;
+      if (tpl && thread.channel === 'whatsapp') {
+        const resolved = await resolveSendableTemplate(db, String(thread.workspace_id), String(tpl.template_id || ''));
+        if ('error' in resolved) throw new HttpError(404, resolved.error);
+        const variables: Record<string, string> = {};
+        const rawVars = (tpl.variables ?? {}) as Record<string, unknown>;
+        for (const name of (Array.isArray(resolved.template.variables) ? resolved.template.variables : []) as string[]) {
+          const v = String(rawVars[name] ?? '').trim();
+          if (!v) throw new HttpError(400, `Fill in "${name}" for the template`);
+          variables[name] = v.slice(0, 1000);
+        }
+        waTemplate = { template_id: resolved.template.id, variables };
+      }
+      const sequenceId = crypto.randomUUID();
+      const rows = steps.map((st, i) => ({
+        user_id: userId, workspace_id: String(thread.workspace_id), kind: 'inbox', inbox_thread_id: threadId,
+        if_no_reply: true, sequence_id: sequenceId, step: i + 1,
+        payload: { body: st.body, attachments: [], include_signature: true, ...(waTemplate ? { wa_template: waTemplate } : {}) },
+        send_at: st.sendAt,
+        summary: st.body.replace(/\s+/g, ' ').slice(0, 200),
+        recipients: String(thread.subject ?? '').slice(0, 300),
+      }));
+      const { data, error } = await db.from('mail_scheduled_sends').insert(rows).select('id, send_at, step');
+      if (error) throw new HttpError(500, `Could not schedule the follow-up: ${error.message}`);
+      let warning: string | null = null;
+      if (thread.channel === 'whatsapp' && !waTemplate) {
+        const w = await whatsappWindow(db, threadId, thread);
+        const closesAt = w.expires_at ? Date.parse(w.expires_at) : 0;
+        if (steps.some((st) => Date.parse(st.sendAt) > closesAt)) {
+          warning = 'WhatsApp\'s 24-hour window will be closed by then, so a typed message cannot go out. Pick an approved template to send instead, or you will just be reminded.';
+        }
+      }
+      return json({ ok: true, outreach: data, sequence_id: sequenceId, warning });
+    }
+
+    case 'outreach_cancel': {
+      const UUID = /^[0-9a-f-]{36}$/i;
+      const id = String(payload.id || '');
+      const sequenceId = String(payload.sequence_id || '');
+      if (!UUID.test(id) && !UUID.test(sequenceId)) throw new HttpError(400, 'id or sequence_id is required');
+      let find = db.from('mail_scheduled_sends').select('id, inbox_thread_id').eq('kind', 'inbox').eq('if_no_reply', true).eq('status', 'pending');
+      find = UUID.test(sequenceId) ? find.eq('sequence_id', sequenceId) : find.eq('id', id);
+      const { data: targets, error: fErr } = await find;
+      if (fErr) throw new HttpError(500, fErr.message);
+      const rowsFound = (targets ?? []) as Array<{ id: string; inbox_thread_id: string }>;
+      if (!rowsFound.length) throw new HttpError(409, 'It is already being sent, or was already cancelled.');
+      const thread = await getThreadOrThrow(db, rowsFound[0].inbox_thread_id);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      const { data: done, error } = await db.from('mail_scheduled_sends')
+        .update({ status: 'cancelled', cancel_reason: 'user', error: 'Cancelled before it was sent.' })
+        .in('id', rowsFound.map((r) => r.id)).eq('inbox_thread_id', thread.id).eq('status', 'pending').select('id');
+      if (error) throw new HttpError(500, `Could not cancel: ${error.message}`);
+      return json({ ok: true, cancelled: done?.length ?? 0 });
     }
 
     case 'delete_thread_forever': {
@@ -6357,10 +6439,19 @@ async function handler(req: Request): Promise<Response> {
     const authHeader = req.headers.get('authorization') || '';
     if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) throw new HttpError(401, 'Unauthorized');
     const { data: row, error } = await db.from('mail_scheduled_sends')
-      .select('id, user_id, inbox_thread_id, payload, status, kind').eq('id', String(payload.scheduled_id || '')).maybeSingle();
+      .select('id, user_id, inbox_thread_id, payload, status, kind, if_no_reply').eq('id', String(payload.scheduled_id || '')).maybeSingle();
     if (error) throw new HttpError(500, error.message);
     if (!row || row.kind !== 'inbox' || row.status !== 'sending') throw new HttpError(409, 'That scheduled message is not claimed for sending');
     const p = (row.payload ?? {}) as Json;
+    const tpl = p.wa_template as { template_id?: string; variables?: Record<string, string> } | undefined;
+    if (row.if_no_reply && tpl?.template_id) {
+      const thread = await getThreadOrThrow(db, String(row.inbox_thread_id));
+      if (thread.channel === 'whatsapp' && !(await whatsappWindow(db, String(row.inbox_thread_id), thread)).open) {
+        return handleJwtAction(db, String(row.user_id), 'send_whatsapp_template', {
+          thread_id: row.inbox_thread_id, template_id: tpl.template_id, variables: tpl.variables ?? {},
+        });
+      }
+    }
     return handleJwtAction(db, String(row.user_id), 'send_message', {
       thread_id: row.inbox_thread_id, body: p.body ?? undefined, attachments: p.attachments ?? [],
       email_cc: p.email_cc ?? [], email_bcc: p.email_bcc ?? [], track_opens: p.track_opens === true,

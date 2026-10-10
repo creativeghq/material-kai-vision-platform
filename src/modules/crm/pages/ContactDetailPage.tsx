@@ -62,6 +62,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { formatDate } from '@/utils/datetime';
 import { LIFECYCLE_STAGE_OPTIONS } from '@/modules/crm/crmConstants';
 import { PartyDealsCard } from '@/components/business/crm/PartyDealsCard';
+import { FollowUpsCard } from '@/components/business/crm/FollowUpsCard';
 
 /** Radix <Select> forbids an empty-string item value, so "not set" needs a sentinel. */
 const UNSET = '__unset__';
@@ -836,7 +837,8 @@ export const ContactDetailPage: React.FC = () => {
                     recordLabel={contact.name}
                     refreshKey={activityRefresh}
                   />
-                ) : (
+                ) : null}
+                {contact.id ? <FollowUpsCard contactId={contact.id} /> : (
                   <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Create this contact to start logging activity.</CardContent></Card>
                 )}
               </TabsContent>

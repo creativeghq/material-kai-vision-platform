@@ -15,6 +15,8 @@ import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
 import { useFileDrop } from '../useFileDrop';
 import { TrackOpensToggle, useTrackOpens } from './OpenTracking';
+import { FollowUpOnSend, applyPlatformPlan, describePlan, type SendFollowUpPlan } from './FollowUpOnSend';
+import { WritingScore } from './WritingScore';
 
 type Suggestion = { id: string; label: string; email: string };
 
@@ -75,6 +77,7 @@ export const ComposeEmailForm: React.FC<{
     return () => { cancelled = true; clearTimeout(t); };
   }, [to, contactId, workspaceId]);
 
+  const [followUp, setFollowUp] = useState<SendFollowUpPlan | null>(null);
   const canSend = !!from && to.trim().includes('@') && subject.trim() && (body.trim() || files.length > 0);
 
   const send = async () => {
@@ -96,6 +99,11 @@ export const ComposeEmailForm: React.FC<{
       });
       if (res.delivery_error) {
         toast({ title: 'Saved, but the email was NOT sent', description: res.delivery_error, variant: 'destructive' });
+      } else if (followUp) {
+        await applyPlatformPlan(res.thread_id, followUp).then(
+          () => toast({ title: `Email sent · ${describePlan(followUp)}` }),
+          (e: unknown) => toast({ title: 'Email sent, but the follow-up was not set', description: (e as Error).message, variant: 'destructive' }),
+        );
       } else {
         toast({ title: 'Email sent' });
       }
@@ -170,6 +178,8 @@ export const ComposeEmailForm: React.FC<{
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <WritingScore body={body} subject={subject} className="mr-auto self-center" />
+        <FollowUpOnSend value={followUp} onChange={setFollowUp} />
         <Button onClick={send} disabled={busy || !canSend}>
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send email'}
         </Button>

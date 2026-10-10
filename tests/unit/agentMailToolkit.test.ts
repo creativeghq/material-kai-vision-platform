@@ -151,7 +151,8 @@ describe('review fixes (2026-10-06)', () => {
 
   it('an "if no reply" reminder only counts a reply that arrived after it was set', () => {
     const sched = read('supabase/functions/mail-scheduler/index.ts');
-    expect(sched).toContain('Number(last.internalDate ?? 0) > setAt');
+    expect(sched).toContain('repliedSince(db, row.mail_accounts, row.gmail_thread_id, row.remind_set_at ? Date.parse(row.remind_set_at) : 0)');
+    expect(sched).toContain('Number(m.internalDate ?? 0) > sinceMs');
     expect(gmailFn).toContain('remind_set_at: new Date().toISOString()');
   });
 

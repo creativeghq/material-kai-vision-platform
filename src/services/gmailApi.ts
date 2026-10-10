@@ -12,7 +12,7 @@ export interface GmailThreadMeta {
   assignee_user_id: string | null; snoozed_until: string | null;
   remind_at?: string | null; remind_note?: string | null; remind_if_no_reply?: boolean;
   shared: boolean; members: Array<{ user_id: string; name: string }>;
-  outreach?: Array<{ id: string; send_at: string }>;
+  outreach?: GmailOutreach[];
 }
 export interface GmailLabel { id: string; name: string; type: 'system' | 'user'; unread: number; total: number; color: string | null }
 export interface GmailAddress { name: string | null; address: string | null; photo_url?: string | null }
@@ -24,7 +24,7 @@ export interface GmailThreadRow {
   woken_at?: string | null;
   outreach?: GmailOutreach[];
 }
-export interface GmailOutreach { id: string; send_at: string; preview: string }
+export interface GmailOutreach { id: string; send_at: string; preview: string; sequence_id?: string | null; step?: number | null }
 export interface GmailAttachment { attachmentId: string; filename: string; mimeType: string; size: number }
 export interface GmailMessage {
   id: string; label_ids: string[]; date: string | null; from: GmailAddress; to: GmailAddress[]; cc: GmailAddress[]; reply_to: string | null;
@@ -72,16 +72,18 @@ export const gmailApi = {
     call<{ ok: boolean; remind_at: string | null }>('remind', input),
   reminders: (account_id: string) =>
     call<{ threads: GmailThreadRow[]; next_page_token: null; estimate: number }>('reminders', { account_id }),
-  outreachSchedule: (input: { account_id: string; thread_id: string; body: string; send_at: string }) =>
-    call<{ ok: boolean; outreach: { id: string; send_at: string }; to: string[] }>('outreach_schedule', input),
-  outreachCancel: (account_id: string, id: string) => call<{ ok: boolean }>('outreach_cancel', { account_id, id }),
+  outreachSchedule: (input: { account_id: string; thread_id: string; steps: Array<{ body: string; send_at: string }> }) =>
+    call<{ ok: boolean; sequence_id: string; to: string[] }>('outreach_schedule', input),
+  outreachCancel: (account_id: string, target: { id?: string; sequence_id?: string }) => call<{ ok: boolean }>('outreach_cancel', { account_id, ...target }),
+  bestTime: (account_id: string, thread_id: string) =>
+    call<{ best_hour: number | null; best_dow: number | null; sample: number; basis: string; who: string }>('best_time', { account_id, thread_id, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
   outreach: (account_id: string) =>
     call<{ threads: GmailThreadRow[]; next_page_token: null; estimate: number }>('outreach', { account_id }),
   assign: (account_id: string, thread_id: string, user_id: string | null) => call<{ ok: boolean }>('assign', { account_id, thread_id, user_id }),
   members: (account_id: string) => call<{ is_shared: boolean; member_ids: string[] }>('members', { account_id }),
   share: (account_id: string, is_shared: boolean, member_ids: string[]) =>
     call<{ ok: boolean; is_shared: boolean; member_ids: string[] }>('share', { account_id, is_shared, member_ids }),
-  assist: (account_id: string, thread_id: string, mode: 'summary' | 'draft' | 'actions' | 'ask' | 'rewrite' | 'shorten' | 'formal', instruction?: string, text?: string) =>
+  assist: (account_id: string, thread_id: string, mode: 'summary' | 'draft' | 'actions' | 'ask' | 'rewrite' | 'shorten' | 'formal' | 'followup', instruction?: string, text?: string) =>
     call<{ text: string; mode: string }>('assist', { account_id, thread_id, mode, instruction, text }),
   schedule: (input: GmailSendInput & { send_at: string }) =>
     call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule', input),

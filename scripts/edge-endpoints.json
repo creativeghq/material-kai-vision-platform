@@ -3025,7 +3025,8 @@
       "internal_modify",
       "outreach",
       "outreach_schedule",
-      "outreach_cancel"
+      "outreach_cancel",
+      "best_time"
     ],
     "request": [
       "workspace_id",
@@ -9147,6 +9148,25 @@
           }
         ],
         "response": "{ok:true}"
+      },
+      {
+        "name": "outreach_schedule",
+        "summary": "Schedule a chain of up to 5 follow-up replies that send unless the other side writes first (an out-of-office does not count). On WhatsApp an approved template covers a closed 24-hour window.",
+        "params": [
+          { "name": "thread_id", "type": "string (uuid)", "required": true, "desc": "Thread the caller is a member of" },
+          { "name": "steps", "type": "array of {body, send_at}", "required": true, "desc": "In order, each a minute to a year out" },
+          { "name": "wa_template", "type": "object {template_id, variables}", "required": false, "desc": "WhatsApp only" }
+        ],
+        "response": "{ok, sequence_id, warning}"
+      },
+      {
+        "name": "outreach_cancel",
+        "summary": "Cancel one pending follow-up, or every pending step of a sequence.",
+        "params": [
+          { "name": "id", "type": "string (uuid)", "required": false, "desc": "One step" },
+          { "name": "sequence_id", "type": "string (uuid)", "required": false, "desc": "The whole chain" }
+        ],
+        "response": "{ok, cancelled}"
       },
       {
         "name": "delete_thread_forever",

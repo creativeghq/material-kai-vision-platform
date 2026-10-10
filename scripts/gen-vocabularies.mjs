@@ -19,6 +19,10 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/emailSignature.generated.ts',
   ],
   [
+    'src/pages/Inbox/outreachLimits.ts',
+    'supabase/functions/_shared/outreachLimits.generated.ts',
+  ],
+  [
     'src/modules/finance/invoice-templates/templateRegistry.ts',
     'supabase/functions/_shared/finance/invoiceTemplates.generated.ts',
   ],

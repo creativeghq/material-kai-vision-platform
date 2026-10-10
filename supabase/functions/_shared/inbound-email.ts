@@ -9,6 +9,7 @@ import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } f
 import { inboxAutopilotSettings } from './inbox-autopilot.ts';
 import { enrichInboundAttachments } from './inbox-attachment-intelligence.ts';
 import { runInBackground } from './background.ts';
+import { isAutoReply } from './mail-auto-reply.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
@@ -730,6 +731,10 @@ export async function deliverToInbox(
       email_reply_to: parsed.replyTo,
       email_html: parsed.html,
       thread_matched_by: found.matchedBy,
+      ...(isAutoReply({
+        autoSubmitted: parsed.headers.get('auto-submitted'), precedence: parsed.headers.get('precedence'),
+        xAutoreply: parsed.headers.get('x-autoreply'), xAutorespond: parsed.headers.get('x-autorespond'), subject: parsed.subject,
+      }) ? { auto_reply: true } : {}),
     },
   }).select('id').single();
   if (msgErr) throw new Error(`inbox_messages insert failed: ${msgErr.message}`);

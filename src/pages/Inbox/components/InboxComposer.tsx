@@ -30,6 +30,8 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { renderSignatureHtml, signatureDocument } from '@/utils/emailSignature';
 import type { InboxPageState } from '../useInboxPage';
+import { FollowUpOnSend } from './FollowUpOnSend';
+import { WritingScore } from './WritingScore';
 
 const CHANNEL_LABEL: Record<string, string> = { whatsapp: 'WhatsApp', email: 'Email', social: 'Social', internal: 'Team chat' };
 const FORMAT_KEY = 'inbox.composer.formatBar';
@@ -50,6 +52,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     aiDrafting, aiDraftShown, setAiDraftShown, draftSteer, setDraftSteer, draftSteerOpen, setDraftSteerOpen,
     pendingCards, setPendingCards, slashMenu, setSlashMenu, isMember, waBlocked, send, sendAndClose,
     discardDraft, aiSuggest, chooseSlashCommand, togglePendingCard, composerSettings, includeSignature, setIncludeSignature,
+    sendFollowUp, setSendFollowUp,
   } = s;
   const { toast } = useToast();
   const [formatOpen, setFormatOpen] = useState(readFormatPref);
@@ -475,6 +478,10 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
+            {isMember && !isNote && activeThread.channel !== 'internal' && (
+              <FollowUpOnSend value={sendFollowUp} onChange={setSendFollowUp} whatsappThreadId={activeThread.channel === 'whatsapp' ? activeThread.id : null} />
+            )}
+            {activeThread.channel === 'email' && !isNote && <WritingScore body={draft} />}
             <SendSplitButton
               label={isNote ? 'Add note' : 'Send'}
               sending={sending}

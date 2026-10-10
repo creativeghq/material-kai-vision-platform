@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive, ArrowLeft, Check, Forward, ListTodo, Loader2, Mail, MailOpen, Paperclip, Reply, ReplyAll, Send, Sparkles, Star, Tag, Trash2, X,
 } from 'lucide-react';
@@ -22,6 +22,8 @@ import { GmailTaskDialog } from './GmailTaskDialog';
 import { AttachmentCards, MailAvatar, PersonChip, RecipientInput, base64ToBlob } from './mailParts';
 import { AttachmentActionsProvider } from '../components/AttachmentActions';
 import { fileToAttachment } from '../composerAttachments';
+import { FollowUpOnSend, applyGmailPlan, describePlan, type SendFollowUpPlan } from '../components/FollowUpOnSend';
+import { WritingScore } from '../components/WritingScore';
 
 
 const stamp = (iso: string | null) => (iso ? `${formatDate(iso)} ${formatTime(iso)}` : '—');
@@ -192,8 +194,14 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
     } finally { setAssisting(null); }
   };
 
+  const [followUp, setFollowUp] = useState<SendFollowUpPlan | null>(null);
+  useEffect(() => { setFollowUp(null); }, [openId, mode]);
   const send = async (sendAt?: Date) => {
     if (!account || !openId || !lastIncoming || !mode) return;
+    if (sendAt && followUp) {
+      toast({ title: 'Send now, or remove the follow-up', description: 'A follow-up starts when the message goes out, so it cannot be set on a message scheduled for later.', variant: 'destructive' });
+      return;
+    }
     setSending(true);
     try {
       const input = {
@@ -207,8 +215,16 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
         await gmailApi.schedule({ ...input, send_at: sendAt.toISOString() });
         toast({ title: 'Scheduled', description: `It goes out ${stamp(sendAt.toISOString())}.` });
       } else {
-        await gmailApi.send(input);
+        const sent = await gmailApi.send(input);
         toast({ title: mode === 'forward' ? 'Forwarded' : 'Reply sent' });
+        if (followUp) {
+          const plan = followUp;
+          setFollowUp(null);
+          await applyGmailPlan(account.id, sent.thread_id, plan, subject || undefined).then(
+            () => toast({ title: describePlan(plan) }),
+            (e: unknown) => toast({ title: 'Sent, but the follow-up was not set', description: (e as Error).message, variant: 'destructive' }),
+          );
+        }
       }
       reset();
       if (!sendAt && mode !== 'forward') await openThread(openId);
@@ -396,6 +412,8 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
               </label>
               <span className="ml-auto flex items-center gap-2">
                 <Button size="sm" variant="ghost" onClick={reset} title="Discard"><Trash2 className="w-4 h-4" /></Button>
+                <WritingScore body={body} subject={mode === 'forward' ? subject : null} />
+                <FollowUpOnSend value={followUp} onChange={setFollowUp} />
                 <SendLaterMenu disabled={!canSend} onPick={(d) => { void send(d); }} />
                 <Button size="sm" onClick={() => { void send(); }} disabled={!canSend}>
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Send<Send className="w-4 h-4 ml-1.5" /></>}

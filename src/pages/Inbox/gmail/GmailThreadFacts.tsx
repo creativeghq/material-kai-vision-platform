@@ -37,6 +37,15 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
 
   useEffect(() => { setMeta(null); void load(); }, [load]);
 
+  const loadBestTime = useCallback(async () => (account ? gmailApi.bestTime(account.id, threadId) : null), [account, threadId]);
+  const draft = useCallback(async () => {
+    if (!account) return '';
+    try { return (await gmailApi.assist(account.id, threadId, 'followup')).text; } catch (e) {
+      toast({ title: 'Could not write the follow-up', description: (e as Error).message, variant: 'destructive' });
+      throw e;
+    }
+  }, [account, threadId, toast]);
+
   const run = async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     try { await fn(); toast({ title: done }); await load(); return true; } catch (e) {
@@ -98,14 +107,18 @@ export const GmailThreadFacts: React.FC<{ g: GmailMailboxState; threadId: string
         outreach={meta.outreach ?? []}
         onBoomerang={(at) => orThrow(snooze(at))}
         onClearBoomerang={() => orThrow(snooze(null))}
-        onOutreach={(at, message) => orThrow(run(async () => {
-          await gmailApi.outreachSchedule({ account_id: account.id, thread_id: threadId, body: message, send_at: at.toISOString() });
+        loadBestTime={loadBestTime}
+        draft={draft}
+        onOutreach={(steps) => orThrow(run(async () => {
+          await gmailApi.outreachSchedule({ account_id: account.id, thread_id: threadId, steps: steps.map((st) => ({ body: st.body, send_at: st.at.toISOString() })) });
           if (g.labelId === OUTREACH_VIEW) void g.loadThreads();
-        }, `Follow-up scheduled for ${formatDate(at.toISOString())} ${formatTime(at.toISOString())} — it sends unless they reply first`))}
-        onCancelOutreach={(id) => orThrow(run(async () => {
-          await gmailApi.outreachCancel(account.id, id);
+        }, steps.length > 1
+          ? `${steps.length} follow-ups scheduled from ${formatDate(steps[0].at.toISOString())} — they stop as soon as they reply`
+          : `Follow-up scheduled for ${formatDate(steps[0].at.toISOString())} ${formatTime(steps[0].at.toISOString())} — it sends unless they reply first`))}
+        onCancelOutreach={(o, whole) => orThrow(run(async () => {
+          await gmailApi.outreachCancel(account.id, whole && o.sequence_id ? { sequence_id: o.sequence_id } : { id: o.id });
           if (g.labelId === OUTREACH_VIEW) void g.loadThreads();
-        }, 'Follow-up cancelled — it will not be sent'))}
+        }, whole ? 'Follow-ups cancelled — none will be sent' : 'Follow-up cancelled — it will not be sent'))}
       />
 
       <DropdownMenu>

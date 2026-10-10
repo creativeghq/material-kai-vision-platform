@@ -18,6 +18,8 @@ import { timeAgo } from '../inboxFormat';
 import { formatDate } from '@/utils/datetime';
 import { LabelChips, MobileChip, SourceWord, ThreadAvatar } from './InboxPrimitives';
 import type { InboxPageState } from '../useInboxPage';
+import { FollowUpStatsLine } from './FollowUpStatsLine';
+import { BulkFollowUp } from './BulkFollowUp';
 
 
 const EMPTY_VIEW = {
@@ -163,6 +165,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               </DropdownMenu>
             )}
             <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('assign_me')}>Assign to me</Button>
+            {view !== 'archived' && <BulkFollowUp disabled={bulkBusy} onPlan={(plan) => runBulkAction('follow_up', undefined, plan)} />}
             {view !== 'archived' && (
               <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('archive')}>Archive</Button>
             )}
@@ -186,6 +189,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 <TabsTrigger value="closed" className="text-xs px-0 py-1">Done</TabsTrigger>
               </TabsList>
             </Tabs>
+            {view === 'followup' && <FollowUpStatsLine refreshKey={visibleThreads.length} />}
             {view === 'followup' && (
               <div role="tablist" aria-label="Follow-up kind" className="flex items-center gap-3 text-xs">
                 {(['boomerang', 'outreach'] as const).map((k) => (
@@ -297,7 +301,11 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                       ) : (
                         <span className="text-[11px] text-muted-foreground">Unassigned</span>
                       )}
-                      {t.follow_up_at && !t.follow_up_fired_at ? (
+                      {t.outreach?.length ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80" title={t.outreach[0].preview}>
+                          <Send className="w-3 h-3" />Sends {formatDate(t.outreach[0].send_at)}{t.outreach.length > 1 ? ` (+${t.outreach.length - 1})` : ''}
+                        </span>
+                      ) : t.follow_up_at && !t.follow_up_fired_at ? (
                         <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80">
                           {t.follow_up_message ? <Send className="w-3 h-3" /> : <AlarmClock className="w-3 h-3" />}
                           {t.follow_up_message ? 'Sends' : 'Back'} {formatDate(t.follow_up_at)}

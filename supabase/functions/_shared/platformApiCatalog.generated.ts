@@ -2259,6 +2259,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "reject_intake",
           "archive_thread",
           "restore_thread",
+          "outreach_schedule",
+          "outreach_cancel",
           "delete_thread_forever",
           "token_get_thread",
           "token_request_code",
@@ -2582,6 +2584,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "reason": {
         "type": "string",
         "description": "Why it was rejected"
+      },
+      "steps": {
+        "type": "string",
+        "description": "In order, each a minute to a year out (array of {body, send_at})"
+      },
+      "wa_template": {
+        "type": "string",
+        "description": "WhatsApp only (object {template_id, variables})"
+      },
+      "id": {
+        "type": "string",
+        "description": "One step (string (uuid))"
+      },
+      "sequence_id": {
+        "type": "string",
+        "description": "The whole chain (string (uuid))"
       },
       "token": {
         "type": "string"
