@@ -228,6 +228,10 @@ async function auditWebsite(supabase: any, website: { id: string; workspace_id: 
     // The synchronous signal is the instant on-page audit.
     const ip = sections?.instant_page?.items?.[0] || {};
     const checks = ip?.checks || {};
+    if (!sections?.instant_page?.items?.length && !Object.keys(cats).length) {
+      const errs = Object.entries(data?.errors || {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
+      throw new Error(errs || 'The audit returned no on-page data and no Lighthouse data.');
+    }
 
     // Failing on-page checks → issues (score is the on-page score for context, not per-check).
     const issues = Object.entries(BAD_CHECKS)
