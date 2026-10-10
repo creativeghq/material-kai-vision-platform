@@ -70,6 +70,7 @@ export function useTableSegments<T, K extends string, F extends string = never>(
       label: spec.label,
       options: segmentOptions(rows, spec.valueOf, spec.labels, spec.order),
       selected: selected[f] ?? [],
+      total: rows.length,
       onChange: (vals) => setSelected((prev) => ({ ...prev, [f]: vals })),
     };
   };

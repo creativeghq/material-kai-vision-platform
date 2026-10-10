@@ -1,9 +1,9 @@
 /** The per-website SEO rail — ONE declaration, read by the dashboard that renders it. */
 import {
-  Bot, FileBarChart, FileStack, FileText, Filter, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard,
+  Bot, FileBarChart, FileStack, FileText, Filter, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard, Link2,
   LayoutList, LineChart, MonitorSmartphone, Radar, Repeat, Scissors, Search, ShieldCheck, ShoppingBag, Sparkles,
   Spline, Swords,
-  Target, TrendingUp,
+  Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -59,7 +59,7 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'analytics-retention', label: 'Retention', icon: Repeat, group: 'audience' },
 
   { value: 'ai', label: 'AI Citations', icon: Sparkles, group: 'visibility' },
-  { value: 'rankings', label: 'Backlinks & Authority', icon: TrendingUp, group: 'visibility' },
+  { value: 'rankings', label: 'Backlinks', icon: Link2, group: 'visibility' },
   { value: 'competitors', label: 'Competitors', icon: Swords, group: 'visibility' },
   { value: 'domains', label: 'Domain Audits', icon: Radar, group: 'visibility' },
 

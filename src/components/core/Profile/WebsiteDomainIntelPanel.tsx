@@ -1,102 +1,52 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, RefreshCw, TrendingUp, ExternalLink, ArrowUp, ArrowDown, Sparkles, Link2, SearchX } from 'lucide-react';
+import { ExternalLink, Link2, Loader2, RefreshCw, SearchX } from 'lucide-react';
+import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TableColumnHeader } from '@/components/core/ui/table-column-header';
 import { HubEmptyState, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
-import { userWebsitesService, type UserWebsite, type DomainIntel, type DomainKeyword } from '@/services/userWebsitesService';
+import { userWebsitesService, type UserWebsite, type DomainIntel, type DomainBacklink } from '@/services/userWebsitesService';
 import { formatNumber } from '@/utils/decimal';
+import { timeAgo } from '@/utils/datetime';
+import { safeHref } from '@/utils/safeUrl';
 import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import { useTableSegments } from './seo/useTableSegments';
 
-type KwSortKey = 'keyword' | 'position' | 'volume' | 'etv' | 'page';
-const POSITION_BANDS: { key: string; label: string; max: number }[] = [
-  { key: '1', label: '#1', max: 1 },
-  { key: '2_3', label: '2–3', max: 3 },
-  { key: '4_10', label: '4–10', max: 10 },
-  { key: '11_20', label: '11–20', max: 20 },
-  { key: '21_50', label: '21–50', max: 50 },
-  { key: '51_100', label: '51–100', max: 100 },
-];
-const POSITION_LABELS = Object.fromEntries(POSITION_BANDS.map((b) => [b.key, b.label]));
-const POSITION_ORDER = POSITION_BANDS.map((b) => b.key);
-const positionBandOf = (k: DomainKeyword): string | null =>
-  k.position == null ? null : (POSITION_BANDS.find((b) => k.position! <= b.max)?.key ?? null);
-
-function timeAgo(iso: string | null | undefined): string {
-  if (!iso) return 'never';
-  const diff = Date.now() - new Date(iso).getTime();
-  const d = Math.floor(diff / 86400000);
-  if (d < 1) return 'today';
-  if (d === 1) return 'yesterday';
-  return `${d}d ago`;
-}
+type LinkSortKey = 'domain' | 'rank' | 'anchor' | 'first_seen';
 const fmt = (n: number | null | undefined) => (n == null ? '—' : formatNumber(Math.round(n)));
 
+const LINK_TYPE_LABELS: Record<string, string> = { dofollow: 'Follow', nofollow: 'Nofollow' };
+const STATE_LABELS: Record<string, string> = { new: 'New', live: 'Live', lost: 'Lost', broken: 'Broken' };
+const STATE_ORDER = ['new', 'live', 'lost', 'broken'];
+const stateOf = (b: DomainBacklink): string =>
+  b.is_broken ? 'broken' : b.is_lost ? 'lost' : b.is_new ? 'new' : 'live';
+
+/** A snapshot is one row per DAY (upserted), so its age is only known to the day. */
+function dayLabel(date: string): string {
+  const d = Math.floor((Date.now() - new Date(`${date}T00:00:00`).getTime()) / 86400000);
+  return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d}d ago`;
+}
+
 /** A missing figure says WHY it is missing (CLAUDE.md rule 3). */
-type SourceKey = 'overview' | 'backlinks' | 'ranked';
-
-function sourceVerdict(s: DomainIntel['latest'], key: SourceKey): string | null {
-  const raw = s?.source_status?.[key];
-  return raw ? String(raw) : null;
-}
-
-function MetricValue({ value, status }: { value: number | null | undefined; status: string | null }) {
-  if (value != null) return <>{fmt(value)}</>;
-  const p = sourceStatusPresentation(status);
-  // null = nothing to say: an old snapshot with no recorded verdict. An em dash is the honest
-  // answer there; inventing a reason would be the defect this fix is closing, inverted.
-  if (!p) return <>—</>;
+function Figure({ label, value, status }: { label: string; value: number | null | undefined; status: string | null }) {
+  const p = value == null ? sourceStatusPresentation(status) : null;
   return (
-    <span
-      className={`text-base font-medium ${p.tone === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}
-      title={p.explain}
-    >
-      {p.placeholder}
-    </span>
-  );
-}
-
-function Metric({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
-  return (
-    <div className="border rounded-lg p-3 bg-muted/20">
+    <div className="border border-hairline rounded-sm p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold tabular-nums">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-/** Position-distribution bar (1 · 2-3 · 4-10 · 11-20 · 21-50 · 51-100). */
-function PositionBars({ s }: { s: DomainIntel['latest'] }) {
-  if (!s) return null;
-  const buckets = [
-    { label: '#1', v: s.pos_1, c: 'bg-emerald-500' },
-    { label: '2–3', v: s.pos_2_3, c: 'bg-emerald-400' },
-    { label: '4–10', v: s.pos_4_10, c: 'bg-lime-500' },
-    { label: '11–20', v: s.pos_11_20, c: 'bg-amber-500' },
-    { label: '21–50', v: s.pos_21_50, c: 'bg-orange-500' },
-    { label: '51–100', v: s.pos_51_100, c: 'bg-muted-foreground/50' },
-  ];
-  const total = buckets.reduce((t, b) => t + (b.v || 0), 0) || 1;
-  return (
-    <div>
-      <div className="flex h-3 rounded-full overflow-hidden">
-        {buckets.map((b) => (b.v ? <div key={b.label} className={b.c} style={{ width: `${((b.v || 0) / total) * 100}%` }} title={`${b.label}: ${fmt(b.v)}`} /> : null))}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
-        {buckets.map((b) => (
-          <span key={b.label} className="inline-flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full ${b.c}`} /> {b.label}: <span className="tabular-nums text-foreground">{fmt(b.v)}</span>
+      <p className="text-2xl font-semibold tabular-nums">
+        {value != null ? fmt(value) : p ? (
+          <span className={`text-base font-medium ${p.tone === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`} title={p.explain}>
+            {p.placeholder}
           </span>
-        ))}
-      </div>
+        ) : '—'}
+      </p>
     </div>
   );
 }
 
+/** Websites → Backlinks: who links to the site, and the index's verdict on its authority. */
 export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
   const [intel, setIntel] = useState<DomainIntel | null>(null);
@@ -106,34 +56,33 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
   const load = async () => {
     setLoading(true);
     try { setIntel(await userWebsitesService.domainIntel(website.id, 180)); }
-    catch (e: any) { toast({ title: 'Could not load Rankings & Links', description: e.message, variant: 'destructive' }); }
+    catch (e: any) { toast({ title: 'Could not load backlinks', description: e.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [website.id]);
 
   const run = async () => {
     setRunning(true);
-    try { await userWebsitesService.domainTrackRun(website.id); toast({ title: 'Snapshot updated' }); load(); }
-    catch (e: any) { toast({ title: 'Snapshot failed', description: e.message, variant: 'destructive' }); }
+    try { await userWebsitesService.domainTrackRun(website.id); toast({ title: 'Backlinks refreshed' }); load(); }
+    catch (e: any) { toast({ title: 'Refresh failed', description: e.message, variant: 'destructive' }); }
     finally { setRunning(false); }
   };
 
-  const kws = intel?.top_keywords || [];
-  const t = useTableSegments<DomainKeyword, KwSortKey, 'position' | 'page'>({
-    rows: kws,
-    searchText: (k) => [k.keyword, k.url],
+  const links = intel?.backlinks ?? [];
+  const t = useTableSegments<DomainBacklink, LinkSortKey, 'type' | 'state'>({
+    rows: links,
+    searchText: (b) => [b.domain_from, b.url_from, b.anchor, b.url_to],
     sorters: {
-      keyword: (k) => k.keyword,
-      position: (k) => k.position,
-      volume: (k) => k.search_volume,
-      etv: (k) => k.etv,
-      page: (k) => k.url,
+      domain: (b) => b.domain_from,
+      rank: (b) => b.domain_from_rank,
+      anchor: (b) => b.anchor,
+      first_seen: (b) => (b.first_seen ? new Date(b.first_seen).getTime() : null),
     },
-    initialSort: { key: 'position', dir: 'asc' },
-    textKeys: ['keyword', 'page'],
+    initialSort: { key: 'rank', dir: 'desc' },
+    textKeys: ['domain', 'anchor'],
     facets: {
-      position: { label: 'position', valueOf: positionBandOf, labels: POSITION_LABELS, order: POSITION_ORDER },
-      page: { label: 'page', valueOf: (k) => k.url },
+      type: { label: 'link type', valueOf: (b) => (b.dofollow == null ? null : b.dofollow ? 'dofollow' : 'nofollow'), labels: LINK_TYPE_LABELS },
+      state: { label: 'state', valueOf: stateOf, labels: STATE_LABELS, order: STATE_ORDER },
     },
   });
 
@@ -142,17 +91,20 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
   }
 
   const s = intel?.latest;
+  const blStatus = s?.source_status?.backlinks ? String(s.source_status.backlinks) : null;
+  const listStatus = s?.source_status?.backlink_list ? String(s.source_status.backlink_list) : null;
+  const listFailed = listStatus === 'failed';
+  const domain = website.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   return (
     <div className="space-y-4">
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="w-4 h-4 text-primary" />Rankings & Links</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base"><Link2 className="w-4 h-4 text-primary" />Backlinks</CardTitle>
             <CardDescription>
-              DataForSEO domain intelligence for the site's market
-              {s?.country_code ? <> · {s.country_code}</> : null}
-              {s ? <> · captured {timeAgo(s.captured_at)}</> : null}
+              Links from other sites to {domain}, from DataForSEO&apos;s backlink index
+              {s ? <> · captured {dayLabel(s.captured_at)}</> : null}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={run} disabled={running}>
@@ -160,107 +112,116 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
             {s ? 'Refresh' : 'Snapshot now'}
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           {!s ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              No snapshot yet. Take one to pull ranking keywords, traffic and backlinks — or the weekly tracker will populate it.
-            </div>
-          ) : s.error ? (
-            <div className="text-xs text-[hsl(var(--error))]">{s.error}</div>
-          ) : (s.ranking_keywords == null && s.backlinks == null
-                && sourceVerdict(s, 'overview') !== 'failed' && sourceVerdict(s, 'backlinks') !== 'failed') ? (
-            /* Both empty AND neither source failed — so this really is a site the index has
-               nothing on. If either FAILED we fall through to the tiles, which say so per
-               source rather than telling the reader their site has no visibility. */
-            <div className="text-center py-6 text-sm text-muted-foreground">
-              DataForSEO has no ranking or backlink data for <b>{website.url.replace(/^https?:\/\//, '')}</b> in {s.country_code}. This is normal for a new or low-traffic site — it fills in as the site gains search visibility.
-            </div>
+            <HubEmptyState
+              variant="empty"
+              title="No backlink snapshot yet"
+              description="The weekly tracker fills this in, or take one now."
+              action={<Button size="sm" onClick={run} disabled={running}>Snapshot now</Button>}
+            />
           ) : (
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric label="Ranking keywords" value={<MetricValue value={s.ranking_keywords} status={sourceVerdict(s, 'overview')} />} />
-                <Metric label="Est. monthly traffic" value={<MetricValue value={s.organic_traffic} status={sourceVerdict(s, 'overview')} />} />
-                <Metric label="Backlinks" value={<MetricValue value={s.backlinks} status={sourceVerdict(s, 'backlinks')} />} />
-                <Metric
-                  label="Referring domains"
-                  value={<MetricValue value={s.referring_domains} status={sourceVerdict(s, 'backlinks')} />}
-                  sub={s.domain_rank != null ? `domain rank ${s.domain_rank}` : undefined}
-                />
-              </div>
-
-              {(s.kw_up != null || s.kw_new != null) && (
-                <div className="flex flex-wrap gap-4 text-xs">
-                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><ArrowUp className="w-3 h-3" /> {fmt(s.kw_up)} up</span>
-                  <span className="inline-flex items-center gap-1 text-[hsl(var(--error))]"><ArrowDown className="w-3 h-3" /> {fmt(s.kw_down)} down</span>
-                  <span className="inline-flex items-center gap-1 text-primary"><Sparkles className="w-3 h-3" /> {fmt(s.kw_new)} new</span>
-                  <span className="inline-flex items-center gap-1 text-muted-foreground">{fmt(s.kw_lost)} lost</span>
-                  {s.spam_score != null && <span className="inline-flex items-center gap-1 text-muted-foreground"><Link2 className="w-3 h-3" /> spam score {s.spam_score}</span>}
-                </div>
+            <>
+              {s.error && <div className="text-xs text-[hsl(var(--error))]">{s.error}</div>}
+              {blStatus === 'failed' && s.source_errors?.backlinks && (
+                <div className="text-xs text-amber-800 dark:text-amber-300">The backlink source failed: {s.source_errors.backlinks}</div>
               )}
-
-              {(s.pos_1 || s.pos_4_10 || s.pos_11_20) ? (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Position distribution</p>
-                  <PositionBars s={s} />
-                </div>
-              ) : null}
-            </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <Figure label="Backlinks" value={s.backlinks} status={blStatus} />
+                <Figure label="Referring domains" value={s.referring_domains} status={blStatus} />
+                <Figure label="Referring main domains" value={s.referring_main_domains} status={blStatus} />
+                <Figure label="Domain rank" value={s.domain_rank} status={blStatus} />
+                <Figure label="Spam score" value={s.spam_score} status={blStatus} />
+                <Figure label="Broken backlinks" value={s.broken_backlinks} status={blStatus} />
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
-      {kws.length > 0 && (
+      {s && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Top Ranking Keywords</CardTitle>
-            <CardDescription>What the domain ranks for right now: the {kws.length} best-positioned keywords. Search and filters apply to these only.</CardDescription>
+            <CardTitle className="text-base">Referring domains</CardTitle>
+            <CardDescription>One link per linking site, strongest site first.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <HubToolbar
-              search={t.query}
-              onSearchChange={t.setQuery}
-              searchPlaceholder="Search keyword or page"
-              actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
-            />
-            {t.visible.length === 0 ? (
+            {links.length === 0 ? (
               <HubEmptyState
-                variant="filtered"
-                icon={SearchX}
-                title="No keywords match these filters"
-                description={`All ${kws.length} keywords are still here; the search or a column filter is hiding them.`}
-                action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+                variant="empty"
+                icon={Link2}
+                title={listFailed ? 'Could not fetch the backlink list' : listStatus ? 'No site links here yet' : 'Not collected yet'}
+                description={
+                  listFailed
+                    ? `${s.source_errors?.backlink_list ?? 'The source failed.'} Unknown, not zero — refresh to try again.`
+                    : listStatus
+                      ? `DataForSEO's index has no link to ${domain}. That is normal for a young site; links from suppliers, directories and press are the usual first ones.`
+                      : 'The list is collected with the next snapshot.'
+                }
+                action={<Button size="sm" variant="outline" onClick={run} disabled={running}>Refresh</Button>}
               />
             ) : (
-            <div className="table-scroll">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableColumnHeader sortKey="keyword" sort={t.sort} onSort={t.onSort}>Keyword</TableColumnHeader>
-                    <TableColumnHeader sortKey="position" sort={t.sort} onSort={t.onSort} segment={t.segment('position')} align="right">Pos.</TableColumnHeader>
-                    <TableColumnHeader sortKey="volume" sort={t.sort} onSort={t.onSort} align="right">Volume</TableColumnHeader>
-                    <TableColumnHeader sortKey="etv" sort={t.sort} onSort={t.onSort} align="right">Est. traffic</TableColumnHeader>
-                    <TableColumnHeader sortKey="page" sort={t.sort} onSort={t.onSort} segment={t.segment('page')}>Page</TableColumnHeader>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {t.visible.map((k) => (
-                    <TableRow key={`${k.keyword}|${k.url ?? ''}`}>
-                      <TableCell className="font-medium max-w-[240px] truncate">{k.keyword}</TableCell>
-                      <TableCell className="text-right tabular-nums">{k.position ?? '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmt(k.search_volume)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{k.etv == null ? '—' : formatNumber(Math.round(k.etv))}</TableCell>
-                      <TableCell className="max-w-[220px] truncate">
-                        {k.url ? (
-                          <a href={`${website.url.replace(/\/$/, '')}${k.url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary text-xs">
-                            <span className="truncate">{k.url}</span><ExternalLink className="w-3 h-3 shrink-0" />
-                          </a>
-                        ) : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+              <>
+                {listFailed && (
+                  <div className="mx-4 my-2 text-xs text-amber-800 dark:text-amber-300">
+                    The latest refresh failed ({s.source_errors?.backlink_list ?? 'source error'}), so this is the list from{' '}
+                    {links[0]?.captured_at ? dayLabel(links[0].captured_at) : 'an earlier capture'}, not today&apos;s.
+                  </div>
+                )}
+                <HubToolbar
+                  search={t.query}
+                  onSearchChange={t.setQuery}
+                  searchPlaceholder="Search site, anchor or page"
+                  actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}
+                />
+                {t.visible.length === 0 ? (
+                  <HubEmptyState
+                    variant="filtered"
+                    icon={SearchX}
+                    title="No links match these filters"
+                    description={`All ${links.length} are still here; the search or a column filter is hiding them.`}
+                    action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
+                  />
+                ) : (
+                  <div className="table-scroll">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableColumnHeader sortKey="domain" sort={t.sort} onSort={t.onSort} segment={t.segment('state')}>Linking site</TableColumnHeader>
+                          <TableColumnHeader sortKey="rank" sort={t.sort} onSort={t.onSort} align="right">Site rank</TableColumnHeader>
+                          <TableColumnHeader sortKey="anchor" sort={t.sort} onSort={t.onSort} segment={t.segment('type')}>Anchor</TableColumnHeader>
+                          <TableColumnHeader>Links to</TableColumnHeader>
+                          <TableColumnHeader sortKey="first_seen" sort={t.sort} onSort={t.onSort} align="right">First seen</TableColumnHeader>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {t.visible.map((b) => {
+                          const st = stateOf(b);
+                          return (
+                            <TableRow key={b.url_from}>
+                              <TableCell className="max-w-[260px]">
+                                <a href={safeHref(b.url_from)} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 font-medium hover:text-primary">
+                                  <span className="truncate">{b.domain_from ?? b.url_from}</span><ExternalLink className="w-3 h-3 shrink-0" />
+                                </a>
+                                {st !== 'live' && <Badge variant={st === 'new' ? 'success' : 'warning'} className="ml-1.5">{STATE_LABELS[st]}</Badge>}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">{fmt(b.domain_from_rank)}</TableCell>
+                              <TableCell className="max-w-[220px]">
+                                <span className="truncate block text-xs">{b.anchor || '—'}</span>
+                                {b.dofollow === false && <span className="text-[11px] text-muted-foreground">nofollow</span>}
+                              </TableCell>
+                              <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
+                                {b.url_to ? b.url_to.replace(/^https?:\/\/[^/]+/, '') || '/' : '—'}
+                              </TableCell>
+                              <TableCell className="text-right text-xs text-muted-foreground">{b.first_seen ? timeAgo(b.first_seen) : '—'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

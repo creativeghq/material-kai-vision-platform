@@ -20,8 +20,10 @@ import type {
 
 const DATAFORSEO_BASE_URL = 'https://api.dataforseo.com/v3';
 const REQUEST_TIMEOUT_MS = 30_000;
-const MAX_RETRIES = 1;
-const RETRY_DELAY_MS = 2_000;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1_000;
+/** A funded account still gets ~1 in 5 calls refused with 402 (measured 2026-10-10); refusals are free. */
+const RETRYABLE_HTTP = new Set([402, 429, 503]);
 
 /** A failure the upstream already decided; retrying it only spends money again. */
 class NonRetryableError extends Error {
@@ -601,18 +603,14 @@ export class DataForSEOClient {
 
         if (!response.ok) {
           const errText = await response.text();
-          // Retry on 429 (rate limit) or 503 (service unavailable)
-          if (
-            (response.status === 429 || response.status === 503) &&
-            attempt < MAX_RETRIES
-          ) {
+          if (RETRYABLE_HTTP.has(response.status) && attempt < MAX_RETRIES) {
             console.warn(
-              `[dataforseo] ${endpoint} returned ${response.status}, retrying in ${RETRY_DELAY_MS}ms...`,
+              `[dataforseo] ${endpoint} returned ${response.status}, retrying in ${RETRY_DELAY_MS * (attempt + 1)}ms...`,
             );
-            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
             continue;
           }
-          throw new Error(
+          throw new NonRetryableError(
             `DataForSEO ${endpoint} error (${response.status}): ${errText}`,
           );
         }

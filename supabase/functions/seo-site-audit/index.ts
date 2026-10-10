@@ -67,6 +67,8 @@ async function dfs(kind: string, params: Record<string, unknown>, userId: string
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { parsed = text; }
   if (!resp.ok) throw new Error(`${kind} ${describeUpstreamError(resp.status, parsed)}`);
+  // MIVAA answers 200 with `success:false` when DataForSEO refused (402, task error) and `raw: {}`.
+  if (parsed?.success === false) throw new Error(`${kind} ${String(parsed?.data?.error || 'upstream refused the call').slice(0, 300)}`);
   return parsed?.data ?? {};
 }
 

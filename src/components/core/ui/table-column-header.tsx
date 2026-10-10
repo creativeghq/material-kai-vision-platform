@@ -32,6 +32,8 @@ export interface TableSegment {
   onChange: (selected: string[]) => void;
   /** Column noun for the menu heading, e.g. "position". */
   label?: string;
+  /** Rows in the table; lets a lone option that leaves some rows out still be offered. */
+  total?: number;
 }
 
 interface TableColumnHeaderProps<K extends string> {
@@ -85,7 +87,9 @@ export function TableColumnHeader<K extends string>({
           <span>{children}</span>
         )}
 
-        {segment && segment.options.length > 0 && (
+        {/* One value covering every row filters nothing, so it is not offered. */}
+        {segment && (active || segment.options.length > 1
+          || (segment.options.length === 1 && segment.total != null && segment.options[0].count < segment.total)) && (
           <Popover>
             <PopoverTrigger asChild>
               <button

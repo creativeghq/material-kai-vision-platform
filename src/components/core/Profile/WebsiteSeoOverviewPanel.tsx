@@ -15,6 +15,7 @@ import {
 } from '@/services/userWebsitesService';
 import { timeAgo } from '@/utils/datetime';
 import { SeoMetricTile } from './seo/SeoMetricTile';
+import { DomainRankingKeywordsCard } from './seo/DomainRankingKeywordsCard';
 import {
   DOMAIN_METRICS,
   GSC_METRICS,
@@ -224,8 +225,9 @@ export const WebsiteSeoOverviewPanel: React.FC<{
               Ranking profile
             </CardTitle>
             <CardDescription>
-              Where the site's {compact(overview.positions.total)} ranking keywords actually sit. Movement below
-              is week over week.
+              {overview.positions.status === 'ok'
+                ? <>Where the site's {compact(overview.positions.total)} ranking keywords actually sit. Movement below is week over week.</>
+                : <>Where the site's ranking keywords sit, once the source has answered. Movement is week over week.</>}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -251,6 +253,8 @@ export const WebsiteSeoOverviewPanel: React.FC<{
           </CardContent>
         </Card>
       )}
+
+      <DomainRankingKeywordsCard website={website} />
 
       {/* ── Search Console ──────────────────────────────────────────────── */}
       <Card className="dashboard-card">

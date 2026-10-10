@@ -20,6 +20,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
 import {
+  describeRankCheck,
   userWebsitesService,
   type KeywordTarget,
   type RankSummary,
@@ -208,6 +209,8 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const [bands, setBands] = useState<string[]>([]);
   const [moves, setMoves] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [pages, setPages] = useState<string[]>([]);
   const [features, setFeatures] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState(ALL);
   const [deviceFilter, setDeviceFilter] = useState(ALL);
@@ -254,17 +257,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
     setBusy('check');
     try {
       const r = await userWebsitesService.runRankCheck(website.id);
-      // A run is capped (oldest-checked first), so with a large set it covers part of
-      // it. Say which part, or "0 of 60 ranking" over a set of 129 reads as the site
-      // having lost every position it held yesterday.
-      const tracked = data?.tracked ?? r.checked;
-      const scope = tracked > r.checked
-        ? `Checked ${r.checked} of ${tracked} (oldest first — run again for the rest)`
-        : `Checked ${r.checked}`;
-      toast({
-        title: 'Rank check finished',
-        description: `${scope} · ${r.ranking} ranking${r.failed ? ` · ${r.failed} could not be checked` : ''}.`,
-      });
+      toast({ title: 'Rank check finished', description: describeRankCheck(r, data?.tracked ?? r.checked) });
       await load();
     } catch (e: any) {
       toast({ title: 'Rank check failed', description: e?.message, variant: 'destructive' });
@@ -315,6 +308,8 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
     if (bands.length && !bands.includes(bandOf(r))) return false;
     if (moves.length && !moves.includes(movementOf(r))) return false;
     if (sources.length && !sources.includes(r.source || 'manual')) return false;
+    if (tags.length && !tags.some((t) => (r.tags ?? []).includes(t))) return false;
+    if (pages.length && !pages.includes(r.url ?? '')) return false;
     if (features.length && !features.some((f) => (r.serp_features ?? []).includes(f))) return false;
     if (countryFilter !== ALL && r.country_code !== countryFilter) return false;
     if (deviceFilter !== ALL && r.device !== deviceFilter) return false;
@@ -347,10 +342,10 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   });
 
   const filtering = q.length > 0 || bands.length > 0 || moves.length > 0
-    || sources.length > 0 || features.length > 0
+    || sources.length > 0 || features.length > 0 || tags.length > 0 || pages.length > 0
     || countryFilter !== ALL || deviceFilter !== ALL || locationFilter !== ALL;
   const clearFilters = () => {
-    setSearch(''); setBands([]); setMoves([]); setSources([]); setFeatures([]);
+    setSearch(''); setBands([]); setMoves([]); setSources([]); setFeatures([]); setTags([]); setPages([]);
     setCountryFilter(ALL); setDeviceFilter(ALL); setLocationFilter(ALL);
   };
 
@@ -359,6 +354,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   );
   const countryOptions = filterOptions(rows, (r) => r.country_code, (v) => v, 'All countries');
   const deviceOptions = filterOptions(rows, (r) => r.device, (v) => (v === 'mobile' ? 'Mobile' : 'Desktop'), 'All devices');
+  const sourceOptions = filterOptions(rows, (r) => r.source || 'manual', (v) => SOURCE_LABELS[v] ?? v, 'All sources');
   const locationOptions = filterOptions(
     rows, (r) => (r.location_code ? String(r.location_code) : COUNTRY_LEVEL),
     (v) => (v === COUNTRY_LEVEL ? 'Country level' : locationNames.get(v) ?? v), 'All locations',
@@ -369,6 +365,11 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const featureFilterOptions = FEATURE_LABELS
     .map((f) => ({ value: f.key, label: f.label, count: rows.filter((r) => (r.serp_features ?? []).includes(f.key)).length }))
     .filter((o) => o.count > 0);
+  const tagCounts = new Map<string, number>();
+  for (const r of rows) for (const t of new Set(r.tags ?? [])) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  const tagFilterOptions = [...tagCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([value, count]) => ({ value, label: value, count }));
 
   // Clamped on every render so removing the last keyword on the last page does not
   // leave the reader on an empty page with no way back.
@@ -580,10 +581,18 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                     <HubFilterSelect label="Country" value={countryFilter} options={countryOptions}
                       onChange={(v) => { setCountryFilter(v); setPage(1); }} />
                   ) : null}
-                  <HubFilterSelect label="Device" value={deviceFilter} options={deviceOptions}
-                    onChange={(v) => { setDeviceFilter(v); setPage(1); }} />
-                  <HubFilterSelect label="Location" value={locationFilter} options={locationOptions}
-                    onChange={(v) => { setLocationFilter(v); setPage(1); }} />
+                  {deviceOptions.length > 2 || deviceFilter !== ALL ? (
+                    <HubFilterSelect label="Device" value={deviceFilter} options={deviceOptions}
+                      onChange={(v) => { setDeviceFilter(v); setPage(1); }} />
+                  ) : null}
+                  {locationOptions.length > 2 || locationFilter !== ALL ? (
+                    <HubFilterSelect label="Location" value={locationFilter} options={locationOptions}
+                      onChange={(v) => { setLocationFilter(v); setPage(1); }} />
+                  ) : null}
+                  {sourceOptions.length > 2 || sources.length > 0 ? (
+                    <HubFilterSelect label="Source" value={sources[0] ?? ALL} options={sourceOptions}
+                      onChange={(v) => { setSources(v === ALL ? [] : [v]); setPage(1); }} />
+                  ) : null}
                 </>
               }
               actions={
@@ -606,10 +615,11 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       sort={sort}
                       onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
                       segment={{
-                        label: 'Source',
-                        options: segmentOptions(rows, (r) => r.source || 'manual', SOURCE_LABELS, ['manual', 'gsc_auto']),
-                        selected: sources,
-                        onChange: (v) => { setSources(v); setPage(1); },
+                        label: 'Tag',
+                        options: tagFilterOptions,
+                        total: rows.length,
+                        selected: tags,
+                        onChange: (v) => { setTags(v); setPage(1); },
                       }}
                     >
                       Keyword
@@ -622,6 +632,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       segment={{
                         label: 'Position band',
                         options: segmentOptions(rows, bandOf, BAND_LABELS, BAND_ORDER),
+                        total: rows.length,
                         selected: bands,
                         onChange: (v) => { setBands(v); setPage(1); },
                       }}
@@ -636,6 +647,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       segment={{
                         label: 'Movement',
                         options: segmentOptions(rows, movementOf, MOVE_LABELS, MOVE_ORDER),
+                        total: rows.length,
                         selected: moves,
                         onChange: (v) => { setMoves(v); setPage(1); },
                       }}
@@ -650,6 +662,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       segment={{
                         label: 'SERP blocks',
                         options: featureFilterOptions,
+                        total: rows.length,
                         selected: features,
                         onChange: (v) => { setFeatures(v); setPage(1); },
                       }}
@@ -660,6 +673,13 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       sortKey="url"
                       sort={sort}
                       onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
+                      segment={{
+                        label: 'Ranking page',
+                        options: segmentOptions(rows, (r) => r.url),
+                        total: rows.length,
+                        selected: pages,
+                        onChange: (v) => { setPages(v); setPage(1); },
+                      }}
                     >
                       Ranking page
                     </TableColumnHeader>

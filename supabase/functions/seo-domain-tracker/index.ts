@@ -13,6 +13,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 const KEYWORD_LIMIT = 100;
+const BACKLINK_LIMIT = 100;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,7 +67,8 @@ async function resolveMarket(supabase: any, websiteId: string, domain: string): 
 }
 
 /** DataForSEO dispatcher via MIVAA's seo-agent route. */
-async function dfs(kind: string, params: Record<string, unknown>): Promise<{ items: any[]; answered: boolean }> {
+/** Throws when the source did not answer. A refusal arrives as HTTP 200 + `success:false` + `raw: {}`. */
+async function dfs(kind: string, params: Record<string, unknown>): Promise<{ items: any[] }> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
     body: JSON.stringify({ params, attribution: {} }),
@@ -74,20 +76,10 @@ async function dfs(kind: string, params: Record<string, unknown>): Promise<{ ite
   const text = await resp.text();
   let parsed: any = null; try { parsed = JSON.parse(text); } catch { parsed = text; }
   if (!resp.ok) throw new Error(`${kind} ${describeUpstreamError(resp.status, parsed, 160)}`);
-
-  const items = parsed?.data?.items || [];
-  // DataForSEO reports failure INSIDE a 200 (its own 2xxxx status codes), so the
-  // envelope decides "answered", never the HTTP status.
-  const raw = parsed?.data?.raw;
-  const top = Number(raw?.status_code);
-  const task = raw?.tasks?.[0];
-  const taskCode = Number(task?.status_code);
-  const answered =
-    (!Number.isFinite(top) || top === 20000) &&
-    (!Number.isFinite(taskCode) || taskCode === 20000) &&
-    Number(raw?.tasks_error || 0) === 0;
-
-  return { items, answered };
+  if (parsed?.success !== true) {
+    throw new Error(String(parsed?.data?.error || 'the source reported an error inside a successful HTTP response').slice(0, 300));
+  }
+  return { items: parsed?.data?.items || [] };
 }
 
 const n = (v: any): number | null => (typeof v === 'number' ? v : null);
@@ -132,48 +124,30 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
   const domain = domainOf(website.url);
   const { country, language } = await resolveMarket(supabase, website.id, domain);
   try {
-    // `.catch(() => [])` on each call makes an upstream FAILURE indistinguishable from an empty
-    // result. That mattered below, where a failed ranked-keywords call produced kws=[] and the
-    // unconditional DELETE then wiped the stored set. `rankedFailed` keeps the two apart.
-    let rankedFailed = false;
-    // Same class of bug on the OTHER two calls, and it ran for longer: a bare
-    // `.catch(() => [])` makes an upstream failure indistinguishable from an
-    // empty result, so a failed backlinks call wrote NULL backlinks/referring
-    // domains/domain rank — and the dashboard, unable to tell that apart from a
-    // site with no links, simply hid the row. Every stored snapshot for the one
-    // connected site is in exactly that state.
+    // A failed source is `failed` with its message, never `no_data`: a stored set is only
+    // replaced when its call answered.
     const sourceErrors: Record<string, string> = {};
     const sourceStatus: Record<string, string> = {};
-    const note = (key: string, e: unknown) => {
-      const msg = e instanceof Error ? e.message : String(e);
-      sourceErrors[key] = msg.slice(0, 300);
-      sourceStatus[key] = 'failed';
-      console.error(`[seo-domain-tracker] ${key} failed:`, msg);
-    };
-    const empty = { items: [] as any[], answered: false };
-    const [overview, backlinks, ranked] = await Promise.all([
-      dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language }).catch((e) => { note('overview', e); return empty; }),
-      dfs('backlinks_summary', { target: domain }).catch((e) => { note('backlinks', e); return empty; }),
-      dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT }).catch((e) => { rankedFailed = true; note('ranked', e); return empty; }),
-    ]);
-
-    // Record a positive verdict per source. `no_data` is a REAL answer — the
-    // backlink index legitimately has no record of a new domain — and must not
-    // be dressed up as a failure any more than as a zero. A panel that cries
-    // wolf gets ignored the one time it matters.
-    const verdict = (key: string, r: { items: any[]; answered: boolean }) => {
-      if (sourceStatus[key] === 'failed') return;
-      if (!r.answered) {
+    const settle = async (key: string, p: Promise<{ items: any[] }>) => {
+      try {
+        const r = await p;
+        sourceStatus[key] = r.items.length > 0 ? 'ok' : 'no_data';
+        return r;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        sourceErrors[key] = msg.slice(0, 300);
         sourceStatus[key] = 'failed';
-        sourceErrors[key] = 'The source reported an error inside a successful HTTP response.';
-        return;
+        console.error(`[seo-domain-tracker] ${key} failed:`, msg);
+        return { items: [] as any[] };
       }
-      sourceStatus[key] = r.items.length > 0 ? 'ok' : 'no_data';
     };
-    verdict('overview', overview);
-    verdict('backlinks', backlinks);
-    verdict('ranked', ranked);
-    if (sourceStatus.ranked === 'failed') rankedFailed = true;
+    const [overview, backlinks, ranked, links] = await Promise.all([
+      settle('overview', dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language })),
+      settle('backlinks', dfs('backlinks_summary', { target: domain })),
+      settle('ranked', dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT })),
+      settle('backlink_list', dfs('backlinks_backlinks', { target: domain, mode: 'one_per_domain', limit: BACKLINK_LIMIT })),
+    ]);
+    const rankedFailed = sourceStatus.ranked === 'failed';
 
     const org = overview.items?.[0]?.metrics?.organic || {};
     const bl = backlinks.items?.[0] || {};
@@ -204,11 +178,6 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
         url: si.relative_url ?? null, captured_at: snapshot.captured_at,
       };
     }).filter((k: any) => k.keyword);
-    // Replace the set ONLY when we actually have a fresh answer. An unconditional DELETE with
-    // the INSERT guarded by `if (kws.length)` means one transient DataForSEO failure wipes
-    // every stored keyword and writes nothing back, while the run still returns { ok: true }
-    // and the snapshot records error: null. The 'Rankings & Links' panel then sits empty until
-    // the next weekly run with nothing reporting it.
     if (rankedFailed) {
       console.warn('[seo-domain-tracker] keeping the existing keyword set — upstream fetch failed for', domain);
     } else {
@@ -218,6 +187,21 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
         const { error: insErr } = await supabase.from('seo_domain_keywords').insert(kws);
         if (insErr) throw new Error(`Could not store the refreshed keyword set: ${insErr.message}`);
       }
+    }
+
+    if (sourceStatus.backlink_list !== 'failed') {
+      const rows = (links.items || []).filter((b: any) => b?.url_from).map((b: any) => ({
+        url_from: String(b.url_from), domain_from: b.domain_from ?? null, url_to: b.url_to ?? null,
+        anchor: typeof b.anchor === 'string' ? b.anchor : null,
+        dofollow: typeof b.dofollow === 'boolean' ? b.dofollow : null,
+        domain_from_rank: n(b.domain_from_rank), page_from_rank: n(b.page_from_rank),
+        spam_score: n(b.backlink_spam_score), first_seen: b.first_seen ?? null, last_seen: b.last_seen ?? null,
+        is_new: b.is_new ?? null, is_lost: b.is_lost ?? null, is_broken: b.is_broken ?? null,
+      }));
+      const { error: blErr } = await supabase.rpc('replace_seo_domain_backlinks', {
+        p_website_id: website.id, p_captured_at: snapshot.captured_at, p_rows: rows,
+      });
+      if (blErr) throw new Error(`Could not store the refreshed backlink set: ${blErr.message}`);
     }
 
     // Week-over-week movement alerts (Flows, workspace-scoped). Best-effort.
@@ -274,8 +258,7 @@ async function trackCompetitors(
       const r = await dfs('labs_domain_rank_overview', {
         target: rival.competitor_domain, country_code: country, language_code: language,
       });
-      status.overview = r.answered ? (r.items.length ? 'ok' : 'no_data') : 'failed';
-      if (!r.answered) errors.overview = 'The source reported an error inside a successful HTTP response.';
+      status.overview = r.items.length ? 'ok' : 'no_data';
       row = r.items?.[0]?.metrics?.organic || {};
     } catch (e) {
       status.overview = 'failed';

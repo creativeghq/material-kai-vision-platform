@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, LayoutList, Loader2, MapPin } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, LayoutList, Loader2, MapPin, RefreshCw } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { TableColumnHeader } from '@/components/core/ui/table-column-header';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { timeAgo } from '@/utils/datetime';
+import { useToast } from '@/hooks/use-toast';
 import {
+  describeRankCheck,
   userWebsitesService,
   type SerpFeatureRow,
   type SerpFeaturesReport,
@@ -66,6 +68,8 @@ export const WebsiteSerpFeaturesPanel: React.FC<{ website: UserWebsite; onOpenRa
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const { toast } = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,6 +86,20 @@ export const WebsiteSerpFeaturesPanel: React.FC<{ website: UserWebsite; onOpenRa
 
   useEffect(() => { void load(); }, [load]);
 
+  /** Features are read off the rank check, so refreshing them IS a rank check. */
+  const refresh = async () => {
+    setChecking(true);
+    try {
+      const r = await userWebsitesService.runRankCheck(website.id);
+      toast({ title: 'Results pages re-read', description: describeRankCheck(r, data?.tracked ?? r.checked) });
+      await load();
+    } catch (e: unknown) {
+      toast({ title: 'Check failed', description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
+    } finally {
+      setChecking(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card className="dashboard-card">
@@ -95,15 +113,23 @@ export const WebsiteSerpFeaturesPanel: React.FC<{ website: UserWebsite; onOpenRa
 
   return (
     <Card className="dashboard-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <LayoutList className="h-4 w-4 text-primary" />
-          SERP features
-        </CardTitle>
-        <CardDescription>
-          Which blocks appear on your tracked keywords&apos; results pages, which of them cite you, and where a rival holds one you do not.
-          {data?.latest_capture ? <> · latest capture {timeAgo(data.latest_capture)}</> : null}
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutList className="h-4 w-4 text-primary" />
+            SERP features
+          </CardTitle>
+          <CardDescription>
+            Which blocks appear on your tracked keywords&apos; results pages, which of them cite you, and where a rival holds one you do not.
+            {data?.latest_capture ? <> · latest capture {timeAgo(data.latest_capture)}</> : null}
+          </CardDescription>
+        </div>
+        {data?.tracked ? (
+          <Button size="sm" variant="outline" onClick={() => void refresh()} disabled={checking}>
+            {checking ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
+            Refresh
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4 p-0 pb-2">
         {error ? (

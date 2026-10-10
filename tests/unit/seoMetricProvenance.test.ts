@@ -47,25 +47,27 @@ describe('#395 — the collector verdict reaches the reader', () => {
     expect(panel).toMatch(/sourceStatusPresentation/);
     expect(panel, 'the panel maps the collector words itself again')
       .not.toMatch(/status === 'failed' \? 'collector_failed'/);
-    for (const source of ['overview', 'backlinks']) {
-      expect(panel, source).toContain(`sourceVerdict(s, '${source}')`);
+    expect(panel).toContain('source_status?.backlinks');
+    // Every backlink figure goes through the verdict rather than printing a bare em dash.
+    for (const label of ['Backlinks', 'Referring domains', 'Domain rank', 'Spam score', 'Broken backlinks']) {
+      expect(panel, label).toContain(`<Figure label="${label}" value={s.`);
     }
-    // …and the four tiles go through it rather than printing a bare em dash.
-    expect(panel).toMatch(/<Metric label="Backlinks" value=\{<MetricValue/);
-    expect(panel).toMatch(/<Metric label="Ranking keywords" value=\{<MetricValue/);
+    expect(panel.match(/status=\{blStatus\} \/>/g) ?? []).toHaveLength(6);
   });
 
-  it('the "no data for this domain" empty state is not shown when a source FAILED', () => {
-    // Otherwise a broken collector tells the reader their site has no search visibility.
-    expect(panel).toMatch(/sourceVerdict\(s, 'overview'\) !== 'failed'/);
-    expect(panel).toMatch(/sourceVerdict\(s, 'backlinks'\) !== 'failed'/);
+  it('the "no links" empty state is not shown when the list FAILED', () => {
+    // Otherwise a broken collector tells the reader nobody links to them.
+    expect(panel).toContain(`listFailed = listStatus === 'failed'`);
+    expect(panel).toMatch(/listFailed\s*\?\s*'Could not fetch/);
   });
 
-  it('the tracker still records a verdict for all three sources', () => {
-    // The reader can only be honest about what the writer recorded.
-    for (const source of ['overview', 'backlinks', 'ranked']) {
-      expect(tracker, source).toContain(`verdict('${source}'`);
+  it('the tracker records a verdict for every source, and a refusal is a failure', () => {
+    for (const source of ['overview', 'backlinks', 'ranked', 'backlink_list']) {
+      expect(tracker, source).toContain(`settle('${source}'`);
     }
+    expect(tracker).toContain(`sourceStatus[key] = 'failed'`);
+    // MIVAA answers HTTP 200 + success:false + raw:{} on a DataForSEO 402: that must throw.
+    expect(tracker).toContain('if (parsed?.success !== true)');
     expect(tracker).toMatch(/source_status: sourceStatus/);
     expect(tracker).toMatch(/source_errors: sourceErrors/);
   });

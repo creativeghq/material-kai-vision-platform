@@ -79,6 +79,14 @@ export function describeCrawlResult(r: CrawlResult): string {
   return s;
 }
 
+/** A rank-check run is capped, oldest first — so name the part of the set it covered. */
+export function describeRankCheck(r: { checked: number; ranking: number; failed: number }, tracked: number): string {
+  const scope = tracked > r.checked
+    ? `Checked ${r.checked} of ${tracked} (oldest first — run again for the rest)`
+    : `Checked ${r.checked}`;
+  return `${scope} · ${r.ranking} ranking${r.failed ? ` · ${r.failed} could not be checked` : ''}.`;
+}
+
 export interface PreviewSampleItem {
   url: string;
   title: string | null;
@@ -262,10 +270,18 @@ export interface DomainSnapshot {
 }
 export interface DomainKeyword { keyword: string; position: number | null; search_volume: number | null; etv: number | null; url: string | null }
 export interface DomainTrendPoint { date: string; ranking_keywords: number | null; organic_traffic: number | null; backlinks: number | null; referring_domains: number | null }
+export interface DomainBacklink {
+  url_from: string; domain_from: string | null; url_to: string | null; anchor: string | null;
+  dofollow: boolean | null; domain_from_rank: number | null; page_from_rank: number | null;
+  spam_score: number | null; first_seen: string | null; last_seen: string | null;
+  is_new: boolean | null; is_lost: boolean | null; is_broken: boolean | null; captured_at: string;
+}
 export interface DomainIntel {
   latest: DomainSnapshot | null;
   trend: DomainTrendPoint[];
   top_keywords: DomainKeyword[];
+  /** One link per referring domain, strongest first. */
+  backlinks?: DomainBacklink[];
 }
 
 /** The derived overview behind the Websites → Overview strip. */
@@ -1247,6 +1263,17 @@ export const userWebsitesService = {
     const { data, error } = await supabase.rpc('get_website_domain_intel', { p_website_id: websiteId, p_days: days });
     if (error) throw error;
     return (data as DomainIntel) ?? null;
+  },
+
+  async domainTopKeywords(websiteId: string, limit = 50): Promise<DomainKeyword[]> {
+    const { data, error } = await supabase.from('seo_domain_keywords' as any)
+      .select('keyword, position, search_volume, etv, url')
+      .eq('website_id', websiteId)
+      .order('position', { ascending: true, nullsFirst: false })
+      .order('etv', { ascending: false, nullsFirst: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data as unknown as DomainKeyword[]) ?? [];
   },
 
   /** The derived search-metric strip. */
