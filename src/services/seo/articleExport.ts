@@ -8,7 +8,6 @@ export interface ExportableArticle {
   secondary_keywords?: string[] | null;
   content_type?: string | null;
   markdown_content: string | null;
-  html_content?: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
   language_code?: string | null;
@@ -80,7 +79,10 @@ function firstParagraph(markdown: string): string | null {
   return null;
 }
 
-export function buildArticleExport(article: ExportableArticle, now: Date = new Date()): ArticleExport {
+export function buildArticleExport(
+  article: ExportableArticle,
+  { html = null, now = new Date() }: { html?: string | null; now?: Date } = {},
+): ArticleExport {
   const markdown = article.markdown_content ?? '';
   const h1 = /^#\s+(.+)$/m.exec(markdown)?.[1]?.trim();
   const title = article.title || h1 || article.target_keyword;
@@ -126,7 +128,7 @@ export function buildArticleExport(article: ExportableArticle, now: Date = new D
     excerpt: article.meta_description || firstParagraph(markdown.replace(/^#\s+.+$/m, '')),
     content: {
       markdown,
-      html: article.html_content ?? null,
+      html,
       word_count: num(article.word_count),
       reading_time_minutes: num(article.reading_time_minutes),
     },

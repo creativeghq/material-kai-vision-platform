@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { renderArticleHtml } from '@/services/seo/articleHtml';
 import { buildArticleExport, articleExportFilename, ARTICLE_EXPORT_SCHEMA } from '@/services/seo/articleExport';
 import { marketForCountry, countryForLocation } from '../../supabase/functions/seo-api/handlers/market.ts';
 
@@ -16,6 +17,19 @@ const MD = [
   '',
   'Δείτε [τον οδηγό](https://www.materialshub.gr/el/idees/x) και [AADE](https://www.aade.gr/).',
   '',
+  '| Δείκτης | Χρήση |',
+  '|---|---|',
+  '| R11 | Βεράντα |',
+  '',
+  '> [!definition] HPL',
+  '> Φύλλο υψηλής πίεσης.',
+  '',
+  '1. Πρώτο βήμα',
+  '',
+  '- Κουκκίδα',
+  '',
+  '<script>alert(1)</script>',
+  '',
   '### Ερώτηση;',
 ].join('\n');
 
@@ -26,7 +40,7 @@ const ARTICLE = {
   target_keyword: 'πλακάκια μπάνιου',
   secondary_keywords: ['χρώματα για πλακάκια μπάνιου'],
   markdown_content: MD,
-  html_content: '<h1>x</h1>',
+  html_content: '<p>STALE-SNAPSHOT</p>',
   meta_title: 'Πλακάκια μπάνιου 2026: Τάσεις',
   meta_description: 'Τάσεις, χρώματα και ιδέες.',
   language_code: 'el',
@@ -39,7 +53,7 @@ const ARTICLE = {
 };
 
 describe('buildArticleExport — one portable document per article', () => {
-  const out = buildArticleExport(ARTICLE, new Date('2026-10-11T12:00:00Z'));
+  const out = buildArticleExport(ARTICLE, { html: renderArticleHtml(MD), now: new Date('2026-10-11T12:00:00Z') });
 
   it('carries title, meta, slug and a URL suggestion on the article site', () => {
     expect(out.schema).toBe(ARTICLE_EXPORT_SCHEMA);
@@ -59,6 +73,36 @@ describe('buildArticleExport — one portable document per article', () => {
       'https://www.materialshub.gr/el/idees/x',
     ]);
     expect(out.links.external.map((l) => l.url)).toEqual(['https://www.aade.gr/']);
+  });
+
+  it('renders HTML from the current markdown, never the stored pipeline snapshot', () => {
+    const html = out.content.html ?? '';
+    expect(JSON.stringify(out)).not.toContain('STALE-SNAPSHOT');
+    expect(buildArticleExport(ARTICLE).content.html).toBeNull();
+    expect(html).toContain('<table>');
+    expect(html).toContain('<td>R11</td>');
+    expect(html).toContain('<ol>');
+    expect(html).toContain('<ul>');
+    expect(html).toMatch(/<aside class="callout callout-tldr"[^>]*>\s*<p>Σύνοψη\.<\/p>/);
+    expect(html).toContain('<p class="callout-title">HPL</p>');
+    expect(html).not.toContain('[!');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('<a href="https://www.aade.gr/">AADE</a>');
+  });
+
+  it('keeps a callout title with inline markup, and drops what a CMS cannot publish', () => {
+    const html = renderArticleHtml([
+      '> [!key] **Grip rating**',
+      '> Body text.',
+      '',
+      '![insecure](http://example.com/x.png)',
+      '',
+      'See [INTERNAL: κουζίνα](kitchen-tiles).',
+    ].join('\n'));
+    expect(html).toContain('<p class="callout-title"><strong>Grip rating</strong></p>');
+    expect(html).toContain('<p>Body text.</p>');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('See κουζίνα.');
   });
 
   it('reports the score and what the article cost', () => {

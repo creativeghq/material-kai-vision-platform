@@ -64,6 +64,7 @@ import {
   Undo2, Wand2, RefreshCw, Plus, Pencil, Download, FileJson,
 } from 'lucide-react';
 import { articleExportFilename, buildArticleExport } from '@/services/seo/articleExport';
+import { CALLOUT_KIND_PATTERN, type CalloutKind } from '@/services/seo/calloutKinds';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
 
@@ -125,7 +126,23 @@ interface SEOArticle {
 function ArticleExportPanel({ article }: { article: SEOArticle }) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
-  const json = useMemo(() => JSON.stringify(buildArticleExport(article), null, 2), [article]);
+  const [html, setHtml] = useState<{ markdown: string; html: string } | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const markdown = article.markdown_content ?? '';
+  useEffect(() => {
+    if (!markdown) return;
+    let live = true;
+    setRenderError(null);
+    import('@/services/seo/articleHtml')
+      .then(({ renderArticleHtml }) => { if (live) setHtml({ markdown, html: renderArticleHtml(markdown) }); })
+      .catch((e: unknown) => { if (live) setRenderError(e instanceof Error ? e.message : String(e)); });
+    return () => { live = false; };
+  }, [markdown]);
+  const ready = !markdown || html?.markdown === markdown;
+  const json = useMemo(
+    () => (ready ? JSON.stringify(buildArticleExport(article, { html: html?.html ?? null }), null, 2) : ''),
+    [article, html, ready],
+  );
 
   const copy = async () => {
     try {
@@ -157,20 +174,24 @@ function ArticleExportPanel({ article }: { article: SEOArticle }) {
           </CardDescription>
         </div>
         <div className="flex gap-1 flex-shrink-0">
-          <Button variant="outline" size="sm" onClick={copy}>
+          <Button variant="outline" size="sm" onClick={copy} disabled={!ready}>
             {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
             {copied ? 'Copied' : 'Copy JSON'}
           </Button>
-          <Button size="sm" onClick={download}>
+          <Button size="sm" onClick={download} disabled={!ready}>
             <Download className="w-3 h-3 mr-1" />
             Download .json
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        <pre className="max-h-[480px] overflow-auto rounded-sm border border-hairline bg-surface-sunken p-3 text-xs leading-relaxed">
-          {json}
-        </pre>
+        {renderError ? (
+          <p className="text-sm text-destructive">Could not render the article HTML: {renderError}</p>
+        ) : (
+          <pre className="max-h-[480px] overflow-auto rounded-sm border border-hairline bg-surface-sunken p-3 text-xs leading-relaxed">
+            {ready ? json : 'Rendering HTML…'}
+          </pre>
+        )}
       </CardContent>
     </Card>
   );
@@ -1720,8 +1741,6 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
 // `> [!info]`, `> [!warning]`, `> [!quote]`). We parse the markdown into
 // semantic sections + render each with first-class UI.
 
-type CalloutKind = 'tldr' | 'key' | 'definition' | 'example' | 'info' | 'warning' | 'quote';
-
 interface CalloutBlock {
   type: 'callout';
   kind: CalloutKind;
@@ -1737,6 +1756,7 @@ interface FaqEntry {
 interface FaqSection {
   type: 'faq';
   heading: string;
+  intro: string;
   entries: FaqEntry[];
 }
 
@@ -1747,7 +1767,7 @@ interface PlainSection {
 
 type ArticleBlock = CalloutBlock | FaqSection | PlainSection;
 
-const CALLOUT_TAG_REGEX = /^\[!(tldr|key|definition|example|info|warning|quote)\](?:\s+(.+))?$/i;
+const CALLOUT_TAG_REGEX = new RegExp(`^\\[!(${CALLOUT_KIND_PATTERN})\\](?:\\s+(.+))?$`, 'i');
 /**
  * WHICH H2 is the FAQ section is decided in `@/services/seo/articleSections`, shared with the
  * edge. This line was `/^##\s+(?:frequently\s+asked\s+questions|faqs?)\s*$/i` — English only,
@@ -1800,6 +1820,8 @@ function extractLead(markdown: string): { lead: string | null; rest: string } {
     first.startsWith('-') ||
     first.startsWith('*') ||
     first.startsWith('```') ||
+    first.startsWith('!') ||
+    first.startsWith('|') ||
     /^\d+\./.test(first)
   ) {
     return { lead: null, rest: markdown };
@@ -1825,8 +1847,9 @@ function extractLead(markdown: string): { lead: string | null; rest: string } {
  * section — whatever that article calls it, in whatever language it is written in. We try several
  * question shapes since the writer model isn't always consistent:
  */
-function extractFaqEntries(sectionLines: string[]): FaqEntry[] {
+function extractFaqEntries(sectionLines: string[]): { intro: string; entries: FaqEntry[] } {
   const entries: FaqEntry[] = [];
+  const introLines: string[] = [];
 
   const isQuestionLine = (
     line: string,
@@ -1861,6 +1884,7 @@ function extractFaqEntries(sectionLines: string[]): FaqEntry[] {
   while (i < sectionLines.length) {
     const match = isQuestionLine(sectionLines[i]);
     if (!match) {
+      if (entries.length === 0) introLines.push(sectionLines[i]);
       i++;
       continue;
     }
@@ -1888,7 +1912,7 @@ function extractFaqEntries(sectionLines: string[]): FaqEntry[] {
     if (question) entries.push({ question, answer });
   }
 
-  return entries;
+  return { intro: introLines.join('\n').trim(), entries };
 }
 
 /**
@@ -1928,10 +1952,10 @@ function parseArticle(markdown: string): ArticleBlock[] {
 
       const sectionLines = lines.slice(sectionStart, faq.endLine);
 
-      const entries = extractFaqEntries(sectionLines);
+      const { intro, entries } = extractFaqEntries(sectionLines);
 
       if (entries.length > 0) {
-        blocks.push({ type: 'faq', heading: headingText, entries });
+        blocks.push({ type: 'faq', heading: headingText, intro, entries });
       } else {
         // No questions extractable — fall back to rendering the section as
         // plain markdown so the user still sees what Claude wrote, instead of
@@ -2133,6 +2157,7 @@ function buildMarkdownComponents(opts: { dense?: boolean } = {}): Components {
 
 const ARTICLE_COMPONENTS = buildMarkdownComponents();
 const DENSE_COMPONENTS = buildMarkdownComponents({ dense: true });
+const LEAD_COMPONENTS: Components = { ...ARTICLE_COMPONENTS, p: ({ children }) => <>{children}</> };
 
 function PlainMarkdown({ children, dense = false }: { children: string; dense?: boolean }) {
   return (
@@ -2186,6 +2211,7 @@ function FaqAccordion({ block }: { block: FaqSection }) {
           {block.entries.length} question{block.entries.length === 1 ? '' : 's'}
         </span>
       </div>
+      {block.intro && <ArticleBlocks blocks={parseArticle(block.intro)} />}
       <Accordion type="multiple" className="space-y-2">
         {block.entries.map((entry, i) => (
           <AccordionItem
@@ -2525,7 +2551,7 @@ function ArticleContent({ markdown, html, title, metaDescription, wordCount, rea
               {/* Lead paragraph — drop cap, larger, serif */}
               {lead && (
                 <p className="font-serif text-[1.25rem] md:text-[1.3125rem] leading-[1.65] text-foreground/95 mb-8 first-letter:font-sans first-letter:text-[3.75rem] first-letter:font-bold first-letter:text-primary first-letter:mr-2 first-letter:float-left first-letter:leading-[0.9] first-letter:mt-1.5">
-                  {lead}
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={LEAD_COMPONENTS}>{lead}</ReactMarkdown>
                 </p>
               )}
 

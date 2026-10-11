@@ -74,9 +74,9 @@ export default defineConfig(({ mode }) => {
             const m = tail?.match(/^(@[^/]+\/[^/]+|[^/]+)/);
             if (!m) return undefined;
             const pkg = m[1];
+            // The server renderer is only reached by a dynamic import (article HTML export).
+            if (pkg === 'react-dom' && tail?.includes('server')) return undefined;
 
-            // Chunk assignments — mirrors the old array-based config exactly,
-            // with @sparkjsdev/spark added to vendor-3d.
             const CHUNK: Record<string, string> = {
               // 3D (three + spark must be co-bundled so spark's `import * as THREE`
               // resolves the full, un-tree-shaken namespace)
