@@ -7,7 +7,7 @@ import { fetchImageGuardedOrNull } from '../../_shared/fetch-image.ts';
 import type { PageImage } from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
 
-export const PHOTO_VERIFY_MODEL = 'claude-haiku-4-5';
+export const PHOTO_VERIFY_MODEL = 'claude-sonnet-5';
 export const PHOTO_VERIFY_MAX_INPUT_TOKENS = 2500;
 export const PHOTO_VERIFY_MAX_OUTPUT_TOKENS = 300;
 
