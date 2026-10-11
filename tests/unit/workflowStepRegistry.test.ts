@@ -41,11 +41,10 @@ function serverSteps(): Map<string, string[]> {
   return out;
 }
 
-/** `STEPS` key → registry definition id. Both sides name the same five workflows. */
+/** `STEPS` key → registry definition id. Both sides name the same four workflows. */
 const PAIRS: Record<string, string> = {
   CATALOG_BUILD: 'catalog-build',
   MENTION_MONITOR: 'mention-monitor',
-  SEO_ARTICLE: 'seo-article',
   PRESENTATION_SHEET: 'presentation-sheet',
   B2B_RESEARCH: 'b2b-research',
 };
@@ -54,9 +53,9 @@ describe('#395 — the workflow step vocabulary is one list, twice', () => {
   it('both sides parse to something real', () => {
     // Without this, a broken parser makes every comparison below vacuous.
     const defs = registryDefinitions();
-    expect(defs.size).toBeGreaterThanOrEqual(8);
+    expect(defs.size).toBeGreaterThanOrEqual(7);
     expect(defs.get('catalog-build')?.length).toBeGreaterThanOrEqual(7);
-    expect(serverSteps().size).toBeGreaterThanOrEqual(5);
+    expect(serverSteps().size).toBeGreaterThanOrEqual(4);
   });
 
   it('every STEPS inventory matches its registry definition, in order', () => {

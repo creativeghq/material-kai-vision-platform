@@ -489,7 +489,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'create_seo_article',
     file: 'supabase/functions/_shared/tools/seo-tools.ts',
     factory: 'createSEOPipelineTool',
-    description: 'Run the full SEO article pipeline: keyword research → planning → writing → analysis with auto-fix.',
+    description: 'Create an SEO article — the only way to write one.',
     params: [
       { name: 'topic', type: 'string', optional: false, description: 'The broad topic or niche (e.g. "sustainable architecture")' },
       { name: 'target_keyword', type: 'string', optional: false, description: 'The primary keyword to target (e.g. "recycled concrete aggregates")' },
@@ -499,6 +499,9 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'language_code', type: 'string', optional: true, description: 'Language the article is researched and written in, e.g. "el" for Greek. Set it only when the user names a market; omitted, the workspace\'s business country decides (Greece → "el").' },
       { name: 'location_code', type: 'number', optional: true, description: 'DataForSEO location code for the market, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Set it together with language_code only when the user names a market; omitted, the business country decides.' },
       { name: 'allow_duplicate', type: 'boolean', optional: true, description: 'The pipeline refuses a keyword this website already has an article on. Set true ONLY when the user explicitly asks to rewrite that article.' },
+      { name: 'writer_notes', type: 'string', optional: true, description: 'Angle or instructions for the writer, in the words of the user. Pass their text as-is.' },
+      { name: 'must_cover', type: 'string', optional: true, description: 'Points the article must cover, one per line or comma-separated. Pass the text of the user as-is.' },
+      { name: 'link_pages', type: 'string', optional: true, description: 'URLs of our own pages the article must link to, separated by spaces, commas or new lines.' },
     ],
   },
   {
@@ -1830,30 +1833,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
-    name: 'seo_article_planner',
-    file: 'supabase/functions/_shared/tools/seo-tools.ts',
-    factory: 'createSEOArticlePlannerTool',
-    description: 'Create a detailed article plan/outline from keyword research data.',
-    params: [
-      { name: 'topic', type: 'string', optional: false, description: 'The article topic' },
-      { name: 'target_keyword', type: 'string', optional: false, description: 'Primary target keyword' },
-      { name: 'keyword_research', type: 'unknown', optional: false, description: 'Full keyword research result from seo_keyword_research tool' },
-      { name: 'content_brief', type: 'unknown', optional: true, description: 'Optional content brief with brand voice, audience, and business context' },
-      { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from the wizard prefix.' },
-    ],
-  },
-  {
-    name: 'seo_article_writer',
-    file: 'supabase/functions/_shared/tools/seo-tools.ts',
-    factory: 'createSEOArticleWriterTool',
-    description: 'Write a full SEO article from an article plan.',
-    params: [
-      { name: 'article_plan', type: 'unknown', optional: false, description: 'Full article plan from seo_article_planner tool' },
-      { name: 'content_brief', type: 'unknown', optional: true, description: 'Optional content brief with brand voice and audience details. Include `firsthandExperience` {proprietaryData[], ownedExamples[], methodology, credentials} when the user has their own data, products or projects to cite — it is the only input to the writer that is not derived from the competing pages. Never invent its contents.' },
-      { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from the wizard prefix.' },
-    ],
-  },
-  {
     name: 'seo_audit_url',
     file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
     factory: 'createSEOAuditUrlTool',
@@ -1933,7 +1912,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'article_plan', type: 'unknown', optional: false, description: 'The article plan used to write the content' },
       { name: 'content_brief', type: 'unknown', optional: true, description: 'Optional content brief' },
       { name: 'article_id', type: 'string', optional: true, description: 'Id of the stored seo_articles row, when re-analyzing an existing article. Lets the freshness signal read the real review date instead of scoring every article as brand new.' },
-      { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from the wizard prefix.' },
     ],
   },
   {
@@ -2137,14 +2115,13 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'seo_keyword_research',
     file: 'supabase/functions/_shared/tools/seo-tools.ts',
     factory: 'createSEOKeywordResearchTool',
-    description: 'Research keywords for SEO article writing.',
+    description: 'Research keywords for a topic.',
     params: [
       { name: 'topic', type: 'string', optional: false, description: 'The broad topic or niche (e.g. "sustainable building materials")' },
       { name: 'target_keyword', type: 'string', optional: false, description: 'The primary keyword to target (e.g. "recycled concrete aggregates")' },
       { name: 'language_code', type: 'string', optional: true, description: 'Language code. Omit unless the user names a market: the workspace business country decides (Greece → "el").' },
       { name: 'location_code', type: 'number', optional: true, description: 'DataForSEO location code. Omit unless the user names a market: the workspace business country decides (Greece → 2300).' },
       { name: 'website_id', type: 'string', optional: true, description: 'Connected website id to file this research under. Omit to use the workspace default connected website.' },
-      { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id passed by the wizard. Extract from `[workflow:seo-article/research:<run_id>]` prefix.' },
     ],
   },
   {

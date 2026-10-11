@@ -94,7 +94,6 @@ export type WorkflowEmitter = ReturnType<typeof createWorkflowEmitter>;
 export const STEPS = {
   CATALOG_BUILD: ['create', 'attach', 'extract', 'add_extra', 'images', 'generate', 'publish', 'send'] as const,
   MENTION_MONITOR: ['enroll', 'first_run', 'llm_probe', 'review'] as const,
-  SEO_ARTICLE: ['research', 'plan', 'write', 'analyze'] as const,
   PRESENTATION_SHEET: ['pick_type', 'fill_inputs', 'render'] as const,
   B2B_RESEARCH: ['search', 'scrape', 'enrich', 'contacts', 'validate', 'save'] as const,
 } as const;

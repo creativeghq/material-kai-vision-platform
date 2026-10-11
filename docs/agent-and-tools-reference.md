@@ -151,11 +151,9 @@ pair could not be recorded and validation is unavailable for that run — stated
 
 ### SEO Article Pipeline (admin/owner only)
 
-- `create_seo_article` — full pipeline (research → plan → write → analyze), 30 cr, async
-- `seo_keyword_research` — stage 1, 18 cr
-- `seo_article_planner` — stage 2, 2 cr
-- `seo_article_writer` — stage 3, 20 cr
-- `seo_content_analyzer` — stage 4
+- `create_seo_article` — the ONLY way to write an article: keyword research → reading our own pages on the topic → plan → write → editor review → analysis report, 30 cr, async. Optional `writer_notes` / `must_cover` / `link_pages` are folded into the brief by the tool
+- `seo_keyword_research` — standalone keyword research, 18 cr
+- `seo_content_analyzer` — scores an article and lists issues; never rewrites it
 
 ### Generation / Sheets (all users)
 

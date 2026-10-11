@@ -172,7 +172,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['check_llm_visibility', 'seo_brand_search_audit', 'seo_llm_mentions_search', 'seo_ai_keyword_volume'],
   },
   'seo-article': {
-    tool_ids: ['create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer'],
+    tool_ids: ['create_seo_article', 'seo_keyword_research', 'seo_content_analyzer'],
   },
   'b2b': {
     adminOnly: true,

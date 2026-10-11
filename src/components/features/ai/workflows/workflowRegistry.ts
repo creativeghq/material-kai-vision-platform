@@ -225,39 +225,6 @@ const CATALOG_SEND: WorkflowDefinition = {
   ],
 };
 
-const SEO_ARTICLE: WorkflowDefinition = {
-  id: 'seo-article',
-  name: 'SEO Article pipeline',
-  description: 'Keyword research → article plan → write → analyze with auto-fix iterations.',
-  icon: 'Newspaper',
-  adminOnly: true,
-  agent_id: 'kai',
-  examples: [
-    'Generate a complete SEO article for "recycled concrete aggregates" targeting the UK market',
-    'Research keywords for "porcelain tile installation" and write a 2000-word article',
-  ],
-  steps: [
-    { id: 'research', order: 1, title: 'Keyword research', icon: 'Search', tool_id: 'seo_keyword_research',
-      description: 'Full DataForSEO research for one seed keyword. Returns volume, KD, intent, related, SERP context.',
-      awaits_user_input: true,
-      input_schema: [
-        { name: 'keyword',  label: 'Seed keyword',     required: true, placeholder: 'porcelain tile installation' },
-        { name: 'country',  label: 'Country',          defaultValue: 'United Kingdom' },
-        { name: 'language', label: 'Language',         defaultValue: 'English' },
-      ],
-    },
-    { id: 'plan',     order: 2, title: 'Article plan',     icon: 'ListTree', tool_id: 'seo_article_planner',
-      description: 'Outline + heading structure + target word count + on-page entities.',
-    },
-    { id: 'write',    order: 3, title: 'Write article',    icon: 'PenLine',  tool_id: 'seo_article_writer',
-      description: 'Generate the full article body from the plan.',
-    },
-    { id: 'analyze',  order: 4, title: 'Analyze + auto-fix', icon: 'BadgeCheck', tool_id: 'seo_content_analyzer',
-      description: '21-check SEO + GEO scoring. Auto-applies fixes when below threshold.',
-    },
-  ],
-};
-
 const MENTION_MONITOR: WorkflowDefinition = {
   id: 'mention-monitor',
   name: 'Track product mentions',
@@ -386,7 +353,6 @@ export const WORKFLOWS: WorkflowDefinition[] = [
   CATALOG_TRANSLATE,
   CATALOG_RESUME,
   CATALOG_SEND,
-  SEO_ARTICLE,
   MENTION_MONITOR,
   PRESENTATION_SHEET,
   B2B_RESEARCH,
@@ -404,7 +370,6 @@ export const WORKFLOW_TOOLKIT: Record<string, string> = {
   'catalog-translate': 'catalogs',
   'catalog-resume': 'catalogs',
   'catalog-send': 'catalogs',
-  'seo-article': 'seo-article',
   'mention-monitor': 'mentions',
   'presentation-sheet': 'presentation-sheets',
   'b2b-research': 'b2b',

@@ -1,7 +1,6 @@
 /**
  * SEO Article Pipeline Tools: callSEOFunction helper,
- * createSEOKeywordResearchTool, createSEOArticlePlannerTool,
- * createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool
+ * createSEOKeywordResearchTool, createSEOContentAnalyzerTool, createSEOPipelineTool
  */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
@@ -19,7 +18,6 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createWorkflowEmitter, STEPS } = await import('./_workflow-chunks.ts');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -69,17 +67,9 @@ export async function callSEOFunction(functionName: string, body: any, timeoutMs
  * SEO Tool: Keyword Research
  * Calls seo-research edge function → DataForSEO API
  */
-export const createSEOKeywordResearchTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
+export const createSEOKeywordResearchTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
-    async ({ topic, target_keyword, language_code, location_code, website_id, _workflow_run_id }) => {
-      // Workflow run_id strategy: prefer agent-passed _workflow_run_id (extracted
-      // from `[workflow:seo-article/research:<run_id>]` prefix). Fall back to a
-      // generated UUID — the frontend's run_id migration handler will reattach
-      // it to the locally-booted wizard run on the first workflow_plan chunk.
-      const runId = _workflow_run_id || crypto.randomUUID();
-      const emitter = createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: runId });
-      emitter.plan({ title: target_keyword, subtitle: topic });
-      emitter.step({ step_id: STEPS.SEO_ARTICLE[0], status: 'running', status_line: `Researching keywords for "${target_keyword}"…`, input: { topic, target_keyword, language_code, location_code } });
+    async ({ topic, target_keyword, language_code, location_code, website_id }) => {
       try {
         onProgress?.(`Researching keywords for "${target_keyword}"...`);
 
@@ -93,7 +83,6 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
         }, 60_000);
 
         if (!result.success) {
-          emitter.step({ step_id: STEPS.SEO_ARTICLE[0], status: 'failed', error_message: result.error || 'Keyword research failed' });
           return JSON.stringify({ success: false, error: result.error || 'Keyword research failed' });
         }
 
@@ -117,152 +106,25 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
           })),
         };
 
-        emitter.step({
-          step_id: STEPS.SEO_ARTICLE[0],
-          status: 'done',
-          status_line: `${summary.total_keywords} keywords · ${summary.total_volume.toLocaleString?.() || summary.total_volume} total volume`,
-          output: { research_id: result.data?.research_id, total_keywords: summary.total_keywords, total_volume: summary.total_volume },
-        });
-
         return JSON.stringify({
           success: true,
           research_id: result.data?.research_id,
-          _workflow_run_id: runId,
           summary,
         });
       } catch (error: any) {
         console.error('SEO keyword research error:', error);
-        emitter.step({ step_id: STEPS.SEO_ARTICLE[0], status: 'failed', error_message: error.message });
         return JSON.stringify({ success: false, error: error.message });
       }
     },
     {
       name: 'seo_keyword_research',
-      description: 'Research keywords for SEO article writing. Uses DataForSEO to find keyword volumes, difficulty, related keywords, People Also Ask questions, and SERP competitors. Always run this first before planning or writing an article. Pass _workflow_run_id when running inside the seo-article wizard.',
+      description: 'Research keywords for a topic. Uses DataForSEO to find keyword volumes, difficulty, related keywords, People Also Ask questions, and SERP competitors. To produce an article, call create_seo_article instead — it runs its own research.',
       schema: z.object({
         topic: z.string().describe('The broad topic or niche (e.g. "sustainable building materials")'),
         target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
         language_code: z.string().optional().describe('Language code. Omit unless the user names a market: the workspace business country decides (Greece → "el").'),
         location_code: z.number().optional().describe('DataForSEO location code. Omit unless the user names a market: the workspace business country decides (Greece → 2300).'),
         website_id: z.string().optional().describe('Connected website id to file this research under. Omit to use the workspace default connected website.'),
-        _workflow_run_id: z.string().optional().describe('Workflow run_id passed by the wizard. Extract from `[workflow:seo-article/research:<run_id>]` prefix.'),
-      }),
-    }
-  );
-};
-
-/**
- * SEO Tool: Article Planner
- * Calls seo-plan edge function → Gemini structured output
- */
-export const createSEOArticlePlannerTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
-  return tool(
-    async ({ topic, target_keyword, keyword_research, content_brief, _workflow_run_id }) => {
-      const runId = _workflow_run_id || crypto.randomUUID();
-      const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: runId }) : null;
-      emitter?.step({ step_id: STEPS.SEO_ARTICLE[1], status: 'running', status_line: `Planning article structure for "${target_keyword}"…`, input: { topic, target_keyword } });
-      try {
-        onProgress?.(`Planning article structure for "${target_keyword}"...`);
-
-        const result = await callSEOFunction('seo-plan', {
-          topic,
-          target_keyword,
-          keyword_research,
-          content_brief,
-          user_id: userId,
-        }, 60_000);
-
-        if (!result.success) {
-          emitter?.step({ step_id: STEPS.SEO_ARTICLE[1], status: 'failed', error_message: result.error || 'Article planning failed' });
-          return JSON.stringify({ success: false, error: result.error || 'Article planning failed' });
-        }
-
-        onProgress?.(`Article plan created: "${result.data?.plan?.metaTitle || target_keyword}"`);
-
-        emitter?.step({
-          step_id: STEPS.SEO_ARTICLE[1],
-          status: 'done',
-          status_line: `Plan ready: ${result.data?.plan?.metaTitle || target_keyword}`,
-          output: { plan_title: result.data?.plan?.metaTitle, sections: result.data?.plan?.sections?.length },
-        });
-
-        return JSON.stringify({
-          success: true,
-          _workflow_run_id: runId,
-          plan: result.data?.plan,
-        });
-      } catch (error: any) {
-        console.error('SEO article planning error:', error);
-        emitter?.step({ step_id: STEPS.SEO_ARTICLE[1], status: 'failed', error_message: error.message });
-        return JSON.stringify({ success: false, error: error.message });
-      }
-    },
-    {
-      name: 'seo_article_planner',
-      description: 'Create a detailed article plan/outline from keyword research data. Uses Gemini to generate structured article plan with headings, sections, meta tags, and keyword targets. Requires keyword research data from seo_keyword_research tool.',
-      schema: z.object({
-        topic: z.string().describe('The article topic'),
-        target_keyword: z.string().describe('Primary target keyword'),
-        keyword_research: z.any().describe('Full keyword research result from seo_keyword_research tool'),
-        content_brief: z.any().optional().describe('Optional content brief with brand voice, audience, and business context'),
-        _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
-      }),
-    }
-  );
-};
-
-/**
- * SEO Tool: Article Writer
- * Calls seo-write edge function → Claude Opus
- */
-export const createSEOArticleWriterTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
-  return tool(
-    async ({ article_plan, content_brief, _workflow_run_id }) => {
-      const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: _workflow_run_id }) : null;
-      emitter?.step({ step_id: STEPS.SEO_ARTICLE[2], status: 'running', status_line: 'Writing article with Claude Opus…' });
-      try {
-        onProgress?.('Writing article with Claude Opus...');
-
-        const result = await callSEOFunction('seo-write', {
-          article_plan,
-          content_brief,
-          user_id: userId,
-        }, 120_000);
-
-        if (!result.success) {
-          emitter?.step({ step_id: STEPS.SEO_ARTICLE[2], status: 'failed', error_message: result.error || 'Article writing failed' });
-          return JSON.stringify({ success: false, error: result.error || 'Article writing failed' });
-        }
-
-        onProgress?.(`Article written: ${result.data?.word_count || 0} words`);
-        emitter?.step({
-          step_id: STEPS.SEO_ARTICLE[2],
-          status: 'done',
-          status_line: `${result.data?.word_count || 0} words written`,
-          output: { word_count: result.data?.word_count },
-        });
-
-        return JSON.stringify({
-          success: true,
-          _workflow_run_id,
-          markdown_content: result.data?.markdown_content,
-          word_count: result.data?.word_count,
-        });
-      } catch (error: any) {
-        console.error('SEO article writing error:', error);
-        emitter?.step({ step_id: STEPS.SEO_ARTICLE[2], status: 'failed', error_message: error.message });
-        return JSON.stringify({ success: false, error: error.message });
-      }
-    },
-    {
-      name: 'seo_article_writer',
-      description: 'Write a full SEO article from an article plan. Uses Claude Opus to generate high-quality long-form content following the plan structure. Requires an article plan from seo_article_planner tool.',
-      schema: z.object({
-        article_plan: z.any().describe('Full article plan from seo_article_planner tool'),
-        content_brief: z.any().optional().describe(
-          'Optional content brief with brand voice and audience details. Include `firsthandExperience` {proprietaryData[], ownedExamples[], methodology, credentials} when the user has their own data, products or projects to cite — it is the only input to the writer that is not derived from the competing pages. Never invent its contents.',
-        ),
-        _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
     }
   );
@@ -272,11 +134,9 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
  * SEO Tool: Content Analyzer
  * Calls seo-analyze edge function → scoring and a fix list; it never rewrites the article
  */
-export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
+export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
-    async ({ content_markdown, article_plan, content_brief, article_id, _workflow_run_id }) => {
-      const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: _workflow_run_id }) : null;
-      emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'running', status_line: 'Analyzing article…' });
+    async ({ content_markdown, article_plan, content_brief, article_id }) => {
       try {
         onProgress?.('Analyzing article content for SEO quality...');
 
@@ -292,23 +152,14 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         }, 180_000);
 
         if (!result.success) {
-          emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'failed', error_message: result.error || 'Content analysis failed' });
           return JSON.stringify({ success: false, error: result.error || 'Content analysis failed' });
         }
 
         const analysis = result.data?.analysis;
         onProgress?.(`Analysis complete: score ${analysis?.overallScore || 0}/100`);
-        emitter?.step({
-          step_id: STEPS.SEO_ARTICLE[3],
-          status: 'done',
-          status_line: `Score ${analysis?.overallScore || 0}/100 · ${analysis?.fixes?.length || 0} issues`,
-          output: { overall_score: analysis?.overallScore, issues_count: analysis?.fixes?.length || 0, iterations: result.data?.iterations || 0 },
-        });
-        emitter?.finished({ status: 'done', summary: `SEO article complete — score ${analysis?.overallScore || 0}/100.` });
 
         return JSON.stringify({
           success: true,
-          _workflow_run_id,
           overall_score: analysis?.overallScore,
           seo_score: analysis?.seoScore,
           readability_score: analysis?.readabilityScore,
@@ -320,7 +171,6 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         });
       } catch (error: any) {
         console.error('SEO content analysis error:', error);
-        emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'failed', error_message: error.message });
         return JSON.stringify({ success: false, error: error.message });
       }
     },
@@ -332,7 +182,6 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         article_plan: z.any().describe('The article plan used to write the content'),
         content_brief: z.any().optional().describe('Optional content brief'),
         article_id: z.string().optional().describe('Id of the stored seo_articles row, when re-analyzing an existing article. Lets the freshness signal read the real review date instead of scoring every article as brand new.'),
-        _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
     }
   );
@@ -413,6 +262,39 @@ export const createSEOScoreUrlTool = (userId: string, onProgress?: (status: stri
   );
 };
 
+function textList(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((v): v is string => typeof v === 'string' && v.trim() !== '').map((v) => v.trim());
+  if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
+  return [];
+}
+
+/** Folds the form's three plain-text inputs into the brief the pipeline reads, keeping what the model sent. */
+export function mergeArticleInputs(
+  contentBrief: unknown,
+  inputs: { writer_notes?: string; must_cover?: string; link_pages?: string },
+): unknown {
+  const notes = inputs.writer_notes?.trim();
+  const rawPoints = inputs.must_cover ?? '';
+  const mustCover = rawPoints
+    .split(rawPoints.includes('\n') ? /\r?\n/ : /,/)
+    .map((p) => p.replace(/^\s*[-*•]\s*/, '').trim())
+    .filter(Boolean);
+  const links = (inputs.link_pages ?? '').split(/[\s,]+/).map((u) => u.trim()).filter(Boolean);
+  if (!notes && mustCover.length === 0 && links.length === 0) return contentBrief;
+
+  const isObject = !!contentBrief && typeof contentBrief === 'object' && !Array.isArray(contentBrief);
+  const base: Record<string, unknown> = isObject ? { ...(contentBrief as Record<string, unknown>) } : {};
+  const prose = isObject ? [] : textList(contentBrief).map((t) => `Business context: ${t}`);
+  base.extraContext = [
+    ...textList(base.extraContext),
+    ...prose,
+    ...(notes ? [notes] : []),
+    ...links.map((u) => `Link this page of ours: ${u}`),
+  ];
+  base.requiredPoints = [...textList(base.requiredPoints), ...mustCover];
+  return base;
+}
+
 /**
  * SEO Tool: Full Pipeline (Async)
  * Calls seo-pipeline edge function → runs all stages, returns article_id immediately
@@ -420,13 +302,13 @@ export const createSEOScoreUrlTool = (userId: string, onProgress?: (status: stri
  */
 export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ topic, target_keyword, content_brief, content_type, website_id, language_code, location_code, allow_duplicate }) => {
+    async ({ topic, target_keyword, content_brief, content_type, website_id, language_code, location_code, allow_duplicate, writer_notes, must_cover, link_pages }) => {
       try {
 
         const result = await callSEOFunction('seo-pipeline', {
           topic,
           target_keyword,
-          content_brief,
+          content_brief: mergeArticleInputs(content_brief, { writer_notes, must_cover, link_pages }),
           content_type: content_type || 'guide',
           user_id: userId,
           website_id: website_id || undefined,
@@ -476,7 +358,7 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
     },
     {
       name: 'create_seo_article',
-      description: 'Run the full SEO article pipeline: keyword research → planning → writing → analysis with auto-fix. This is an async operation — it creates an article record and processes in the background. Use this when the user wants a complete SEO article generated end-to-end. For individual steps, use the specific tools instead.',
+      description: 'Create an SEO article — the only way to write one. Runs keyword research → reading the pages of our own site on the topic → plan → write → editor review → analysis report. Async: it creates the article record and processes in the background. Call it ONCE per article.',
       schema: z.object({
         topic: z.string().describe('The broad topic or niche (e.g. "sustainable architecture")'),
         target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
@@ -492,6 +374,9 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
         language_code: z.string().optional().describe('Language the article is researched and written in, e.g. "el" for Greek. Set it only when the user names a market; omitted, the workspace\'s business country decides (Greece → "el").'),
         location_code: z.number().optional().describe('DataForSEO location code for the market, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Set it together with language_code only when the user names a market; omitted, the business country decides.'),
         allow_duplicate: z.boolean().optional().describe('The pipeline refuses a keyword this website already has an article on. Set true ONLY when the user explicitly asks to rewrite that article.'),
+        writer_notes: z.string().optional().describe('Angle or instructions for the writer, in the words of the user. Pass their text as-is.'),
+        must_cover: z.string().optional().describe('Points the article must cover, one per line or comma-separated. Pass the text of the user as-is.'),
+        link_pages: z.string().optional().describe('URLs of our own pages the article must link to, separated by spaces, commas or new lines.'),
       }),
     }
   );

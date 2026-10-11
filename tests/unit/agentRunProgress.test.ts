@@ -153,41 +153,41 @@ describe('a run is derived from the stream', () => {
 
   it('hands a turn over to the workflow that announced itself', () => {
     let run = newRun();
-    run = applyRunChunk(run, { type: 'tool_call', tool: 'seo_keyword_research' });
-    run = applyRunChunk(run, { type: 'workflow_plan', run_id: 'wf-77', definition_id: 'seo-article' });
+    run = applyRunChunk(run, { type: 'tool_call', tool: 'track_product_mentions' });
+    run = applyRunChunk(run, { type: 'workflow_plan', run_id: 'wf-77', definition_id: 'mention-monitor' });
     // The plan is strictly more informative than the tools discovered under it, and one turn
     // must not draw two cards.
     expect(run.workflow_run_id).toBe('wf-77');
-    expect(run.definition_id).toBe('seo-article');
+    expect(run.definition_id).toBe('mention-monitor');
   });
 
   it('renders a planned workflow through the same model as a discovered run', () => {
     const wf = {
-      definition_id: 'seo-article',
+      definition_id: 'mention-monitor',
       run_id: 'wf-1',
-      steps: { research: { step_id: 'research', status: 'done' as const, status_line: '48 keywords' } },
-      step_order: WORKFLOWS.find((w) => w.id === 'seo-article')!.steps.map((s) => s.id),
+      steps: { enroll: { step_id: 'enroll', status: 'done' as const, status_line: 'Flobali enrolled' } },
+      step_order: WORKFLOWS.find((w) => w.id === 'mention-monitor')!.steps.map((s) => s.id),
       status: 'running' as const,
       metadata: {},
     };
-    const run: AgentRunState = runFromWorkflow(wf, { toolkitId: WORKFLOW_TOOLKIT['seo-article'] });
+    const run: AgentRunState = runFromWorkflow(wf, { toolkitId: WORKFLOW_TOOLKIT['mention-monitor'] });
     expect(run.origin).toBe('planned');
     expect(run.step_order.length).toBe(4);
-    expect(run.steps.research.status).toBe('done');
+    expect(run.steps.enroll.status).toBe('done');
     // A planned run knows its steps before they run — that is what the user is watching.
-    expect(run.steps.plan.status).toBe('pending');
-    expect(run.steps.plan.title).toBe('Article plan');
-    expect(run.toolkit_name).toBe('SEO Article Pipeline');
+    expect(run.steps.first_run.status).toBe('pending');
+    expect(run.steps.first_run.title).toBe('First refresh');
+    expect(run.toolkit_name).toBe('Mention Monitoring');
   });
 });
 
 describe('the wizard and the run card agree on when there is an ask', () => {
   const wf = (steps: Record<string, string>, awaiting?: string): WorkflowRuntimeState => ({
-    definition_id: 'seo-article',
+    definition_id: 'mention-monitor',
     run_id: 'wf-1',
-    step_order: ['research', 'plan', 'write', 'analyze'],
+    step_order: ['enroll', 'first_run', 'llm_probe', 'review'],
     steps: Object.fromEntries(
-      ['research', 'plan', 'write', 'analyze'].map((id) => [
+      ['enroll', 'first_run', 'llm_probe', 'review'].map((id) => [
         id, { step_id: id, status: (steps[id] ?? 'pending') as never },
       ]),
     ),
@@ -199,18 +199,18 @@ describe('the wizard and the run card agree on when there is an ask', () => {
   it('says nothing while the active step is running — the run card is telling that story', () => {
     // The slot carries its own separator and padding, so a null render paints an empty strip
     // under the step list for the whole length of every running step.
-    expect(wizardHasSomethingToShow(wf({ research: 'running' }))).toBe(false);
-    expect(wizardHasSomethingToShow(wf({ research: 'done', plan: 'awaiting_input' }))).toBe(true);
+    expect(wizardHasSomethingToShow(wf({ enroll: 'running' }))).toBe(false);
+    expect(wizardHasSomethingToShow(wf({ enroll: 'done', first_run: 'awaiting_input' }))).toBe(true);
   });
 
   it('an explicit ask outranks "everything finished"', () => {
-    const done = { research: 'done', plan: 'done', write: 'done', analyze: 'done' };
+    const done = { enroll: 'done', first_run: 'done', llm_probe: 'done', review: 'done' };
     expect(isWorkflowAllDone(wf(done))).toBe(true);
     // Re-run / Edit input on a finished step sets awaiting_input_step_id. Short-circuiting to
     // the completion card here meant both buttons produced no form at all.
-    expect(isWorkflowAllDone(wf(done, 'write'))).toBe(false);
-    expect(resolveWizardStepId(wf(done, 'write'))).toBe('write');
-    expect(wizardHasSomethingToShow(wf(done, 'write'))).toBe(true);
+    expect(isWorkflowAllDone(wf(done, 'llm_probe'))).toBe(false);
+    expect(resolveWizardStepId(wf(done, 'llm_probe'))).toBe('llm_probe');
+    expect(wizardHasSomethingToShow(wf(done, 'llm_probe'))).toBe(true);
   });
 });
 

@@ -197,7 +197,7 @@ Partners run as the `member` role. Available tools:
 **Blocked for partner keys** (admin/owner-only — server-side gating via the `member` role lock)
 - `b2b_manufacturer_search`, `company_website_scrape`, `company_enrichment`, `contact_discovery`, `email_validate`, `save_to_crm`
 - `research_analysis`, `analytics_analysis`, `business_analysis`, `product_analysis` (sub-agent orchestration)
-- `create_seo_article`, `seo_article_planner`, `seo_article_writer`, `seo_content_analyzer`, `seo_keyword_research`
+- `create_seo_article`, `seo_content_analyzer`, `seo_keyword_research`
 - `dispatch_background_task`
 - `price_lookup`
 - Presentation catalog tools (`create_catalog`, `attach_catalog_pdfs`, `extract_from_catalog_pdfs`, `translate_pdf_to_catalog`, `add_material_to_catalog`, `find_image_for_material`, `generate_catalog_pdf`, `publish_catalog`)

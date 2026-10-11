@@ -65,10 +65,9 @@ describe('the toolkit is actually offered now', () => {
   });
 
   it('the article pipeline is reachable too', () => {
-    // These five sat inside the SUB-AGENT admin block, a different one from the toolkit's, so the
+    // These sat inside the SUB-AGENT admin block, a different one from the toolkit's, so the
     // first fix would have left the whole pipeline offered-and-unbound.
-    for (const t of ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer',
-      'seo_content_analyzer', 'create_seo_article']) {
+    for (const t of ['seo_keyword_research', 'seo_content_analyzer', 'create_seo_article']) {
       const m = new RegExp(`\\{\\s*\\n\\s*id: '${t}',[\\s\\S]*?\\n\\s*\\},`).exec(CATALOG);
       expect(m, `${t} entry missing`).toBeTruthy();
       expect(m![0], `${t} is still adminOnly`).not.toMatch(/adminOnly:\s*true/);

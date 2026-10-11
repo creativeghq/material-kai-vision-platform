@@ -913,7 +913,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   {
     id: 'create_seo_article', name: 'Full SEO Pipeline', category: 'SEO Article',
     credits: 30,
-    desc: 'Run the full SEO article pipeline: research → plan → write → analyze with auto-fix. Returns article_id immediately, processes in background.',
+    desc: 'The one way to write an article: keyword research → reading our own pages on the topic → plan → write → editor review → analysis report. Returns article_id immediately, processes in background.',
     examples: [
       'Generate a complete SEO article for "recycled concrete aggregates" targeting the UK market',
     ],
@@ -921,21 +921,11 @@ const KAI_TOOLS: AgentToolEntry[] = [
   {
     id: 'seo_keyword_research', name: 'Article: Research', category: 'SEO Article',
     credits: 18,
-    desc: 'Stage 1 of the article pipeline. Full DataForSEO keyword research with content analysis.',
-  },
-  {
-    id: 'seo_article_planner', name: 'Article: Plan', category: 'SEO Article',
-    credits: 2,
-    desc: 'Stage 2 — create a structured article plan from keyword research.',
-  },
-  {
-    id: 'seo_article_writer', name: 'Article: Write', category: 'SEO Article',
-    credits: 20,
-    desc: 'Stage 3 — generate full article from a plan.',
+    desc: 'Standalone DataForSEO keyword research with content analysis. Writing an article does its own research.',
   },
   {
     id: 'seo_content_analyzer', name: 'Article: Analyze', category: 'SEO Article',
-    desc: 'Stage 4 — score article against 21 SEO + GEO checks; auto-fix iterations.',
+    desc: 'Score an article against the SEO + GEO checks and list issues; it does not change the article.',
   },
 
   // ── Background + admin ────────────────────────────────────────────
@@ -3540,24 +3530,25 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'seo-article',
     name: 'SEO Article Pipeline',
-    description: 'Research → plan → write → analyze with auto-fix. Admin-only.',
+    description: 'Research → read our pages on the topic → plan → write → editor review → analysis report.',
     icon: 'Newspaper',
     tool_ids: [
-      'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
-      'seo_article_writer', 'seo_content_analyzer',
+      'create_seo_article', 'seo_keyword_research', 'seo_content_analyzer',
     ],
     quick_starts: [
       {
         label: 'Generate full article',
-        description: 'End-to-end: research → plan → write → analyze with auto-fix',
+        description: 'Research, read our pages on the topic, plan, write, editor review, then an analysis report',
         prompt: 'Generate a complete SEO article.',
         icon: 'Newspaper',
-        workflow_id: 'seo-article',
-        promptTemplate: 'Generate a complete SEO article targeting the keyword "{{keyword}}" (website_id: {{website_id}}; market ISO code: {{country}} — if blank, leave language_code and location_code unset so the business\'s own market is used).',
+        promptTemplate: 'Call create_seo_article ONCE, and no other SEO tool, to generate a complete SEO article targeting the keyword "{{keyword}}" (website_id: {{website_id}}; market ISO code: {{country}} — if blank, leave language_code and location_code unset so the business\'s own market is used). Pass each text below verbatim as the create_seo_article param of the same name; omit any that is empty.\n\nwriter_notes:\n{{writer_notes}}\n\nmust_cover:\n{{must_cover}}\n\nlink_pages:\n{{link_pages}}',
         form: [
           { key: 'keyword', label: 'Target keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
           { key: 'country', label: 'Target market (blank = your business country)', kind: 'country_code' },
           { key: 'website_id', label: 'Website', kind: 'website' },
+          { key: 'writer_notes', label: 'Angle / notes for the writer', kind: 'textarea' },
+          { key: 'must_cover', label: 'Must cover', kind: 'textarea', help: 'One point per line.' },
+          { key: 'link_pages', label: 'Pages of ours to link (URLs)', kind: 'textarea', help: 'One URL per line.' },
         ],
       },
       {

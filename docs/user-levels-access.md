@@ -112,7 +112,7 @@ Personas are computed from these sources:
 | `generate_3d` (Interior Designer agent) | ✅ | — |
 | Sub-agent orchestration (`research_analysis`, `analytics_analysis`, `business_analysis`, `product_analysis`) | ❌ | ✅ |
 | B2B tools (`b2b_manufacturer_search`, `company_website_scrape`, `company_enrichment`, `contact_discovery`, `email_validate`, `save_to_crm`) | ❌ | ✅ |
-| SEO pipeline (`seo_keyword_research`, `seo_article_planner`, `seo_article_writer`, `seo_content_analyzer`, `create_seo_article`) | ❌ | ✅ |
+| SEO pipeline (`seo_keyword_research`, `seo_content_analyzer`, `create_seo_article`) | ❌ | ✅ |
 
 ---
 

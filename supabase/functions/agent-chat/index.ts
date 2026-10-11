@@ -1068,8 +1068,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Escape hatch — admin only
       'seo_dataforseo_call',
       // SEO article pipeline (admin/owner only)
-      'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
-      'seo_article_writer', 'seo_content_analyzer',
+      'create_seo_article', 'seo_keyword_research', 'seo_content_analyzer',
       // Background task dispatch (admin/owner only)
       'workspace_capabilities', 'dispatch_background_task',
       // Price lookup from Pricing KB category (admin/owner only)
@@ -1352,7 +1351,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
       'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
       'seo_ai_overview', 'seo_google_maps', 'seo_gbp_info',
-      'create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer',
+      'create_seo_article', 'seo_keyword_research', 'seo_content_analyzer',
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
       // Same cluster, other half: Edith held research + analytics and was offered
       // "Business breakdown", which runs a tool she did not have.
@@ -2107,7 +2106,7 @@ async function executeAgent(
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'b2b_research_validate', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
   const needsWebResearch = config.tools.some((t: string) => ['web_search', 'web_fetch', 'web_research_validate'].includes(t));
-  const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
+  const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_content_analyzer', 'seo_score_url', 'create_seo_article'].includes(t));
   // SEO agent toolkit (conversational research surface — separate from the article pipeline)
   const SEO_AGENT_TOOL_NAMES = [
     'seo_research_keyword',
@@ -2250,8 +2249,6 @@ async function executeAgent(
   const createEmailValidateTool = b2bMod?.createEmailValidateTool;
   const createSaveToCRMTool = b2bMod?.createSaveToCRMTool;
   const createSEOKeywordResearchTool = seoMod?.createSEOKeywordResearchTool;
-  const createSEOArticlePlannerTool = seoMod?.createSEOArticlePlannerTool;
-  const createSEOArticleWriterTool = seoMod?.createSEOArticleWriterTool;
   const createSEOContentAnalyzerTool = seoMod?.createSEOContentAnalyzerTool;
   const createSEOScoreUrlTool = seoMod?.createSEOScoreUrlTool;
   const createSEOPipelineTool = seoMod?.createSEOPipelineTool;
@@ -3103,18 +3100,11 @@ async function executeAgent(
   // SEO Article Pipeline tools — the same module gate as the rest of the toolkit, not the admin
   // role. They sat inside the sub-agent admin block, so a paying workspace could see the whole
   // article pipeline in the palette and have none of it bound (#401).
-  // onChunk is wired across all 4 stages so the seo-article wizard advances on each emit.
   if (config.tools.includes('seo_keyword_research')) {
-    tools.push(createSEOKeywordResearchTool(userId, sendProgress, onChunk));
-  }
-  if (config.tools.includes('seo_article_planner')) {
-    tools.push(createSEOArticlePlannerTool(userId, sendProgress, onChunk));
-  }
-  if (config.tools.includes('seo_article_writer')) {
-    tools.push(createSEOArticleWriterTool(userId, sendProgress, onChunk));
+    tools.push(createSEOKeywordResearchTool(userId, sendProgress));
   }
   if (config.tools.includes('seo_content_analyzer')) {
-    tools.push(createSEOContentAnalyzerTool(userId, sendProgress, onChunk));
+    tools.push(createSEOContentAnalyzerTool(userId, sendProgress));
   }
   if (config.tools.includes('seo_score_url')) {
     tools.push(createSEOScoreUrlTool(userId, sendProgress, onChunk));

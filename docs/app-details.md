@@ -203,7 +203,7 @@ Tools gated to Admin/Owner only:
 - `contact_discovery` — Hunter.io with Apollo.io fallback
 - `email_validate` — ZeroBounce email validation before outreach
 - `save_to_crm` — saves enriched company and contact data
-- `seo_keyword_research`, `seo_article_planner`, `seo_article_writer`, `seo_content_analyzer`, `create_seo_article` — full SEO content pipeline
+- `create_seo_article` — the one SEO article pipeline; `seo_keyword_research` and `seo_content_analyzer` run standalone
 - Sub-agents: `research_analysis`, `analytics_analysis`, `business_analysis`, `product_analysis`
 
 **Interior Designer Agent**
