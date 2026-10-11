@@ -167,6 +167,33 @@ export async function findSitePages(
   }
 }
 
+/** Every Latin-script word in the site's own URL slugs: material, category, series and factory terms. */
+export async function siteSlugTerms(supabase: DbClient, websiteId: string | null): Promise<Set<string>> {
+  const terms = new Set<string>();
+  if (!websiteId) return terms;
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data, error } = await supabase
+      .from('user_website_pages').select('url')
+      .eq('website_id', websiteId).eq('is_active', true)
+      .range(from, from + 999);
+    if (error) {
+      console.warn('[seo-site-pages] slug vocabulary unavailable:', error.message);
+      break;
+    }
+    for (const r of (data ?? []) as { url: string }[]) {
+      try {
+        for (const w of new URL(r.url).pathname.toLowerCase().split(/[/_-]+/)) {
+          if (/^[a-z]{3,}$/.test(w)) terms.add(w);
+        }
+      } catch {
+        continue;
+      }
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  return terms;
+}
+
 /** A picked slug that exists in 3+ sections becomes its live copy in the section with most impressions. */
 async function consolidateMatrixPicks(
   supabase: DbClient,

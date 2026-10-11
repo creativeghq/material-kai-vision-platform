@@ -120,6 +120,7 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_writer');
     const systemPrompt = (await buildWritingSystemPrompt(supabase, baseSystemPrompt, plan, brief, research))
       + await buildSitePagesBlock(supabase, body.site_pages)
+      + await buildProtectedTermsBlock(supabase, body.protected_terms)
       + outputLanguageBlock(body.language_code);
     const userPrompt = await buildWritingUserPrompt(supabase, plan, brief, research);
 
@@ -266,6 +267,14 @@ async function buildSitePagesBlock(supabase: DbClient, raw: unknown): Promise<st
     : [];
   if (pages.length === 0) return '';
   return await getToolPrompt(supabase, 'seo_writer_site_links') + sitePagesBlock(sitePagesDataLines(pages));
+}
+
+async function buildProtectedTermsBlock(supabase: DbClient, raw: unknown): Promise<string> {
+  const terms = Array.isArray(raw)
+    ? raw.map((t) => String(t)).filter((t) => /^[a-z][a-z-]{1,40}$/.test(t)).slice(0, 150)
+    : [];
+  if (terms.length === 0) return '';
+  return await getToolPrompt(supabase, 'seo_writer_protected_terms') + sitePagesBlock(terms.join(', '));
 }
 
 /** First-hand experience block — the "E" in E-E-A-T. */

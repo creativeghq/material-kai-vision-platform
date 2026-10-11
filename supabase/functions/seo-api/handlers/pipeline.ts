@@ -14,7 +14,10 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
-import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
+import { enforceSiteAssets, findSitePages, siteSlugTerms, type SitePage } from './site-pages.ts';
+import { latinTerms } from './foreign-words.ts';
+
+const termOf = (k: unknown) => (typeof k === 'string' ? k : String((k as { term?: string })?.term ?? ''));
 import { marketForCountry } from './market.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { PHOTOS_PER_PAGE } from './site-pages.ts';
@@ -460,9 +463,19 @@ async function runPipelineStages(ctx: {
       creditsByStage.photo_checks = charged;
     }
     const planBrief = await withSiteClusterContext(supabase, brief, websiteId, articleId, sitePages);
+
+    // Terms that are ours or searched as written: never translated, respelled or flagged.
+    const researchTerms = latinTerms([research.targetKeyword, ...research.recommendedSecondaries.map(termOf),
+      ...(research.serpSignals?.relatedSearches ?? [])].join(' '));
+    const protectedTerms = new Set([...await siteSlugTerms(supabase, websiteId), ...researchTerms]);
+    const writerTerms = [...new Set([
+      ...researchTerms,
+      ...sitePages.flatMap((p) => latinTerms(`${p.url.replace(/^https?:\/\/[^/]+/, '').replace(/[/_-]+/g, ' ')} ${p.title ?? ''}`)),
+    ])].filter((t) => protectedTerms.has(t)).slice(0, 150);
     await updateArticle(supabase, articleId, {
       site_link_targets: sitePages.map((p) => ({ url: p.url, title: p.title, photos: p.images.length })),
-    }, `Site context: ${sitePages.length} of our pages as link targets, ${sitePages.reduce((s, p) => s + p.images.length, 0)} photos`);
+      protected_terms: [...protectedTerms],
+    }, `Site context: ${sitePages.length} of our pages as link targets, ${sitePages.reduce((s, p) => s + p.images.length, 0)} photos, ${protectedTerms.size} protected terms`);
 
     const planResult = await callStage('plan', req, {
       topic: body.topic,
@@ -502,6 +515,7 @@ async function runPipelineStages(ctx: {
       article_plan: plan,
       content_brief: brief,
       site_pages: sitePages,
+      protected_terms: writerTerms,
       language_code: body.language_code || undefined,
       keyword_research_summary: {
         targetKeyword: research.targetKeyword,
@@ -541,6 +555,7 @@ async function runPipelineStages(ctx: {
       auto_fix: autoFix,
       max_iterations: maxFixIterations,
       site_url: website?.url ?? null,
+      protected_terms: [...protectedTerms],
       user_id: userId,
       serp_signals: research.serpSignals,
     }, 180_000);

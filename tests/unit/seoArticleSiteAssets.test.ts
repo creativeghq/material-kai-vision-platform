@@ -4,7 +4,7 @@ import {
   applySiteAssetRules,
   countSiteLinks,
 } from '../../supabase/functions/seo-api/handlers/site-assets.ts';
-import { foreignWords } from '../../supabase/functions/seo-api/handlers/foreign-words.ts';
+import { foreignWords, latinTerms } from '../../supabase/functions/seo-api/handlers/foreign-words.ts';
 
 const PAGE = 'https://materialshub.gr/el/proionta/plakakia/atlas-concorde';
 
@@ -100,6 +100,17 @@ describe('foreignWords — English left in a Greek article', () => {
       '![Πλακάκι](https://media.materialshub.gr/products/x-slab.webp)',
     ].join('\n');
     expect(foreignWords(md)).toEqual(['accent', 'walk-in']);
+  });
+
+  it('never flags a protected term: our slug vocabulary and the target searches', () => {
+    const md = 'Πλακάκια porcelain και travertine σε μπάνιο με accent τοίχο και ντουζιέρα walk-in.';
+    const protectedTerms = new Set(['porcelain', 'travertine', 'walk']);
+    expect(foreignWords(md, protectedTerms)).toEqual(['accent', 'walk-in']);
+    expect(foreignWords(md, new Set([...protectedTerms, 'in']))).toEqual(['accent']);
+  });
+
+  it('latinTerms keeps a hyphenated term whole and in parts', () => {
+    expect(latinTerms('πλακάκια book-match και Terrazzo, cm')).toEqual(['book-match', 'book', 'match', 'terrazzo']);
   });
 
   it('says nothing about an article written in Latin script', () => {

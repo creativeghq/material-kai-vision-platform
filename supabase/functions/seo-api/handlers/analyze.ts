@@ -22,7 +22,7 @@ import { normalizeContentBrief, briefList, type NormalizedBrief } from './conten
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { DEFAULT_GEMINI_MODEL, generateWithGemini } from '../../_shared/ai-client.ts';
 import { countSiteLinks } from './site-assets.ts';
-import { foreignWords } from './foreign-words.ts';
+import { ALLOWED_FOREIGN_WORDS, foreignWords } from './foreign-words.ts';
 import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import type {
   SEOAnalyzeRequest,
@@ -191,8 +191,9 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
 
     // Run analysis
     const siteUrl = typeof body.site_url === 'string' ? body.site_url : null;
+    const protectedTerms = Array.isArray(body.protected_terms) ? body.protected_terms.map(String) : null;
     let analysis = analyzeContent(
-      content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl,
+      content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl, protectedTerms,
     );
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
@@ -234,7 +235,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         // Re-analyze
         const scoreBefore = analysis.overallScore;
         analysis = analyzeContent(
-          content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl,
+          content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl, protectedTerms,
         );
         console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100 (reachable: ${reachableScore(analysis)})`);
 
@@ -364,6 +365,8 @@ export function analyzeContent(
   brief?: NormalizedBrief | null,
   contentDatedAt?: string,
   siteUrl?: string | null,
+  /** Our slug, category and searched terms: never flagged as foreign. */
+  protectedTerms?: Iterable<string> | null,
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
   const content = markdown.toLowerCase();
@@ -613,7 +616,7 @@ export function analyzeContent(
   }
 
   // ── Check 12b: English left in a non-English article ──
-  const foreign = foreignWords(markdown);
+  const foreign = foreignWords(markdown, new Set([...ALLOWED_FOREIGN_WORDS, ...(protectedTerms ?? [])]));
   if (foreign.length > 0) {
     fixes.push({
       category: 'language',
