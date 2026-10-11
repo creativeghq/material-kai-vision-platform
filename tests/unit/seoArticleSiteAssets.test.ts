@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { extractContentImages } from '../../supabase/functions/_shared/page-images.ts';
 import {
+  applyReviewEdits,
   applySiteAssetRules,
   countSiteLinks,
+  pageFacts,
 } from '../../supabase/functions/seo-api/handlers/site-assets.ts';
 import { foreignWords, latinTerms } from '../../supabase/functions/seo-api/handlers/foreign-words.ts';
 
@@ -115,6 +117,51 @@ describe('foreignWords — English left in a Greek article', () => {
 
   it('says nothing about an article written in Latin script', () => {
     expect(foreignWords('# Bathroom tiles\nAn accent wall with a walk-in shower.')).toEqual([]);
+  });
+});
+
+describe('pageFacts — what a page states, not its navigation', () => {
+  it('keeps content lines and drops the title, menus and button rows', () => {
+    const text = [
+      'Cersanit Marinel Πλακάκια — Τιμή ανά τ.μ. | MaterialsHub',
+      'Συμβουλευτική Προϊόντα Σειρές Πλατφόρμα Ιδέες Εταιρεία Επικοινωνία EN Κατάλογος Πλατφόρμα →',
+      'Ζητήστε Τιμή Καλέστε Τώρα',
+      'Η σειρά Marinel είναι πλακάκι της Cersanit , κατασκευασμένο στην Πολωνία.',
+      'Κυκλοφορεί σε δύο επιφάνειες: γυαλιστερό και ανάγλυφο.',
+    ].join('\n');
+    expect(pageFacts(text)).toBe(
+      'Η σειρά Marinel είναι πλακάκι της Cersanit , κατασκευασμένο στην Πολωνία.\nΚυκλοφορεί σε δύο επιφάνειες: γυαλιστερό και ανάγλυφο.',
+    );
+    expect(pageFacts(null)).toBeNull();
+  });
+});
+
+describe('applyReviewEdits — the editor fixes words, never links', () => {
+  const md = 'Η Aparici είναι ιταλικό εργοστάσιο. Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel) σε ματ.';
+
+  it('applies an edit whose text occurs exactly once', () => {
+    const out = applyReviewEdits(md, [{ find: 'Η Aparici είναι ιταλικό εργοστάσιο.', replace: 'Η Aparici είναι ισπανικό εργοστάσιο.', kind: 'wrong_fact' }]);
+    expect(out.applied).toHaveLength(1);
+    expect(out.markdown).toContain('ισπανικό');
+  });
+
+  it('refuses an edit that would drop a link, or text that is absent', () => {
+    const out = applyReviewEdits(md, [
+      { find: 'Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel) σε ματ.', replace: 'Η σειρά Marinel είναι γυαλιστερή.', kind: 'wrong_fact' },
+      { find: 'δεν υπάρχει', replace: 'x', kind: 'language' },
+    ]);
+    expect(out.applied).toHaveLength(0);
+    expect(out.skipped.map((s) => s.why)).toEqual(['would drop a link or image', 'text not found']);
+    expect(out.markdown).toBe(md);
+  });
+
+  it('keeps the link when the edit carries it over', () => {
+    const out = applyReviewEdits(md, [{
+      find: 'Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel) σε ματ.',
+      replace: 'Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel), γυαλιστερή και ανάγλυφη.',
+      kind: 'wrong_fact',
+    }]);
+    expect(out.applied).toHaveLength(1);
   });
 });
 

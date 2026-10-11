@@ -7,7 +7,7 @@ const HANDLERS = join(process.cwd(), 'supabase/functions/seo-api/handlers');
 const src = (f: string) => blankComments(readFileSync(join(HANDLERS, f), 'utf-8'));
 
 describe('SEO stages bill what they cost', () => {
-  it.each(['research.ts', 'plan.ts', 'write.ts', 'apply-fix.ts', 'faq.ts'])(
+  it.each(['research.ts', 'plan.ts', 'write.ts', 'apply-fix.ts', 'faq.ts', 'review.ts'])(
     '%s reserves, settles and refunds through stage-billing, with no flat price left',
     (file) => {
       const code = src(file);

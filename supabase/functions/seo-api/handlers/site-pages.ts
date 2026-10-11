@@ -5,13 +5,15 @@ import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { fetchTextGuarded } from '../../_shared/fetch-image.ts';
 import { extractContentImages, type PageImage } from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
-import { applySiteAssetRules, hostOf, siteLinkUrls, trimSlash } from './site-assets.ts';
+import { applySiteAssetRules, hostOf, pageFacts, siteLinkUrls, trimSlash } from './site-assets.ts';
 import { verifyPhoto, type PhotoUsage } from './photo-verify.ts';
 
 export interface SitePage {
   url: string;
   title: string | null;
   description: string | null;
+  /** What the page itself states (pageFacts) — the only facts an article may say about it. */
+  facts?: string | null;
   similarity: number;
   images: PageImage[];
 }
@@ -148,6 +150,10 @@ export async function findSitePages(
     );
 
     await consolidateMatrixPicks(supabase, opts.websiteId, picked, sectionScore);
+    const { data: texts } = await supabase
+      .from('user_website_pages').select('id, content_text').in('id', picked.map((p) => p.id));
+    const textById = new Map((texts ?? []).map((t: { id: string; content_text: string | null }) => [t.id, t.content_text]));
+    for (const p of picked) p.facts = pageFacts(textById.get(p.id));
     await refreshImages(supabase, picked.filter((p) => p.stale));
     const lang = opts.languageCode || 'en';
     // No usage sink = nothing reserved for the checks: run none, offer only photos checked before.
@@ -165,33 +171,6 @@ export async function findSitePages(
     console.warn('[seo-site-pages] failed:', (e as Error).message);
     return [];
   }
-}
-
-/** Every Latin-script word in the site's own URL slugs: material, category, series and factory terms. */
-export async function siteSlugTerms(supabase: DbClient, websiteId: string | null): Promise<Set<string>> {
-  const terms = new Set<string>();
-  if (!websiteId) return terms;
-  for (let from = 0; from < 20000; from += 1000) {
-    const { data, error } = await supabase
-      .from('user_website_pages').select('url')
-      .eq('website_id', websiteId).eq('is_active', true)
-      .range(from, from + 999);
-    if (error) {
-      console.warn('[seo-site-pages] slug vocabulary unavailable:', error.message);
-      break;
-    }
-    for (const r of (data ?? []) as { url: string }[]) {
-      try {
-        for (const w of new URL(r.url).pathname.toLowerCase().split(/[/_-]+/)) {
-          if (/^[a-z]{3,}$/.test(w)) terms.add(w);
-        }
-      } catch {
-        continue;
-      }
-    }
-    if ((data ?? []).length < 1000) break;
-  }
-  return terms;
 }
 
 /** A picked slug that exists in 3+ sections becomes its live copy in the section with most impressions. */
@@ -342,7 +321,8 @@ export function sitePagesDataLines(pages: SitePage[], imagesPerPage = 2): string
       `${i + 1}. URL: ${p.url}`,
       `   Title: ${serpValue(p.title ?? '', 200)}`,
     ];
-    if (p.description) lines.push(`   About: ${serpValue(p.description, 300)}`);
+    const facts = p.facts || p.description;
+    if (facts) lines.push(`   Facts:\n${serpValue(facts, 1500).split('\n').map((l) => `     ${l}`).join('\n')}`);
     for (const img of p.images.filter((im) => whole(im.src)).slice(0, imagesPerPage)) {
       lines.push(`   Photo: ${img.src} | shows: ${serpValue(img.alt, 200)}`);
     }

@@ -14,6 +14,52 @@ export function hostOf(u: string): string | null {
   }
 }
 
+/** The facts a page states: content lines from its stored text, not navigation, menus or buttons. */
+export function pageFacts(contentText: string | null | undefined, maxChars = 1500): string | null {
+  if (!contentText) return null;
+  const kept: string[] = [];
+  let size = 0;
+  for (const raw of contentText.split('\n').slice(1)) {
+    const line = raw.replace(/\s+/g, ' ').trim();
+    if (line.length < 20 || !/[.,:;·×–\d]/.test(line) || /→/.test(line)) continue;
+    kept.push(line);
+    size += line.length + 1;
+    if (size >= maxChars) break;
+  }
+  return kept.length ? kept.join('\n').slice(0, maxChars) : null;
+}
+
+export interface ReviewEdit { find: string; replace: string; kind: string; note?: string }
+
+/** Reviewer edits by exact match: only text found once, and only if every URL in it survives. */
+export function applyReviewEdits(
+  markdown: string,
+  edits: ReviewEdit[],
+): { markdown: string; applied: ReviewEdit[]; skipped: (ReviewEdit & { why: string })[] } {
+  let out = markdown;
+  const applied: ReviewEdit[] = [];
+  const skipped: (ReviewEdit & { why: string })[] = [];
+  for (const e of edits) {
+    if (!e.find || e.find === e.replace) {
+      skipped.push({ ...e, why: 'empty or unchanged' });
+      continue;
+    }
+    const count = out.split(e.find).length - 1;
+    if (count !== 1) {
+      skipped.push({ ...e, why: count === 0 ? 'text not found' : 'text not unique' });
+      continue;
+    }
+    const urls = [...e.find.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1]);
+    if (urls.some((u) => !e.replace.includes(`](${u})`))) {
+      skipped.push({ ...e, why: 'would drop a link or image' });
+      continue;
+    }
+    out = out.replace(e.find, () => e.replace);
+    applied.push(e);
+  }
+  return { markdown: out, applied, skipped };
+}
+
 /** Every link (not image) in the markdown whose host is `siteHost`. */
 export function siteLinkUrls(markdown: string, siteHost: string): string[] {
   return [...markdown.matchAll(LINK_RE)].map((m) => m[2]).filter((u) => hostOf(u) === siteHost);

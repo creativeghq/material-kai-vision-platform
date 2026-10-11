@@ -14,11 +14,12 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
-import { enforceSiteAssets, findSitePages, siteSlugTerms, type SitePage } from './site-pages.ts';
+import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
 import { latinTerms } from './foreign-words.ts';
 
 const termOf = (k: unknown) => (typeof k === 'string' ? k : String((k as { term?: string })?.term ?? ''));
 import { marketForCountry } from './market.ts';
+import { reviewArticle } from './review.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { PHOTOS_PER_PAGE } from './site-pages.ts';
 import { PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, PHOTO_VERIFY_MODEL, type PhotoUsage } from './photo-verify.ts';
@@ -66,9 +67,7 @@ async function callStage(
   body: any,
   timeoutMs: number = 120_000,
 ): Promise<any> {
-  // A stage that hangs would otherwise hang the whole isolate until the platform kills it,
-  // and the catch below — the only thing that marks the row `failed` — would never run. The
-  // race does not cancel the work, it just guarantees we get to write down what happened.
+  // A hung stage would block the catch that marks the row failed; the race only guarantees we record it.
   let timer: number | undefined;
   const guard = new Promise<never>((_, reject) => {
     timer = setTimeout(
@@ -154,9 +153,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       if (!ent.ok) return ent.response;
     }
 
-    // The peak a run holds at once is the write reservation plus what research and planning
-    // already settled to. Checked up front so a short wallet is refused before research is paid
-    // for, instead of failing at the write stage with two stages already spent.
+    // Peak hold = write reservation + settled research/plan; refused up front, before research is paid for.
     const peakCredits = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS, 150)
       + PRE_WRITE_TYPICAL_CREDITS;
     const { data: preflight } = await supabase.rpc('preflight_credits', {
@@ -247,8 +244,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       }
     }
 
-    // A second article on the same keyword for the same site competes with the first for one
-    // ranking — refused before anything is billed, unless the caller says it is a deliberate rewrite.
+    // A second article on one keyword for one site competes for the same ranking: refused unless a deliberate rewrite.
     if (websiteId && body.allow_duplicate !== true) {
       // A row still "in progress" past the in-flight window is a dead run, not an article.
       const { data: siblings, error: siblingErr } = await supabase
@@ -464,14 +460,12 @@ async function runPipelineStages(ctx: {
     }
     const planBrief = await withSiteClusterContext(supabase, brief, websiteId, articleId, sitePages);
 
-    // Terms that are ours or searched as written: never translated, respelled or flagged.
-    const researchTerms = latinTerms([research.targetKeyword, ...research.recommendedSecondaries.map(termOf),
-      ...(research.serpSignals?.relatedSearches ?? [])].join(' '));
-    const protectedTerms = new Set([...await siteSlugTerms(supabase, websiteId), ...researchTerms]);
-    const writerTerms = [...new Set([
-      ...researchTerms,
-      ...sitePages.flatMap((p) => latinTerms(`${p.url.replace(/^https?:\/\/[^/]+/, '').replace(/[/_-]+/g, ' ')} ${p.title ?? ''}`)),
-    ])].filter((t) => protectedTerms.has(t)).slice(0, 150);
+    // Words from the slugs/titles of the pages this article links, and from its target searches:
+    // never flagged as foreign by the analyzer.
+    const protectedTerms = new Set(latinTerms([
+      research.targetKeyword, ...research.recommendedSecondaries.map(termOf),
+      ...sitePages.map((p) => `${p.url.replace(/^https?:\/\/[^/]+/, '').replace(/[/_-]+/g, ' ')} ${p.title ?? ''}`),
+    ].join(' ')));
     await updateArticle(supabase, articleId, {
       site_link_targets: sitePages.map((p) => ({ url: p.url, title: p.title, photos: p.images.length })),
       protected_terms: [...protectedTerms],
@@ -515,7 +509,6 @@ async function runPipelineStages(ctx: {
       article_plan: plan,
       content_brief: brief,
       site_pages: sitePages,
-      protected_terms: writerTerms,
       language_code: body.language_code || undefined,
       keyword_research_summary: {
         targetKeyword: research.targetKeyword,
@@ -528,7 +521,7 @@ async function runPipelineStages(ctx: {
     }, 300_000);
 
     const written = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, writeResult.data.content_markdown, sitePages);
-    const contentMarkdown = written.markdown;
+    let contentMarkdown = written.markdown;
     const wordCount = writeResult.data.word_count;
     totalCredits += Number(writeResult.data.credits_used ?? 0);
     creditsByStage.write = Number(writeResult.data.credits_used ?? 0);
@@ -538,6 +531,21 @@ async function runPipelineStages(ctx: {
       word_count: wordCount,
       progress_percentage: 70,
     }, `Article written: ${wordCount} words (${written.unlinked} unverified site links unwrapped, ${written.removedImages} photos not from our pages removed)`);
+
+    // Editor's review: claims against our page facts, sums, relationship claims, the language.
+    const reviewed = await reviewArticle(supabase, {
+      markdown: contentMarkdown, sitePages, brief, languageCode: body.language_code ?? null, userId, workspaceId,
+    });
+    contentMarkdown = reviewed.markdown;
+    totalCredits += reviewed.report.credits;
+    creditsByStage.review = reviewed.report.credits;
+    await updateArticle(supabase, articleId, {
+      markdown_content: contentMarkdown,
+      progress_percentage: 74,
+      review: reviewed.report,
+    }, reviewed.report.failed
+      ? `Review did not run: ${reviewed.report.failed}`
+      : `Reviewed: ${reviewed.report.applied.length} corrections applied, ${reviewed.report.skipped.length} could not be placed, ${reviewed.report.unresolved.length} flagged for the editor`);
 
     // ────────────────────────────────────────────────────────────
     // STAGE 4: ANALYZE + AUTO-FIX
