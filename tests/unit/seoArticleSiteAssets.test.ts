@@ -4,7 +4,10 @@ import {
   applyReviewEdits,
   applySiteAssetRules,
   countSiteLinks,
+  imageAlts,
   pageFacts,
+  pagesNamedIn,
+  slugNameWords,
   slugTerms,
 } from '../../supabase/functions/seo-api/handlers/site-assets.ts';
 import { foreignWords, latinTerms } from '../../supabase/functions/seo-api/handlers/foreign-words.ts';
@@ -193,5 +196,30 @@ describe('slugTerms — an article topic as the words of our URL slugs', () => {
     ['ιδέες για την κουζίνα', ['idees', 'kouzina']],
   ])('%s', (keyword, expected) => {
     expect(slugTerms(keyword)).toEqual(expected);
+  });
+});
+
+describe('which of our pages a review section uses', () => {
+  const pages = [
+    { url: 'https://materialshub.gr/el/proionta/plakakia/cersanit-terrazzo-stone-2-0', images: [{ src: 'https://cdn.x/c.webp' }] },
+    { url: 'https://materialshub.gr/el/proionta/plakakia/pamesa-terrazzo', images: [] },
+    { url: 'https://materialshub.gr/el/proionta/plakakia/typou-terrazzo', images: [] },
+  ];
+
+  it('reads a page name from its slug', () => {
+    expect(slugNameWords(pages[0].url)).toEqual(['cersanit', 'terrazzo', 'stone']);
+  });
+
+  it('counts a link, a photo, or every slug word named in the prose', () => {
+    expect(pagesNamedIn('Η σειρά Terrazzo Stone 2.0 της Cersanit φτάνει R11.', pages).map((p) => p.url)).toEqual([pages[0].url]);
+    expect(pagesNamedIn('![x](https://cdn.x/c.webp)', pages)).toHaveLength(1);
+    expect(pagesNamedIn(`[κατηγορία](${pages[2].url})`, pages).map((p) => p.url)).toEqual([pages[2].url]);
+    expect(pagesNamedIn('Τα πλακάκια terrazzo ταιριάζουν σε μπάνιο.', pages), 'a shared word alone names nothing').toEqual([]);
+  });
+
+  it('lists every photo by its source', () => {
+    expect([...imageAlts('![Ένα μπάνιο](https://a/1.webp) και ![](https://a/2.webp)')]).toEqual([
+      ['https://a/1.webp', 'Ένα μπάνιο'], ['https://a/2.webp', ''],
+    ]);
   });
 });

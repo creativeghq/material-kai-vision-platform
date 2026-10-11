@@ -1,17 +1,21 @@
-/** Editor's review after the writer: claims vs our page facts, sums, language; exact edits applied by match. */
+/** Editor's review after the writer: claims vs our page facts, sums, language; every finding is applied as an exact edit. */
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { DEFAULT_CLAUDE_MODEL, callClaudeMessages } from '../../_shared/ai-client.ts';
 import { getToolPrompt } from '../../_shared/prompt-utils.ts';
 import type { NormalizedBrief } from './content-brief.ts';
 import { sitePagesBlock, sitePagesDataLines, type SitePage } from './site-pages.ts';
-import { applyReviewEdits, type ReviewEdit } from './site-assets.ts';
+import { applyReviewEdits, pagesNamedIn, type ReviewEdit } from './site-assets.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 
 const REVIEW_MAX_INPUT_TOKENS = 14000;
 const REVIEW_CONCURRENCY = 4;
 const REVIEW_MAX_OUTPUT_TOKENS = 6000;
-const KINDS = ['unsupported_claim', 'wrong_fact', 'arithmetic', 'relationship_claim', 'language', 'loanword'];
+const KINDS = [
+  'unsupported_claim', 'wrong_fact', 'arithmetic', 'relationship_claim', 'language', 'loanword',
+  'photo_description', 'link', 'meta',
+];
+const META_PART = '## META';
 
 const SCHEMA = {
   type: 'object',
@@ -30,24 +34,16 @@ const SCHEMA = {
         additionalProperties: false,
       },
     },
-    unresolved: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { quote: { type: 'string' }, note: { type: 'string' } },
-        required: ['quote', 'note'],
-        additionalProperties: false,
-      },
-    },
   },
-  required: ['edits', 'unresolved'],
+  required: ['edits'],
   additionalProperties: false,
 };
+
+export interface ArticleMeta { title: string; metaTitle: string; metaDescription: string }
 
 export interface ReviewReport {
   applied: ReviewEdit[];
   skipped: (ReviewEdit & { why: string })[];
-  unresolved: { quote: string; note: string }[];
   credits: number;
   failed?: string;
 }
@@ -65,33 +61,57 @@ function sections(markdown: string): string[] {
   return markdown.split(/\n(?=## )/).map((s) => s.trim()).filter(Boolean);
 }
 
+/** A page the part names keeps its facts and photos; every other page is listed by URL and title only. */
+function pagesFor(part: string, pages: SitePage[]): SitePage[] {
+  const named = new Set(pagesNamedIn(part, pages).map((p) => p.url));
+  return pages.map((p) => (named.has(p.url) ? p : { ...p, facts: null, description: null, images: [] }));
+}
+
+function applyMetaEdits(meta: ArticleMeta, edits: ReviewEdit[]): { meta: ArticleMeta; applied: ReviewEdit[]; skipped: (ReviewEdit & { why: string })[] } {
+  const out = { ...meta };
+  const applied: ReviewEdit[] = [];
+  const skipped: (ReviewEdit & { why: string })[] = [];
+  for (const e of edits) {
+    const field = (['title', 'metaTitle', 'metaDescription'] as const).find((k) => out[k].split(e.find).length === 2);
+    if (!field || !e.find || e.find === e.replace) {
+      skipped.push({ ...e, why: 'text not found in the title or meta' });
+      continue;
+    }
+    out[field] = out[field].replace(e.find, () => e.replace);
+    applied.push(e);
+  }
+  return { meta: out, applied, skipped };
+}
+
 /** Never throws: a review that cannot run leaves the article as written and says why. */
 export async function reviewArticle(
   supabase: DbClient,
   opts: {
-    markdown: string; sitePages: SitePage[]; brief: NormalizedBrief | null;
+    markdown: string; meta: ArticleMeta; sitePages: SitePage[]; brief: NormalizedBrief | null;
     languageCode: string | null; userId: string; workspaceId: string | null;
   },
-): Promise<{ markdown: string; report: ReviewReport }> {
+): Promise<{ markdown: string; meta: ArticleMeta; report: ReviewReport }> {
   const wallet: StageWallet = { userId: opts.userId, workspaceId: opts.workspaceId, opType: 'seo_review' };
-  const parts = sections(opts.markdown);
+  const metaPart = `${META_PART}\nTITLE: ${opts.meta.title}\nMETA TITLE: ${opts.meta.metaTitle}\nMETA DESCRIPTION: ${opts.meta.metaDescription}`;
+  const parts = [...sections(opts.markdown), metaPart];
   const perPart = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, REVIEW_MAX_INPUT_TOKENS, REVIEW_MAX_OUTPUT_TOKENS, 25);
   const ceiling = perPart * parts.length;
   const hold = await reserveStage(supabase, wallet, ceiling, 'SEO article review');
   if (!hold.ok) {
-    return { markdown: opts.markdown, report: { applied: [], skipped: [], unresolved: [], credits: 0, failed: `not reviewed: ${hold.error}` } };
+    return { markdown: opts.markdown, meta: opts.meta, report: { applied: [], skipped: [], credits: 0, failed: `not reviewed: ${hold.error}` } };
   }
 
   const system = await getToolPrompt(supabase, 'seo_reviewer') + businessContext(opts.brief);
-  const facts = sitePagesBlock(sitePagesDataLines(opts.sitePages));
-  const edits: ReviewEdit[] = [];
-  const unresolved: { quote: string; note: string }[] = [];
+  const bodyEdits: ReviewEdit[] = [];
+  const metaEdits: ReviewEdit[] = [];
   const priced: (number | null)[] = [];
   const failures: string[] = [];
   const queue = [...parts];
   const worker = async () => {
     for (let part = queue.shift(); part; part = queue.shift()) {
+      const isMeta = part.startsWith(META_PART);
       try {
+        const facts = sitePagesBlock(sitePagesDataLines(isMeta ? pagesFor('', opts.sitePages) : pagesFor(part, opts.sitePages)));
         const res = await callClaudeMessages({
           model: DEFAULT_CLAUDE_MODEL,
           max_tokens: REVIEW_MAX_OUTPUT_TOKENS,
@@ -99,7 +119,10 @@ export async function reviewArticle(
           messages: [{
             role: 'user',
             content: `Article language: ${opts.languageCode ?? 'en'}\n${facts}\n`
-              + `Review this ONE section of the article; the rest is reviewed separately.\n<article>\n${part}\n</article>`,
+              + (isMeta
+                ? 'Review the article\'s TITLE, META TITLE and META DESCRIPTION below (the search snippet).\n'
+                : 'Review this ONE section of the article; the rest is reviewed separately.\n')
+              + `<article>\n${part}\n</article>`,
           }],
           output_config: { format: { type: 'json_schema', schema: SCHEMA } },
         }, { task: 'seo_review', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 180_000 });
@@ -112,8 +135,7 @@ export async function reviewArticle(
           continue;
         }
         const out = JSON.parse(res.content?.find((b) => b.type === 'text')?.text ?? '');
-        if (Array.isArray(out?.edits)) edits.push(...out.edits);
-        if (Array.isArray(out?.unresolved)) unresolved.push(...out.unresolved);
+        if (Array.isArray(out?.edits)) (isMeta ? metaEdits : bodyEdits).push(...out.edits);
       } catch (e) {
         failures.push((e as Error).message.slice(0, 200));
       }
@@ -123,11 +145,15 @@ export async function reviewArticle(
 
   const actual = priced.some((c) => c === null) ? null : priced.reduce<number>((s, c) => s + (c ?? 0), 0);
   const credits = await settleStage(supabase, wallet, ceiling, actual, { sections: parts.length, failed: failures.length });
-  const result = applyReviewEdits(opts.markdown, edits);
+  const body = applyReviewEdits(opts.markdown, bodyEdits);
+  const meta = applyMetaEdits(opts.meta, metaEdits);
   return {
-    markdown: result.markdown,
+    markdown: body.markdown,
+    meta: meta.meta,
     report: {
-      applied: result.applied, skipped: result.skipped, unresolved, credits,
+      applied: [...body.applied, ...meta.applied],
+      skipped: [...body.skipped, ...meta.skipped],
+      credits,
       ...(failures.length ? { failed: `${failures.length} of ${parts.length} sections not reviewed: ${failures[0]}` } : {}),
     },
   };

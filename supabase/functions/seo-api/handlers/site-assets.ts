@@ -46,6 +46,27 @@ export function pageFacts(contentText: string | null | undefined, maxChars = 150
 
 export interface ReviewEdit { find: string; replace: string; kind: string; note?: string }
 
+/** The words of a page's last URL segment that can name it in prose (cersanit-terrazzo-stone-2-0 → cersanit, terrazzo, stone). */
+export function slugNameWords(url: string): string[] {
+  const last = trimSlash(url).split('/').pop() ?? '';
+  return decodeURIComponent(last).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3);
+}
+
+/** The pages a piece of text uses: it links one, shows one of its photos, or names every word of its slug. */
+export function pagesNamedIn<P extends { url: string; images: { src: string }[] }>(text: string, pages: P[]): P[] {
+  const lower = text.toLowerCase();
+  return pages.filter((p) => {
+    const words = slugNameWords(p.url);
+    return text.includes(trimSlash(p.url)) || p.images.some((i) => text.includes(i.src))
+      || (words.length >= 2 && words.every((w) => lower.includes(w)));
+  });
+}
+
+/** Every image in the markdown as src → its alt text. */
+export function imageAlts(markdown: string): Map<string, string> {
+  return new Map([...markdown.matchAll(/!\[([^\]]*)\]\(([^)\s]+)\)/g)].map((m) => [m[2], m[1]] as const));
+}
+
 /** Reviewer edits by exact match: only text found once, and only if every URL in it survives. */
 export function applyReviewEdits(
   markdown: string,

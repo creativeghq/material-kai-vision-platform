@@ -13,8 +13,8 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
-import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
-import { slugTerms } from './site-assets.ts';
+import { enforceSiteAssets, findSitePages, saveCorrectedPhotoDescriptions, type SitePage } from './site-pages.ts';
+import { imageAlts, slugTerms } from './site-assets.ts';
 import { latinTerms } from './foreign-words.ts';
 
 import { marketForCountry } from './market.ts';
@@ -638,19 +638,28 @@ async function runLateStages(ctx: {
 
     // Editor's review: claims against our page facts, sums, relationship claims, the language.
     const reviewed = await reviewArticle(supabase, {
-      markdown: ctx.contentMarkdown, sitePages, brief, languageCode: resume.language_code, userId, workspaceId,
+      markdown: ctx.contentMarkdown,
+      meta: { title: plan.title, metaTitle: plan.metaTitle, metaDescription: plan.metaDescription },
+      sitePages, brief, languageCode: resume.language_code, userId, workspaceId,
     });
     totalCredits += reviewed.report.credits;
     creditsByStage.review = reviewed.report.credits;
+    Object.assign(plan, reviewed.meta);
+    const before = imageAlts(ctx.contentMarkdown);
+    const correctedPhotos = new Map([...imageAlts(reviewed.markdown)].filter(([src, alt]) => before.has(src) && before.get(src) !== alt));
+    await saveCorrectedPhotoDescriptions(supabase, websiteId, sitePages, correctedPhotos, resume.language_code ?? 'en');
     const fixed = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, reviewed.markdown, sitePages);
     const finalMarkdown = fixed.markdown;
     await updateArticle(supabase, articleId, {
       markdown_content: finalMarkdown,
+      title: plan.title,
+      meta_title: plan.metaTitle,
+      meta_description: plan.metaDescription,
       progress_percentage: 88,
       review: reviewed.report,
     }, reviewed.report.failed
       ? `Review did not run: ${reviewed.report.failed}`
-      : `Reviewed: ${reviewed.report.applied.length} corrections applied, ${reviewed.report.skipped.length} could not be placed, ${reviewed.report.unresolved.length} flagged for the editor`);
+      : `Reviewed: ${reviewed.report.applied.length} corrections applied (${correctedPhotos.size} photo descriptions), ${reviewed.report.skipped.length} could not be placed`);
 
     const scored = await callStage('analyze', req, {
       article_plan: plan,

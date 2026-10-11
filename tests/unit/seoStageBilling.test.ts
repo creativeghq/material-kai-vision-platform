@@ -61,6 +61,19 @@ describe('SEO stages bill what they cost', () => {
     expect(src('pipeline.ts'), 'Google queries carry competitor names; they are not our terms').not.toMatch(/recommendedSecondaries\.map\(termOf\)/);
   });
 
+  it('the review fixes what it finds: no pending list, and the title and meta are reviewed too', () => {
+    const code = src('review.ts');
+    expect(code).not.toMatch(/unresolved/);
+    expect(code).toContain('applyMetaEdits(opts.meta, metaEdits)');
+    expect(src('pipeline.ts')).toContain('Object.assign(plan, reviewed.meta)');
+  });
+
+  it('a corrected photo description is kept by the article and by the cached check', () => {
+    const code = src('pipeline.ts');
+    expect(code.indexOf('saveCorrectedPhotoDescriptions(')).toBeGreaterThan(-1);
+    expect(code.indexOf('saveCorrectedPhotoDescriptions(')).toBeLessThan(code.indexOf('enforceSiteAssets(supabase, websiteId, website?.url ?? null, reviewed.markdown'));
+  });
+
   it('the pipeline refuses a short wallet before research is paid for', () => {
     const code = src('pipeline.ts');
     const preflight = code.indexOf("rpc('preflight_credits'");

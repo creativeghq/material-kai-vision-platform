@@ -245,6 +245,42 @@ async function verifyPhotos(
   }
 }
 
+/**
+ * The editor corrected a photo description: the article keeps the correction (it is what
+ * enforceSiteAssets restores alts from) and so does the cached check, so the next article reuses it.
+ */
+export async function saveCorrectedPhotoDescriptions(
+  supabase: DbClient,
+  websiteId: string | null,
+  pages: SitePage[],
+  corrected: Map<string, string>,
+  lang: string,
+): Promise<number> {
+  let saved = 0;
+  for (const page of pages) {
+    const hits = page.images.filter((im) => corrected.has(im.src));
+    if (!hits.length) continue;
+    hits.forEach((im) => { im.alt = corrected.get(im.src)!; });
+    if (!websiteId) continue;
+    const { data: row } = await supabase
+      .from('user_website_pages').select('id, images').eq('website_id', websiteId).eq('url', page.url).maybeSingle();
+    const images = (row?.images ?? []) as PageImage[];
+    let changed = false;
+    for (const im of images) {
+      const text = corrected.get(im.src);
+      if (text && im.seen?.[lang]) {
+        im.seen[lang] = { ...im.seen[lang], text };
+        changed = true;
+      }
+    }
+    if (!changed) continue;
+    const { error } = await supabase.from('user_website_pages').update({ images }).eq('id', row!.id);
+    if (error) console.warn(`[seo-site-pages] could not store corrected photo description for ${page.url}:`, error.message);
+    else saved += hits.length;
+  }
+  return saved;
+}
+
 async function refreshImages(supabase: DbClient, pages: (SitePage & { id: string })[]): Promise<void> {
   const queue = [...pages];
   const worker = async () => {
