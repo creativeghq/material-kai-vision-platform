@@ -23,6 +23,14 @@ const MAX_URL_CHARS = 1000;
 const MATRIX_MIN = 3;
 const SINGLE_PAGE_BONUS = 0.05;
 
+function sectionOf(url: string): string {
+  try {
+    return new URL(url).pathname.split('/').filter(Boolean)[0] ?? '';
+  } catch {
+    return '';
+  }
+}
+
 function parentOf(url: string): string {
   try {
     return new URL(url).pathname.split('/').filter(Boolean).slice(0, -1).join('/');
@@ -84,8 +92,6 @@ export async function findSitePages(
     }
     const byId = new Map((rows ?? []).map((r: Record<string, unknown>) => [String(r.id), r]));
 
-    // Same-slug pages are one programmatic template in several places; the one Google already
-    // shows wins, then the one under the article's language path, then the closest match.
     type Candidate = SitePage & { id: string; stale: boolean; impressions: number; langPath: boolean };
     const groups = new Map<string, Candidate[]>();
     for (const m of matches as Record<string, unknown>[]) {
@@ -107,18 +113,32 @@ export async function findSitePages(
         langPath: !!opts.languageCode && new URL(url).pathname.startsWith(`/${opts.languageCode}/`),
       });
     }
-    // A slug found under several parents is a generated matrix: a page that exists once outranks
-    // it at equal relevance, and every matrix pick uses ONE parent (the most relevant overall),
-    // so an article for all of Greece does not link three different towns' copies.
+    // A slug under several parents is a generated matrix: a page that exists once outranks it at
+    // equal relevance. Within a matrix: the page Google shows, the article's language path, the
+    // section Google shows most, then one consistent parent — never three towns' copies.
     const parentWeight = new Map<string, number>();
     for (const c of [...groups.values()].flat()) {
       const parent = parentOf(c.url);
       parentWeight.set(parent, (parentWeight.get(parent) ?? 0) + c.similarity);
     }
+    const sectionImpressions = new Map<string, number>();
+    const { data: demandRows } = await supabase
+      .from('user_website_pages')
+      .select('url, demand_snapshot')
+      .eq('website_id', opts.websiteId)
+      .eq('is_active', true)
+      .not('demand_snapshot', 'is', null)
+      .limit(5000);
+    for (const r of (demandRows ?? []) as { url: string; demand_snapshot: { impressions?: number } | null }[]) {
+      const section = sectionOf(r.url);
+      sectionImpressions.set(section, (sectionImpressions.get(section) ?? 0) + Number(r.demand_snapshot?.impressions ?? 0));
+    }
+    const sectionScore = (u: string) => sectionImpressions.get(sectionOf(u)) ?? 0;
     const best = (g: Candidate[]) => Math.max(...g.map((c) => c.similarity)) + (g.length >= MATRIX_MIN ? 0 : SINGLE_PAGE_BONUS);
     const picked = [...groups.values()].sort((a, b) => best(b) - best(a)).slice(0, opts.limit).map((group) =>
       [...group].sort((a, b) =>
         (b.impressions - a.impressions) || (Number(b.langPath) - Number(a.langPath))
+          || (sectionScore(b.url) - sectionScore(a.url))
           || ((parentWeight.get(parentOf(b.url)) ?? 0) - (parentWeight.get(parentOf(a.url)) ?? 0))
           || (b.similarity - a.similarity)
       )[0]

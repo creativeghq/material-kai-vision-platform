@@ -230,7 +230,11 @@ async function discoverSitemapUrl(siteUrl: string): Promise<string | null> {
  * so the editorial and product sitemaps listed after it were never seen and their pages retired.
  * `editorial` = URLs from sitemaps small enough to be hand-made, read first by the backfill.
  */
-async function collectSitemapUrls(rootSitemap: string, cap: number): Promise<{ urls: string[]; editorial: Set<string>; total: number; skippedSitemaps: number }> {
+async function collectSitemapUrls(
+  rootSitemap: string,
+  cap: number,
+  alreadyRead: Set<string> = new Set(),
+): Promise<{ urls: string[]; editorial: Set<string>; total: number; skippedSitemaps: number }> {
   const seen = new Set<string>();
   const lists: string[][] = [];
   const queue: { url: string; depth: number }[] = [{ url: rootSitemap, depth: 0 }];
@@ -263,7 +267,10 @@ async function collectSitemapUrls(rootSitemap: string, cap: number): Promise<{ u
   const collected: string[] = [];
   const editorial = new Set<string>();
   for (const list of lists) {
-    const take = list.slice(0, shares.get(list) ?? 0);
+    // Inside a share, a page we have already read is kept before one we have not, so a full
+    // share never retires an indexed page in favour of an unread one.
+    const ordered = [...list.filter((u) => alreadyRead.has(u)), ...list.filter((u) => !alreadyRead.has(u))];
+    const take = ordered.slice(0, shares.get(list) ?? 0);
     collected.push(...take);
     if (list.length <= EDITORIAL_SITEMAP_MAX && take.length === list.length) take.forEach((u) => editorial.add(u));
   }
@@ -534,7 +541,20 @@ async function planCrawl(
     }
   }
 
-  const { urls, editorial, total: discoveredTotal, skippedSitemaps } = await collectSitemapUrls(sitemapUrl, cap);
+  const alreadyRead = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('user_website_pages')
+      .select('url')
+      .eq('website_id', websiteId)
+      .not('content_excerpt', 'is', null)
+      .range(from, from + 999);
+    if (error) console.warn(`[crawl-user-website] read-page preference unavailable: ${error.message}`);
+    if (error || !data?.length) break;
+    data.forEach((r: { url: string }) => alreadyRead.add(r.url));
+    if (data.length < 1000) break;
+  }
+  const { urls, editorial, total: discoveredTotal, skippedSitemaps } = await collectSitemapUrls(sitemapUrl, cap, alreadyRead);
   if (urls.length === 0) {
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),

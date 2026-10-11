@@ -502,7 +502,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
                   <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--warning))] mt-0.5 flex-shrink-0" />
                   <p>
                     Your sitemap has {formatNumber(previewResult.result.pages_discovered)} URLs but the cap for this site is {previewResult.website.max_pages}.
-                    The crawler picks the first {previewResult.website.max_pages} sitemap entries. Raise the cap (max 6000) or use a topic-scoped sitemap URL if needed.
+                    The crawler shares the cap across your sitemaps (small ones are kept whole) and keeps pages it has already read. Raise the cap (max 6000) or use a topic-scoped sitemap URL if needed.
                   </p>
                 </div>
               )}
