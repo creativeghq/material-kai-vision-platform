@@ -612,23 +612,8 @@ async function runLateStages(ctx: {
   let totalCredits = resume.total_credits;
   const creditsByStage = { ...resume.credits_by_stage };
 
-    // Editor's review: claims against our page facts, sums, relationship claims, the language.
-    const reviewed = await reviewArticle(supabase, {
-      markdown: contentMarkdown, sitePages, brief, languageCode: resume.language_code, userId, workspaceId,
-    });
-    contentMarkdown = reviewed.markdown;
-    totalCredits += reviewed.report.credits;
-    creditsByStage.review = reviewed.report.credits;
-    await updateArticle(supabase, articleId, {
-      markdown_content: contentMarkdown,
-      progress_percentage: 74,
-      review: reviewed.report,
-    }, reviewed.report.failed
-      ? `Review did not run: ${reviewed.report.failed}`
-      : `Reviewed: ${reviewed.report.applied.length} corrections applied, ${reviewed.report.skipped.length} could not be placed, ${reviewed.report.unresolved.length} flagged for the editor`);
-
     // ────────────────────────────────────────────────────────────
-    // STAGE 4: ANALYZE + AUTO-FIX
+    // STAGE 4: ANALYZE + AUTO-FIX, then the editor's review LAST — a rewrite after it would undo it
     // ────────────────────────────────────────────────────────────
     await updateArticle(supabase, articleId, {
       status: 'analyzing',
@@ -636,29 +621,50 @@ async function runLateStages(ctx: {
       current_stage: 'analyze',
     }, 'Analyzing content quality and SEO...');
 
-    const analyzeResult = await callStage('analyze', req, {
-      content_markdown: contentMarkdown,
+    const analyzeBody = {
       article_plan: plan,
       content_brief: brief,
-      auto_fix: autoFix,
       max_iterations: maxFixIterations,
       site_url: website?.url ?? null,
       protected_terms: [...protectedTerms],
       user_id: userId,
       serp_signals: research.serpSignals,
-    }, 180_000);
+    };
+    const fixResult = await callStage('analyze', req, { ...analyzeBody, content_markdown: contentMarkdown, auto_fix: autoFix }, 180_000);
+    const fixIterations = fixResult.data.fix_iterations;
+    totalCredits += Number(fixResult.data.credits_used ?? 0);
+    creditsByStage.analyze = Number(fixResult.data.credits_used ?? 0);
+    contentMarkdown = (await enforceSiteAssets(supabase, websiteId, website?.url ?? null, fixResult.data.content_markdown, sitePages)).markdown;
+    await updateArticle(supabase, articleId, {
+      markdown_content: contentMarkdown,
+      progress_percentage: 80,
+    }, `Auto-fix: score ${fixResult.data.analysis.overallScore}/100 after ${fixIterations} fix iterations`);
 
-    const fixed = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, analyzeResult.data.content_markdown, sitePages);
+    // Editor's review: claims against our page facts, sums, relationship claims, the language.
+    const reviewed = await reviewArticle(supabase, {
+      markdown: contentMarkdown, sitePages, brief, languageCode: resume.language_code, userId, workspaceId,
+    });
+    totalCredits += reviewed.report.credits;
+    creditsByStage.review = reviewed.report.credits;
+    const fixed = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, reviewed.markdown, sitePages);
     const finalMarkdown = fixed.markdown;
-    const analysis: ContentAnalysisResult = analyzeResult.data.analysis;
-    const fixIterations = analyzeResult.data.fix_iterations;
-    const finalWordCount = analyzeResult.data.word_count;
-    totalCredits += Number(analyzeResult.data.credits_used ?? 0);
-    creditsByStage.analyze = Number(analyzeResult.data.credits_used ?? 0);
+    await updateArticle(supabase, articleId, {
+      markdown_content: finalMarkdown,
+      progress_percentage: 88,
+      review: reviewed.report,
+    }, reviewed.report.failed
+      ? `Review did not run: ${reviewed.report.failed}`
+      : `Reviewed: ${reviewed.report.applied.length} corrections applied, ${reviewed.report.skipped.length} could not be placed, ${reviewed.report.unresolved.length} flagged for the editor`);
+
+    const scored = await callStage('analyze', req, { ...analyzeBody, content_markdown: finalMarkdown, auto_fix: false }, 60_000);
+    const analysis: ContentAnalysisResult = scored.data.analysis;
+    const finalWordCount = scored.data.word_count;
+    totalCredits += Number(scored.data.credits_used ?? 0);
+    creditsByStage.analyze += Number(scored.data.credits_used ?? 0);
 
     await updateArticle(supabase, articleId, {
       progress_percentage: 90,
-    }, `Analysis complete: score ${analysis.overallScore}/100, ${fixIterations} fix iterations${fixed.unlinked + fixed.removedImages ? ` (${fixed.unlinked} links unwrapped, ${fixed.removedImages} photos removed after fixing)` : ""}`);
+    }, `Analysis complete: score ${analysis.overallScore}/100, ${fixIterations} fix iterations${fixed.unlinked + fixed.removedImages ? ` (${fixed.unlinked} links unwrapped, ${fixed.removedImages} photos removed after review)` : ""}`);
 
     // ────────────────────────────────────────────────────────────
     // STAGE 5: FINALIZE — Build Frase-style report

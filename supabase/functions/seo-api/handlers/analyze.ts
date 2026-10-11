@@ -424,15 +424,17 @@ export function analyzeContent(
   }
 
   // ── Check 2: Secondary keyword presence ──
+  // Accent-folded: a search query is typed without accents, and the article must not be.
+  const folded = foldAccents(content);
   const missingSecs = plan.secondaryKeywords
     .slice(0, 5)
-    .filter((kw) => countPhrase(content, kw.toLowerCase()) === 0);
+    .filter((kw) => countPhrase(folded, foldAccents(kw.toLowerCase())) === 0);
   if (missingSecs.length > 0) {
     fixes.push({
       category: 'secondary_keywords',
       severity: 'medium',
       description: `Missing secondary keywords: ${missingSecs.join(', ')}`,
-      suggestion: `Weave these keywords naturally into relevant sections`,
+      suggestion: 'Cover these topics in correctly spelled, accented, grammatical wording. Never paste a search query verbatim, and skip any that names another retailer or brand we do not carry.',
       affectedSection: null,
       autoFixable: true,
       applied: false,
@@ -608,9 +610,10 @@ export function analyzeContent(
       category: 'links',
       severity: 'medium',
       description: `Only ${externalCitations} source citations (need 3+)`,
-      suggestion: 'Add more [SOURCE: description](url) citations for GEO',
+      suggestion: 'Add [SOURCE: description](url) citations to sources an editor has actually read',
       affectedSection: null,
-      autoFixable: true,
+      // A model asked for sources it never read invents them.
+      autoFixable: false,
       applied: false,
     });
   }
@@ -776,7 +779,7 @@ export function analyzeContent(
           description: `Article doesn't reference any of Google's AI-Overview cited sources: ${cited.slice(0, 5).join(', ')}`,
           suggestion: `Add one or more [SOURCE: ...](https://${cited[0] || 'domain'}/...) citations referencing the same authoritative sources Google's AI cites — drives topical-authority alignment.`,
           affectedSection: null,
-          autoFixable: true,
+          autoFixable: false,
           applied: false,
         });
       }
@@ -1221,6 +1224,10 @@ async function applyFixes(
 // ════════════════════════════════════════════════════════════════
 // UTILITY
 // ════════════════════════════════════════════════════════════════
+
+function foldAccents(text: string): string {
+  return text.normalize('NFD').replace(/\p{M}/gu, '');
+}
 
 function countPhrase(text: string, phrase: string): number {
   if (!phrase) return 0;

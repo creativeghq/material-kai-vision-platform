@@ -44,6 +44,25 @@ describe('SEO stages bill what they cost', () => {
     expect(code, 'an unpriced DataForSEO call must keep the ceiling').toMatch(/client\.unpricedCalls > 0/);
   });
 
+  it('the editor review is the last pass over the text: auto-fix before it, only a re-score after', () => {
+    const code = src('pipeline.ts');
+    const autoFix = code.indexOf('auto_fix: autoFix }');
+    const review = code.indexOf('await reviewArticle(');
+    const rescore = code.indexOf('auto_fix: false }');
+    expect(autoFix).toBeGreaterThan(-1);
+    expect(autoFix).toBeLessThan(review);
+    expect(review).toBeLessThan(rescore);
+  });
+
+  it('the auto-fixer is never asked to add citations it has not read', () => {
+    const code = src('analyze.ts');
+    for (const marker of ["suggestion: 'Add [SOURCE:", 'citations referencing the same authoritative sources']) {
+      const at = code.indexOf(marker);
+      expect(at, marker).toBeGreaterThan(-1);
+      expect(code.slice(at, at + 400)).toMatch(/autoFixable: false/);
+    }
+  });
+
   it('the pipeline refuses a short wallet before research is paid for', () => {
     const code = src('pipeline.ts');
     const preflight = code.indexOf("rpc('preflight_credits'");
