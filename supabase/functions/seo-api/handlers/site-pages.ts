@@ -113,9 +113,7 @@ export async function findSitePages(
         langPath: !!opts.languageCode && new URL(url).pathname.startsWith(`/${opts.languageCode}/`),
       });
     }
-    // A slug under several parents is a generated matrix: a page that exists once outranks it at
-    // equal relevance. Within a matrix: the page Google shows, the article's language path, the
-    // section Google shows most, then one consistent parent — never three towns' copies.
+    // Same-slug copies: the page Google shows, the article's language path, the section Google shows most.
     const parentWeight = new Map<string, number>();
     for (const c of [...groups.values()].flat()) {
       const parent = parentOf(c.url);
@@ -144,11 +142,53 @@ export async function findSitePages(
       )[0]
     );
 
+    await consolidateMatrixPicks(supabase, opts.websiteId, picked, sectionScore);
     await refreshImages(supabase, picked.filter((p) => p.stale));
     return picked.map(({ id: _id, stale: _stale, impressions: _i, langPath: _l, ...page }) => page);
   } catch (e) {
     console.warn('[seo-site-pages] failed:', (e as Error).message);
     return [];
+  }
+}
+
+/** A picked slug that exists in 3+ sections becomes its live copy in the section with most impressions. */
+async function consolidateMatrixPicks(
+  supabase: DbClient,
+  websiteId: string,
+  picked: (SitePage & { id: string; stale: boolean })[],
+  sectionScore: (url: string) => number,
+): Promise<void> {
+  for (const pick of picked) {
+    const slug = slugKey(pick.url);
+    if (!slug || slug === pick.url) continue;
+    const { data, error } = await supabase
+      .from('user_website_pages')
+      .select('id, url, title, description, http_status, images, images_fetched_at')
+      .eq('website_id', websiteId)
+      .eq('is_active', true)
+      .not('embedding', 'is', null)
+      .like('url', `%/${slug}`)
+      .limit(100);
+    if (error) {
+      console.warn('[seo-site-pages] matrix lookup failed:', error.message);
+      return;
+    }
+    const copies = ((data ?? []) as Record<string, unknown>[])
+      .filter((r) => slugKey(String(r.url)) === slug && Number(r.http_status ?? 0) < 400);
+    if (new Set(copies.map((r) => sectionOf(String(r.url)))).size < MATRIX_MIN) continue;
+    const best = copies.sort((a, b) =>
+      (sectionScore(String(b.url)) - sectionScore(String(a.url))) || String(a.url).localeCompare(String(b.url))
+    )[0];
+    if (!best || best.url === pick.url || sectionScore(String(best.url)) <= sectionScore(pick.url)) continue;
+    const fetchedAt = best.images_fetched_at ? new Date(String(best.images_fetched_at)).getTime() : 0;
+    Object.assign(pick, {
+      id: String(best.id),
+      url: String(best.url),
+      title: (best.title as string | null) ?? pick.title,
+      description: (best.description as string | null) ?? pick.description,
+      images: Array.isArray(best.images) ? (best.images as PageImage[]) : [],
+      stale: !best.images_fetched_at || Date.now() - fetchedAt > IMAGE_REFRESH_MS,
+    });
   }
 }
 
