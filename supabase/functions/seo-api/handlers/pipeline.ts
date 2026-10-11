@@ -14,6 +14,7 @@ import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
 import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
+import { slugTerms } from './site-assets.ts';
 import { latinTerms } from './foreign-words.ts';
 
 import { marketForCountry } from './market.ts';
@@ -414,6 +415,9 @@ async function runPipelineStages(ctx: {
       current_stage: 'plan',
     }, 'Planning article structure...');
 
+    const topicRead = await readTopicPages(websiteId, body.target_keyword);
+    if (topicRead) await updateArticle(supabase, articleId, {}, topicRead);
+
     // Photo checks are paid vision calls: reserved at their ceiling, settled to the tokens used
     // (a photo checked before is cached and costs nothing).
     const photoWallet: StageWallet = { userId, workspaceId, opType: 'seo_photo_verify' };
@@ -529,6 +533,29 @@ async function runPipelineStages(ctx: {
     if (!handOffResult?.success) {
       throw new Error(`Could not continue after writing: ${handOffResult?.error ?? `HTTP ${handOff.status}`}`);
     }
+}
+
+/** Reads the site's unread pages on this topic first (a new category, a product nobody searched for); billed per page by the crawler. */
+async function readTopicPages(websiteId: string | null, keyword: string): Promise<string | null> {
+  const focus = slugTerms(keyword);
+  if (!websiteId || !focus.length) return null;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/crawl-user-website`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${supabaseServiceKey}`,
+        'x-cron-secret': Deno.env.get('CRON_SECRET') || '',
+      },
+      body: JSON.stringify({ website_id: websiteId, focus }),
+      signal: AbortSignal.timeout(150_000),
+    });
+    const out = await res.json().catch(() => null);
+    if (!out?.success) return `Topic pages (${focus.join(' + ')}) not read: ${out?.error ?? `HTTP ${res.status}`}`;
+    return `Topic pages (${focus.join(' + ')}): ${out.data?.pages_fetched ?? 0} read of ${out.data?.pages_queued ?? 0} unread`;
+  } catch (e) {
+    return `Topic pages (${focus.join(' + ')}) not read: ${(e as Error).message}`;
+  }
 }
 
 interface ResumeState {

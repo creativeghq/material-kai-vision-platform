@@ -5,6 +5,7 @@ import {
   applySiteAssetRules,
   countSiteLinks,
   pageFacts,
+  slugTerms,
 } from '../../supabase/functions/seo-api/handlers/site-assets.ts';
 import { foreignWords, latinTerms } from '../../supabase/functions/seo-api/handlers/foreign-words.ts';
 
@@ -180,5 +181,17 @@ describe('countSiteLinks — real links to our own pages are internal links', ()
     const md = '[a](https://materialshub.gr/a) [b](https://www.materialshub.gr/b) ![c](https://materialshub.gr/c.webp) [d](https://x.gr/d)';
     expect(countSiteLinks(md, 'https://materialshub.gr')).toBe(2);
     expect(countSiteLinks(md, null)).toBe(0);
+  });
+});
+
+describe('slugTerms — an article topic as the words of our URL slugs', () => {
+  it.each([
+    ['πλακάκια terrazzo', ['plakakia', 'terrazzo']],
+    ['έπιπλα μπάνιου', ['epipla', 'mpaniou']],
+    ['πλακάκια εξωτερικού χώρου', ['plakakia', 'exoterikou', 'chorou']],
+    ['είδη υγιεινής', ['eidi', 'ygieinis']],
+    ['ιδέες για την κουζίνα', ['idees', 'kouzina']],
+  ])('%s', (keyword, expected) => {
+    expect(slugTerms(keyword)).toEqual(expected);
   });
 });

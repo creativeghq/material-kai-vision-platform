@@ -6,6 +6,21 @@ const CAPTION_RE = /^([ \t]*!\[[^\]]*\]\([^)\s]+\)[ \t]*)\n[ \t]*(?:\*[^*\n][^\n
 
 export const trimSlash = (u: string): string => u.replace(/\/+$/, '');
 
+const GREEKLISH_PAIRS: [string, string][] = [['ου', 'ou'], ['θ', 'th'], ['χ', 'ch'], ['ψ', 'ps']];
+const GREEKLISH: Record<string, string> = {
+  α: 'a', β: 'v', γ: 'g', δ: 'd', ε: 'e', ζ: 'z', η: 'i', ι: 'i', κ: 'k', λ: 'l', μ: 'm', ν: 'n',
+  ξ: 'x', ο: 'o', π: 'p', ρ: 'r', σ: 's', ς: 's', τ: 't', υ: 'y', φ: 'f', ω: 'o',
+};
+const SLUG_STOPWORDS = new Set(['stin', 'ston', 'stis', 'stous', 'tous', 'tis', 'gia', 'kai', 'apo', 'me', 'the', 'and', 'for', 'with']);
+
+/** A keyword as the words of a Greeklish URL slug: «πλακάκια terrazzo» → plakakia, terrazzo. */
+export function slugTerms(text: string): string[] {
+  let s = text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  for (const [gr, lat] of GREEKLISH_PAIRS) s = s.split(gr).join(lat);
+  s = [...s].map((c) => GREEKLISH[c] ?? c).join('');
+  return [...new Set(s.split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !SLUG_STOPWORDS.has(w)))];
+}
+
 export function hostOf(u: string): string | null {
   try {
     return new URL(u).host.replace(/^www\./, '');

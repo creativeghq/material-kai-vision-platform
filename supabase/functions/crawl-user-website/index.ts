@@ -55,6 +55,21 @@ const RATE_LIMIT_DEFAULT_WAIT_MS = 12_000;
 const RATE_LIMIT_MAX_RETRIES = 3;
 const PREVIEW_SAMPLE_SIZE = 5;
 const USER_AGENT = 'Material-Kai-Vision/1.0 (+sitemap-indexer)';
+const MAX_FOCUS_TERMS = 6;
+
+/** Slug words a caller asks to read first (an article's topic). Lower-case ASCII only: they travel into URL matching. */
+function focusTerms(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map((t) => String(t).toLowerCase().trim()).filter((t) => /^[a-z0-9]{3,40}$/.test(t)))]
+    .slice(0, MAX_FOCUS_TERMS);
+}
+
+/** Every focus term appears in the URL path, so "plakakia terrazzo" does not match every tile. */
+function matchesFocus(url: string, focus: string[]): boolean {
+  if (!focus.length) return false;
+  const path = url.toLowerCase().replace(/^https?:\/\/[^/]+/, '');
+  return focus.every((t) => path.includes(t));
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -234,6 +249,7 @@ async function collectSitemapUrls(
   rootSitemap: string,
   cap: number,
   alreadyRead: Set<string> = new Set(),
+  focus: string[] = [],
 ): Promise<{ urls: string[]; editorial: Set<string>; total: number; skippedSitemaps: number }> {
   const seen = new Set<string>();
   const lists: string[][] = [];
@@ -269,7 +285,9 @@ async function collectSitemapUrls(
   for (const list of lists) {
     // Inside a share, a page we have already read is kept before one we have not, so a full
     // share never retires an indexed page in favour of an unread one.
-    const ordered = [...list.filter((u) => alreadyRead.has(u)), ...list.filter((u) => !alreadyRead.has(u))];
+    const focused = list.filter((u) => matchesFocus(u, focus));
+    const rest = list.filter((u) => !matchesFocus(u, focus));
+    const ordered = [...focused, ...rest.filter((u) => alreadyRead.has(u)), ...rest.filter((u) => !alreadyRead.has(u))];
     const take = ordered.slice(0, shares.get(list) ?? 0);
     collected.push(...take);
     if (list.length <= EDITORIAL_SITEMAP_MAX && take.length === list.length) take.forEach((u) => editorial.add(u));
@@ -524,6 +542,7 @@ interface CrawlPlan {
 async function planCrawl(
   supabase: DbClient,
   website: { id: string; user_id: string; url: string; sitemap_url: string | null; max_pages: number },
+  focus: string[] = [],
 ): Promise<CrawlPlan | { error: string }> {
   const { id: websiteId, user_id: userId, url: siteUrl, max_pages } = website;
   const cap = Math.min(max_pages || 50, MAX_PAGES_HARD_CAP);
@@ -554,7 +573,7 @@ async function planCrawl(
     data.forEach((r: { url: string }) => alreadyRead.add(r.url));
     if (data.length < 1000) break;
   }
-  const { urls, editorial, total: discoveredTotal, skippedSitemaps } = await collectSitemapUrls(sitemapUrl, cap, alreadyRead);
+  const { urls, editorial, total: discoveredTotal, skippedSitemaps } = await collectSitemapUrls(sitemapUrl, cap, alreadyRead, focus);
   if (urls.length === 0) {
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),
@@ -581,6 +600,18 @@ async function planCrawl(
     );
     writes += 1;
     if (error) { writeFailures += 1; firstWriteError ??= error.message; }
+  }
+
+  // A topic read reads only the unread pages on that topic: the article waiting on it needs those, not the demand queue.
+  if (focus.length) {
+    const queue: QueueEntry[] = urls.filter((u) => matchesFocus(u, focus) && !alreadyRead.has(u))
+      .slice(0, MAX_FETCH_PER_RUN)
+      .map((url) => ({ url, reason: 'topic', keywords: null, best_position: null, impressions: null, clicks: null }));
+    return {
+      sitemapUrl, seenAt, cap, queue, writes, writeFailures, firstWriteError,
+      discovered: discoveredTotal,
+      capped: discoveredTotal > urls.length || skippedSitemaps > 0,
+    };
   }
 
   const { data: queueRows, error: queueErr } = await supabase.rpc('get_page_crawl_queue', {
@@ -730,7 +761,7 @@ async function executeCrawl(
       demand_reason: entry.reason,
       fetch_method: s.fetch_method ?? null,
       ...(s.images ? { images: s.images, images_fetched_at: now } : {}),
-      demand_snapshot: entry.reason === 'seed' || isBackfill ? null : {
+      demand_snapshot: entry.reason === 'seed' || entry.reason === 'topic' || isBackfill ? null : {
         keywords: entry.keywords,
         best_position: entry.best_position,
         impressions: entry.impressions,
@@ -876,7 +907,7 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
 
   // Planning is free; READING is what costs. The flat fee per invocation this replaces billed
   // 240 credits across two days on which zero pages were read, and refunded none of it.
-  const plan = await planCrawl(supabase, website);
+  const plan = await planCrawl(supabase, website, focusTerms(body.focus));
   if ('error' in plan) {
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),

@@ -97,9 +97,9 @@ describe('a fetched page carries what a suggestion needs', () => {
     expect(crawler).toMatch(/keywords: kwList/);
   });
 
-  it('marks a seed or backfill read as having no demand behind it', () => {
+  it('marks a seed, topic or backfill read as having no demand behind it', () => {
     expect(crawler, 'a seed or backfill page has no search evidence, and must not claim one')
-      .toMatch(/entry\.reason === 'seed' \|\| isBackfill \? null :/);
+      .toMatch(/entry\.reason === 'seed' \|\| entry\.reason === 'topic' \|\| isBackfill \? null :/);
   });
 
   it('backfills never-read pages direct-only, after the demand queue', () => {
