@@ -14,7 +14,7 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
-import { findSitePages, type SitePage } from './site-pages.ts';
+import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
 import { handleWrite } from './write.ts';
 import { handleAnalyze } from './analyze.ts';
 import { buildGapsGains } from './gaps.ts';
@@ -69,9 +69,6 @@ async function callStage(
     const response = await Promise.race([STAGE_HANDLERS[stage](req, body), guard]);
     const result = await response.json().catch(() => null);
     if (!result?.success) {
-      // Name the stage, the status AND whatever the stage itself said. The old message was a
-      // bare `<fn> returned failure` with the real reason dropped, which is why a dead URL
-      // and a genuine research error were indistinguishable in `error_message`.
       const detail = result?.error || `HTTP ${response.status}`;
       throw new Error(`The ${stage} stage failed: ${detail}`);
     }
@@ -172,10 +169,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       }
     }
 
-    // In-flight guard. Bounded by age as well as status: a run that died mid-request leaves its
-    // row in a non-terminal status forever (the catch only fires when the isolate survives), and
-    // without the window that stuck row would block the keyword permanently — trading a
-    // double-charge for a feature that never works again, which is the worse failure.
+    // In-flight guard, bounded by age: a dead run stays non-terminal forever and must not block the keyword.
     const IN_FLIGHT_WINDOW_MS = 30 * 60 * 1000;
     const { data: running, error: inFlightErr } = await supabase
       .from('seo_articles')
@@ -188,8 +182,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       .order('created_at', { ascending: false })
       .limit(1);
     if (inFlightErr) {
-      // Never silently: an unreadable guard is a guard that is not running, and the cost of
-      // that is a duplicated paid pipeline.
       console.error('[seo-pipeline] in-flight duplicate check failed:', inFlightErr.message);
     }
     const inFlight = running?.[0];
@@ -207,25 +199,20 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       });
     }
 
-    // One normalization for the whole run - see content-brief.ts. Every stage normalizes
-    // defensively too, but doing it here means the shape STORED on the article row is the
-    // canonical one, so a re-run, the viewer and the provenance byline all read the same
-    // brief rather than whatever the caller happened to send.
     const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief);
 
-    // Resolve the connected website this article belongs to — explicit body.website_id
-    // when the agent picked one, else the workspace's default site. Also feeds the
-    // interlink page-matcher below so suggestions come from the same site.
     const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
     const websiteId = website?.id ?? null;
 
     // A second article on the same keyword for the same site competes with the first for one
     // ranking — refused before anything is billed, unless the caller says it is a deliberate rewrite.
     if (websiteId && body.allow_duplicate !== true) {
+      // A row still "in progress" past the in-flight window is a dead run, not an article.
       const { data: siblings, error: siblingErr } = await supabase
         .from('seo_articles')
         .select('id, title, target_keyword, status')
         .eq('website_id', websiteId)
+        .or(`status.eq.completed,created_at.gte.${new Date(Date.now() - 30 * 60 * 1000).toISOString()}`)
         .neq('status', 'failed');
       if (siblingErr) {
         return jsonResponse({ success: false, error: `Could not check for an existing article: ${siblingErr.message}` }, 500);
@@ -257,7 +244,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         progress_percentage: 0,
         current_stage: 'research',
         pipeline_log: [`[${new Date().toISOString()}] Pipeline started for "${body.target_keyword}"`],
-        stages_data: { extra: { language_code: body.language_code || 'en' } },
+        stages_data: { extra: { language_code: body.language_code || 'en', site_url: website?.url ?? null } },
       })
       .select('id')
       .single();
@@ -308,9 +295,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       },
     });
   } catch (error: any) {
-    // Only reached for a failure BEFORE the stages were handed off — auth, validation,
-    // entitlement, the insert itself. Once `runInBackground` has the work, failures are
-    // recorded on the row by the catch above, because there is no response left to fail.
     console.error('[seo-pipeline] Error before hand-off:', error);
     if (articleId) {
       const { error: failErr } = await supabase
@@ -411,6 +395,7 @@ async function runPipelineStages(ctx: {
       userId, workspaceId, websiteId,
       queryText: [body.topic, body.target_keyword, ...research.recommendedSecondaries.slice(0, 8)].join('\n'),
       limit: SITE_LINK_TARGETS,
+      languageCode: body.language_code ?? null,
     });
     const planBrief = await withSiteClusterContext(supabase, brief, websiteId, articleId, sitePages);
     await updateArticle(supabase, articleId, {
@@ -465,7 +450,8 @@ async function runPipelineStages(ctx: {
       user_id: userId,
     }, 300_000);
 
-    const contentMarkdown = writeResult.data.content_markdown;
+    const written = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, writeResult.data.content_markdown, sitePages);
+    const contentMarkdown = written.markdown;
     const wordCount = writeResult.data.word_count;
     totalCredits += writeResult.data.credits_used || 20;
 
@@ -473,7 +459,7 @@ async function runPipelineStages(ctx: {
       markdown_content: contentMarkdown,
       word_count: wordCount,
       progress_percentage: 70,
-    }, `Article written: ${wordCount} words`);
+    }, `Article written: ${wordCount} words (${written.unlinked} unverified site links unwrapped, ${written.removedImages} photos not from our pages removed)`);
 
     // ────────────────────────────────────────────────────────────
     // STAGE 4: ANALYZE + AUTO-FIX
@@ -490,11 +476,13 @@ async function runPipelineStages(ctx: {
       content_brief: brief,
       auto_fix: autoFix,
       max_iterations: maxFixIterations,
+      site_url: website?.url ?? null,
       user_id: userId,
       serp_signals: research.serpSignals,
     }, 180_000);
 
-    const finalMarkdown = analyzeResult.data.content_markdown;
+    const fixed = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, analyzeResult.data.content_markdown, sitePages);
+    const finalMarkdown = fixed.markdown;
     const analysis: ContentAnalysisResult = analyzeResult.data.analysis;
     const fixIterations = analyzeResult.data.fix_iterations;
     const finalWordCount = analyzeResult.data.word_count;
@@ -502,7 +490,7 @@ async function runPipelineStages(ctx: {
 
     await updateArticle(supabase, articleId, {
       progress_percentage: 90,
-    }, `Analysis complete: score ${analysis.overallScore}/100, ${fixIterations} fix iterations`);
+    }, `Analysis complete: score ${analysis.overallScore}/100, ${fixIterations} fix iterations${fixed.unlinked + fixed.removedImages ? ` (${fixed.unlinked} links unwrapped, ${fixed.removedImages} photos removed after fixing)` : ""}`);
 
     // ────────────────────────────────────────────────────────────
     // STAGE 5: FINALIZE — Build Frase-style report
@@ -1236,12 +1224,7 @@ async function withSiteClusterContext(
   const cluster = base.clusterContext ?? { pillarTopic: null, relatedArticles: [], differentiationNote: null };
   return {
     ...base,
-    clusterContext: {
-      ...cluster,
-      relatedArticles: [...cluster.relatedArticles, ...already],
-      differentiationNote: cluster.differentiationNote
-        ?? 'Cover what these pages do not; where they already answer something, link to them rather than restating it.',
-    },
+    clusterContext: { ...cluster, relatedArticles: [...cluster.relatedArticles, ...already] },
   };
 }
 

@@ -230,7 +230,7 @@ async function discoverSitemapUrl(siteUrl: string): Promise<string | null> {
  * so the editorial and product sitemaps listed after it were never seen and their pages retired.
  * `editorial` = URLs from sitemaps small enough to be hand-made, read first by the backfill.
  */
-async function collectSitemapUrls(rootSitemap: string, cap: number): Promise<{ urls: string[]; editorial: Set<string>; total: number }> {
+async function collectSitemapUrls(rootSitemap: string, cap: number): Promise<{ urls: string[]; editorial: Set<string>; total: number; skippedSitemaps: number }> {
   const seen = new Set<string>();
   const lists: string[][] = [];
   const queue: { url: string; depth: number }[] = [{ url: rootSitemap, depth: 0 }];
@@ -267,7 +267,7 @@ async function collectSitemapUrls(rootSitemap: string, cap: number): Promise<{ u
     collected.push(...take);
     if (list.length <= EDITORIAL_SITEMAP_MAX && take.length === list.length) take.forEach((u) => editorial.add(u));
   }
-  return { urls: collected, editorial, total: lists.reduce((n, l) => n + l.length, 0) };
+  return { urls: collected, editorial, total: lists.reduce((n, l) => n + l.length, 0), skippedSitemaps: queue.length };
 }
 
 interface ScrapeResult {
@@ -534,7 +534,7 @@ async function planCrawl(
     }
   }
 
-  const { urls, editorial, total: discoveredTotal } = await collectSitemapUrls(sitemapUrl, cap);
+  const { urls, editorial, total: discoveredTotal, skippedSitemaps } = await collectSitemapUrls(sitemapUrl, cap);
   if (urls.length === 0) {
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),
@@ -605,14 +605,18 @@ async function planCrawl(
     if (backfillErr) return { error: `backfill queue unavailable: ${backfillErr.message}` };
     const editorialUnread: { page_url: string }[] = [];
     const editorialList = [...editorial];
-    for (let i = 0; i < editorialList.length && editorialUnread.length < room; i += 100) {
+    // Small batches: the URLs travel in the query string. A failure only loses the head start.
+    for (let i = 0; i < editorialList.length && editorialUnread.length < room; i += 25) {
       const { data, error } = await supabase
         .from('user_website_pages')
         .select('url')
         .eq('website_id', websiteId)
         .is('content_excerpt', null)
-        .in('url', editorialList.slice(i, i + 100));
-      if (error) return { error: `editorial backfill unavailable: ${error.message}` };
+        .in('url', editorialList.slice(i, i + 25));
+      if (error) {
+        console.warn(`[crawl-user-website] editorial backfill skipped: ${error.message}`);
+        break;
+      }
       editorialUnread.push(...(data ?? []).map((r: { url: string }) => ({ page_url: r.url })));
     }
     const queued = new Set(queue.map((q) => q.url));
@@ -629,7 +633,7 @@ async function planCrawl(
   return {
     sitemapUrl, seenAt, cap, queue, writes, writeFailures, firstWriteError,
     discovered: discoveredTotal,
-    capped: discoveredTotal > urls.length,
+    capped: discoveredTotal > urls.length || skippedSitemaps > 0,
   };
 }
 

@@ -15,10 +15,14 @@ function attr(tag: string, name: string): string | null {
 }
 
 function decode(s: string): string {
-  return s
-    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&');
+  return s.replace(
+    /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|(amp|lt|gt|quot|apos|nbsp));/g,
+    (_m, dec: string, hex: string, name: string) => {
+      if (dec) return String.fromCodePoint(Number(dec));
+      if (hex) return String.fromCodePoint(parseInt(hex, 16));
+      return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }[name] ?? ' ';
+    },
+  );
 }
 
 /**
@@ -35,7 +39,8 @@ export function extractContentImages(html: string, pageUrl: string, max = 6): Pa
     const rawSrc = attr(tag, 'src');
     const alt = decode(attr(tag, 'alt') ?? '').replace(/\s+/g, ' ').trim();
     if (!rawSrc || !alt || rawSrc.startsWith('data:')) continue;
-    if (/logo|λογότυπο/i.test(alt) || /logo/i.test(rawSrc)) continue;
+    // An SVG is an icon or a badge, never a product photograph.
+    if (/logo|λογότυπο/i.test(alt) || /logo|\.svg(?:[?#]|$)/i.test(rawSrc)) continue;
     if (attr(tag, 'aria-hidden') === 'true') continue;
 
     const w = Number(attr(tag, 'width')) || 0;

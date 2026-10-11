@@ -93,12 +93,14 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
       });
     }
 
+    const siteUrl = (article.stages_data as { extra?: { site_url?: string } } | null)?.extra?.site_url ?? null;
     const analysis = analyzeContent(
       markdown,
       plan,
       undefined,
       normalizeContentBrief(article.content_brief),
       undefined,
+      siteUrl,
     );
 
     // Gaps/Gains are re-derived here too. They were built from competitor PAGE TITLES with two

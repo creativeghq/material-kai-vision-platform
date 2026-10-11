@@ -21,6 +21,7 @@ import {
 import { normalizeContentBrief, briefList, type NormalizedBrief } from './content-brief.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
+import { countSiteLinks } from './site-assets.ts';
 import type {
   SEOAnalyzeRequest,
   SEOAnalyzeResponse,
@@ -184,8 +185,9 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
 
     // Run analysis
+    const siteUrl = typeof body.site_url === 'string' ? body.site_url : null;
     let analysis = analyzeContent(
-      content, body.article_plan, body.serp_signals, brief, contentDatedAt,
+      content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl,
     );
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
@@ -226,7 +228,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         // Re-analyze
         const scoreBefore = analysis.overallScore;
         analysis = analyzeContent(
-          content, body.article_plan, body.serp_signals, brief, contentDatedAt,
+          content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl,
         );
         console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100 (reachable: ${reachableScore(analysis)})`);
 
@@ -355,6 +357,7 @@ export function analyzeContent(
   serpSignals?: SerpSignalBlob,
   brief?: NormalizedBrief | null,
   contentDatedAt?: string,
+  siteUrl?: string | null,
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
   const content = markdown.toLowerCase();
@@ -572,16 +575,19 @@ export function analyzeContent(
     }
   }
 
-  // ── Check 11: Internal link placeholders ──
-  const internalLinks = (markdown.match(/\[INTERNAL:/g) || []).length;
+  // ── Check 11: Internal links — real links to this article's own site, or placeholders ──
+  const internalLinks = (markdown.match(/\[INTERNAL:/g) || []).length + countSiteLinks(markdown, siteUrl);
   if (internalLinks < 3) {
     fixes.push({
       category: 'links',
       severity: 'medium',
-      description: `Only ${internalLinks} internal link placeholders (need 3+)`,
-      suggestion: 'Add more [INTERNAL: anchor text](topic) placeholders',
+      description: `Only ${internalLinks} internal links (need 3+)`,
+      suggestion: siteUrl
+        ? "Link 3+ of this site's own pages where the reader would want to go next"
+        : 'Add more [INTERNAL: anchor text](topic) placeholders',
       affectedSection: null,
-      autoFixable: true,
+      // A fixer cannot know which of our URLs exist, so it must not be asked to invent one.
+      autoFixable: !siteUrl,
       applied: false,
     });
   }

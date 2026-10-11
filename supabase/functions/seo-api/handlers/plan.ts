@@ -10,6 +10,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { serpBlock, serpValue } from './untrusted.ts';
+import { sitePagesBlock } from './site-pages.ts';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
@@ -279,7 +280,7 @@ Content type: ${briefValue(brief.contentType)}`;
 
 === CLUSTER CONTEXT ===
 Pillar topic: ${brief.clusterContext.pillarTopic || 'N/A'}
-Already published: ${brief.clusterContext.relatedArticles.join(', ') || 'None'}
+Already published: ${sitePagesBlock(brief.clusterContext.relatedArticles.map((a) => `- ${serpValue(a, 400)}`).join('\n')) || 'None'}
 Unique angle: ${brief.clusterContext.differentiationNote || 'N/A'}
 Do NOT repeat topics already covered in related articles.`;
     }
