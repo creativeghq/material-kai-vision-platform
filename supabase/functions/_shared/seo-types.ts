@@ -520,7 +520,6 @@ export interface ArticleOutput {
 
   // Pipeline Metadata
   pipelineLog: string[];
-  fixIterations: number;
   status: 'draft' | 'generating' | 'completed' | 'failed' | 'published';
   createdAt: string;
 }
@@ -587,8 +586,6 @@ export interface SEOAnalyzeRequest {
   content_markdown: string;
   article_plan: ArticlePlan;
   content_brief?: ContentBrief;
-  auto_fix?: boolean; // default: true
-  max_iterations?: number; // default: 3
   user_id?: string;
   /** Phase 4 — mention-monitoring SERP signals. Drives 6 extra gap-scoring
    * rules (AI Overview match, featured-snippet alignment, PAA coverage,
@@ -619,7 +616,6 @@ export interface SEOAnalyzeResponse {
     content_markdown: string;
     word_count: number;
     analysis: ContentAnalysisResult;
-    fix_iterations: number;
     meets_threshold: boolean;
     credits_used: number;
   };
@@ -631,8 +627,6 @@ export interface SEOPipelineRequest {
   target_keyword: string;
   content_brief?: ContentBrief;
   additional_instructions?: string;
-  auto_fix?: boolean; // default: true
-  max_fix_iterations?: number; // default: 3
   language_code?: string; // default: 'en'
   location_code?: number; // default: 2840 (US)
   skip_research?: boolean;

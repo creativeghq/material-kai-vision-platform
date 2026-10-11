@@ -270,11 +270,11 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
 
 /**
  * SEO Tool: Content Analyzer
- * Calls seo-analyze edge function → scoring + optional auto-fix
+ * Calls seo-analyze edge function → scoring and a fix list; it never rewrites the article
  */
 export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
   return tool(
-    async ({ content_markdown, article_plan, content_brief, auto_fix, max_iterations, article_id, _workflow_run_id }) => {
+    async ({ content_markdown, article_plan, content_brief, article_id, _workflow_run_id }) => {
       const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: _workflow_run_id }) : null;
       emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'running', status_line: 'Analyzing article…' });
       try {
@@ -288,8 +288,6 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
           // the GEO freshness signal has nothing to measure and scores every article as
           // brand new — a constant dressed as a measurement.
           article_id,
-          auto_fix: auto_fix ?? false,
-          max_iterations: max_iterations ?? 2,
           user_id: userId,
         }, 180_000);
 
@@ -328,13 +326,11 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
     },
     {
       name: 'seo_content_analyzer',
-      description: 'Analyze SEO article content for quality, keyword optimization, readability, and SEO best practices. Scores content 0-100 and identifies issues. Can auto-fix content if score is below 70. Requires article content and plan.',
+      description: 'Analyze SEO article content for quality, keyword optimization, readability, and SEO best practices. Scores content 0-100 and lists issues for the editor; it does not change the article. Requires article content and plan.',
       schema: z.object({
         content_markdown: z.string().describe('The article content in markdown format'),
         article_plan: z.any().describe('The article plan used to write the content'),
         content_brief: z.any().optional().describe('Optional content brief'),
-        auto_fix: z.boolean().optional().describe('Auto-fix content if score is below 70 (default: false)'),
-        max_iterations: z.number().optional().describe('Max fix iterations (default: 2, max: 3)'),
         article_id: z.string().optional().describe('Id of the stored seo_articles row, when re-analyzing an existing article. Lets the freshness signal read the real review date instead of scoring every article as brand new.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
@@ -424,15 +420,13 @@ export const createSEOScoreUrlTool = (userId: string, onProgress?: (status: stri
  */
 export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type, website_id, language_code, location_code, allow_duplicate }) => {
+    async ({ topic, target_keyword, content_brief, content_type, website_id, language_code, location_code, allow_duplicate }) => {
       try {
 
         const result = await callSEOFunction('seo-pipeline', {
           topic,
           target_keyword,
           content_brief,
-          auto_fix: auto_fix ?? true,
-          max_fix_iterations: max_fix_iterations ?? 2,
           content_type: content_type || 'guide',
           user_id: userId,
           website_id: website_id || undefined,
@@ -493,8 +487,6 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
           'Every other input to the article is derived from the pages it is competing against, so this is the only information Google cannot already get from the incumbents. ' +
           'NEVER invent values for either block — ask the user, or omit them and let the analyzer report the gap.',
         ),
-        auto_fix: z.boolean().optional().describe('Auto-fix content if quality score is below 70 (default: true)'),
-        max_fix_iterations: z.number().optional().describe('Max auto-fix iterations (default: 2)'),
         content_type: z.string().optional().describe('Article type: guide, listicle, comparison, how-to, case-study (default: guide)'),
         website_id: z.string().optional().describe('Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.'),
         language_code: z.string().optional().describe('Language the article is researched and written in, e.g. "el" for Greek. Set it only when the user names a market; omitted, the workspace\'s business country decides (Greece → "el").'),

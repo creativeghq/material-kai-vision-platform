@@ -1,12 +1,4 @@
-/**
- * SEO Analyze Edge Function
- *
- * Analyzes article content for SEO quality and auto-fixes issues.
- * Runs 15+ custom checks, calculates scores, and optionally
- * uses Gemini to apply targeted fixes (up to 3 iterations).
- *
- * Credit cost: 2 per analysis + 5 per fix iteration (max 17 credits)
- */
+/** SEO analysis: the checks, the scores and the fix list. It reports; it never rewrites the article. */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
@@ -18,12 +10,9 @@ import { readingEase } from './readability.ts';
 import {
   findFaqSection, isQuestionHeading,
 } from '../../_shared/seo/articleSections.generated.ts';
-import { normalizeContentBrief, briefList, type NormalizedBrief } from './content-brief.ts';
-import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
-import { DEFAULT_GEMINI_MODEL, generateWithGemini } from '../../_shared/ai-client.ts';
+import { normalizeContentBrief, type NormalizedBrief } from './content-brief.ts';
 import { countSiteLinks } from './site-assets.ts';
-import { ALLOWED_FOREIGN_WORDS, foreignWords } from './foreign-words.ts';
-import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
+import { ALLOWED_FOREIGN_WORDS, foreignWords, latinTerms } from './foreign-words.ts';
 import type {
   SEOAnalyzeRequest,
   SEOAnalyzeResponse,
@@ -39,10 +28,6 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const ANALYSIS_CREDIT_COST = 2;
-/** Budget the per-iteration ceiling is priced on: the fixer returns the WHOLE article. */
-const FIX_MAX_INPUT_TOKENS = 20000;
-const FIX_MAX_OUTPUT_TOKENS = 32000;
-const DEFAULT_MAX_ITERATIONS = 3;
 const MIN_ACCEPTABLE_SCORE = 70;
 
 /**
@@ -119,14 +104,6 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }
 
-  // Track fix credits actually debited so the failure path can refund them too
-  // (the catch previously refunded only the analysis credit).
-  // MUST be declared outside the try: the catch below reads it, and a `let` inside
-  // the try block is not in scope there — it threw ReferenceError inside the error
-  // handler, so no refund ever happened.
-  let fixCreditsDebited = 0;
-  let openFixReserve = 0;
-
   // Outside the try: the refund lives in the catch and has to know which wallet was charged.
   let workspaceId: string | null = null;
 
@@ -179,77 +156,21 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     // article this is, the row wins — otherwise the signal grades itself.
     const contentDatedAt = await resolveContentDate(supabase, userId, body);
 
-    const autoFix = body.auto_fix !== false;
-    const maxIterations = body.max_iterations || DEFAULT_MAX_ITERATIONS;
-    let content = body.content_markdown;
-    let fixIterations = 0;
+    const content = body.content_markdown;
     // Normalized at the boundary - see content-brief.ts. Reaches analyzeContent (which
-    // reports provenance / firsthand-experience gaps off it) and applyFixes (voice).
+    // reports provenance / firsthand-experience gaps off it).
     const brief = normalizeContentBrief(body.content_brief);
 
-    console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
+    console.log(`[seo-analyze] Analyzing "${body.article_plan.title}"`);
 
     // Run analysis
     const siteUrl = typeof body.site_url === 'string' ? body.site_url : null;
     const protectedTerms = Array.isArray(body.protected_terms) ? body.protected_terms.map(String) : null;
-    let analysis = analyzeContent(
+    const analysis = analyzeContent(
       content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl, protectedTerms,
     );
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
-
-    // Auto-fix loop.
-    if (autoFix && analysis.overallScore < MIN_ACCEPTABLE_SCORE) {
-      for (let i = 0; i < maxIterations; i++) {
-        const autoFixableFixes = analysis.fixes.filter(
-          (f) => f.autoFixable && !f.applied,
-        );
-        if (autoFixableFixes.length === 0) break;
-
-        const fixWallet: StageWallet = { userId, workspaceId, opType: 'seo_fix' };
-        const fixCeiling = await tokenCeiling(supabase, DEFAULT_GEMINI_MODEL, FIX_MAX_INPUT_TOKENS, FIX_MAX_OUTPUT_TOKENS, 50);
-        const hold = await reserveStage(supabase, fixWallet, fixCeiling, `SEO auto-fix iteration ${i + 1}`, {
-          iteration: i + 1, fixes_count: autoFixableFixes.length,
-        });
-        if (!hold.ok) {
-          console.warn(`[seo-analyze] Cannot reserve fix credits, stopping auto-fix`);
-          break;
-        }
-        openFixReserve = fixCeiling;
-
-        console.log(`[seo-analyze] Fix iteration ${i + 1}: applying ${autoFixableFixes.length} fixes...`);
-
-        const fix = await applyFixes(supabase, content, autoFixableFixes, body.article_plan, brief, { userId, workspaceId });
-        if (!fix.delivered) {
-          // A truncated rewrite is discarded, so nothing was delivered and nothing is sold.
-          await refundStage(supabase, fixWallet, openFixReserve, 'fixer truncated');
-          openFixReserve = 0;
-          break;
-        }
-        fixCreditsDebited += await settleStage(supabase, fixWallet, openFixReserve,
-          await tokenCredits(supabase, fix.model, fix.usage), { iteration: i + 1, model: fix.model });
-        openFixReserve = 0;
-        content = fix.content;
-        fixIterations++;
-
-        // Re-analyze
-        const scoreBefore = analysis.overallScore;
-        analysis = analyzeContent(
-          content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl, protectedTerms,
-        );
-        console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100 (reachable: ${reachableScore(analysis)})`);
-
-        if (analysis.overallScore >= MIN_ACCEPTABLE_SCORE) break;
-        // No progress — the remaining fixes are ones this loop cannot actually land, so
-        // paying for another identical pass would burn credits to re-edit finished prose.
-        // This is the evidence-based version of what the old `reachableScore` gate was
-        // guessing at before the first iteration had run.
-        if (analysis.overallScore <= scoreBefore) {
-          console.log('[seo-analyze] Iteration did not raise the score — stopping rather than paying for another.');
-          break;
-        }
-      }
-    }
 
     const wordCount = content.split(/\s+/).filter(Boolean).length;
 
@@ -259,9 +180,8 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         content_markdown: content,
         word_count: wordCount,
         analysis,
-        fix_iterations: fixIterations,
         meets_threshold: analysis.overallScore >= MIN_ACCEPTABLE_SCORE,
-        credits_used: Math.round((ANALYSIS_CREDIT_COST + fixCreditsDebited) * 100) / 100,
+        credits_used: ANALYSIS_CREDIT_COST,
       },
     };
 
@@ -269,13 +189,12 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
   } catch (error: any) {
     console.error('[seo-analyze] Error:', error);
     try {
-      // Refund the analysis credit AND any auto-fix iteration credits already debited.
       await supabase.rpc('refund_credits', {
         p_user_id: userId,
-        p_amount: ANALYSIS_CREDIT_COST + fixCreditsDebited + openFixReserve,
+        p_amount: ANALYSIS_CREDIT_COST,
         p_operation_type: 'seo_analyze_refund',
         p_description: 'Refund: SEO analysis failed',
-        p_metadata: { error: error.message, fix_credits_refunded: fixCreditsDebited },
+        p_metadata: { error: error.message },
         p_workspace_id: workspaceId,
       });
     } catch (refundErr) {
@@ -293,7 +212,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
 // ════════════════════════════════════════════════════════════════
 
 /** Penalty each severity subtracts from the 100-point base. Single source — the
- *  score loop and `reachableScore` must never drift apart. */
+ *  score loop must never drift from it. */
 const SEVERITY_PENALTY: Record<ContentFix['severity'], number> = {
   critical: 15,
   high: 10,
@@ -321,18 +240,6 @@ function totalPenalty(fixes: ContentFix[]): number {
     penalty += SEVERITY_PENALTY[fix.severity] ?? 0;
   }
   return penalty;
-}
-
-/**
- * The score the auto-fix loop could reach if it fixed everything it is able to —
- * i.e. the current score with the penalties from NON-auto-fixable fixes added back.
- * Used to decide whether another paid fix iteration is worth running.
- */
-function reachableScore(analysis: ContentAnalysisResult): number {
-  const unfixable = analysis.fixes
-    .filter((f) => !f.autoFixable)
-    ;
-  return Math.min(100, analysis.overallScore + totalPenalty(unfixable));
 }
 
 /** When was this content last written or reviewed? */
@@ -370,6 +277,7 @@ export function analyzeContent(
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
   const content = markdown.toLowerCase();
+  const ownTerms = new Set([...ALLOWED_FOREIGN_WORDS, ...(protectedTerms ?? [])]);
   const words = markdown.split(/\s+/).filter(Boolean);
   const wordCount = words.length;
   const primaryKw = plan.primaryKeyword.toLowerCase();
@@ -619,7 +527,7 @@ export function analyzeContent(
   }
 
   // ── Check 12b: English left in a non-English article ──
-  const foreign = foreignWords(markdown, new Set([...ALLOWED_FOREIGN_WORDS, ...(protectedTerms ?? [])]));
+  const foreign = foreignWords(markdown, ownTerms);
   if (foreign.length > 0) {
     fixes.push({
       category: 'language',
@@ -717,7 +625,7 @@ export function analyzeContent(
 
   // ── Check 15: GEO entity coverage ──
   const missingEntities = plan.entityMentions.filter(
-    (e) => !content.includes(e.toLowerCase()),
+    (e) => !content.includes(e.toLowerCase()) && !namesSomeoneElse(e, ownTerms),
   );
   if (missingEntities.length > 0 && plan.entityMentions.length > 0) {
     fixes.push({
@@ -824,7 +732,7 @@ export function analyzeContent(
     // with the primary keyword. Article should mention at least 30% of
     // those terms naturally somewhere in the body (not necessarily as
     // headings — natural cross-references count).
-    const related = serpSignals.relatedSearches || [];
+    const related = (serpSignals.relatedSearches || []).filter((t) => !namesSomeoneElse(t, ownTerms));
     if (related.length >= 5) {
       const lowerContent = content;
       const covered = related.filter((t) => {
@@ -1155,75 +1063,13 @@ function scoreFreshness(contentDatedAt: string | undefined, recommendations: str
 }
 
 // ════════════════════════════════════════════════════════════════
-// AUTO-FIX VIA GEMINI
-// ════════════════════════════════════════════════════════════════
-
-async function applyFixes(
-  supabase: any,
-  content: string,
-  fixes: ContentFix[],
-  plan: ArticlePlan,
-  brief: NormalizedBrief | null,
-  who: { userId: string; workspaceId: string | null },
-): Promise<{ content: string; delivered: boolean; model: string; usage: { inputTokens: number; outputTokens: number } }> {
-  const fixList = fixes
-    .map(
-      (f) =>
-        `[${f.severity.toUpperCase()}] ${f.category}: ${f.description}\n   Action: ${f.suggestion}${f.affectedSection ? `\n   Affected section: ${f.affectedSection}` : ''}`,
-    )
-    .join('\n\n');
-
-  const voiceInstructions = brief
-    ? `\n=== VOICE TO PRESERVE ===\nTone: ${briefList(brief.brandVoice.toneAttributes)}\nStyle: ${brief.brandVoice.writingStyle || 'Clear and professional'}\nNEVER introduce: ${brief.brandVoice.avoidList.join(', ') || 'N/A'}`
-    : '';
-
-  // No fallback. Swallowing this and substituting a one-line stand-in would apply auto-fixes
-  // to a customer's article under a prompt nobody wrote and nobody could see — and the admin's
-  // seo_fixer edits would appear to save while changing nothing (#347 phase 3P).
-  const baseFixPrompt = await getToolPrompt(supabase, 'seo_fixer');
-
-  const prompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'seo_fixer_user'), { base_fix_prompt: baseFixPrompt, voice_instructions: voiceInstructions, fix_list: fixList, content: content });
-
-  const result = await generateWithGemini(prompt, {
-    task: 'seo_analyze_revise',
-    temperature: 0.3,
-    // This call returns the WHOLE article rewritten, so its ceiling has to clear the whole
-    // article. At 8192 it did not: the first pipeline article measured 2,077 Greek words —
-    // 9,934 output tokens from the writer — so an auto-fix pass would have handed back a
-    // document cut off mid-sentence, and `handleAnalyze` writes the result straight onto
-    // `content`. `auto_fix` defaults to TRUE, so this was one fixable issue away from
-    // silently destroying a finished article. Same defect the writer had, one stage later.
-    maxTokens: FIX_MAX_OUTPUT_TOKENS,
-    thinkingLevel: 'low',
-    model: DEFAULT_GEMINI_MODEL,
-    userId: who.userId,
-    workspaceId: who.workspaceId ?? undefined,
-  });
-  const spent = { model: result.model, usage: result.usage };
-
-  // A truncated rewrite is a valid string and would replace a complete article with a
-  // partial one. Auto-fix is an ENHANCEMENT: when it cannot finish, keep the good article
-  // rather than banking a broken improvement.
-  if (result.finishReason === 'length') {
-    console.error(
-      `[seo-analyze] fixer hit the token ceiling (${result.usage.outputTokens} output tokens) — `
-      + 'keeping the unfixed article rather than saving a truncated rewrite.',
-    );
-    return { content, delivered: false, ...spent };
-  }
-
-  let fixed = result.text;
-  // Strip markdown fences
-  if (fixed.startsWith('```markdown')) fixed = fixed.slice('```markdown'.length);
-  if (fixed.startsWith('```')) fixed = fixed.slice(3);
-  if (fixed.endsWith('```')) fixed = fixed.slice(0, -3);
-
-  return { content: fixed.trim(), delivered: true, ...spent };
-}
-
-// ════════════════════════════════════════════════════════════════
 // UTILITY
 // ════════════════════════════════════════════════════════════════
+
+/** A Latin-script name we do not carry (another brand, a retailer): never something the article "misses". */
+function namesSomeoneElse(term: string, ownTerms: Set<string>): boolean {
+  return latinTerms(term).some((w) => !ownTerms.has(w));
+}
 
 function foldAccents(text: string): string {
   return text.normalize('NFD').replace(/\p{M}/gu, '');

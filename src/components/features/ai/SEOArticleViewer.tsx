@@ -110,7 +110,6 @@ interface SEOArticle {
   current_stage: string | null;
   stages_data: any;
   pipeline_log: string[];
-  fix_iterations: number;
   credits_used: number;
   credits_by_stage?: Record<string, number> | null;
   site_url?: string | null;

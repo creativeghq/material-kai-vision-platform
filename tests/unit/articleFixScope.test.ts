@@ -128,39 +128,4 @@ describe('the score measures the article, not how many rows the analyzer emitted
     expect((src.match(/penaltyGroup: 'readability:long-paragraphs'/g) ?? []).length).toBe(2);
     expect((src.match(/penaltyGroup: 'readability:long-sentences'/g) ?? []).length).toBe(2);
   });
-
-  it('reachableScore uses the same grouped arithmetic as the score', () => {
-    // Two ways of adding up penalties is two answers to one question — the money-derivation
-    // rule, applied to a score.
-    expect(src).toContain('return Math.min(100, analysis.overallScore + totalPenalty(unfixable));');
-  });
-});
-
-describe('the auto-fix loop runs on the score the reader sees', () => {
-  it('enters on overallScore, not on reachableScore', () => {
-    expect(src).toContain('if (autoFix && analysis.overallScore < MIN_ACCEPTABLE_SCORE) {');
-    expect(src).not.toContain('if (autoFix && reachableScore(analysis) < MIN_ACCEPTABLE_SCORE) {');
-  });
-
-  it('exits on the score the reader sees too', () => {
-    const loop = src.slice(src.indexOf('for (let i = 0; i < maxIterations; i++)'));
-    const body = loop.slice(0, loop.indexOf('const wordCount'));
-    expect(body).toContain('if (analysis.overallScore >= MIN_ACCEPTABLE_SCORE) break;');
-    expect(body).not.toContain('if (reachableScore(analysis) >= MIN_ACCEPTABLE_SCORE) break;');
-  });
-
-  it('stops paying when an iteration did not move the score', () => {
-    // This is what actually prevents the incident the old gate was guessing at: burning
-    // paid iterations re-editing prose whose remaining faults the loop cannot land. On
-    // evidence, after a pass, rather than on a prediction made before any pass has run.
-    const loop = src.slice(src.indexOf('for (let i = 0; i < maxIterations; i++)'));
-    const body = loop.slice(0, loop.indexOf('const wordCount'));
-    expect(body).toContain('const scoreBefore = analysis.overallScore;');
-    expect(body).toContain('if (analysis.overallScore <= scoreBefore) {');
-  });
-
-  it('still breaks when there is nothing auto-fixable left', () => {
-    const loop = src.slice(src.indexOf('for (let i = 0; i < maxIterations; i++)'));
-    expect(loop.slice(0, 900)).toContain('if (autoFixableFixes.length === 0) break;');
-  });
 });

@@ -16,7 +16,6 @@ import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } 
 import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
 import { latinTerms } from './foreign-words.ts';
 
-const termOf = (k: unknown) => (typeof k === 'string' ? k : String((k as { term?: string })?.term ?? ''));
 import { marketForCountry } from './market.ts';
 import { reviewArticle } from './review.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
@@ -125,9 +124,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         400,
       );
     }
-
-    const autoFix = body.auto_fix !== false;
-    const maxFixIterations = body.max_fix_iterations || 3;
 
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
     let memberQuery = supabase
@@ -307,7 +303,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     runInBackground(
       runPipelineStages({
         supabase, req, body, brief, userId, workspaceId, websiteId, website,
-        articleId: backgroundArticleId, autoFix, maxFixIterations, startTime,
+        articleId: backgroundArticleId, startTime,
       }).catch((stageError: unknown) => markFailed(supabase, backgroundArticleId, stageError)),
       'seo-pipeline',
     );
@@ -362,13 +358,11 @@ async function runPipelineStages(ctx: {
   websiteId: string | null;
   website: Awaited<ReturnType<typeof resolveWebsite>>;
   articleId: string;
-  autoFix: boolean;
-  maxFixIterations: number;
   startTime: number;
 }): Promise<void> {
   const {
     supabase, req, body, brief, userId, workspaceId, websiteId, website,
-    articleId, autoFix, maxFixIterations, startTime,
+    articleId, startTime,
   } = ctx;
   let totalCredits = 0;
   const creditsByStage: Record<string, number> = {};
@@ -446,7 +440,7 @@ async function runPipelineStages(ctx: {
     // Words from the slugs/titles of the pages this article links, and from its target searches:
     // never flagged as foreign by the analyzer.
     const protectedTerms = new Set(latinTerms([
-      research.targetKeyword, ...research.recommendedSecondaries.map(termOf),
+      research.targetKeyword,
       ...sitePages.map((p) => `${p.url.replace(/^https?:\/\/[^/]+/, '').replace(/[/_-]+/g, ' ')} ${p.title ?? ''}`),
     ].join(' ')));
     await updateArticle(supabase, articleId, {
@@ -519,7 +513,7 @@ async function runPipelineStages(ctx: {
     const resume: ResumeState = {
       research, plan, site_pages: sitePages, protected_terms: [...protectedTerms],
       total_credits: totalCredits, credits_by_stage: creditsByStage, start_time: startTime,
-      auto_fix: autoFix, max_fix_iterations: maxFixIterations, language_code: body.language_code ?? null,
+      language_code: body.language_code ?? null,
     };
     await updateArticle(supabase, articleId, { resume }, 'Draft saved; review and analysis continue');
     const handOff = await fetch(`${supabaseUrl}/functions/v1/seo-api`, {
@@ -545,8 +539,6 @@ interface ResumeState {
   total_credits: number;
   credits_by_stage: Record<string, number>;
   start_time: number;
-  auto_fix: boolean;
-  max_fix_iterations: number;
   language_code: string | null;
 }
 
@@ -605,43 +597,21 @@ async function runLateStages(ctx: {
 }): Promise<void> {
   const { supabase, req, userId, workspaceId, websiteId, website, articleId, brief, resume } = ctx;
   const { research, plan, site_pages: sitePages, protected_terms: protectedTerms, start_time: startTime } = resume;
-  const autoFix = resume.auto_fix;
-  const maxFixIterations = resume.max_fix_iterations;
-  let contentMarkdown = ctx.contentMarkdown;
   let totalCredits = resume.total_credits;
   const creditsByStage = { ...resume.credits_by_stage };
 
     // ────────────────────────────────────────────────────────────
-    // STAGE 4: ANALYZE + AUTO-FIX, then the editor's review LAST — a rewrite after it would undo it
+    // STAGE 4: the editor's review, then an analysis that only reports — nothing rewrites after the editor
     // ────────────────────────────────────────────────────────────
     await updateArticle(supabase, articleId, {
       status: 'analyzing',
       progress_percentage: 75,
       current_stage: 'analyze',
-    }, 'Analyzing content quality and SEO...');
-
-    const analyzeBody = {
-      article_plan: plan,
-      content_brief: brief,
-      max_iterations: maxFixIterations,
-      site_url: website?.url ?? null,
-      protected_terms: [...protectedTerms],
-      user_id: userId,
-      serp_signals: research.serpSignals,
-    };
-    const fixResult = await callStage('analyze', req, { ...analyzeBody, content_markdown: contentMarkdown, auto_fix: autoFix }, 180_000);
-    const fixIterations = fixResult.data.fix_iterations;
-    totalCredits += Number(fixResult.data.credits_used ?? 0);
-    creditsByStage.analyze = Number(fixResult.data.credits_used ?? 0);
-    contentMarkdown = (await enforceSiteAssets(supabase, websiteId, website?.url ?? null, fixResult.data.content_markdown, sitePages)).markdown;
-    await updateArticle(supabase, articleId, {
-      markdown_content: contentMarkdown,
-      progress_percentage: 80,
-    }, `Auto-fix: score ${fixResult.data.analysis.overallScore}/100 after ${fixIterations} fix iterations`);
+    }, 'Editor review...');
 
     // Editor's review: claims against our page facts, sums, relationship claims, the language.
     const reviewed = await reviewArticle(supabase, {
-      markdown: contentMarkdown, sitePages, brief, languageCode: resume.language_code, userId, workspaceId,
+      markdown: ctx.contentMarkdown, sitePages, brief, languageCode: resume.language_code, userId, workspaceId,
     });
     totalCredits += reviewed.report.credits;
     creditsByStage.review = reviewed.report.credits;
@@ -655,15 +625,23 @@ async function runLateStages(ctx: {
       ? `Review did not run: ${reviewed.report.failed}`
       : `Reviewed: ${reviewed.report.applied.length} corrections applied, ${reviewed.report.skipped.length} could not be placed, ${reviewed.report.unresolved.length} flagged for the editor`);
 
-    const scored = await callStage('analyze', req, { ...analyzeBody, content_markdown: finalMarkdown, auto_fix: false }, 60_000);
+    const scored = await callStage('analyze', req, {
+      article_plan: plan,
+      content_brief: brief,
+      content_markdown: finalMarkdown,
+      site_url: website?.url ?? null,
+      protected_terms: [...protectedTerms],
+      user_id: userId,
+      serp_signals: research.serpSignals,
+    }, 60_000);
     const analysis: ContentAnalysisResult = scored.data.analysis;
     const finalWordCount = scored.data.word_count;
     totalCredits += Number(scored.data.credits_used ?? 0);
-    creditsByStage.analyze += Number(scored.data.credits_used ?? 0);
+    creditsByStage.analyze = Number(scored.data.credits_used ?? 0);
 
     await updateArticle(supabase, articleId, {
       progress_percentage: 90,
-    }, `Analysis complete: score ${analysis.overallScore}/100, ${fixIterations} fix iterations${fixed.unlinked + fixed.removedImages ? ` (${fixed.unlinked} links unwrapped, ${fixed.removedImages} photos removed after review)` : ""}`);
+    }, `Analysis complete: score ${analysis.overallScore}/100${fixed.unlinked + fixed.removedImages ? ` (${fixed.unlinked} links unwrapped, ${fixed.removedImages} photos removed after review)` : ""}`);
 
     // ────────────────────────────────────────────────────────────
     // STAGE 5: FINALIZE — Build Frase-style report
@@ -863,7 +841,6 @@ async function runLateStages(ctx: {
       gaps_gains_data: gapsGains,
       research_tab_data: researchTabData,
       interlinking_data: interlinkingData,
-      fix_iterations: fixIterations,
       geo_score: analysis.geoScore?.overall || null,
       credits_used: Math.round(totalCredits * 100) / 100,
       credits_by_stage: creditsByStage,

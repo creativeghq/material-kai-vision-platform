@@ -417,7 +417,7 @@ The five original functions (`seo-research` / `seo-plan` / `seo-write` / `seo-an
 | `research` | DataForSEO keyword research (6 parallel calls). |
 | `plan` | Article structure, meta tags, FAQ schema. |
 | `write` | Full article via Claude. |
-| `analyze` | 15+ quality checks, auto-fix pass. |
+| `analyze` | 15+ quality checks and a fix list. Reports only; it never rewrites the article. |
 | `pipeline` | research → plan → write → analyze end to end. |
 | `toolkit_research` / `toolkit_audit` | Website-aware toolkit entry points. |
 
@@ -446,7 +446,7 @@ Three scoring rules were corrected in the same pass because they pushed *against
 
 - **Keyword density is now asymmetric.** Too low is informational (`low`, not auto-fixable); it used to be `high` + auto-fixable, which sent the fix loop back into the prose to inject keyword repetitions purely to move a number that has not been a positive ranking signal for years. Placement (first 100 words / H1 / an H2) is what is actually enforced. Too high is still auto-fixed — removing stuffing improves prose and ranking together.
 - **`authorityTone` → `claimAttribution`.** The old signal penalised hedging ("might", "perhaps"), i.e. scored an article *up* for asserting things it could not support, and the fix loop stripped qualifiers out of claims that genuinely vary by case. It now penalises the real problem — the appeal to an unnamed authority ("studies show", "experts agree"). The writer prompt gained a matching hard rule: never invent a source, URL, statistic, quote or person.
-- **The auto-fix loop is gated on `reachableScore`, not `overallScore`** — the raw score with non-auto-fixable penalties added back. Previously an article whose only remaining problems were unfixable (plan-level meta lengths, intent mismatch, and now the two checks above) could never reach 70, so it burned all three paid iterations re-editing prose that was already finished.
+- **There is no auto-fix pass.** It rewrote the whole article with Gemini after the editor review and put back what the review removed (2026-10-11). The pipeline order is write → editor review → analysis, and the analysis only reports.
 
 Still open, deliberately not built: no scaled-content guard (Phase 5 auto-suggests write-next
 topics with no check against the site's declared focus) and no YMYL gate. The `[SOURCE:]` and

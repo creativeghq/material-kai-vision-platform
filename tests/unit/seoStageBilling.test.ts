@@ -32,10 +32,11 @@ describe('SEO stages bill what they cost', () => {
     expect(code).toMatch(/settleStage\(supabase, wallet, ceiling, actual/);
   });
 
-  it('the auto-fix loop settles every pass to its real cost', () => {
+  it('the analysis reports and never rewrites the article', () => {
     const code = src('analyze.ts');
-    expect(code).not.toMatch(/const FIX_CREDIT_COST/);
-    expect(code).toMatch(/tokenCredits\(supabase, fix\.model, fix\.usage\)/);
+    expect(code, 'a model call in the analyzer is a rewrite path').not.toMatch(/generateWith\w+\(|callClaudeMessages\(/);
+    expect(code).not.toMatch(/auto_fix|applyFixes/);
+    expect(src('pipeline.ts')).not.toMatch(/auto_fix|autoFix/);
   });
 
   it('research settles to provider-reported DataForSEO spend, never a guess', () => {
@@ -44,23 +45,20 @@ describe('SEO stages bill what they cost', () => {
     expect(code, 'an unpriced DataForSEO call must keep the ceiling').toMatch(/client\.unpricedCalls > 0/);
   });
 
-  it('the editor review is the last pass over the text: auto-fix before it, only a re-score after', () => {
+  it('the editor review is the last pass over the text; only the score is computed after it', () => {
     const code = src('pipeline.ts');
-    const autoFix = code.indexOf('auto_fix: autoFix }');
     const review = code.indexOf('await reviewArticle(');
-    const rescore = code.indexOf('auto_fix: false }');
-    expect(autoFix).toBeGreaterThan(-1);
-    expect(autoFix).toBeLessThan(review);
-    expect(review).toBeLessThan(rescore);
+    const analyze = code.indexOf("callStage('analyze'");
+    expect(review).toBeGreaterThan(-1);
+    expect(review).toBeLessThan(analyze);
+    expect(code.indexOf("callStage('analyze'", analyze + 1), 'a second analyze pass').toBe(-1);
   });
 
-  it('the auto-fixer is never asked to add citations it has not read', () => {
+  it('another company\'s brand or a retailer is never reported as something the article misses', () => {
     const code = src('analyze.ts');
-    for (const marker of ["suggestion: 'Add [SOURCE:", 'citations referencing the same authoritative sources']) {
-      const at = code.indexOf(marker);
-      expect(at, marker).toBeGreaterThan(-1);
-      expect(code.slice(at, at + 400)).toMatch(/autoFixable: false/);
-    }
+    expect(code).toMatch(/!namesSomeoneElse\(e, ownTerms\)/);
+    expect(code).toMatch(/relatedSearches \|\| \[\]\)\.filter\(\(t\) => !namesSomeoneElse\(t, ownTerms\)\)/);
+    expect(src('pipeline.ts'), 'Google queries carry competitor names; they are not our terms').not.toMatch(/recommendedSecondaries\.map\(termOf\)/);
   });
 
   it('the pipeline refuses a short wallet before research is paid for', () => {

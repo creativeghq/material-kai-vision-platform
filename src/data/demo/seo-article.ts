@@ -30,7 +30,6 @@ export const SEO_ARTICLE_DEMO_DATA = {
     current_stage: 'done',
     stages_data: null,
     pipeline_log: ['Research completed', 'Plan generated', 'Article written (1850 words)', 'Analysis passed (score: 87)', 'Finalized'],
-    fix_iterations: 1,
     error_message: null,
     created_at: '2025-02-24T10:30:00Z',
     updated_at: '2025-02-24T10:42:00Z',
