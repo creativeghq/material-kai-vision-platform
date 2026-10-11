@@ -7,7 +7,7 @@ const HANDLERS = join(process.cwd(), 'supabase/functions/seo-api/handlers');
 const src = (f: string) => blankComments(readFileSync(join(HANDLERS, f), 'utf-8'));
 
 describe('SEO stages bill what they cost', () => {
-  it.each(['research.ts', 'plan.ts', 'write.ts', 'apply-fix.ts', 'faq.ts', 'review.ts'])(
+  it.each(['research.ts', 'plan.ts', 'write.ts', 'apply-fix.ts', 'faq.ts'])(
     '%s reserves, settles and refunds through stage-billing, with no flat price left',
     (file) => {
       const code = src(file);
@@ -23,6 +23,13 @@ describe('SEO stages bill what they cost', () => {
     const code = src(file);
     expect(code).toMatch(/tokenCredits\(supabase, result\.model, result\.usage\)/);
     expect(code).toMatch(/workspaceId: workspaceId \?\? undefined/);
+  });
+
+  it('the review reserves every section up front and settles once to the tokens used', () => {
+    const code = src('review.ts');
+    expect(code.indexOf('reserveStage(')).toBeGreaterThan(-1);
+    expect(code.indexOf('reserveStage(')).toBeLessThan(code.indexOf('callClaudeMessages('));
+    expect(code).toMatch(/settleStage\(supabase, wallet, ceiling, actual/);
   });
 
   it('the auto-fix loop settles every pass to its real cost', () => {
