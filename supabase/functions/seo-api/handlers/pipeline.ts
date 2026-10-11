@@ -111,6 +111,9 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
   if (!userId) {
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }
+  if (typeof body.resume_article_id === 'string') {
+    return resumePipeline(supabase, req, userId, body.resume_article_id);
+  }
   const startTime = Date.now();
   let articleId: string | null = null;
   let totalCredits = 0;
@@ -306,26 +309,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       runPipelineStages({
         supabase, req, body, brief, userId, workspaceId, websiteId, website,
         articleId: backgroundArticleId, autoFix, maxFixIterations, startTime,
-      }).catch(async (stageError: unknown) => {
-        const message = stageError instanceof Error ? stageError.message : String(stageError);
-        console.error('[seo-pipeline] stage failure:', stageError);
-        // Written directly, not through updateArticle: this is the error path, so it must not
-        // throw and must not depend on the read-modify-write updateArticle performs.
-        // `processing_time_ms` is NOT a column — naming it here once got the FAILURE write
-        // rejected too, which is how a failed article became indistinguishable from a running
-        // one and spun at its last stage forever.
-        const { error: failErr } = await supabase
-          .from('seo_articles')
-          .update({
-            status: 'failed',
-            error_message: message.slice(0, 2000),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', backgroundArticleId);
-        if (failErr) {
-          console.error(`[seo-pipeline] could not mark article ${backgroundArticleId} failed:`, failErr.message);
-        }
-      }),
+      }).catch((stageError: unknown) => markFailed(supabase, backgroundArticleId, stageError)),
       'seo-pipeline',
     );
 
@@ -521,7 +505,7 @@ async function runPipelineStages(ctx: {
     }, 300_000);
 
     const written = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, writeResult.data.content_markdown, sitePages);
-    let contentMarkdown = written.markdown;
+    const contentMarkdown = written.markdown;
     const wordCount = writeResult.data.word_count;
     totalCredits += Number(writeResult.data.credits_used ?? 0);
     creditsByStage.write = Number(writeResult.data.credits_used ?? 0);
@@ -532,9 +516,105 @@ async function runPipelineStages(ctx: {
       progress_percentage: 70,
     }, `Article written: ${wordCount} words (${written.unlinked} unverified site links unwrapped, ${written.removedImages} photos not from our pages removed)`);
 
+    // One isolate cannot run every stage inside the background wall clock, so review onward runs in a fresh one.
+    const resume: ResumeState = {
+      research, plan, site_pages: sitePages, protected_terms: [...protectedTerms],
+      total_credits: totalCredits, credits_by_stage: creditsByStage, start_time: startTime,
+      auto_fix: autoFix, max_fix_iterations: maxFixIterations, language_code: body.language_code ?? null,
+    };
+    await updateArticle(supabase, articleId, { resume }, 'Draft saved; review and analysis continue');
+    const handOff = await fetch(`${supabaseUrl}/functions/v1/seo-api`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        authorization: req.headers.get('authorization') ?? '',
+        ...(req.headers.get('apikey') ? { apikey: req.headers.get('apikey')! } : {}),
+      },
+      body: JSON.stringify({ action: 'pipeline', resume_article_id: articleId, user_id: userId }),
+    });
+    const handOffResult = await handOff.json().catch(() => null);
+    if (!handOffResult?.success) {
+      throw new Error(`Could not continue after writing: ${handOffResult?.error ?? `HTTP ${handOff.status}`}`);
+    }
+}
+
+interface ResumeState {
+  research: KeywordResearchResult;
+  plan: ArticlePlan;
+  site_pages: SitePage[];
+  protected_terms: string[];
+  total_credits: number;
+  credits_by_stage: Record<string, number>;
+  start_time: number;
+  auto_fix: boolean;
+  max_fix_iterations: number;
+  language_code: string | null;
+}
+
+async function markFailed(supabase: DbClient, articleId: string, error: unknown): Promise<void> {
+  console.error('[seo-pipeline] stage failure:', error);
+  const message = error instanceof Error ? error.message : String(error);
+  // Written directly, not through updateArticle: the error path must not depend on its read-modify-write.
+  const { error: failErr } = await supabase
+    .from('seo_articles')
+    .update({ status: 'failed', error_message: message.slice(0, 2000), updated_at: new Date().toISOString() })
+    .eq('id', articleId);
+  if (failErr) console.error(`[seo-pipeline] could not mark article ${articleId} failed:`, failErr.message);
+}
+
+/** The hand-off from runPipelineStages: claims the written draft once, then runs review → finalize. */
+async function resumePipeline(supabase: DbClient, req: Request, userId: string, articleId: string): Promise<Response> {
+  const { data: row, error } = await supabase
+    .from('seo_articles')
+    .update({ current_stage: 'analyze', updated_at: new Date().toISOString() })
+    .eq('id', articleId)
+    .eq('user_id', userId)
+    .eq('status', 'writing')
+    .eq('current_stage', 'write')
+    .select('id, workspace_id, website_id, content_brief, markdown_content, stages_data')
+    .maybeSingle();
+  if (error) return jsonResponse({ success: false, error: error.message }, 500);
+  if (!row) return jsonResponse({ success: false, error: 'Not found' }, 404);
+  const resume = row.stages_data?.extra?.resume as ResumeState | undefined;
+  if (!resume) {
+    await markFailed(supabase, articleId, new Error('The written draft has no saved pipeline state to continue from.'));
+    return jsonResponse({ success: false, error: 'No saved state' }, 409);
+  }
+  const workspaceId: string | null = row.workspace_id;
+  const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: row.website_id ?? undefined });
+  runInBackground(
+    runLateStages({
+      supabase, req, userId, workspaceId, websiteId: row.website_id, website, articleId,
+      brief: row.content_brief as NormalizedBrief | null, contentMarkdown: row.markdown_content ?? '', resume,
+    }).catch((e: unknown) => markFailed(supabase, articleId, e)),
+    'seo-pipeline-resume',
+  );
+  return jsonResponse({ success: true, data: { article_id: articleId } });
+}
+
+async function runLateStages(ctx: {
+  supabase: DbClient;
+  req: Request;
+  userId: string;
+  workspaceId: string | null;
+  websiteId: string | null;
+  website: Awaited<ReturnType<typeof resolveWebsite>>;
+  articleId: string;
+  brief: NormalizedBrief | null;
+  contentMarkdown: string;
+  resume: ResumeState;
+}): Promise<void> {
+  const { supabase, req, userId, workspaceId, websiteId, website, articleId, brief, resume } = ctx;
+  const { research, plan, site_pages: sitePages, protected_terms: protectedTerms, start_time: startTime } = resume;
+  const autoFix = resume.auto_fix;
+  const maxFixIterations = resume.max_fix_iterations;
+  let contentMarkdown = ctx.contentMarkdown;
+  let totalCredits = resume.total_credits;
+  const creditsByStage = { ...resume.credits_by_stage };
+
     // Editor's review: claims against our page facts, sums, relationship claims, the language.
     const reviewed = await reviewArticle(supabase, {
-      markdown: contentMarkdown, sitePages, brief, languageCode: body.language_code ?? null, userId, workspaceId,
+      markdown: contentMarkdown, sitePages, brief, languageCode: resume.language_code, userId, workspaceId,
     });
     contentMarkdown = reviewed.markdown;
     totalCredits += reviewed.report.credits;
@@ -786,6 +866,7 @@ async function runPipelineStages(ctx: {
       credits_used: Math.round(totalCredits * 100) / 100,
       credits_by_stage: creditsByStage,
       processing_time_ms: processingTimeMs,
+      resume: null,
       status: 'completed',
       progress_percentage: 100,
       current_stage: 'done',
