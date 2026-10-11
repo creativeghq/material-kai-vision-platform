@@ -2,6 +2,7 @@
 
 const LINK_RE = /(?<!!)\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
 const IMAGE_RE = /!\[[^\]]*\]\(([^)\s]+)\)/g;
+const CAPTION_RE = /^([ \t]*!\[[^\]]*\]\([^)\s]+\)[ \t]*)\n[ \t]*(?:\*[^*\n][^\n]*\*|_[^_\n][^\n]*_)[ \t]*$/gm;
 
 export const trimSlash = (u: string): string => u.replace(/\/+$/, '');
 
@@ -33,15 +34,18 @@ export function applySiteAssetRules(
   markdown: string,
   siteHost: string,
   livePages: Set<string>,
-  photos: Set<string>,
+  /** Offered photo URL → the description it is published with (its checked alt). */
+  photos: Map<string, string>,
 ): { markdown: string; removedImages: number; unlinked: number } {
   let removedImages = 0;
   let unlinked = 0;
   const placed = new Set<string>();
-  let out = markdown.replace(IMAGE_RE, (img, src: string) => {
+  // A caption is the model describing a photo it never saw: the line right under an image goes.
+  let out = markdown.replace(CAPTION_RE, '$1');
+  out = out.replace(IMAGE_RE, (_img, src: string) => {
     if (photos.has(src) && !placed.has(src)) {
       placed.add(src);
-      return img;
+      return `![${photos.get(src)!.replace(/[[\]]/g, '')}](${src})`;
     }
     removedImages += 1;
     return '';

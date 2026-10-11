@@ -22,6 +22,7 @@ import { normalizeContentBrief, briefList, type NormalizedBrief } from './conten
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { DEFAULT_GEMINI_MODEL, generateWithGemini } from '../../_shared/ai-client.ts';
 import { countSiteLinks } from './site-assets.ts';
+import { foreignWords } from './foreign-words.ts';
 import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import type {
   SEOAnalyzeRequest,
@@ -607,6 +608,20 @@ export function analyzeContent(
       suggestion: 'Add more [SOURCE: description](url) citations for GEO',
       affectedSection: null,
       autoFixable: true,
+      applied: false,
+    });
+  }
+
+  // ── Check 12b: English left in a non-English article ──
+  const foreign = foreignWords(markdown);
+  if (foreign.length > 0) {
+    fixes.push({
+      category: 'language',
+      severity: foreign.length > 5 ? 'high' : 'medium',
+      description: `${foreign.length} foreign word(s) left in the article: ${foreign.slice(0, 15).join(', ')}`,
+      suggestion: "Use the article language's own term; keep a foreign word only for a brand, product or colour name, or a term searchers type that way",
+      affectedSection: null,
+      autoFixable: false,
       applied: false,
     });
   }

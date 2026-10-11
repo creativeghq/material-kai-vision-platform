@@ -4,6 +4,7 @@ import {
   applySiteAssetRules,
   countSiteLinks,
 } from '../../supabase/functions/seo-api/handlers/site-assets.ts';
+import { foreignWords } from '../../supabase/functions/seo-api/handlers/foreign-words.ts';
 
 const PAGE = 'https://materialshub.gr/el/proionta/plakakia/atlas-concorde';
 
@@ -39,7 +40,7 @@ describe('extractContentImages — what an article may lift from one of our page
 
 describe('applySiteAssetRules — the published article points only at what exists', () => {
   const live = new Set(['https://materialshub.gr/el/proionta/plakakia', 'https://materialshub.gr/el/idees/lebites-aeriou']);
-  const photos = new Set(['https://media.materialshub.gr/products/norde.webp']);
+  const photos = new Map([['https://media.materialshub.gr/products/norde.webp', 'Γκρι πορσελανάτο πλακάκι τύπου πέτρας']]);
 
   it('removes a page URL pasted as a photo, and a photo placed twice keeps its first place', () => {
     const md = [
@@ -70,11 +71,47 @@ describe('applySiteAssetRules — the published article points only at what exis
   });
 });
 
+describe('applySiteAssetRules — a photo is published with what it shows, never a caption', () => {
+  it('replaces the writer alt with the checked description and drops the caption under it', () => {
+    const photos = new Map([['https://materialshub.gr/assets/hero-2.webp', 'Έπιπλο μπάνιου με φωτιζόμενο καθρέπτη']]);
+    const md = [
+      '![Εφαρμογή στεγανωτικής μεμβράνης](https://materialshub.gr/assets/hero-2.webp)',
+      '*Η στεγανοποίηση πριν την πλακόστρωση είναι προϋπόθεση.*',
+      '',
+      'Κείμενο.',
+    ].join('\n');
+    const out = applySiteAssetRules(md, 'materialshub.gr', new Set(), photos);
+    expect(out.markdown).toBe('![Έπιπλο μπάνιου με φωτιζόμενο καθρέπτη](https://materialshub.gr/assets/hero-2.webp)\n\nΚείμενο.');
+  });
+
+  it('leaves an ordinary italic sentence that is not directly under a photo', () => {
+    const md = 'Κείμενο.\n*Σημείωση σε πλάγια.*';
+    expect(applySiteAssetRules(md, 'materialshub.gr', new Set(), new Map()).markdown).toBe(md);
+  });
+});
+
+describe('foreignWords — English left in a Greek article', () => {
+  it('lists lower-case Latin words, not brand names, allowed terms, URLs or callout tags', () => {
+    const md = [
+      '# Πλακάκια μπάνιου',
+      '> [!tldr]',
+      '> Ένα accent τοίχος με [Bisazza Marmo Lux](https://materialshub.gr/el/proionta/plakakia/bisazza-marmo-lux).',
+      'Ντουζιέρα walk-in, terrazzo και spa αισθητική, πλάκες 120x260 cm, χρώμα Sage Green.',
+      '![Πλακάκι](https://media.materialshub.gr/products/x-slab.webp)',
+    ].join('\n');
+    expect(foreignWords(md)).toEqual(['accent', 'walk-in']);
+  });
+
+  it('says nothing about an article written in Latin script', () => {
+    expect(foreignWords('# Bathroom tiles\nAn accent wall with a walk-in shower.')).toEqual([]);
+  });
+});
+
 describe('applySiteAssetRules — one link per page', () => {
   it('keeps the first link to a page and unwraps repeats', () => {
     const live = new Set(['https://materialshub.gr/el/proionta/plakakia']);
     const md = '[one](https://materialshub.gr/el/proionta/plakakia) then [two](https://materialshub.gr/el/proionta/plakakia/)';
-    const out = applySiteAssetRules(md, 'materialshub.gr', live, new Set());
+    const out = applySiteAssetRules(md, 'materialshub.gr', live, new Map());
     expect(out.unlinked).toBe(1);
     expect(out.markdown).toBe('[one](https://materialshub.gr/el/proionta/plakakia) then two');
   });

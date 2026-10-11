@@ -6,6 +6,7 @@ import { fetchTextGuarded } from '../../_shared/fetch-image.ts';
 import { extractContentImages, type PageImage } from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
 import { applySiteAssetRules, hostOf, siteLinkUrls, trimSlash } from './site-assets.ts';
+import { verifyPhoto, type PhotoUsage } from './photo-verify.ts';
 
 export interface SitePage {
   url: string;
@@ -22,6 +23,8 @@ const IMAGE_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_URL_CHARS = 1000;
 const MATRIX_MIN = 3;
 const SINGLE_PAGE_BONUS = 0.05;
+/** Photos per page offered to the writer — and therefore checked by vision. */
+export const PHOTOS_PER_PAGE = 2;
 
 function sectionOf(url: string): string {
   try {
@@ -62,6 +65,8 @@ export async function findSitePages(
   opts: {
     userId: string; workspaceId: string | null; websiteId: string | null;
     queryText: string; limit: number; languageCode?: string | null;
+    /** Receives the token usage of every photo check, so the caller can bill it. */
+    photoUsage?: PhotoUsage[];
   },
 ): Promise<SitePage[]> {
   if (!opts.websiteId) return [];
@@ -144,7 +149,18 @@ export async function findSitePages(
 
     await consolidateMatrixPicks(supabase, opts.websiteId, picked, sectionScore);
     await refreshImages(supabase, picked.filter((p) => p.stale));
-    return picked.map(({ id: _id, stale: _stale, impressions: _i, langPath: _l, ...page }) => page);
+    const lang = opts.languageCode || 'en';
+    // No usage sink = nothing reserved for the checks: run none, offer only photos checked before.
+    if (opts.photoUsage) {
+      await verifyPhotos(supabase, picked, lang, { userId: opts.userId, workspaceId: opts.workspaceId }, opts.photoUsage);
+    }
+    // Only checked photos leave this function, and their alt IS what the check saw.
+    return picked.map(({ id: _id, stale: _stale, impressions: _i, langPath: _l, ...page }) => ({
+      ...page,
+      images: page.images.slice(0, PHOTOS_PER_PAGE)
+        .filter((im) => im.seen?.[lang])
+        .map((im) => ({ src: im.src, alt: im.seen![lang].text })),
+    }));
   } catch (e) {
     console.warn('[seo-site-pages] failed:', (e as Error).message);
     return [];
@@ -192,6 +208,37 @@ async function consolidateMatrixPicks(
   }
 }
 
+/** Vision-check the photos an article may be offered; cached per photo and language on the page row. */
+async function verifyPhotos(
+  supabase: DbClient,
+  pages: (SitePage & { id: string })[],
+  lang: string,
+  who: { userId: string; workspaceId: string | null },
+  usageSink?: PhotoUsage[],
+): Promise<void> {
+  const jobs = pages.flatMap((page) =>
+    page.images.slice(0, PHOTOS_PER_PAGE).filter((im) => !im.seen?.[lang]).map((im) => ({ page, im })));
+  const touched = new Set<SitePage & { id: string }>();
+  const worker = async () => {
+    for (let job = jobs.shift(); job; job = jobs.shift()) {
+      try {
+        const { seen, usage } = await verifyPhoto(supabase, job.im, lang, who);
+        if (usage) usageSink?.push(usage);
+        if (!seen) continue;
+        job.im.seen = { ...(job.im.seen ?? {}), [lang]: { ...seen, at: new Date().toISOString() } };
+        touched.add(job.page);
+      } catch (e) {
+        console.warn(`[seo-site-pages] photo check failed for ${job.im.src}:`, (e as Error).message);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: IMAGE_FETCH_CONCURRENCY }, worker));
+  for (const page of touched) {
+    const { error } = await supabase.from('user_website_pages').update({ images: page.images }).eq('id', page.id);
+    if (error) console.warn(`[seo-site-pages] could not store photo checks for ${page.url}:`, error.message);
+  }
+}
+
 async function refreshImages(supabase: DbClient, pages: (SitePage & { id: string })[]): Promise<void> {
   const queue = [...pages];
   const worker = async () => {
@@ -234,7 +281,7 @@ export async function enforceSiteAssets(
   const siteHost = siteUrl ? hostOf(siteUrl) : null;
   if (!websiteId || !siteHost) return { markdown, removedImages: 0, unlinked: 0 };
 
-  const photos = new Set(pages.flatMap((p) => p.images.map((i) => i.src)));
+  const photos = new Map(pages.flatMap((p) => p.images.map((i) => [i.src, i.alt] as const)));
   const linked = siteLinkUrls(markdown, siteHost);
   const live = new Set(pages.map((p) => trimSlash(p.url)));
   const unknown = [...new Set(linked.map(trimSlash))].filter((u) => !live.has(u));
@@ -270,7 +317,7 @@ export function sitePagesDataLines(pages: SitePage[], imagesPerPage = 2): string
     ];
     if (p.description) lines.push(`   About: ${serpValue(p.description, 300)}`);
     for (const img of p.images.filter((im) => whole(im.src)).slice(0, imagesPerPage)) {
-      lines.push(`   Photo: ${img.src} | alt: ${serpValue(img.alt, 200)}`);
+      lines.push(`   Photo: ${img.src} | shows: ${serpValue(img.alt, 200)}`);
     }
     return lines.join('\n');
   }).join('\n');

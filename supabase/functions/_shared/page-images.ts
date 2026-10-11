@@ -3,6 +3,8 @@
 export interface PageImage {
   src: string;
   alt: string;
+  /** What a vision check saw, per article language — the only description an article may print. */
+  seen?: Record<string, { text: string; site_alt_ok: boolean; at: string }>;
 }
 
 /** Below this many pixels on the longer declared side an image is an icon, a logo or a chip. */

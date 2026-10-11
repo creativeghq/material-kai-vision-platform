@@ -16,7 +16,9 @@ import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
 import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
 import { marketForCountry } from './market.ts';
-import { tokenCeiling } from './stage-billing.ts';
+import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
+import { PHOTOS_PER_PAGE } from './site-pages.ts';
+import { PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, PHOTO_VERIFY_MODEL, type PhotoUsage } from './photo-verify.ts';
 import { WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS } from './write.ts';
 import { DEFAULT_CLAUDE_MODEL } from '../../_shared/ai-client.ts';
 
@@ -436,12 +438,27 @@ async function runPipelineStages(ctx: {
       current_stage: 'plan',
     }, 'Planning article structure...');
 
+    // Photo checks are paid vision calls: reserved at their ceiling, settled to the tokens used
+    // (a photo checked before is cached and costs nothing).
+    const photoWallet: StageWallet = { userId, workspaceId, opType: 'seo_photo_verify' };
+    const photoCeiling = SITE_LINK_TARGETS * PHOTOS_PER_PAGE * await tokenCeiling(
+      supabase, PHOTO_VERIFY_MODEL, PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, 1);
+    const photoHold = await reserveStage(supabase, photoWallet, photoCeiling, `SEO photo checks: "${body.target_keyword}"`);
+    const photoUsage: PhotoUsage[] = [];
     const sitePages = await findSitePages(supabase, {
       userId, workspaceId, websiteId,
       queryText: [body.topic, body.target_keyword, ...research.recommendedSecondaries.slice(0, 8)].join('\n'),
       limit: SITE_LINK_TARGETS,
       languageCode: body.language_code ?? null,
+      photoUsage: photoHold.ok ? photoUsage : undefined,
     });
+    if (photoHold.ok) {
+      const priced = await Promise.all(photoUsage.map((u) => tokenCredits(supabase, u.model, u)));
+      const actual = priced.some((c) => c === null) ? null : priced.reduce<number>((s, c) => s + (c ?? 0), 0);
+      const charged = await settleStage(supabase, photoWallet, photoCeiling, actual, { photos_checked: photoUsage.length });
+      totalCredits += charged;
+      creditsByStage.photo_checks = charged;
+    }
     const planBrief = await withSiteClusterContext(supabase, brief, websiteId, articleId, sitePages);
     await updateArticle(supabase, articleId, {
       site_link_targets: sitePages.map((p) => ({ url: p.url, title: p.title, photos: p.images.length })),
@@ -548,10 +565,7 @@ async function runPipelineStages(ctx: {
       progress_percentage: 92,
     }, 'Building SEO report...');
 
-    // Append the visible byline / disclosure before HTML conversion, so the markdown
-    // the operator copies into their CMS carries it too. No-ops when the brief has no
-    // `provenance` block — an invented byline is worse than none, and the analyzer
-    // already reports the gap.
+    // Byline / disclosure go in before HTML conversion; none is invented when provenance is absent.
     const publishedAt = new Date().toISOString();
     const publishedMarkdown = appendProvenanceBlock(finalMarkdown, brief, website);
 
@@ -621,18 +635,9 @@ async function runPipelineStages(ctx: {
       detailedReport: {},
     };
 
-    // Query existing platform articles for interlinking.
-    //
-    // Scoped to the WORKSPACE, not just the author. A user who belongs to two workspaces was
-    // being offered their own articles from the other one as interlink targets — titles, slugs
-    // and target keywords from a tenant this article has nothing to do with, surfaced in a
-    // deliverable (#361 `EG-7`). `user_id` stays as well: with no workspace resolved (a user
-    // with no membership) the author is the only boundary there is.
+    // Interlink candidates, scoped to the WORKSPACE as well as the author (#361 EG-7).
     let existingQuery = supabase
       .from('seo_articles')
-      // `overall_score` is not a column and was never read from this result anyway — its
-      // presence alone got the select rejected, so existingArticlesRaw was always null and
-      // interlinking never found a single existing article.
       .select('id, title, slug, target_keyword')
       .eq('user_id', userId)
       .eq('status', 'completed')
@@ -661,12 +666,7 @@ async function runPipelineStages(ctx: {
     // indexed website pages (if they've connected one in profile settings).
     const siteArticles = await buildSiteMatches(supabase, userId, workspaceId ?? null, plan, finalMarkdown, websiteId);
 
-    // ── Phase 5 — auto-interlink from Google's "related searches" block ──
-    // Each term in serpSignals.relatedSearches is a query Google clusters
-    // with the primary keyword by user intent. We use this as a high-quality
-    // signal in two ways:
-    //   1. Boost any existing platform article whose target_keyword matches
-    //      a related-search term (stronger than generic keyword overlap).
+    // ── Phase 5 — Google related searches: boost matching articles, else suggest a next article ──
     const relatedSearches = research.serpSignals?.relatedSearches || [];
     let suggestedLinks = extractInternalLinks(finalMarkdown);
     let existingArticlesFinal = existingArticles;
@@ -680,8 +680,6 @@ async function runPipelineStages(ctx: {
       // Same workspace scoping as the query above — this one feeds the same suggestion list.
       if (workspaceId) relatedQuery = relatedQuery.eq('workspace_id', workspaceId);
       const { data: relatedMatchesRaw } = await relatedQuery
-        // was `overall_score` (not a column) — the real one is `seo_score`, which the final
-        // update writes from the same analysis.overallScore value.
         .order('seo_score', { ascending: false })
         .limit(40);
       const relatedMatches: typeof existingArticles = [];
