@@ -5,7 +5,7 @@
  * Claude is chosen for writing due to superior prose quality,
  * natural tone, and stronger E-E-A-T experiential signals.
  *
- * Credit cost: 20 credits
+ * Credits: a ceiling reserved before the call, settled to tokens × model price × markup.
  */
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
@@ -25,7 +25,8 @@ import {
 } from './content-brief.ts';
 import { outputLanguageBlock } from './output-language.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
-import { generateWithClaude } from '../../_shared/ai-client.ts';
+import { DEFAULT_CLAUDE_MODEL, generateWithClaude } from '../../_shared/ai-client.ts';
+import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { sitePagesBlock, sitePagesDataLines, type SitePage } from './site-pages.ts';
 import type {
   SEOWriteRequest,
@@ -38,12 +39,13 @@ import type {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const CREDIT_COST = 20;
+/** Input budget the ceiling is priced on (system prompt + plan + site pages). */
+export const WRITE_MAX_INPUT_TOKENS = 20000;
 
 const WRITE_TEMPERATURE = 0.7;
 
 /** Article output budget. */
-const WRITE_MAX_OUTPUT_TOKENS = 32000;
+export const WRITE_MAX_OUTPUT_TOKENS = 32000;
 
 
 export async function handleWrite(req: Request, body: any): Promise<Response> {
@@ -70,6 +72,8 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
 
   // Outside the try: the refund lives in the catch and has to know which wallet was charged.
   let workspaceId: string | null = null;
+  let reserved = 0;
+  let wallet: StageWallet | null = null;
 
   try {
 
@@ -96,26 +100,13 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
-    // Debit credits
-    const { data: debitResult, error: debitError } = await supabase.rpc(
-      'debit_credits',
-      {
-        p_user_id: userId,
-        p_amount: CREDIT_COST,
-        p_operation_type: 'seo_write',
-        p_description: `SEO article writing: "${body.article_plan.title}"`,
-        p_metadata: {
-          title: body.article_plan.title,
-          target_keyword: body.article_plan.primaryKeyword,
-        },
-        p_workspace_id: workspaceId,
-      },
-    );
-
-    if (debitError || !debitResult?.[0]?.success) {
-      const msg = debitResult?.[0]?.error_message || debitError?.message || 'Insufficient credits';
-      return jsonResponse({ success: false, error: msg }, 402);
-    }
+    wallet = { userId, workspaceId, opType: 'seo_write' };
+    const ceiling = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS, 150);
+    const hold = await reserveStage(supabase, wallet, ceiling, `SEO article writing: "${body.article_plan.title}"`, {
+      title: body.article_plan.title, target_keyword: body.article_plan.primaryKeyword,
+    });
+    if (!hold.ok) return jsonResponse({ success: false, error: hold.error }, 402);
+    reserved = ceiling;
 
     console.log(`[seo-write] Writing article: "${body.article_plan.title}" (user: ${userId})`);
 
@@ -138,6 +129,9 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
       systemPrompt,
       temperature: WRITE_TEMPERATURE,
       maxTokens: WRITE_MAX_OUTPUT_TOKENS,
+      model: DEFAULT_CLAUDE_MODEL,
+      userId,
+      workspaceId: workspaceId ?? undefined,
     });
 
     // A truncated article is a valid string, so nothing downstream can tell one from a
@@ -150,6 +144,9 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
         + 'Lower targetWordCount or raise WRITE_MAX_OUTPUT_TOKENS.',
       );
     }
+    const creditsUsed = await settleStage(supabase, wallet, reserved,
+      await tokenCredits(supabase, result.model, result.usage), { model: result.model, title: plan.title });
+    reserved = 0;
 
     // Clean response — strip markdown fences if present
     let markdown = result.text;
@@ -178,26 +175,14 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
         content_markdown: markdown,
         word_count: wordCount,
         title,
-        credits_used: CREDIT_COST,
+        credits_used: creditsUsed,
       },
     };
 
     return jsonResponse(response);
   } catch (error: any) {
     console.error('[seo-write] Error:', error);
-    try {
-      await supabase.rpc('refund_credits', {
-        p_user_id: userId,
-        p_amount: CREDIT_COST,
-        p_operation_type: 'seo_write_refund',
-        p_description: 'Refund: SEO writing failed',
-        p_metadata: { error: error.message },
-        p_workspace_id: workspaceId,
-      });
-      console.log('[seo-write] Credits refunded');
-    } catch (refundErr) {
-      console.error('[seo-write] Refund failed:', refundErr);
-    }
+    if (wallet && reserved > 0) await refundStage(supabase, wallet, reserved, String(error?.message ?? error));
     return jsonResponse(
       { success: false, error: error.message || 'Writing failed' },
       500,

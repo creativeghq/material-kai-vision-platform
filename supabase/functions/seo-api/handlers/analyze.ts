@@ -20,8 +20,9 @@ import {
 } from '../../_shared/seo/articleSections.generated.ts';
 import { normalizeContentBrief, briefList, type NormalizedBrief } from './content-brief.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
-import { generateWithGemini } from '../../_shared/ai-client.ts';
+import { DEFAULT_GEMINI_MODEL, generateWithGemini } from '../../_shared/ai-client.ts';
 import { countSiteLinks } from './site-assets.ts';
+import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import type {
   SEOAnalyzeRequest,
   SEOAnalyzeResponse,
@@ -37,7 +38,9 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const ANALYSIS_CREDIT_COST = 2;
-const FIX_CREDIT_COST = 5;
+/** Budget the per-iteration ceiling is priced on: the fixer returns the WHOLE article. */
+const FIX_MAX_INPUT_TOKENS = 20000;
+const FIX_MAX_OUTPUT_TOKENS = 32000;
 const DEFAULT_MAX_ITERATIONS = 3;
 const MIN_ACCEPTABLE_SCORE = 70;
 
@@ -121,6 +124,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
   // the try block is not in scope there — it threw ReferenceError inside the error
   // handler, so no refund ever happened.
   let fixCreditsDebited = 0;
+  let openFixReserve = 0;
 
   // Outside the try: the refund lives in the catch and has to know which wallet was charged.
   let workspaceId: string | null = null;
@@ -200,29 +204,30 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         );
         if (autoFixableFixes.length === 0) break;
 
-        // Debit fix credits
-        const { data: fixDebit, error: fixDebitErr } = await supabase.rpc(
-          'debit_credits',
-          {
-            p_user_id: userId,
-            p_amount: FIX_CREDIT_COST,
-            p_operation_type: 'seo_fix',
-            p_description: `SEO auto-fix iteration ${i + 1}`,
-            p_metadata: { iteration: i + 1, fixes_count: autoFixableFixes.length },
-            p_workspace_id: workspaceId,
-          },
-        );
-
-        if (fixDebitErr || !fixDebit?.[0]?.success) {
-          console.warn(`[seo-analyze] Cannot debit fix credits, stopping auto-fix`);
+        const fixWallet: StageWallet = { userId, workspaceId, opType: 'seo_fix' };
+        const fixCeiling = await tokenCeiling(supabase, DEFAULT_GEMINI_MODEL, FIX_MAX_INPUT_TOKENS, FIX_MAX_OUTPUT_TOKENS, 50);
+        const hold = await reserveStage(supabase, fixWallet, fixCeiling, `SEO auto-fix iteration ${i + 1}`, {
+          iteration: i + 1, fixes_count: autoFixableFixes.length,
+        });
+        if (!hold.ok) {
+          console.warn(`[seo-analyze] Cannot reserve fix credits, stopping auto-fix`);
           break;
         }
-        fixCreditsDebited += FIX_CREDIT_COST;
+        openFixReserve = fixCeiling;
 
         console.log(`[seo-analyze] Fix iteration ${i + 1}: applying ${autoFixableFixes.length} fixes...`);
 
-        // Apply fixes via Gemini
-        content = await applyFixes(supabase, content, autoFixableFixes, body.article_plan, brief);
+        const fix = await applyFixes(supabase, content, autoFixableFixes, body.article_plan, brief, { userId, workspaceId });
+        if (!fix.delivered) {
+          // A truncated rewrite is discarded, so nothing was delivered and nothing is sold.
+          await refundStage(supabase, fixWallet, openFixReserve, 'fixer truncated');
+          openFixReserve = 0;
+          break;
+        }
+        fixCreditsDebited += await settleStage(supabase, fixWallet, openFixReserve,
+          await tokenCredits(supabase, fix.model, fix.usage), { iteration: i + 1, model: fix.model });
+        openFixReserve = 0;
+        content = fix.content;
         fixIterations++;
 
         // Re-analyze
@@ -254,7 +259,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         analysis,
         fix_iterations: fixIterations,
         meets_threshold: analysis.overallScore >= MIN_ACCEPTABLE_SCORE,
-        credits_used: ANALYSIS_CREDIT_COST + (fixIterations * FIX_CREDIT_COST),
+        credits_used: Math.round((ANALYSIS_CREDIT_COST + fixCreditsDebited) * 100) / 100,
       },
     };
 
@@ -265,7 +270,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
       // Refund the analysis credit AND any auto-fix iteration credits already debited.
       await supabase.rpc('refund_credits', {
         p_user_id: userId,
-        p_amount: ANALYSIS_CREDIT_COST + fixCreditsDebited,
+        p_amount: ANALYSIS_CREDIT_COST + fixCreditsDebited + openFixReserve,
         p_operation_type: 'seo_analyze_refund',
         p_description: 'Refund: SEO analysis failed',
         p_metadata: { error: error.message, fix_credits_refunded: fixCreditsDebited },
@@ -1138,7 +1143,8 @@ async function applyFixes(
   fixes: ContentFix[],
   plan: ArticlePlan,
   brief: NormalizedBrief | null,
-): Promise<string> {
+  who: { userId: string; workspaceId: string | null },
+): Promise<{ content: string; delivered: boolean; model: string; usage: { inputTokens: number; outputTokens: number } }> {
   const fixList = fixes
     .map(
       (f) =>
@@ -1166,9 +1172,13 @@ async function applyFixes(
     // document cut off mid-sentence, and `handleAnalyze` writes the result straight onto
     // `content`. `auto_fix` defaults to TRUE, so this was one fixable issue away from
     // silently destroying a finished article. Same defect the writer had, one stage later.
-    maxTokens: 32000,
+    maxTokens: FIX_MAX_OUTPUT_TOKENS,
     thinkingLevel: 'low',
+    model: DEFAULT_GEMINI_MODEL,
+    userId: who.userId,
+    workspaceId: who.workspaceId ?? undefined,
   });
+  const spent = { model: result.model, usage: result.usage };
 
   // A truncated rewrite is a valid string and would replace a complete article with a
   // partial one. Auto-fix is an ENHANCEMENT: when it cannot finish, keep the good article
@@ -1178,7 +1188,7 @@ async function applyFixes(
       `[seo-analyze] fixer hit the token ceiling (${result.usage.outputTokens} output tokens) — `
       + 'keeping the unfixed article rather than saving a truncated rewrite.',
     );
-    return content;
+    return { content, delivered: false, ...spent };
   }
 
   let fixed = result.text;
@@ -1187,7 +1197,7 @@ async function applyFixes(
   if (fixed.startsWith('```')) fixed = fixed.slice(3);
   if (fixed.endsWith('```')) fixed = fixed.slice(0, -3);
 
-  return fixed.trim();
+  return { content: fixed.trim(), delivered: true, ...spent };
 }
 
 // ════════════════════════════════════════════════════════════════

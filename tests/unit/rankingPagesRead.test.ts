@@ -94,12 +94,15 @@ describe('the reader is actually wired in', () => {
     const src = read('supabase/functions/seo-api/handlers/research.ts');
     // A handler with two debits needs two refunds, and the refund path is the one nobody
     // exercises until it is wrong.
-    expect(src.match(/rpc\(\s*\n?\s*'debit_credits'/g) ?? []).toHaveLength(1);
+    expect(src.match(/reserveStage\(/g) ?? []).toHaveLength(1);
+    expect(src).not.toMatch(/rpc\(\s*\n?\s*'debit_credits'/);
+    expect(src).toMatch(/serviceCredits\(supabase, FIRECRAWL_SERVICE, readPages \? READ_PAGES_LIMIT : 0\)/);
+    expect(src).toMatch(/serviceCredits\(supabase, FIRECRAWL_SERVICE, pagesRead\)/);
     // Declared outside the try, because the refund lives in the catch.
-    const declare = src.indexOf('let creditCost = CREDIT_COST;');
+    const declare = src.indexOf('let reserved = 0;');
     const tryAt = src.indexOf('\n  try {');
     expect(declare).toBeGreaterThan(-1);
-    expect(declare, 'creditCost is out of scope in the refund').toBeLessThan(tryAt);
+    expect(declare, 'the reservation is out of scope in the refund').toBeLessThan(tryAt);
   });
 
   it('the planner is given what was read, not the page titles', () => {

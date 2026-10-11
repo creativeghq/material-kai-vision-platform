@@ -247,7 +247,7 @@ describe('an FAQ entry goes into the FAQ section', () => {
   it('a hand-written answer costs nothing', () => {
     // The debit sits inside `if (!answer)`, so typing your own answer never reaches the model.
     const faq = readFileSync(join(HANDLERS, 'faq.ts'), 'utf-8');
-    const debitAt = faq.indexOf('debit_credits');
+    const debitAt = faq.indexOf('reserveStage(');
     const guardAt = faq.indexOf('if (!answer) {');
     expect(guardAt).toBeGreaterThan(-1);
     expect(debitAt, 'the debit must sit inside the generate-an-answer branch').toBeGreaterThan(guardAt);

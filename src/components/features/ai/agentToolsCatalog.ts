@@ -3553,10 +3553,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Generate a complete SEO article.',
         icon: 'Newspaper',
         workflow_id: 'seo-article',
-        promptTemplate: 'Generate a complete SEO article targeting the keyword "{{keyword}}" for {{country}} (website_id: {{website_id}}).',
+        promptTemplate: 'Generate a complete SEO article targeting the keyword "{{keyword}}" (website_id: {{website_id}}; market ISO code: {{country}} — if blank, leave language_code and location_code unset so the business\'s own market is used).',
         form: [
           { key: 'keyword', label: 'Target keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
-          { key: 'country', label: 'Target market', kind: 'country', default: 'the United Kingdom' },
+          { key: 'country', label: 'Target market (blank = your business country)', kind: 'country_code' },
           { key: 'website_id', label: 'Website', kind: 'website' },
         ],
       },

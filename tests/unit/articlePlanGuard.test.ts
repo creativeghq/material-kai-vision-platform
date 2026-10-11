@@ -109,10 +109,11 @@ describe('the handlers actually call the guard, before the debit', () => {
       'utf-8',
     );
     const guardAt = src.indexOf('missingArticlePlanFields(');
-    const debitAt = src.indexOf("'debit_credits'");
+    const charges = ["'debit_credits'", 'reserveStage('].map((m) => src.indexOf(m)).filter((i) => i > -1);
+    const debitAt = charges.length ? Math.min(...charges) : -1;
 
     expect(guardAt, `${file} never calls missingArticlePlanFields`).toBeGreaterThan(-1);
-    expect(debitAt, `${file} no longer calls debit_credits — update this test`).toBeGreaterThan(-1);
+    expect(debitAt, `${file} no longer charges credits — update this test`).toBeGreaterThan(-1);
     expect(guardAt, `${file} validates the plan AFTER debiting`).toBeLessThan(debitAt);
   });
 });

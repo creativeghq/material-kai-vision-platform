@@ -66,6 +66,10 @@ function taskStatusError(endpoint: string, json: unknown): string | null {
 
 export class DataForSEOClient {
   private authHeader: string;
+  /** USD the provider reported across every call this instance made; the caller bills it. */
+  spentUsd = 0;
+  /** Calls whose response carried no cost — the caller must not settle below its ceiling. */
+  unpricedCalls = 0;
 
   constructor(login: string, password: string) {
     this.authHeader = 'Basic ' + btoa(`${login}:${password}`);
@@ -616,6 +620,9 @@ export class DataForSEOClient {
         }
 
         const json = await response.json();
+        const cost = Number(json?.cost ?? NaN);
+        if (Number.isFinite(cost)) this.spentUsd += cost;
+        else this.unpricedCalls += 1;
         // DataForSEO answers HTTP 200 for a FAILED task and puts the verdict in `status_code`
         // (20000-29999 = ok). Returning the body unchecked means a paid call that produced
         // nothing reads as a successful one and its `result` array is simply empty — a silent

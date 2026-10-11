@@ -5,7 +5,8 @@
  * Runs 6 parallel API calls: keyword expansion, related keywords,
  * bulk difficulty, PAA questions, SERP competitors, content analysis.
  *
- * Credit cost: 18 credits, or 23 when it also reads the pages that actually rank.
+ * Credits: a ceiling reserved up front, settled to the provider-reported DataForSEO cost plus
+ * the SERP-signals call and the Firecrawl page reads, each priced in ai_model_pricing.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -19,6 +20,13 @@ import { fetchOpportunitiesStateless } from '../../_shared/mention-opportunities
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
 import { readRankingPages } from '../serp-content.ts';
+import type { DbClient } from '../../_shared/supabase-client.ts';
+import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts';
+import { refundStage, reserveStage, serviceCredits, settleStage, type StageWallet } from './stage-billing.ts';
+import { countryForLocation, marketForCountry } from './market.ts';
+
+const SERP_SIGNALS_SERVICE = 'seo-serp-signals';
+const FIRECRAWL_SERVICE = 'firecrawl-scrape';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -35,33 +43,22 @@ async function dataforseoCredentials(supabase: { from: (t: string) => any }): Pr
   return { login: login.value ?? '', password: password.value ?? '' };
 }
 
-const CREDIT_COST = 18;
-
-/**
- * Reading the pages that actually rank costs a Firecrawl fetch each. Priced into the SAME debit
- * rather than a second one: a handler with two debits needs two refunds, and the refund path is
- * the one nobody exercises until it is wrong.
- */
-const READ_PAGES_COST = 5;
 const READ_PAGES_LIMIT = 5;
 
+/** Ceiling on provider-reported DataForSEO spend for one research run, in $0.001 units (measured ~135). */
+const DATAFORSEO_CEILING_UNITS = 400;
 
-/** Map DataForSEO numeric location_code → ISO-3166 alpha-2 country code so
- * the mention-monitoring opportunities endpoint can pin the correct locale.
- * Mirrors the `_country_to_dfs_location` table in
- * `mention_opportunity_service.py`. Default = US. */
-function dfsLocationToCountry(loc: number): string {
-  const map: Record<number, string> = {
-    2840: 'US', 2826: 'GB', 2276: 'DE', 2250: 'FR', 2380: 'IT', 2724: 'ES',
-    2300: 'GR', 2528: 'NL', 2056: 'BE', 2040: 'AT', 2756: 'CH', 2620: 'PT',
-    2372: 'IE', 2124: 'CA', 2036: 'AU', 2616: 'PL', 2752: 'SE', 2208: 'DK',
-    2578: 'NO', 2246: 'FI', 2792: 'TR', 2100: 'BG', 2642: 'RO', 2196: 'CY',
-  };
-  return map[loc] || 'US';
+/** Reserve for one research run: every service it may touch, at its ceiling. */
+async function researchCeiling(supabase: DbClient, readPages: boolean): Promise<number> {
+  const parts = await Promise.all([
+    serviceCredits(supabase, DATAFORSEO_SERVICE, DATAFORSEO_CEILING_UNITS),
+    serviceCredits(supabase, SERP_SIGNALS_SERVICE, 1),
+    serviceCredits(supabase, FIRECRAWL_SERVICE, readPages ? READ_PAGES_LIMIT : 0),
+  ]);
+  return parts.some((p) => p === null) ? 80 : Math.ceil(parts.reduce<number>((s, p) => s + (p ?? 0), 0));
 }
 
 export async function handleResearch(req: Request, body: any): Promise<Response> {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -72,26 +69,21 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Authenticate
   const auth = await authenticate(req);
   if (!auth.success) {
     return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
   }
 
-  // Service-role/secret callers (e.g. agent-chat sending the service key) authenticate at
-  // 'secret' level with auth.userId === null; they pass the acting user_id in the body.
-  // User-JWT callers keep auth.userId. Accept either.
+  // Service-role/secret callers authenticate with userId null and pass the acting user_id in the body.
   const userId = auth.userId ?? body.user_id;
   if (!userId) {
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }
 
-  // Declared OUTSIDE the try because the refund lives in the catch: a refund that cannot see
-  // which wallet was charged would hand the money back to the wrong one.
+  // Declared OUTSIDE the try because the refund lives in the catch and needs the wallet.
   let workspaceId: string | null = null;
-  // Same reason, and the same trap: the refund lives in the catch. A cost decided inside the try
-  // is out of scope exactly where the money has to be handed back.
-  let creditCost = CREDIT_COST;
+  let reserved = 0;
+  let wallet: StageWallet | null = null;
 
   try {
 
@@ -104,9 +96,6 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
 
     const dfs = await dataforseoCredentials(supabase);
     if (!dfs.login || !dfs.password) {
-      // Say WHERE to put them. The old message was true and useless: the credentials WERE
-      // configured, on the MIVAA host, and no reader of this error could have known that this
-      // particular function looks somewhere else.
       return jsonResponse(
         {
           success: false,
@@ -119,53 +108,37 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       );
     }
 
-    const locationCode = body.location_code || 2840;
-    const languageCode = body.language_code || 'en';
 
-    // Opt OUT, not in: a plan written without reading the competition is the default this was
-    // built to replace.
+    // Opt OUT, not in: reading the competition is the default.
     const readPages = body.read_ranking_pages !== false;
-    creditCost = CREDIT_COST + (readPages ? READ_PAGES_COST : 0);
 
-    // Entitlement gate BEFORE the debit and the upstream calls (#212 + invariant 10).
-    // Also resolves the workspace the research is filed under (was a late `.single()`
-    // lookup, which errors → null for multi-workspace users — same bug pipeline.ts fixed).
+    // Entitlement gate BEFORE the debit and the upstream calls (#212 + invariant 10); resolves the workspace.
     const { workspaceId: resolvedWs, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
     workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
-    // Billed to the WORKSPACE, not to whoever pressed the button.
-    const { data: debitResult, error: debitError } = await supabase.rpc(
-      'debit_credits',
-      {
-        p_user_id: userId,
-        p_amount: creditCost,
-        p_operation_type: 'seo_research',
-        p_description: `SEO keyword research: "${body.target_keyword}"`,
-        p_metadata: {
-          topic: body.topic,
-          target_keyword: body.target_keyword,
-          location_code: locationCode,
-          read_ranking_pages: readPages,
-        },
-        p_workspace_id: workspaceId,
-      },
-    );
+    // No market named → the business's own (GR → Greece, Greek), the same rule the pipeline applies.
+    const market = (!body.location_code || !body.language_code) && workspaceId
+      ? marketForCountry((await supabase.from('finance_settings').select('business_country_code')
+          .eq('workspace_id', workspaceId).maybeSingle()).data?.business_country_code)
+      : null;
+    const locationCode = body.location_code || market?.location_code || 2840;
+    const languageCode = body.language_code || market?.language_code || 'en';
 
-    if (debitError || !debitResult?.[0]?.success) {
-      const msg = debitResult?.[0]?.error_message || debitError?.message || 'Insufficient credits';
-      return jsonResponse({ success: false, error: msg }, 402);
-    }
+    // Billed to the WORKSPACE: a ceiling now, settled below to what the providers actually cost.
+    wallet = { userId, workspaceId, opType: 'seo_research' };
+    const ceiling = await researchCeiling(supabase, readPages);
+    const hold = await reserveStage(supabase, wallet, ceiling, `SEO keyword research: "${body.target_keyword}"`, {
+      topic: body.topic, target_keyword: body.target_keyword, location_code: locationCode, read_ranking_pages: readPages,
+    });
+    if (!hold.ok) return jsonResponse({ success: false, error: hold.error }, 402);
+    reserved = ceiling;
 
     console.log(`[seo-research] Starting research for "${body.target_keyword}" (user: ${userId})`);
 
-    // Run DataForSEO research + mention-monitoring opportunities IN PARALLEL.
-    // The opportunities call hits MIVAA's /opportunities-stateless endpoint,
-    // which fans out to DataForSEO SERP / Labs (PAA, AI Overview, featured
-    // snippet, related searches, top organic, video / news / shopping
-    // carousels, knowledge graph, paid bidders) on the SAME keyword.
+    // DataForSEO research and MIVAA SERP signals (PAA, AI Overview, related searches) IN PARALLEL.
     const client = new DataForSEOClient(dfs.login, dfs.password);
-    const countryCode = dfsLocationToCountry(locationCode);
+    const countryCode = countryForLocation(locationCode) ?? 'US';
     const [research, serpSignals] = await Promise.all([
       client.researchKeyword(
         body.target_keyword,
@@ -173,8 +146,9 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
         locationCode,
         languageCode,
       ),
-      fetchOpportunitiesStateless({
+      fetchOpportunitiesStateless(supabase, {
         subjectLabel: body.target_keyword,
+        workspaceId,
         languageCodes: [languageCode],
         countryCodes: [countryCode],
         limitPerType: 5,
@@ -196,18 +170,16 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       console.log('[seo-research] opportunities enrichment unavailable — continuing baseline');
     }
 
-    // Read the pages that actually rank. Until this, `serpInsights[].headings` was `[]` with the
-    // comment "Not available from SERP" and `contentGapOpportunities` was a list of competitor
-    // TITLES — so the planner was told "here are the gaps" and handed ten page titles.
-    //
-    // Failures are STATED, never dropped: a page Firecrawl could not fetch stays in the list with
-    // its reason, so nothing downstream can read three pages as a survey of ten.
+    // Read the pages that actually rank. Failures are STATED, never dropped: a page that could not
+    // be fetched stays in the list with its reason, so three reads never pass for a survey of ten.
+    let pagesRead = 0;
     if (readPages) {
       const targets = research.serpInsights
         .filter((c) => !!c.url)
         .map((c) => ({ url: c.url, position: c.position }));
       const ranking = await readRankingPages(targets, { limit: READ_PAGES_LIMIT });
       research.rankingContent = ranking;
+      pagesRead = ranking.read;
 
       const byUrl = new Map(ranking.pages.map((r) => [r.url, r]));
       for (const c of research.serpInsights) {
@@ -222,11 +194,18 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       );
     }
 
-    // File this research under a connected website — explicit body.website_id when the
-    // agent picked one, else the workspace's default site (null when none connected).
+    // File under the connected website: explicit body.website_id, else the workspace default.
     const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
 
-    // Persist to database
+    // What this run consumed; a DataForSEO response with no cost keeps the ceiling.
+    const spend = client.unpricedCalls > 0 ? [null] : await Promise.all([
+      serviceCredits(supabase, DATAFORSEO_SERVICE, client.spentUsd * 1000),
+      serviceCredits(supabase, SERP_SIGNALS_SERVICE, serpSignals ? 1 : 0),
+      serviceCredits(supabase, FIRECRAWL_SERVICE, pagesRead),
+    ]);
+    const actualCredits = spend.some((c) => c === null) ? null : spend.reduce<number>((s, c) => s + (c ?? 0), 0);
+    const creditCost = actualCredits ?? reserved;
+
     const { data: researchRow, error: insertError } = await supabase
       .from('seo_keyword_research')
       .insert({
@@ -252,13 +231,15 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       .single();
 
     if (insertError || !researchRow?.id) {
-      // A persist failure leaves an empty research_id that the planner/pipeline can't dereference —
-      // so the 18-credit charge would buy an unusable result. Throw into the catch below, which refunds
-      // + returns 500 (the user retries) rather than silently charging for a broken result.
+      // A persist failure leaves nothing usable; the catch refunds and the caller retries.
       throw new Error(`Failed to persist research: ${insertError?.message ?? 'no row returned'}`);
     }
 
-    console.log(`[seo-research] Complete. Research ID: ${researchRow?.id}`);
+    await settleStage(supabase, wallet, reserved, actualCredits, {
+      research_id: researchRow.id, dataforseo_usd: client.spentUsd, serp_signals: !!serpSignals, pages_read: pagesRead,
+    });
+    reserved = 0;
+    console.log(`[seo-research] Complete. Research ID: ${researchRow?.id}, ${creditCost} credits`);
 
     const response: SEOResearchResponse = {
       success: true,
@@ -273,20 +254,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
   } catch (error: any) {
     console.error('[seo-research] Error:', error);
 
-    // Attempt credit refund on failure
-    try {
-      await supabase.rpc('refund_credits', {
-        p_user_id: userId,
-        p_amount: creditCost,
-        p_operation_type: 'seo_research_refund',
-        p_description: `Refund: SEO research failed`,
-        p_metadata: { error: error.message },
-        p_workspace_id: workspaceId,
-      });
-      console.log('[seo-research] Credits refunded');
-    } catch (refundErr) {
-      console.error('[seo-research] Refund failed:', refundErr);
-    }
+    if (wallet && reserved > 0) await refundStage(supabase, wallet, reserved, String(error?.message ?? error));
 
     return jsonResponse(
       { success: false, error: error.message || 'Research failed' },

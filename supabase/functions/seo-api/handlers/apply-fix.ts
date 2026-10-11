@@ -5,7 +5,8 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
-import { generateWithClaude } from '../../_shared/ai-client.ts';
+import { DEFAULT_CLAUDE_MODEL, generateWithClaude } from '../../_shared/ai-client.ts';
+import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { normalizeContentBrief, briefList } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
@@ -17,8 +18,8 @@ import type { ArticlePlan, ContentAnalysisResult } from '../../_shared/seo-types
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-/** One block, one model turn. A twelfth of the input the whole-article fixer sends. */
-const APPLY_CREDIT_COST = 2;
+/** One block, one model turn: the ceiling is priced on this much input. */
+const APPLY_MAX_INPUT_TOKENS = 4000;
 
 /** Claude, not the whole-article fixer's Gemini. */
 const APPLY_MODEL_MAX_TOKENS = 4000;
@@ -35,7 +36,8 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
   if (!userId) return jsonResponse({ success: false, error: 'user_id is required' }, 400);
 
   let workspaceId: string | null = null;
-  let debited = false;
+  let reserved = 0;
+  let wallet: StageWallet | null = null;
 
   try {
     const articleId = typeof body.article_id === 'string' ? body.article_id : null;
@@ -75,21 +77,13 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
     workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
-    const { data: debit, error: debitErr } = await supabase.rpc('debit_credits', {
-      p_user_id: userId,
-      p_amount: APPLY_CREDIT_COST,
-      p_operation_type: 'seo_apply_fix',
-      p_description: `SEO fix applied: ${instruction.slice(0, 80)}`,
-      p_metadata: { article_id: articleId, block_chars: anchor.length },
-      p_workspace_id: workspaceId,
+    wallet = { userId, workspaceId, opType: 'seo_apply_fix' };
+    const ceiling = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, APPLY_MAX_INPUT_TOKENS, APPLY_MODEL_MAX_TOKENS, 20);
+    const hold = await reserveStage(supabase, wallet, ceiling, `SEO fix applied: ${instruction.slice(0, 80)}`, {
+      article_id: articleId, block_chars: anchor.length,
     });
-    if (debitErr || !debit?.[0]?.success) {
-      return jsonResponse(
-        { success: false, error: debit?.[0]?.error_message || debitErr?.message || 'Insufficient credits' },
-        402,
-      );
-    }
-    debited = true;
+    if (!hold.ok) return jsonResponse({ success: false, error: hold.error }, 402);
+    reserved = ceiling;
 
     const brief = normalizeContentBrief(article.content_brief);
     const voice = brief
@@ -109,9 +103,11 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
       task: 'seo_apply_fix',
       temperature: 0.3,
       maxTokens: APPLY_MODEL_MAX_TOKENS,
+      model: DEFAULT_CLAUDE_MODEL,
       userId,
       workspaceId: workspaceId ?? undefined,
     });
+    const actualCredits = await tokenCredits(supabase, result.model, result.usage);
 
     if (result.finishReason === 'length') {
       throw new Error('The rewrite hit the token ceiling and would have been truncated — nothing was changed.');
@@ -161,6 +157,9 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
       : (await supabase.from('seo_articles').update(snapshot).eq('id', articleId)).error?.message ?? null;
     if (writeErr) throw new Error(`Could not save the revised article: ${writeErr}`);
 
+    const creditsUsed = await settleStage(supabase, wallet, reserved, actualCredits, { article_id: articleId, model: result.model });
+    reserved = 0;
+
     return jsonResponse({
       success: true,
       data: {
@@ -172,24 +171,11 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
         analysis: reanalysed,
         can_revert: true,
         reverts_to: capturedAt,
-        credits_used: APPLY_CREDIT_COST,
+        credits_used: creditsUsed,
       },
     });
   } catch (error: any) {
-    if (debited) {
-      try {
-        await supabase.rpc('refund_credits', {
-          p_user_id: userId,
-          p_amount: APPLY_CREDIT_COST,
-          p_operation_type: 'seo_apply_fix_refund',
-          p_description: 'Refund: applying the fix failed',
-          p_metadata: { error: String(error?.message ?? error).slice(0, 300) },
-          p_workspace_id: workspaceId,
-        });
-      } catch (refundErr) {
-        console.error('[seo-apply-fix] refund failed:', refundErr);
-      }
-    }
+    if (wallet && reserved > 0) await refundStage(supabase, wallet, reserved, String(error?.message ?? error));
     console.error('[seo-apply-fix] Error:', error);
     return jsonResponse({ success: false, error: error?.message || 'Could not apply the fix' }, 500);
   }

@@ -5,7 +5,8 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
-import { generateWithClaude } from '../../_shared/ai-client.ts';
+import { DEFAULT_CLAUDE_MODEL, generateWithClaude } from '../../_shared/ai-client.ts';
+import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { normalizeContentBrief, briefList } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
@@ -20,8 +21,8 @@ import type { ArticlePlan, ContentAnalysisResult } from '../../_shared/seo-types
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-/** One short answer, one model turn. */
-const FAQ_CREDIT_COST = 2;
+/** One short answer, one model turn: the ceiling is priced on this much input. */
+const FAQ_MAX_INPUT_TOKENS = 3000;
 const FAQ_MAX_TOKENS = 1200;
 
 export async function handleAddFaq(req: Request, body: any): Promise<Response> {
@@ -36,7 +37,10 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
   if (!userId) return jsonResponse({ success: false, error: 'user_id is required' }, 400);
 
   let workspaceId: string | null = null;
-  let debited = false;
+  let reserved = 0;
+  let wallet: StageWallet | null = null;
+  let actualCredits: number | null = null;
+  let model: string | null = null;
 
   try {
     const articleId = typeof body.article_id === 'string' ? body.article_id : null;
@@ -69,21 +73,13 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
 
     let answer = providedAnswer;
     if (!answer) {
-      const { data: debit, error: debitErr } = await supabase.rpc('debit_credits', {
-        p_user_id: userId,
-        p_amount: FAQ_CREDIT_COST,
-        p_operation_type: 'seo_add_faq',
-        p_description: `SEO FAQ answer: ${question.slice(0, 80)}`,
-        p_metadata: { article_id: articleId },
-        p_workspace_id: workspaceId,
+      wallet = { userId, workspaceId, opType: 'seo_add_faq' };
+      const ceiling = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, FAQ_MAX_INPUT_TOKENS, FAQ_MAX_TOKENS, 8);
+      const hold = await reserveStage(supabase, wallet, ceiling, `SEO FAQ answer: ${question.slice(0, 80)}`, {
+        article_id: articleId,
       });
-      if (debitErr || !debit?.[0]?.success) {
-        return jsonResponse(
-          { success: false, error: debit?.[0]?.error_message || debitErr?.message || 'Insufficient credits' },
-          402,
-        );
-      }
-      debited = true;
+      if (!hold.ok) return jsonResponse({ success: false, error: hold.error }, 402);
+      reserved = ceiling;
 
       const brief = normalizeContentBrief(article.content_brief);
       const voice = brief
@@ -106,9 +102,12 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
         task: 'seo_add_faq',
         temperature: 0.3,
         maxTokens: FAQ_MAX_TOKENS,
+        model: DEFAULT_CLAUDE_MODEL,
         userId,
         workspaceId: workspaceId ?? undefined,
       });
+      actualCredits = await tokenCredits(supabase, result.model, result.usage);
+      model = result.model;
       if (result.finishReason === 'length') {
         throw new Error('The answer hit the token ceiling and would have been truncated — nothing was added.');
       }
@@ -171,6 +170,11 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
       if (error) throw new Error(`Could not save the FAQ: ${error.message}`);
     }
 
+    const creditsUsed = wallet && reserved > 0
+      ? await settleStage(supabase, wallet, reserved, actualCredits, { article_id: articleId, model })
+      : 0;
+    reserved = 0;
+
     return jsonResponse({
       success: true,
       data: {
@@ -184,24 +188,11 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
         gaps_gains: gapsGains,
         can_revert: true,
         reverts_to: capturedAt,
-        credits_used: debited ? FAQ_CREDIT_COST : 0,
+        credits_used: creditsUsed,
       },
     });
   } catch (error: any) {
-    if (debited) {
-      try {
-        await supabase.rpc('refund_credits', {
-          p_user_id: userId,
-          p_amount: FAQ_CREDIT_COST,
-          p_operation_type: 'seo_add_faq_refund',
-          p_description: 'Refund: adding the FAQ failed',
-          p_metadata: { error: String(error?.message ?? error).slice(0, 300) },
-          p_workspace_id: workspaceId,
-        });
-      } catch (refundErr) {
-        console.error('[seo-add-faq] refund failed:', refundErr);
-      }
-    }
+    if (wallet && reserved > 0) await refundStage(supabase, wallet, reserved, String(error?.message ?? error));
     console.error('[seo-add-faq] Error:', error);
     return jsonResponse({ success: false, error: error?.message || 'Could not add the FAQ' }, 500);
   }

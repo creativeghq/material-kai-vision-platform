@@ -15,6 +15,13 @@ import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
 import { enforceSiteAssets, findSitePages, type SitePage } from './site-pages.ts';
+import { marketForCountry } from './market.ts';
+import { tokenCeiling } from './stage-billing.ts';
+import { WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS } from './write.ts';
+import { DEFAULT_CLAUDE_MODEL } from '../../_shared/ai-client.ts';
+
+/** What research + planning typically settle to before the write reservation is taken. */
+const PRE_WRITE_TYPICAL_CREDITS = 40;
 import { handleWrite } from './write.ts';
 import { handleAnalyze } from './analyze.ts';
 import { buildGapsGains } from './gaps.ts';
@@ -142,6 +149,24 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       if (!ent.ok) return ent.response;
     }
 
+    // The peak a run holds at once is the write reservation plus what research and planning
+    // already settled to. Checked up front so a short wallet is refused before research is paid
+    // for, instead of failing at the write stage with two stages already spent.
+    const peakCredits = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS, 150)
+      + PRE_WRITE_TYPICAL_CREDITS;
+    const { data: preflight } = await supabase.rpc('preflight_credits', {
+      p_user_id: userId, p_amount: peakCredits, p_workspace_id: workspaceId,
+    });
+    const pf = Array.isArray(preflight) ? preflight[0] : preflight;
+    if (pf && pf.sufficient === false) {
+      return jsonResponse({
+        success: false,
+        error: `An article needs up to ${peakCredits} credits available while it is written `
+          + `(you are charged only what it actually uses, typically about 90). Balance: ${Number(pf.balance ?? 0)}.`,
+        credits_required: peakCredits,
+      }, 402);
+    }
+
     // ── Idempotency (#361 `EG-8`) ────────────────────────────────────────────────────────
     const idempotencyKey = typeof body.idempotency_key === 'string' && body.idempotency_key.trim()
       ? body.idempotency_key.trim().slice(0, 200)
@@ -204,6 +229,19 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
     const websiteId = website?.id ?? null;
 
+    // A caller that names no market gets the business's own (GR → Greece, Greek), never a silent US.
+    let marketSource = body.language_code && body.location_code ? 'caller' : 'default_us';
+    if ((!body.language_code || !body.location_code) && workspaceId) {
+      const { data: fin } = await supabase
+        .from('finance_settings').select('business_country_code').eq('workspace_id', workspaceId).maybeSingle();
+      const market = marketForCountry(fin?.business_country_code);
+      if (market) {
+        body.language_code ||= market.language_code;
+        body.location_code ||= market.location_code;
+        marketSource = 'workspace_country';
+      }
+    }
+
     // A second article on the same keyword for the same site competes with the first for one
     // ranking — refused before anything is billed, unless the caller says it is a deliberate rewrite.
     if (websiteId && body.allow_duplicate !== true) {
@@ -244,7 +282,12 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         progress_percentage: 0,
         current_stage: 'research',
         pipeline_log: [`[${new Date().toISOString()}] Pipeline started for "${body.target_keyword}"`],
-        stages_data: { extra: { language_code: body.language_code || 'en', site_url: website?.url ?? null } },
+        stages_data: { extra: {
+          language_code: body.language_code || 'en',
+          location_code: body.location_code || 2840,
+          market_source: marketSource,
+          site_url: website?.url ?? null,
+        } },
       })
       .select('id')
       .single();
@@ -344,6 +387,7 @@ async function runPipelineStages(ctx: {
     articleId, autoFix, maxFixIterations, startTime,
   } = ctx;
   let totalCredits = 0;
+  const creditsByStage: Record<string, number> = {};
 
     // ────────────────────────────────────────────────────────────
     // STAGE 1: RESEARCH
@@ -373,7 +417,8 @@ async function runPipelineStages(ctx: {
       }, 90_000);
 
       research = researchResult.data.research;
-      totalCredits += researchResult.data.credits_used || 18;
+      totalCredits += Number(researchResult.data.credits_used ?? 0);
+      creditsByStage.research = Number(researchResult.data.credits_used ?? 0);
 
       await updateArticle(supabase, articleId, {
         keyword_research_id: researchResult.data.research_id,
@@ -413,7 +458,8 @@ async function runPipelineStages(ctx: {
     }, 180_000);
 
     const plan: ArticlePlan = planResult.data.plan;
-    totalCredits += planResult.data.credits_used || 2;
+    totalCredits += Number(planResult.data.credits_used ?? 0);
+    creditsByStage.plan = Number(planResult.data.credits_used ?? 0);
 
     await updateArticle(supabase, articleId, {
       title: plan.title,
@@ -453,7 +499,8 @@ async function runPipelineStages(ctx: {
     const written = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, writeResult.data.content_markdown, sitePages);
     const contentMarkdown = written.markdown;
     const wordCount = writeResult.data.word_count;
-    totalCredits += writeResult.data.credits_used || 20;
+    totalCredits += Number(writeResult.data.credits_used ?? 0);
+    creditsByStage.write = Number(writeResult.data.credits_used ?? 0);
 
     await updateArticle(supabase, articleId, {
       markdown_content: contentMarkdown,
@@ -486,7 +533,8 @@ async function runPipelineStages(ctx: {
     const analysis: ContentAnalysisResult = analyzeResult.data.analysis;
     const fixIterations = analyzeResult.data.fix_iterations;
     const finalWordCount = analyzeResult.data.word_count;
-    totalCredits += analyzeResult.data.credits_used || (2 + fixIterations * 5);
+    totalCredits += Number(analyzeResult.data.credits_used ?? 0);
+    creditsByStage.analyze = Number(analyzeResult.data.credits_used ?? 0);
 
     await updateArticle(supabase, articleId, {
       progress_percentage: 90,
@@ -714,7 +762,8 @@ async function runPipelineStages(ctx: {
       interlinking_data: interlinkingData,
       fix_iterations: fixIterations,
       geo_score: analysis.geoScore?.overall || null,
-      credits_used: totalCredits,
+      credits_used: Math.round(totalCredits * 100) / 100,
+      credits_by_stage: creditsByStage,
       processing_time_ms: processingTimeMs,
       status: 'completed',
       progress_percentage: 100,

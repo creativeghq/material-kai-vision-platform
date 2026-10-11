@@ -33,11 +33,14 @@ import {
   type NormalizedBrief,
 } from './content-brief.ts';
 import { outputLanguageBlock } from './output-language.ts';
+import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
+import { DEFAULT_GEMINI_MODEL } from '../../_shared/ai-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const CREDIT_COST = 2;
+/** Input budget the ceiling is priced on (system + research context). */
+const PLAN_MAX_INPUT_TOKENS = 20000;
 
 
 /** Article plan structure budget. */
@@ -102,6 +105,8 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
   // Outside the try: the refund lives in the catch and has to know which wallet was charged.
   let workspaceId: string | null = null;
+  let reserved = 0;
+  let wallet: StageWallet | null = null;
 
   try {
 
@@ -147,23 +152,13 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
     workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
-    // Debit credits
-    const { data: debitResult, error: debitError } = await supabase.rpc(
-      'debit_credits',
-      {
-        p_user_id: userId,
-        p_amount: CREDIT_COST,
-        p_operation_type: 'seo_plan',
-        p_description: `SEO article planning: "${body.target_keyword}"`,
-        p_metadata: { topic: body.topic, target_keyword: body.target_keyword },
-        p_workspace_id: workspaceId,
-      },
-    );
-
-    if (debitError || !debitResult?.[0]?.success) {
-      const msg = debitResult?.[0]?.error_message || debitError?.message || 'Insufficient credits';
-      return jsonResponse({ success: false, error: msg }, 402);
-    }
+    wallet = { userId, workspaceId, opType: 'seo_plan' };
+    const ceiling = await tokenCeiling(supabase, DEFAULT_GEMINI_MODEL, PLAN_MAX_INPUT_TOKENS, PLAN_MAX_OUTPUT_TOKENS, 40);
+    const hold = await reserveStage(supabase, wallet, ceiling, `SEO article planning: "${body.target_keyword}"`, {
+      topic: body.topic, target_keyword: body.target_keyword,
+    });
+    if (!hold.ok) return jsonResponse({ success: false, error: hold.error }, 402);
+    reserved = ceiling;
 
     console.log(`[seo-plan] Planning article for "${body.target_keyword}" (user: ${userId})`);
 
@@ -188,7 +183,13 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
       temperature: 0.4,
       maxTokens: PLAN_MAX_OUTPUT_TOKENS,
       thinkingLevel: 'high',
+      model: DEFAULT_GEMINI_MODEL,
+      userId,
+      workspaceId: workspaceId ?? undefined,
     });
+    const creditsUsed = await settleStage(supabase, wallet, reserved,
+      await tokenCredits(supabase, result.model, result.usage), { model: result.model, target_keyword: body.target_keyword });
+    reserved = 0;
 
     const plan = result.output as ArticlePlan;
 
@@ -207,25 +208,13 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
     const response: SEOPlanResponse = {
       success: true,
-      data: { plan, credits_used: CREDIT_COST },
+      data: { plan, credits_used: creditsUsed },
     };
 
     return jsonResponse(response);
   } catch (error: any) {
     console.error('[seo-plan] Error:', error);
-    try {
-      await supabase.rpc('refund_credits', {
-        p_user_id: userId,
-        p_amount: CREDIT_COST,
-        p_operation_type: 'seo_plan_refund',
-        p_description: 'Refund: SEO planning failed',
-        p_metadata: { error: error.message },
-        p_workspace_id: workspaceId,
-      });
-      console.log('[seo-plan] Credits refunded');
-    } catch (refundErr) {
-      console.error('[seo-plan] Refund failed:', refundErr);
-    }
+    if (wallet && reserved > 0) await refundStage(supabase, wallet, reserved, String(error?.message ?? error));
     return jsonResponse(
       { success: false, error: error.message || 'Planning failed' },
       500,

@@ -320,7 +320,7 @@ describe('no reader keys off the English label any more', () => {
     // could know what language to write a new heading in.
     const pipeline = read('supabase/functions/seo-api/handlers/pipeline.ts');
     expect(pipeline).toContain('language_code: body.language_code');
-    expect(pipeline).toContain('stages_data: { extra: { language_code:');
+    expect(pipeline).toMatch(/stages_data: \{ extra: \{\s*language_code:/);
   });
 });
 

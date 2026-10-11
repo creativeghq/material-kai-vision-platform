@@ -61,8 +61,9 @@ import {
   AlertOctagon,
   Quote,
   BookOpen,
-  Undo2, Wand2, RefreshCw, Plus, Pencil,
+  Undo2, Wand2, RefreshCw, Plus, Pencil, Download, FileJson,
 } from 'lucide-react';
+import { articleExportFilename, buildArticleExport } from '@/services/seo/articleExport';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
 
@@ -111,10 +112,68 @@ interface SEOArticle {
   pipeline_log: string[];
   fix_iterations: number;
   credits_used: number;
+  credits_by_stage?: Record<string, number> | null;
+  site_url?: string | null;
+  location_code?: number | null;
   processing_time_ms: number;
   error_message: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** The whole article as one JSON document to publish elsewhere: copy it or download it. */
+function ArticleExportPanel({ article }: { article: SEOArticle }) {
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+  const json = useMemo(() => JSON.stringify(buildArticleExport(article), null, 2), [article]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: 'Could not copy', description: 'Use Download instead.', variant: 'destructive' });
+    }
+  };
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = articleExportFilename(article);
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+        <div>
+          <CardTitle className="text-sm">Publish anywhere</CardTitle>
+          <CardDescription className="text-xs">
+            Title, meta, URL suggestion, content as Markdown and HTML, outline, FAQ, images, links,
+            JSON-LD schema and cost in one JSON document.
+          </CardDescription>
+        </div>
+        <div className="flex gap-1 flex-shrink-0">
+          <Button variant="outline" size="sm" onClick={copy}>
+            {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+            {copied ? 'Copied' : 'Copy JSON'}
+          </Button>
+          <Button size="sm" onClick={download}>
+            <Download className="w-3 h-3 mr-1" />
+            Download .json
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <pre className="max-h-[480px] overflow-auto rounded-sm border border-hairline bg-surface-sunken p-3 text-xs leading-relaxed">
+          {json}
+        </pre>
+      </CardContent>
+    </Card>
+  );
 }
 
 interface GEOScore {
@@ -798,7 +857,7 @@ function AddFaqControl({ onAdd }: {
       <Textarea
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
-        placeholder="Answer (optional) — leave blank and it is written for you, 40-60 words, 2 credits"
+        placeholder="Answer (optional) — leave blank and it is written for you, 40-60 words, about 2-3 credits"
         rows={3}
         className="text-sm"
       />
@@ -2976,7 +3035,17 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                       Inter-Linking
                     </TabsTrigger>
                   )}
+                  {article.status === 'completed' && article.markdown_content && (
+                    <TabsTrigger value="export" className="gap-1">
+                      <FileJson className="w-3.5 h-3.5" />
+                      Export
+                    </TabsTrigger>
+                  )}
                 </TabsList>
+
+                <TabsContent value="export" className="mt-4">
+                  <ArticleExportPanel article={article} />
+                </TabsContent>
 
                 <TabsContent value="content" className="mt-4">
                   <SearchAppearance

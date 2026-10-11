@@ -142,8 +142,8 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
       schema: z.object({
         topic: z.string().describe('The broad topic or niche (e.g. "sustainable building materials")'),
         target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
-        language_code: z.string().optional().describe('Language code, defaults to "en"'),
-        location_code: z.number().optional().describe('DataForSEO location code, defaults to 2840 (US)'),
+        language_code: z.string().optional().describe('Language code. Omit unless the user names a market: the workspace business country decides (Greece → "el").'),
+        location_code: z.number().optional().describe('DataForSEO location code. Omit unless the user names a market: the workspace business country decides (Greece → 2300).'),
         website_id: z.string().optional().describe('Connected website id to file this research under. Omit to use the workspace default connected website.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id passed by the wizard. Extract from `[workflow:seo-article/research:<run_id>]` prefix.'),
       }),
@@ -497,8 +497,8 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
         max_fix_iterations: z.number().optional().describe('Max auto-fix iterations (default: 2)'),
         content_type: z.string().optional().describe('Article type: guide, listicle, comparison, how-to, case-study (default: guide)'),
         website_id: z.string().optional().describe('Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.'),
-        language_code: z.string().optional().describe('Language the article is researched and written in, e.g. "el" for Greek. Defaults to "en" — SET IT whenever the keyword or the requested market is not English, or the whole article is planned against the wrong SERP.'),
-        location_code: z.number().optional().describe('DataForSEO location code for the market being targeted, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Defaults to 2840 (US). Set it together with language_code.'),
+        language_code: z.string().optional().describe('Language the article is researched and written in, e.g. "el" for Greek. Set it only when the user names a market; omitted, the workspace\'s business country decides (Greece → "el").'),
+        location_code: z.number().optional().describe('DataForSEO location code for the market, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Set it together with language_code only when the user names a market; omitted, the business country decides.'),
         allow_duplicate: z.boolean().optional().describe('The pipeline refuses a keyword this website already has an article on. Set true ONLY when the user explicitly asks to rewrite that article.'),
       }),
     }

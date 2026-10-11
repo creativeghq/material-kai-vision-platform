@@ -4,9 +4,15 @@ import type {
   MentionOpportunity,
   SerpSignalBlob,
 } from './seo-types.ts';
+import { resolveSecret } from './secrets.ts';
+
+/** Where MIVAA lives when no deployer override is set (same default as toolkit-research). */
+const DEFAULT_BACKEND_URL = 'https://v1api.materialshub.gr';
 
 interface FetchOpportunitiesParams {
   subjectLabel: string;
+  /** The tenant the run belongs to — MIVAA attributes its usage rows to it. */
+  workspaceId?: string | null;
   brandName?: string | null;
   aliases?: string[];
   languageCodes?: string[];
@@ -32,14 +38,20 @@ const DEFAULT_TYPES = [
 ];
 
 export async function fetchOpportunitiesStateless(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
   params: FetchOpportunitiesParams,
 ): Promise<SerpSignalBlob | null> {
-  const backend = Deno.env.get('PYTHON_BACKEND_URL');
-  const cronSecret = Deno.env.get('CRON_SECRET');
-  if (!backend || !cronSecret) {
-    console.warn(
-      '[mention-opportunities] PYTHON_BACKEND_URL or CRON_SECRET unset — skipping enrichment',
-    );
+  // Through the resolver, never Deno.env alone: on this platform both live in platform_secrets,
+  // and an env-only read skipped this call on every article ever researched.
+  const [backendSecret, cronSecretRow] = await Promise.all([
+    resolveSecret(supabase, 'PYTHON_BACKEND_URL'),
+    resolveSecret(supabase, 'CRON_SECRET'),
+  ]);
+  const backend = backendSecret.value || DEFAULT_BACKEND_URL;
+  const cronSecret = cronSecretRow.value;
+  if (!cronSecret) {
+    console.warn('[mention-opportunities] CRON_SECRET unresolvable — skipping enrichment');
     return null;
   }
   const url = `${backend.replace(/\/+$/, '')}/api/v1/mention-monitoring/opportunities-stateless`;
@@ -52,6 +64,7 @@ export async function fetchOpportunitiesStateless(
     homepage_domain: params.homepageDomain || undefined,
     types: params.types || DEFAULT_TYPES,
     limit_per_type: params.limitPerType ?? 5,
+    workspace_id: params.workspaceId || undefined,
     use_llm_summary: false,
   };
   let resp: Response;
