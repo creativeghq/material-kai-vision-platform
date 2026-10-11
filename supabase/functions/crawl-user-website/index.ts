@@ -26,6 +26,9 @@ const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 const MIVAA_API_KEY = () => Deno.env.get('MIVAA_API_KEY') || '';
 
 const MAX_SITEMAP_DEPTH = 3;
+const MAX_CHILD_SITEMAPS = 60;
+/** A sitemap this small is hand-made pages (articles, landing pages), not a generated matrix. */
+const EDITORIAL_SITEMAP_MAX = 300;
 // A sitemap is an attacker-influenced document fetched from an attacker-influenced host, so its
 // size is not ours to assume (#363 `EE-14`). 10 MB is far beyond any real sitemap (the sitemaps
 // spec caps them at 50 MB / 50k URLs, and index files are tiny) and small enough that a
@@ -221,30 +224,50 @@ async function discoverSitemapUrl(siteUrl: string): Promise<string | null> {
   return null;
 }
 
-async function collectSitemapUrls(rootSitemap: string, cap: number): Promise<string[]> {
+/**
+ * Every child sitemap gets a fair share of `cap`: a small one is kept whole and the large ones
+ * split what remains. Filling in document order let one programmatic sitemap take the whole cap,
+ * so the editorial and product sitemaps listed after it were never seen and their pages retired.
+ * `editorial` = URLs from sitemaps small enough to be hand-made, read first by the backfill.
+ */
+async function collectSitemapUrls(rootSitemap: string, cap: number): Promise<{ urls: string[]; editorial: Set<string>; total: number }> {
   const seen = new Set<string>();
-  const collected: string[] = [];
+  const lists: string[][] = [];
   const queue: { url: string; depth: number }[] = [{ url: rootSitemap, depth: 0 }];
 
-  while (queue.length && collected.length < cap) {
+  while (queue.length && lists.length < MAX_CHILD_SITEMAPS) {
     const { url, depth } = queue.shift()!;
     if (seen.has(url) || depth > MAX_SITEMAP_DEPTH) continue;
     seen.add(url);
     const xml = await fetchText(url);
     if (!xml) continue;
     const { urls, sitemaps } = parseSitemap(xml);
-    for (const u of urls) {
-      if (collected.length >= cap) break;
-      if (!seen.has(u)) {
-        seen.add(u);
-        collected.push(u);
-      }
-    }
+    const fresh = urls.filter((u) => !seen.has(u));
+    fresh.forEach((u) => seen.add(u));
+    if (fresh.length) lists.push(fresh);
     for (const s of sitemaps) {
       if (!seen.has(s)) queue.push({ url: s, depth: depth + 1 });
     }
   }
-  return collected;
+
+  const shares = new Map<string[], number>();
+  let remaining = cap;
+  const open = [...lists].sort((a, b) => a.length - b.length);
+  while (open.length) {
+    const fair = Math.floor(remaining / open.length);
+    const list = open.shift()!;
+    const take = Math.min(list.length, fair);
+    shares.set(list, take);
+    remaining -= take;
+  }
+  const collected: string[] = [];
+  const editorial = new Set<string>();
+  for (const list of lists) {
+    const take = list.slice(0, shares.get(list) ?? 0);
+    collected.push(...take);
+    if (list.length <= EDITORIAL_SITEMAP_MAX && take.length === list.length) take.forEach((u) => editorial.add(u));
+  }
+  return { urls: collected, editorial, total: lists.reduce((n, l) => n + l.length, 0) };
 }
 
 interface ScrapeResult {
@@ -436,7 +459,7 @@ async function previewWebsite(
     }
   }
 
-  const urls = await collectSitemapUrls(sitemapUrl, MAX_PAGES_HARD_CAP);
+  const { urls } = await collectSitemapUrls(sitemapUrl, MAX_PAGES_HARD_CAP);
   if (urls.length === 0) {
     return { ok: false, sitemap_url: sitemapUrl, pages_discovered: 0, capped_at: 0, sample: [], error: 'sitemap empty' };
   }
@@ -511,15 +534,14 @@ async function planCrawl(
     }
   }
 
-  const allUrls = await collectSitemapUrls(sitemapUrl, MAX_PAGES_HARD_CAP);
-  if (allUrls.length === 0) {
+  const { urls, editorial, total: discoveredTotal } = await collectSitemapUrls(sitemapUrl, cap);
+  if (urls.length === 0) {
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),
       last_crawl_error: 'Sitemap returned no URLs.',
     }).eq('id', websiteId);
     return { error: 'sitemap empty' };
   }
-  const urls = allUrls.slice(0, cap);
   // Store only once the sitemap has actually yielded URLs (#363 `EE-19`).
   if (autodiscovered) {
     await supabase.from('user_websites').update({ sitemap_url: sitemapUrl }).eq('id', websiteId);
@@ -581,10 +603,23 @@ async function planCrawl(
       p_limit: room + queue.length,
     });
     if (backfillErr) return { error: `backfill queue unavailable: ${backfillErr.message}` };
+    const editorialUnread: { page_url: string }[] = [];
+    const editorialList = [...editorial];
+    for (let i = 0; i < editorialList.length && editorialUnread.length < room; i += 100) {
+      const { data, error } = await supabase
+        .from('user_website_pages')
+        .select('url')
+        .eq('website_id', websiteId)
+        .is('content_excerpt', null)
+        .in('url', editorialList.slice(i, i + 100));
+      if (error) return { error: `editorial backfill unavailable: ${error.message}` };
+      editorialUnread.push(...(data ?? []).map((r: { url: string }) => ({ page_url: r.url })));
+    }
     const queued = new Set(queue.map((q) => q.url));
-    for (const r of (backfillRows ?? []) as { page_url: string }[]) {
+    for (const r of [...editorialUnread, ...(backfillRows ?? [])] as { page_url: string }[]) {
       if (queue.length >= MAX_BACKFILL_PER_RUN) break;
       if (queued.has(r.page_url)) continue;
+      queued.add(r.page_url);
       queue.push({
         url: r.page_url, reason: 'backfill', keywords: null, best_position: null, impressions: null, clicks: null,
       });
@@ -593,8 +628,8 @@ async function planCrawl(
 
   return {
     sitemapUrl, seenAt, cap, queue, writes, writeFailures, firstWriteError,
-    discovered: allUrls.length,
-    capped: allUrls.length > cap,
+    discovered: discoveredTotal,
+    capped: discoveredTotal > urls.length,
   };
 }
 
