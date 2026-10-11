@@ -26,6 +26,7 @@ import {
 import { outputLanguageBlock } from './output-language.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithClaude } from '../../_shared/ai-client.ts';
+import { sitePagesBlock, sitePagesDataLines, type SitePage } from './site-pages.ts';
 import type {
   SEOWriteRequest,
   SEOWriteResponse,
@@ -127,6 +128,7 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_writer');
     const systemPrompt = (await buildWritingSystemPrompt(supabase, baseSystemPrompt, plan, brief, research))
+      + await buildSitePagesBlock(supabase, body.site_pages)
       + outputLanguageBlock(body.language_code);
     const userPrompt = await buildWritingUserPrompt(supabase, plan, brief, research);
 
@@ -270,6 +272,15 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
   prompt += await buildSerpSignalsWriterBlock(supabase, research?.serpSignals);
 
   return prompt;
+}
+
+async function buildSitePagesBlock(supabase: DbClient, raw: unknown): Promise<string> {
+  const pages = Array.isArray(raw)
+    ? (raw as SitePage[]).filter((p) => typeof p?.url === 'string' && /^https:\/\//.test(p.url))
+      .map((p) => ({ ...p, images: Array.isArray(p.images) ? p.images : [] }))
+    : [];
+  if (pages.length === 0) return '';
+  return await getToolPrompt(supabase, 'seo_writer_site_links') + sitePagesBlock(sitePagesDataLines(pages));
 }
 
 /** First-hand experience block — the "E" in E-E-A-T. */

@@ -424,7 +424,7 @@ export const createSEOScoreUrlTool = (userId: string, onProgress?: (status: stri
  */
 export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type, website_id, language_code, location_code }) => {
+    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type, website_id, language_code, location_code, allow_duplicate }) => {
       try {
 
         const result = await callSEOFunction('seo-pipeline', {
@@ -442,6 +442,7 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
           // US competitor headings for a Greek keyword are a plausible research result.
           language_code: language_code || undefined,
           location_code: location_code || undefined,
+          allow_duplicate: allow_duplicate === true,
           // 30s, not 300s. `seo-pipeline` now creates the row and hands the stages to
           // `EdgeRuntime.waitUntil`, so this call returns as soon as the article id exists —
           // a second or two. The old 5-minute budget was for a handler that ran all five
@@ -498,6 +499,7 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
         website_id: z.string().optional().describe('Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.'),
         language_code: z.string().optional().describe('Language the article is researched and written in, e.g. "el" for Greek. Defaults to "en" — SET IT whenever the keyword or the requested market is not English, or the whole article is planned against the wrong SERP.'),
         location_code: z.number().optional().describe('DataForSEO location code for the market being targeted, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Defaults to 2840 (US). Set it together with language_code.'),
+        allow_duplicate: z.boolean().optional().describe('The pipeline refuses a keyword this website already has an article on. Set true ONLY when the user explicitly asks to rewrite that article.'),
       }),
     }
   );

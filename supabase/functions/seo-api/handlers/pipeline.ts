@@ -13,7 +13,8 @@ import { runInBackground } from '../../_shared/background.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
-import { resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
+import { normalizeContentBrief, resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
+import { findSitePages, type SitePage } from './site-pages.ts';
 import { handleWrite } from './write.ts';
 import { handleAnalyze } from './analyze.ts';
 import { buildGapsGains } from './gaps.ts';
@@ -32,6 +33,11 @@ import type {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+/** Our pages offered to the writer as link targets and photo sources. */
+const SITE_LINK_TARGETS = 14;
+/** Of those, how many the planner is told already exist on the site. */
+const SITE_CONTEXT_PAGES = 6;
 
 
 /** The four stages, called IN-PROCESS. */
@@ -113,10 +119,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const autoFix = body.auto_fix !== false;
     const maxFixIterations = body.max_fix_iterations || 3;
 
-    // Get workspace ID.
-    // Was `.single()`, which ERRORS (PGRST116, "multiple rows returned") for any user who
-    // belongs to more than one workspace — and the error was not destructured, so
-    // workspaceId silently became null.
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
     let memberQuery = supabase
       .from('workspace_members')
@@ -175,11 +177,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // without the window that stuck row would block the keyword permanently — trading a
     // double-charge for a feature that never works again, which is the worse failure.
     const IN_FLIGHT_WINDOW_MS = 30 * 60 * 1000;
-    // Two `neq`s rather than `.not('status', 'in', '(…)')`: the negated-in spelling is easy to
-    // get subtly wrong, and a rejected filter here does not fail loudly — PostgREST returns an
-    // error, supabase-js resolves, and the guard just silently stops finding anything. Excluding
-    // the two TERMINAL states also means a stage added later is treated as in-flight, which is
-    // the direction that keeps the guard working.
     const { data: running, error: inFlightErr } = await supabase
       .from('seo_articles')
       .select('id, status, progress_percentage, current_stage, created_at')
@@ -222,6 +219,29 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
     const websiteId = website?.id ?? null;
 
+    // A second article on the same keyword for the same site competes with the first for one
+    // ranking — refused before anything is billed, unless the caller says it is a deliberate rewrite.
+    if (websiteId && body.allow_duplicate !== true) {
+      const { data: siblings, error: siblingErr } = await supabase
+        .from('seo_articles')
+        .select('id, title, target_keyword, status')
+        .eq('website_id', websiteId)
+        .neq('status', 'failed');
+      if (siblingErr) {
+        return jsonResponse({ success: false, error: `Could not check for an existing article: ${siblingErr.message}` }, 500);
+      }
+      const wanted = normalizeKeyword(body.target_keyword);
+      const twin = (siblings ?? []).find((a: { target_keyword: string | null }) => normalizeKeyword(a.target_keyword ?? '') === wanted);
+      if (twin) {
+        return jsonResponse({
+          success: false,
+          error: `This website already has an article on "${twin.target_keyword}" ("${twin.title ?? 'untitled'}"). `
+            + 'Pick a different keyword or angle, or pass allow_duplicate to rewrite it on purpose.',
+          data: { existing_article_id: twin.id },
+        }, 409);
+      }
+    }
+
     // Create article record immediately (for frontend polling)
     const { data: articleRow, error: insertError } = await supabase
       .from('seo_articles')
@@ -237,11 +257,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         progress_percentage: 0,
         current_stage: 'research',
         pipeline_log: [`[${new Date().toISOString()}] Pipeline started for "${body.target_keyword}"`],
-        // The language reached the stages and was then thrown away, so nothing that touches the
-        // article AFTERWARDS could know what language it is in — which is exactly what an
-        // "add a question to the FAQ" needs before it can name a section it has to create.
-        // `stages_data.extra` because `seo_articles` has no such column and updateArticle's
-        // merge keeps `extra` across every later stage.
         stages_data: { extra: { language_code: body.language_code || 'en' } },
       })
       .select('id')
@@ -392,19 +407,24 @@ async function runPipelineStages(ctx: {
       current_stage: 'plan',
     }, 'Planning article structure...');
 
+    const sitePages = await findSitePages(supabase, {
+      userId, workspaceId, websiteId,
+      queryText: [body.topic, body.target_keyword, ...research.recommendedSecondaries.slice(0, 8)].join('\n'),
+      limit: SITE_LINK_TARGETS,
+    });
+    const planBrief = await withSiteClusterContext(supabase, brief, websiteId, articleId, sitePages);
+    await updateArticle(supabase, articleId, {
+      site_link_targets: sitePages.map((p) => ({ url: p.url, title: p.title, photos: p.images.length })),
+    }, `Site context: ${sitePages.length} of our pages as link targets, ${sitePages.reduce((s, p) => s + p.images.length, 0)} photos`);
+
     const planResult = await callStage('plan', req, {
       topic: body.topic,
       target_keyword: body.target_keyword,
       keyword_research: research,
-      content_brief: brief,
+      content_brief: planBrief,
       additional_instructions: body.additional_instructions,
       language_code: body.language_code || undefined,
       user_id: userId,
-      // 180s, like write and analyze. It was 60 — set when the plan call had a 4096-token
-      // budget that could not finish anyway. A reasoning model with room to think takes
-      // longer, and losing the race here does NOT cancel `handlePlan`: it completes, keeps
-      // its 2 credits (its own catch never fires, so nothing refunds), and the pipeline
-      // fails holding a plan that exists.
     }, 180_000);
 
     const plan: ArticlePlan = planResult.data.plan;
@@ -433,23 +453,16 @@ async function runPipelineStages(ctx: {
     const writeResult = await callStage('write', req, {
       article_plan: plan,
       content_brief: brief,
+      site_pages: sitePages,
       language_code: body.language_code || undefined,
       keyword_research_summary: {
         targetKeyword: research.targetKeyword,
         recommendedPrimary: research.recommendedPrimary,
         recommendedSecondaries: research.recommendedSecondaries.slice(0, 5),
         paaQuestions: research.paaQuestions,
-        // Phase 3 — forward mention-monitoring SERP signals so the writer
-        // can use AI Overview text, featured-snippet target, and PAA
-        // answer snippets directly inside the prompt.
         serpSignals: research.serpSignals,
       },
       user_id: userId,
-      // 300s, measured not guessed. Claude Opus 5 writing this pipeline's own plan — 2,200
-      // Greek words over 7 sections — took 217s and 9,934 output tokens against the live API
-      // on 2026-09-06 (Sonnet 5 took 154s for the same brief, so the model choice does not
-      // rescue a 180s budget either). At 180s the stage was killed mid-generation and the run
-      // died as `The write stage did not finish within 180s.`
     }, 300_000);
 
     const contentMarkdown = writeResult.data.content_markdown;
@@ -478,8 +491,6 @@ async function runPipelineStages(ctx: {
       auto_fix: autoFix,
       max_iterations: maxFixIterations,
       user_id: userId,
-      // Phase 4 — forward mention-monitoring SERP signals so the analyzer
-      // can run gap-scoring rules tied to current SERP state.
       serp_signals: research.serpSignals,
     }, 180_000);
 
@@ -508,10 +519,8 @@ async function runPipelineStages(ctx: {
     const publishedAt = new Date().toISOString();
     const publishedMarkdown = appendProvenanceBlock(finalMarkdown, brief, website);
 
-    // Generate HTML from markdown (basic conversion)
     const htmlContent = markdownToHtml(publishedMarkdown);
 
-    // Build schema markup
     const schemaMarkup = buildSchemaMarkup(plan, publishedMarkdown, {
       brief: brief,
       website,
@@ -873,6 +882,13 @@ function markdownToHtml(markdown: string): string {
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
+  // Images before links, or the link rule turns `![alt](src)` into `!<a>`. https only.
+  html = html.replace(
+    /!\[([^\]]*)\]\(([^)\s]+)\)/g,
+    (_m, alt: string, url: string) =>
+      /^https:\/\//i.test(url.replace(/[^\x21-\x7e]/g, '')) ? `<img src="${url}" alt="${alt}" loading="lazy" />` : alt,
+  );
+
   // Links. `$2` is already escaped, so it is safe as an attribute VALUE; `safeHref` is what
   // decides whether it is a URL we are willing to emit at all.
   html = html.replace(
@@ -1179,6 +1195,54 @@ function collectHeadings(sections: any[]): string[] {
   };
   walk(sections);
   return out;
+}
+
+/** Case-, accent- and spacing-insensitive form of a keyword; Greek final sigma folds to σ. */
+export function normalizeKeyword(keyword: string): string {
+  return keyword
+    .normalize('NFD').replace(/\p{M}/gu, '')
+    .toLowerCase().replace(/ς/g, 'σ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The brief the PLANNER sees: the caller's, plus what this site already published — its other
+ * articles and its closest existing pages — so the outline differentiates instead of repeating
+ * them. The caller's own cluster context is kept and extended, never replaced.
+ */
+async function withSiteClusterContext(
+  supabase: DbClient,
+  brief: NormalizedBrief | null,
+  websiteId: string | null,
+  articleId: string,
+  sitePages: SitePage[],
+): Promise<NormalizedBrief | null> {
+  if (!websiteId) return brief;
+  const { data: articles } = await supabase
+    .from('seo_articles')
+    .select('title, target_keyword, published_url')
+    .eq('website_id', websiteId)
+    .eq('status', 'completed')
+    .neq('id', articleId)
+    .limit(30);
+  const already = [
+    ...((articles ?? []) as { title: string | null; target_keyword: string | null; published_url: string | null }[])
+      .map((a) => `${a.title ?? a.target_keyword} (our article${a.published_url ? `, ${a.published_url}` : ''})`),
+    ...sitePages.slice(0, SITE_CONTEXT_PAGES).map((p) => `${p.title ?? p.url} (our page, ${p.url})`),
+  ];
+  if (already.length === 0) return brief;
+
+  const base = brief ?? normalizeContentBrief({})!;
+  const cluster = base.clusterContext ?? { pillarTopic: null, relatedArticles: [], differentiationNote: null };
+  return {
+    ...base,
+    clusterContext: {
+      ...cluster,
+      relatedArticles: [...cluster.relatedArticles, ...already],
+      differentiationNote: cluster.differentiationNote
+        ?? 'Cover what these pages do not; where they already answer something, link to them rather than restating it.',
+    },
+  };
 }
 
 /** Pick the secondary keyword that best appears in the target page's title/description, else fall back to title. */

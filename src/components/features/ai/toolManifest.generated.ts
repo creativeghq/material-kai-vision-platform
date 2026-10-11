@@ -500,6 +500,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'website_id', type: 'string', optional: true, description: 'Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.' },
       { name: 'language_code', type: 'string', optional: true, description: 'Language the article is researched and written in, e.g. "el" for Greek. Defaults to "en" — SET IT whenever the keyword or the requested market is not English, or the whole article is planned against the wrong SERP.' },
       { name: 'location_code', type: 'number', optional: true, description: 'DataForSEO location code for the market being targeted, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Defaults to 2840 (US). Set it together with language_code.' },
+      { name: 'allow_duplicate', type: 'boolean', optional: true, description: 'The pipeline refuses a keyword this website already has an article on. Set true ONLY when the user explicitly asks to rewrite that article.' },
     ],
   },
   {

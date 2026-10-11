@@ -17,6 +17,7 @@ import { scrapeMarkdown, excerptFromMarkdown } from '../_shared/scrape-markdown.
 import { chargeCronUser, refundCronUser } from '../_shared/cron-billing.ts';
 import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
+import { extractContentImages, type PageImage } from '../_shared/page-images.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -259,6 +260,8 @@ interface ScrapeResult {
   rate_limited?: boolean;
   retry_after_ms?: number;
   fetch_method?: 'direct' | 'firecrawl';
+  /** Only a direct read sees the HTML; absent means "not read", never "no photos". */
+  images?: PageImage[];
 }
 
 /**
@@ -337,6 +340,7 @@ async function directScrape(url: string): Promise<ScrapeResult> {
     description: metaContent(html, ['description', 'og:description']),
     content_excerpt: text.slice(0, 600),
     text,
+    images: extractContentImages(html, url),
   };
 }
 
@@ -666,6 +670,7 @@ async function executeCrawl(
       keywords: kwList,
       demand_reason: entry.reason,
       fetch_method: s.fetch_method ?? null,
+      ...(s.images ? { images: s.images, images_fetched_at: now } : {}),
       demand_snapshot: entry.reason === 'seed' || isBackfill ? null : {
         keywords: entry.keywords,
         best_position: entry.best_position,
