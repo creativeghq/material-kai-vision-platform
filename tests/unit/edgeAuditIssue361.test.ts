@@ -51,27 +51,16 @@ describe('EG-5 — SERP-derived text is fenced as DATA before it reaches an LLM'
   });
 });
 
-// ── EG-6: the generated article HTML is a deliverable, pasted into someone's CMS ────────────
-describe('EG-6 — generated markdown is escaped before it becomes HTML', () => {
-  const src = codeOnly(read('seo-api/handlers/pipeline.ts'));
-
-  it('escapes the source once, up front, with the canonical escaper', () => {
-    expect(src, 'the local escaper is gone — invariant 11 says use the shared one')
-      .toContain("from '../../_shared/html.ts'");
-    expect(
-      src,
-      'markdownToHtml stopped escaping its input. Raw <script> in model output — which is fed ' +
-        'competitor-authored SERP text — passes straight into the deliverable.',
-    ).toMatch(/let html = escapeHtml\(markdown\)/);
+// ── EG-6: article HTML is a deliverable, pasted into someone's CMS ─────────────────────────
+describe('EG-6 — article HTML is rendered from the markdown at export, never stored', () => {
+  it('the pipeline writes no HTML copy of the article', () => {
+    const src = codeOnly(read('seo-api/handlers/pipeline.ts'));
+    expect(src).not.toMatch(/html_content|markdownToHtml/);
   });
 
-  it('sanitises the one attribute it emits', () => {
-    expect(src, 'link hrefs are interpolated unsanitised again — javascript: is live in React 18')
-      .not.toMatch(/'<a href="\$2">/);
-    expect(src, 'safeHref is gone').toContain('safeHref(');
-    const fn = src.slice(src.indexOf('function safeHref('));
-    expect(fn.slice(0, fn.indexOf('\n}')), 'safeHref no longer restricts the scheme')
-      .toContain('SAFE_HREF_RE');
+  it('the export renderer never passes raw HTML through', () => {
+    const src = codeOnly(readFileSync(join(__dirname, '../../src/services/seo/articleHtml.tsx'), 'utf8'));
+    expect(src).not.toMatch(/rehype-raw|dangerouslySetInnerHTML/);
   });
 });
 

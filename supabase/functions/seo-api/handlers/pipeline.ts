@@ -1,7 +1,6 @@
 /** SEO Pipeline Edge Function (Async Orchestrator) */
 
 import { createClient } from '@supabase/supabase-js';
-import { escapeHtml } from '../../_shared/html.ts';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
@@ -674,11 +673,9 @@ async function runLateStages(ctx: {
       progress_percentage: 92,
     }, 'Building SEO report...');
 
-    // Byline / disclosure go in before HTML conversion; none is invented when provenance is absent.
+    // Byline / disclosure go in before the final save; none is invented when provenance is absent.
     const publishedAt = new Date().toISOString();
     const publishedMarkdown = appendProvenanceBlock(finalMarkdown, brief, website);
-
-    const htmlContent = markdownToHtml(publishedMarkdown);
 
     const schemaMarkup = buildSchemaMarkup(plan, publishedMarkdown, {
       brief: brief,
@@ -845,14 +842,13 @@ async function runLateStages(ctx: {
     const processingTimeMs = Date.now() - startTime;
 
     // Final update. Routed through updateArticle so the column allowlist applies: the real
-    // columns are written, and the 15 non-columns this used to name (html_content,
-    // reading_time_minutes, content_analysis, overall_score, keyword_density, schema_markup,
+    // columns are written, and the 14 non-columns this used to name (reading_time_minutes,
+    // content_analysis, overall_score, keyword_density, schema_markup,
     // faq_schema, optimize_data, brief_data, gaps_gains_data, research_tab_data,
     // fix_iterations, geo_score, credits_used, processing_time_ms) are preserved in
     // stages_data.extra instead of taking the whole statement down with them.
     await updateArticle(supabase, articleId, {
       markdown_content: publishedMarkdown,
-      html_content: htmlContent,
       word_count: finalWordCount,
       reading_time_minutes: Math.ceil(finalWordCount / 200),
       content_analysis: analysis,
@@ -986,88 +982,6 @@ async function updateArticle(
     console.error(`[seo-pipeline] Failed to update article ${articleId}:`, error.message, 'keys:', Object.keys(updates).join(','));
     throw new Error(`Failed to persist article progress: ${error.message}`);
   }
-}
-
-/**
- * Schemes an `<a href>` in generated article HTML may carry.
- *
- * React 18 still renders a `javascript:` href (it warns, it does not block — #358), and this
- * HTML is the deliverable an operator pastes into their CMS, where nothing warns at all.
- */
-const SAFE_HREF_RE = /^(?:https?:\/\/|mailto:|tel:|[./#?])/i;
-
-/**
- * URL for the `href` of a converted markdown link, or `#` when it is not one we will emit.
- *
- * The value arrives already HTML-escaped (see `markdownToHtml`), which is what makes a plain
- * prefix test sufficient: an entity-encoded evasion like `&#106;avascript:` has had its `&`
- * escaped to `&amp;` and reaches the browser as literal text, not as a scheme.
- */
-function safeHref(escapedUrl: string): string {
-  // Strip whitespace and control characters, which browsers historically ignore INSIDE a
-  // scheme (`java<TAB>script:` is read as `javascript:`), before deciding what it is.
-  const probe = escapedUrl.replace(/[^\x21-\x7e]/g, '');
-  return SAFE_HREF_RE.test(probe) ? escapedUrl : '#';
-}
-
-/** Basic markdown → HTML conversion. */
-function markdownToHtml(markdown: string): string {
-  let html = escapeHtml(markdown);
-
-  // Headings
-  html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
-  html = html.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>');
-  html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
-  html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
-
-  // Bold and italic
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-  // Images before links, or the link rule turns `![alt](src)` into `!<a>`. https only.
-  html = html.replace(
-    /!\[([^\]]*)\]\(([^)\s]+)\)/g,
-    (_m, alt: string, url: string) =>
-      /^https:\/\//i.test(url.replace(/[^\x21-\x7e]/g, '')) ? `<img src="${url}" alt="${alt}" loading="lazy" />` : alt,
-  );
-
-  // Links. `$2` is already escaped, so it is safe as an attribute VALUE; `safeHref` is what
-  // decides whether it is a URL we are willing to emit at all.
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    (_m, text: string, url: string) => `<a href="${safeHref(url)}">${text}</a>`,
-  );
-
-  // Horizontal rule — must run BEFORE the list rule, which would otherwise read
-  // `---` as a bullet, and before paragraph wrapping, which would emit `<p>---</p>`.
-  html = html.replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '<hr />');
-
-  // Unordered lists
-  html = html.replace(/^[-*]\s+(.+)$/gm, '<li>$1</li>');
-
-  // Paragraphs (lines not already wrapped in tags)
-  const lines = html.split('\n');
-  const result: string[] = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (
-      trimmed &&
-      !trimmed.startsWith('<h') &&
-      !trimmed.startsWith('<li') &&
-      !trimmed.startsWith('<ul') &&
-      !trimmed.startsWith('<ol') &&
-      !trimmed.startsWith('<hr')
-    ) {
-      result.push(`<p>${trimmed}</p>`);
-    } else {
-      result.push(line);
-    }
-  }
-
-  return result.join('\n');
 }
 
 /**

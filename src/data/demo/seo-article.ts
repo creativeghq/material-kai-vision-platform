@@ -88,7 +88,6 @@ TikTok Shop, Instagram Shopping, and Pinterest are the highest-converting channe
 
 **How important is SEO for accessories e-commerce?**
 Extremely important. Long-tail keyword strategies targeting "how to style" queries see 280% higher CTR and 3× better conversion than generic terms.`,
-    html_content: null,
     // Tab: Optimize
     optimize_data: {
       contentScore: 87,

@@ -58,9 +58,9 @@ describe('a score that could not be computed is stated, not implied', () => {
     expect(VIEWER).toMatch(/score_unavailable/);
   });
 
-  it('the stale render is dropped, so the rendered view cannot show the replaced text', () => {
-    const save = VIEWER.slice(VIEWER.indexOf('const saveMarkdown'), VIEWER.indexOf('const reanalyze'));
-    expect(save).toMatch(/html_content: null/);
+  it('the rendered view reads only the markdown, so no stored render can show the replaced text', () => {
+    expect(VIEWER).not.toMatch(/html_content/);
+    expect(VIEWER).toMatch(/const rawSource = markdown \|\| '';/);
   });
 });
 

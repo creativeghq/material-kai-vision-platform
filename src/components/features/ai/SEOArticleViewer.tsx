@@ -76,7 +76,6 @@ interface SEOArticle {
   secondary_keywords: string[];
   content_type: string;
   markdown_content: string | null;
-  html_content: string | null;
   /**
    * The language the article was commissioned in, folded up from `stages_data.extra`.
    *
@@ -2395,7 +2394,6 @@ function ArticlePerformance({
 
 interface ArticleContentProps {
   markdown: string | null;
-  html: string | null;
   /**
    * Save a hand-edited body. Absent in demo mode, where there is no row to write to.
    * Resolves with the SAVE's own outcome, so the toolbar never claims a save it did not get.
@@ -2409,7 +2407,7 @@ interface ArticleContentProps {
   readingTimeMinutes?: number;
 }
 
-function ArticleContent({ markdown, html, title, metaDescription, wordCount, readingTimeMinutes, onSaveMarkdown }: ArticleContentProps) {
+function ArticleContent({ markdown, title, metaDescription, wordCount, readingTimeMinutes, onSaveMarkdown }: ArticleContentProps) {
   const [copied, setCopied] = useState(false);
   const [view, setView] = useState<'rendered' | 'markdown'>('rendered');
   // The draft is held here and only ever written by one call, which also re-scores — see
@@ -2420,7 +2418,7 @@ function ArticleContent({ markdown, html, title, metaDescription, wordCount, rea
   const [saveError, setSaveError] = useState<string | null>(null);
   const editing = draft !== null;
 
-  const beginEdit = () => { setSaveError(null); setDraft(markdown ?? html ?? ''); setView('markdown'); };
+  const beginEdit = () => { setSaveError(null); setDraft(markdown ?? ''); setView('markdown'); };
   const cancelEdit = () => { setSaveError(null); setDraft(null); };
   const commitEdit = async () => {
     if (draft === null || !onSaveMarkdown) return;
@@ -2443,7 +2441,7 @@ function ArticleContent({ markdown, html, title, metaDescription, wordCount, rea
   };
 
   const { headline, lead, blocks, raw } = useMemo(() => {
-    const rawSource = markdown || html || '';
+    const rawSource = markdown || '';
     const headlineFromMarkdown = extractLeadingH1(rawSource);
     const afterH1 = headlineFromMarkdown ? stripLeadingH1(rawSource) : rawSource;
     const { lead: leadPara, rest } = extractLead(afterH1);
@@ -2453,9 +2451,9 @@ function ArticleContent({ markdown, html, title, metaDescription, wordCount, rea
       blocks: parseArticle(rest),
       raw: rawSource,
     };
-  }, [markdown, html, title]);
+  }, [markdown, title]);
 
-  if (!markdown && !html) {
+  if (!markdown) {
     return <p className="text-sm text-muted-foreground">No content available yet</p>;
   }
 
@@ -2815,9 +2813,6 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
     setArticle((prev) => (prev ? {
       ...prev,
       markdown_content: data.data.markdown_content ?? next,
-      // html_content is the pipeline's render of the OLD body. Leaving it would make the
-      // rendered view show the text the writer just replaced.
-      html_content: null,
       word_count: data.data.word_count ?? prev.word_count,
       content_analysis: data.data.analysis ?? prev.content_analysis,
       seo_score: data.data.seo_score ?? prev.seo_score,
@@ -3090,7 +3085,6 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                   )}
                   <ArticleContent
                     markdown={article.markdown_content}
-                    html={article.html_content}
                     onSaveMarkdown={initialArticle ? undefined : saveMarkdown}
                     title={article.title}
                     metaDescription={article.meta_description}
