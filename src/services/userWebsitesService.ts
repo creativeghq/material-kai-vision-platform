@@ -747,6 +747,8 @@ export interface AiVisibility {
     first_run_at: string | null;
     last_run_at: string | null;
     subjects_probed: number;
+    latest_checks?: number;
+    latest_failed?: number;
   };
   models: AiVisibilityModelRow[];
   subjects: {

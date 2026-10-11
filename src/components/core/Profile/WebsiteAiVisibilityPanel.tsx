@@ -499,7 +499,9 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   }
 
   const t = data.totals;
-  const failedShare = t.probes > 0 ? Math.round((t.failed / t.probes) * 100) : 0;
+  const latestChecks = t.latest_checks ?? t.probes;
+  const latestFailed = t.latest_failed ?? t.failed;
+  const failedShare = latestChecks > 0 ? Math.round((latestFailed / latestChecks) * 100) : 0;
   const sentimentTotal = Object.values(data.sentiment).reduce((s, n) => s + n, 0);
   const tier = state?.own_brand_probe_tier ?? 'cheap';
   const tierRoster = roster?.tiers?.[tier] ?? [];
@@ -553,9 +555,9 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             <div className="flex items-start gap-2 rounded-sm border border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>
-                {compact(t.failed)} of {compact(t.probes)} questions ({failedShare}%) never got an answer and are
-                excluded from every rate here. A failed call is not an absent mention — where a whole assistant
-                failed it reads <b>Unknown</b> below, never 0%.
+                {compact(latestFailed)} of {compact(latestChecks)} questions ({failedShare}%) got no answer on their
+                latest check and are excluded from every rate here. A failed call is not an absent mention — where a
+                whole assistant failed it reads <b>Unknown</b> below, never 0%.
               </span>
             </div>
           )}
