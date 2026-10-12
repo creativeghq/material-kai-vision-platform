@@ -1,5 +1,6 @@
 /** Zernio Webhook Handler Edge Function */
 
+import { formIdFromToken, renderWhatsAppFormSubmission, type WhatsAppFormField } from '../_shared/whatsappForms.generated.ts';
 import { attributeProfileNumbers, chargeFirstMonth, holdNumbers } from '../_shared/channel-recurring-billing.ts';
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
@@ -615,7 +616,9 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     }).catch(() => {});
   }
 
-  const preview = (msg.text || '[attachment]').substring(0, 200);
+  const submission = isOutgoingEcho ? null : await readFormSubmission(supabase, workspaceId, msg);
+  const bodyText: string | null = submission?.text ?? msg.text ?? null;
+  const preview = (bodyText || '[attachment]').substring(0, 200);
   // Imported history keeps the time it was actually sent. Left to `now()`, a back-fill stamps
   // every message of every conversation with the minute the import ran — the first one filed 8
   // conversations spanning weeks as if all 47 messages had arrived inside three minutes, which
@@ -633,7 +636,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     // Inline media is the shape the real payloads use. Pull the bytes in — the url they carry is
     // an authenticated API endpoint, so the browser cannot render it and it expires besides.
     inboundAttachments = await materialiseInlineAttachments(supabase, threadId, inboundAttachments);
-  } else if (!msg.text || isMediaPlaceholder(msg.text)) {
+  } else if (!submission && (!msg.text || isMediaPlaceholder(msg.text))) {
     // Nothing inline but the message clearly had something: fall back to the per-index endpoint.
     const fetched = await fetchAndStoreInboundAttachments(supabase, {
       threadId,
@@ -649,7 +652,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // recoverable from the next real one instead of staying a guess. (Pipeline convention #1:
   // explicit failure markers, never an empty return.)
   // `[Unsupported message]` counts as no text — see isMediaPlaceholder.
-  const hasRealText = !!msg.text && !isMediaPlaceholder(msg.text);
+  const hasRealText = !!submission || (!!msg.text && !isMediaPlaceholder(msg.text));
   const unresolvedMedia = !hasRealText && inboundAttachments.length === 0;
   if (unresolvedMedia) {
     console.warn(
@@ -675,7 +678,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   const { data: insertedMsg, error: msgErr } = await supabase.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: senderParticipantId,
-    body: msg.text ?? null,
+    body: bodyText,
     attachments: inboundAttachments,
     message_type: 'text',
     ...(originalSentAt ? { created_at: originalSentAt } : {}),
@@ -688,6 +691,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
       // not moved by our own words.
       ...(isOutgoingEcho ? { sent_from: 'device' } : {}),
       ...(unresolvedMedia ? { attachment_unresolved: true, provider_keys: Object.keys(msg) } : {}),
+      ...(submission ? { whatsapp_form: { form_id: submission.formId, name: submission.formName } } : {}),
       // Kept whether or not it was usable as `created_at`, so "why is this message stamped
       // today" is answerable from the row rather than from a guess.
       ...(historical ? { imported: true, sent_at: msg.sentAt ?? null } : {}),
@@ -725,6 +729,13 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // failed on their side is not). `runInBackground` keeps the isolate alive until this settles.
   // The ORDER inside is the point and is unchanged: read → notify → hand-off.
   const messageId = insertedMsg?.id ? String(insertedMsg.id) : null;
+  if (submission && messageId) {
+    const { error: respErr } = await supabase.from('whatsapp_form_responses').insert({
+      workspace_id: workspaceId, form_id: submission.formId, thread_id: threadId, message_id: messageId,
+      contact_id: contactId, flow_token: submission.token, data: submission.data,
+    });
+    if (respErr) console.error('[zernio-webhook] form response filed as a message but its row FAILED', threadId, respErr.message);
+  }
   runInBackground((async () => {
     // HEARD and READ before anyone is told. A voice note is transcribed and a document is
     // classified now, so the notification below can carry the words that were spoken and the
@@ -1511,6 +1522,31 @@ async function recordActivatedNumber(supabase: any, num: any): Promise<string | 
     return `first month NOT charged (${charge.error}); ${held} number(s) on hold`;
   }
   return `charged ${charge.credits} credits`;
+}
+
+/** A WhatsApp Form submission (nfm_reply), rendered as the text the thread and order intake read. */
+async function readFormSubmission(supabase: any, workspaceId: string, msg: any) {
+  const m = { ...msg, ...(msg?.metadata && typeof msg.metadata === 'object' ? msg.metadata : {}) };
+  if (m.interactiveType !== 'nfm_reply' || m.nfmReplyName === 'address_message') return null;
+  let data = m.flowResponseData;
+  if ((!data || typeof data !== 'object') && typeof m.flowResponseJson === 'string') {
+    try { data = JSON.parse(m.flowResponseJson); } catch { data = null; }
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const { flow_token: token, ...fields } = data as Record<string, unknown>;
+  const formId = formIdFromToken(token);
+  const { data: form } = formId
+    ? await supabase.from('whatsapp_forms').select('id, name, fields')
+      .eq('id', formId).eq('workspace_id', workspaceId).maybeSingle()
+    : { data: null };
+  const known = form as { id: string; name: string; fields: WhatsAppFormField[] } | null;
+  return {
+    text: renderWhatsAppFormSubmission(known ? { name: known.name, fields: known.fields ?? [] } : null, fields),
+    formId: known?.id ?? null,
+    formName: known?.name ?? null,
+    token: typeof token === 'string' ? token : null,
+    data: fields,
+  };
 }
 
 /** Best-effort: find which user a contact's most recent outbound campaign belonged to. */

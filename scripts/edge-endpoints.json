@@ -4630,6 +4630,106 @@
         "response": "{success:boolean, outcome:string, registered:boolean, url?:string}"
       },
       {
+        "name": "whatsapp-form-save",
+        "summary": "Create or update a DRAFT WhatsApp form (a one-screen Meta WhatsApp Flow) from a field list (owner/admin). Uploads the Flow JSON and returns Meta's validation errors.",
+        "params": [
+          {
+            "name": "workspaceId",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace that owns the form"
+          },
+          {
+            "name": "formId",
+            "type": "string",
+            "required": false,
+            "desc": "Draft to update; omit to create"
+          },
+          {
+            "name": "channelId",
+            "type": "string",
+            "required": false,
+            "desc": "WhatsApp channel the form is sent from"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Form title, up to 30 characters"
+          },
+          {
+            "name": "purpose",
+            "type": "string",
+            "required": false,
+            "desc": "order | lead | booking | support | survey | other"
+          },
+          {
+            "name": "intro",
+            "type": "string",
+            "required": false,
+            "desc": "Message sent with the form"
+          },
+          {
+            "name": "cta",
+            "type": "string",
+            "required": false,
+            "desc": "Button text, up to 20 characters"
+          },
+          {
+            "name": "submitLabel",
+            "type": "string",
+            "required": false,
+            "desc": "Submit button label"
+          },
+          {
+            "name": "fields",
+            "type": "array",
+            "required": true,
+            "desc": "[{key?, label, kind, required, options?, helper?}]"
+          }
+        ],
+        "response": "{success:boolean, form:object, validation_errors:[]}"
+      },
+      {
+        "name": "whatsapp-form-publish",
+        "summary": "Publish a draft form so it can be sent (owner/admin). Registers a Flows key on the number when none exists. Irreversible: a published form is frozen.",
+        "params": [
+          {
+            "name": "formId",
+            "type": "string",
+            "required": true,
+            "desc": "Form id"
+          }
+        ],
+        "response": "{success:boolean, form:object}"
+      },
+      {
+        "name": "whatsapp-form-retire",
+        "summary": "Delete a draft form, or deprecate a published one so customers can no longer open it (owner/admin). Its answers are kept.",
+        "params": [
+          {
+            "name": "formId",
+            "type": "string",
+            "required": true,
+            "desc": "Form id"
+          }
+        ],
+        "response": "{success:boolean, deleted:boolean}"
+      },
+      {
+        "name": "whatsapp-form-preview",
+        "summary": "Meta's web preview link for a form.",
+        "params": [
+          {
+            "name": "formId",
+            "type": "string",
+            "required": true,
+            "desc": "Form id"
+          }
+        ],
+        "response": "{success:boolean, url:string, expires_at:string|null}"
+      },
+      {
         "name": "create-whatsapp-template",
         "summary": "Submit a WhatsApp template to Meta for approval. Previously the only route to a new template was leaving the app for WhatsApp Manager. A `library` template is pre-approved; a custom one enters Meta review.",
         "params": [
@@ -9003,6 +9103,44 @@
             "desc": "WhatsApp conversation"
           }
         ]
+      },
+      {
+        "name": "list_whatsapp_forms",
+        "summary": "Published WhatsApp forms that can be sent from this conversation's number.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string",
+            "required": true,
+            "desc": "WhatsApp conversation"
+          }
+        ],
+        "response": "{forms:[]}"
+      },
+      {
+        "name": "send_whatsapp_form",
+        "summary": "Send a published WhatsApp form into the conversation. Only inside the 24-hour window. The customer's answers come back as a message that order intake reads.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string",
+            "required": true,
+            "desc": "WhatsApp conversation"
+          },
+          {
+            "name": "form_id",
+            "type": "string",
+            "required": true,
+            "desc": "Published form"
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": false,
+            "desc": "Message sent with the form; defaults to the form's intro"
+          }
+        ],
+        "response": "{message:object|null}"
       },
       {
         "name": "send_whatsapp_template",

@@ -10,7 +10,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeToE164 } from '../phoneNumber';
-import { edgeErrorMessage } from '@/utils/edgeError';
+import { edgeErrorMessage, parseEdgeError } from '@/utils/edgeError';
 import type {
   MessagingChannel,
   MessagingTemplate,
@@ -605,6 +605,12 @@ export class MessagingService {
    * lets the composer's own 24-hour-window rules apply, rather than a CRM button re-implementing
    * them or a green tick claiming something we cannot know.
    */
+  async whatsAppFormAction<T = Record<string, unknown>>(action: 'whatsapp-form-save' | 'whatsapp-form-publish' | 'whatsapp-form-retire' | 'whatsapp-form-preview', body: Record<string, unknown>): Promise<T> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', { body: { action, ...body } });
+    if (error) throw new Error((await parseEdgeError(error)).message);
+    return data as T;
+  }
+
   async phoneNumberCountries(): Promise<Array<{ code: string; monthlyCents: number; monthly_credits: number; needsKyc: boolean }>> {
     const { data, error } = await supabase.functions.invoke('messaging-api', { body: { action: 'phone-number-countries' } });
     if (error) throw error;

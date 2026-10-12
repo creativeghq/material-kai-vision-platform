@@ -93,6 +93,11 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
     aliases: ['Messaging → Channels'],
   },
   {
+    id: 'whatsapp-forms',
+    breadcrumb: 'Profile → Social Accounts → WhatsApp forms',
+    route: '/profile?tab=social-accounts&section=wa-forms',
+  },
+  {
     id: 'quote-requests',
     breadcrumb: 'Quotes → Requests',
     route: '/quotes?tab=requests',

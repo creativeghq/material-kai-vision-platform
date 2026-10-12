@@ -14,6 +14,7 @@ import { slashCommandMatches, slashTokenAtCaret } from '../inboxSlashCommands';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { CatalogPicker, EmojiPicker, SlashCommandMenu } from './ComposerPickers';
 import { WhatsAppTemplateDialog } from './WhatsAppTemplateDialog';
+import { WhatsAppFormButton } from './WhatsAppFormDialog';
 import { EmailFormatBar, EmailPreview } from './EmailFormatBar';
 import { SendSplitButton } from './SendSplitButton';
 import { ComposerInsertMenu } from './ComposerInsertMenu';
@@ -441,6 +442,9 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 recipient={{ name: threadDisplayName(activeThread), email: emailRecipients?.to ?? null }}
                 onInsert={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))}
               />
+              {activeThread.channel === 'whatsapp' && (
+                <WhatsAppFormButton threadId={activeThread.id} disabled={waBlocked} onSent={() => openThread(activeThread.id)} />
+              )}
               <span className="mx-1 h-4 w-px bg-hairline" aria-hidden />
             </>
           )}

@@ -34,8 +34,9 @@ import {
   sendWhatsAppReply, sendWhatsAppMessage, setMessageReaction,
   sendSocialCommentReply, sendSocialDirectMessage,
   sendCommentPrivateReply, setCommentHidden, markConversationRead,
-  ensureZernioSecrets, fetchLastInboundAt, publicAppUrl,
+  ensureZernioSecrets, fetchLastInboundAt, publicAppUrl, zernioApi,
 } from '../_shared/zernio.ts';
+import { WHATSAPP_FORM_SCREEN, whatsAppFormToken } from '../_shared/whatsappForms.generated.ts';
 import {
   buildEmailCardsHtml, buildEmailCardsText, buildWhatsAppCardMessages, cardPriceLine, cardsPreview,
   fitTextWithCards, INBOX_CARD_MAX, type InboxCard, type InboxCardKind, type WhatsAppCardMessage,
@@ -4623,6 +4624,75 @@ async function handleJwtAction(
       return json({ templates: data ?? [] });
     }
 
+    case 'list_whatsapp_forms': {
+      const thread = await getThreadOrThrow(db, String(payload.thread_id || ''));
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      const accountId = String(((thread.metadata || {}) as Record<string, unknown>).zernio_account_id || '');
+      const { data, error } = await db.from('whatsapp_forms')
+        .select('id, name, purpose, intro, cta, fields')
+        .eq('workspace_id', String(thread.workspace_id)).eq('status', 'published').eq('zernio_account_id', accountId)
+        .order('name', { ascending: true });
+      if (error) throw new HttpError(500, `Could not load forms: ${error.message}`);
+      return json({ forms: data ?? [] });
+    }
+
+    case 'send_whatsapp_form': {
+      const thread = await getThreadOrThrow(db, String(payload.thread_id || ''));
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+      if (thread.channel !== 'whatsapp') throw new HttpError(400, 'Forms are for WhatsApp conversations');
+      const workspaceId = String(thread.workspace_id);
+      const meta = (thread.metadata || {}) as Record<string, unknown>;
+      const accountId = String(meta.zernio_account_id || '');
+      const to = toE164(String(meta.contact_phone || ''));
+      if (!accountId || !to) throw new HttpError(409, 'This conversation has no WhatsApp number to send to.');
+      if (!(await isWorkspaceEntitled(db, workspaceId, 'messaging'))) {
+        throw new HttpError(402, 'WhatsApp forms need the Messaging module.');
+      }
+      const { data: form } = await db.from('whatsapp_forms')
+        .select('id, name, intro, cta, status, zernio_flow_id, zernio_account_id')
+        .eq('id', String(payload.form_id || '')).eq('workspace_id', workspaceId).maybeSingle();
+      if (!form) throw new HttpError(404, 'Form not found');
+      if (form.status !== 'published') throw new HttpError(409, 'Publish this form before sending it.');
+      if (form.zernio_account_id !== accountId) throw new HttpError(409, 'This form belongs to another WhatsApp number.');
+      const refusal = await whyNotSendable(db, { workspaceId, to, isTemplate: false });
+      if (refusal) throw new HttpError(409, refusal);
+
+      const body = String(payload.body ?? '').trim().slice(0, 1024) || form.intro || `Please fill in: ${form.name}`;
+      const fixture = await isFixtureWorkspace(db, workspaceId);
+      let wamid: string | null = null;
+      if (!fixture) {
+        try {
+          const res = await zernioApi('POST', '/whatsapp/flows/send', {
+            accountId, to, flow_id: form.zernio_flow_id, flow_cta: form.cta, body,
+            flow_token: whatsAppFormToken(String(form.zernio_flow_id), String(form.id)),
+            flow_action: 'navigate', flow_action_payload: { screen: WHATSAPP_FORM_SCREEN },
+          });
+          wamid = res?.messageId ?? null;
+        } catch (e) {
+          throw new HttpError(502, `Form NOT sent: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      let senderParticipantId = access.participant?.id ?? null;
+      if (!senderParticipantId) senderParticipantId = await ensureMemberParticipant(db, thread, userId);
+      const { data: msg, error: msgErr } = await db.from('inbox_messages').insert({
+        thread_id: thread.id, sender_participant_id: senderParticipantId, body: `${body}\n\n[${form.cta}] · ${form.name}`,
+        attachments: [], message_type: 'text',
+        metadata: {
+          channel: 'whatsapp', direction: 'outgoing', wamid, delivery_status: 'sent',
+          whatsapp_form: { form_id: form.id, name: form.name },
+        },
+      }).select('*').single();
+      if (msgErr) console.error('[inbox-api] form sent but its message row FAILED', thread.id, msgErr);
+      const { error: threadErr } = await db.from('inbox_threads')
+        .update({ last_message_at: new Date().toISOString(), last_message_preview: `${form.name} (form)` })
+        .eq('id', thread.id);
+      if (threadErr) console.error('[inbox-api] form sent but the thread preview FAILED', thread.id, threadErr);
+      return json({ message: msg ?? null });
+    }
+
     case 'send_whatsapp_template': {
       const thread = await getThreadOrThrow(db, String(payload.thread_id || ''));
       const access = await resolveThreadAccess(db, userId, thread, operator);
@@ -4683,7 +4753,7 @@ async function handleJwtAction(
       }).select('*').single();
       if (msgErr) console.error('[inbox-api] template sent but its message row FAILED', thread.id, msgErr);
       const { error: threadErr } = await db.from('inbox_threads')
-        .update({ last_message_at: new Date().toISOString(), last_message_preview: body.replace(/s+/g, ' ').slice(0, 140) })
+        .update({ last_message_at: new Date().toISOString(), last_message_preview: body.replace(/\s+/g, ' ').slice(0, 140) })
         .eq('id', thread.id);
       if (threadErr) console.error('[inbox-api] template sent but the thread preview FAILED', thread.id, threadErr);
       return json({ message: msg ?? null });

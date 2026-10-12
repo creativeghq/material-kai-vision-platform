@@ -31,6 +31,11 @@ import {
   whyNotSendable,
 } from '../_shared/whatsapp-templates.ts';
 import { checkChannelSeat } from '../_shared/channel-seats.ts';
+import {
+  WHATSAPP_FORM_FIELD_KINDS, WHATSAPP_FORM_LIMITS, WHATSAPP_FORM_PURPOSES, buildWhatsAppFlowJson, fieldKeyFrom,
+  metaFlowCategory, validateWhatsAppForm,
+  type WhatsAppFormField, type WhatsAppFormFieldKind, type WhatsAppFormPurpose,
+} from '../_shared/whatsappForms.generated.ts';
 import { reconcileWaba } from '../_shared/whatsapp-cost-reconcile.ts';
 import {
   attributeProfileNumbers, billChannelsForMonth, periodMonth, recurringCredits, retryFailedCharges,
@@ -291,6 +296,25 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
       const ids = await callerWorkspaceIds();
       return ids.length === 1 ? ids[0] : null;
+    };
+
+    const requireWorkspaceManager = async (wsId: string, doing: string): Promise<void> => {
+      if (isAdminAccess(auth)) return;
+      const { data: role } = await supabaseClient
+        .from('workspace_members').select('role')
+        .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
+      if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
+        throw new HttpError(403, `Only a workspace owner or admin can ${doing}`);
+      }
+    };
+
+    const loadForm = async (formId: unknown) => {
+      const { data: form } = await supabaseClient.from('whatsapp_forms').select('*').eq('id', String(formId ?? '')).maybeSingle();
+      if (!form) throw new HttpError(404, 'Form not found');
+      if (!isAdminAccess(auth) && !(await callerWorkspaceIds()).includes(form.workspace_id)) {
+        throw new HttpError(404, 'Form not found');
+      }
+      return form as Record<string, any>;
     };
 
     /** Workspace ids a read action may see: null = unrestricted (platform secret-key caller). */
@@ -863,12 +887,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (!isAdminAccess(auth)) {
           const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
           if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
-          const { data: role } = await supabaseClient
-            .from('workspace_members').select('role')
-            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
-          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
-            throw new HttpError(403, 'Only a workspace owner or admin can retry a failed charge');
-          }
+          await requireWorkspaceManager(wsId, 'retry a failed charge');
           scope = wsId;
         }
         const result = await retryFailedCharges(supabaseClient, scope);
@@ -1038,14 +1057,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
-        if (!isAdminAccess(auth)) {
-          const { data: role } = await supabaseClient
-            .from('workspace_members').select('role')
-            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
-          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
-            throw new HttpError(403, 'Only a workspace owner or admin can start a number verification');
-          }
-        }
+        await requireWorkspaceManager(wsId, 'start a number verification');
         const country = String(requestBody.country ?? '').trim().toUpperCase();
         if (!/^[A-Z]{2}$/.test(country)) throw new HttpError(400, 'country is required');
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
@@ -1067,14 +1079,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
 
-        if (!isAdminAccess(auth)) {
-          const { data: role } = await supabaseClient
-            .from('workspace_members').select('role')
-            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
-          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
-            throw new HttpError(403, 'Only a workspace owner or admin can buy a number');
-          }
-        }
+        await requireWorkspaceManager(wsId, 'buy a number');
         if (!auth.userId) throw new HttpError(400, 'A signed-in owner or admin is needed to pay for the number');
 
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
@@ -1177,14 +1182,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         // Open to the tenant now, but only to someone who runs the workspace. Releasing is
         // irreversible and takes the number away from everyone using it — not a thing an ordinary
         // member should be able to do on the workspace's behalf.
-        if (!isAdminAccess(auth)) {
-          const { data: role } = await supabaseClient
-            .from('workspace_members').select('role')
-            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
-          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
-            throw new HttpError(403, 'Only a workspace owner or admin can give up a number');
-          }
-        }
+        await requireWorkspaceManager(wsId, 'give up a number');
 
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
         await assertOwnProfile(supabaseClient, wsId, profileId);
@@ -2098,6 +2096,139 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // get a new one was to leave this app for WhatsApp Manager. A `library` template is
       // pre-approved and usable immediately; a custom one goes to review (up to 24h).
       // ─────────────────────────────────────────────────────────────
+      case 'whatsapp-form-save': {
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        if (!isAdminAccess(auth) && !(await isWorkspaceEntitled(supabaseClient, wsId, 'messaging'))) {
+          return notEntitledResponse('messaging');
+        }
+        await requireWorkspaceManager(wsId, 'build a WhatsApp form');
+
+        const name = String(requestBody.name ?? '').trim();
+        const purpose = (WHATSAPP_FORM_PURPOSES as readonly string[]).includes(requestBody.purpose)
+          ? requestBody.purpose as WhatsAppFormPurpose : 'other';
+        const cta = String(requestBody.cta ?? '').trim() || 'Open form';
+        const submitLabel = String(requestBody.submitLabel ?? '').trim() || 'Send';
+        const intro = String(requestBody.intro ?? '').trim().slice(0, 1024);
+        if (cta.length > WHATSAPP_FORM_LIMITS.cta) throw new HttpError(400, `The button text is longer than ${WHATSAPP_FORM_LIMITS.cta} characters.`);
+        if (submitLabel.length > WHATSAPP_FORM_LIMITS.submit) throw new HttpError(400, `The submit label is longer than ${WHATSAPP_FORM_LIMITS.submit} characters.`);
+
+        const taken = new Set<string>();
+        const fields: WhatsAppFormField[] = (Array.isArray(requestBody.fields) ? requestBody.fields : []).map((raw: any) => {
+          const label = String(raw?.label ?? '').trim();
+          const wanted = String(raw?.key ?? '');
+          const key = /^[a-z][a-z0-9_]{0,59}$/.test(wanted) && !taken.has(wanted) ? wanted : fieldKeyFrom(label, taken);
+          taken.add(key);
+          const kind = (WHATSAPP_FORM_FIELD_KINDS as readonly string[]).includes(raw?.kind) ? raw.kind as WhatsAppFormFieldKind : 'text';
+          return {
+            key, label, kind, required: raw?.required === true,
+            ...(kind === 'dropdown' ? { options: (Array.isArray(raw?.options) ? raw.options : []).map((o: unknown) => String(o).trim()).filter(Boolean) } : {}),
+            ...(raw?.helper ? { helper: String(raw.helper).trim() } : {}),
+          };
+        });
+        const problems = validateWhatsAppForm({ title: name, fields });
+        if (problems.length) throw new HttpError(400, problems.join(' '));
+
+        let existing: Record<string, any> | null = null;
+        if (requestBody.formId) {
+          existing = await loadForm(requestBody.formId);
+          if (existing.workspace_id !== wsId) throw new HttpError(404, 'Form not found');
+          if (existing.status !== 'draft') throw new HttpError(409, 'A published form cannot change. Duplicate it to make a new version.');
+        }
+
+        let channelQuery = supabaseClient.from('messaging_channels').select('id, zernio_account_id')
+          .eq('workspace_id', wsId).eq('channel_type', 'whatsapp').not('zernio_account_id', 'is', null);
+        channelQuery = existing
+          ? channelQuery.eq('zernio_account_id', existing.zernio_account_id)
+          : requestBody.channelId ? channelQuery.eq('id', String(requestBody.channelId)) : channelQuery.order('is_default', { ascending: false });
+        const { data: channel } = await channelQuery.limit(1).maybeSingle();
+        const accountId = (channel as { zernio_account_id?: string } | null)?.zernio_account_id;
+        if (!accountId) throw new HttpError(400, 'Connect a WhatsApp number to this workspace first.');
+
+        const categories = [metaFlowCategory(purpose)];
+        let flowId = existing?.zernio_flow_id as string | undefined;
+        if (!flowId) {
+          const created = await zernioApi('POST', '/whatsapp/flows', {
+            accountId, name: `${name} ${crypto.randomUUID().slice(0, 8)}`, categories,
+          });
+          flowId = String(created?.flow?.id ?? created?.id ?? '');
+          if (!flowId) throw new HttpError(502, 'Zernio did not return a flow id');
+        } else if (existing && (existing.name !== name || existing.purpose !== purpose)) {
+          await zernioApi('PATCH', `/whatsapp/flows/${encodeURIComponent(flowId)}`, {
+            accountId, name: `${name} ${String(existing.id).slice(0, 8)}`, categories,
+          });
+        }
+
+        const upload = await zernioApi('PUT', `/whatsapp/flows/${encodeURIComponent(flowId)}/json`, {
+          accountId, flow_json: buildWhatsAppFlowJson({ title: name, fields, submitLabel }),
+        });
+        const validationErrors = Array.isArray(upload?.validation_errors) ? upload.validation_errors : [];
+
+        const row = {
+          name, purpose, intro, cta, submit_label: submitLabel, fields, validation_errors: validationErrors,
+          channel_id: (channel as { id: string }).id,
+        };
+        const saved = existing
+          ? await supabaseClient.from('whatsapp_forms').update(row).eq('id', existing.id).select('*').single()
+          : await supabaseClient.from('whatsapp_forms').insert({
+            ...row, workspace_id: wsId, zernio_account_id: accountId, zernio_flow_id: flowId, created_by: auth.userId ?? null,
+          }).select('*').single();
+        if (saved.error) {
+          if (!existing) {
+            await zernioApi('DELETE', `/whatsapp/flows/${encodeURIComponent(flowId)}?accountId=${encodeURIComponent(accountId)}`)
+              .catch((e: unknown) => console.error('[messaging-api] orphan WhatsApp flow left at Zernio', flowId, e));
+          }
+          throw new HttpError(500, `The form was not saved: ${saved.error.message}`);
+        }
+        return jsonResponse({ success: true, form: saved.data, validation_errors: validationErrors });
+      }
+
+      case 'whatsapp-form-publish': {
+        const form = await loadForm(requestBody.formId);
+        await requireWorkspaceManager(form.workspace_id, 'publish a WhatsApp form');
+        if (form.status !== 'draft') throw new HttpError(409, 'Only a draft can be published.');
+        if (Array.isArray(form.validation_errors) && form.validation_errors.length) {
+          throw new HttpError(409, 'Meta reported problems with this form. Fix them and save before publishing.');
+        }
+        const accountId = String(form.zernio_account_id);
+        const key = await zernioApi('GET', `/whatsapp/flows/encryption-key?accountId=${encodeURIComponent(accountId)}`);
+        if (key?.registered !== true) {
+          await zernioApi('POST', '/whatsapp/flows/encryption-key', { accountId, businessPublicKey: await generatePublicKeyPem() });
+        }
+        await zernioApi('POST', `/whatsapp/flows/${encodeURIComponent(String(form.zernio_flow_id))}/publish`, { accountId });
+        const { data, error } = await supabaseClient.from('whatsapp_forms')
+          .update({ status: 'published', published_at: new Date().toISOString() }).eq('id', form.id).select('*').single();
+        if (error) throw new HttpError(500, `Published at WhatsApp but not recorded here: ${error.message}`);
+        return jsonResponse({ success: true, form: data });
+      }
+
+      case 'whatsapp-form-retire': {
+        const form = await loadForm(requestBody.formId);
+        await requireWorkspaceManager(form.workspace_id, 'retire a WhatsApp form');
+        const accountId = String(form.zernio_account_id);
+        const flowId = encodeURIComponent(String(form.zernio_flow_id ?? ''));
+        if (form.status === 'draft') {
+          if (form.zernio_flow_id) await zernioApi('DELETE', `/whatsapp/flows/${flowId}?accountId=${encodeURIComponent(accountId)}`);
+          const { error } = await supabaseClient.from('whatsapp_forms').delete().eq('id', form.id);
+          if (error) throw new HttpError(500, error.message);
+          return jsonResponse({ success: true, deleted: true });
+        }
+        if (form.status === 'published') {
+          await zernioApi('POST', `/whatsapp/flows/${flowId}/deprecate`, { accountId });
+        }
+        const { error } = await supabaseClient.from('whatsapp_forms').update({ status: 'deprecated' }).eq('id', form.id);
+        if (error) throw new HttpError(500, error.message);
+        return jsonResponse({ success: true, deleted: false });
+      }
+
+      case 'whatsapp-form-preview': {
+        const form = await loadForm(requestBody.formId);
+        const flowId = encodeURIComponent(String(form.zernio_flow_id));
+        const res = await zernioApi('GET', `/whatsapp/flows/${flowId}/preview?accountId=${encodeURIComponent(String(form.zernio_account_id))}`);
+        if (!res?.preview_url) throw new HttpError(502, 'WhatsApp returned no preview for this form.');
+        return jsonResponse({ success: true, url: res.preview_url, expires_at: res.expires_at ?? null });
+      }
+
       case 'create-whatsapp-template': {
         const { from, name, category, language, components, libraryTemplateName } = requestBody;
         if (!name || !category || !language) {
@@ -2347,3 +2478,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     return jsonResponse({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 }));
+
+/** Meta refuses to publish a flow on a number with no Flows key. Navigate-only forms never decrypt, so the private half is not kept. */
+async function generatePublicKeyPem(): Promise<string> {
+  const pair = await crypto.subtle.generateKey(
+    { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true, ['encrypt', 'decrypt'],
+  );
+  const spki = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
+  const b64 = btoa(String.fromCharCode(...spki)).match(/.{1,64}/g)!.join('\n');
+  return `-----BEGIN PUBLIC KEY-----\n${b64}\n-----END PUBLIC KEY-----\n`;
+}

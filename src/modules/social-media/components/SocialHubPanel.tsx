@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Bell, Building2, Phone,
+  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Bell, Building2, Phone, ClipboardList,
 } from 'lucide-react';
 import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -13,6 +13,7 @@ import { WorkspaceSocialAccounts } from './WorkspaceSocialAccounts';
 import { MessagingChannelsTab } from '@/modules/messaging/components/MessagingChannelsTab';
 import { PhoneNumbersTab } from '@/modules/messaging/components/PhoneNumbersTab';
 import { MessagingTemplatesTab } from '@/modules/messaging/components/MessagingTemplatesTab';
+import { WhatsAppFormsTab } from '@/modules/messaging/components/WhatsAppFormsTab';
 import { MessagingCampaignsTab } from '@/modules/messaging/components/MessagingCampaignsTab';
 import { MessagingLogsTab } from '@/modules/messaging/components/MessagingLogsTab';
 import { MessagingAnalyticsTab } from '@/modules/messaging/components/MessagingAnalyticsTab';
@@ -21,7 +22,7 @@ import { PushNotificationsTab } from '@/modules/messaging/components/PushNotific
 
 type SectionId =
   | 'accounts' | 'workspace-accounts' | 'analytics'
-  | 'whatsapp' | 'wa-numbers' | 'wa-templates' | 'wa-campaigns' | 'wa-logs' | 'wa-analytics'
+  | 'whatsapp' | 'wa-numbers' | 'wa-templates' | 'wa-forms' | 'wa-campaigns' | 'wa-logs' | 'wa-analytics'
   | 'wa-optouts' | 'wa-push';
 
 const DEFAULT_SECTION: SectionId = 'accounts';
@@ -37,6 +38,7 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
   'whatsapp': MessagingChannelsTab,
   'wa-numbers': PhoneNumbersTab,
   'wa-templates': MessagingTemplatesTab,
+  'wa-forms': WhatsAppFormsTab,
   'wa-campaigns': MessagingCampaignsTab,
   'wa-logs': MessagingLogsTab,
   'wa-analytics': MessagingAnalyticsTab,
@@ -68,6 +70,7 @@ export const SocialHubPanel: React.FC = () => {
         // then everything else. It used to be the one step the product did not offer.
         { id: 'wa-numbers', label: 'Get a number', icon: Phone },
         { id: 'wa-templates', label: 'WhatsApp templates', icon: FileText },
+        { id: 'wa-forms', label: 'WhatsApp forms', icon: ClipboardList },
         { id: 'wa-campaigns', label: 'WhatsApp campaigns', icon: Send },
         { id: 'wa-logs', label: 'Message log', icon: MessageCircle },
         { id: 'wa-analytics', label: 'WhatsApp analytics', icon: BarChart3 },

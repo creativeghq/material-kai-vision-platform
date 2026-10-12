@@ -15,7 +15,9 @@ describe('#369 a workspace buys its own WhatsApp number and pays for it in credi
   it('is a workspace owner/admin action, no longer operator-only', () => {
     const ops = api.slice(api.indexOf('const OPERATOR_ACTIONS'), api.indexOf(']);', api.indexOf('const OPERATOR_ACTIONS')));
     expect(ops).not.toContain("'purchase-phone-number'");
-    expect(purchase).toMatch(/\['owner', 'admin'\]\.includes/);
+    expect(purchase).toContain("await requireWorkspaceManager(wsId, 'buy a number')");
+    const gate = api.slice(api.indexOf('const requireWorkspaceManager'), api.indexOf('const loadForm'));
+    expect(gate).toMatch(/\['owner', 'admin'\]\.includes/);
   });
 
   it('debits the first month before buying and refunds when nothing was issued', () => {

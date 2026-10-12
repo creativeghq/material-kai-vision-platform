@@ -2249,6 +2249,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "schedule_message",
           "assist",
           "list_whatsapp_templates",
+          "list_whatsapp_forms",
+          "send_whatsapp_form",
           "send_whatsapp_template",
           "create_share_link",
           "suggest_reply",
@@ -2529,6 +2531,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "description": "For ask"
       },
+      "form_id": {
+        "type": "string",
+        "description": "Published form"
+      },
       "template_id": {
         "type": "string",
         "description": "messaging_templates id (string (uuid))"
@@ -2782,6 +2788,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "inbox-analytics",
           "webhook-status",
           "register-webhook",
+          "whatsapp-form-save",
+          "whatsapp-form-publish",
+          "whatsapp-form-retire",
+          "whatsapp-form-preview",
           "create-whatsapp-template",
           "sync-channels",
           "whatsapp-templates",
@@ -2987,6 +2997,30 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "toDate": {
         "type": "string",
         "description": "YYYY-MM-DD"
+      },
+      "formId": {
+        "type": "string",
+        "description": "Draft to update; omit to create"
+      },
+      "purpose": {
+        "type": "string",
+        "description": "order | lead | booking | support | survey | other"
+      },
+      "intro": {
+        "type": "string",
+        "description": "Message sent with the form"
+      },
+      "cta": {
+        "type": "string",
+        "description": "Button text, up to 20 characters"
+      },
+      "submitLabel": {
+        "type": "string",
+        "description": "Submit button label"
+      },
+      "fields": {
+        "type": "array",
+        "description": "[{key?, label, kind, required, options?, helper?}]"
       },
       "language": {
         "type": "string",

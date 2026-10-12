@@ -295,6 +295,7 @@ GET /v1/whatsapp/conversions
 GET /v1/whatsapp/dataset
 GET /v1/whatsapp/flow-responses
 GET /v1/whatsapp/flows
+GET /v1/whatsapp/flows/encryption-key
 GET /v1/whatsapp/flows/{flowId}
 GET /v1/whatsapp/flows/{flowId}/json
 GET /v1/whatsapp/flows/{flowId}/preview
@@ -502,6 +503,7 @@ POST /v1/whatsapp/calls
 POST /v1/whatsapp/conversions
 POST /v1/whatsapp/dataset
 POST /v1/whatsapp/flows
+POST /v1/whatsapp/flows/encryption-key
 POST /v1/whatsapp/flows/send
 POST /v1/whatsapp/flows/{flowId}/deprecate
 POST /v1/whatsapp/flows/{flowId}/publish

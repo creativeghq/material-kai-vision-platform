@@ -1,3 +1,4 @@
+import type { WhatsAppFormField, WhatsAppFormPurpose } from '@/modules/messaging/whatsappForms';
 import { supabase } from '@/integrations/supabase/client';
 import { parseEdgeError } from '@/utils/edgeError';
 import type { InboxDocumentKind } from '@/modules/messaging/inboxDocumentKinds';
@@ -542,6 +543,10 @@ export interface InboxWhatsAppTemplate {
   id: string; name: string; content: string; variables: string[] | null; category: string | null; whatsapp_language_code: string | null;
 }
 
+export interface InboxWhatsAppForm {
+  id: string; name: string; purpose: WhatsAppFormPurpose; intro: string; cta: string; fields: WhatsAppFormField[];
+}
+
 export type AttachmentInput =
   | { filename: string; content_type: string; data_base64: string }
   | InboxAttachment;
@@ -612,6 +617,12 @@ export const inboxApi = {
   },
   listWhatsAppTemplates(thread_id: string) {
     return call<{ templates: InboxWhatsAppTemplate[] }>('list_whatsapp_templates', { thread_id });
+  },
+  listWhatsAppForms(thread_id: string) {
+    return call<{ forms: InboxWhatsAppForm[] }>('list_whatsapp_forms', { thread_id });
+  },
+  sendWhatsAppForm(input: { thread_id: string; form_id: string; body?: string }) {
+    return call<{ message: InboxMessage | null }>('send_whatsapp_form', input);
   },
   sendWhatsAppTemplate(input: { thread_id: string; template_id: string; variables: Record<string, string> }) {
     return call<{ message: InboxMessage | null }>('send_whatsapp_template', input);

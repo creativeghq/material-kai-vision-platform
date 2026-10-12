@@ -146,7 +146,7 @@ describe('the file is fetched, not waited for', () => {
     // One wasted round trip per plain text message would be a real cost on a busy number.
     // Inline media first (the shape real payloads use); the per-index endpoint only as a fallback.
     expect(hook).toMatch(/if \(inboundAttachments\.length\) \{/);
-    expect(hook).toMatch(/\} else if \(!msg\.text \|\| isMediaPlaceholder\(msg\.text\)\) \{/);
+    expect(hook).toMatch(/\} else if \(!submission && \(!msg\.text \|\| isMediaPlaceholder\(msg\.text\)\)\) \{/);
   });
 });
 
