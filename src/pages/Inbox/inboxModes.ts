@@ -19,7 +19,7 @@ const MODE_CHANNELS: Record<InboxMode, string[]> = {
 
 const MODE_SOURCES: Record<InboxMode, InboxSourceKey[] | null> = {
   all: null,
-  platform: ['public_profile', 'email', 'social_dm', 'social_comments', 'customer', 'dealer', 'team'],
+  platform: ['public_profile', 'lead_form', 'email', 'social_dm', 'social_comments', 'customer', 'dealer', 'team'],
   whatsapp: [],
   gmail: [],
 };

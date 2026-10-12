@@ -83,10 +83,11 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
 
   const meta = activeThread.metadata as Record<string, unknown> | null;
   const isPublicComment = activeThread.channel === 'social' && meta?.social_kind === 'comments';
+  const leadBlocked = activeThread.channel === 'social' && meta?.social_kind === 'lead' && !isNote;
   // Email is written in paragraphs, so Enter is a new line there and only Mod+Enter sends.
   const enterSends = !(activeThread.channel === 'email' && !isNote);
   const hasContent = !!draft.trim() || attachments.length > 0 || pendingCards.length > 0;
-  const canSend = !sending && !waBlocked && hasContent;
+  const canSend = !sending && !waBlocked && !leadBlocked && hasContent;
   const dirty = hasContent || !!replyTo;
 
   const toggleFormat = () => {
@@ -129,6 +130,14 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
             This posts publicly as a reply under your {String(meta?.platform ?? 'social')} post,
             visible to everyone. Keep order details and personal information out of it.
           </span>
+        </div>
+      )}
+
+      {leadBlocked && (
+        <div className="text-xs bg-orange-500/10 dark:bg-orange-500/15 border border-orange-500/25 dark:border-orange-500/30 text-orange-800 dark:text-orange-300 rounded-sm px-3 py-2">
+          A lead form has no conversation to reply into. Contact them with the details they gave
+          {meta?.contact_email ? ` (${String(meta.contact_email)})` : ''}{meta?.contact_phone ? ` (${String(meta.contact_phone)})` : ''},
+          or add them to the CRM from the side panel. Internal notes are still allowed.
         </div>
       )}
 

@@ -2,7 +2,7 @@
  * Where a conversation came from — the ONE derivation, used by the badge, the filter and the
  * thread header alike.
  */
-import { Mail, MessageCircle, MessageSquare, MessagesSquare, Share2, UserRound, Users } from 'lucide-react';
+import { ClipboardList, Mail, MessageCircle, MessageSquare, MessagesSquare, Share2, UserRound, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { FilterOption } from '@/components/core/filters';
 import type { InboxChannel, InboxThread } from '@/services/inboxApi';
@@ -13,6 +13,7 @@ export type InboxSourceKey =
   | 'email'
   | 'social_dm'
   | 'social_comments'
+  | 'lead_form'
   | 'team'
   | 'customer'
   | 'dealer';
@@ -56,6 +57,7 @@ const SOURCE_CHANNEL: Record<InboxSourceKey, InboxChannel | null> = {
   email: 'email',
   social_dm: 'social',
   social_comments: 'social',
+  lead_form: 'social',
   team: 'internal',
   customer: 'internal',
   dealer: 'internal',
@@ -111,6 +113,14 @@ const SOURCE_META: Record<InboxSourceKey, { label: string; Icon: LucideIcon; ton
       dot: 'bg-pink-500 dark:bg-pink-400',
     },
   },
+  lead_form: {
+    label: 'Lead form', Icon: ClipboardList,
+    tone: {
+      tag: 'bg-orange-500/10 dark:bg-orange-500/15 text-orange-800 dark:text-orange-300 border-orange-500/25 dark:border-orange-500/30',
+      text: 'text-orange-800 dark:text-orange-300',
+      dot: 'bg-orange-500 dark:bg-orange-400',
+    },
+  },
   team: {
     label: 'Team', Icon: Users,
     tone: {
@@ -164,6 +174,7 @@ export function inboxSourceKey(t: Pick<InboxThread, 'channel' | 'thread_type' | 
     // Labelling both "Social" would leave an operator one keystroke from answering a private
     // question underneath a public post.
     const meta = (t.metadata ?? {}) as Record<string, unknown>;
+    if (meta.social_kind === 'lead') return 'lead_form';
     return meta.social_kind === 'comments' ? 'social_comments' : 'social_dm';
   }
   if (t.thread_type === 'upstream') return 'dealer';
@@ -204,7 +215,7 @@ export function channelForSource(key: string | null | undefined): InboxChannel |
 
 /** Filter options, in the order an operator scans them: outside world first, then inside. */
 export const SOURCE_FILTER_ORDER: InboxSourceKey[] = [
-  'public_profile', 'email', 'whatsapp', 'social_dm', 'social_comments', 'customer', 'dealer', 'team',
+  'public_profile', 'lead_form', 'email', 'whatsapp', 'social_dm', 'social_comments', 'customer', 'dealer', 'team',
 ];
 
 export function inboxSourceOptions(): FilterOption[] {

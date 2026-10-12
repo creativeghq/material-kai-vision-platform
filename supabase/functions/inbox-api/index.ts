@@ -1125,6 +1125,13 @@ function assertAttachmentsAllowed(thread: Record<string, unknown>, messageType: 
   if (size > MAX_ATTACHMENT_BASE64) throw new HttpError(413, 'Attachments exceed 20 MB for one message.');
 }
 
+function assertReplyable(thread: Record<string, unknown>, messageType: string): void {
+  const meta = (thread.metadata ?? {}) as Record<string, unknown>;
+  if (thread.channel === 'social' && meta.social_kind === 'lead' && messageType !== 'note') {
+    throw new HttpError(400, 'A lead form has no conversation to reply into. Contact the person with the details they gave, or leave a note.');
+  }
+}
+
 /** The client's picks (a kind and a product id each) → cards the customer can be shown. */
 async function resolveInboxCards(
   db: DbClient,
@@ -2287,6 +2294,7 @@ async function handleJwtAction(
         throw new HttpError(403, 'Only members may leave private notes');
       }
       assertAttachmentsAllowed(thread, messageType, payload.attachments);
+      assertReplyable(thread, messageType);
       const body = payload.body != null ? String(payload.body) : null;
       // WhatsApp: freeform replies only inside Meta's 24h service window. Notes (internal) exempt.
       // Checked FIRST — it is the cheap refusal, and everything below (uploads, card pricing) is
@@ -2407,6 +2415,7 @@ async function handleJwtAction(
         ? cleanEmailCopies({ cc: payload.email_cc, bcc: payload.email_bcc }, [])
         : { cc: [], bcc: [] };
       assertAttachmentsAllowed(thread, 'text', payload.attachments);
+      assertReplyable(thread, 'text');
       const attachments = await normalizeAttachments(db, threadId, payload.attachments);
       if (!body && attachments.length === 0) throw new HttpError(400, 'Write a message or attach a file');
       const { data, error } = await db.from('mail_scheduled_sends').insert({

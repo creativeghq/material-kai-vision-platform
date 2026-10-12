@@ -80,7 +80,7 @@ async function recordPlatformLeg(
   supabase: any,
   zernioPostId: string,
   platform: string,
-  leg: { status: 'published' | 'failed'; error?: string | null; url?: string | null },
+  leg: { status: 'published' | 'failed' | 'deleted'; error?: string | null; url?: string | null },
 ): Promise<{ id: string; workspace_id: string; user_id: string; caption: string | null } | null> {
   const { data: row } = await supabase
     .from('social_posts')
@@ -1321,6 +1321,176 @@ async function handleSocialComment(supabase: any, payload: any): Promise<void> {
   })).catch(() => {});
 }
 
+/** The WhatsApp thread a call belongs to: same business number, same customer phone. */
+async function findWhatsAppThreadForCall(supabase: any, accountId: string | undefined, customerPhone: string | undefined) {
+  const phone = contactPhoneOf({ phoneNumber: customerPhone });
+  if (!accountId || !phone) return null;
+  const { data } = await supabase
+    .from('inbox_threads').select('id, workspace_id')
+    .eq('channel', 'whatsapp')
+    .eq('metadata->>zernio_account_id', accountId)
+    .eq('metadata->>contact_phone', phone)
+    .order('last_message_at', { ascending: false })
+    .limit(1).maybeSingle();
+  return (data as { id: string; workspace_id: string } | null) ?? null;
+}
+
+function callDuration(seconds: unknown): string {
+  const s = Math.max(0, Math.round(Number(seconds) || 0));
+  return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+}
+
+/** WhatsApp Business Calling (#384 B): a call is a visible event on the customer's thread, never a silent one. */
+async function handleCallEvent(supabase: any, event: string, payload: any): Promise<{ recorded: boolean; note?: string }> {
+  const accountId = accountIdOf(payload.account);
+  let body: string;
+  let key: string;
+  let customer: string | undefined;
+  if (event === 'call.permission_request') {
+    const p = payload.permission || {};
+    customer = p.from;
+    key = `perm:${payload.id}`;
+    body = p.response === 'accept'
+      ? `The customer agreed to receive WhatsApp calls${p.isPermanent ? '' : ' for now'}.`
+      : 'The customer declined WhatsApp calls.';
+  } else {
+    const c = payload.call || {};
+    customer = c.direction === 'outbound' ? c.to : c.from;
+    key = `${event}:${c.id ?? payload.id}`;
+    const dir = c.direction === 'outbound' ? 'Outgoing' : 'Incoming';
+    if (event === 'call.ended') {
+      body = c.endReason === 'no_answer' || c.endReason === 'rejected'
+        ? `${dir} WhatsApp call, not answered.`
+        : `${dir} WhatsApp call, ${callDuration(c.durationSeconds)}${c.isVoicemail ? ' (voicemail)' : ''}.`;
+    } else if (event === 'call.failed') {
+      body = `${dir} WhatsApp call failed${c.error?.message ? `: ${String(c.error.message).slice(0, 200)}` : '.'}`;
+    } else {
+      return { recorded: false, note: 'call.ended carries the outcome' };
+    }
+  }
+
+  const thread = await findWhatsAppThreadForCall(supabase, accountId, customer);
+  if (!thread) return { recorded: false, note: 'no WhatsApp thread with this customer on this number' };
+
+  const { data: dupe } = await supabase
+    .from('inbox_messages').select('id')
+    .eq('thread_id', thread.id).eq('metadata->>call_event_key', key)
+    .limit(1).maybeSingle();
+  if (dupe) return { recorded: true, note: 'already recorded' };
+
+  const call = payload.call || {};
+  const { error } = await supabase.from('inbox_messages').insert({
+    thread_id: thread.id,
+    message_type: 'system',
+    body,
+    metadata: {
+      channel: 'whatsapp', call_event: event, call_event_key: key,
+      call_id: call.id ?? null, direction: call.direction ?? null,
+      duration_seconds: call.durationSeconds ?? null, end_reason: call.endReason ?? null,
+      permission: event === 'call.permission_request' ? (payload.permission?.response ?? null) : null,
+    },
+  });
+  if (error) throw new Error(`call event inbox_messages insert failed: ${error.message}`);
+  return { recorded: true };
+}
+
+/** An ig.me / m.me link or ad that re-opened a DM (#384 B): which entry point it was, kept on the thread. */
+async function handleReferral(supabase: any, payload: any): Promise<{ recorded: boolean }> {
+  const convId = String(payload.conversation?.id ?? '');
+  if (!convId) return { recorded: false };
+  const { data: thread } = await supabase
+    .from('inbox_threads').select('id, metadata')
+    .eq('channel', 'social').eq('metadata->>zernio_conversation_id', convId)
+    .limit(1).maybeSingle();
+  if (!thread) return { recorded: false };
+  const r = payload.referral || {};
+  const meta = (thread.metadata && typeof thread.metadata === 'object' ? thread.metadata : {}) as Record<string, unknown>;
+  const { error } = await supabase.from('inbox_threads').update({
+    metadata: {
+      ...meta,
+      last_referral: {
+        ref: r.ref ?? null, source: r.source ?? null, type: r.type ?? null,
+        ad_id: r.ad_id ?? null, ad_title: r.ads_context_data?.ad_title ?? null,
+        referer_uri: r.referer_uri ?? null, at: payload.timestamp ?? new Date().toISOString(),
+      },
+    },
+  }).eq('id', thread.id);
+  if (error) throw new Error(`referral not recorded: ${error.message}`);
+  return { recorded: true };
+}
+
+function leadAnswer(v: unknown): string {
+  return Array.isArray(v) ? v.map((x) => String(x)).join(', ') : v == null ? '' : String(v);
+}
+
+/** A Meta Lead Gen (Instant Form) submission (#384 B): an Inbox thread holding the answers, never a silent CRM row. */
+async function handleLeadReceived(supabase: any, payload: any): Promise<{ thread_id?: string; note?: string }> {
+  const lead = payload.lead || {};
+  const accountId = accountIdOf(payload.account);
+  const { workspaceId, socialAccountId, connectedBy } = await resolveSocialWorkspace(supabase, accountId);
+  if (!workspaceId) return { note: `no workspace for account ${accountId}` };
+  const leadgenId = String(lead.leadgenId ?? lead.id ?? '');
+  if (!leadgenId) return { note: 'no lead id on the payload' };
+
+  const fields = (lead.fields && typeof lead.fields === 'object' ? lead.fields : {}) as Record<string, unknown>;
+  const name = leadAnswer(fields.full_name ?? fields.name)
+    || [leadAnswer(fields.first_name), leadAnswer(fields.last_name)].filter(Boolean).join(' ')
+    || 'Someone';
+  const email = leadAnswer(fields.email) || null;
+  const phone = leadAnswer(fields.phone_number ?? fields.phone) || null;
+  const formName = String(lead.formName || 'Lead form');
+  const at = lead.createdAt || payload.timestamp || new Date().toISOString();
+
+  const threadId = await findOrCreateSocialThread(supabase, {
+    allowAgent: false,
+    workspaceId,
+    preferredOwner: connectedBy,
+    externalKey: `lead:${leadgenId}`,
+    subject: `${formName} · ${name}`.substring(0, 120),
+    metadata: {
+      social_kind: 'lead',
+      platform: 'facebook',
+      zernio_account_id: accountId,
+      social_account_id: socialAccountId,
+      lead_form_id: lead.formId ?? null,
+      lead_form_name: lead.formName ?? null,
+      lead_ad_id: lead.adId ?? null,
+      lead_campaign_id: lead.campaignId ?? null,
+      lead_is_organic: lead.isOrganic ?? null,
+      contact_email: email,
+      contact_phone: phone,
+    },
+    at,
+  });
+
+  const { data: dupe } = await supabase
+    .from('inbox_messages').select('id')
+    .eq('thread_id', threadId).eq('metadata->>leadgen_id', leadgenId)
+    .limit(1).maybeSingle();
+  if (dupe) return { thread_id: threadId, note: 'already recorded' };
+
+  const lines = Object.entries(fields).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${leadAnswer(v)}`);
+  const { error } = await supabase.from('inbox_messages').insert({
+    thread_id: threadId,
+    sender_participant_id: null,
+    body: lines.length ? lines.join('\n') : '(The form had no answers.)',
+    attachments: [],
+    message_type: 'text',
+    metadata: {
+      channel: 'social', direction: 'incoming', platform: 'facebook', social_kind: 'lead',
+      leadgen_id: leadgenId, form_id: lead.formId ?? null, fields,
+    },
+  });
+  if (error) throw new Error(`lead inbox_messages insert failed: ${error.message}`);
+
+  await notifyThreadMembers(
+    supabase, threadId, workspaceId,
+    `New lead · ${name}`,
+    `${formName}${email ? ` · ${email}` : ''}${phone ? ` · ${phone}` : ''}`.substring(0, 200),
+  );
+  return { thread_id: threadId };
+}
+
 /** Best-effort: find which user a contact's most recent outbound campaign belonged to. */
 async function resolveCampaignOwner(supabase: any, phone: string): Promise<string | null> {
   const { data: log } = await supabase
@@ -1511,6 +1681,21 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       await handleSocialComment(supabase, payload);
       return jsonResponse({ received: true, event });
     }
+    if (event === 'call.received' || event === 'call.ended' || event === 'call.failed' || event === 'call.permission_request') {
+      const outcome = await handleCallEvent(supabase, event, payload);
+      return jsonResponse({ received: true, event, ...outcome });
+    }
+    if (event === 'referral.received') {
+      const outcome = await handleReferral(supabase, payload);
+      return jsonResponse({ received: true, event, ...outcome });
+    }
+    if (event === 'lead.received') {
+      const outcome = await handleLeadReceived(supabase, payload);
+      return jsonResponse({ received: true, event, ...outcome });
+    }
+    if (event === 'webhook.test') {
+      return jsonResponse({ received: true, event, note: 'test delivery acknowledged' });
+    }
     if (event === 'conversation.started') {
       // The thread is created by message.received, which always accompanies or follows this.
       // Acknowledged explicitly so it does not read as an unhandled event in the logs.
@@ -1524,7 +1709,8 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     // until now: `WebhookPayloadPostPlatform` carries a `platform` block naming the target and an
     // `account` block naming the connected account, so the failing network is right there in the
     // payload the dispatcher was throwing away.
-    if (event === 'post.platform.published' || event === 'post.platform.failed') {
+    if (event === 'post.platform.published' || event === 'post.platform.failed'
+        || event === 'post.platform.deleted' || event === 'post.tiktok.url_resolved') {
       const legPlatform: string | undefined =
         (payload as any)?.platform?.platform ?? (payload as any)?.platform?.name ?? account?.platform;
       if (!zernioPostId || !legPlatform) {
@@ -1533,15 +1719,16 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
         return jsonResponse({ received: true, event, note: 'no post id or platform on the payload' });
       }
       const failed = event === 'post.platform.failed';
+      const deleted = event === 'post.platform.deleted';
       const legError = failed
         ? ((payload as any)?.platform?.error ?? firstPlatformError(post) ?? 'Publish failed on this platform')
         : null;
-      const legUrl = !failed
-        ? ((payload as any)?.platform?.platformPostUrl ?? (payload as any)?.platform?.url ?? null)
+      const legUrl = !failed && !deleted
+        ? ((payload as any)?.platform?.publishedUrl ?? (payload as any)?.platform?.platformPostUrl ?? (payload as any)?.platform?.url ?? null)
         : null;
 
       const sp = await recordPlatformLeg(supabase, zernioPostId, legPlatform, {
-        status: failed ? 'failed' : 'published',
+        status: failed ? 'failed' : deleted ? 'deleted' : 'published',
         error: legError,
         url: legUrl,
       });
@@ -1938,7 +2125,7 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
         // A review is customer CONTENT and Zernio does not resend after a 200, so a transient
         // fault here loses it permanently. The upsert is keyed on (platform, external_id), which
         // is what makes the retry converge instead of duplicating.
-        || event === 'review.new' || event === 'review.updated') {
+        || event === 'review.new' || event === 'review.updated' || event === 'lead.received') {
       return jsonResponse({ error: `Transient failure handling ${event}`, event }, 500);
     }
   }

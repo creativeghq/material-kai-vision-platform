@@ -34,6 +34,10 @@ describe('#384 A — every event we ask for has somewhere to go', () => {
     ).toEqual([]);
   });
 
+  it('a published leg keeps its public link, read from the field the spec names', () => {
+    expect(src(HANDLER)).toMatch(/platform\?\.publishedUrl/);
+  });
+
   it('the leg is keyed by platform, not appended to a list', () => {
     // The same leg can report twice (a retry, a redelivery). A list would show one network as two
     // outcomes with no way to tell which is current.
@@ -66,9 +70,41 @@ describe('#384 A — every event we ask for has somewhere to go', () => {
     // Recording it with nothing rendering it just moves the silence.
     const panel = src(PANEL);
     expect(panel).toMatch(/const failedLegs =/);
-    expect(panel).toMatch(/\{platformLabel\(leg\.platform\)\} failed/);
+    expect(panel).toMatch(/\{platformLabel\(leg\.platform\)\} \{leg\.deleted \? 'deleted' : 'failed'\}/);
     // Read from the leg record, not inferred from the aggregate status — which says `published`
     // for exactly the case this exists to show.
     expect(panel).toMatch(/leg\?\.status === 'failed'/);
+  });
+});
+
+describe('#384 B — leads, calls and referrals are subscribed and land somewhere a person sees', () => {
+  const events = src(EVENTS);
+  const list = events.slice(events.indexOf('ZERNIO_WEBHOOK_EVENTS = ['), events.indexOf('] as const'));
+  const handler = src(HANDLER);
+
+  it.each(['lead.received', 'call.ended', 'call.failed', 'call.permission_request', 'referral.received', 'webhook.test',
+    'post.platform.deleted', 'post.tiktok.url_resolved'])('%s is subscribed and dispatched', (event) => {
+    expect(list).toContain(`'${event}'`);
+    expect(handler).toContain(`event === '${event}'`);
+  });
+
+  it('a lead becomes an Inbox thread holding the answers, de-duplicated by its lead id, never a silent CRM row', () => {
+    const fn = handler.slice(handler.indexOf('async function handleLeadReceived('));
+    const body = fn.slice(0, fn.indexOf('\nasync function ') > 0 ? fn.indexOf('\nasync function ') : 4000);
+    expect(body).toContain('findOrCreateSocialThread(');
+    expect(body).toContain("social_kind: 'lead'");
+    expect(body).toContain(".eq('metadata->>leadgen_id', leadgenId)");
+    expect(body).not.toMatch(/from\('crm_contacts'\)\.insert/);
+  });
+
+  it('a lead is customer content, so a transient fault asks Zernio to resend it', () => {
+    expect(handler).toMatch(/\|\| event === 'review\.new' \|\| event === 'review\.updated' \|\| event === 'lead\.received'\)/);
+  });
+
+  it('a lead thread cannot be replied into, on the server as well as in the composer', () => {
+    const api = src('supabase/functions/inbox-api/index.ts');
+    expect(api).toMatch(/meta\.social_kind === 'lead' && messageType !== 'note'/);
+    expect((api.match(/assertReplyable\(thread, /g) ?? []).length).toBe(2);
+    expect(src('src/pages/Inbox/components/InboxComposer.tsx')).toMatch(/!leadBlocked && hasContent/);
   });
 });

@@ -26,6 +26,7 @@ const EXAMPLES: Record<InboxSourceKey, ThreadShape> = {
   whatsapp: thread('whatsapp', 'customer', { zernio_conversation_id: 'c1' }),
   social_dm: thread('social', 'customer', { platform: 'instagram' }),
   social_comments: thread('social', 'customer', { platform: 'facebook', social_kind: 'comments' }),
+  lead_form: thread('social', 'customer', { platform: 'facebook', social_kind: 'lead' }),
   team: thread('internal', 'internal'),
   customer: thread('internal', 'customer'),
   dealer: thread('internal', 'upstream'),

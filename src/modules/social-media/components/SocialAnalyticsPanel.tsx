@@ -194,8 +194,8 @@ const statusVariant = (s: string) =>
  */
 const failedLegs = (post: { metadata?: { platforms?: Record<string, { status?: string; error?: string }> | null } | null }) =>
   Object.entries(post.metadata?.platforms ?? {})
-    .filter(([, leg]) => leg?.status === 'failed')
-    .map(([platform, leg]) => ({ platform, error: leg?.error }));
+    .filter(([, leg]) => leg?.status === 'failed' || leg?.status === 'deleted')
+    .map(([platform, leg]) => ({ platform, error: leg?.error, deleted: leg?.status === 'deleted' }));
 
 /** `—` for an absent value, never 0: "not synced yet" and "nobody saw it" are different facts. */
 const num = (v: number | null | undefined) => (v == null ? '—' : formatNumber(v));
@@ -978,11 +978,11 @@ export const SocialAnalyticsPanel: React.FC = () => {
                           {failedLegs(post).map((leg) => (
                             <Badge
                               key={leg.platform}
-                              variant="error"
+                              variant={leg.deleted ? 'warning' : 'error'}
                               className="ml-1"
-                              title={leg.error ?? undefined}
+                              title={leg.deleted ? 'Removed on the platform after it was published' : leg.error ?? undefined}
                             >
-                              {platformLabel(leg.platform)} failed
+                              {platformLabel(leg.platform)} {leg.deleted ? 'deleted' : 'failed'}
                             </Badge>
                           ))}
                         </TableCell>
