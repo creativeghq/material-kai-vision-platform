@@ -737,32 +737,6 @@ export async function markConversationRead(conversationId: string): Promise<bool
 }
 
 /**
- * Presigned upload for media that must reach Zernio as a URL it can fetch.
- *
- * Publishing sends `mediaItems` as URLs. Everything in a PRIVATE bucket is therefore
- * unpublishable today — the signed URL we could mint expires, and storage convention #7 forbids
- * persisting one. Uploading to Zernio instead makes private assets publishable at all.
- */
-export async function presignZernioMedia(params: {
-  fileName: string;
-  contentType: string;
-}): Promise<{ uploadUrl: string; publicUrl: string } | null> {
-  try {
-    const res = await zernioApi('POST', '/media/presign', {
-      fileName: params.fileName,
-      contentType: params.contentType,
-    });
-    const data = res?.data ?? res;
-    const uploadUrl = data?.uploadUrl ?? data?.url;
-    const publicUrl = data?.publicUrl ?? data?.fileUrl ?? data?.mediaUrl;
-    return uploadUrl && publicUrl ? { uploadUrl, publicUrl } : null;
-  } catch (err) {
-    console.warn('[zernio] media presign failed:', err);
-    return null;
-  }
-}
-
-/**
  * Start or continue a DM on a non-WhatsApp platform (Instagram, Facebook, X, Bluesky, Reddit,
  * Telegram, Slack). Same endpoint as the WhatsApp cold start — Zernio upserts into the existing
  * thread when one exists — but keyed on the platform's own participant id rather than a phone
