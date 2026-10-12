@@ -1,9 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Plus, Loader2, Tag, Trash2, Check, Zap } from 'lucide-react';
+import { Plus, Loader2, Tag, Trash2, Check, Zap, MoreHorizontal, Pencil, Palette } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/core/ui/alert-dialog';
+import { NavRow } from './InboxPrimitives';
 import { inboxApi, LABEL_COLORS, type InboxLabel } from '@/services/inboxApi';
 import { LabelRulesDialog, labelHasRules } from './LabelRulesDialog';
 
@@ -23,8 +32,122 @@ export function useLabelCrud(workspaceId: string, onChanged: () => void) {
   const create = useCallback((name: string, color: string) => run(() => inboxApi.createLabel(workspaceId, name, color), 'Could not create label'), [run, workspaceId]);
   const recolor = useCallback((id: string, color: string) => run(() => inboxApi.updateLabel(id, { color }), 'Failed'), [run]);
   const remove = useCallback((id: string) => run(() => inboxApi.deleteLabel(id), 'Could not delete label'), [run]);
-  return { busy, run, create, recolor, remove };
+  const rename = useCallback((id: string, name: string) => run(() => inboxApi.updateLabel(id, { name }), 'Could not rename label'), [run]);
+  return { busy, run, create, recolor, remove, rename };
 }
+
+/** One label in the sidebar; owners and admins get rename, colour and delete on hover. */
+export const LabelSidebarRow: React.FC<{
+  workspaceId: string;
+  label: InboxLabel;
+  count?: string;
+  active: boolean;
+  canManage: boolean;
+  dot: string;
+  onSelect: () => void;
+  onChanged: () => void;
+}> = ({ workspaceId, label, count, active, canManage, dot, onSelect, onChanged }) => {
+  const { busy, recolor, remove, rename } = useLabelCrud(workspaceId, onChanged);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(label.name);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const save = async () => {
+    const next = name.trim();
+    if (!next || next === label.name) { setEditing(false); setName(label.name); return; }
+    if (await rename(label.id, next)) setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 px-2.5 py-1">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+        <Input
+          autoFocus
+          value={name}
+          maxLength={60}
+          disabled={busy}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => void save()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); void save(); }
+            if (e.key === 'Escape') { setEditing(false); setName(label.name); }
+          }}
+          className="h-7 text-sm"
+          aria-label="Label name"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative">
+      <NavRow
+        icon={<span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />}
+        label={label.name}
+        dense
+        count={count}
+        active={active}
+        onClick={onSelect}
+      />
+      {canManage && (
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Options for ${label.name}`}
+              className={`absolute right-1 top-1/2 -translate-y-1/2 rounded-sm bg-card p-1 text-muted-foreground hover:text-foreground ${
+                menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'}`}
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onSelect={() => { setName(label.name); setEditing(true); }}>
+              <Pencil className="mr-2 h-3.5 w-3.5" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger><Palette className="mr-2 h-3.5 w-3.5" /> Colour</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="p-2">
+                <div className="flex items-center gap-1.5">
+                  {LABEL_COLORS.map((c) => (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => { void recolor(label.id, c.key); setMenuOpen(false); }}
+                      title={c.label}
+                      aria-label={`Colour: ${c.label}`}
+                      className={`w-4 h-4 rounded-full ${c.dot} ${label.color === c.key ? 'ring-2 ring-offset-1 ring-offset-background ring-foreground/50' : ''}`}
+                    />
+                  ))}
+                </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setConfirmDelete(true)}>
+              <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete the label “{label.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It comes off every conversation that has it{count ? ` (${count})` : ''}. The conversations and their messages stay.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void remove(label.id)}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
 
 export const LabelManagerPopover: React.FC<{
   workspaceId: string;

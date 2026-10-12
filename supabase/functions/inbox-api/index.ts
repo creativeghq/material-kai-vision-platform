@@ -4476,7 +4476,11 @@ async function handleJwtAction(
         throw new HttpError(403, 'Only a workspace owner or admin may manage labels');
       }
       const patch: Record<string, unknown> = {};
-      if (payload.name != null) patch.name = String(payload.name).trim();
+      if (payload.name != null) {
+        const name = String(payload.name).trim();
+        if (!name) throw new HttpError(400, 'A label needs a name');
+        patch.name = name.slice(0, 60);
+      }
       if (payload.color != null) patch.color = String(payload.color);
       Object.assign(patch, labelRulePatch(payload));
       const { data: label, error } = await db.from('inbox_labels').update(patch).eq('id', labelId)
@@ -4495,7 +4499,8 @@ async function handleJwtAction(
       if (!operator && callerRole !== 'owner' && callerRole !== 'admin') {
         throw new HttpError(403, 'Only a workspace owner or admin may manage labels');
       }
-      await db.from('inbox_labels').delete().eq('id', labelId); // cascade removes assignments
+      const { error: delErr } = await db.from('inbox_labels').delete().eq('id', labelId);
+      if (delErr) throw new HttpError(500, `Could not delete the label: ${delErr.message}`);
       return json({ ok: true });
     }
 

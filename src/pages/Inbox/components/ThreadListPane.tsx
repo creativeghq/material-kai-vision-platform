@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlarmClock, Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, ArchiveRestore, Trash2, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
+import { AlarmClock, ChevronRight, Folder as FolderIcon, FolderOpen, Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, ArchiveRestore, Trash2, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
 import { visibleModes, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
@@ -14,7 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { labelDot } from '../inboxFormat';
 import { FilterBar } from '@/components/core/filters';
 import { inboxSourceMeta, inboxThreadSource, SOURCE_FILTER_ORDER } from '../inboxSource';
-import { type InboxThreadStatus } from '@/services/inboxApi';
+import { type InboxThread, type InboxThreadStatus } from '@/services/inboxApi';
+import { whatsAppFolders } from '../whatsappFolders';
 import { timeAgo } from '../inboxFormat';
 import { formatDate } from '@/utils/datetime';
 import { LabelChips, MobileChip, SourceWord, ThreadAvatar } from './InboxPrimitives';
@@ -22,6 +23,8 @@ import type { InboxPageState } from '../useInboxPage';
 import { FollowUpStatsLine } from './FollowUpStatsLine';
 import { BulkFollowUp } from './BulkFollowUp';
 
+
+const FOLDER_VIEW_KEY = 'inbox.whatsapp.layout';
 
 const EMPTY_VIEW = {
   all: { title: 'No conversations yet', description: 'Email, WhatsApp, social and enquiries from your public profile all land here, each tagged with where it came from.' },
@@ -74,7 +77,124 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     wsLabels,
     sourceCounts,
     threadDisplayName,
+    labelIds,
   } = s;
+  const [folderView, setFolderView] = React.useState<boolean>(() => {
+    try { return localStorage.getItem(FOLDER_VIEW_KEY) !== 'list'; } catch { return true; }
+  });
+  const chooseFolderView = (on: boolean) => {
+    setFolderView(on);
+    try { localStorage.setItem(FOLDER_VIEW_KEY, on ? 'folders' : 'list'); } catch { /* per-viewer convenience only */ }
+  };
+  const [openFolders, setOpenFolders] = React.useState<Set<string>>(new Set());
+  const toggleFolder = (id: string) => setOpenFolders((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const showFolders = mode === 'whatsapp' && folderView && view === 'all' && !String(query ?? '').trim() && labelIds.length === 0;
+  const renderRow = (t: InboxThread) => {
+              const name = threadDisplayName(t);
+              const active = activeId === t.id;
+              const source = inboxThreadSource(t);
+              // Unassigned is STATED, not left blank: blank also reads as "did not render".
+              const assignee = t.assigned_user_id ? (t.assignee_name ?? 'Assigned') : null;
+              const orderPending = (t.metadata as { order_intake?: { status?: string } } | null)
+                ?.order_intake?.status === 'pending_review';
+              const selected = selectedIds.has(t.id);
+              return (
+                <div key={t.id} className="group relative">
+                <span className={`absolute left-1 top-1/2 -translate-y-1/2 z-10 ${selectedIds.size > 0 || selected ? 'flex' : 'hidden md:group-hover:flex'}`}>
+                  <Checkbox aria-label={`Select ${name}`} checked={selected} onCheckedChange={() => toggleSelected(t.id)} />
+                </span>
+                <button
+                  onClick={() => (selectedIds.size > 0 ? toggleSelected(t.id) : openThread(t.id))}
+                  className={`w-full text-left ${selectedIds.size > 0 ? 'pl-8 pr-4' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${selected ? 'bg-primary/[0.06]' : ''} ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
+                >
+                  <div className="relative shrink-0 mt-0.5">
+                    <ThreadAvatar thread={t} name={name} className="h-9 w-9" showMood />
+                    {/* Solid, not tinted: at 16px a 15% wash reads as grey in every theme,
+                        and the glyph inside it needs a ground to sit on. */}
+                    <span
+                      className={`absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center text-white ${source.tone.dot}`}
+                      title={source.label}
+                    >
+                      <source.Icon className="w-2 h-2" />
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                      <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{name}</span>
+                      <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{timeAgo(t.last_message_at)}</span>
+                    </div>
+                    {t.channel === 'email' && t.subject && t.subject !== name && (
+                      <div className={`text-sm truncate ${t.unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}`}>{t.subject}</div>
+                    )}
+                    {t.last_message_preview && (
+                      <div className={`text-xs truncate mt-0.5 ${t.unread ? 'text-foreground/70' : 'text-muted-foreground'}`}>{t.last_message_preview}</div>
+                    )}
+                    <div className="flex items-center gap-x-2 gap-y-1 mt-1.5 flex-wrap">
+                      <SourceWord source={source} />
+                      {t.has_attachments && (
+                        <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground">
+                          <Paperclip className="w-3 h-3" />Files
+                        </span>
+                      )}
+                      {assignee ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80 truncate max-w-[9rem]" title={`Assigned to ${assignee}`}>
+                          <UserAvatar userId={t.assigned_user_id} name={assignee} className="h-4 w-4 text-[8px]" />
+                          <span className="truncate">{assignee}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">Unassigned</span>
+                      )}
+                      {t.outreach?.length ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80" title={t.outreach[0].preview}>
+                          <Send className="w-3 h-3" />Sends {formatDate(t.outreach[0].send_at)}{t.outreach.length > 1 ? ` (+${t.outreach.length - 1})` : ''}
+                        </span>
+                      ) : t.follow_up_at && !t.follow_up_fired_at ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80">
+                          {t.follow_up_message ? <Send className="w-3 h-3" /> : <AlarmClock className="w-3 h-3" />}
+                          {t.follow_up_message ? 'Sends' : 'Back'} {formatDate(t.follow_up_at)}
+                        </span>
+                      ) : t.status !== 'open' && !t.archived_at && <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status === 'snoozed' ? 'follow up' : t.status}</span>}
+                      {t.agent_state === 'active' && (
+                        <span className="inline-flex items-center gap-1 text-[11px] leading-none text-primary"><Bot className="w-3 h-3" />AI</span>
+                      )}
+                      {/* Same reasoning as the order badge below: "the customer spoke last and
+                          nobody answered" is a JOB, not a description, and it was invisible
+                          from the list — `unread` only says whether anyone LOOKED. That is how
+                          33 conversations reached a week without a reply while the mailbox
+                          showed 67 identically-open threads. The age is measured from the
+                          FIRST unanswered message, so it is how long they have really waited. */}
+                      {t.waiting_on === 'us' && (
+                        <Badge variant="warning" className="text-[10px] py-0">
+                          <Clock className="w-2.5 h-2.5" />
+                          Waiting {timeAgo(t.waiting_since || t.last_message_at)}
+                          {(t.unanswered_count ?? 0) > 1 ? ` · ${t.unanswered_count} msgs` : ''}
+                        </Badge>
+                      )}
+                      {/* #342: an order waiting for approval is the one thing worth seeing
+                          from the list — otherwise it is only discoverable by opening the
+                          thread, which is how an order sits unactioned for a week. It keeps
+                          a tag where the rest of the row went to plain words, because it is
+                          the one item in the row that is a JOB rather than a description. */}
+                      {orderPending && (
+                        <Badge variant="warning" className="text-[10px] py-0">
+                          <ShoppingCart className="w-2.5 h-2.5" />Order
+                        </Badge>
+                      )}
+                      <LabelChips labels={t.labels} />
+                    </div>
+                  </div>
+                </button>
+                </div>
+              );
+  };
+
+  const folders = showFolders ? whatsAppFolders(visibleThreads, wsLabels) : [];
+
   return (
     <div className={`dashboard-card md:col-span-4 lg:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
       <div className="p-3 border-b border-hairline bg-surface-sunken space-y-3 shrink-0">
@@ -234,6 +354,14 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             )}
             </div>
           ) : <span />}
+          {mode === 'whatsapp' && (
+            <div role="tablist" aria-label="WhatsApp layout" className="flex items-center gap-3 text-xs">
+              <button role="tab" aria-selected={folderView} onClick={() => chooseFolderView(true)} className="py-1 inline-flex items-center gap-1">
+                <FolderIcon className="w-3 h-3" />Folders
+              </button>
+              <button role="tab" aria-selected={!folderView} onClick={() => chooseFolderView(false)} className="py-1">List</button>
+            </div>
+          )}
           <FilterBar
             groups={filterGroups}
             values={filterValues}
@@ -274,108 +402,49 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               description={EMPTY_VIEW[view === 'all' || view === 'unread' ? 'all' : view].description}
             />
           )
-        ) : groupedThreads.map(([bucket, items]) => (
-          <div key={bucket}>
-            <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">{bucket}</div>
-            {items.map((t) => {
-              const name = threadDisplayName(t);
-              const active = activeId === t.id;
-              const source = inboxThreadSource(t);
-              // Unassigned is STATED, not left blank: blank also reads as "did not render".
-              const assignee = t.assigned_user_id ? (t.assignee_name ?? 'Assigned') : null;
-              const orderPending = (t.metadata as { order_intake?: { status?: string } } | null)
-                ?.order_intake?.status === 'pending_review';
-              const selected = selectedIds.has(t.id);
-              return (
-                <div key={t.id} className="group relative">
-                <span className={`absolute left-1 top-1/2 -translate-y-1/2 z-10 ${selectedIds.size > 0 || selected ? 'flex' : 'hidden md:group-hover:flex'}`}>
-                  <Checkbox aria-label={`Select ${name}`} checked={selected} onCheckedChange={() => toggleSelected(t.id)} />
+        ) : showFolders ? folders.map((f) => {
+          const open = openFolders.has(f.id) || f.threads.some((t) => t.id === activeId);
+          const fresh = f.unread > 0;
+          const latestName = f.latest ? threadDisplayName(f.latest) : '';
+          return (
+            <div key={f.id} className="border-b border-hairline">
+              <button
+                type="button"
+                onClick={() => toggleFolder(f.id)}
+                aria-expanded={open}
+                className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 transition-colors ${
+                  fresh ? 'bg-[hsl(var(--success-bg))] border-l-[hsl(var(--success))]' : 'border-l-transparent hover:bg-surface-hover'}`}
+              >
+                <span className={`relative h-9 w-9 shrink-0 rounded-sm flex items-center justify-center ${
+                  fresh ? 'bg-success text-success-foreground' : 'bg-surface-sunken text-muted-foreground'}`}>
+                  {open ? <FolderOpen className="w-4 h-4" /> : <FolderIcon className="w-4 h-4" />}
+                  {f.color && <span className={`absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${labelDot(f.color)}`} />}
                 </span>
-                <button
-                  onClick={() => (selectedIds.size > 0 ? toggleSelected(t.id) : openThread(t.id))}
-                  className={`w-full text-left ${selectedIds.size > 0 ? 'pl-8 pr-4' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${selected ? 'bg-primary/[0.06]' : ''} ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
-                >
-                  <div className="relative shrink-0 mt-0.5">
-                    <ThreadAvatar thread={t} name={name} className="h-9 w-9" showMood />
-                    {/* Solid, not tinted: at 16px a 15% wash reads as grey in every theme,
-                        and the glyph inside it needs a ground to sit on. */}
-                    <span
-                      className={`absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center text-white ${source.tone.dot}`}
-                      title={source.label}
-                    >
-                      <source.Icon className="w-2 h-2" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`flex-1 truncate text-sm ${fresh ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{f.name}</span>
+                    {fresh && (
+                      <span className="text-[11px] rounded-xs bg-success text-success-foreground px-1.5 tabular-nums">{f.unread} new</span>
+                    )}
+                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                      {f.threads.length} · {f.latest ? timeAgo(f.latest.last_message_at) : ''}
                     </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                      <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{name}</span>
-                      <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{timeAgo(t.last_message_at)}</span>
+                  {f.latest?.last_message_preview && (
+                    <div className={`text-xs truncate mt-0.5 ${fresh ? 'text-[hsl(var(--success))] font-medium' : 'text-muted-foreground'}`}>
+                      {latestName}: {f.latest.last_message_preview}
                     </div>
-                    {t.channel === 'email' && t.subject && t.subject !== name && (
-                      <div className={`text-sm truncate ${t.unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}`}>{t.subject}</div>
-                    )}
-                    {t.last_message_preview && (
-                      <div className={`text-xs truncate mt-0.5 ${t.unread ? 'text-foreground/70' : 'text-muted-foreground'}`}>{t.last_message_preview}</div>
-                    )}
-                    <div className="flex items-center gap-x-2 gap-y-1 mt-1.5 flex-wrap">
-                      <SourceWord source={source} />
-                      {t.has_attachments && (
-                        <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground">
-                          <Paperclip className="w-3 h-3" />Files
-                        </span>
-                      )}
-                      {assignee ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80 truncate max-w-[9rem]" title={`Assigned to ${assignee}`}>
-                          <UserAvatar userId={t.assigned_user_id} name={assignee} className="h-4 w-4 text-[8px]" />
-                          <span className="truncate">{assignee}</span>
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground">Unassigned</span>
-                      )}
-                      {t.outreach?.length ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80" title={t.outreach[0].preview}>
-                          <Send className="w-3 h-3" />Sends {formatDate(t.outreach[0].send_at)}{t.outreach.length > 1 ? ` (+${t.outreach.length - 1})` : ''}
-                        </span>
-                      ) : t.follow_up_at && !t.follow_up_fired_at ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80">
-                          {t.follow_up_message ? <Send className="w-3 h-3" /> : <AlarmClock className="w-3 h-3" />}
-                          {t.follow_up_message ? 'Sends' : 'Back'} {formatDate(t.follow_up_at)}
-                        </span>
-                      ) : t.status !== 'open' && !t.archived_at && <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status === 'snoozed' ? 'follow up' : t.status}</span>}
-                      {t.agent_state === 'active' && (
-                        <span className="inline-flex items-center gap-1 text-[11px] leading-none text-primary"><Bot className="w-3 h-3" />AI</span>
-                      )}
-                      {/* Same reasoning as the order badge below: "the customer spoke last and
-                          nobody answered" is a JOB, not a description, and it was invisible
-                          from the list — `unread` only says whether anyone LOOKED. That is how
-                          33 conversations reached a week without a reply while the mailbox
-                          showed 67 identically-open threads. The age is measured from the
-                          FIRST unanswered message, so it is how long they have really waited. */}
-                      {t.waiting_on === 'us' && (
-                        <Badge variant="warning" className="text-[10px] py-0">
-                          <Clock className="w-2.5 h-2.5" />
-                          Waiting {timeAgo(t.waiting_since || t.last_message_at)}
-                          {(t.unanswered_count ?? 0) > 1 ? ` · ${t.unanswered_count} msgs` : ''}
-                        </Badge>
-                      )}
-                      {/* #342: an order waiting for approval is the one thing worth seeing
-                          from the list — otherwise it is only discoverable by opening the
-                          thread, which is how an order sits unactioned for a week. It keeps
-                          a tag where the rest of the row went to plain words, because it is
-                          the one item in the row that is a JOB rather than a description. */}
-                      {orderPending && (
-                        <Badge variant="warning" className="text-[10px] py-0">
-                          <ShoppingCart className="w-2.5 h-2.5" />Order
-                        </Badge>
-                      )}
-                      <LabelChips labels={t.labels} />
-                    </div>
-                  </div>
-                </button>
+                  )}
                 </div>
-              );
-            })}
+                <ChevronRight className={`w-4 h-4 mt-2.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+              </button>
+              {open && <div className="pl-3 bg-surface-sunken/40">{f.threads.map((t) => renderRow(t))}</div>}
+            </div>
+          );
+        }) : groupedThreads.map(([bucket, items]) => (
+          <div key={bucket}>
+            <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">{bucket}</div>
+            {items.map((t) => renderRow(t))}
           </div>
         ))}
         {!loadingThreads && nextCursor && (

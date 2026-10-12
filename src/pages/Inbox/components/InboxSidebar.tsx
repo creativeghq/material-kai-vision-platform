@@ -10,7 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { inboxSourceMeta, SOURCE_FILTER_ORDER } from '../inboxSource';
 import { initials, labelDot } from '../inboxFormat';
 import { NavRow, SidebarHeading } from './InboxPrimitives';
-import { LabelManagerPopover } from './InboxLabels';
+import { LabelManagerPopover, LabelSidebarRow } from './InboxLabels';
 import type { InboxPageState } from '../useInboxPage';
 
 
@@ -248,14 +248,16 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
             onClick={() => setLabelFilter(null)}
           />
           {wsLabels.map((l) => (
-            <NavRow
+            <LabelSidebarRow
               key={l.id}
-              icon={<span className={`w-2 h-2 rounded-full shrink-0 ${labelDot(l.color)}`} />}
-              label={l.name}
-              dense
+              workspaceId={activeWorkspaceId ?? ''}
+              label={l}
+              dot={labelDot(l.color)}
               count={labelCounts ? String(labelCounts[l.id] ?? 0) : undefined}
               active={labelIds.includes(l.id)}
-              onClick={() => setLabelFilter(labelIds.length === 1 && labelIds[0] === l.id ? null : l.id)}
+              canManage={canManageLabels && !!activeWorkspaceId}
+              onSelect={() => setLabelFilter(labelIds.length === 1 && labelIds[0] === l.id ? null : l.id)}
+              onChanged={() => { loadLabels(); loadThreads({ silent: true }); }}
             />
           ))}
           {wsLabels.length === 0 && (
