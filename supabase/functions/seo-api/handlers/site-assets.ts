@@ -186,3 +186,10 @@ export function applySiteAssetRules(
   });
   return { markdown: out, removedImages, unlinked: unwrapped.length, unwrapped };
 }
+
+/** A path under another language's prefix (/en/… for an el article) is that language's copy. */
+export function inArticleLanguage(url: string, languageCode: string | null): boolean {
+  if (!languageCode) return true;
+  const first = new URL(url).pathname.split('/')[1] ?? '';
+  return !/^[a-z]{2}$/.test(first) || first === languageCode.toLowerCase().slice(0, 2);
+}

@@ -1,5 +1,5 @@
 /**
- * Brand profile — the workspace-stable half of every content brief.
+ * Brand profile — the stable half of every content brief: a website's own, or the workspace default.
  *
  * `ContentBrief` has always declared brandVoice, provenance and firsthandExperience, and the
  * analyzer scores against all three. Nothing ever filled them, so `provenance` and
@@ -8,7 +8,7 @@
  * two to leave broken.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, Save, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, ShieldCheck, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -46,42 +46,91 @@ const EMPTY: BrandProfile = {
   proprietary_data: [], owned_examples: [], methodology: null, credentials: null,
 };
 
+/** Only the profile's own fields are written: never the row id, workspace or website. */
+const pickProfile = (p: BrandProfile): BrandProfile & { updated_at: string } => ({
+  ...(Object.fromEntries((Object.keys(EMPTY) as (keyof BrandProfile)[]).map((k) => [k, p[k]])) as unknown as BrandProfile),
+  updated_at: new Date().toISOString(),
+});
 /** Comma-separated in, trimmed array out. Empty entries are dropped, not stored as ''. */
 const toList = (s: string): string[] => s.split(',').map((x) => x.trim()).filter(Boolean);
 const fromList = (a: string[] | null | undefined): string => (a ?? []).join(', ');
 /** '' means "not stated" — stored as NULL so it is distinguishable from a deliberate blank. */
 const orNull = (s: string): string | null => (s.trim() ? s.trim() : null);
 
-export const WebsiteBrandProfilePanel: React.FC = () => {
+type Row = BrandProfile & { id: string; website_id: string | null };
+interface GlossaryLesson { id: string; from_text: string; to_text: string }
+
+export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string }> = ({ websiteId }) => {
   const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
   const [p, setP] = useState<BrandProfile>(EMPTY);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [ownVoice, setOwnVoice] = useState(false);
+  const [glossary, setGlossary] = useState<GlossaryLesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase
-      .from('workspace_brand_profile').select('*').eq('workspace_id', activeWorkspaceId).maybeSingle();
-    setP(data ? { ...EMPTY, ...(data as unknown as BrandProfile) } : EMPTY);
+    const [{ data, error }, { data: lessons }] = await Promise.all([
+      supabase.from('workspace_brand_profile').select('*').eq('workspace_id', activeWorkspaceId),
+      supabase.from('seo_writer_lessons').select('id, from_text, to_text')
+        .eq('workspace_id', activeWorkspaceId).eq('kind', 'glossary').eq('status', 'approved').order('created_at'),
+    ]);
+    if (error) toast({ title: 'Could not load the brand profile', description: error.message, variant: 'destructive' });
+    const all = (data ?? []) as unknown as Row[];
+    const own = all.find((r) => r.website_id === websiteId);
+    const used = own ?? all.find((r) => r.website_id === null);
+    setRows(all);
+    setOwnVoice(!!own);
+    setP(used ? { ...EMPTY, ...used } : EMPTY);
+    setGlossary((lessons ?? []) as GlossaryLesson[]);
     setLoading(false);
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, websiteId, toast]);
 
   useEffect(() => { void load(); }, [load]);
 
   const save = async () => {
     if (!activeWorkspaceId) return;
     setSaving(true);
-    const { error } = await supabase.from('workspace_brand_profile')
-      .upsert({ workspace_id: activeWorkspaceId, ...p, updated_at: new Date().toISOString() },
-              { onConflict: 'workspace_id' });
+    const target = rows.find((r) => r.website_id === (ownVoice ? websiteId : null));
+    const payload = pickProfile(p);
+    const { data: written, error } = target
+      ? await supabase.from('workspace_brand_profile').update(payload).eq('id', target.id).select('id')
+      : await supabase.from('workspace_brand_profile')
+        .insert({ ...payload, workspace_id: activeWorkspaceId, website_id: ownVoice ? websiteId : null }).select('id');
     setSaving(false);
-    if (error) {
-      toast({ title: 'Could not save', description: error.message, variant: 'destructive' });
+    if (error || !written?.length) {
+      toast({
+        title: 'Could not save',
+        description: error?.message ?? 'Only a workspace admin can change the brand profile.',
+        variant: 'destructive',
+      });
       return;
     }
     toast({ title: 'Brand profile saved', description: 'New articles will use it from the next run.' });
+    void load();
+  };
+
+  const revertToDefault = async () => {
+    const own = rows.find((r) => r.website_id === websiteId);
+    if (!own) { void load(); return; }
+    const { error } = await supabase.from('workspace_brand_profile').delete().eq('id', own.id);
+    if (error) {
+      toast({ title: 'Could not switch back', description: error.message, variant: 'destructive' });
+      return;
+    }
+    void load();
+  };
+
+  const dropLesson = async (id: string) => {
+    const { error } = await supabase.from('seo_writer_lessons').update({ status: 'dismissed' }).eq('id', id);
+    if (error) {
+      toast({ title: 'Could not remove it', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setGlossary((g) => g.filter((l) => l.id !== id));
   };
 
   const text = (label: string, key: keyof BrandProfile, hint?: string) => (
@@ -123,11 +172,17 @@ export const WebsiteBrandProfilePanel: React.FC = () => {
         <div>
           <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Brand profile</CardTitle>
           <CardDescription>
-            Filled in once, applied to every article this workspace writes. It only fills what a
-            brief leaves out — a brief that names its own author always wins. Provenance and
-            first-hand experience are the two checks no competing tool makes, and they fail on
-            every article until this is set.
+            {ownVoice
+              ? 'This website has its own voice; the workspace default does not apply to its articles.'
+              : 'This website uses the workspace default voice, shared by every website without its own.'}
+            {' '}A brief that names its own author always wins.
           </CardDescription>
+          <Button
+            variant="link" size="sm" className="h-auto px-0"
+            onClick={() => (ownVoice ? void revertToDefault() : setOwnVoice(true))}
+          >
+            {ownVoice ? 'Use the workspace default instead' : 'Give this website its own voice'}
+          </Button>
         </div>
         <Button onClick={() => void save()} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -142,6 +197,25 @@ export const WebsiteBrandProfilePanel: React.FC = () => {
             {list('Personality', 'personality_traits', 'expert, no-nonsense')}
             {list('Preferred terminology', 'terminology_preferences', 'porcelain tile, not "ceramic"')}
             {list('Words to avoid', 'avoid_list', 'cheap, revolutionary')}
+          </div>
+          <div className="space-y-1">
+            <Label>Learned from your edits</Label>
+            {glossary.length ? (
+              <ul className="flex flex-wrap gap-2">
+                {glossary.map((l) => (
+                  <li key={l.id} className="flex items-center gap-1 rounded-sm border border-hairline px-2 py-0.5 text-xs">
+                    «{l.to_text}», never «{l.from_text}»
+                    <Button variant="ghost" size="sm" className="h-5 px-1" onClick={() => void dropLesson(l.id)} aria-label="Remove">
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                None yet. Approve a word lesson on a published article and it appears here, for every website.
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label htmlFor="writing_style">Writing style</Label>

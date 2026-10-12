@@ -84,7 +84,7 @@ describe('a dictionary correction', () => {
       { find: 'φορμά', replace: 'φορμά', kind: 'lexicon' },
       { find: 'φορμά', replace: 'φόρμα', kind: 'lexicon' },
       { find: 'δεν υπάρχει εδώ', replace: 'κάτι', kind: 'lexicon' },
-    ]);
+    ], new Set(['φορμά']));
     expect(out.markdown).toBe('Το φόρμα και το φόρμα. Ένα κείμενο.');
     expect(out.corrected).toEqual([{ from: 'φορμά', to: 'φόρμα' }]);
     expect(out.skipped.map((s) => s.why)).toEqual(['empty or unchanged', 'text not found']);
@@ -102,5 +102,14 @@ describe('what the guides cover', () => {
     expect(guideSectionsToCover({ read: 4, common: [{ label: 'Αντοχή', pages: 3 }], distinctive: [label('Τιμές')] } as never)).toEqual(['Αντοχή']);
     expect(guideSectionsToCover({ read: 4, common: [], distinctive: [label('Τιμές'), label('Αρμόστοκοι')] } as never)).toEqual(['Τιμές', 'Αρμόστοκοι']);
     expect(guideSectionsToCover(undefined)).toEqual([]);
+  });
+});
+
+describe('a dictionary fix never spreads to a word the dictionary did not flag', () => {
+  it('a one-word edit of a correct word applies only where it is unique', () => {
+    const md = 'Ένα μεγάλο πλακάκι. Ένα μεγάλο σπίτι.';
+    const out = applyLexiconEdits(md, [{ find: 'μεγάλο', replace: 'μεγάλη', kind: 'lexicon' }], new Set(['ρεκτιφιαρισμένα']));
+    expect(out.markdown).toBe(md);
+    expect(out.skipped.map((s) => s.why)).toEqual(['text not unique']);
   });
 });

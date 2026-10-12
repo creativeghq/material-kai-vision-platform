@@ -231,10 +231,9 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       });
     }
 
-    const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief);
-
     const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
     const websiteId = website?.id ?? null;
+    const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief, websiteId);
 
     // A caller that names no market gets the business's own (GR → Greece, Greek), never a silent US.
     let marketSource = body.language_code && body.location_code ? 'caller' : 'default_us';

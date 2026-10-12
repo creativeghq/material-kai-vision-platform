@@ -7,7 +7,7 @@ import {
   extractContentImages, photoCheckCurrent, photoOffered, siteMinPhotoWidth, type PageImage,
 } from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
-import { applySiteAssetRules, hostOf, pageFacts, siteLinkUrls, trimSlash, type SiteAssetResult } from './site-assets.ts';
+import { applySiteAssetRules, hostOf, inArticleLanguage, pageFacts, siteLinkUrls, trimSlash, type SiteAssetResult } from './site-assets.ts';
 import { verifyPhoto, type PhotoUsage } from './photo-verify.ts';
 import { productSpecsLines } from './site-catalogue.ts';
 
@@ -158,7 +158,7 @@ export async function findSitePages(
     if (opts.mustInclude?.length) {
       const forced = await forcedPages(supabase, opts.websiteId, opts.mustInclude, opts.languageCode ?? null);
       const forcedUrls = new Set(forced.map((p) => trimSlash(p.url)));
-      picked.splice(0, picked.length, ...[...forced, ...picked.filter((p) => !forcedUrls.has(trimSlash(p.url)))].slice(0, Math.max(opts.limit, forced.length)));
+      picked.splice(0, picked.length, ...[...forced, ...picked.filter((p) => !forcedUrls.has(trimSlash(p.url)))].slice(0, opts.limit));
     }
     const { data: texts } = await supabase
       .from('user_website_pages').select('id, content_text, specs').in('id', picked.map((p) => p.id));
@@ -199,20 +199,23 @@ async function forcedPages(
   const cols = 'id, url, title, description, images, images_fetched_at, http_status, links_to, specs';
   const wanted = [...new Set(urls.map(trimSlash))];
   const { data: heads } = await supabase.from('user_website_pages').select(cols)
-    .eq('website_id', websiteId).in('url', [...wanted, ...wanted.map((u) => `${u}/`)]);
+    .eq('website_id', websiteId).eq('is_active', true).in('url', [...wanted, ...wanted.map((u) => `${u}/`)]);
   const memberUrls = (heads ?? []).flatMap((h: { links_to: string[] | null }) => h.links_to ?? []);
   const { data: members } = memberUrls.length
     ? await supabase.from('user_website_pages').select(cols).eq('website_id', websiteId)
-      .in('url', memberUrls.slice(0, 200)).not('specs', 'is', null)
+      .eq('is_active', true).in('url', memberUrls.slice(0, 200)).not('specs', 'is', null)
     : { data: [] };
-  const memberByUrl = new Map((members ?? []).map((m: { url: string }) => [m.url, m]));
-  const rows: Record<string, unknown>[] = [];
+  const memberByUrl = new Map((members ?? [])
+    .filter((m: { url: string }) => inArticleLanguage(m.url, languageCode))
+    .map((m: { url: string }) => [m.url, m]));
+  const rows = new Map<string, Record<string, unknown>>();
   for (const h of (heads ?? []) as Record<string, unknown>[]) {
-    rows.push(h);
+    rows.set(trimSlash(String(h.url)), h);
     ((h.links_to as string[] | null) ?? []).map((u) => memberByUrl.get(u)).filter(Boolean)
-      .slice(0, MEMBERS_PER_FORCED_PAGE).forEach((m) => rows.push(m as Record<string, unknown>));
+      .slice(0, MEMBERS_PER_FORCED_PAGE)
+      .forEach((m) => rows.set(trimSlash(String((m as { url: string }).url)), m as Record<string, unknown>));
   }
-  return rows.filter((r) => Number(r.http_status ?? 0) < 400).map((r) => {
+  return [...rows.values()].filter((r) => r.http_status != null && Number(r.http_status) < 400).map((r) => {
     const fetchedAt = r.images_fetched_at ? new Date(String(r.images_fetched_at)).getTime() : 0;
     return {
       id: String(r.id),

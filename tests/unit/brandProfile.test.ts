@@ -59,7 +59,7 @@ describe('it is actually applied, and reachable', () => {
     // reads the stored one, so merging here means the stored brief carries it.
     for (const [name, src] of [['plan', PLAN], ['pipeline', PIPELINE]] as const) {
       expect(src, `${name} still normalizes without the profile`)
-        .toMatch(/await resolveBriefWithProfile\(supabase, workspaceId, body\.content_brief\)/);
+        .toMatch(/await resolveBriefWithProfile\(supabase, workspaceId, body\.content_brief, (websiteId|typeof body\.website_id === 'string' \? body\.website_id : null)\)/);
     }
   });
 
@@ -68,11 +68,32 @@ describe('it is actually applied, and reachable', () => {
     expect(DASH).toMatch(/WebsiteBrandProfilePanel/);
     expect(DASH).toMatch(/value="brand"/);
     expect(PANEL).toMatch(/from\('workspace_brand_profile'\)/);
-    expect(PANEL).toMatch(/onConflict: 'workspace_id'/);
+    expect(PANEL).toMatch(/website_id: ownVoice \? websiteId : null/);
+    expect(DASH).toMatch(/<WebsiteBrandProfilePanel websiteId=\{website\.id\} \/>/);
   });
 
   it('blank AI disclosure means NOT STATED, never "human wrote it"', () => {
     // The one field where a wrong default is a false claim about authorship.
     expect(PANEL).toMatch(/<option value="">Not stated<\/option>/);
+  });
+});
+
+describe('a website may have its own voice', () => {
+  it('its own row replaces the workspace default; a site without one uses the default', async () => {
+    const { pickBrandProfile } = await import('../../supabase/functions/seo-api/handlers/content-brief.ts');
+    const rows = [{ website_id: null, name: 'default' }, { website_id: 'site-b', name: 'b' }];
+    expect(pickBrandProfile(rows, 'site-b')?.name).toBe('b');
+    expect(pickBrandProfile(rows, 'site-a')?.name).toBe('default');
+    expect(pickBrandProfile(rows, null)?.name).toBe('default');
+    expect(pickBrandProfile([{ website_id: 'site-b', name: 'b' }], 'site-a')).toBeNull();
+  });
+
+  it('the pipeline resolves the brief for the article\'s own website', () => {
+    expect(PIPELINE.indexOf('const websiteId = website?.id ?? null;'))
+      .toBeLessThan(PIPELINE.indexOf('resolveBriefWithProfile(supabase, workspaceId, body.content_brief, websiteId)'));
+  });
+
+  it('the panel writes only profile fields, never the row identity', () => {
+    expect(PANEL).toMatch(/const payload = pickProfile\(p\)/);
   });
 });

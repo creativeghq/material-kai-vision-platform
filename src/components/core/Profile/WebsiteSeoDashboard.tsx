@@ -198,7 +198,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
         </TabsContent>
 
         <TabsContent value="brand" className="space-y-4">
-          <WebsiteBrandProfilePanel />
+          <WebsiteBrandProfilePanel websiteId={website.id} />
         </TabsContent>
 
         <TabsContent value="articles" className="space-y-4">

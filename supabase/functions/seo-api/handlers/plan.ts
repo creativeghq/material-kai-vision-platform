@@ -168,7 +168,7 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
     // Fills brandVoice / provenance / firsthandExperience from the workspace profile where the
     // caller left them absent. Without it those three are null on every run and the E-E-A-T
     // checks fail as a writing problem rather than a missing input.
-    const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief);
+    const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief, typeof body.website_id === 'string' ? body.website_id : null);
 
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_planner');

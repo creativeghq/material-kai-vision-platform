@@ -170,15 +170,15 @@ export function replaceWordInProse(markdown: string, from: string, to: string): 
   return { markdown: text, count };
 }
 
-/** A one-word correction applies wherever the word appears; anything longer must match exactly once. */
-export function applyLexiconEdits(markdown: string, edits: ReviewEdit[]) {
+/** A one-word fix of a flagged word applies wherever it appears; anything else must match exactly once. */
+export function applyLexiconEdits(markdown: string, edits: ReviewEdit[], flagged: Set<string>) {
   let out = markdown;
   const corrected: { from: string; to: string }[] = [];
   const skipped: { find: string; replace: string; why: string }[] = [];
   for (const e of edits) {
     const find = e.find.trim();
     const replace = e.replace.trim();
-    if (ONE_GREEK_WORD.test(find) && ONE_GREEK_WORD.test(replace) && find !== replace) {
+    if (ONE_GREEK_WORD.test(find) && ONE_GREEK_WORD.test(replace) && find !== replace && flagged.has(find.toLowerCase())) {
       const r = replaceWordInProse(out, find, replace);
       if (r.count) {
         out = r.markdown;
@@ -221,10 +221,10 @@ export async function enforceLexicon(
   const language = baseLanguage(opts.languageCode);
   const empty: LexiconReport = { checked: 0, unknown_before: [], corrected: [], kept: [], skipped: [], unverified: [], credits: 0 };
   let markdown = opts.markdown;
+  const house: { from: string; to: string }[] = [];
   try {
     if (!(await hasLexicon(supabase, language))) return { markdown, report: empty };
     if (language === 'el') markdown = fixGreekPunctuation(markdown);
-    const house: { from: string; to: string }[] = [];
     for (const g of await approvedGlossary(supabase, opts.workspaceId, language)) {
       const r = replaceWordInProse(markdown, g.from, g.to);
       if (r.count) { markdown = r.markdown; house.push(g); }
@@ -272,7 +272,7 @@ export async function enforceLexicon(
     }
     const credits = await settleStage(supabase, wallet, ceiling, actual, { unknown: unknown.length, edits: edits.length });
 
-    const applied = applyLexiconEdits(markdown, edits);
+    const applied = applyLexiconEdits(markdown, edits, new Set(unknown.map((w) => w.toLowerCase())));
     markdown = applied.markdown;
     const corrected = [...house, ...applied.corrected];
     const touched = new Set(edits.flatMap((e) => visibleGreekWords(e.find).map((w) => w.toLowerCase())));
@@ -285,7 +285,7 @@ export async function enforceLexicon(
       return { markdown, report: { ...report, corrected, kept, skipped, credits, failed: `not re-checked: ${(e as Error).message.slice(0, 200)}` } };
     }
   } catch (e) {
-    return { markdown, report: { ...empty, failed: (e as Error).message.slice(0, 200) } };
+    return { markdown, report: { ...empty, corrected: house, failed: (e as Error).message.slice(0, 200) } };
   }
 }
 

@@ -5,6 +5,7 @@ import { blankComments } from '../helpers/stripComments';
 import {
   anchorNamesOtherPlace,
   applySiteAssetRules,
+  inArticleLanguage,
   isOfficialHost,
 } from '../../supabase/functions/seo-api/handlers/site-assets.ts';
 import { changedSentences, draftPlainText } from '../../supabase/functions/seo-api/handlers/draft-diff.ts';
@@ -98,5 +99,14 @@ describe('the writer and the reviewer state only true facts about us', () => {
     const code = src('lessons.ts');
     expect(code).toContain("getToolPrompt(supabase, 'seo_lesson_extractor')");
     expect(code.indexOf('reserveStage(')).toBeLessThan(code.indexOf('callClaudeMessages('));
+  });
+});
+
+describe('pages forced in as link targets', () => {
+  it('keep a page in the article language or with no language prefix, never another language copy', () => {
+    expect(inArticleLanguage('https://tiles.example/el/proionta/a', 'el')).toBe(true);
+    expect(inArticleLanguage('https://tiles.example/en/products/a', 'el')).toBe(false);
+    expect(inArticleLanguage('https://tiles.example/athens/plakakia', 'el')).toBe(true);
+    expect(inArticleLanguage('https://tiles.example/en/products/a', null)).toBe(true);
   });
 });
