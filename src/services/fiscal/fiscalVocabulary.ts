@@ -83,6 +83,8 @@ export function mydataIncomeClassificationType(documentType: string | null | und
   // A self-delivery / self-supply (6.x) is not a sale to anybody — AADE refuses the sales pair
   // on it (331) and validates `E3_595` + `category1_6` instead. Verified against the sandbox.
   if (t.startsWith('6.')) return 'E3_595';
+  if (t === '1.2' || t === '2.2') return 'E3_561_005';
+  if (t === '1.3' || t === '2.3') return 'E3_561_006';
   return t.startsWith('11.') ? 'E3_561_003' : 'E3_561_001';
 }
 

@@ -490,8 +490,8 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
               vatNumber: counterpart.vatNumber,
               country: counterpart.country,
               branch: counterpart.branch ?? 0,
-              // Mandatory on a movement document (204).
-              ...(statesGoods ? { name: counterpart.name ?? '' } : {}),
+              // Mandatory on a movement document (204) and for any counterpart outside Greece.
+              ...(statesGoods || (counterpart.country && counterpart.country !== 'GR') ? { name: counterpart.name ?? '' } : {}),
               address: {
                 street: counterpart.address?.street ?? '',
                 number: counterpart.address?.number ?? '',

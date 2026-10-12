@@ -89,11 +89,10 @@ export function mydataSalesDocumentType(
   regime: SaleRegime = 'domestic',
 ): string {
   if (buyerIsConsumer(buyer)) return supply === 'services' ? '11.2' : '11.1';
-  if (supply !== 'services') {
-    if (regime === 'intra_community') return '1.2';
-    if (regime === 'export') return '1.3';
-  }
-  return supply === 'services' ? '2.1' : '1.1';
+  const services = supply === 'services';
+  if (regime === 'intra_community') return services ? '2.2' : '1.2';
+  if (regime === 'export') return services ? '2.3' : '1.3';
+  return services ? '2.1' : '1.1';
 }
 
 /** AADE ERP v2.0.2 §8.3 — 14 intra-community, 8 exports, 16 art. 39α/45 reverse charge. A

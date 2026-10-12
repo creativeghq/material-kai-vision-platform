@@ -34,6 +34,7 @@ import {
   buyerIsConsumer as isConsumerBuyer, supplyKindOf, mydataSalesDocumentType,
   mydataSalesDocumentReason,
 } from '@/modules/finance/utils/salesDocumentKind';
+import { saleRegimeForCountry } from '@/lib/vatCountries';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { MYDATA_TYPE_FAMILY } from '@/modules/finance/components/mydataTypes';
@@ -925,16 +926,21 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
    * 9.3 delivery note or a 1.6 supplemental keeps it: proposing is not overriding.
    */
   const supplyKind = useMemo(() => supplyKindOf(lines), [lines]);
+  const saleRegime = useMemo(
+    () => saleRegimeForCountry(customerAddr?.country_code ?? null, !buyerIsConsumer),
+    [customerAddr?.country_code, buyerIsConsumer],
+  );
   const proposedDocType = useMemo(
     // `buyerIsConsumer` above is the shared rule already applied to this buyer. Passing it back in
     // as an identity keeps ONE answer to "is this a consumer" on this screen.
     () => mydataSalesDocumentType(
       buyerIsConsumer ? { isCompany: false } : { isCompany: true },
       supplyKind,
+      saleRegime,
     ),
-    [buyerIsConsumer, supplyKind],
+    [buyerIsConsumer, supplyKind, saleRegime],
   );
-  const AUTO_DOC_CODES = ['1.1', '2.1', '11.1', '11.2'];
+  const AUTO_DOC_CODES = ['1.1', '2.1', '11.1', '11.2', '1.2', '1.3', '2.2', '2.3'];
 
   useEffect(() => {
     if (!AUTO_DOC_CODES.includes(documentType)) return;
@@ -1552,6 +1558,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       buyerIsConsumer ? { isCompany: false } : { isCompany: true },
                       supplyKind,
                     )}
+                  </p>
+                )}
+                {saleRegime !== 'domestic' && (
+                  <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                    {saleRegime === 'intra_community'
+                      ? `The buyer is in ${customerAddr?.country_code}: an intra-community sale is ${supplyKind === 'services' ? '2.2' : '1.2'} at 0% VAT, with its exemption cause (art. 33 for goods), and needs the buyer's VAT validated in VIES. Goods collected in Greece are a domestic sale — pick 1.1.`
+                      : `The buyer is outside the EU (${customerAddr?.country_code}): an export is ${supplyKind === 'services' ? '2.3' : '1.3'} at 0% VAT, with its exemption cause (art. 29 for goods).`}
                   </p>
                 )}
                 <p className="text-[11px] text-muted-foreground">

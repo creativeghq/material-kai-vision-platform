@@ -449,6 +449,7 @@ export async function buildInvoiceInputFromDb(
     overrides.invoiceType ?? inv.document_type ?? (counterpart.vatNumber ? '1.1' : '11.1'),
   );
   const isRetailDoc = docTypeForClassification.startsWith('11.');
+  const isCrossBorderDoc = ['1.2', '1.3', '2.2', '2.3'].includes(docTypeForClassification);
 
   // The document-level fallback for a line that carries no classification of its own — DERIVED
   // from the document type, because AADE validates the pair against it. It was a flat
@@ -540,7 +541,7 @@ export async function buildInvoiceInputFromDb(
       // AADE recType 3 — "Other Taxes Line with VAT". A levy charged to the customer as its own
       // VAT-bearing line says so; without it the line reads to AADE as ordinary goods.
       recType: Number(it.rec_type ?? 0) || undefined,
-      incomeClassificationType: it.income_classification_type ?? productIncomeType(prod) ?? incType,
+      incomeClassificationType: it.income_classification_type ?? (isCrossBorderDoc ? incType : productIncomeType(prod) ?? incType),
       incomeClassificationCategory: it.income_classification_category ?? productIncomeCategory(prod) ?? incCat,
       ...(inv.is_b2g ? { cpvCode: prod?.cpv_code || inv.b2g_details?.cpvCode || undefined } : {}),
     };

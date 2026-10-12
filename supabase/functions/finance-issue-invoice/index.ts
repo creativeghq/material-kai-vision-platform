@@ -1,4 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
+import { saleRegimeForCountry } from '../_shared/vatCountries.generated.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -118,6 +119,10 @@ async function reserveTransmission(
  * only the act of issuing or transmitting. `vat_validated===false` ⇒ ΑΑΔΕ-inactive / VIES-rejected;
  * null ⇒ never validated. Credit limit lives on the CRM party row; outstanding excludes this doc.
  */
+const CROSS_BORDER_TYPES: Record<string, 'intra_community' | 'export'> = {
+  '1.2': 'intra_community', '2.2': 'intra_community', '1.3': 'export', '2.3': 'export',
+};
+
 async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string[]> {
   const { data: inv } = await supabase
     .from('invoices')
@@ -136,7 +141,6 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     .select('risk_block_inactive_vat, risk_block_unvalidated_vat, risk_warn_over_credit_limit, risk_block_over_credit_limit, risk_block_min_order, risk_block_unpaid_invoice, min_order_value')
     .eq('workspace_id', inv.workspace_id)
     .maybeSingle();
-  // No settings row ⇒ safe defaults (block inactive only).
   const rules = {
     block_inactive: s?.risk_block_inactive_vat ?? true,
     block_unvalidated: s?.risk_block_unvalidated_vat ?? false,
@@ -159,8 +163,9 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
   const buyerId = inv.customer_company_id ?? inv.customer_contact_id;
   if (!buyerId) return blocks;
 
-  // Companies carry vat_validated; contacts (retail/individuals) may not — only credit applies there.
-  const cols = isCompany ? 'vat_number, vat_validated, credit_limit' : 'vat_number, credit_limit';
+  const cols = isCompany
+    ? 'vat_number, vat_validated, credit_limit, country_code, billing_country_code'
+    : 'vat_number, credit_limit, country_code, billing_country_code';
   const { data: buyer } = await supabase
     .from(isCompany ? 'crm_companies' : 'crm_contacts')
     .select(cols)
@@ -179,12 +184,29 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     blocks.push('an invoice (τιμολόγιο) requires a buyer VAT number — issue a retail receipt (11.x) for a private individual');
   }
 
+  const docType = String(inv.document_type ?? '');
+  const crossBorder = CROSS_BORDER_TYPES[docType];
+  if (crossBorder) {
+    const country = String(buyer.billing_country_code || buyer.country_code || '').trim().toUpperCase();
+    const regime = saleRegimeForCountry(country, true);
+    if (regime !== crossBorder) {
+      blocks.push(regime === 'domestic'
+        ? `a ${docType} is a cross-border document, but the buyer is ${country ? 'in Greece' : 'not given a country'} — set the buyer's country or issue a domestic invoice`
+        : `a ${docType} is for ${crossBorder === 'intra_community' ? 'an EU' : 'a non-EU'} buyer, but this buyer is in ${country}`);
+    }
+    const { data: vatLines } = await supabase.from('invoice_items')
+      .select('id').eq('invoice_id', invoiceId).gt('vat_percent', 0).limit(1);
+    if (vatLines?.length) blocks.push(`a ${docType} carries no Greek VAT — every line must be 0% with its exemption cause`);
+    if (crossBorder === 'intra_community' && !(isCompany && buyer.vat_validated === true)) {
+      blocks.push("an intra-community document needs the buyer's EU VAT number validated in VIES first");
+    }
+  }
+
   if (isCompany && hasVat) {
     if (rules.block_inactive && buyer.vat_validated === false) blocks.push('the buyer ΑΦΜ is inactive / not recognised');
     if (rules.block_unvalidated && (buyer.vat_validated === null || buyer.vat_validated === undefined)) blocks.push('the buyer VAT has never been validated');
   }
 
-  // Both rules read the buyer's open documents, fetched once.
   const needsOpenDocs =
     (rules.block_over && buyer.credit_limit != null && Number(buyer.credit_limit) > 0) ||
     rules.block_unpaid;

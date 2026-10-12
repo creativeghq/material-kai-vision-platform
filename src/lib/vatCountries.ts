@@ -93,3 +93,11 @@ export const toVatPrefix = (code: string | null | undefined): string => {
   const u = (code ?? '').trim().toUpperCase();
   return u === 'GR' ? 'EL' : u;
 };
+
+export type CountrySaleRegime = 'domestic' | 'intra_community' | 'export';
+
+export function saleRegimeForCountry(country: string | null | undefined, isBusiness: boolean | null | undefined): CountrySaleRegime {
+  const c = toVatPrefix(country);
+  if (!c || c === 'EL' || isBusiness === false) return 'domestic';
+  return VAT_COUNTRY_OPTIONS.some((o) => o.eu && o.code === c) ? 'intra_community' : 'export';
+}

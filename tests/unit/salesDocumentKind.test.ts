@@ -155,7 +155,7 @@ describe('the 2x2 that decides the document code', () => {
   });
 
   it('only ever returns a code myDATA defines', () => {
-    const valid = new Set(['1.1', '1.2', '1.3', '2.1', '11.1', '11.2']);
+    const valid = new Set(['1.1', '1.2', '1.3', '2.1', '2.2', '2.3', '11.1', '11.2']);
     for (const buyer of [BUSINESS, CONSUMER, null]) {
       for (const supply of ['goods', 'services', 'mixed', 'unknown'] as const) {
         for (const regime of ['domestic', 'intra_community', 'export', 'reverse_charge_39a'] as const) {
@@ -165,11 +165,11 @@ describe('the 2x2 that decides the document code', () => {
     }
   });
 
-  it('gives a cross-border supply of GOODS its own document type, and leaves services on 2.1', () => {
+  it('gives a cross-border supply its own document type, goods and services alike (AADE 2.2 / 2.3 exist)', () => {
     expect(mydataSalesDocumentType(BUSINESS, 'goods', 'intra_community')).toBe('1.2');
     expect(mydataSalesDocumentType(BUSINESS, 'goods', 'export')).toBe('1.3');
-    expect(mydataSalesDocumentType(BUSINESS, 'services', 'intra_community')).toBe('2.1');
-    expect(mydataSalesDocumentType(BUSINESS, 'services', 'export')).toBe('2.1');
+    expect(mydataSalesDocumentType(BUSINESS, 'services', 'intra_community')).toBe('2.2');
+    expect(mydataSalesDocumentType(BUSINESS, 'services', 'export')).toBe('2.3');
   });
 
   it('does not change the document type for a 39a reverse charge - only the VAT treatment', () => {
