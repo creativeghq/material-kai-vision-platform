@@ -477,6 +477,29 @@ export function analyzeContent(
       autoFixable: false,
       applied: false,
     });
+  } else if (plan.metaDescription.length < 120) {
+    fixes.push({
+      category: 'meta_tags',
+      severity: 'low',
+      description: `Meta description is ${plan.metaDescription.length} characters (min: 120)`,
+      suggestion: 'Extend the meta description to 120-155 characters with what the reader will find',
+      affectedSection: null,
+      autoFixable: false,
+      applied: false,
+    });
+  }
+
+  const altless = [...markdown.matchAll(/!\[\s*\]\([^)]+\)/g)].length;
+  if (altless > 0) {
+    fixes.push({
+      category: 'meta_tags',
+      severity: 'medium',
+      description: `${altless} image(s) with no description (alt text)`,
+      suggestion: 'Describe what each photo shows in the article language',
+      affectedSection: null,
+      autoFixable: false,
+      applied: false,
+    });
   }
 
   // ── Check 10: FAQ section presence ──

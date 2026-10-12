@@ -6844,6 +6844,18 @@
             "desc": "The suggestion to dismiss."
           }
         ]
+      },
+      {
+        "name": "update_article",
+        "summary": "Review an existing article for content that has gone out of date: re-reads the current facts of the article's own linked pages and flags statements that no longer match them (prices, sizes, lead times, availability, a linked page that is gone), dates older than this month, and time-sensitive statements in an article that seo_article_freshness says is due for refresh. Outdated statements get replace proposals in stages_data.extra.suggestions (source 'update'); coverage is re-checked against the latest answer check when that check is newer. Stamps seo_articles.last_reviewed_at (clearing refresh_notified_at) and stages_data.extra.update_report. Free when nothing is outdated (no model call); otherwise credits reserved before the call, settled after, refunded on failure.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The article to review."
+          }
+        ]
       }
     ],
     "request": {

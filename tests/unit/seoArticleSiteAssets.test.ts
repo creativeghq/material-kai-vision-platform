@@ -20,7 +20,7 @@ describe('extractContentImages — what an article may lift from one of our page
       <img src="/assets/brave.webp" alt="Πλακάκια Atlas Concorde Brave — πέτρα, 75×150 cm" width="760" height="760">
       <img src="https://media.tiles.example/products/norde.webp" alt="Norde">`;
     expect(extractContentImages(html, PAGE)).toEqual([
-      { src: 'https://tiles.example/assets/brave.webp', alt: 'Πλακάκια Atlas Concorde Brave — πέτρα, 75×150 cm' },
+      { src: 'https://tiles.example/assets/brave.webp', alt: 'Πλακάκια Atlas Concorde Brave — πέτρα, 75×150 cm', display_width: 760 },
       { src: 'https://media.tiles.example/products/norde.webp', alt: 'Norde' },
     ]);
   });

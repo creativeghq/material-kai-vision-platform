@@ -5,6 +5,7 @@ import {
   PHOTO_CHECK_VERSION,
   photoCheckCurrent,
   photoOffered,
+  siteMinPhotoWidth,
   type PageImage,
   type PhotoSeen,
 } from '../../supabase/functions/_shared/page-images.ts';
@@ -68,9 +69,17 @@ describe('photoOffered — which checked photos the writer may place', () => {
     expect(photoOffered(img(seen({ has_text: true, text_language: 'EN' })), 'el-GR')).toBe(false);
   });
 
-  it(`does not offer a photo narrower than ${MIN_PHOTO_WIDTH}px, or one whose size is unknown`, () => {
-    expect(photoOffered(img(seen({ width: 760 })), 'el')).toBe(false);
+  it('does not offer a photo narrower than the site displays its photos, or one whose size is unknown', () => {
+    expect(photoOffered(img(seen({ width: 760 })), 'el', 684)).toBe(true);
+    expect(photoOffered(img(seen({ width: 500 })), 'el')).toBe(false);
+    expect(photoOffered(img(seen({ width: 760 })), 'el', 900)).toBe(false);
     expect(photoOffered(img(seen({ width: null })), 'el')).toBe(false);
+  });
+
+  it('takes the minimum from the width the site itself displays photos at', () => {
+    const shown = (w: number): PageImage => ({ src: 'https://site.gr/' + w + Math.random(), alt: 'a', display_width: w });
+    expect(siteMinPhotoWidth([760, 760, 760, 760, 160, 760].map(shown))).toBe(684);
+    expect(siteMinPhotoWidth([760, 760].map(shown)), 'too few to tell').toBe(MIN_PHOTO_WIDTH);
   });
 
   it('treats an unversioned cache entry as unchecked, so it is verified again', () => {
@@ -87,7 +96,7 @@ describe('site-pages wiring', () => {
   const verify = blankedSource('supabase/functions/seo-api/handlers/photo-verify.ts');
 
   it('offers only photos that pass photoOffered, and re-checks entries that are not current', () => {
-    expect(src).toMatch(/\.filter\(\(im\) => photoOffered\(im, lang\)\)/);
+    expect(src).toMatch(/\.filter\(\(im\) => photoOffered\(im, lang, minWidth\)\)/);
     expect(src).toMatch(/\.filter\(\(im\) => !photoCheckCurrent\(im, lang\)\)/);
     expect(src).not.toMatch(/\.filter\(\(im\) => im\.seen\?\.\[lang\]\)/);
   });

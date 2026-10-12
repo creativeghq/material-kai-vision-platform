@@ -25,6 +25,24 @@ const RETRY_DELAY_MS = 1_000;
 /** A funded account still gets ~1 in 5 calls refused with 402 (measured 2026-10-10); refusals are free. */
 const RETRYABLE_HTTP = new Set([402, 429, 503]);
 
+export const CHATGPT_ANSWER_MODEL = 'gpt-4.1-mini';
+export const PERPLEXITY_ANSWER_MODEL = 'sonar';
+
+export interface LlmAnswer {
+  text: string;
+  references: { url: string; domain: string; title: string }[];
+}
+
+function withoutTracking(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const k of [...u.searchParams.keys()]) if (k.startsWith('utm_')) u.searchParams.delete(k);
+    return u.toString();
+  } catch {
+    return '';
+  }
+}
+
 /** A failure the upstream already decided; retrying it only spends money again. */
 class NonRetryableError extends Error {
   constructor(message: string) {
@@ -434,7 +452,6 @@ export class DataForSEOClient {
     return { questions, serpFeatures };
   }
 
-  /** 5. SERP Regular — top 10 organic competitors */
   /** Google AI Mode's answer for a query: the generative answer readers see. Null when Google gives none. */
   async aiModeAnswer(
     keyword: string,
@@ -452,6 +469,43 @@ export class DataForSEOClient {
       url: String(r?.url || ''), domain: String(r?.domain || ''), title: String(r?.title || ''),
     }));
     return { text: text.slice(0, 4000), references };
+  }
+
+  /** ChatGPT's searched answer. A reasoning model may decline to search, so a non-reasoning one is forced to. */
+  chatGptAnswer(keyword: string, countryIso: string | null): Promise<LlmAnswer | null> {
+    return this.llmAnswer('chat_gpt', {
+      user_prompt: keyword.slice(0, 500), model_name: CHATGPT_ANSWER_MODEL, max_output_tokens: 2048,
+      web_search: true, force_web_search: true,
+      ...(countryIso ? { web_search_country_iso_code: countryIso } : {}),
+    });
+  }
+
+  /** Perplexity's answer; Sonar always searches and takes no `web_search` flag. */
+  perplexityAnswer(keyword: string, countryIso: string | null): Promise<LlmAnswer | null> {
+    return this.llmAnswer('perplexity', {
+      user_prompt: keyword.slice(0, 500), model_name: PERPLEXITY_ANSWER_MODEL, max_output_tokens: 2048,
+      ...(countryIso ? { web_search_country_iso_code: countryIso } : {}),
+    });
+  }
+
+  private async llmAnswer(family: 'chat_gpt' | 'perplexity', task: Record<string, unknown>): Promise<LlmAnswer | null> {
+    const data = await this.apiCall(`/ai_optimization/${family}/llm_responses/live`, [task]);
+    const sections = (data?.tasks?.[0]?.result?.[0]?.items || [])
+      .filter((i: any) => i?.type === 'message')
+      .flatMap((i: any) => i?.sections || []);
+    const text = sections.map((s: any) => (s?.type === 'text' && s?.text) || '').filter(Boolean).join('\n').trim();
+    const seen = new Set<string>();
+    const references: LlmAnswer['references'] = [];
+    for (const a of sections.flatMap((s: any) => s?.annotations || [])) {
+      const url = withoutTracking(String(a?.url || ''));
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      let domain = '';
+      try { domain = new URL(url).host.replace(/^www\./, ''); } catch { continue; }
+      references.push({ url, domain, title: String(a?.title || '') });
+    }
+    if (!text && !references.length) return null;
+    return { text: text.slice(0, 4000), references: references.slice(0, 30) };
   }
 
   /** The organic results for any query (the guide form of a topic, for instance). */

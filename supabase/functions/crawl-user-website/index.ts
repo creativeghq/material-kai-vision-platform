@@ -11,13 +11,14 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { scrapeMarkdown, excerptFromMarkdown } from '../_shared/scrape-markdown.ts';
 import { chargeCronUser, refundCronUser } from '../_shared/cron-billing.ts';
 import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 import { extractContentImages, type PageImage } from '../_shared/page-images.ts';
+import { extractContentLinks, extractSpecs, type PageSpecs } from './spec-extract.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -56,6 +57,8 @@ const RATE_LIMIT_MAX_RETRIES = 3;
 const PREVIEW_SAMPLE_SIZE = 5;
 const USER_AGENT = 'Material-Kai-Vision/1.0 (+sitemap-indexer)';
 const MAX_FOCUS_TERMS = 6;
+const SPEC_BACKFILL_DEFAULT = 20;
+const SPEC_BACKFILL_MAX = 40;
 
 /** Slug words a caller asks to read first (an article's topic). Lower-case ASCII only: they travel into URL matching. */
 function focusTerms(raw: unknown): string[] {
@@ -310,6 +313,9 @@ interface ScrapeResult {
   fetch_method?: 'direct' | 'firecrawl';
   /** Only a direct read sees the HTML; absent means "not read", never "no photos". */
   images?: PageImage[];
+  /** Direct read only, like `images`: absent = not read, null = read and the page states none. */
+  specs?: PageSpecs | null;
+  links_to?: string[];
 }
 
 /**
@@ -389,6 +395,8 @@ async function directScrape(url: string): Promise<ScrapeResult> {
     content_excerpt: text.slice(0, 600),
     text,
     images: extractContentImages(html, url),
+    specs: extractSpecs(html, url),
+    links_to: extractContentLinks(html, url),
   };
 }
 
@@ -761,6 +769,7 @@ async function executeCrawl(
       demand_reason: entry.reason,
       fetch_method: s.fetch_method ?? null,
       ...(s.images ? { images: s.images, images_fetched_at: now } : {}),
+      ...(s.links_to ? { specs: s.specs ?? null, links_to: s.links_to, specs_checked_at: now } : {}),
       demand_snapshot: entry.reason === 'seed' || entry.reason === 'topic' || isBackfill ? null : {
         keywords: entry.keywords,
         best_position: entry.best_position,
@@ -837,6 +846,116 @@ async function executeCrawl(
   };
 }
 
+/**
+ * Re-read pages for `specs`/`links_to` only — direct fetch, never Firecrawl, no charge. `urls`
+ * must already be rows of this website. `linked_from` reads that page, then the same-site pages
+ * it links to, adding any the sitemap cap left out: the category's own HTML is the membership.
+ */
+async function backfillSpecs(
+  supabase: DbClient,
+  website: { id: string; user_id: string },
+  body: { limit?: unknown; urls?: unknown; linked_from?: unknown; force?: unknown },
+): Promise<{
+  checked: number; with_specs: number; added: number; failed: number; write_failures: number;
+  candidates: number; remaining: number; linked_from: string | null; first_error?: string;
+}> {
+  const limit = Math.min(Math.max(Math.floor(Number(body.limit) || SPEC_BACKFILL_DEFAULT), 1), SPEC_BACKFILL_MAX);
+  const force = body.force === true;
+  const deadline = Date.now() + SCRAPE_BUDGET_MS;
+  let checked = 0, withSpecs = 0, added = 0, failed = 0, writeFailures = 0;
+  let firstError: string | null = null;
+  const missing = new Set<string>();
+  const recordError = (error: { message: string } | null) => {
+    if (!error) return;
+    writeFailures += 1;
+    firstError ??= error.message;
+  };
+
+  const readOne = async (url: string): Promise<string[] | null> => {
+    const { text: html } = await fetchGuarded(url, {
+      accept: 'text/html,application/xhtml+xml,*/*', maxBytes: MAX_PAGE_BYTES, timeoutMs: 20_000,
+    });
+    if (!html) { failed += 1; return null; }
+    const fields = {
+      specs: extractSpecs(html, url),
+      links_to: extractContentLinks(html, url),
+      specs_checked_at: new Date().toISOString(),
+    };
+    if (missing.has(url)) {
+      const { error } = await supabase.from('user_website_pages').upsert(
+        { website_id: website.id, user_id: website.user_id, url, is_active: true, ...fields },
+        { onConflict: 'website_id,url', ignoreDuplicates: true },
+      );
+      recordError(error);
+      if (!error) added += 1;
+    } else {
+      const { error } = await supabase.from('user_website_pages').update(fields)
+        .eq('website_id', website.id).eq('url', url);
+      recordError(error);
+    }
+    checked += 1;
+    if (fields.specs) withSpecs += 1;
+    return fields.links_to;
+  };
+
+  let candidates: string[] = [];
+  let linkedFrom: string | null = null;
+  if (typeof body.linked_from === 'string' && body.linked_from) {
+    const { data, error } = await supabase.from('user_website_pages').select('url')
+      .eq('website_id', website.id).eq('url', body.linked_from).maybeSingle();
+    if (error) throw new Error(`category lookup failed: ${error.message}`);
+    if (!data) throw new HttpError(404, 'linked_from is not a page of this website');
+    linkedFrom = data.url as string;
+    candidates = (await readOne(linkedFrom)) ?? [];
+  } else if (Array.isArray(body.urls)) {
+    candidates = body.urls.map((u) => String(u)).filter(Boolean).slice(0, 200);
+  }
+
+  const todo: string[] = [];
+  if (candidates.length) {
+    const known = new Map<string, boolean>();
+    for (let i = 0; i < candidates.length; i += 25) {
+      const { data, error } = await supabase.from('user_website_pages').select('url, specs_checked_at')
+        .eq('website_id', website.id).in('url', candidates.slice(i, i + 25));
+      if (error) throw new Error(`page lookup failed: ${error.message}`);
+      for (const r of (data ?? []) as { url: string; specs_checked_at: string | null }[]) {
+        known.set(r.url, !!r.specs_checked_at);
+      }
+    }
+    for (const url of candidates) {
+      if (!known.has(url)) {
+        if (!linkedFrom) continue;
+        missing.add(url);
+        todo.push(url);
+      } else if (force || !known.get(url)) {
+        todo.push(url);
+      }
+    }
+  } else if (!linkedFrom) {
+    const { data, error } = await supabase.from('user_website_pages').select('url')
+      .eq('website_id', website.id).eq('is_active', true)
+      .not('content_excerpt', 'is', null).is('specs_checked_at', null)
+      .order('fetched_at', { ascending: false, nullsFirst: false })
+      .limit(limit);
+    if (error) throw new Error(`page lookup failed: ${error.message}`);
+    todo.push(...(data ?? []).map((r: { url: string }) => r.url));
+  }
+
+  const batch = todo.slice(0, limit);
+  const queue = [...batch];
+  const worker = async () => {
+    for (let url = queue.shift(); url && Date.now() < deadline; url = queue.shift()) await readOne(url);
+  };
+  await Promise.all(Array.from({ length: Math.min(FIRECRAWL_CONCURRENCY, queue.length) }, worker));
+
+  return {
+    checked, with_specs: withSpecs, added, failed, write_failures: writeFailures,
+    candidates: todo.length, remaining: Math.max(todo.length - batch.length, 0) + queue.length,
+    linked_from: linkedFrom,
+    ...(firstError ? { first_error: firstError } : {}),
+  };
+}
+
 Deno.serve(withApiLogging('crawl-user-website', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
@@ -875,6 +994,10 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
     return jsonResponse({ success: false, error: 'Website not found' }, 404);
   }
   if (!website.is_active) return jsonResponse({ success: false, error: 'Website is inactive' }, 400);
+
+  if (body.backfill_specs === true) {
+    return jsonResponse({ success: true, mode: 'backfill_specs', data: await backfillSpecs(supabase, website, body) });
+  }
 
   const mode = body.mode === 'preview' ? 'preview' : 'full';
 

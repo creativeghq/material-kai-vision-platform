@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 // client, which is why the verdict was never covered while it lived here.
 import { fixListState, FIX_STATE_COPY, type FixListState } from './seoFixState';
 import { ArticleSuggestionsPanel } from './ArticleSuggestionsPanel';
+import { ArticleSearchPerformance } from './ArticleSearchPerformance';
 import { WriterLessonsPanel } from './WriterLessonsPanel';
 import {
   findConclusionLine, findFaqSection, sectionLabelsFor, type SectionLabels,
@@ -29,6 +30,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
+import { parseEdgeError } from '@/utils/edgeError';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
@@ -104,6 +107,7 @@ interface SEOArticle {
   /** Where this article actually went live. Without it nothing can be matched to Search Console. */
   published_url?: string | null;
   published_at?: string | null;
+  website_id?: string | null;
   word_count: number;
   reading_time_minutes: number;
   keyword_density: any;
@@ -2393,6 +2397,71 @@ function ArticlePerformance({
   );
 }
 
+interface FreshnessRow { last_reviewed_at: string | null; content_dated_at: string | null; refresh_interval_days: number; age_days: number; is_due: boolean }
+
+function ArticleUpdateControl({ articleId, onChanged }: {
+  articleId: string;
+  onChanged: () => Promise<void> | void;
+}) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const [fresh, setFresh] = useState<FreshnessRow | null>(null);
+
+  const loadFreshness = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('seo_article_freshness' as never)
+      .select('last_reviewed_at, content_dated_at, refresh_interval_days, age_days, is_due')
+      .eq('article_id', articleId)
+      .maybeSingle();
+    if (error) console.warn('[ArticleUpdate] freshness unreadable:', error.message);
+    setFresh((data as FreshnessRow | null) ?? null);
+  }, [articleId]);
+
+  useEffect(() => { void loadFreshness(); }, [loadFreshness]);
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('seo-api', {
+        body: { action: 'update_article', article_id: articleId },
+      });
+      if (error || !data?.success) {
+        const message = error ? (await parseEdgeError(error, 'The review failed.')).message : data?.error;
+        toast({ title: 'Could not update the article', description: message || 'Nothing was changed.', variant: 'destructive' });
+        return;
+      }
+      const r = data.data?.update_report ?? {};
+      toast({
+        title: r.proposed ? `${r.proposed} update${r.proposed === 1 ? '' : 's'} proposed` : 'Nothing out of date',
+        description: data.data?.message
+          ?? `${r.checked ?? 0} statements checked, ${r.outdated ?? 0} outdated, ${data.data?.credits_used ?? 0} credits used. Review them in Article Suggestions.`,
+      });
+      await Promise.all([onChanged(), loadFreshness()]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const stale = fresh?.is_due === true;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <Button size="sm" variant={stale ? 'secondary' : 'outline'} onClick={run} disabled={busy} className="gap-1.5">
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+        {busy ? 'Reviewing' : 'Update article'}
+      </Button>
+      {stale && fresh && (
+        <Badge variant="warning">Due for refresh: {fresh.age_days} days old, refreshed every {fresh.refresh_interval_days}</Badge>
+      )}
+      <span className="text-[11px] text-muted-foreground">
+        {fresh?.last_reviewed_at
+          ? `Last reviewed ${formatDate(fresh.last_reviewed_at)}`
+          : `Not reviewed since it was written${fresh?.content_dated_at ? ` (${formatDate(fresh.content_dated_at)})` : ''}`}
+        . Checks prices, sizes and dates against the linked pages; free when nothing is out of date.
+      </span>
+    </div>
+  );
+}
+
 interface ArticleContentProps {
   markdown: string | null;
   /**
@@ -3075,6 +3144,14 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                   )}
                   {!initialArticle && article.status === 'completed' && article.markdown_content && (
                     <>
+                      <div className="mb-4">
+                        <ArticleSearchPerformance
+                          articleId={article.id}
+                          websiteId={article.website_id ?? null}
+                          publishedUrl={article.published_url ?? null}
+                        />
+                      </div>
+                      <ArticleUpdateControl articleId={article.id} onChanged={reloadArticle} />
                       <ArticleSuggestionsPanel
                         articleId={article.id}
                         extra={article.stages_data?.extra}

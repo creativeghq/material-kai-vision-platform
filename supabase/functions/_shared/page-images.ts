@@ -16,14 +16,16 @@ export interface PhotoSeen {
 export interface PageImage {
   src: string;
   alt: string;
+  /** The width the page displays it at (its <img width>), when declared. */
+  display_width?: number;
   /** What a vision check saw, per article language — the only description an article may print. */
   seen?: Record<string, PhotoSeen>;
 }
 
 /** A cached check older than this lacks the text and size verdicts, so it is run again. */
 export const PHOTO_CHECK_VERSION = 2;
-/** Narrower than this a photo is a catalogue thumbnail, and an article stretches it across the page. */
-export const MIN_PHOTO_WIDTH = 1000;
+/** The minimum when the site states no display width for its images. */
+export const MIN_PHOTO_WIDTH = 600;
 
 const baseLang = (code: string) => code.toLowerCase().split(/[-_]/)[0];
 
@@ -31,11 +33,18 @@ export function photoCheckCurrent(im: PageImage, lang: string): boolean {
   return im.seen?.[lang]?.v === PHOTO_CHECK_VERSION;
 }
 
-/** Checked at the current version, wide enough, and any text baked into it is in the article's language. */
-export function photoOffered(im: PageImage, lang: string): boolean {
+/** 90% of the width the site itself displays its photos at (median of declared widths), else MIN_PHOTO_WIDTH. */
+export function siteMinPhotoWidth(images: PageImage[]): number {
+  const widths = images.map((i) => i.display_width ?? 0).filter((w) => w >= MIN_DECLARED_PX).sort((a, b) => a - b);
+  if (widths.length < 5) return MIN_PHOTO_WIDTH;
+  return Math.round(widths[Math.floor(widths.length / 2)] * 0.9);
+}
+
+/** Checked at the current version, wide enough for the site, and any text baked into it is in the article's language. */
+export function photoOffered(im: PageImage, lang: string, minWidth = MIN_PHOTO_WIDTH): boolean {
   const s = im.seen?.[lang];
   if (!s || s.v !== PHOTO_CHECK_VERSION) return false;
-  if (!(Number(s.width) >= MIN_PHOTO_WIDTH)) return false;
+  if (!(Number(s.width) >= minWidth)) return false;
   return !(s.has_text && s.text_language && baseLang(s.text_language) !== baseLang(lang));
 }
 
@@ -91,7 +100,7 @@ export function extractContentImages(html: string, pageUrl: string, max = 6): Pa
     }
     if (seen.has(src)) continue;
     seen.add(src);
-    out.push({ src, alt: alt.slice(0, MAX_ALT_CHARS) });
+    out.push({ src, alt: alt.slice(0, MAX_ALT_CHARS), ...(w ? { display_width: w } : {}) });
   }
   return out;
 }

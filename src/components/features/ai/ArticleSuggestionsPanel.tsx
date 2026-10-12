@@ -11,7 +11,7 @@ import { parseEdgeError } from '@/utils/edgeError';
 
 export interface ArticleSuggestion {
   id: string;
-  source: 'coverage' | 'answer_check' | 'analysis';
+  source: 'coverage' | 'answer_check' | 'analysis' | 'update';
   title: string;
   kind: 'insert' | 'replace';
   find?: string;
@@ -30,16 +30,20 @@ interface CoverageReport {
 }
 
 interface AnswerCheck {
+  engine: string;
   checked_at: string;
   status: string;
   our_domain_cited: boolean | null;
   missing: unknown[] | null;
 }
 
+const ENGINE_LABEL: Record<string, string> = { google_ai_mode: 'Google AI Mode', chatgpt: 'ChatGPT', perplexity: 'Perplexity' };
+
 const SOURCE_TAG: Record<ArticleSuggestion['source'], { label: string; variant: 'info' | 'warning' | 'neutral' }> = {
   coverage: { label: 'Reader expectation', variant: 'info' },
   answer_check: { label: 'AI answer', variant: 'warning' },
   analysis: { label: 'Analysis', variant: 'neutral' },
+  update: { label: 'Out of date', variant: 'warning' },
 };
 
 /** The last line of the anchor: where the new block lands. */
@@ -52,7 +56,7 @@ async function invokeSeo(body: Record<string, unknown>): Promise<{ data?: any; e
   return { data: data.data };
 }
 
-function ReaderExpectations({ coverage, check }: { coverage: CoverageReport | null; check: AnswerCheck | null }) {
+function ReaderExpectations({ coverage, checks }: { coverage: CoverageReport | null; checks: AnswerCheck[] }) {
   const parts: React.ReactNode[] = [];
   if (coverage) {
     parts.push(coverage.failed
@@ -61,10 +65,10 @@ function ReaderExpectations({ coverage, check }: { coverage: CoverageReport | nu
   } else {
     parts.push(<span key="c">Coverage not checked yet</span>);
   }
-  if (check) {
+  for (const check of checks) {
     parts.push(
-      <span key="a" className="inline-flex items-center gap-1.5">
-        AI answer checked {formatDate(check.checked_at)}
+      <span key={check.engine} className="inline-flex items-center gap-1.5">
+        {ENGINE_LABEL[check.engine] ?? check.engine} {formatDate(check.checked_at)}
         {check.status === 'ok' ? (
           <>
             <Badge variant={check.our_domain_cited ? 'success' : 'warning'}>
@@ -121,7 +125,7 @@ export function ArticleSuggestionsPanel({ articleId, extra, onChanged }: {
   const [generating, setGenerating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [check, setCheck] = useState<AnswerCheck | null>(null);
+  const [checks, setChecks] = useState<AnswerCheck[]>([]);
 
   const all = Array.isArray(extra?.suggestions) ? (extra.suggestions as ArticleSuggestion[]) : [];
   const pending = all.filter((s) => s.status === 'pending');
@@ -132,13 +136,15 @@ export function ArticleSuggestionsPanel({ articleId, extra, onChanged }: {
     (async () => {
       const { data, error: readErr } = await supabase
         .from('seo_article_answer_checks')
-        .select('checked_at, status, our_domain_cited, missing')
+        .select('engine, checked_at, status, our_domain_cited, missing')
         .eq('article_id', articleId)
         .order('checked_at', { ascending: false })
-        .limit(1);
+        .limit(12);
       if (!live) return;
       if (readErr) console.warn('[ArticleSuggestions] answer checks unreadable:', readErr.message);
-      setCheck((data?.[0] as AnswerCheck | undefined) ?? null);
+      const latest = new Map<string, AnswerCheck>();
+      for (const row of (data ?? []) as AnswerCheck[]) if (!latest.has(row.engine)) latest.set(row.engine, row);
+      setChecks([...latest.values()]);
     })();
     return () => { live = false; };
   }, [articleId]);
@@ -208,7 +214,7 @@ export function ArticleSuggestionsPanel({ articleId, extra, onChanged }: {
       </div>
 
       <div className="border-b border-hairline px-3 py-2">
-        <ReaderExpectations coverage={coverage} check={check} />
+        <ReaderExpectations coverage={coverage} checks={checks} />
       </div>
 
       {error && (

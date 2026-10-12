@@ -22,6 +22,7 @@ import { handleAiKeywordVolume } from './handlers/ai-keyword-volume.ts';
 import { handleAnswerCheck } from './handlers/answer-check.ts';
 import { handleLessons } from './handlers/lessons.ts';
 import { handleSuggestionApply, handleSuggestionDismiss, handleSuggestions } from './handlers/suggestions.ts';
+import { handleUpdateArticle } from './handlers/update-article.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   research: handleResearch,
@@ -45,6 +46,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   suggestions: handleSuggestions,
   suggestion_apply: handleSuggestionApply,
   suggestion_dismiss: handleSuggestionDismiss,
+  update_article: handleUpdateArticle,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {

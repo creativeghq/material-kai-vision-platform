@@ -4,11 +4,12 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { fetchTextGuarded } from '../../_shared/fetch-image.ts';
 import {
-  extractContentImages, photoCheckCurrent, photoOffered, type PageImage,
+  extractContentImages, photoCheckCurrent, photoOffered, siteMinPhotoWidth, type PageImage,
 } from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
 import { applySiteAssetRules, hostOf, pageFacts, siteLinkUrls, trimSlash } from './site-assets.ts';
 import { verifyPhoto, type PhotoUsage } from './photo-verify.ts';
+import { productSpecsLines } from './site-catalogue.ts';
 
 export interface SitePage {
   url: string;
@@ -154,11 +155,17 @@ export async function findSitePages(
 
     await consolidateMatrixPicks(supabase, opts.websiteId, picked, sectionScore);
     const { data: texts } = await supabase
-      .from('user_website_pages').select('id, content_text').in('id', picked.map((p) => p.id));
-    const textById = new Map((texts ?? []).map((t: { id: string; content_text: string | null }) => [t.id, t.content_text]));
-    for (const p of picked) p.facts = pageFacts(textById.get(p.id));
+      .from('user_website_pages').select('id, content_text, specs').in('id', picked.map((p) => p.id));
+    const rowById = new Map((texts ?? []).map((t: { id: string; content_text: string | null; specs: unknown }) => [t.id, t]));
+    for (const p of picked) {
+      const row = rowById.get(p.id);
+      const specs = productSpecsLines({ specs: row?.specs });
+      const text = pageFacts(row?.content_text);
+      p.facts = specs.length ? ['Specs (as the page states them):', ...specs, text ?? ''].join('\n').trim() : text;
+    }
     await refreshImages(supabase, picked.filter((p) => p.stale));
     const lang = opts.languageCode || 'en';
+    const minWidth = siteMinPhotoWidth(picked.flatMap((p) => p.images));
     // No usage sink = nothing reserved for the checks: run none, offer only photos checked before.
     if (opts.photoUsage) {
       await verifyPhotos(supabase, picked, lang, { userId: opts.userId, workspaceId: opts.workspaceId }, opts.photoUsage);
@@ -167,7 +174,7 @@ export async function findSitePages(
     return picked.map(({ id: _id, stale: _stale, impressions: _i, langPath: _l, ...page }) => ({
       ...page,
       images: page.images.slice(0, PHOTOS_PER_PAGE)
-        .filter((im) => photoOffered(im, lang))
+        .filter((im) => photoOffered(im, lang, minWidth))
         .map((im) => ({ src: im.src, alt: im.seen![lang].text })),
     }));
   } catch (e) {

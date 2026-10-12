@@ -22,6 +22,9 @@ import { reviewArticle } from './review.ts';
 import { checkCoverage, mustCoverFrom } from './coverage.ts';
 import { approvedLessonLines } from './lessons.ts';
 import { accentKeywords, enforceLexicon } from './lexicon.ts';
+import { catalogueFactsFor } from './site-catalogue.ts';
+import { enforceGrammar } from './grammar.ts';
+import { checkArithmetic, fixArithmetic } from './arithmetic-check.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { PHOTOS_PER_PAGE } from './site-pages.ts';
 import { PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, PHOTO_VERIFY_MODEL, type PhotoUsage } from './photo-verify.ts';
@@ -451,6 +454,10 @@ async function runPipelineStages(ctx: {
       protected_terms: [...protectedTerms],
     }, `Site context: ${sitePages.length} of our pages as link targets, ${sitePages.reduce((s, p) => s + p.images.length, 0)} photos, ${protectedTerms.size} protected terms`);
 
+    // Category totals counted from our own crawled pages: the writer states them instead of guessing.
+    const catalogueFacts = websiteId ? await catalogueFactsFor(supabase, websiteId, sitePages.map((p) => p.url)) : null;
+    if (catalogueFacts && brief) brief.extraContext.push(catalogueFacts);
+
     const planResult = await callStage('plan', req, {
       topic: body.topic,
       target_keyword: body.target_keyword,
@@ -521,6 +528,7 @@ async function runPipelineStages(ctx: {
       research, plan, site_pages: sitePages, protected_terms: [...protectedTerms],
       total_credits: totalCredits, credits_by_stage: creditsByStage, start_time: startTime,
       language_code: body.language_code ?? null,
+      catalogue_facts: catalogueFacts,
     };
     await updateArticle(supabase, articleId, { resume }, 'Draft saved; review and analysis continue');
     const handOff = await fetch(`${supabaseUrl}/functions/v1/seo-api`, {
@@ -570,6 +578,7 @@ interface ResumeState {
   credits_by_stage: Record<string, number>;
   start_time: number;
   language_code: string | null;
+  catalogue_facts: string | null;
 }
 
 async function markFailed(supabase: DbClient, articleId: string, error: unknown): Promise<void> {
@@ -629,6 +638,7 @@ async function runLateStages(ctx: {
   const { research, plan, site_pages: sitePages, protected_terms: protectedTerms, start_time: startTime } = resume;
   let totalCredits = resume.total_credits;
   const creditsByStage = { ...resume.credits_by_stage };
+  if (resume.catalogue_facts && brief) brief.extraContext.push(resume.catalogue_facts);
 
     // ────────────────────────────────────────────────────────────
     // STAGE 4: the editor's review, then an analysis that only reports — nothing rewrites after the editor
@@ -656,7 +666,11 @@ async function runLateStages(ctx: {
     const lexicon = await enforceLexicon(supabase, { markdown: fixed.markdown, languageCode: resume.language_code, websiteId, workspaceId, userId });
     totalCredits += lexicon.report.credits;
     creditsByStage.lexicon = lexicon.report.credits;
-    const finalMarkdown = lexicon.markdown;
+    const grammar = await enforceGrammar(supabase, { markdown: lexicon.markdown, languageCode: resume.language_code, userId, workspaceId });
+    totalCredits += grammar.report.credits;
+    creditsByStage.grammar = grammar.report.credits;
+    const arithmetic = checkArithmetic(grammar.markdown);
+    const finalMarkdown = arithmetic.wrong.length ? fixArithmetic(grammar.markdown, arithmetic.wrong).markdown : grammar.markdown;
     await updateArticle(supabase, articleId, {
       markdown_content: finalMarkdown,
       title: plan.title,
@@ -665,6 +679,8 @@ async function runLateStages(ctx: {
       progress_percentage: 88,
       review: reviewed.report,
       lexicon: lexicon.report,
+      grammar: grammar.report,
+      arithmetic: { checked: arithmetic.checked, corrected: arithmetic.wrong },
     }, reviewed.report.failed
       ? `Review did not run: ${reviewed.report.failed}`
       : `Reviewed: ${reviewed.report.applied.length} corrections applied (${correctedPhotos.size} photo descriptions), ${reviewed.report.skipped.length} could not be placed; `

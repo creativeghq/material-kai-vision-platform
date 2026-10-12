@@ -1,6 +1,6 @@
 /** Article suggestions: which items to propose for, and whether a proposal still fits the text. Import-free (unit-tested). */
 
-export type SuggestionSource = 'coverage' | 'answer_check' | 'analysis';
+export type SuggestionSource = 'coverage' | 'answer_check' | 'analysis' | 'update';
 export type SuggestionStatus = 'pending' | 'applied' | 'dismissed';
 
 export interface SuggestionItem {
@@ -99,8 +99,12 @@ export function applySuggestion(
 }
 
 /** Fresh proposals replace older pending ones; applied and dismissed history stays. */
-export function mergeSuggestions(existing: ArticleSuggestion[], fresh: ArticleSuggestion[]): ArticleSuggestion[] {
-  return [...existing.filter((s) => s.status !== 'pending'), ...fresh];
+export function mergeSuggestions(
+  existing: ArticleSuggestion[],
+  fresh: ArticleSuggestion[],
+  regenerated: SuggestionSource[] = ['coverage', 'answer_check', 'analysis'],
+): ArticleSuggestion[] {
+  return [...existing.filter((s) => s.status !== 'pending' || !regenerated.includes(s.source)), ...fresh];
 }
 
 export function storedSuggestions(raw: unknown): ArticleSuggestion[] {
