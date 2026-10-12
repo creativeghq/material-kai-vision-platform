@@ -44,6 +44,9 @@ export function renderCatalogueFacts(summaries: CatalogueSummary[], countedOn: D
   return [
     `CATALOGUE FACTS (counted from our own pages on ${countedOn.toISOString().slice(0, 10)})`,
     'Each count is how many of our product pages state that value, exactly as the page words it. Value (count).',
+    'These counts cover ONLY the product pages each category page links to, which may be its first page of results. '
+      + 'Never present them as the size of the whole catalogue or category ("we have N series") unless the category page\'s '
+      + 'own Facts state that total; write "among the series listed" or use the category page\'s stated total instead.',
     ...bodies.flat(),
   ].join('\n');
 }
