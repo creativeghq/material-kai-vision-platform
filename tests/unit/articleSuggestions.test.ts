@@ -33,7 +33,7 @@ describe('suggestions handler — source guards', () => {
   it('loads its prompt from the database and constrains the reply with a JSON schema', () => {
     const fn = body('handleSuggestions');
     expect(fn).toMatch(/getToolPrompt\(supabase, 'seo_suggestion_writer'\)/);
-    expect(fn).toMatch(/output_config: \{ format: \{ type: 'json_schema'/);
+    expect(fn).toMatch(/output_config: \{ (effort: 'low', )?format: \{ type: 'json_schema'/);
     expect(fn).toMatch(/stop_reason === 'refusal' \|\| res\.stop_reason === 'max_tokens'/);
   });
 

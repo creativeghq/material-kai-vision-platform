@@ -18,7 +18,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const LESSON_MODEL = 'claude-sonnet-5';
 const LESSON_MAX_INPUT_TOKENS = 14000;
-const LESSON_MAX_OUTPUT_TOKENS = 4000;
+const LESSON_MAX_OUTPUT_TOKENS = 8000;
 const CATEGORIES = ['wording', 'greek', 'fact', 'claim_about_us', 'price', 'photo', 'link', 'coverage', 'structure', 'other'];
 
 const SCHEMA = {
@@ -82,7 +82,7 @@ export async function extractLessons(
         role: 'user',
         content: `Article language: ${language}\n<draft_vs_published>\n${list('REMOVED OR CHANGED (our draft)', diff.removed)}\n\n${list('ADDED OR CHANGED (published)', diff.added)}\n</draft_vs_published>`,
       }],
-      output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_lessons', userId: a.user_id, workspaceId: a.workspace_id, timeoutMs: 120_000 });
     actual = await tokenCredits(supabase, LESSON_MODEL, {
       inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),

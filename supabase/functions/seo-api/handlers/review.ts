@@ -184,7 +184,7 @@ async function consistencyPass(
         role: 'user',
         content: `Article language: ${opts.languageCode ?? 'en'}\n${sitePagesBlock(sitePagesDataLines(pagesFor(opts.markdown, opts.sitePages)))}\n<article>\n${opts.markdown}\n</article>`,
       }],
-      output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_consistency', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 180_000 });
     actual = await tokenCredits(supabase, CONSISTENCY_MODEL, {
       inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),

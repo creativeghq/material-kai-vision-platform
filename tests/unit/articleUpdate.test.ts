@@ -43,7 +43,7 @@ describe('update_article handler — source guards', () => {
     expect(fn).toMatch(/getToolPrompt\(supabase, 'seo_article_updater'\)/);
     expect(fn).toMatch(/model: UPDATE_MODEL/);
     expect(SRC).toMatch(/UPDATE_MODEL = 'claude-sonnet-5'/);
-    expect(fn).toMatch(/output_config: \{ format: \{ type: 'json_schema'/);
+    expect(fn).toMatch(/output_config: \{ (effort: 'low', )?format: \{ type: 'json_schema'/);
     expect(fn).toMatch(/stop_reason === 'refusal' \|\| res\.stop_reason === 'max_tokens'/);
   });
 

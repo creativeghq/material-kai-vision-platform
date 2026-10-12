@@ -66,7 +66,7 @@ describe('enforceLexicon — source guards', () => {
   });
 
   it('constrains the reply by schema and never salvages a refusal or a truncated one', () => {
-    expect(src).toMatch(/output_config:\s*\{\s*format:\s*\{\s*type:\s*'json_schema'/);
+    expect(src).toMatch(/output_config:\s*\{\s*(effort:\s*'low',\s*)?format:\s*\{\s*type:\s*'json_schema'/);
     expect(src).toMatch(/stop_reason === 'refusal' \|\| res\.stop_reason === 'max_tokens'/);
   });
 });

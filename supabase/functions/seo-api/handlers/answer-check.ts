@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
+import { runInBackground } from '../../_shared/background.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
@@ -20,7 +21,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 export const ANSWER_CHECK_INTERVAL_DAYS = 7;
-const ARTICLES_PER_CRON_RUN = 10;
+const ARTICLES_PER_CRON_RUN = 3;
 const COVERAGE_ANSWER_CHARS = 3400;
 
 export type AnswerEngine = 'google_ai_mode' | 'chatgpt' | 'perplexity';
@@ -222,11 +223,14 @@ export async function handleAnswerCheck(req: Request, body: any): Promise<Respon
     .order('created_at', { ascending: true })
     .limit(500);
   if (error) return jsonResponse({ success: false, error: error.message }, 500);
-  const results = [];
-  for (const a of (candidates ?? []) as CheckableArticle[]) {
-    if (results.filter((r) => !('skipped' in r)).length >= ARTICLES_PER_CRON_RUN) break;
-    if (fresh.has(a.id)) continue;
-    results.push(await checkArticle(supabase, a).catch((e: Error) => ({ article_id: a.id, status: 'failed', error: e.message })));
-  }
-  return jsonResponse({ success: true, data: { checked: results.filter((r) => !('skipped' in r)).length, results } });
+  const due = ((candidates ?? []) as CheckableArticle[]).filter((a) => !fresh.has(a.id));
+  runInBackground((async () => {
+    let checked = 0;
+    for (const a of due) {
+      if (checked >= ARTICLES_PER_CRON_RUN) break;
+      const r = await checkArticle(supabase, a).catch((e: Error) => ({ article_id: a.id, status: 'failed', error: e.message }));
+      if (!('skipped' in r)) checked += 1;
+    }
+  })(), 'seo-answer-check');
+  return jsonResponse({ success: true, data: { due: due.length, checking_up_to: ARTICLES_PER_CRON_RUN } });
 }

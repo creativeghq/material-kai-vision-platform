@@ -64,7 +64,7 @@ export async function verifyPhoto(
         },
       ],
     }],
-    output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
   }, { task: 'seo_photo_verify', userId: who.userId, workspaceId: who.workspaceId, timeoutMs: 30_000 });
 
   const usage: PhotoUsage = {

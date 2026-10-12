@@ -197,7 +197,7 @@ export async function enforceLexicon(
           content: `Article language: ${language}\n<unknown_words>\n${unknown.join('\n')}\n</unknown_words>\n`
             + `<sentences>\n${sentences.join('\n')}\n</sentences>`,
         }],
-        output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
       }, { task: 'seo_lexicon', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 120_000 });
       actual = await tokenCredits(supabase, LEXICON_MODEL, {
         inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),

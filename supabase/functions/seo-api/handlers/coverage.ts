@@ -87,7 +87,7 @@ export async function checkCoverage(
         role: 'user',
         content: `Article language: ${opts.languageCode ?? 'en'}\n${mustCoverBlock(opts.mustCover)}\n<article>\n${serpValue(opts.text, 60000)}\n</article>`,
       }],
-      output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_coverage', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 120_000 });
     actual = await tokenCredits(supabase, COVERAGE_MODEL, {
       inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),

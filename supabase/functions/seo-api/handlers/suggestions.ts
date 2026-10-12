@@ -185,7 +185,7 @@ export async function handleSuggestions(req: Request, body: any): Promise<Respon
           `<article>\n${markdown.replace(/<\/?article>/gi, ' ').slice(0, 60000)}\n</article>`,
         ].join('\n'),
       }],
-      output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_suggestions', userId, workspaceId: workspaceId ?? null, timeoutMs: 130_000 });
     const actual = await tokenCredits(supabase, SUGGESTION_MODEL, {
       inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
