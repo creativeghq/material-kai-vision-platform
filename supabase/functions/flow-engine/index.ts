@@ -24,7 +24,8 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 // Invariant 7 — a config-supplied URL this runtime will fetch (#357 AE-10).
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
-import { sendCommentPrivateReply, sendSocialCommentReply } from '../_shared/zernio.ts';
+import { ensureZernioSecrets, sendCommentPrivateReply, sendSocialCommentReply } from '../_shared/zernio.ts';
+import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -1410,6 +1411,7 @@ async function executeAction(
         .limit(1).maybeSingle();
       if (done) return { output: { skipped: true, reason: 'already answered', comment_id: commentId } };
 
+      await assertSameWorkspace(supabase, 'inbox_threads', threadId, scope.workspaceId, 'comment thread');
       const target = { accountId: String(meta.zernio_account_id ?? ''), postId: String(meta.zernio_post_id ?? ''), commentId, message };
       const res = isPrivate ? await sendCommentPrivateReply(target) : await sendSocialCommentReply(target);
       if (!res.success) throw new Error(`${actionType} not delivered: ${res.error ?? 'refused'}`);
@@ -2308,6 +2310,7 @@ Deno.serve(withApiLogging('flow-engine', async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    await ensureZernioSecrets(supabase);
 
     const callerTrusted = auth.level === 'secret' || isCronAuthorized(req);
 
