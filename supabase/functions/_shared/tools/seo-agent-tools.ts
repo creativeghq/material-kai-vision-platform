@@ -464,7 +464,7 @@ export const createSEOOpportunitiesTool = (
     },
     {
       name: 'seo_opportunities',
-      description: 'What to work on next for a site, as ONE ranked list derived in SQL: pages Google has never crawled or has crawled and declined, queries ranking 4–20 that are close, and queries several of our own pages compete for. Each row states the reason it exists. Coverage counts are OBSERVED over the URLs inspected so far and never extrapolated to the whole site. Kinds that cannot be evaluated yet are returned with a stated reason rather than omitted.',
+      description: 'What to work on next for a site, as ONE ranked list derived in SQL: pages Google has never crawled or has crawled and declined, queries ranking 4–20 that are close, queries several of our own pages compete for, published articles slipping in Search Console, and keywords tracked competitors rank for where nothing of ours does. Each row states the reason it exists. Coverage counts are OBSERVED over the URLs inspected so far and never extrapolated to the whole site. Kinds that cannot be evaluated yet are returned with a stated reason rather than omitted.',
       schema: z.object({
         website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
       }),

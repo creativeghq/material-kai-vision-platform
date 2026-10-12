@@ -55,6 +55,7 @@ const AgentHubPage: React.FC = () => {
         toolkitId: quickstartParam.slice(0, quickstartParam.indexOf(':')),
         label: quickstartParam.slice(quickstartParam.indexOf(':') + 1),
         website: searchParams.get('website') ?? undefined,
+        keyword: searchParams.get('keyword') ?? undefined,
       }
     : capHandoff.quickStart;
   // When arriving via `?capability=` with NO specific action, hand the capability's toolkit to the

@@ -919,7 +919,7 @@ interface AgentHubProps {
   /** Deep-link: deterministically launch a guided flow on open, by toolkit + label
    *  (e.g. {toolkitId:'generation', label:'Test on a room'}). Runs the same
    *  handleQuickStart dispatcher the in-app UI uses, so ANY flow is reachable. */
-  initialQuickStart?: { toolkitId: string; label: string; website?: string };
+  initialQuickStart?: { toolkitId: string; label: string; website?: string; keyword?: string };
   /** Deep-link: open with this toolkit enabled + its quick-starts shown (onboarding), so a
    *  capability arrival lands on "here's what you can do" instead of a blank chat. */
   initialToolkitId?: string;
@@ -4205,7 +4205,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const tk = TOOLKITS.find((t) => t.id === initialQuickStart.toolkitId);
     const qs = tk?.quick_starts?.find((q) => q.label === initialQuickStart.label);
     if (tk && qs) {
-      handleQuickStart(qs, tk, undefined, initialQuickStart.website ? { website_id: initialQuickStart.website } : undefined);
+      const seed: Record<string, string> = {
+        ...(initialQuickStart.website ? { website_id: initialQuickStart.website } : {}),
+        ...(initialQuickStart.keyword ? { keyword: initialQuickStart.keyword } : {}),
+      };
+      handleQuickStart(qs, tk, undefined, Object.keys(seed).length ? seed : undefined);
     } else console.warn('[AgentHub] Unknown quickstart deep-link:', initialQuickStart);
   }, [userId, initialQuickStart, initialImages, attachedImages, handleQuickStart]);
 

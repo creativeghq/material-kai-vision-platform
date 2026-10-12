@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, HelpCircle, Loader2, Minus, Sparkles, Target } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -36,7 +37,10 @@ interface ResearchBlob {
     serpFeatureTypes?: string[];
   };
   paaQuestions?: string[];
-  clusters?: { name?: string; theme?: string; keywords?: any[]; totalVolume?: number }[];
+  clusters?: {
+    name?: string; theme?: string; clusterName?: string; keywords?: any[]; totalVolume?: number;
+    primaryKeyword?: any; secondaryKeywords?: any[];
+  }[];
   serpInsights?: { url?: string; title?: string; domain?: string; position?: number }[];
   contentGapOpportunities?: string[];
   rankingContent?: {
@@ -146,6 +150,22 @@ export const KeywordResearchDetail: React.FC<{
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState<string | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const { toast } = useToast();
+  const saveAsPlan = async () => {
+    setPlanning(true);
+    try {
+      const { data, error: rpcErr } = await supabase.rpc('save_research_as_plan' as never, { p_research_id: researchId } as never);
+      if (rpcErr) throw new Error(rpcErr.message);
+      const added = Number(data) || 0;
+      toast({
+        title: added ? `${added} page${added === 1 ? '' : 's'} added to the plan` : 'Already in the plan',
+        description: 'Track them under Articles → Topic plan.',
+      });
+    } catch (e) {
+      toast({ title: 'Not saved', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally { setPlanning(false); }
+  };
   const track = async (keywords: string[], origin: string) => {
     if (!onTrack) return;
     setTracking(origin);
@@ -473,12 +493,17 @@ export const KeywordResearchDetail: React.FC<{
       {/* ── Clusters ───────────────────────────────────────────────────── */}
       {clusters.length > 0 && (
         <Card className="dashboard-card">
-          <CardHeader>
-            <CardTitle className="text-base">Keyword clusters</CardTitle>
-            <CardDescription>
-              {clusters.length} themes the expanded keyword set falls into. Each is a candidate page rather than a
-              candidate paragraph.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Keyword clusters</CardTitle>
+              <CardDescription>
+                {clusters.length} themes the expanded keyword set falls into. Each is a candidate page rather than a
+                candidate paragraph.
+              </CardDescription>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => void saveAsPlan()} disabled={planning}>
+              {planning && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />} Save as plan
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -494,7 +519,9 @@ export const KeywordResearchDetail: React.FC<{
                 </TableHeader>
                 <TableBody>
                   {clusters.map((c: any, i: number) => {
-                    const kws: any[] = Array.isArray(c.keywords) ? c.keywords : [];
+                    const kws: any[] = Array.isArray(c.keywords)
+                      ? c.keywords
+                      : [...(c.primaryKeyword ? [c.primaryKeyword] : []), ...(Array.isArray(c.secondaryKeywords) ? c.secondaryKeywords : [])];
                     const vol =
                       c.totalVolume ?? kws.reduce((s, k) => s + (Number(k?.searchVolume) || 0), 0);
                     const terms: string[] = kws.map((k: any) => k?.term ?? k?.keyword).filter(Boolean);
@@ -502,7 +529,7 @@ export const KeywordResearchDetail: React.FC<{
                     const origin = `cluster-${i}`;
                     return (
                       <TableRow key={i}>
-                        <TableCell className="font-medium">{c.name || c.theme || `Cluster ${i + 1}`}</TableCell>
+                        <TableCell className="font-medium">{c.name || c.theme || c.clusterName || `Cluster ${i + 1}`}</TableCell>
                         <TableCell className="text-right tabular-nums">{kws.length || '—'}</TableCell>
                         <TableCell className="text-right tabular-nums">{vol ? compact(vol) : '—'}</TableCell>
                         <TableCell className="max-w-[320px] truncate text-xs text-muted-foreground">

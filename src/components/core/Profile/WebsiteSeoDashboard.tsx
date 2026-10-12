@@ -8,6 +8,7 @@ import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPan
 import { WebsiteHealthPanel } from '@/components/core/Profile/WebsiteHealthPanel';
 import { WebsiteDomainIntelPanel } from '@/components/core/Profile/WebsiteDomainIntelPanel';
 import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOverviewPanel';
+import { TopicPlanCard } from '@/components/core/Profile/seo/TopicPlanCard';
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
@@ -202,6 +203,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
 
         <TabsContent value="articles" className="space-y-4">
           <WebsiteArticlesPanel website={website} />
+          <TopicPlanCard websiteId={website.id} onOpenResearch={() => setTab('research')} />
         </TabsContent>
 
         <TabsContent value="research">

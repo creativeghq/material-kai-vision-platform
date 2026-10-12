@@ -136,6 +136,12 @@ export interface SeoArticleFreshnessRow {
   refresh_due_at: string;
   age_days: number;
   is_due: boolean;
+  due_reason: string | null;
+  main_query: string | null;
+  position_now: number | null;
+  position_prev: number | null;
+  clicks_now: number | null;
+  clicks_prev: number | null;
 }
 
 export interface SeoArticleRow {
@@ -986,7 +992,7 @@ export const userWebsitesService = {
   async freshness(websiteId: string, limit = 50): Promise<SeoArticleFreshnessRow[]> {
     const { data, error } = await supabase
       .from('seo_article_freshness' as never)
-      .select('article_id, title, slug, target_keyword, published_at, last_reviewed_at, refresh_interval_days, refresh_due_at, age_days, is_due')
+      .select('article_id, title, slug, target_keyword, published_at, last_reviewed_at, refresh_interval_days, refresh_due_at, age_days, is_due, due_reason, main_query, position_now, position_prev, clicks_now, clicks_prev')
       .eq('website_id', websiteId)
       .order('refresh_due_at', { ascending: true })
       .limit(limit);

@@ -35,6 +35,30 @@ interface FreshnessRow {
   refresh_due_at: string;
   refresh_notified_at: string | null;
   age_days: number;
+  due_reason: string | null;
+  main_query: string | null;
+  position_now: number | null;
+  position_prev: number | null;
+  clicks_now: number | null;
+  clicks_prev: number | null;
+}
+
+function whyDue(row: FreshnessRow): string {
+  const q = row.main_query ? ` on "${row.main_query}"` : '';
+  switch (row.due_reason) {
+    case 'position_drop':
+      return row.position_now == null
+        ? `It dropped out of the search results${q}.`
+        : `It slipped from position ${row.position_prev} to ${row.position_now}${q} over the last 28 days.`;
+    case 'clicks_drop':
+      return `Its clicks fell from ${row.clicks_prev} to ${row.clicks_now} over the last 28 days.`;
+    case 'not_indexed':
+      return 'Search Console has no rows for it 28 days after publishing. Check that Google has indexed it.';
+    default:
+      return `It has been ${row.age_days} days since this article was last reviewed`
+        + `${row.target_keyword ? ` (target: ${row.target_keyword})` : ''}.`
+        + ' Articles refreshed inside the last three months are cited noticeably more often by answer engines.';
+  }
 }
 
 Deno.serve(withApiLogging('seo-content-freshness', async (req: Request) => {
@@ -76,10 +100,8 @@ Deno.serve(withApiLogging('seo-content-freshness', async (req: Request) => {
         user_id: row.user_id,
         workspace_id: row.workspace_id,
         title: `"${label}" is due for a refresh`,
-        body: `It has been ${row.age_days} days since this article was last reviewed`
-          + `${row.target_keyword ? ` (target: ${row.target_keyword})` : ''}.`
-          + ' Articles refreshed inside the last three months are cited noticeably more'
-          + ' often by answer engines.',
+        body: whyDue(row),
+        due_reason: row.due_reason,
         action_url: '/profile?tab=websites',
         type: 'info',
         article_id: row.article_id,

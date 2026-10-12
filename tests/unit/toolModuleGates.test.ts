@@ -73,6 +73,9 @@ function toolFiles(): Map<string, string> {
 const ENFORCED_UPSTREAM: Record<string, string> = {
   'supabase/functions/_shared/tools/real-estate-tools.ts': 'supabase/functions/real-estate-api/index.ts',
   'supabase/functions/_shared/tools/social-tools.ts': 'supabase/functions/zernio-api/handlers/publish.ts',
+  // Constructed only by agent-chat, and only after is_workspace_entitled('seo-toolkit') says yes.
+  'supabase/functions/_shared/tools/seo-agent-tools.ts': 'supabase/functions/agent-chat/index.ts',
+  'supabase/functions/_shared/tools/seo-tools.ts': 'supabase/functions/agent-chat/index.ts',
 };
 
 describe('#395 — a paid module is enforced in the tool, not in the nav', () => {
@@ -156,12 +159,6 @@ describe('#395 — a paid module is enforced in the tool, not in the nav', () =>
 /** The two halves of a paid module have to name each other. */
 describe('a paid module is named on BOTH sides', () => {
   const EXEMPT: Record<string, string> = {
-    // The seven SEO clusters gate on `seo-toolkit` inside dataforseo-spend-gate.ts and declare no
-    // slug, so today they are offered to workspaces that cannot use them. Adding the slug flips
-    // visibility for seven clusters at once and belongs in its own change with its own check of
-    // who is entitled — recorded here so it cannot be forgotten, and so nothing NEW joins it.
-    // SHRINK-ONLY: entries come off this list, they do not go on.
-    'seo-toolkit': 'the seven seo-* clusters — see #395 follow-up',
   };
 
   it('every slug a tool gates on is declared by the cluster that offers it', () => {

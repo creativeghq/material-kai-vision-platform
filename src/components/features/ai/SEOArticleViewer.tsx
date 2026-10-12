@@ -69,7 +69,9 @@ import {
   Undo2, Wand2, RefreshCw, Plus, Pencil, Download, FileJson,
 } from 'lucide-react';
 import { articleExportFilename, buildArticleExport } from '@/services/seo/articleExport';
+import { dueReasonText } from '@/services/seo/dueReason';
 import { PublishToWordPressButtons } from './PublishToWordPressButtons';
+import { ArticleVersionHistory } from './ArticleVersionHistory';
 import { CALLOUT_KIND_PATTERN, type CalloutKind } from '@/services/seo/calloutKinds';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
@@ -2399,7 +2401,11 @@ function ArticlePerformance({
   );
 }
 
-interface FreshnessRow { last_reviewed_at: string | null; content_dated_at: string | null; refresh_interval_days: number; age_days: number; is_due: boolean }
+interface FreshnessRow {
+  last_reviewed_at: string | null; content_dated_at: string | null; refresh_interval_days: number; age_days: number; is_due: boolean;
+  due_reason: string | null; main_query: string | null; position_now: number | null; position_prev: number | null;
+  clicks_now: number | null; clicks_prev: number | null;
+}
 
 function ArticleUpdateControl({ articleId, onChanged }: {
   articleId: string;
@@ -2412,7 +2418,7 @@ function ArticleUpdateControl({ articleId, onChanged }: {
   const loadFreshness = useCallback(async () => {
     const { data, error } = await supabase
       .from('seo_article_freshness' as never)
-      .select('last_reviewed_at, content_dated_at, refresh_interval_days, age_days, is_due')
+      .select('last_reviewed_at, content_dated_at, refresh_interval_days, age_days, is_due, due_reason, main_query, position_now, position_prev, clicks_now, clicks_prev')
       .eq('article_id', articleId)
       .maybeSingle();
     if (error) console.warn('[ArticleUpdate] freshness unreadable:', error.message);
@@ -2452,7 +2458,7 @@ function ArticleUpdateControl({ articleId, onChanged }: {
         {busy ? 'Reviewing' : 'Update article'}
       </Button>
       {stale && fresh && (
-        <Badge variant="warning">Due for refresh: {fresh.age_days} days old, refreshed every {fresh.refresh_interval_days}</Badge>
+        <Badge variant="warning">Due for refresh: {dueReasonText(fresh)}</Badge>
       )}
       <span className="text-[11px] text-muted-foreground">
         {fresh?.last_reviewed_at
@@ -3154,6 +3160,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                         />
                       </div>
                       <ArticleUpdateControl articleId={article.id} onChanged={reloadArticle} />
+                      <div className="mb-3"><ArticleVersionHistory articleId={article.id} onRestored={reloadArticle} /></div>
                       <ArticleSuggestionsPanel
                         articleId={article.id}
                         extra={article.stages_data?.extra}

@@ -16,6 +16,7 @@ import {
 import { timeAgo } from '@/utils/datetime';
 import { SeoMetricTile } from './seo/SeoMetricTile';
 import { DomainRankingKeywordsCard } from './seo/DomainRankingKeywordsCard';
+import { WebsiteOpportunitiesCard } from './seo/WebsiteOpportunitiesCard';
 import {
   DOMAIN_METRICS,
   GSC_METRICS,
@@ -170,6 +171,7 @@ export const WebsiteSeoOverviewPanel: React.FC<{
 
   return (
     <div className="space-y-4">
+      <WebsiteOpportunitiesCard websiteId={website.id} onOpenTab={onOpenTab} />
       {/* ── Search presence ─────────────────────────────────────────────── */}
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-3">

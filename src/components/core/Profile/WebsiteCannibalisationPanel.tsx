@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { GitMerge, Loader2, SearchX } from 'lucide-react';
+import { Check, Copy, GitMerge, Loader2, SearchX } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState, HubFilterSelect, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
   userWebsitesService,
   type CannibalItem,
@@ -40,12 +41,62 @@ function pathOf(url: string): string {
   try { return new URL(url).pathname || '/'; } catch { return url; }
 }
 
+/** Pick the page that keeps the query; every other competing page 301s to it. */
+function ConsolidateDialog({ item, onClose }: { item: CannibalItem; onClose: () => void }) {
+  const bestConverter = [...item.pages].sort((a, b) => b.clicks - a.clicks)[0];
+  const [canonical, setCanonical] = useState((item.leader_is_best_converter ? item.pages[0] : bestConverter)?.page ?? '');
+  const [copied, setCopied] = useState(false);
+  const others = item.pages.filter((p) => p.page !== canonical);
+  const lines = others.map((p) => `Redirect 301 ${pathOf(p.page)} ${canonical}`).join('\n');
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(lines); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { setCopied(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Consolidate “{item.query}”</DialogTitle>
+          <DialogDescription>
+            Keep one page for this query. Move anything the others say that it does not into it first, then redirect them.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1">
+          {item.pages.map((p) => (
+            <label key={p.page} className="flex cursor-pointer items-baseline gap-2 rounded-sm px-2 py-1 hover:bg-surface-hover">
+              <input type="radio" name="canonical" checked={canonical === p.page} onChange={() => setCanonical(p.page)} />
+              <span className="min-w-0 flex-1 truncate text-sm">{pathOf(p.page)}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                {p.position != null ? `#${p.position}` : '—'} · {compact(p.clicks)} clicks
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">Redirects (Apache .htaccess format)</span>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void copy()} disabled={!others.length}>
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {copied ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
+          <pre className="overflow-x-auto rounded-sm border border-hairline bg-surface-sunken p-3 text-xs">{lines || 'Pick the page to keep.'}</pre>
+          <p className="text-[11px] text-muted-foreground">
+            On WordPress, the Redirection plugin takes the same pairs. Update internal links to the kept page too, or each one costs a hop.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Row({ item }: { item: CannibalItem }) {
   // Google's preferred page is the one it shows most; the best converter is the one
   // that earns clicks. When they differ, the split is not just theoretical — it is
   // actively sending people to the weaker page.
   const leader = item.pages[0];
   const bestConverter = [...item.pages].sort((a, b) => b.clicks - a.clicks)[0];
+  const [consolidating, setConsolidating] = useState(false);
 
   return (
     <div className="rounded-sm border border-hairline p-3">
@@ -54,11 +105,13 @@ function Row({ item }: { item: CannibalItem }) {
           <Badge variant={severityVariant(item.severity)}>{item.severity}</Badge>
           <span className="truncate text-sm font-medium text-foreground">{item.query}</span>
         </div>
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums text-muted-foreground">
           {compact(item.impressions)} impressions · {item.page_count} pages
           {item.best_position != null ? ` · best #${item.best_position}` : ''}
+          <Button size="sm" variant="outline" className="h-7" onClick={() => setConsolidating(true)}>Consolidate</Button>
         </span>
       </div>
+      {consolidating && <ConsolidateDialog item={item} onClose={() => setConsolidating(false)} />}
 
       {!item.leader_is_best_converter && bestConverter && leader && (
         <p className="mt-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-300">

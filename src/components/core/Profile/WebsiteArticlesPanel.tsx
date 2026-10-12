@@ -24,6 +24,7 @@ import {
 } from '@/services/userWebsitesService';
 import { Loading, STATUS_COLOR, useLaunchQuickStart } from './seo/dashboardPrimitives';
 import { AGE_WINDOW_LABELS, AGE_WINDOW_ORDER, ageWindowOf, timeOf, useTableSegments } from './seo/useTableSegments';
+import { dueReasonText } from '@/services/seo/dueReason';
 
 const ARTICLE_LIMIT = 500;
 type SortKey = 'title' | 'keyword' | 'seo' | 'words' | 'status' | 'created' | 'age';
@@ -278,8 +279,14 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
                     <TableCell className="text-muted-foreground tabular-nums">
                       {freshnessById.get(a.id)
                         ? (
-                          <span className={freshnessById.get(a.id)!.is_due ? 'text-destructive' : undefined}>
+                          <span
+                            className={freshnessById.get(a.id)!.is_due ? 'text-destructive' : undefined}
+                            title={freshnessById.get(a.id)!.is_due ? dueReasonText(freshnessById.get(a.id)!) : undefined}
+                          >
                             {freshnessById.get(a.id)!.age_days}d
+                            {freshnessById.get(a.id)!.is_due && (
+                              <span className="block text-[11px] font-normal">{dueReasonText(freshnessById.get(a.id)!)}</span>
+                            )}
                           </span>
                         )
                         // An unpublished draft has no content age — that is not the same

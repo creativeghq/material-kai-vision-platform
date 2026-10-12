@@ -680,7 +680,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     const unavailable: any[] = data.unavailable || [];
     const KIND_LABEL: Record<string, string> = {
       not_crawled: 'Not crawled', crawled_not_indexed: 'Crawled, not indexed',
-      quick_win: 'Quick win', consolidate: 'Consolidate', refresh: 'Refresh', fix_page: 'Fix page',
+      quick_win: 'Quick win', consolidate: 'Consolidate', refresh: 'Refresh', fix_page: 'Fix page', new_page: 'New page',
     };
     return (
       <Card className="space-y-3">

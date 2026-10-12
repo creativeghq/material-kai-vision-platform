@@ -3208,6 +3208,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-research',
+    moduleSlug: 'seo-toolkit',
     name: 'SEO Research',
     description: 'Your own rankings (rank tracker + Search Console), keyword research, SERP audit, URL audit, intent classification — read-only.',
     icon: 'Search',
@@ -3222,6 +3223,16 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview',
     ],
     quick_starts: [
+      {
+        label: 'What should I work on?', description: 'One ranked list: quick wins, refreshes, consolidations, pages to add', icon: 'Layers',
+        prompt: 'What should I work on next for our website? Rank the opportunities.',
+        done: 'Here is what to work on next, ranked, with the reason for each.',
+        promptTemplate: 'What should I work on next for our website? Rank the opportunities.',
+        run: { tool: 'seo_opportunities' },
+        form: [
+          { key: 'website_id', label: 'Website', kind: 'website' },
+        ],
+      },
       {
         label: 'My rankings', description: 'What your own site ranks for — rank tracker + Search Console', icon: 'Globe',
         prompt: 'Which keywords does my website rank for right now? Use our own rank tracker and Search Console data.',
@@ -3279,6 +3290,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-domain',
+    moduleSlug: 'seo-toolkit',
     name: 'SEO Domain Intel',
     description: 'Domain snapshot, ranked keywords, competitor + keyword gap, traffic estimation.',
     icon: 'Globe',
@@ -3325,6 +3337,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-backlinks',
+    moduleSlug: 'seo-toolkit',
     name: 'SEO Backlinks',
     description: 'Backlinks summary, anchor texts, referring domains.',
     icon: 'Link2',
@@ -3357,6 +3370,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-content',
+    moduleSlug: 'seo-toolkit',
     name: 'SEO Content & Tech',
     description: 'Sentiment, tech stack, WHOIS, OnPage crawl, LLM mentions.',
     icon: 'FileSearch',
@@ -3401,6 +3415,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-multi-engine',
+    moduleSlug: 'seo-toolkit',
     name: 'SEO Multi-Engine + Niche',
     description: 'YouTube, Local Pack, Google Trends, Amazon, App keywords, Trustpilot, Pinterest, Reddit.',
     icon: 'Layers',
@@ -3458,6 +3473,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-composite',
+    moduleSlug: 'seo-toolkit',
     name: 'SEO Composite Audits',
     description: 'Full site review + brand-search audit (multi-section bundles).',
     icon: 'BadgeCheck',
@@ -3535,6 +3551,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-article',
+    moduleSlug: 'seo-toolkit',
     name: 'SEO Article Pipeline',
     description: 'Research → read our pages on the topic → plan → write → editor review → analysis report.',
     icon: 'Newspaper',
