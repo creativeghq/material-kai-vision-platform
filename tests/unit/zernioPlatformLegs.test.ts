@@ -82,10 +82,15 @@ describe('#384 B — leads, calls and referrals are subscribed and land somewher
   const list = events.slice(events.indexOf('ZERNIO_WEBHOOK_EVENTS = ['), events.indexOf('] as const'));
   const handler = src(HANDLER);
 
-  it.each(['lead.received', 'call.ended', 'call.failed', 'call.permission_request', 'referral.received', 'webhook.test',
+  it.each(['lead.received', 'call.ended', 'call.failed', 'call.permission_request', 'referral.received',
     'post.platform.deleted', 'post.tiktok.url_resolved'])('%s is subscribed and dispatched', (event) => {
     expect(list).toContain(`'${event}'`);
     expect(handler).toContain(`event === '${event}'`);
+  });
+
+  it('webhook.test is answered but never subscribed: Zernio rejects the whole settings PUT when it is listed', () => {
+    expect(list).not.toContain("'webhook.test'");
+    expect(handler).toContain("event === 'webhook.test'");
   });
 
   it('a lead becomes an Inbox thread holding the answers, de-duplicated by its lead id, never a silent CRM row', () => {

@@ -369,7 +369,7 @@ export const ZERNIO_WEBHOOK_EVENTS = [
   'post.platform.published', 'post.platform.failed', 'post.platform.deleted', 'post.tiktok.url_resolved',
   // Meta lead forms, WhatsApp calls and the entry point that re-opened a DM.
   'lead.received', 'call.received', 'call.ended', 'call.failed', 'call.permission_request',
-  'referral.received', 'webhook.test',
+  'referral.received',
   // WhatsApp operational health — a declined/suspended number stops all sending, and a
   // template whose category Meta changed silently re-prices every message on it.
   'whatsapp.template.status_updated', 'whatsapp.template.category_updated',
