@@ -181,6 +181,7 @@ describe('tenant flow vocabulary', () => {
   const RPC_ACTIONS = [
     'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
     'create_task', 'advance_deal_stage', 'add_note', 'assign_user', 'gmail_modify',
+    'comment_reply', 'comment_private_reply',
   ];
 
   const SYNC_HINT =

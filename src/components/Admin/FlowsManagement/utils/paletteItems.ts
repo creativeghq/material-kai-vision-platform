@@ -657,6 +657,14 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Label / Archive Email', description: 'Label, archive, star or mark read the Gmail thread that triggered this', icon: 'Mail', color: 'blue',
     defaultData: { label: 'Label / Archive Email', category: 'action', actionType: 'gmail_modify', config: { account_id: '{{trigger.data.account_id}}', thread_id: '{{trigger.data.gmail_thread_id}}' } } as ActionNodeData },
 
+  { type: 'actionNode', category: 'action', subType: 'comment_reply', group: 'Social',
+    label: 'Reply to Comment', description: 'Answer the comment that triggered this, publicly under the post', icon: 'MessageSquareReply', color: 'blue',
+    defaultData: { label: 'Reply to Comment', category: 'action', actionType: 'comment_reply', config: { thread_id: '{{trigger.data.thread_id}}', comment_id: '{{trigger.data.comment_id}}', message: '' } } as ActionNodeData },
+
+  { type: 'actionNode', category: 'action', subType: 'comment_private_reply', group: 'Social',
+    label: 'Reply by DM', description: 'Answer the comment that triggered this privately, by direct message (once per comment)', icon: 'MessageSquareReply', color: 'blue',
+    defaultData: { label: 'Reply by DM', category: 'action', actionType: 'comment_private_reply', config: { thread_id: '{{trigger.data.thread_id}}', comment_id: '{{trigger.data.comment_id}}', message: '' } } as ActionNodeData },
+
   { type: 'actionNode', category: 'action', subType: 'log_event', group: 'Data',
     label: 'Log Event', description: 'Write an audit / dedup-marker row', icon: 'ScrollText', color: 'blue',
     defaultData: { label: 'Log Event', category: 'action', actionType: 'log_event', config: { table: '', row: '{}' } } as ActionNodeData },

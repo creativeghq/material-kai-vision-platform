@@ -33,6 +33,7 @@ import type {
   UpdateProductConfig,
   CreateTaskConfig,
   GmailModifyConfig,
+  CommentReplyConfig,
   AdvanceDealStageConfig,
   CreatePlannedPaymentConfig,
   LinkDocumentConfig,
@@ -830,6 +831,25 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               Stages belong to the deal&apos;s TYPE. A stage from another pipeline is refused by the
               database, so the run log will say so rather than moving it somewhere impossible.
             </p>
+          </div>
+        </div>
+      );
+    }
+
+    case 'comment_reply':
+    case 'comment_private_reply': {
+      const cfg = config as CommentReplyConfig;
+      return (
+        <div className="space-y-3">
+          <p className="text-[11px] text-muted-foreground">
+            {data.actionType === 'comment_private_reply'
+              ? 'Sends the commenter a direct message. Instagram and Facebook allow one per comment, within a limited time after it was posted.'
+              : 'Posts a reply under the comment, visible to everyone who can see the post. Keep order details and personal information out of it.'}
+            {' '}Use it after a &ldquo;Social Comment Received&rdquo; trigger, with a condition on the comment text for keywords.
+          </p>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Message</Label>
+            <Textarea rows={3} value={cfg.message || ''} onChange={(e) => onChange({ ...cfg, message: e.target.value })} placeholder="Thanks! We've sent you the details by message." />
           </div>
         </div>
       );

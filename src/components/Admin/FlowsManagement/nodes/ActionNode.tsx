@@ -6,7 +6,7 @@ import {
   UserPen, PackageCheck, ScrollText, CheckSquare, Kanban, CalendarClock, Link2,
   BotMessageSquare, LayoutGrid, ImagePlus,
   Compass, FileSearch, Building2, UserSearch, MailCheck,
-  MessageCircle, Megaphone, TrendingDown,
+  MessageCircle, Megaphone, TrendingDown, MessageSquareReply,
 } from 'lucide-react';
 import type {
   ActionNodeData, ActionType,
@@ -35,6 +35,8 @@ const actionIcons: Record<ActionType, React.ElementType> = {
   update_product: PackageCheck,
   create_task: CheckSquare,
   gmail_modify: Mail,
+  comment_reply: MessageSquareReply,
+  comment_private_reply: MessageSquareReply,
   advance_deal_stage: Kanban,
   create_planned_payment: CalendarClock,
   link_document: Link2,

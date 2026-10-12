@@ -24,6 +24,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 // Invariant 7 — a config-supplied URL this runtime will fetch (#357 AE-10).
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { sendCommentPrivateReply, sendSocialCommentReply } from '../_shared/zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -1382,6 +1383,49 @@ async function executeAction(
       const j = await res.json().catch(() => ({})) as Record<string, unknown>;
       if (!res.ok) throw new Error(`gmail_modify failed: ${String(j.error ?? res.status)}`);
       return { output: { modified: true, thread_id: threadId, added: j.added ?? [], removed: j.removed ?? [] } };
+    }
+
+    case 'comment_reply':
+    case 'comment_private_reply': {
+      const threadId = String(resolved.thread_id ?? '');
+      const commentId = String(resolved.comment_id ?? '');
+      const message = String(resolved.message ?? '').trim();
+      if (!threadId || threadId.includes('{{') || !commentId || commentId.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_comment' } };
+      }
+      if (!message || message.includes('{{')) return { output: { skipped: true, reason: 'no_message' } };
+      if (!scope?.workspaceId || scope.isGlobal) {
+        return { output: { skipped: true, reason: 'only a workspace flow may answer a comment' } };
+      }
+      const { data: thread } = await supabase.from('inbox_threads')
+        .select('id, workspace_id, channel, metadata').eq('id', threadId).maybeSingle();
+      const meta = ((thread as { metadata?: Record<string, unknown> } | null)?.metadata ?? {}) as Record<string, unknown>;
+      if (!thread || thread.workspace_id !== scope.workspaceId || thread.channel !== 'social' || meta.social_kind !== 'comments') {
+        return { output: { skipped: true, reason: 'not a comment thread of this workspace' } };
+      }
+      const isPrivate = actionType === 'comment_private_reply';
+      const kind = isPrivate ? 'private_reply' : 'comment_reply';
+      const { data: done } = await supabase.from('inbox_messages').select('id')
+        .eq('thread_id', threadId).eq('metadata->>social_kind', kind).eq('metadata->>comment_id', commentId)
+        .limit(1).maybeSingle();
+      if (done) return { output: { skipped: true, reason: 'already answered', comment_id: commentId } };
+
+      const target = { accountId: String(meta.zernio_account_id ?? ''), postId: String(meta.zernio_post_id ?? ''), commentId, message };
+      const res = isPrivate ? await sendCommentPrivateReply(target) : await sendSocialCommentReply(target);
+      if (!res.success) throw new Error(`${actionType} not delivered: ${res.error ?? 'refused'}`);
+
+      const { error: noteErr } = await supabase.from('inbox_messages').insert(isPrivate
+        ? {
+            thread_id: threadId, message_type: 'note', attachments: [],
+            body: `Sent privately to the commenter by an automation: ${message}`,
+            metadata: { channel: 'social', social_kind: 'private_reply', comment_id: commentId, automated: true, relay: res },
+          }
+        : {
+            thread_id: threadId, message_type: 'text', attachments: [], body: message,
+            metadata: { channel: 'social', direction: 'outgoing', social_kind: 'comment_reply', comment_id: commentId, automated: true, relay: res },
+          });
+      if (noteErr) console.error(`[flow-engine] ${actionType} sent but not recorded on the thread`, threadId, noteErr.message);
+      return { output: { replied: true, private: isPrivate, comment_id: commentId, message_id: res.messageId ?? null } };
     }
 
     case 'create_task': {

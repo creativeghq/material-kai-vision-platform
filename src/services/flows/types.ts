@@ -783,6 +783,8 @@ export type ActionType =
   | 'update_product'
   | 'create_task'
   | 'gmail_modify'
+  | 'comment_reply'
+  | 'comment_private_reply'
   | 'advance_deal_stage'
   | 'create_planned_payment'
   | 'link_document'
@@ -912,6 +914,12 @@ export interface UpdateProductConfig {
 }
 
 /** Act on the Gmail thread a `mail.received` event came from. Shared mailboxes of this workspace only. */
+export interface CommentReplyConfig {
+  thread_id?: string;
+  comment_id?: string;
+  message?: string;
+}
+
 export interface GmailModifyConfig {
   account_id?: string;
   thread_id?: string;
