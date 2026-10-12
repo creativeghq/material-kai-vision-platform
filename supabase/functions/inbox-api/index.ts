@@ -485,6 +485,17 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
     const owner = await workspaceOwner(db, workspaceId);
     if (!owner) return;
 
+    if (thread.channel === 'whatsapp' && !(await whatsappWindow(db, threadId, thread)).open) {
+      const { error: noteErr } = await db.from('inbox_messages').insert({
+        thread_id: threadId,
+        message_type: 'system',
+        body: 'The assistant did not answer: the WhatsApp 24-hour window is closed — only an approved template can be sent.',
+        metadata: { agent_reply_error: 'whatsapp_window_closed' },
+      });
+      if (noteErr) console.error('[inbox-api] could not record the skipped agent reply:', noteErr.message);
+      return;
+    }
+
     // ── Billing ──────────────────────────────────────────────────────────
     // No debit here any more, and no refund, because there is nothing left to refund.
     let replyText: string;

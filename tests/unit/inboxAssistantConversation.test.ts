@@ -134,6 +134,14 @@ describe('the handoff is real, and only on an unattended reply', () => {
     expect(gate).toBeLessThan(fn.indexOf('insertMessageAndNotify('));
   });
 
+  it('checks the WhatsApp 24-hour window before the model turn, not after it', () => {
+    const src = code(INBOX);
+    const fn = src.slice(src.indexOf('async function maybeRunAgentReply'), src.indexOf('interface TranscriptAttachment'));
+    const window = fn.indexOf("thread.channel === 'whatsapp' && !(await whatsappWindow(db, threadId, thread)).open");
+    expect(window).toBeGreaterThan(-1);
+    expect(window).toBeLessThan(fn.indexOf("task: 'inbox_agent_reply'"));
+  });
+
   it('leaves a team-visible note when the turn fails, including on exhausted credits', () => {
     const src = code(INBOX);
     expect(src).toContain('The assistant could not answer this message');
