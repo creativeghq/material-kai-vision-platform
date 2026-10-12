@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
+import { BookVsLedgerCard } from '@/modules/finance/components/BookVsLedgerCard';
 import {
   hasFigures,
   mydataBookService,
@@ -481,6 +482,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
           </CardContent>
         )}
       </Card>
+      {workspaceId && <BookVsLedgerCard workspaceId={workspaceId} from={range.from} to={range.to} />}
     </div>
   );
 };

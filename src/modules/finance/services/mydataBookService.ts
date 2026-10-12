@@ -54,7 +54,34 @@ export interface EntityEntryRow {
   vat: number;
 }
 
+export interface BookVsLedgerRow {
+  month: string;
+  direction: 'income' | 'expense';
+  aade_net: number | null;
+  aade_vat: number | null;
+  aade_docs: number | null;
+  aade_status: string | null;
+  ledger_net: number;
+  ledger_vat: number;
+  ledger_docs: number;
+  net_difference: number | null;
+  verdict: 'matches' | 'differs' | 'outside_ledger' | BookStatus;
+}
+
 export const mydataBookService = {
+  async getBookVsLedger(workspaceId: string, from: string, to: string): Promise<BookVsLedgerRow[]> {
+    const { data, error } = await supabase.rpc('get_mydata_book_vs_ledger' as never, {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    } as never);
+    if (error) throw error;
+    return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+      ...(r as unknown as BookVsLedgerRow),
+      aade_net: r.aade_net === null ? null : Number(r.aade_net),
+      ledger_net: Number(r.ledger_net ?? 0),
+      net_difference: r.net_difference === null ? null : Number(r.net_difference),
+    }));
+  },
+
   /** AADE's book for a date range, one row per month per direction. */
   async getBook(workspaceId: string, from: string, to: string): Promise<BookMonthRow[]> {
     const { data, error } = await supabase.rpc('get_mydata_book_aggregate', {
