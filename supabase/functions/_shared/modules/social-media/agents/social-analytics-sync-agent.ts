@@ -102,6 +102,7 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
           post_id:         post.id,
           workspace_id:    post.workspace_id,
           synced_at:       new Date().toISOString(),
+          snapshot_date:   new Date().toISOString().slice(0, 10),
           impressions:     analytics.impressions     ?? 0,
           reach:           analytics.reach           ?? 0,
           likes:           analytics.likes           ?? 0,
@@ -111,7 +112,7 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
           clicks:          analytics.clicks          ?? 0,
           engagement_rate: analytics.engagement_rate ?? 0,
           metadata:        { raw: analytics },
-        }, { onConflict: 'post_id' });
+        }, { onConflict: 'post_id,snapshot_date' });
 
       if (upsertErr) {
         await log('warn', `Failed to upsert analytics for post ${post.id}`, { error: upsertErr.message });

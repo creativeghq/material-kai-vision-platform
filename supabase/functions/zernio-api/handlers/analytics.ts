@@ -551,6 +551,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
               post_id: saved.id,
               workspace_id,
               synced_at: new Date().toISOString(),
+              snapshot_date: new Date().toISOString().slice(0, 10),
               impressions: a.impressions ?? 0,
               reach: a.reach ?? 0,
               likes: a.likes ?? 0,
@@ -562,7 +563,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
               // `views` has no column and is not the same thing as impressions — keep it rather
               // than folding it into a field that means something else.
               metadata: { raw: a, source: 'external_sync' },
-            }, { onConflict: 'post_id' });
+            }, { onConflict: 'post_id,snapshot_date' });
             if (mErr) errors.push(`${acct.platform} ${zernioPostId} metrics: ${mErr.message}`);
             else withMetrics++;
           }
@@ -680,6 +681,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
             post_id: post.id,
             workspace_id: post.workspace_id,
             synced_at: new Date().toISOString(),
+            snapshot_date: new Date().toISOString().slice(0, 10),
             impressions: a.impressions ?? 0,
             reach: a.reach ?? 0,
             likes: a.likes ?? 0,
@@ -689,7 +691,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
             clicks: a.clicks ?? 0,
             engagement_rate: a.engagementRate ?? 0,
             metadata: { raw: a },
-          }, { onConflict: 'post_id' });
+          }, { onConflict: 'post_id,snapshot_date' });
           if (metricsErr) throw metricsErr;
 
           synced++;
