@@ -56,6 +56,8 @@ import { resolveUploadPath } from '@/utils/storagePaths';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { agentChatHistoryService, ChatConversation, SaveMessageOptions } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useVoiceRecording } from '@/hooks/useVoiceRecording';
+import { transcribeRecording } from '@/services/voiceDictationService';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard, primaryListCount } from './AgentResultCard';
@@ -4368,17 +4370,37 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     attachImageFiles(imageFiles);
   }, [attachImageFiles]);
 
+  const recorder = useVoiceRecording({ maxSeconds: 300 });
+  const [transcribingVoice, setTranscribingVoice] = useState(false);
+  const { recording: voiceRecording, reset: resetVoiceRecording } = recorder;
+  useEffect(() => {
+    if (!voiceRecording || !workspaceId) return;
+    let cancelled = false;
+    setTranscribingVoice(true);
+    transcribeRecording({ workspaceId }, voiceRecording)
+      .then((text) => { if (!cancelled) setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)); })
+      .catch((err: unknown) => {
+        if (!cancelled) toast({ title: 'Voice Input Error', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+      })
+      .finally(() => { if (!cancelled) { setTranscribingVoice(false); resetVoiceRecording(); } });
+    return () => { cancelled = true; };
+  }, [voiceRecording, workspaceId, toast, resetVoiceRecording]);
+  const voiceAvailable = isVoiceSupported || recorder.isSupported;
+  const voiceActive = isRecording || recorder.isRecording;
+
   const handleVoiceInput = useCallback(() => {
-    if (!isVoiceSupported) {
-      toast({
-        title: 'Voice Input Not Supported',
-        description: 'Your browser does not support voice input. Please use Chrome, Edge, or Safari.',
-        variant: 'destructive',
-      });
+    if (isVoiceSupported) { toggleRecording(); return; }
+    if (recorder.isSupported) {
+      if (recorder.isRecording) recorder.stop();
+      else void recorder.start();
       return;
     }
-    toggleRecording();
-  }, [isVoiceSupported, toggleRecording, toast]);
+    toast({
+      title: 'Voice Input Not Supported',
+      description: 'This browser cannot record audio.',
+      variant: 'destructive',
+    });
+  }, [isVoiceSupported, toggleRecording, toast, recorder]);
 
   const handleLoadConversation = useCallback(
     async (conversationId: string) => {
@@ -6983,20 +7005,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <TooltipTrigger asChild>
                       <button
                         onClick={handleVoiceInput}
-                        disabled={!isVoiceSupported}
+                        disabled={!voiceAvailable || transcribingVoice}
                         className={cn(
                           'p-1.5 rounded-lg transition-colors',
-                          isRecording
+                          voiceActive
                             ? 'bg-red-500 text-white animate-pulse'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
-                          !isVoiceSupported && 'opacity-40 cursor-not-allowed',
+                          !voiceAvailable && 'opacity-40 cursor-not-allowed',
                         )}
                       >
-                        <Mic className="h-4 w-4" />
+                        {transcribingVoice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="left">
-                      <p>{isRecording ? 'Stop recording' : !isVoiceSupported ? 'Voice not supported' : 'Voice input'}</p>
+                      <p>{voiceActive ? 'Stop recording' : transcribingVoice ? 'Transcribing…' : !voiceAvailable ? 'Voice not supported' : 'Voice input'}</p>
                     </TooltipContent>
                   </Tooltip>
 

@@ -177,7 +177,7 @@ async function billingUser(db: Db, workspaceId: string): Promise<string | null> 
  * Settle a reservation against what the call actually cost. No usage → released; no price row →
  * released with the reason (an unpriced model is a gap in ai_model_pricing, not a free call).
  */
-async function settleAgainstUsage(
+export async function settleAgainstUsage(
   db: Db,
   args: {
     userId: string; workspaceId: string; ceiling: number; model: string; task: string;

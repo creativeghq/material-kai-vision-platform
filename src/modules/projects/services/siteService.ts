@@ -1,5 +1,6 @@
 /** Snags (punch list) + site visit log — WS4 (#285). */
 import { supabase } from '@/integrations/supabase/client';
+import { transcribeRecording } from '@/services/voiceDictationService';
 import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';
 
 const SITE_PHOTO_BUCKET = 'pdf-documents';
@@ -175,6 +176,10 @@ export const siteService = {
     if (error) throw new Error(error.message || 'The dictation could not be read.');
     if (!data?.success) throw new Error(data?.error || 'The dictation could not be turned into records.');
     return data;
+  },
+
+  transcribeRecording(projectId: string, recording: Blob): Promise<string> {
+    return transcribeRecording({ projectId }, recording);
   },
 
   async createSnag(input: NewSnag, photos: File[] = []): Promise<ProjectSnag> {

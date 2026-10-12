@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 import { humanizeLabel } from '@/utils/humanize';
 import { todayLocalISO } from '@/utils/datetime';
 import { siteService, type SnagSeverity } from '../services/siteService';
@@ -56,7 +57,27 @@ export const DictateSiteWalkDialog: React.FC<Props> = ({ projectId, onClose, onS
   const [saving, setSaving] = useState(false);
 
   const voice = useVoiceInput({ language, continuous: true, interimResults: true });
+  const recorder = useVoiceRecording();
+  const [preferRecording, setPreferRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [typed, setTyped] = useState('');
+  const recordMode = recorder.isSupported && (preferRecording || !voice.isSupported);
+  const { recording, reset: resetRecording } = recorder;
+
+  useEffect(() => {
+    if (!recording) return;
+    let cancelled = false;
+    setTranscribing(true);
+    siteService.transcribeRecording(projectId, recording)
+      .then((text) => { if (!cancelled) setTyped((prev) => (prev.trim() ? `${prev.trim()}\n${text}` : text)); })
+      .catch((err: unknown) => {
+        if (!cancelled) toast({ title: 'Could not transcribe the recording', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+      })
+      .finally(() => { if (!cancelled) { setTranscribing(false); resetRecording(); } });
+    return () => { cancelled = true; };
+  }, [recording, projectId, toast, resetRecording]);
+
+  const clock = `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}`;
 
   // The transcript the person will actually send: what they dictated, plus anything they typed or
   // corrected afterwards. Seeded from the recogniser but editable, because the fastest fix for a
@@ -150,7 +171,7 @@ export const DictateSiteWalkDialog: React.FC<Props> = ({ projectId, onClose, onS
 
         {!proposal ? (
           <div className="space-y-3">
-            {!voice.isSupported && (
+            {!voice.isSupported && !recorder.isSupported && (
               <div className="flex items-start gap-2 rounded-sm border border-hairline bg-surface-sunken p-3 text-sm">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-800 dark:text-amber-400" aria-hidden />
                 <p className="text-muted-foreground">
@@ -160,7 +181,31 @@ export const DictateSiteWalkDialog: React.FC<Props> = ({ projectId, onClose, onS
               </div>
             )}
 
-            <div className="flex items-center gap-2">
+            {recordMode ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant={recorder.isRecording ? 'secondary' : 'default'}
+                onClick={() => (recorder.isRecording ? recorder.stop() : void recorder.start())}
+                disabled={reading || transcribing}
+              >
+                {recorder.isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {recorder.isRecording ? `Stop (${clock})` : 'Record'}
+              </Button>
+              {transcribing && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Transcribing…
+                </span>
+              )}
+              {!recorder.isRecording && !transcribing && (
+                <span className="text-xs text-muted-foreground">Greek or English; transcribed when you stop.</span>
+              )}
+              {voice.isSupported && !recorder.isRecording && !transcribing && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setPreferRecording(false)}>Live captions instead</Button>
+              )}
+            </div>
+            ) : (
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant={voice.isRecording ? 'secondary' : 'default'}
@@ -182,9 +227,15 @@ export const DictateSiteWalkDialog: React.FC<Props> = ({ projectId, onClose, onS
               {voice.isRecording && (
                 <span className="text-xs text-muted-foreground">Listening…</span>
               )}
+              {recorder.isSupported && !voice.isRecording && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setPreferRecording(true)}>Record instead (better for Greek)</Button>
+              )}
             </div>
+            )}
 
-            {voice.error && <p className="text-xs text-destructive">{voice.error}</p>}
+            {(recordMode ? recorder.error : voice.error) && (
+              <p className="text-xs text-destructive">{recordMode ? recorder.error : voice.error}</p>
+            )}
 
             <div className="space-y-1">
               <Label className="text-xs">What you said</Label>
@@ -202,7 +253,7 @@ export const DictateSiteWalkDialog: React.FC<Props> = ({ projectId, onClose, onS
 
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-              <Button size="sm" onClick={() => void read()} disabled={reading || !typed.trim()}>
+              <Button size="sm" onClick={() => void read()} disabled={reading || transcribing || recorder.isRecording || !typed.trim()}>
                 {reading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 Read it
               </Button>

@@ -118,7 +118,7 @@ describe('the dictation dialog', () => {
   it('says so when the browser cannot listen, and still works', () => {
     // Speech recognition is simply absent in some browsers. A dead button would look broken.
     expect(DIALOG).toContain('voice.isSupported');
-    expect(DIALOG).toMatch(/!voice\.isSupported && \(/);
+    expect(DIALOG).toMatch(/!voice\.isSupported && !recorder\.isSupported && \(/);
     expect(DIALOG).toContain('Type the note below instead');
   });
 

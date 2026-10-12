@@ -273,7 +273,9 @@ describe('inbound delivery is actually wired end to end', () => {
     const prefixes = (handler.code.match(/event\.startsWith\('([a-z][a-z0-9_]*\.[a-z0-9_.]*)'\)/g) ?? [])
       .map((m) => m.replace(/^event\.startsWith\('/, '').replace(/'\)$/, ''));
 
-    const unsubscribed = [...branched].filter((e) => !subscribed.has(e));
+    // Sent only as a test delivery; Zernio's settings PUT rejects the whole list when it is named.
+    const deliveryOnly = new Set(['webhook.test']);
+    const unsubscribed = [...branched].filter((e) => !subscribed.has(e) && !deliveryOnly.has(e));
     expect(unsubscribed, 'handled but never delivered — add to ZERNIO_WEBHOOK_EVENTS').toEqual([]);
 
     for (const prefix of prefixes) {
