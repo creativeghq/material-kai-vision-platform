@@ -23,6 +23,12 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function svc() { return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY); }
+function userClient(jwt: string) {
+  return createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: { persistSession: false },
+  });
+}
 
 // One source (#391) — the generated mirror. These were hand-written twins of the unions
 // in `assetsService`, and they feed the z.enums below.
@@ -30,6 +36,7 @@ import {
   ASSET_CATEGORIES as CATEGORIES,
   ACQUISITION_TYPES as ACQ_TYPES,
 } from '../assetVocabulary.generated.ts';
+import { roleGate } from './module-gate.ts';
 
 function contactName(c: any): string | null {
   if (!c) return null;
@@ -78,7 +85,7 @@ async function resolveSupplier(workspaceId: string, name: string): Promise<{ id:
   return { id: ins.data.id, name: ins.data.name };
 }
 
-export const createManageCompanyAssetsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
+export const createManageCompanyAssetsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void, jwt?: string) =>
   tool(async (args: {
     action: 'list' | 'add' | 'assign' | 'return';
     category?: typeof CATEGORIES[number];
@@ -96,13 +103,29 @@ export const createManageCompanyAssetsTool = (userId: string, workspaceId: strin
         if (args.category) q = q.eq('category', args.category);
         const { data, error } = await q;
         if (error) throw error;
+        const book = new Map<string, any>();
+        let bookNote: string | null = null;
+        if (jwt && data?.length) {
+          const db = userClient(jwt);
+          const denied = await roleGate(db, workspaceId, 'is_workspace_finance_viewer');
+          if (denied) bookNote = 'Book values are finance data and are not shown to your role.';
+          else {
+            const { data: values, error: bvErr } = await db.rpc('get_asset_book_values', { p_asset_ids: data.map((a: any) => a.id) });
+            if (bvErr) bookNote = `Book values could not be read: ${bvErr.message}`;
+            for (const v of (values ?? []) as any[]) book.set(v.asset_id, v);
+          }
+        } else if (!jwt) bookNote = 'Book values need a signed-in session.';
         const rows = (data || []).map((a: any) => {
           const active = (a.assignments || []).find((x: any) => !x.returned_at);
           const holder = active ? (contactName(active.employee?.contact) || contactName(active.contact)) : null;
-          return { id: a.id, name: a.name, category: a.category, identifier: a.identifier, status: a.status, acquisition_type: a.acquisition_type, cost: a.acquisition_cost, currency: a.currency, held_by: holder };
+          const bv = book.get(a.id);
+          return {
+            id: a.id, name: a.name, category: a.category, identifier: a.identifier, status: a.status, acquisition_type: a.acquisition_type, cost: a.acquisition_cost, currency: a.currency, held_by: holder,
+            book_value: bv?.book_value ?? null, accumulated_depreciation: bv?.accumulated ?? null, fully_depreciated: bv?.fully_depreciated ?? null,
+          };
         });
-        onChunk?.({ type: 'company_assets_list', data: { count: rows.length, assets: rows } });
-        return JSON.stringify({ success: true, assets: rows });
+        onChunk?.({ type: 'company_assets_list', data: { count: rows.length, assets: rows, book_value_note: bookNote } });
+        return JSON.stringify({ success: true, assets: rows, book_value_note: bookNote ?? undefined });
       }
 
       if (args.action === 'add') {
@@ -165,7 +188,7 @@ export const createManageCompanyAssetsTool = (userId: string, workspaceId: strin
     }
   }, {
     name: 'manage_company_assets',
-    description: 'Manage the company assets register (vehicles, phones, payment cards, laptops, equipment) shared across Finance and HR. Actions: "list" (optionally filtered by category), "add" a new asset, "assign" an asset to a person by name (employee or contact — releases any current holder), "return" an asset (release its holder). Use for e.g. "add a company phone iPhone 15 for sales", "assign the Ford Transit to Maria", "who holds what / list company vehicles", "mark the laptop returned".',
+    description: 'Manage the company assets register (vehicles, phones, payment cards, laptops, equipment) shared across Finance and HR. Actions: "list" (optionally filtered by category; each asset carries its written-down book value, accumulated depreciation and whether it is fully depreciated — derived by the platform, quote it rather than the purchase price), "add" a new asset, "assign" an asset to a person by name (employee or contact — releases any current holder), "return" an asset (release its holder). Use for e.g. "add a company phone iPhone 15 for sales", "assign the Ford Transit to Maria", "who holds what / list company vehicles", "mark the laptop returned".',
     schema: z.object({
       action: z.enum(['list', 'add', 'assign', 'return']).describe('What to do'),
       category: z.enum(CATEGORIES).optional().describe('Asset category (filter for list; type for add)'),

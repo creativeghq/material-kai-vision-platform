@@ -627,7 +627,7 @@ export const createSEOMyRankingsTool = (
 const SITE_REPORT_DEFAULT_DAYS: Record<string, number> = {
   search_metrics: 180, domain_intel: 180, ai_visibility: 90, ai_answers: 90,
   ai_citations: 90, ai_citability: 90, ai_corpus: 90,
-  cannibalisation: 90, competitors: 365, analytics: 28, page_queries: 90,
+  cannibalisation: 90, competitors: 365, analytics: 28, page_queries: 90, query_pages: 28,
 };
 
 /** Trim a jsonb payload so a 129-row series does not become the whole context window. */
@@ -761,6 +761,7 @@ function siteReportCardProjection(data: any): {
 
 async function readSiteReport(
   supabase: any, siteId: string, kind: string, days: number, page?: string, metric?: string,
+  query?: string, groupBy?: string,
 ): Promise<{ data: any; error?: string }> {
   // Named `rpc` so `scripts/audit-agent-data-coverage.mjs` sees these reads the same way it sees
   // a direct `.rpc('…')` — the coverage baseline is scanned from source.
@@ -817,6 +818,13 @@ async function readSiteReport(
         const list = Array.isArray(rows) ? rows : [];
         return { data: { page, window_days: days, status: list.length ? 'ok' : 'no_data', queries: list } };
       }
+      case 'query_pages':
+        return {
+          data: await rpc('get_gsc_query_page_rows', {
+            p_website_id: siteId, p_days: Math.min(days, 180), p_group_by: groupBy ?? (page ? 'query' : 'page'),
+            p_page: page ?? null, p_query: query ?? null, p_search: null, p_limit: 200, p_country: null, p_device: null,
+          }),
+        };
       default:
         return { data: null, error: `unknown report kind "${kind}"` };
     }
@@ -829,7 +837,7 @@ export const createSEOSiteReportTool = (
   _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
 ) => {
   return tool(
-    async ({ kind, website_id, days, page, metric }) => {
+    async ({ kind, website_id, days, page, metric, query, group_by }) => {
       if (!ctx?.supabase || !ctx?.workspaceId) {
         return JSON.stringify({ success: false, error: 'No workspace context — a site report needs a signed-in workspace.' });
       }
@@ -841,7 +849,7 @@ export const createSEOSiteReportTool = (
       const windowDays = Math.min(Math.max(Math.trunc(days ?? SITE_REPORT_DEFAULT_DAYS[kind] ?? 90), 7), 365);
       onChunk?.({ type: 'tool_progress', status: `Reading the ${kind.replace(/_/g, ' ')} report for ${site.domain}…`, timestamp: Date.now() });
 
-      const r = await readSiteReport(ctx.supabase, site.id, kind, windowDays, page, metric);
+      const r = await readSiteReport(ctx.supabase, site.id, kind, windowDays, page, metric, query, group_by);
       if (r.error) return JSON.stringify({ success: false, error: r.error });
       const data = r.data;
       const status = typeof data?.status === 'string' ? data.status : null;
@@ -868,13 +876,15 @@ export const createSEOSiteReportTool = (
     },
     {
       name: 'seo_site_report',
-      description: 'A report on the workspace\'s OWN connected website from what the platform already measures — free, first-party, no upstream call. kind: overview (site, tracked domains, research, articles at a glance) · health (latest Lighthouse/on-page audit: scores + issues) · crawl (last site crawl: pages, issues by severity, issue groups) · search_metrics (Search Console + tracked-domain metrics with verdicts) · domain_intel (the weekly DataForSEO snapshot of the site itself: rank, keywords, backlinks, trend) · ai_visibility (how often ChatGPT/Gemini/Claude probes mention the site, by model and prompt, with competitors) · ai_citations (the citation half: per-assistant citation rate and mention rate each with a verdict on whether the figure is real, plus who is CITED and who is NAMED instead of us in the answers that left us out - an assistant that returned no sources reports citation as not_collected, never 0%) · ai_citability (for each question we lost, the page of ours that should have answered it, scored on eight extraction dimensions, with the specific fixes) · ai_corpus (the DataForSEO index of real AI answers: how often the domain is cited, and which domains, pages and brands lead the market - a SEPARATE sample from our own probes, never merged, and ChatGPT coverage there is United States only) · ai_answers (what each assistant answered each question) · cannibalisation (queries where two of our pages compete) · competitors (tracked competitors\' series for a metric) · analytics (Google Analytics summary) · page_queries (Search Console queries for ONE page — needs page). Use this before any paid crawl or third-party lookup when the question is about our own site. Defaults to the connected website.',
+      description: 'A report on the workspace\'s OWN connected website from what the platform already measures — free, first-party, no upstream call. kind: overview (site, tracked domains, research, articles at a glance) · health (latest Lighthouse/on-page audit: scores + issues) · crawl (last site crawl: pages, issues by severity, issue groups) · search_metrics (Search Console + tracked-domain metrics with verdicts) · domain_intel (the weekly DataForSEO snapshot of the site itself: rank, keywords, backlinks, trend) · ai_visibility (how often ChatGPT/Gemini/Claude probes mention the site, by model and prompt, with competitors) · ai_citations (the citation half: per-assistant citation rate and mention rate each with a verdict on whether the figure is real, plus who is CITED and who is NAMED instead of us in the answers that left us out - an assistant that returned no sources reports citation as not_collected, never 0%) · ai_citability (for each question we lost, the page of ours that should have answered it, scored on eight extraction dimensions, with the specific fixes) · ai_corpus (the DataForSEO index of real AI answers: how often the domain is cited, and which domains, pages and brands lead the market - a SEPARATE sample from our own probes, never merged, and ChatGPT coverage there is United States only) · ai_answers (what each assistant answered each question) · cannibalisation (queries where two of our pages compete) · competitors (tracked competitors\' series for a metric) · analytics (Google Analytics summary) · page_queries (Search Console queries for ONE page — needs page) · query_pages (the query × page drill-down within the window: group_by query or page, filtered to one page and/or one query — "which queries bring traffic to this page", "which of our pages rank for this query"). Use this before any paid crawl or third-party lookup when the question is about our own site. Defaults to the connected website.',
       schema: z.object({
-        kind: z.enum(['overview', 'health', 'crawl', 'search_metrics', 'domain_intel', 'ai_visibility', 'ai_citations', 'ai_citability', 'ai_corpus', 'ai_answers', 'cannibalisation', 'competitors', 'analytics', 'page_queries'])
+        kind: z.enum(['overview', 'health', 'crawl', 'search_metrics', 'domain_intel', 'ai_visibility', 'ai_citations', 'ai_citability', 'ai_corpus', 'ai_answers', 'cannibalisation', 'competitors', 'analytics', 'page_queries', 'query_pages'])
           .describe('Which report to read.'),
         website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
         days: z.number().int().min(7).max(365).optional().describe('Look-back window in days. Defaults per report (28 analytics, 90 AI/cannibalisation, 180 search/domain, 365 competitors).'),
-        page: z.string().optional().describe('page_queries only: the page URL whose Search Console queries to list.'),
+        page: z.string().optional().describe('page_queries / query_pages: the page URL whose Search Console queries to list.'),
+        query: z.string().optional().describe('query_pages only: limit to one search query.'),
+        group_by: z.enum(['query', 'page']).optional().describe('query_pages only: one row per query (default when a page is given) or per page.'),
         metric: z.string().optional().describe('competitors only: which metric series to read, default organic_traffic.'),
       }),
     },

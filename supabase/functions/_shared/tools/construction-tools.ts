@@ -10,12 +10,55 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
+const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const MODULE_SLUG = 'projects';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
-import { moduleGate } from './module-gate.ts';
+import { moduleGate, roleGate, type WorkspaceRolePredicate } from './module-gate.ts';
 import { resolveProjectId as sbResolveProjectId } from '../assessment.ts';
+
+function userClient(jwt: string) {
+  return createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: { persistSession: false },
+  });
+}
+
+type ProjectView = 'pnl' | 'finance_summary' | 'cost_by_code' | 'labor' | 'inspections';
+
+const PROJECT_VIEW_GATES: Record<ProjectView, WorkspaceRolePredicate | null> = {
+  pnl: 'is_workspace_finance_viewer',
+  finance_summary: 'is_workspace_finance_viewer',
+  cost_by_code: 'is_workspace_finance_viewer',
+  labor: 'is_workspace_finance_viewer',
+  inspections: null,
+};
+
+function readView(db: ReturnType<typeof userClient>, view: ProjectView, projectId: string) {
+  switch (view) {
+    case 'pnl': return db.rpc('get_project_pnl', { p_project_id: projectId });
+    case 'finance_summary': return db.rpc('get_project_finance_summary', { p_project_id: projectId });
+    case 'cost_by_code': return db.rpc('get_project_cost_by_code', { p_project_id: projectId });
+    case 'labor': return db.rpc('get_project_labor', { p_project_id: projectId });
+    case 'inspections': return db.rpc('get_project_inspections', { p_project_id: projectId });
+  }
+}
+
+async function readProjectView(
+  jwt: string | undefined, workspaceId: string, projectId: string, view: ProjectView,
+): Promise<{ payload: Record<string, unknown> } | { refusal: string }> {
+  if (!jwt) return { refusal: JSON.stringify({ success: false, error: 'This report needs a signed-in user session.' }) };
+  const db = userClient(jwt);
+  const gate = PROJECT_VIEW_GATES[view];
+  if (gate) {
+    const denied = await roleGate(db, workspaceId, gate);
+    if (denied) return { refusal: denied };
+  }
+  const { data, error } = await readView(db, view, projectId);
+  if (error) return { refusal: JSON.stringify({ success: false, error: error.message }) };
+  return { payload: { success: true, project_id: projectId, view, url: `/projects/${projectId}?tab=finance`, data } };
+}
 
 /**
  * The shared workspace-scoped resolver (#395, invariant 1). Deliberately the same one
@@ -45,14 +88,24 @@ export const createProjectCvrTool = (
   userId: string,
   workspaceId: string | null,
   onChunk?: (chunk: any) => void,
+  jwt?: string,
 ) => {
   return tool(
-    async ({ project_id, project_name }: { project_id?: string; project_name?: string }) => {
+    async ({ project_id, project_name, view }: { project_id?: string; project_name?: string; view?: 'cvr' | ProjectView }) => {
       const denied = await moduleGate(workspaceId, MODULE_SLUG);
       if (denied) return denied;
 
       const id = await resolveProject(userId, workspaceId, project_id, project_name);
       if (!id) return notFound(project_name);
+
+      if (view && view !== 'cvr') {
+        const read = await readProjectView(jwt, workspaceId ?? '', id, view);
+        if ('refusal' in read) return read.refusal;
+        try {
+          onChunk?.({ type: 'project_report', ...read.payload, timestamp: Date.now() });
+        } catch { /* stream may be closed */ }
+        return JSON.stringify(read.payload);
+      }
 
       onChunk?.({ type: 'tool_progress', status: 'Reading the cost report…', timestamp: Date.now() });
 
@@ -115,10 +168,17 @@ export const createProjectCvrTool = (
         + 'variations, broken down by cost code with the margin on each. Use this to answer "how '
         + 'is this job doing", "are we making money on it", or "where is the margin going". Only '
         + 'APPROVED variations are counted — anything still being argued about is excluded, so do '
-        + 'not describe the result as the final account.',
+        + 'not describe the result as the final account. Other views of the same project, for ANY '
+        + 'kind of project: pnl (profit and loss — revenue, committed and actual cost, margin), '
+        + 'finance_summary (receivables, payables and cost against budget — "is this project over '
+        + 'budget"), cost_by_code (supplier, labour and expense cost per cost code), labor (hours and '
+        + 'labour cost per person), inspections (site inspections with pass/fail counts and open '
+        + 'failures). All derived by the platform — report the figures, never recompute them.',
       schema: z.object({
         project_id: z.string().optional().describe('The project id, when you already have it'),
         project_name: z.string().optional().describe('The project name, if you do not have the id'),
+        view: z.enum(['cvr', 'pnl', 'finance_summary', 'cost_by_code', 'labor', 'inspections']).optional()
+          .describe('Which report (default cvr — the construction cost value reconciliation).'),
       }),
     },
   );
@@ -394,11 +454,12 @@ export const createBidAnalysisTool = (
   userId: string,
   workspaceId: string | null,
   onChunk?: (chunk: any) => void,
+  jwt?: string,
 ) => {
   return tool(
     async (
-      { package_reference, package_name, project_id, project_name }:
-      { package_reference?: string; package_name?: string; project_id?: string; project_name?: string },
+      { package_reference, package_name, project_id, project_name, include_line_comparison }:
+      { package_reference?: string; package_name?: string; project_id?: string; project_name?: string; include_line_comparison?: boolean },
     ) => {
       const denied = await moduleGate(workspaceId, MODULE_SLUG);
       if (denied) return denied;
@@ -430,6 +491,14 @@ export const createBidAnalysisTool = (
             ? `No tender package on this project matches "${package_reference ?? package_name}".`
             : 'This project has no tender packages yet.',
         });
+      }
+
+      let lineDb: ReturnType<typeof userClient> | null = null;
+      if (include_line_comparison) {
+        if (!jwt) return JSON.stringify({ success: false, error: 'The line-by-line comparison needs a signed-in user session.' });
+        lineDb = userClient(jwt);
+        const gated = await roleGate(lineDb, workspaceId ?? '', 'is_workspace_sell_side');
+        if (gated) return gated;
       }
 
       const out: Array<Record<string, unknown>> = [];
@@ -475,6 +544,12 @@ export const createBidAnalysisTool = (
             priced_by: l.bidders_priced,
           })),
         });
+        if (lineDb) {
+          const { data: comparison, error: cmpErr } = await lineDb.rpc('get_package_bid_comparison', { p_package_id: pid });
+          out[out.length - 1].line_comparison = cmpErr
+            ? { error: cmpErr.message }
+            : ((comparison ?? []) as Array<Record<string, unknown>>).slice(0, 200);
+        }
       }
 
       const payload = {
@@ -507,12 +582,16 @@ export const createBidAnalysisTool = (
         + 'and which line prices are well under or well over the rest. Use for "which groundworks '
         + 'bid should we take", "is the cheapest bid actually the cheapest", "what should I ask '
         + 'them before we award". Reports a COMPARABLE total alongside the submitted one, because '
-        + 'the lowest submitted figure is regularly the one with a hole in it.',
+        + 'the lowest submitted figure is regularly the one with a hole in it. Set '
+        + 'include_line_comparison for the side-by-side grid: every package line with each bidder\'s '
+        + 'rate and amount and which is lowest.',
       schema: z.object({
         package_reference: z.string().optional()
           .describe('The package reference, e.g. PKG-003, when you know it'),
         package_name: z.string().optional()
           .describe('Part of the package name, e.g. "groundworks". Omit both to compare every package.'),
+        include_line_comparison: z.boolean().optional()
+          .describe('Add the line-by-line grid of every bidder\'s rate per package item.'),
         project_id: z.string().optional().describe('The project id, when you already have it'),
         project_name: z.string().optional().describe('The project name, if you do not have the id'),
       }),

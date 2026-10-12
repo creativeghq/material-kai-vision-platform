@@ -222,6 +222,69 @@ export const createManageRealEstateTool = (
           onChunk?.({ type: 'real_estate_investments', ...invPayload, timestamp: Date.now() });
           return JSON.stringify({ success: true, ...invPayload });
         }
+        case 'property_performance': {
+          const sb = dealsClient(jwt);
+          let pq = sb.from('properties').select('id, title').eq('workspace_id', workspaceId);
+          if (property_id) pq = pq.eq('id', property_id);
+          const { data: props, error: pErr } = await pq.order('created_at', { ascending: false }).limit(50);
+          if (pErr) return JSON.stringify({ success: false, error: pErr.message });
+          if (!props?.length) return JSON.stringify({ success: false, error: property_id ? 'listing not found' : 'No listings in this workspace yet.' });
+          const { data, error } = await sb.rpc('get_property_performance', { p_property_ids: props.map((p: any) => p.id) });
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          const titles = new Map(props.map((p: any) => [p.id, p.title]));
+          const performance = ((data ?? []) as any[]).map((r) => ({ property: titles.get(r.property_id) ?? null, ...r }));
+          onChunk?.({ type: 'real_estate_performance', performance, timestamp: Date.now() });
+          return JSON.stringify({ success: true, count: performance.length, performance });
+        }
+        case 'property_links': {
+          if (!property_id) return JSON.stringify({ success: false, error: 'property_id is required' });
+          const sb = dealsClient(jwt);
+          const { data: own } = await sb.from('properties').select('id, title').eq('id', property_id).eq('workspace_id', workspaceId).maybeSingle();
+          if (!own) return JSON.stringify({ success: false, error: 'listing not found' });
+          const [links, projects] = await Promise.all([
+            sb.rpc('get_property_commercial_links', { p_property_id: property_id }),
+            sb.rpc('get_property_projects', { p_property_id: property_id }),
+          ]);
+          if (links.error || projects.error) return JSON.stringify({ success: false, error: (links.error ?? projects.error)!.message });
+          const linkPayload = { property: own.title, commercial: links.data, projects: projects.data ?? [] };
+          onChunk?.({ type: 'real_estate_links', ...linkPayload, timestamp: Date.now() });
+          return JSON.stringify({ success: true, ...linkPayload });
+        }
+        case 'rent_settlements': {
+          const sb = dealsClient(jwt);
+          let tq = sb.from('property_tenancies').select('id, property_id').eq('workspace_id', workspaceId);
+          if (property_id) tq = tq.eq('property_id', property_id);
+          const { data: tenancies, error: tErr } = await tq.limit(200);
+          if (tErr) return JSON.stringify({ success: false, error: tErr.message });
+          if (!tenancies?.length) return JSON.stringify({ success: true, count: 0, charges: [], note: 'No tenancies here, so no rent has been charged.' });
+          const { data: charges, error: cErr } = await sb.from('property_rent_charges')
+            .select('id, tenancy_id, due_date')
+            .eq('workspace_id', workspaceId)
+            .in('tenancy_id', tenancies.map((t: any) => t.id))
+            .order('due_date', { ascending: false })
+            .limit(50);
+          if (cErr) return JSON.stringify({ success: false, error: cErr.message });
+          if (!charges?.length) return JSON.stringify({ success: true, count: 0, charges: [], note: 'No rent charges have been raised yet.' });
+          const { data, error } = await sb.rpc('get_rent_charge_settlements', { p_charge_ids: charges.map((c: any) => c.id) });
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          const due = new Map(charges.map((c: any) => [c.id, c]));
+          const settled = ((data ?? []) as any[]).map((r) => ({ due_date: due.get(r.charge_id)?.due_date ?? null, tenancy_id: due.get(r.charge_id)?.tenancy_id ?? null, ...r }));
+          onChunk?.({ type: 'real_estate_rent_settlements', charges: settled, timestamp: Date.now() });
+          return JSON.stringify({ success: true, count: settled.length, charges: settled });
+        }
+        case 'commission_splits': {
+          const sb = dealsClient(jwt);
+          let sq = sb.from('property_sales').select('id, property_id, completed_at').eq('workspace_id', workspaceId);
+          if (property_id) sq = sq.eq('property_id', property_id);
+          const { data: sales, error: sErr } = await sq.order('completed_at', { ascending: false, nullsFirst: false }).limit(25);
+          if (sErr) return JSON.stringify({ success: false, error: sErr.message });
+          if (!sales?.length) return JSON.stringify({ success: true, count: 0, splits: [], note: 'No completed sales yet.' });
+          const { data, error } = await sb.rpc('get_sale_commission_splits', { p_sale_ids: sales.map((x: any) => x.id) });
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          const splits = (data ?? []) as any[];
+          onChunk?.({ type: 'real_estate_commission_splits', splits, timestamp: Date.now() });
+          return JSON.stringify({ success: true, count: splits.length, splits });
+        }
         case 'buyer_portal_link': {
           const res = await callApi(jwt, workspaceId, 'list-buyer-requirements', crm_contact_id ? { crm_contact_id } : {});
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
@@ -247,6 +310,10 @@ export const createManageRealEstateTool = (
         '  • list_investments — investment portfolio roll-up + per-property yield/cash-flow (needs the Investments add-on).',
         '  • cma_report       — comparative market analysis: suggested price + comps stats (property_id, or property_type+town+area).',
         '  • buyer_portal_link— the shareable portal URL(s) for registered buyers (optional crm_contact_id).',
+        '  • property_performance — days on market, views, inquiries, viewings, offers and price changes per listing (optional property_id; else the 50 newest).',
+        '  • property_links   — what a listing is tied to commercially (orders, bills, what was sold, ordered and billed) and its projects (needs property_id).',
+        '  • rent_settlements — each rent charge with what was received, what is outstanding and its payment status (optional property_id).',
+        '  • commission_splits — how each sale\'s commission splits between agents and referrers, and what is paid (optional property_id).',
         'Writes:',
         '  • create_listing   — create a DRAFT listing (title + property_type + transaction_type; optional price, town). Returns the id to finish in the workbench.',
         '  • publish_listing  — take a listing live (needs property_id). Fails with the missing fields if compliance requirements aren’t met (GR: energy class + Electronic Building ID, short-let: ΑΜΑ).',
@@ -257,7 +324,7 @@ export const createManageRealEstateTool = (
         '  • manage_deal      — create a pipeline deal (property_id) or update one (deal_id): move stage, set deal_value/buyer_contact_id, or set status won/lost/open.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'list_deals', 'list_investments', 'cma_report', 'buyer_portal_link', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance', 'complete_sale', 'manage_deal']).describe('Which action to run.'),
+        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'list_deals', 'list_investments', 'cma_report', 'buyer_portal_link', 'property_performance', 'property_links', 'rent_settlements', 'commission_splits', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance', 'complete_sale', 'manage_deal']).describe('Which action to run.'),
         status: z.string().optional().describe('Filter by listing_status (properties) or inquiry status (leads).'),
         property_type: z.string().optional().describe('residential/commercial/land/other — filter, or category for create_listing.'),
         transaction_type: z.string().optional().describe('sale/rent/short_let/business_transfer — for create_listing.'),

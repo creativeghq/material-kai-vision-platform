@@ -102,6 +102,14 @@ export const createManageFlowsTool = (
         return JSON.stringify({ success: true, count: flows.length, flows });
       }
 
+      if (action === 'suggestions') {
+        const { data, error } = await db.rpc('get_flow_suggestions', { p_workspace_id: ws });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const suggestions = data ?? [];
+        onChunk?.({ type: 'flow_suggestions', suggestions, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: suggestions.length, suggestions });
+      }
+
       if (action === 'create') {
         // Missing the essentials → ask for them in chat (the visual builder is the other path).
         if (!name || !trigger_type || !Array.isArray(actions) || actions.length === 0) {
@@ -162,6 +170,9 @@ export const createManageFlowsTool = (
         '',
         'Actions:',
         '  list   → show this workspace\'s flows.',
+        '  suggestions → automations this workspace would benefit from, derived from the last 30 days of',
+        '           notifications (received vs opened), each with a ready prefill for create and, when it',
+        '           cannot be built, the reason. Offer them; never create one without the user saying so.',
         '  create → build a flow. Requires name + trigger_type + a non-empty actions array. If the',
         '           user is vague, ASK for the missing details in chat, then call create. (They can',
         '           also build it visually on the Automations page.)',
@@ -174,7 +185,7 @@ export const createManageFlowsTool = (
         '  "turn off flow X" → action=toggle, active=false',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list', 'create', 'toggle', 'remove']).default('list'),
+        action: z.enum(['list', 'suggestions', 'create', 'toggle', 'remove']).default('list'),
         name: z.string().optional().describe('Human name for the flow (create).'),
         trigger_type: z.enum(TENANT_TRIGGERS as unknown as [string, ...string[]]).optional()
           .describe('The event that starts the flow.'),

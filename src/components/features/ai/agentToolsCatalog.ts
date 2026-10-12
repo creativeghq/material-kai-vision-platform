@@ -1860,6 +1860,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['source_product', 'create_purchase_order', 'send_purchase_order'],
     quick_starts: [
       { label: 'Source a product', description: 'Find a supplier', prompt: 'Help me source a product from a supplier.', icon: 'Search' },
+      {
+        label: 'Sourcing board', description: 'Open demand and how it is supplied', icon: 'ListChecks',
+        prompt: 'Show me the sourcing board.',
+        done: 'Here is the sourcing board.',
+        run: { tool: 'source_product', fixedArgs: { action: 'board' } },
+      },
     ],
   },
   {

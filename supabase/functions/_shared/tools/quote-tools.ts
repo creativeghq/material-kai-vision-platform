@@ -545,32 +545,57 @@ export const createListMyQuotesTool = (
   userId: string,
   workspaceId: string,
   onChunk?: (chunk: any) => void,
+  jwt?: string,
 ) => {
   return tool(
     async (input: { limit?: number; status?: string }) => {
       const denied = await moduleGate(workspaceId, 'quotes');
       if (denied) return denied;
-      const sb = svcClient();
+      if (!jwt) return JSON.stringify({ success: false, error: 'Listing quotes needs a signed-in user session.' });
+      const sb = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+        auth: { persistSession: false },
+      });
       try {
         let q = sb
           .from('quotes')
-          .select('id, name, status, quote_number, currency, grand_total, total_items, created_at')
+          .select('id, name, status, quote_number, currency, total_items, created_at')
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .limit(Math.min(input.limit ?? 10, 50));
         if (input.status) q = q.eq('status', input.status);
         const { data, error } = await q;
         if (error) return JSON.stringify({ success: false, error: error.message });
-        const quotes = (data || []).map((r: any) => ({
-          quote_id: r.id,
-          name: r.name,
-          status: r.status,
-          quote_number: r.quote_number,
-          currency: r.currency || 'EUR',
-          grand_total: r.grand_total,
-          item_count: r.total_items,
-          created_at: r.created_at,
-        }));
+        const ids = (data || []).map((r: any) => r.id as string);
+        const [totals, billing] = ids.length
+          ? await Promise.all([
+            sb.rpc('get_quote_totals', { p_quote_ids: ids }),
+            sb.rpc('get_quote_billing_progress', { p_quote_ids: ids }),
+          ])
+          : [{ data: [], error: null }, { data: [], error: null }];
+        if (totals.error || billing.error) return JSON.stringify({ success: false, error: (totals.error ?? billing.error)!.message });
+        const totalsById = new Map(((totals.data ?? []) as any[]).map((t) => [t.quote_id, t]));
+        const billingById = new Map(((billing.data ?? []) as any[]).map((b) => [b.quote_id, b]));
+        const quotes = (data || []).map((r: any) => {
+          const t = totalsById.get(r.id);
+          const b = billingById.get(r.id);
+          return {
+            quote_id: r.id,
+            name: r.name,
+            status: r.status,
+            quote_number: r.quote_number,
+            currency: r.currency || 'EUR',
+            subtotal: t?.subtotal ?? null,
+            discount: t?.discount ?? null,
+            vat_amount: t?.vat_amount ?? null,
+            grand_total: t?.grand_total ?? null,
+            billed_pct: b?.billed_pct ?? null,
+            remaining_pct: b?.remaining_pct ?? null,
+            invoice_count: b?.invoice_count ?? 0,
+            item_count: r.total_items,
+            created_at: r.created_at,
+          };
+        });
         onChunk?.({ type: 'quotes_list', quotes });
         return JSON.stringify({ success: true, count: quotes.length, quotes });
       } catch (e) {
@@ -579,7 +604,7 @@ export const createListMyQuotesTool = (
     },
     {
       name: 'list_my_quotes',
-      description: "List the workspace's recent quotes with status and totals. Use to reference or pick an existing quote (returns quote ids usable by generate_quote_pdf).",
+      description: "List the workspace's recent quotes with status, their derived totals (subtotal, discount, VAT, grand total) and how much of each has been invoiced so far (billed_pct / remaining_pct). Use to reference or pick an existing quote (returns quote ids usable by generate_quote_pdf), or for \"how much of this quote have we billed\".",
       schema: z.object({
         limit: z.number().optional().describe('Max quotes to return (default 10, max 50).'),
         status: z.string().optional().describe("Optional status filter: draft / submitted / quoted / accepted / rejected / expired."),

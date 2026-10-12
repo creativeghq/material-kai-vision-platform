@@ -38,10 +38,38 @@ export const createSourceProductTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ product_id, quantity, deliver_to_address_unit_id }) => {
-      onChunk?.({ type: 'tool_progress', status: 'Resolving supply options…', timestamp: Date.now() });
+    async ({ action, product_id, quantity, deliver_to_address_unit_id, mine, query, factory }) => {
       try {
         const sb = userClient(jwt);
+        if (action === 'board') {
+          const { data, error } = await sb.rpc('get_sourcing_board', { p_workspace_id: workspaceId, p_mine: mine === true });
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          onChunk?.({ type: 'sourcing_board', board: data, timestamp: Date.now() });
+          return JSON.stringify({ success: true, board: data });
+        }
+        if (action === 'suppliers') {
+          if (product_id) {
+            const { data: own } = await sb.from('products').select('id').eq('id', product_id).eq('workspace_id', workspaceId).maybeSingle();
+            if (!own) return JSON.stringify({ success: false, error: 'product not found in this workspace' });
+          }
+          const { data, error } = product_id
+            ? await sb.rpc('list_supplier_products', { p_product_id: product_id })
+            : await sb.rpc('list_workspace_product_suppliers', { p_workspace_id: workspaceId });
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          onChunk?.({ type: 'sourcing_suppliers', product_id: product_id ?? null, suppliers: data ?? [], timestamp: Date.now() });
+          return JSON.stringify({ success: true, product_id: product_id ?? null, suppliers: data ?? [] });
+        }
+        if (action === 'granted_catalog') {
+          const { data, error } = await sb.rpc('list_granted_catalog_products', {
+            p_workspace_id: workspaceId, p_query: query ?? null, p_factory: factory ?? null, p_limit: 50,
+          });
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          const products = data ?? [];
+          onChunk?.({ type: 'sourcing_granted_catalog', products, timestamp: Date.now() });
+          return JSON.stringify({ success: true, count: products.length, products });
+        }
+        if (!product_id || !quantity) return JSON.stringify({ success: false, error: 'resolve needs product_id and quantity.' });
+        onChunk?.({ type: 'tool_progress', status: 'Resolving supply options…', timestamp: Date.now() });
         const { data, error } = await sb.rpc('resolve_sourcing_options', {
           p_workspace_id: workspaceId,
           p_product_id: product_id,
@@ -66,10 +94,17 @@ export const createSourceProductTool = (
     {
       name: 'source_product',
       description:
-        'Rank where stock for a product can come from (own warehouse by delivery proximity, uncommitted inbound purchase orders, and suppliers by cost/lead/MOQ). Returns the options + the operator sell price as a margin reference. Read-only, 0 credits.',
+        'Rank where stock for a product can come from (own warehouse by delivery proximity, uncommitted inbound purchase orders, and suppliers by cost/lead/MOQ). Returns the options + the operator sell price as a margin reference. Read-only, 0 credits. '
+        + 'Other actions: board — the sourcing board, every open demand line and how it is being supplied (reserved, on a PO, still to source); mine=true for the lines you own. '
+        + 'suppliers — with product_id, every supplier that offers that product with their SKU, cost, MOQ, lead time and which is preferred; without it, every supplier this workspace buys from and how many products each covers. '
+        + 'granted_catalog — the factory products this workspace has been granted to sell, optionally filtered by query or factory, and whether each is already listed.',
       schema: z.object({
-        product_id: z.string().describe('Product UUID to source.'),
-        quantity: z.number().positive().describe('Quantity required.'),
+        action: z.enum(['resolve', 'board', 'suppliers', 'granted_catalog']).optional().describe('What to read (default resolve — rank supply options for product_id + quantity).'),
+        product_id: z.string().optional().describe('Product UUID (resolve: required; suppliers: optional).'),
+        quantity: z.number().positive().optional().describe('resolve: quantity required.'),
+        mine: z.boolean().optional().describe('board: only the lines assigned to you.'),
+        query: z.string().optional().describe('granted_catalog: search text over name / SKU.'),
+        factory: z.string().optional().describe('granted_catalog: limit to one factory by name.'),
         deliver_to_address_unit_id: z.string().optional().describe('Optional crm_address_units id — ranks warehouses by proximity to this destination.'),
       }),
     },

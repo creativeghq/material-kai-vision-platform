@@ -53,3 +53,24 @@ export async function moduleGate(
     return refuse(`Could not verify access to the ${moduleSlug} module.`, moduleSlug);
   }
 }
+
+export type WorkspaceRolePredicate = 'is_workspace_finance_viewer' | 'is_workspace_sell_side';
+
+const REFUSAL: Record<WorkspaceRolePredicate, string> = {
+  is_workspace_finance_viewer: 'These figures are finance data — only the workspace owner, an admin or the accountant can read them.',
+  is_workspace_sell_side: 'Costs and margins are internal — a client or supplier account cannot read them.',
+};
+
+type RpcCapable = {
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+};
+
+export async function roleGate(
+  db: RpcCapable,
+  workspaceId: string,
+  predicate: WorkspaceRolePredicate,
+): Promise<string | null> {
+  const { data, error } = await db.rpc(predicate, { p_workspace_id: workspaceId });
+  if (error) return JSON.stringify({ success: false, error: `Could not check your role: ${error.message}` });
+  return data === true ? null : JSON.stringify({ success: false, error: REFUSAL[predicate] });
+}

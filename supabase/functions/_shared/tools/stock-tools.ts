@@ -120,7 +120,7 @@ export const createManageStockTool = (
   }
 
   return tool(
-    async ({ action, item_id, item_query, direction, quantity, reason, to_warehouse_id, warehouse_query, pending_id }: any) => {
+    async ({ action, item_id, item_query, direction, quantity, reason, to_warehouse_id, warehouse_query, pending_id, project_id, project_name }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -130,6 +130,27 @@ export const createManageStockTool = (
         if (!res.ok) return JSON.stringify({ success: false, error: res.error });
         onChunk?.({ type: 'stock_overview', overview: res.data?.overview ?? {}, timestamp: Date.now() });
         return JSON.stringify({ success: true, overview: res.data?.overview ?? {} });
+      }
+
+      if (action === 'project_holds') {
+        const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: `Bearer ${jwt}` } },
+          auth: { persistSession: false },
+        });
+        let pq = db.from('projects').select('id, name').eq('workspace_id', ws);
+        if (project_id) pq = pq.eq('id', String(project_id));
+        else if (project_name) pq = pq.ilike('name', `%${String(project_name).trim()}%`);
+        else return JSON.stringify({ success: false, error: 'project_holds needs project_id or project_name.' });
+        const { data: projects, error: pErr } = await pq.limit(5);
+        if (pErr) return JSON.stringify({ success: false, error: pErr.message });
+        if (!projects?.length) return JSON.stringify({ success: false, error: 'No matching project in this workspace.' });
+        if (projects.length > 1) return JSON.stringify({ success: false, error: 'Several projects match — ask which one.', candidates: projects });
+        const project = projects[0];
+        const { data, error } = await db.rpc('get_project_stock_holds', { p_project_id: project.id });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const holds = data ?? [];
+        onChunk?.({ type: 'stock_project_holds', project, holds, timestamp: Date.now() });
+        return JSON.stringify({ success: true, project, count: holds.length, holds });
       }
 
       if (action === 'list_low_stock') {
@@ -284,6 +305,8 @@ export const createManageStockTool = (
         '  overview        → warehouse count, items, units on hand/reserved, low-stock, out-of-stock, pending intake.',
         '  check_stock     → find items by name/SKU (item_query) with on-hand / reserved / available quantities.',
         '  list_low_stock  → items at or below their reorder point (need restocking).',
+        '  project_holds   → stock held for ONE project: reservations and inbound allocations against its sales',
+        '                    orders, per product, with status and expected date. Give project_id OR project_name.',
         '  list_movements  → the most recent stock movements (receive/issue/adjust) across the warehouse.',
         '  adjust_stock    → change on-hand for ONE item. Give item_id OR item_query, direction, quantity.',
         '                    direction: in = receive/add, out = issue/remove, adjust = set the exact on-hand.',
@@ -313,7 +336,7 @@ export const createManageStockTool = (
         'If a query matches multiple items/warehouses, ask the user which one before writing.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'list_movements', 'adjust_stock', 'reorder', 'forecast', 'forecast_preview', 'transfer', 'list_pending', 'approve_pending', 'dismiss_pending']),
+        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'project_holds', 'list_movements', 'adjust_stock', 'reorder', 'forecast', 'forecast_preview', 'transfer', 'list_pending', 'approve_pending', 'dismiss_pending']),
         item_id: z.string().uuid().optional().describe('Target stock item id (adjust_stock, transfer).'),
         item_query: z.string().optional().describe('Fuzzy name or SKU to search/resolve (check_stock, adjust_stock, transfer).'),
         direction: z.enum(DIRECTIONS as unknown as [string, ...string[]]).optional().describe('in=receive, out=issue, adjust=set exact on-hand (adjust_stock).'),
@@ -322,6 +345,8 @@ export const createManageStockTool = (
         to_warehouse_id: z.string().uuid().optional().describe('Destination warehouse id (transfer).'),
         warehouse_query: z.string().optional().describe('Fuzzy destination warehouse name/code to resolve (transfer).'),
         pending_id: z.string().uuid().optional().describe('Pending intake item id (approve_pending / dismiss_pending).'),
+        project_id: z.string().uuid().optional().describe('project_holds: the project id.'),
+        project_name: z.string().optional().describe('project_holds: project name fragment to resolve when you have no id.'),
       }),
     },
   );

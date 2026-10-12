@@ -26,6 +26,13 @@ const UNPAID_STATUSES = ['issued', 'partially_paid', 'overdue', 'sent'];
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { attachPartyNames } from './record-labels.ts';
+import { roleGate } from './module-gate.ts';
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const monthStartMonthsAgo = (n: number) => {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - n, 1)).toISOString().slice(0, 10);
+};
 /** User-scoped client so RLS + membership-asserting RPCs behave exactly as on the page. */
 function userClient(jwt: string | undefined) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -67,7 +74,7 @@ export const createManageFinanceTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, customer_company_id, customer_name, unpaid_only, limit = 20, invoice_id, direction, confirm }) => {
+    async ({ action, customer_company_id, customer_name, unpaid_only, limit = 20, invoice_id, direction, confirm, order_id, order_type, search, from_date, to_date }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const sb = userClient(jwt);
@@ -143,19 +150,30 @@ export const createManageFinanceTool = (
           company = await resolveCompany(sb, workspaceId, customer_company_id, customer_name);
           if (!company) return JSON.stringify({ success: false, error: 'customer not found in this workspace' });
         }
-        let q = sb.from('orders').select('id, order_number, order_type, status, payment_status, total, currency, created_at, customer_company_id, supplier_company_id, project_id')
-          .eq('workspace_id', workspaceId)
-          .order('created_at', { ascending: false })
-          .limit(Math.min(limit, 50));
-        if (company) q = q.eq('customer_company_id', company.id);
-        const { data, error } = await q;
+        const { data, error } = await sb.rpc('search_orders', {
+          p_workspace_id: workspaceId, p_order_type: order_type ?? null, p_status: null,
+          p_company_id: company?.id ?? null, p_contact_id: null, p_project_id: null, p_search: search ?? null,
+          p_limit: Math.min(limit, 50), p_offset: 0, p_created_from: from_date ?? null, p_created_to: to_date ?? null,
+          p_total_min: null, p_total_max: null, p_currency: null, p_payment_status: null,
+        });
         if (error) return JSON.stringify({ success: false, error: error.message });
-        // A purchase order's counterparty is the SUPPLIER, so both sides get a name — picking one
-        // would leave half the list with a blank party column.
-        const orders = await attachPartyNames(sb, data ?? [], [
-          { idField: 'customer_company_id', nameField: 'customer_name' },
-          { idField: 'supplier_company_id', nameField: 'supplier_name' },
-        ]);
+        const found = ((data ?? []) as Array<{ order_row: Record<string, any>; party_name: string | null }>);
+        const ids = found.map((r) => r.order_row.id as string);
+        const { data: settlements, error: sErr } = ids.length
+          ? await sb.rpc('get_order_settlements', { p_order_ids: ids })
+          : { data: [], error: null };
+        if (sErr) return JSON.stringify({ success: false, error: sErr.message });
+        const byOrder = new Map(((settlements ?? []) as Array<Record<string, any>>).map((s) => [s.order_id, s]));
+        const orders = found.map(({ order_row: o, party_name }) => {
+          const s = byOrder.get(o.id);
+          return {
+            id: o.id, order_number: o.order_number, order_type: o.order_type, status: o.status,
+            total: o.total, currency: o.currency, created_at: o.created_at, project_id: o.project_id,
+            customer_company_id: o.customer_company_id, supplier_company_id: o.supplier_company_id,
+            party_name,
+            settled: s?.settled ?? null, outstanding: s?.outstanding ?? null, payment_status: s?.payment_status ?? null,
+          };
+        });
         onChunk?.({ type: 'finance_orders_list', workspace_id: workspaceId, customer: company, orders, timestamp: Date.now() });
         return JSON.stringify({ success: true, count: orders.length, orders: orders.slice(0, 15) });
       }
@@ -170,10 +188,21 @@ export const createManageFinanceTool = (
         if (error) return JSON.stringify({ success: false, error: error.message });
         // "Who was this paid to" is the whole point of a payment row, and the select answered it
         // for nobody: a list of amounts and dates with no counterparty at all.
-        const payments = await attachPartyNames(sb, data ?? [], [
+        const named = await attachPartyNames(sb, data ?? [], [
           { idField: 'counterparty_company_id', nameField: 'counterparty_name' },
           { idField: 'counterparty_contact_id', nameField: 'counterparty_name', table: 'crm_contacts' },
         ]);
+        const paymentIds = named.map((p: Record<string, any>) => p.id as string);
+        const { data: remainders, error: rErr } = paymentIds.length
+          ? await sb.rpc('get_payment_remainders', { p_payment_ids: paymentIds })
+          : { data: [], error: null };
+        if (rErr) return JSON.stringify({ success: false, error: rErr.message });
+        const byPayment = new Map(((remainders ?? []) as Array<Record<string, any>>).map((r) => [r.payment_id, r]));
+        const payments = named.map((p: Record<string, any>) => ({
+          ...p,
+          allocated: byPayment.get(p.id)?.allocated ?? null,
+          unallocated: byPayment.get(p.id)?.unallocated ?? null,
+        }));
         onChunk?.({ type: 'finance_payments_list', workspace_id: workspaceId, direction: direction || 'all', payments, timestamp: Date.now() });
         return JSON.stringify({ success: true, count: payments.length, payments: payments.slice(0, 15) });
       }
@@ -212,25 +241,132 @@ export const createManageFinanceTool = (
         });
       }
 
+      if (action === 'monthly_pnl') {
+        const denied = await roleGate(sb, workspaceId, 'is_workspace_sell_side');
+        if (denied) return denied;
+        const { data, error } = await sb.rpc('get_monthly_pnl', {
+          p_workspace_id: workspaceId, p_from: from_date ?? monthStartMonthsAgo(11),
+        });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const months = (data ?? []) as Array<Record<string, unknown>>;
+        onChunk?.({ type: 'finance_monthly_pnl', months, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: months.length, months });
+      }
+
+      if (action === 'profit_drawdown') {
+        const denied = await roleGate(sb, workspaceId, 'is_workspace_finance_viewer');
+        if (denied) return denied;
+        const { data, error } = await sb.rpc('get_profit_drawdown', {
+          p_workspace_id: workspaceId, p_from: from_date ?? monthStartMonthsAgo(11), p_to: to_date ?? todayIso(),
+        });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'finance_profit_drawdown', drawdown: data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, drawdown: data });
+      }
+
+      if (action === 'order_profit') {
+        if (!order_id) return JSON.stringify({ success: false, error: 'order_profit needs an order_id (from list_orders).' });
+        const denied = await roleGate(sb, workspaceId, 'is_workspace_sell_side');
+        if (denied) return denied;
+        const { data: own } = await sb.from('orders').select('id').eq('id', order_id).eq('workspace_id', workspaceId).maybeSingle();
+        if (!own) return JSON.stringify({ success: false, error: 'order not found in this workspace' });
+        const [pos, lines] = await Promise.all([
+          sb.rpc('get_order_profit_positions', { p_order_ids: [order_id] }),
+          sb.rpc('get_order_item_costs', { p_order_ids: [order_id] }),
+        ]);
+        if (pos.error || lines.error) return JSON.stringify({ success: false, error: (pos.error ?? lines.error)!.message });
+        const position = ((pos.data ?? []) as Array<Record<string, unknown>>)[0] ?? null;
+        if (!position) return JSON.stringify({ success: false, error: 'order_profit covers sales orders only — this is a purchase order.' });
+        onChunk?.({ type: 'finance_order_profit', order_id, position, line_costs: lines.data ?? [], timestamp: Date.now() });
+        return JSON.stringify({ success: true, order_id, position, line_costs: lines.data ?? [] });
+      }
+
+      if (action === 'invoice_profit') {
+        if (!invoice_id) return JSON.stringify({ success: false, error: 'invoice_profit needs an invoice_id (from list_invoices).' });
+        const denied = await roleGate(sb, workspaceId, 'is_workspace_sell_side');
+        if (denied) return denied;
+        const { data, error } = await sb.rpc('get_invoice_item_costs', { p_invoice_ids: [invoice_id] });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const lines = (data ?? []) as Array<Record<string, unknown>>;
+        onChunk?.({ type: 'finance_invoice_profit', invoice_id, lines, timestamp: Date.now() });
+        return JSON.stringify({ success: true, invoice_id, count: lines.length, lines });
+      }
+
+      if (action === 'order_customs') {
+        if (!order_id) return JSON.stringify({ success: false, error: 'order_customs needs an order_id (from list_orders).' });
+        const { data, error } = await sb.rpc('get_order_customs_preview', { p_order_id: order_id });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'finance_order_customs', order_id, preview: data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, order_id, preview: data });
+      }
+
+      if (action === 'buyer_limits' || action === 'party_profit') {
+        const company = await resolveCompany(sb, workspaceId, customer_company_id, customer_name);
+        if (!company) return JSON.stringify({ success: false, error: 'Provide a customer_company_id or customer_name that exists in this workspace.' });
+        if (action === 'buyer_limits') {
+          const denied = await roleGate(sb, workspaceId, 'is_workspace_sell_side');
+          if (denied) return denied;
+          const { data, error } = await sb.rpc('get_buyer_finance_limits', {
+            p_workspace_id: workspaceId, p_company_id: company.id, p_contact_id: null,
+          });
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          onChunk?.({ type: 'finance_buyer_limits', customer: company, limits: data, timestamp: Date.now() });
+          return JSON.stringify({ success: true, customer: company, limits: data });
+        }
+        const denied = await roleGate(sb, workspaceId, 'is_workspace_finance_viewer');
+        if (denied) return denied;
+        const { data, error } = await sb.rpc('get_party_profit_position', {
+          p_workspace_id: workspaceId, p_company_id: company.id, p_contact_id: null,
+        });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'finance_party_profit', customer: company, position: data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, customer: company, position: data });
+      }
+
+      if (action === 'supplier_inbound_orders') {
+        const { data, error } = await sb.rpc('get_supplier_inbound_orders', { p_workspace_id: workspaceId });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'finance_supplier_inbound_orders', result: data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, result: data });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
       name: 'manage_finance',
       description:
-        'Finance documents: list_invoices (recent / per-customer / unpaid), list_orders (sales orders), ' +
-        'list_payments (money in/out), customer_balance ("what does X owe?"), worklist ("what needs doing" — '
-        + 'every sales order waiting on something, with the blocking state and the next action), and issue_invoice (issue a ' +
+        'Finance documents: list_invoices (recent / per-customer / unpaid), list_orders (orders, filterable by '
+        + 'customer, order_type, search text and created date, each with settled / outstanding / payment status '
+        + 'already derived), list_payments (money in/out, each with how much is still unallocated), '
+        + 'customer_balance ("what does X owe?"), worklist ("what needs doing" — '
+        + 'every sales order waiting on something, with the blocking state and the next action), '
+        + 'monthly_pnl ("how did we do this month" — revenue, cost of goods and gross margin per month from from_date), '
+        + 'profit_drawdown (profit claimed vs drawn over from_date..to_date), order_profit (revenue, cost and margin '
+        + 'of one sales order plus its line costs — order_id), invoice_profit (cost and margin per line of one '
+        + 'invoice — invoice_id), order_customs (TARIC sub-headings and the low-value customs duty estimate for '
+        + 'one order — order_id), buyer_limits (a customer\'s credit limit, exposure and minimum order — check it '
+        + 'BEFORE drafting a quote or order for them), party_profit (margin earned on one customer), '
+        + 'supplier_inbound_orders (for a claimed supplier workspace: what buyers on the platform ordered from us), and issue_invoice (issue a ' +
         'DRAFT invoice + transmit to ΑΑΔΕ/myDATA). issue_invoice is a legal fiscal action — it ALWAYS asks ' +
         'the user to Approve/Decline first (never pass confirm:true yourself; the UI sets it when the user ' +
-        'approves). Reads are 0 credits.',
+        'approves). Every figure is derived by the platform — report it, never recompute it. Reads are 0 credits.',
       schema: z.object({
-        action: z.enum(['list_invoices', 'list_orders', 'list_payments', 'customer_balance', 'worklist', 'issue_invoice']).default('list_invoices'),
+        action: z.enum([
+          'list_invoices', 'list_orders', 'list_payments', 'customer_balance', 'worklist', 'issue_invoice',
+          'monthly_pnl', 'profit_drawdown', 'order_profit', 'invoice_profit', 'order_customs',
+          'buyer_limits', 'party_profit', 'supplier_inbound_orders',
+        ]).default('list_invoices'),
         customer_company_id: z.string().optional().describe('CRM company UUID (preferred).'),
         customer_name: z.string().optional().describe('Customer company name to fuzzy-match if you don\'t have the id.'),
         unpaid_only: z.boolean().optional().describe('list_invoices: only invoices still owed (issued/partially paid/overdue).'),
         direction: z.enum(['in', 'out']).optional().describe('list_payments: filter money received (in) vs paid out (out).'),
         limit: z.number().int().min(1).max(50).default(20),
-        invoice_id: z.string().optional().describe('issue_invoice: the DRAFT invoice UUID to issue.'),
+        invoice_id: z.string().optional().describe('issue_invoice: the DRAFT invoice UUID to issue. invoice_profit: the invoice UUID.'),
+        order_id: z.string().optional().describe('order_profit / order_customs: the order UUID (from list_orders).'),
+        order_type: z.string().optional().describe('list_orders: "sales" or "purchase". Omit for both.'),
+        search: z.string().optional().describe('list_orders: free-text search over order number and party name.'),
+        from_date: z.string().optional().describe('YYYY-MM-DD start for list_orders, monthly_pnl, profit_drawdown (default: 11 months back, first of the month).'),
+        to_date: z.string().optional().describe('YYYY-MM-DD end for list_orders, profit_drawdown (default today).'),
         confirm: z.boolean().optional().describe('Do NOT set this — the Approve/Decline card sets confirm:true when the user approves.'),
       }),
     },

@@ -2833,7 +2833,7 @@ async function executeAgent(
     tools.push(createGenerateQuotePdfTool(userId, workspaceId, userJwt, onChunk));
   }
   if (config.tools.includes('list_my_quotes') && createListMyQuotesTool) {
-    tools.push(createListMyQuotesTool(userId, workspaceId, onChunk));
+    tools.push(createListMyQuotesTool(userId, workspaceId, onChunk, userJwt));
   }
   // The unpriced half of the same module (#341). Bound wherever create_quote is, because the
   // decision between them is made mid-conversation off a `price_my_spec` verdict — an agent that
@@ -2866,7 +2866,7 @@ async function executeAgent(
     tools.push(createListMyProjectsTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('project_cvr') && createProjectCvrTool) {
-    tools.push(createProjectCvrTool(userId, workspaceId, onChunk));
+    tools.push(createProjectCvrTool(userId, workspaceId, onChunk, userJwt));
   }
   if (config.tools.includes('project_applications') && createProjectApplicationsTool) {
     tools.push(createProjectApplicationsTool(userId, workspaceId, onChunk));
@@ -2878,7 +2878,7 @@ async function executeAgent(
     tools.push(createTenderStatusTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('tender_bid_analysis') && createBidAnalysisTool) {
-    tools.push(createBidAnalysisTool(userId, workspaceId, onChunk));
+    tools.push(createBidAnalysisTool(userId, workspaceId, onChunk, userJwt));
   }
   if (config.tools.includes('find_project') && createFindProjectTool) {
     tools.push(createFindProjectTool(userId, workspaceId, onChunk));
@@ -2928,15 +2928,15 @@ async function executeAgent(
   if (config.tools.some((t: string) => ['product_provenance', 'product_price_history', 'projects_using_product', 'products_in_project', 'customer_overview', 'supplier_overview'].includes(t))) {
     try {
       const graphMod = await import('../_shared/tools/graph-tools.ts');
-      if (config.tools.includes('product_provenance')) tools.push(graphMod.createProductProvenanceTool(workspaceId, onChunk));
+      if (config.tools.includes('product_provenance')) tools.push(graphMod.createProductProvenanceTool(workspaceId, onChunk, userJwt));
       if (config.tools.includes('product_price_history')) tools.push(graphMod.createProductPriceHistoryTool(workspaceId, onChunk));
       if (config.tools.includes('projects_using_product')) tools.push(graphMod.createProjectsUsingProductTool(workspaceId, onChunk));
       if (config.tools.includes('products_in_project')) tools.push(graphMod.createProductsInProjectTool(workspaceId, onChunk));
-      if (config.tools.includes('customer_overview')) tools.push(graphMod.createCustomerOverviewTool(workspaceId, onChunk));
-      if (isAdmin && config.tools.includes('supplier_overview')) tools.push(graphMod.createSupplierOverviewTool(workspaceId, onChunk));
+      if (config.tools.includes('customer_overview')) tools.push(graphMod.createCustomerOverviewTool(workspaceId, onChunk, userJwt));
+      if (isAdmin && config.tools.includes('supplier_overview')) tools.push(graphMod.createSupplierOverviewTool(workspaceId, onChunk, userJwt));
       if (config.tools.includes('products_by_brand')) tools.push(graphMod.createProductsByBrandTool(workspaceId, onChunk));
       if (config.tools.includes('brand_overview')) tools.push(graphMod.createBrandOverviewTool(workspaceId, onChunk));
-      if (config.tools.includes('related_products')) tools.push(graphMod.createRelatedProductsTool(workspaceId, onChunk));
+      if (config.tools.includes('related_products')) tools.push(graphMod.createRelatedProductsTool(workspaceId, onChunk, userJwt));
       if (config.tools.includes('find_products_by_spec')) tools.push(graphMod.createFindProductsBySpecTool(workspaceId, onChunk));
       if (config.tools.includes('price_my_spec')) tools.push(graphMod.createPriceMySpecTool(workspaceId, onChunk));
     } catch (graphErr) {
@@ -2999,7 +2999,7 @@ async function executeAgent(
   if (config.tools.includes('manage_company_assets')) {
     try {
       const assetMod = await import('../_shared/tools/company-assets-tools.ts');
-      tools.push(assetMod.createManageCompanyAssetsTool(userId, workspaceId, onChunk));
+      tools.push(assetMod.createManageCompanyAssetsTool(userId, workspaceId, onChunk, userJwt));
     } catch (assetErr) {
       console.warn('⚠️ Could not register company-assets tool:', assetErr);
     }

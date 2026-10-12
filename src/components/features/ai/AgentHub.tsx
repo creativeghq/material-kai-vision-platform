@@ -357,6 +357,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   construction_variations: 'Variations',
   construction_tenders: 'Tender packages',
   construction_bid_analysis: 'Bid analysis',
+  project_report: 'Project report',
   // Deterministic surface preview (#447): the card draws it in the browser from this chunk.
   visualizer_render: 'Surface preview',
   // Cross-entity record lookup. The "Find a record" quick-start is a DIRECT run (no model turn),
@@ -371,6 +372,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   crm_deals_list: 'Deal pipeline',
   crm_deal_forecast: 'Weighted forecast',
   crm_deal_saved: 'Deal updated',
+  crm_deal_documents: 'Deal documents',
+  crm_deal_pipeline_stats: 'Pipeline analytics',
   // Counterparty bank accounts. The "Bank accounts" quick-start is a DIRECT run, so this card is
   // the only thing that puts them on screen; the saved card is how the operator sees what the
   // approval they just gave actually wrote.
@@ -451,6 +454,10 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   real_estate_cma: 'CMA valuation',
   real_estate_investments: 'Investment portfolio',
   real_estate_portals: 'Buyer portals',
+  real_estate_performance: 'Listing performance',
+  real_estate_links: 'Listing links',
+  real_estate_rent_settlements: 'Rent received',
+  real_estate_commission_splits: 'Commission splits',
   // Appointments
   appointments_list: 'Upcoming appointments',
   appointment_scheduled: 'Appointment scheduled',
@@ -460,6 +467,14 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   finance_payments_list: 'Payments',
   customer_balance_result: 'Customer balance',
   finance_invoice_issued: 'Invoice issued',
+  finance_monthly_pnl: 'Monthly P&L',
+  finance_profit_drawdown: 'Profit drawdown',
+  finance_order_profit: 'Order margin',
+  finance_invoice_profit: 'Invoice margin',
+  finance_order_customs: 'Customs preview',
+  finance_buyer_limits: 'Credit limit',
+  finance_party_profit: 'Customer margin',
+  finance_supplier_inbound_orders: 'Orders from buyers',
   // Finance expenses
   // The myDATA/ΑΑΔΕ expenses FEED — a different and much larger set than `expenses_list`, which
   // is only what we have booked. Both quick-starts are `run:` (no model turn), so an unregistered
@@ -513,6 +528,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // logged to console.debug and the user got a bare "Done!" with the data thrown away.
   job_sites_list: 'Job boards searched',
   flows_list: 'Workspace flows',
+  flow_suggestions: 'Suggested automations',
   tech_radar_list: 'Tech radar',
   // Also a `run:` ("Track an entry" pins action:'create'), so also unnarrated. Its `done` copy
   // at least says an entry was added — but the title, cadence and derived schedule it came back
@@ -530,6 +546,10 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   stock_transferred: 'Stock transferred',
   stock_pending: 'Pending intake',
   stock_pending_resolved: 'Intake resolved',
+  stock_project_holds: 'Stock held for project',
+  sourcing_board: 'Sourcing board',
+  sourcing_suppliers: 'Product suppliers',
+  sourcing_granted_catalog: 'Products you may sell',
   // HR management
   hr_employees: 'Employees',
   hr_overview: 'HR overview',

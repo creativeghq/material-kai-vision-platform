@@ -19,6 +19,20 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+
+async function readPartyWork(jwt: string | undefined, companyId: string): Promise<unknown> {
+  if (!jwt) return null;
+  const { data, error } = await userClient(jwt).rpc('get_party_work', { p_party_kind: 'company', p_party_id: companyId });
+  return error ? { error: error.message } : (data ?? []);
+}
+
+function userClient(jwt: string) {
+  return createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: { persistSession: false },
+  });
+}
+
 // ── id resolvers (workspace-scoped) ─────────────────────────────────────────
 
 async function resolveProductId(sb: any, workspaceId: string, productId?: string, sku?: string): Promise<string | null> {
@@ -69,6 +83,7 @@ async function resolveCompanyId(sb: any, workspaceId: string, companyId?: string
 export const createProductProvenanceTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
+  jwt?: string,
 ) => {
   return tool(
     async ({ product_id, sku }: { product_id?: string; sku?: string }) => {
@@ -79,8 +94,20 @@ export const createProductProvenanceTool = (
       const { data, error } = await sb.rpc('get_product_provenance', { p_workspace_id: workspaceId, p_product_id: pid });
       if (error) return JSON.stringify({ success: false, error: error.message });
 
-      onChunk?.({ type: 'product_provenance_result', workspace_id: workspaceId, product_id: pid, provenance: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, provenance: data });
+      let product: Record<string, any> | null = null;
+      let costs: Record<string, any> | null = null;
+      if (jwt) {
+        const db = userClient(jwt);
+        const { data: detail } = await db.rpc('get_product_detail', { p_product_id: pid });
+        product = detail && detail.workspace_id === workspaceId ? detail : null;
+        if (product?.viewer_can_see_internal === true) {
+          const { data: costRows } = await db.rpc('get_product_costs', { p_product_ids: [pid] });
+          costs = ((costRows ?? []) as Array<Record<string, any>>)[0] ?? null;
+        }
+      }
+
+      onChunk?.({ type: 'product_provenance_result', workspace_id: workspaceId, product_id: pid, provenance: data, product, costs, timestamp: Date.now() });
+      return JSON.stringify({ success: true, provenance: data, product, costs });
     },
     {
       name: 'product_provenance',
@@ -88,7 +115,8 @@ export const createProductProvenanceTool = (
         'Full provenance of a product: which supplier(s) it was bought from, which projects use it, ' +
         'how many quotes/invoices reference it, the source document, and the latest tracked retail price. ' +
         'Use for "where did we buy product X", "is product X used anywhere", "show product X across the business". ' +
-        'Pass product_id (e.g. from material_search) or a sku.',
+        'Also returns the product record as THIS user may see it (internal fields only for admins / sales managers) and, ' +
+        'for those same people only, its cost, cost source and markup. Pass product_id (e.g. from material_search) or a sku.',
       schema: z.object({
         product_id: z.string().optional().describe('Product UUID (preferred — from a material_search result)'),
         sku: z.string().optional().describe('SKU / external SKU to resolve to a product when no id is known'),
@@ -200,6 +228,7 @@ export const createProductsInProjectTool = (
 export const createCustomerOverviewTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
+  jwt?: string,
 ) => {
   return tool(
     async ({ company_id, company_name }: { company_id?: string; company_name?: string }) => {
@@ -209,15 +238,17 @@ export const createCustomerOverviewTool = (
 
       const { data, error } = await sb.rpc('customer_360', { p_workspace_id: workspaceId, p_company_id: cid });
       if (error) return JSON.stringify({ success: false, error: error.message });
+      const work = await readPartyWork(jwt, cid);
 
-      onChunk?.({ type: 'customer_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, overview: data });
+      onChunk?.({ type: 'customer_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, work, timestamp: Date.now() });
+      return JSON.stringify({ success: true, overview: data, work });
     },
     {
       name: 'customer_overview',
       description:
         'A 360° view of a customer company: quote count + total value + open count, invoice count + outstanding ' +
         'AR with aging buckets (current / 1-30 / 31-60 / 61-90 / 90+), and their projects. ' +
+        'Plus `work`: the dated log of every project, quote, order, invoice, payment, contract, deal and message with them, with amounts and status. ' +
         'Use for "give me everything on customer X", "how much does X owe us", "X\'s account summary". ' +
         'Pass company_id or company_name.',
       schema: z.object({
@@ -233,6 +264,7 @@ export const createCustomerOverviewTool = (
 export const createSupplierOverviewTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
+  jwt?: string,
 ) => {
   return tool(
     async ({ company_id, company_name }: { company_id?: string; company_name?: string }) => {
@@ -242,15 +274,17 @@ export const createSupplierOverviewTool = (
 
       const { data, error } = await sb.rpc('supplier_360', { p_workspace_id: workspaceId, p_company_id: cid });
       if (error) return JSON.stringify({ success: false, error: error.message });
+      const work = await readPartyWork(jwt, cid);
 
-      onChunk?.({ type: 'supplier_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, overview: data });
+      onChunk?.({ type: 'supplier_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, work, timestamp: Date.now() });
+      return JSON.stringify({ success: true, overview: data, work });
     },
     {
       name: 'supplier_overview',
       description:
         'A 360° view of a supplier company: bill count + outstanding AP with aging buckets, purchase-order ' +
-        'count + open count, and the products we source from them. Finance data — admin/owner only. ' +
+        'count + open count, and the products we source from them, plus `work`: the dated log of every document '
+        + 'and project with them. Finance data — admin/owner only. ' +
         'Use for "what do we owe supplier X", "what do we buy from X". Pass company_id or company_name.',
       schema: z.object({
         company_id: z.string().optional().describe('CRM company UUID'),
@@ -323,6 +357,7 @@ export const createBrandOverviewTool = (
 export const createRelatedProductsTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
+  jwt?: string,
 ) => {
   return tool(
     async ({ product_id, sku, limit }: { product_id?: string; sku?: string; limit?: number }) => {
@@ -331,8 +366,15 @@ export const createRelatedProductsTool = (
       if (!pid) return JSON.stringify({ success: false, error: 'Need product_id or a resolvable sku.' });
       const { data, error } = await sb.rpc('get_cooccurring_products', { p_workspace_id: workspaceId, p_product_id: pid, p_limit: limit ?? 20 });
       if (error) return JSON.stringify({ success: false, error: error.message });
-      onChunk?.({ type: 'related_products_result', workspace_id: workspaceId, product_id: pid, related: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, related: data });
+      let linked: unknown = null;
+      if (jwt) {
+        const { data: edges, error: edgeErr } = await userClient(jwt).rpc('get_related_products', {
+          p_workspace_id: workspaceId, p_product_id: pid, p_types: null, p_limit: limit ?? 20,
+        });
+        linked = edgeErr ? { error: edgeErr.message } : edges;
+      }
+      onChunk?.({ type: 'related_products_result', workspace_id: workspaceId, product_id: pid, related: data, linked, timestamp: Date.now() });
+      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, related: data, linked });
     },
     {
       name: 'related_products',
@@ -340,6 +382,7 @@ export const createRelatedProductsTool = (
         'Products frequently used TOGETHER with a given product — co-occurrence across the same projects, quotes, ' +
         'and moodboards (a relational "used together" signal, distinct from visual/embedding similarity). ' +
         'Each result carries the breakdown (via_projects / via_quotes / via_moodboards) + a combined score. ' +
+        '`linked` adds the catalogue\'s product graph (same material family, matching pattern, same collection, complementary, alternative) with a weight and the reason. ' +
         'Use for "what goes with product X", "what do people buy alongside X". Pass product_id or sku.',
       schema: z.object({
         product_id: z.string().optional().describe('Product UUID'),

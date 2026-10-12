@@ -379,7 +379,7 @@ export const createManageDealTool = (
   });
 
   return tool(
-    async ({ action, deal_type, deal_id, title, contact_query, value, stage, lost_reason }: AnyRow) => {
+    async ({ action, deal_type, deal_id, title, contact_query, value, stage, lost_reason, months }: AnyRow) => {
       const denied = await moduleGate(workspaceId, 'deals');
       if (denied) return denied;
       // `Bearer ` with nothing after it is malformed, not anonymous: the request dies as "Empty
@@ -434,6 +434,42 @@ export const createManageDealTool = (
         if (error) return JSON.stringify({ success: false, error: error.message });
         onChunk?.({ type: 'crm_deal_forecast', rows: data ?? [], timestamp: Date.now() });
         return JSON.stringify({ success: true, forecast: data ?? [] });
+      }
+
+      if (action === 'documents') {
+        if (!deal_id) return JSON.stringify({ success: false, error: 'documents needs a deal_id (call list first).' });
+        const { data: own } = await db.from('crm_deals').select('id').eq('id', deal_id).eq('workspace_id', workspaceId).maybeSingle();
+        if (!own) return JSON.stringify({ success: false, error: 'deal not found' });
+        const { data, error } = await db.rpc('get_deal_documents', { p_deal_id: deal_id });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const documents = (data ?? []) as AnyRow[];
+        onChunk?.({ type: 'crm_deal_documents', deal_id, documents, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: documents.length, documents });
+      }
+
+      if (action === 'pipeline_stats') {
+        let typeId: string | null = null;
+        if (deal_type) {
+          const { list, hit } = await resolveType();
+          if (!hit) return JSON.stringify({ success: false, error: `unknown deal type. Available: ${list.map((t: AnyRow) => t.label).join(', ')}` });
+          typeId = hit.id;
+        }
+        const scope = { p_workspace_id: workspaceId, p_deal_type_id: typeId };
+        const [totals, funnel, velocity, owners, outcomes] = await Promise.all([
+          db.rpc('get_deal_stage_totals', scope),
+          db.rpc('get_deal_stage_funnel', scope),
+          db.rpc('get_deal_velocity', scope),
+          db.rpc('get_deal_owner_stats', scope),
+          db.rpc('get_deal_outcomes_by_month', { ...scope, p_months: months ?? 12 }),
+        ]);
+        const failed = [totals, funnel, velocity, owners, outcomes].find((r) => r.error);
+        if (failed?.error) return JSON.stringify({ success: false, error: failed.error.message });
+        const stats = {
+          stage_totals: totals.data ?? [], funnel: funnel.data ?? [], velocity: velocity.data ?? [],
+          owners: owners.data ?? [], outcomes_by_month: outcomes.data ?? [],
+        };
+        onChunk?.({ type: 'crm_deal_pipeline_stats', deal_type_id: typeId, ...stats, timestamp: Date.now() });
+        return JSON.stringify({ success: true, deal_type_id: typeId, ...stats });
       }
 
       if (action === 'create') {
@@ -502,14 +538,19 @@ export const createManageDealTool = (
       description:
         'The deal pipeline, for every kind of deal (real estate, project, construction, or a type this '
         + 'workspace defined). list — open deals. forecast — weighted pipeline, already derived. '
+        + 'documents — the quotes, orders and invoices on one deal (deal_id). pipeline_stats — "how is '
+        + 'the pipeline / who is closing / where do deals stall": value per stage, the stage funnel with '
+        + 'conversion, days spent per stage, per-owner win rates and won/lost per month (optional '
+        + 'deal_type, months). '
         + 'create — a new deal for a contact (needs contact_query; deal_type defaults to General). '
         + 'move — advance a deal to a stage BY NAME (stages differ per deal type; the error lists the '
         + 'valid ones). lose — mark it lost with a reason. Property and project deals are created on '
         + 'the board, because they must be attached to a listing or project.',
       schema: z.object({
-        action: z.enum(['list', 'forecast', 'create', 'move', 'lose']).default('list'),
-        deal_type: z.string().optional().describe('create: the deal type by name, e.g. "Construction". Defaults to General.'),
-        deal_id: z.string().optional().describe('move/lose: the deal UUID from list.'),
+        action: z.enum(['list', 'forecast', 'documents', 'pipeline_stats', 'create', 'move', 'lose']).default('list'),
+        deal_type: z.string().optional().describe('create: the deal type by name, e.g. "Construction". Defaults to General. pipeline_stats: limit to this type (omit for all).'),
+        deal_id: z.string().optional().describe('documents/move/lose: the deal UUID from list.'),
+        months: z.number().int().min(1).max(36).optional().describe('pipeline_stats: months of won/lost history (default 12).'),
         title: z.string().optional().describe('create: what the deal is called.'),
         contact_query: z.string().optional().describe('create: the contact name to attach (required).'),
         value: z.number().optional().describe('create: deal value.'),
