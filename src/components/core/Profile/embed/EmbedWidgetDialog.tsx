@@ -33,6 +33,7 @@ import {
   type EmbedWidgetId, type WidgetOptions,
 } from './embedWidgets';
 import { EmbedWidgetPreview } from './EmbedWidgetPreview';
+import { StoreProductOverlaysPanel } from './StoreProductOverlaysPanel';
 
 type Step = 'widget' | 'content' | 'site' | 'code';
 
@@ -533,6 +534,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
             </div>
               </>
             )}
+            {options.fromStore && <StoreProductOverlaysPanel workspaceId={workspaceId} />}
             <div className="space-y-2 rounded-md border border-hairline p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-0.5">

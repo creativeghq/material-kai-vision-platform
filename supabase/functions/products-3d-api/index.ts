@@ -24,6 +24,7 @@ import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 import { PLACE_SPACE_SCHEMA, validatePlaceSpace } from '../_shared/place-space.ts';
+import { normalizeShopOrigin, storeExternalIds } from '../_shared/shop-origin.ts';
 
 /** Page size ceiling — an embed grid is a shelf, not a catalog dump. */
 const MAX_LIMIT = 60;
@@ -1038,6 +1039,26 @@ Deno.serve(withApiLogging((req) => {
       .select('paid_tools_enabled, daily_usd_cap, allow_generation').eq('id', auth.ctx.keyId).maybeSingle();
     const placeAi = keyRow?.paid_tools_enabled === true && Number(keyRow?.daily_usd_cap ?? 0) > 0;
     return embedJson({ ok: true, turnstile_site_key: siteKey, place_ai: placeAi, realism: keyRow?.allow_generation === true }, 200, cors);
+  }
+
+  if (action === 'store_overlays') {
+    const origin = normalizeShopOrigin(req.headers.get('origin'));
+    const ids = storeExternalIds(params.ids);
+    if (!origin || ids.length === 0) return embedJson({ ok: true, overlays: {} }, 200, cors);
+    const { data: rows, error: ovErr } = await supabase.from('store_product_overlays')
+      .select('external_id, width_cm, height_cm, cache_status, storage_bucket, storage_object_path')
+      .eq('workspace_id', workspaceId).eq('shop_origin', origin).in('external_id', ids);
+    if (ovErr) return embedJson({ error: 'Could not read product sizes' }, 500, cors);
+    const base = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/`;
+    const overlays: Record<string, { width_m: number | null; height_m: number | null; cutout_url: string | null }> = {};
+    for (const r of rows ?? []) {
+      overlays[r.external_id as string] = {
+        width_m: r.width_cm == null ? null : Number(r.width_cm) / 100,
+        height_m: r.height_cm == null ? null : Number(r.height_cm) / 100,
+        cutout_url: r.cache_status === 'ready' && r.storage_object_path ? `${base}${r.storage_bucket}/${r.storage_object_path}` : null,
+      };
+    }
+    return embedJson({ ok: true, overlays }, 200, cors);
   }
 
   if (action === 'realism') {

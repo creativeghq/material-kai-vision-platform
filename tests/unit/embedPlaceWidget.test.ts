@@ -220,6 +220,19 @@ describe('a shop’s products are read live from the shop, never copied to us', 
     expect(loader).not.toMatch(/apiBase/);
   });
 
+  it('the merchant’s sizes and cut-outs are merged over the shop products, keyed by the shop’s own id', () => {
+    const widget = read('src/embed/materialkai-place.ts');
+    const overlay = widget.slice(widget.indexOf('private async applyStoreOverlays('));
+    expect(widget.indexOf('this.products = await this.loadStoreProducts();'))
+      .toBeLessThan(widget.indexOf('await this.applyStoreOverlays(key);'));
+    expect(overlay).toContain("action: 'store_overlays'");
+    expect(overlay).toMatch(/overlays\[p\.id\]/);
+    const api = read('supabase/functions/products-3d-api/index.ts');
+    const handler = api.slice(api.indexOf("action === 'store_overlays'"), api.indexOf("action === 'realism'"));
+    expect(handler).toMatch(/normalizeShopOrigin\(req\.headers\.get\('origin'\)\)/);
+    expect(handler).toMatch(/\.eq\('workspace_id', workspaceId\)\.eq\('shop_origin', origin\)/);
+  });
+
   it('nothing in the app calls the retired catalogue import', () => {
     for (const f of ['src/services/embedKeysService.ts', 'src/services/commerce/storeConnectionsService.ts',
       'src/components/core/Profile/embed/EmbedWidgetDialog.tsx']) {

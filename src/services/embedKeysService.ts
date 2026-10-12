@@ -195,6 +195,35 @@ export async function productCutouts(
   return { cutouts: (data?.cutouts ?? []) as ProductCutout[], no_image: (data?.no_image ?? []) as string[] };
 }
 
+export interface StoreProductOverlay {
+  external_id: string;
+  title: string;
+  image: string | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  cutout_status: 'none' | 'pending' | 'ready' | 'failed' | 'outdated';
+  cutout_url: string | null;
+  cutout_error: string | null;
+}
+
+async function storeCall<T>(workspaceId: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('product-cutouts', { body: { ...body, workspace_id: workspaceId } });
+  if (error) throw error;
+  if (data?.error) throw new Error(String(data.error));
+  return data as T;
+}
+
+export const storeProductOverlays = {
+  origins: (workspaceId: string) =>
+    storeCall<{ origins: string[] }>(workspaceId, { action: 'store_origins' }).then((r) => r.origins ?? []),
+  list: (workspaceId: string, origin: string) =>
+    storeCall<{ platform: string; products: StoreProductOverlay[] }>(workspaceId, { action: 'store_list', origin }),
+  setSize: (workspaceId: string, origin: string, p: { external_id: string; title: string; width_cm: number | null; height_cm: number | null }) =>
+    storeCall<{ ok: true }>(workspaceId, { action: 'store_set_size', origin, ...p }),
+  prepare: (workspaceId: string, origin: string, externalIds: string[]) =>
+    storeCall<{ platform: string; products: StoreProductOverlay[] }>(workspaceId, { action: 'store_prepare', origin, external_ids: externalIds.slice(0, 60) }),
+};
+
 export async function embedReadiness(workspaceId: string): Promise<EmbedReadiness> {
   const [publishedProducts, blueprints, publishedBlueprints, scenes, wastagePatterns] = await Promise.all([
     countRows(supabase.from('product_prices').select('product_id', { count: 'exact', head: true })

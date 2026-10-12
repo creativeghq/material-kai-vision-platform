@@ -61,3 +61,38 @@ describe('product-cutouts does things in the order that keeps money and tenants 
     expect(processRow).toMatch(/crypto\.randomUUID\(\)\}\.png/);
   });
 });
+
+describe('a shop product gets a size and a cut-out without being copied to us', () => {
+  const fn = read('supabase/functions/product-cutouts/index.ts');
+  const store = fn.slice(fn.indexOf('async function handleStore('), fn.indexOf('Deno.serve('));
+
+  it('store actions run only after the caller is checked against the workspace', () => {
+    expect(fn.indexOf('userCanAccessWorkspace(supabase, user.id, workspaceId)'))
+      .toBeLessThan(fn.indexOf('return await handleStore('));
+  });
+
+  it('a shop is only reachable when it is an allowed origin of the workspace’s own active embed keys', () => {
+    expect(fn).toMatch(/from\('material_kai_keys'\)[\s\S]{0,120}\.eq\('workspace_id', workspaceId\)\.eq\('is_active', true\)/);
+    expect(store).toMatch(/if \(!origin \|\| !origins\.includes\(origin\)\)/);
+  });
+
+  it('the image to cut out is read from the shop by the server, never taken from the request', () => {
+    expect(store).toContain('const shop = await readShop(origin)');
+    expect(store).toMatch(/source_url: t\.image/);
+    expect(store).not.toMatch(/body\.(image|source_url|url)\b/);
+  });
+
+  it('the shop is fetched through the SSRF guard', () => {
+    expect(fn).toMatch(/fetchTextGuarded\(origin \+ path/);
+  });
+
+  it('a size write is an allowlisted payload, never the request body', () => {
+    const setSize = store.slice(store.indexOf("body.action === 'store_set_size'"), store.indexOf('const shop = await readShop'));
+    expect(setSize).not.toMatch(/\.\.\.body/);
+    expect(setSize).toMatch(/workspace_id: workspaceId/);
+  });
+
+  it('store cut-outs are claimed by the storage reaper through their own table', () => {
+    expect(store).toMatch(/table: 'store_product_overlays'/);
+  });
+});

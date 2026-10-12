@@ -273,8 +273,10 @@ export class MaterialKaiPlace extends HTMLElement {
           if (this.photo) this.render();
         })
         .catch(() => { this.siteKey = null; });
-      if (fromStore) this.products = await this.loadStoreProducts();
-      else void this.loadSizes(key);
+      if (fromStore) {
+        this.products = await this.loadStoreProducts();
+        await this.applyStoreOverlays(key);
+      } else void this.loadSizes(key);
     } catch {
       this.status.textContent = 'Could not reach the catalogue.';
       return;
@@ -334,6 +336,26 @@ export class MaterialKaiPlace extends HTMLElement {
     } catch {
       return;
     }
+  }
+
+  private async applyStoreOverlays(key: string) {
+    const ids = this.products.map((p) => p.id);
+    if (ids.length === 0) return;
+    const params = new URLSearchParams({ action: 'store_overlays', key, ids: ids.join(',') });
+    const res = await fetch(`${this.apiBase}/functions/v1/products-3d-api?${params}`).catch(() => null);
+    const body = res ? await res.json().catch(() => null) : null;
+    const overlays = (body?.overlays ?? {}) as Record<string, { width_m: number | null; height_m: number | null; cutout_url: string | null }>;
+    this.products = this.products.map((p) => {
+      const o = overlays[p.id];
+      if (!o) return p;
+      return {
+        ...p,
+        image: o.cutout_url ?? p.image,
+        cutout: o.cutout_url ?? p.cutout,
+        widthM: typeof o.width_m === 'number' ? o.width_m : p.widthM,
+        heightM: typeof o.height_m === 'number' ? o.height_m : p.heightM,
+      };
+    });
   }
 
   private fileInput(camera: boolean): HTMLInputElement {
