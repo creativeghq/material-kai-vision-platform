@@ -1,7 +1,7 @@
 /** How an inbound (myDATA received) document's triage state is WORDED for the operator. */
 import { isCancelledDocument } from '@/modules/finance/utils/inboundProvenance';
 
-export type InboundStatus = 'new' | 'classified' | 'received' | 'partially_received' | 'dismissed';
+export type InboundStatus = 'new' | 'unconfirmed' | 'classified' | 'received' | 'partially_received' | 'dismissed';
 
 /** Table cell: only the acted-on states get a word. `new` is absent on purpose. */
 export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = {
@@ -14,6 +14,7 @@ export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = 
   partially_received: { label: 'Part stocked', tone: 'text-amber-800 dark:text-amber-300' },
   ordered: { label: 'Ordered', tone: 'text-emerald-600 dark:text-emerald-400' },
   dismissed: { label: 'Dismissed', tone: 'text-muted-foreground line-through' },
+  unconfirmed: { label: 'To confirm', tone: 'text-amber-800 dark:text-amber-300' },
   // AADE voided the document. Written as a light/dark PAIR because `red-400` is chosen for
   // plum-black and renders far too pale on the light themes' cream.
   cancelled: { label: 'Cancelled at AADE', tone: 'text-red-700 dark:text-red-400' },
@@ -39,6 +40,7 @@ export function inboundOutcomes(
   }
   if (doc.status === 'dismissed') return [INBOUND_OUTCOME.dismissed];
   const out: { label: string; tone: string }[] = [];
+  if (doc.status === 'unconfirmed') out.push(INBOUND_OUTCOME.unconfirmed);
   if (opts?.ordered) out.push(INBOUND_OUTCOME.ordered);
   if (doc.created_supplier_bill_id) out.push(INBOUND_OUTCOME.classified);
   if (doc.status === 'received') out.push(INBOUND_OUTCOME.received);

@@ -5,6 +5,7 @@
  * the shared 3-dots action menu. Delivery/goods-receipt notes (`delivery_notes`) and the
  * Expenses inbox (`inbound_documents`) are fully wired surfaces alongside invoices.
  */
+import { UploadSupplierInvoiceButton } from '@/modules/finance/components/UploadSupplierInvoiceButton';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, ChevronRight, Send, Building2, CreditCard } from 'lucide-react';
@@ -644,6 +645,11 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                     {/* A truncated list looks exactly like a short one. Say it out loud rather
                         than showing a prefix and letting the operator conclude the older
                         documents were never fetched. */}
+                    {canOperateFinance && activeWorkspaceId && (
+                      <div className="flex justify-end border-b border-hairline px-4 py-2">
+                        <UploadSupplierInvoiceButton workspaceId={activeWorkspaceId} onDone={() => void load()} />
+                      </div>
+                    )}
                     {inboundTotal > inbound.length && (
                       <p className="border-b border-hairline bg-surface-sunken px-4 py-2 text-[11px] text-amber-800 dark:text-amber-300">
                         Showing the {inbound.length.toLocaleString()} most recent of {inboundTotal.toLocaleString()} documents.

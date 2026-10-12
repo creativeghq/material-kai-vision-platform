@@ -30260,7 +30260,7 @@
         ],
         "summary": "Read a photographed receipt into expense fields, and keep the image on the bill",
         "operationId": "post_scan_receipt",
-        "description": "Turns a photo or PDF of a receipt into the fields an expense needs (#379). The reader is a forced Anthropic tool call over the image; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. It deliberately writes nothing: the caller creates the trip line or the supplier bill and confirms the figures, because a confident wrong reading is the failure mode of extraction. An unreadable date comes back null rather than defaulted — this function runs in UTC and the caller fills the operator's local day. `attach_bill` / `sign_bill` put the image on a supplier bill in the private bucket and mint a short-lived URL for it.\n\n**Actions** (`action` in the body):\n- `scan` — Extract vendor, date, currency and amounts from a receipt image or PDF → `{success, status: 'extracted'|'failed', unreadable, fields:{vendor, doc_date, currency, total_gross, vat_amount, net, document_number, category_hint, confidence, foots}}`\n- `attach_bill` — Store a receipt against a supplier bill (Finance expense) → `{success, receipt_path, signed_url}`\n- `sign_bill` — Mint a fresh signed URL for a receipt already on a bill → `{success, signed_url}`",
+        "description": "Turns a photo or PDF of a receipt into the fields an expense needs (#379). The reader is a forced Anthropic tool call over the image; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. It deliberately writes nothing: the caller creates the trip line or the supplier bill and confirms the figures, because a confident wrong reading is the failure mode of extraction. An unreadable date comes back null rather than defaulted — this function runs in UTC and the caller fills the operator's local day. `attach_bill` / `sign_bill` put the image on a supplier bill in the private bucket and mint a short-lived URL for it.\n\n**Actions** (`action` in the body):\n- `scan` — Extract vendor, date, currency and amounts from a receipt image or PDF → `{success, status: 'extracted'|'failed', unreadable, fields:{vendor, doc_date, currency, total_gross, vat_amount, net, document_number, category_hint, confidence, foots}}`\n- `attach_bill` — Store a receipt against a supplier bill (Finance expense) → `{success, receipt_path, signed_url}`\n- `sign_bill` — Mint a fresh signed URL for a receipt already on a bill → `{success, signed_url}`\n- `ingest_invoice` — Read a supplier's own invoice (PDF or image) into header and lines, store it, and attach it to the inbound document it belongs to or file it as a new unconfirmed one (#377 Phase 2). With doc_id it completes that document: lines are written only when they foot to the myDATA net total. Without it, a document matching an existing one by supplier VAT, date and net is attached to that one rather than filed twice; anything else is filed with status unconfirmed and is never booked on its own. Credits are debited before the model runs. → `{success, outcome: 'attached'|'created'|'matched_existing'|'already_ingested'|'unreadable', doc_id, lines_written, foots, lines_total, document_total_net}`\n- `sign_inbound_document` — A short-lived link to the supplier's own document attached to an inbound document. → `{success, signed_url}`",
         "security": [
           {
             "supabaseJwt": []
@@ -30403,6 +30403,71 @@
                       "bill_id": {
                         "type": "string",
                         "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {success, signed_url}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ingest_invoice"
+                        ],
+                        "description": "Read a supplier's own invoice (PDF or image) into header and lines, store it, and attach it to the inbound document it belongs to or file it as a new unconfirmed one (#377 Phase 2). With doc_id it completes that document: lines are written only when they foot to the myDATA net total. Without it, a document matching an existing one by supplier VAT, date and net is attached to that one rather than filed twice; anything else is filed with status unconfirmed and is never booked on its own. Credits are debited before the model runs."
+                      },
+                      "doc_id": {
+                        "type": "string",
+                        "description": "Attach to this inbound document; its workspace is the caller's own, checked by RLS (string (uuid))"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Required without doc_id; checked against the caller's membership (string (uuid))"
+                      },
+                      "data_base64": {
+                        "type": "string",
+                        "description": "The file, up to 10 MB (or name an inbox attachment instead)"
+                      },
+                      "content_type": {
+                        "type": "string",
+                        "description": "application/pdf, image/jpeg, image/png or image/webp"
+                      },
+                      "filename": {
+                        "type": "string",
+                        "description": "Original file name"
+                      },
+                      "inbox_message_id": {
+                        "type": "string",
+                        "description": "Read the file from this Inbox message (filed as source email) (string (uuid))"
+                      },
+                      "attachment_name": {
+                        "type": "string",
+                        "description": "Which attachment of that message"
+                      }
+                    },
+                    "description": "Returns: {success, outcome: 'attached'|'created'|'matched_existing'|'already_ingested'|'unreadable', doc_id, lines_written, foots, lines_total, document_total_net}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "doc_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "sign_inbound_document"
+                        ],
+                        "description": "A short-lived link to the supplier's own document attached to an inbound document."
+                      },
+                      "doc_id": {
+                        "type": "string",
+                        "description": "The inbound document; visibility is the caller's RLS read (string (uuid))"
                       }
                     },
                     "description": "Returns: {success, signed_url}"

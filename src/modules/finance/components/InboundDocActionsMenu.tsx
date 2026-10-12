@@ -6,9 +6,12 @@
  *     Greek and myDATA returned only a VAT number / no name), deduped by VAT within the workspace.
  *   • Add products → warehouse (reuses the existing ReceiveToWarehouseDialog via callback).
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2, Send } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2, Send, FileUp, FileText, CheckCircle2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { formatMoney } from '@/utils/decimal';
+import { inboundService } from '@/modules/finance/services/inboundService';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -121,18 +124,75 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // and the Expenses-by-Supplier list offer the same act rather than two spellings of it.
   const [crmOpen, setCrmOpen] = useState(false);
 
+  const { toast } = useToast();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [docBusy, setDocBusy] = useState(false);
+  const unconfirmed = doc.status === 'unconfirmed';
+  const canAttachDocument = !isCancelled && !isPayroll && doc.status !== 'dismissed';
+
+  const attachDocument = async (file: File) => {
+    setDocBusy(true);
+    try {
+      const r = await inboundService.ingestSupplierDocument({ docId: doc.id, file });
+      if (r.lines_written) {
+        toast({ title: 'Supplier document attached', description: 'Its lines foot to the document total and were added.' });
+      } else if (r.foots === false) {
+        toast({
+          title: 'Attached, but the lines do not foot',
+          description: `The lines read from the PDF total ${formatMoney(r.lines_total ?? 0, doc.currency)}, the document says ${formatMoney(r.document_total_net ?? 0, doc.currency)}. Add the detail by hand.`,
+        });
+      } else {
+        toast({ title: 'Supplier document attached' });
+      }
+      onChanged?.();
+    } catch (err) {
+      toast({ title: 'Could not attach the document', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+    } finally {
+      setDocBusy(false);
+    }
+  };
+
+  const viewDocument = async () => {
+    try { window.open(await inboundService.signSupplierDocument(doc.id), '_blank', 'noopener'); }
+    catch (err) { toast({ title: 'Could not open the document', description: err instanceof Error ? err.message : undefined, variant: 'destructive' }); }
+  };
+
+  const confirm = async () => {
+    setDocBusy(true);
+    try { await inboundService.confirmDocument(doc.id); toast({ title: 'Confirmed', description: 'It is now in the queue like any other document.' }); onChanged?.(); }
+    catch (err) { toast({ title: 'Could not confirm', description: err instanceof Error ? err.message : undefined, variant: 'destructive' }); }
+    finally { setDocBusy(false); }
+  };
+
   return (
     <>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/pdf,image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void attachDocument(f); }}
+      />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={(e) => e.stopPropagation()}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+            {busy || docBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuItem onClick={() => setPreviewOpen(true)}>
             <Eye className="h-4 w-4 mr-2" /> Preview
           </DropdownMenuItem>
+          {doc.document_path && (
+            <DropdownMenuItem onClick={() => void viewDocument()}>
+              <FileText className="h-4 w-4 mr-2" /> Supplier&apos;s document
+            </DropdownMenuItem>
+          )}
+          {unconfirmed && (
+            <DropdownMenuItem onClick={() => void confirm()} disabled={docBusy}>
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Confirm document
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Add to platform</DropdownMenuLabel>
@@ -151,6 +211,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           {/* Before receiving is possible at all, the document has to NAME something. This is the
               one thing standing between a 14.x (or any thin 2.x) and the entire existing intake
               chain, so it sits directly above it and only appears when it is the blocker. */}
+          {canAttachDocument && (
+            <DropdownMenuItem onClick={() => fileInput.current?.click()} disabled={docBusy}>
+              <FileUp className="h-4 w-4 mr-2" /> {doc.document_path ? 'Replace supplier PDF' : 'Attach supplier PDF'}
+            </DropdownMenuItem>
+          )}
           {canAddDetail && (
             <DropdownMenuItem onClick={onAddLineDetail}>
               <ListPlus className="h-4 w-4 mr-2" /> Add line detail
@@ -175,8 +240,8 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               to match it against, which is precisely what 3-way match exists to prevent. */}
           <DropdownMenuItem
             onClick={onCreateOrder}
-            disabled={hasOrder || isPayroll || isCancelled || doc.status === 'dismissed' || !onCreateOrder}
-            title={isCancelled
+            disabled={hasOrder || isPayroll || isCancelled || unconfirmed || doc.status === 'dismissed' || !onCreateOrder}
+            title={unconfirmed ? 'Confirm the document first — it was read from a file, not filed with AADE.' : isCancelled
               ? 'Cancelled at AADE — a void document cannot become an expense.'
               : isPayroll ? 'Payroll is recorded in HR, never as a supplier bill — this document is here for visibility.' : undefined}
           >

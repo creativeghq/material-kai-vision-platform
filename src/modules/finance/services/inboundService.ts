@@ -4,6 +4,8 @@
  * client reads what's been pulled and turns a doc into a supplier bill / warehouse intake.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { blobToBase64 } from '@/services/voiceDictationService';
+import { edgeErrorMessage } from '@/utils/edgeError';
 // One normalised VAT key (#353 CRM-4).
 import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
 import { edgeError } from '@/utils/edgeError';
@@ -123,6 +125,15 @@ export type InboundSource = 'mydata' | 'mydata_self' | 'email' | 'upload' | 'pep
 /** Where the line detail came from — a different fact from where the money record came from. */
 export type InboundLinesSource = 'mydata' | 'user' | 'document' | 'none';
 
+export interface InboundIngestResult {
+  outcome: 'attached' | 'created' | 'matched_existing' | 'already_ingested' | 'unreadable';
+  doc_id?: string;
+  lines_written?: boolean;
+  foots?: boolean | null;
+  lines_total?: number | null;
+  document_total_net?: number | null;
+}
+
 export interface InboundDocument {
   id: string;
   workspace_id: string;
@@ -190,8 +201,10 @@ export interface InboundDocument {
   total_vat: number | null;
   total_gross: number | null;
   lines: InboundDocLine[];
-  status: 'new' | 'classified' | 'received' | 'partially_received' | 'dismissed';
+  status: 'new' | 'unconfirmed' | 'classified' | 'received' | 'partially_received' | 'dismissed';
   created_supplier_bill_id: string | null;
+  document_path?: string | null;
+  supplier_invoice_number?: string | null;
   /** Set = paid outside the platform, so the cost is excluded from the P&L and reported apart. */
   settled_outside_at?: string | null;
   settled_outside_note?: string | null;
@@ -366,7 +379,7 @@ export const inboundService = {
     'move_purpose', 'vat_payment_suspension', 'total_withheld', 'total_fees', 'total_stamp_duty',
     'total_other_taxes', 'total_deductions', 'currency', 'total_net', 'total_vat', 'total_gross',
     'status', 'created_supplier_bill_id', 'category_id', 'created_at', 'updated_at',
-    'settled_outside_at', 'settled_outside_note',
+    'settled_outside_at', 'settled_outside_note', 'document_path', 'supplier_invoice_number',
     // Derived on the row: the list and its filters read what SQL decided.
     'expense_kind', 'vat_treatment', 'origin',
   ].join(', '),
@@ -521,6 +534,39 @@ export const inboundService = {
     } as never);
     if (error) throw error;
     return data as unknown as { lines: number; lines_total: number; document_total_net: number };
+  },
+
+  async ingestSupplierDocument(input:
+    | { docId: string; file: File }
+    | { workspaceId: string; file: File }
+    | { workspaceId: string; inboxMessageId: string; attachmentName: string },
+  ): Promise<InboundIngestResult> {
+    const body: Record<string, unknown> = { action: 'ingest_invoice' };
+    if ('docId' in input) body.doc_id = input.docId;
+    else body.workspace_id = input.workspaceId;
+    if ('inboxMessageId' in input) {
+      body.inbox_message_id = input.inboxMessageId;
+      body.attachment_name = input.attachmentName;
+    } else {
+      body.data_base64 = await blobToBase64(input.file);
+      body.content_type = input.file.type;
+      body.filename = input.file.name;
+    }
+    const { data, error } = await supabase.functions.invoke('scan-receipt', { body });
+    if (error) throw new Error(await edgeErrorMessage(error, 'The document could not be read.'));
+    if (!data?.success) throw new Error(data?.error || 'The document could not be read.');
+    return data as InboundIngestResult;
+  },
+
+  async signSupplierDocument(docId: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('scan-receipt', { body: { action: 'sign_inbound_document', doc_id: docId } });
+    if (error || !data?.signed_url) throw new Error(data?.error || error?.message || 'The document could not be opened.');
+    return data.signed_url as string;
+  },
+
+  async confirmDocument(docId: string): Promise<void> {
+    const { error } = await supabase.rpc('inbound_doc_confirm' as never, { p_doc_id: docId } as never);
+    if (error) throw error;
   },
 
   async toSupplierBill(docId: string): Promise<string> {

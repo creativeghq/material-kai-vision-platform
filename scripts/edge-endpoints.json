@@ -16839,6 +16839,68 @@
           }
         ],
         "response": "{success, signed_url}"
+      },
+      {
+        "name": "ingest_invoice",
+        "summary": "Read a supplier's own invoice (PDF or image) into header and lines, store it, and attach it to the inbound document it belongs to or file it as a new unconfirmed one (#377 Phase 2). With doc_id it completes that document: lines are written only when they foot to the myDATA net total. Without it, a document matching an existing one by supplier VAT, date and net is attached to that one rather than filed twice; anything else is filed with status unconfirmed and is never booked on its own. Credits are debited before the model runs.",
+        "params": [
+          {
+            "name": "doc_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "Attach to this inbound document; its workspace is the caller's own, checked by RLS"
+          },
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "Required without doc_id; checked against the caller's membership"
+          },
+          {
+            "name": "data_base64",
+            "type": "string",
+            "required": false,
+            "desc": "The file, up to 10 MB (or name an inbox attachment instead)"
+          },
+          {
+            "name": "content_type",
+            "type": "string",
+            "required": false,
+            "desc": "application/pdf, image/jpeg, image/png or image/webp"
+          },
+          {
+            "name": "filename",
+            "type": "string",
+            "required": false,
+            "desc": "Original file name"
+          },
+          {
+            "name": "inbox_message_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "Read the file from this Inbox message (filed as source email)"
+          },
+          {
+            "name": "attachment_name",
+            "type": "string",
+            "required": false,
+            "desc": "Which attachment of that message"
+          }
+        ],
+        "response": "{success, outcome: 'attached'|'created'|'matched_existing'|'already_ingested'|'unreadable', doc_id, lines_written, foots, lines_total, document_total_net}"
+      },
+      {
+        "name": "sign_inbound_document",
+        "summary": "A short-lived link to the supplier's own document attached to an inbound document.",
+        "params": [
+          {
+            "name": "doc_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "The inbound document; visibility is the caller's RLS read"
+          }
+        ],
+        "response": "{success, signed_url}"
       }
     ],
     "request": {

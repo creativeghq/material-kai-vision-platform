@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, MoreHorizontal, ReceiptText, ShoppingCart, Wallet } from 'lucide-react';
+import { Download, FileInput, Loader2, MoreHorizontal, ReceiptText, ShoppingCart, Wallet } from 'lucide-react';
+import { inboundService } from '@/modules/finance/services/inboundService';
+import { describeIngest } from '@/modules/finance/components/UploadSupplierInvoiceButton';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -27,7 +29,8 @@ export const AttachmentActionsMenu: React.FC<{
   contentType?: string | null;
   loadFile?: () => Promise<File>;
   className?: string;
-}> = ({ href, name, contentType, loadFile, className }) => {
+  inboxMessageId?: string;
+}> = ({ href, name, contentType, loadFile, className, inboxMessageId }) => {
   const scope = useContext(Scope);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -48,6 +51,23 @@ export const AttachmentActionsMenu: React.FC<{
       setExpenseOpen(true);
     } catch (e) {
       toast({ title: 'Could not open the document', description: (e as Error).message, variant: 'destructive' });
+    } finally { setLoading(false); }
+  };
+
+  const fileAsSupplierDocument = async () => {
+    if (!scope) return;
+    setLoading(true);
+    try {
+      const r = inboxMessageId
+        ? await inboundService.ingestSupplierDocument({ workspaceId: scope.workspaceId, inboxMessageId, attachmentName: name })
+        : await (async () => {
+          const file = await getFile();
+          if (!file) throw new Error('The file could not be read');
+          return inboundService.ingestSupplierDocument({ workspaceId: scope.workspaceId, file });
+        })();
+      toast(describeIngest(r));
+    } catch (e) {
+      toast({ title: 'Could not file the document', description: (e as Error).message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
@@ -77,6 +97,7 @@ export const AttachmentActionsMenu: React.FC<{
           <DropdownMenuItem onSelect={() => setOrderOpen(true)}><ShoppingCart className="w-3.5 h-3.5 mr-2" />Create an order</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => { void book(); }}><ReceiptText className="w-3.5 h-3.5 mr-2" />Book as a supplier bill</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => { void book(); }}><Wallet className="w-3.5 h-3.5 mr-2" />Pay this invoice</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => { void fileAsSupplierDocument(); }}><FileInput className="w-3.5 h-3.5 mr-2" />File in supplier documents</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => { void download(); }}><Download className="w-3.5 h-3.5 mr-2" />Download</DropdownMenuItem>
         </DropdownMenuContent>

@@ -4,6 +4,7 @@ import { getToolPrompt } from './prompt-utils.ts';
 import { reserveCredits, refundCredits, settleCredits } from './credit-reserve.ts';
 import { resolveTokenPrice } from './ai-logger.ts';
 import { callClaudeMessages, transcribeAudioWithGemini } from './ai-client.ts';
+import { ingestSupplierDocument, INVOICE_MIME } from './finance/invoice-extraction.ts';
 import { INBOX_DOCUMENT_KINDS, type InboxDocumentKind } from './inboxDocumentKinds.generated.ts';
 import {
   describeDocumentBankDetails, documentBankToolProperties, readDocumentBankDetails,
@@ -459,9 +460,33 @@ export async function enrichInboundAttachments(
       const document = await classifyOne(db, att, family, bytes, ctx);
       await patchAttachment(db, args.messageId, index, { document });
       results.push({ index, family, wrote: 'document', status: document.status, document });
+      if (document.status === 'ok' && (document.kind === 'invoice' || document.kind === 'credit_note')) {
+        await captureSupplierDocument(db, { ...args, index, att, bytes, payer });
+      }
     }
   }
   return results;
+}
+
+async function captureSupplierDocument(
+  db: Db,
+  a: { workspaceId: string; threadId: string; messageId: string; index: number; att: InboxAttachmentRecord; bytes: Uint8Array; payer: string },
+): Promise<void> {
+  try {
+    const { data: setting } = await db.from('finance_settings').select('inbound_email_capture').eq('workspace_id', a.workspaceId).maybeSingle();
+    if (setting?.inbound_email_capture !== true) return;
+    const { data: thread } = await db.from('inbox_threads').select('channel').eq('id', a.threadId).maybeSingle();
+    if (thread?.channel !== 'email') return;
+    const mime = upstreamMediaType(a.att, attachmentFamily(a.att));
+    if (!INVOICE_MIME.test(mime)) return;
+    const r = await ingestSupplierDocument(db, db, {
+      workspaceId: a.workspaceId, userId: a.payer, bytes: a.bytes, mime, name: String(a.att.name ?? 'supplier-invoice'),
+      target: { kind: 'create', source: 'email', origin: { inbox_message_id: a.messageId, attachment_index: a.index } },
+    });
+    if (r.outcome === 'failed') console.warn(`[inbox-attachments] supplier document capture failed for ${a.messageId}#${a.index}: ${r.error}`);
+  } catch (err) {
+    console.warn(`[inbox-attachments] supplier document capture threw for ${a.messageId}#${a.index}:`, err instanceof Error ? err.message : String(err));
+  }
 }
 
 /** The kind as a person says it: `delivery_note` → "delivery note". */

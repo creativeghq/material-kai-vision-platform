@@ -31,6 +31,7 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
    * each lookup notifies that supplier's TAXISnet inbox, which is the operator's call to make.
    */
   const [aadeNames, setAadeNames] = useState(false);
+  const [emailCapture, setEmailCapture] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -45,10 +46,11 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       setHasKey(!!c?.has_key);
       setEnabled(c?.enabled ?? true);
       const { data: fin } = await supabase.from('finance_settings')
-        .select('auto_convert_inbound_expenses, resolve_issuer_names_via_aade')
+        .select('auto_convert_inbound_expenses, resolve_issuer_names_via_aade, inbound_email_capture')
         .eq('workspace_id', workspaceId).maybeSingle();
       setAutoConvert(!!(fin as any)?.auto_convert_inbound_expenses);
       setAadeNames(!!(fin as any)?.resolve_issuer_names_via_aade);
+      setEmailCapture(!!(fin as any)?.inbound_email_capture);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -61,7 +63,7 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       // Base URL is always production (myDATA RequestDocs) — the poller defaults to it.
       await inboundService.saveCreds(workspaceId, { aadeUserId: userId, subscriptionKey: key.trim() || undefined, enabled });
       const { error: finErr } = await supabase.from('finance_settings')
-        .update({ auto_convert_inbound_expenses: autoConvert, resolve_issuer_names_via_aade: aadeNames })
+        .update({ auto_convert_inbound_expenses: autoConvert, resolve_issuer_names_via_aade: aadeNames, inbound_email_capture: emailCapture } as never)
         .eq('workspace_id', workspaceId);
       if (finErr) throw finErr;
       if (key.trim()) setHasKey(true);
@@ -125,6 +127,17 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
             </p>
           </div>
           <Switch checked={aadeNames} onCheckedChange={setAadeNames} />
+        </div>
+        <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-3">
+          <div className="min-w-0 text-sm">
+            File emailed supplier invoices automatically
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              When an email to your platform address carries an invoice or credit note, it is read and filed
+              here as a document to confirm, or attached to the myDATA document it matches. Nothing is booked
+              or paid on its own. Each file read spends credits.
+            </p>
+          </div>
+          <Switch checked={emailCapture} onCheckedChange={setEmailCapture} />
         </div>
         <div>
           <Button size="sm" onClick={save} disabled={saving}>

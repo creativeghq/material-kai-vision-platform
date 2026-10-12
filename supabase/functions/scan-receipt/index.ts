@@ -7,6 +7,9 @@ import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { documentBankToolProperties, readDocumentBankDetails } from '../_shared/finance/document-bank-details.ts';
+import {
+  ingestSupplierDocument, INVOICE_MIME, MAX_INVOICE_BYTES, type IngestTarget,
+} from '../_shared/finance/invoice-extraction.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -31,8 +34,12 @@ const MAX_BASE64_CHARS = 6 * 1024 * 1024;
 const ALLOWED_MIME = /^(image\/(jpeg|png|webp|gif|heic|heif)|application\/pdf)$/i;
 
 interface Body {
-  action?: 'scan' | 'attach_bill' | 'sign_bill';
+  action?: 'scan' | 'attach_bill' | 'sign_bill' | 'ingest_invoice' | 'sign_inbound_document';
   workspace_id?: string;
+  doc_id?: string;
+  inbox_message_id?: string;
+  attachment_index?: number;
+  attachment_name?: string;
   bill_id?: string;
   filename?: string;
   content_type?: string;
@@ -138,6 +145,8 @@ Deno.serve(withApiLogging('scan-receipt', async (req: Request) => {
     case 'scan': return scan(body, admin, uid);
     case 'attach_bill': return attachBill(body, reader, admin);
     case 'sign_bill': return signBill(body, reader, admin);
+    case 'ingest_invoice': return ingestInvoice(body, reader, admin, uid);
+    case 'sign_inbound_document': return signInboundDocument(body, reader, admin);
     default: throw new HttpError(400, 'Unknown action');
   }
 }));
@@ -293,5 +302,66 @@ async function signBill(body: Body, reader: any, admin: any): Promise<Response> 
   const { data: signed, error } = await admin.storage
     .from(bill.receipt_bucket || 'pdf-documents').createSignedUrl(bill.receipt_path, SIGNED_TTL);
   if (error) throw new HttpError(500, `Could not sign the receipt: ${error.message}`);
+  return json({ success: true, signed_url: signed?.signedUrl ?? null });
+}
+
+async function ingestInvoice(body: Body, reader: any, admin: any, uid: string): Promise<Response> {
+  let workspaceId: string;
+  let target: IngestTarget;
+  let bytes: Uint8Array;
+  let mime = (body.content_type || '').toLowerCase();
+  let name = body.filename || 'supplier-invoice';
+
+  if (body.doc_id) {
+    const { data: doc } = await reader.from('inbound_documents').select('id, workspace_id').eq('id', body.doc_id).maybeSingle();
+    if (!doc) throw new HttpError(404, 'Document not found');
+    workspaceId = doc.workspace_id;
+    target = { kind: 'attach', docId: doc.id };
+  } else {
+    if (!body.workspace_id) throw new HttpError(400, 'workspace_id required');
+    workspaceId = body.workspace_id;
+    if (!(await userCanAccessWorkspace(admin, uid, workspaceId))) throw new HttpError(404, 'Workspace not found');
+    target = body.inbox_message_id
+      ? { kind: 'create', source: 'email', origin: { inbox_message_id: body.inbox_message_id, attachment_index: Number(body.attachment_index ?? 0) } }
+      : { kind: 'create', source: 'upload' };
+  }
+
+  if (body.inbox_message_id) {
+    const { data: msg } = await reader.from('inbox_messages')
+      .select('id, thread_id, attachments').eq('id', body.inbox_message_id).maybeSingle();
+    const { data: thread } = msg
+      ? await reader.from('inbox_threads').select('workspace_id').eq('id', msg.thread_id).maybeSingle()
+      : { data: null };
+    if (!msg || thread?.workspace_id !== workspaceId) throw new HttpError(404, 'Message not found');
+    const list = (Array.isArray(msg.attachments) ? msg.attachments : []) as Array<Record<string, any>>;
+    const index = body.attachment_name ? list.findIndex((a) => a?.name === body.attachment_name) : Number(body.attachment_index ?? 0);
+    const att = index >= 0 ? list[index] : undefined;
+    if (target.kind === 'create' && target.origin) target.origin.attachment_index = index;
+    if (!att?.storage_bucket || !att?.storage_object_path) throw new HttpError(404, 'Attachment not found');
+    const { data: file, error } = await admin.storage.from(att.storage_bucket).download(att.storage_object_path);
+    if (error || !file) throw new HttpError(404, 'The attachment file could not be read');
+    bytes = new Uint8Array(await file.arrayBuffer());
+    mime = String(att.content_type || file.type || '').toLowerCase();
+    name = String(att.name || name);
+  } else {
+    if (!body.data_base64) throw new HttpError(400, 'data_base64 required');
+    bytes = b64ToBytes(body.data_base64);
+  }
+  if (!INVOICE_MIME.test(mime)) throw new HttpError(415, 'Attach the supplier invoice as a PDF or an image.');
+  if (bytes.length > MAX_INVOICE_BYTES) throw new HttpError(413, 'That file is larger than 10 MB.');
+
+  const result = await ingestSupplierDocument(admin, reader, { workspaceId, userId: uid, bytes, mime, name, target });
+  if (result.outcome === 'failed') return json({ success: false, ...result }, result.status ?? 500);
+  return json({ success: true, ...result });
+}
+
+async function signInboundDocument(body: Body, reader: any, admin: any): Promise<Response> {
+  if (!body.doc_id) throw new HttpError(400, 'doc_id required');
+  const { data: doc } = await reader.from('inbound_documents')
+    .select('id, document_bucket, document_path').eq('id', body.doc_id).maybeSingle();
+  if (!doc) throw new HttpError(404, 'Document not found');
+  if (!doc.document_path) throw new HttpError(404, 'No supplier document attached');
+  const { data: signed, error } = await admin.storage.from(doc.document_bucket || 'pdf-documents').createSignedUrl(doc.document_path, SIGNED_TTL);
+  if (error) throw new HttpError(500, `Could not sign the document: ${error.message}`);
   return json({ success: true, signed_url: signed?.signedUrl ?? null });
 }

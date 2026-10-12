@@ -352,7 +352,7 @@ export const AttachmentView: React.FC<{
         <div className="group/att flex items-center gap-1.5 px-2 py-1.5 text-xs">
           <span className="truncate flex-1" title={name}>{name}</span>
           {size && <span className="text-muted-foreground tabular-nums shrink-0">{size}</span>}
-          <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
+          <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} inboxMessageId={messageId} />
         </div>
         {kind !== 'file' && (
           <div className="px-2 pb-1.5">
@@ -373,7 +373,7 @@ export const AttachmentView: React.FC<{
             thumbnail is the message — a photo of the damaged tile IS what the customer said. */}
         <span className="relative block w-fit group/att">
         <span className="absolute top-2.5 right-1 z-10 rounded-sm bg-card/90 md:opacity-0 md:group-hover/att:opacity-100 transition-opacity">
-          <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
+          <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} inboxMessageId={messageId} />
         </span>
         <button type="button" onClick={() => setZoom(true)} className="block mt-1.5 group">
           <img
@@ -425,7 +425,7 @@ export const AttachmentView: React.FC<{
             </span>
           </span>
         </button>
-        <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
+        <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} inboxMessageId={messageId} />
         </div>
         <AttachmentDocumentTag
           att={att} family="pdf" threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
@@ -440,7 +440,7 @@ export const AttachmentView: React.FC<{
          className="flex items-center gap-1 text-xs underline text-primary min-w-0">
         <Paperclip className="w-3 h-3 shrink-0" /> <span className="truncate">{name}</span>
       </a>
-      <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} />
+      <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} inboxMessageId={messageId} />
     </span>
   );
 };
