@@ -126,7 +126,7 @@ export async function reviewArticle(
                 : 'Review this ONE section of the article; the rest is reviewed separately.\n')
               + `<article>\n${part}\n</article>`,
           }],
-          output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+          output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
         }, { task: 'seo_review', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 180_000 });
         priced.push(await tokenCredits(supabase, DEFAULT_CLAUDE_MODEL, {
           inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
