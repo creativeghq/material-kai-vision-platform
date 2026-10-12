@@ -89,6 +89,11 @@ describe('the writer and the reviewer state only true facts about us', () => {
     expect(sitePages).toContain(".not('specs', 'is', null)");
   });
 
+  it('the writer sees what the answer engine tells searchers, without its sources', () => {
+    expect(src('pipeline.ts')).toContain('aiModeAnswer: research.aiModeAnswer?.text ? { text: research.aiModeAnswer.text, references: [] } : null');
+    expect(src('write.ts')).toContain('serpValue(research.aiModeAnswer.text, 3000)');
+  });
+
   it('lessons reserve before the model call and come from a DB prompt', () => {
     const code = src('lessons.ts');
     expect(code).toContain("getToolPrompt(supabase, 'seo_lesson_extractor')");

@@ -508,6 +508,7 @@ async function runPipelineStages(ctx: {
         recommendedSecondaries: secondaries.map((k, i) => ({ ...k, term: accented[i] ?? k.term })),
         paaQuestions: research.paaQuestions,
         serpSignals: research.serpSignals,
+        aiModeAnswer: research.aiModeAnswer?.text ? { text: research.aiModeAnswer.text, references: [] } : null,
       },
       user_id: userId,
     }, 300_000);
