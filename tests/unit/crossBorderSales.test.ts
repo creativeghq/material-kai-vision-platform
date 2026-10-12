@@ -54,8 +54,8 @@ describe('#377 ViDA gap 1 — a sale to a buyer outside Greece is a cross-border
   });
 });
 
-describe('#377 ViDA gap 2 — a party's Peppol electronic address', () => {
-  it('is looked up in the Peppol Directory through the SSRF guard, inside the caller's CRM scope', () => {
+describe("#377 ViDA gap 2 — a party's Peppol electronic address", () => {
+  it("is looked up in the Peppol Directory through the SSRF guard, inside the caller's CRM scope", () => {
     const h = read('supabase/functions/crm-api/handlers/companies-api-handler.ts');
     const route = h.slice(h.indexOf("path[1] === 'peppol-lookup'"));
     expect(route.slice(0, 800)).toMatch(/!scopeAllows\(scope, company\.workspace_id\)/);
