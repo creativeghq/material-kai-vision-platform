@@ -25,6 +25,7 @@ const LIFECYCLE_TRIGGERS = [
   'project_asset_registered',
   'project_task_overdue',
   'project_member_added',
+  'project_task_commented',
 ] as const;
 
 /**
@@ -48,6 +49,7 @@ const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string | null> = {
    */
   project_task_overdue: null,
   project_member_added: null,
+  project_task_commented: null,
 };
 
 const TYPES = 'src/services/flows/types.ts';

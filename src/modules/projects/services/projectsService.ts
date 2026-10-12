@@ -371,6 +371,14 @@ export interface ProjectDashboard {
   deliveries: ProjectDelivery[];
   open_purchase_orders: number;
   crew: Array<{ day: string; workers: number; minutes: number }>;
+  materials_by_category: ProjectMaterialsRow[];
+}
+
+export interface ProjectMaterialsRow {
+  kind: 'category' | 'uncategorised_product' | 'not_linked';
+  category_id: string | null;
+  name: string | null;
+  amount: number;
 }
 
 /** A row of `list_project_visits`: a meeting (timestamptz) or a booking (local date + time). */
@@ -389,7 +397,7 @@ export interface ProjectVisit {
   created_at: string;
 }
 
-export interface VisitSlot { slot_date: string; slot_time: string; time_zone: string }
+export interface VisitSlot { slot_date: string; slot_time: string; time_zone: string; starts_at: string }
 
 export function visitStart(v: ProjectVisit): Date | null {
   if (v.starts_at) return new Date(v.starts_at);
@@ -1666,6 +1674,12 @@ class ProjectsService {
         is_late: !!d.is_late,
       })),
       open_purchase_orders: Number(r.open_purchase_orders ?? 0),
+      materials_by_category: ((r.materials_by_category ?? []) as any[]).map((m) => ({
+        kind: m.kind,
+        category_id: m.category_id ?? null,
+        name: m.name ?? null,
+        amount: Number(m.amount ?? 0),
+      })),
       crew: ((r.crew ?? []) as any[]).map((c) => ({
         day: String(c.day).slice(0, 10), workers: Number(c.workers ?? 0), minutes: Number(c.minutes ?? 0),
       })),

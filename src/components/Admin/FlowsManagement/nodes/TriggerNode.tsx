@@ -143,6 +143,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   project_created: FolderPlus,
   project_task_completed: CheckCircle2,
   project_member_added: UserPlus,
+  project_task_commented: MessageSquareReply,
   project_milestone_reached: Flag,
   project_snag_raised: AlertTriangle,
   project_expense_approved: BadgeCheck,

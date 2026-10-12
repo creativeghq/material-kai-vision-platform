@@ -196,6 +196,7 @@ export type TriggerType =
   | 'project_created'
   | 'project_task_completed'
   | 'project_member_added'
+  | 'project_task_commented'
   | 'project_milestone_reached'
   | 'project_snag_raised'
   | 'project_expense_approved'
@@ -316,6 +317,7 @@ export interface ProjectCreatedTriggerConfig {}
 export interface ProjectTaskCompletedTriggerConfig {}
 /** A workspace teammate was put on a project; user_id is the person added. */
 export interface ProjectMemberAddedTriggerConfig {}
+export interface ProjectTaskCommentedTriggerConfig {}
 /** A task marked as a milestone was completed. */
 export interface ProjectMilestoneReachedTriggerConfig {}
 /** A defect was raised on site. */
@@ -654,6 +656,7 @@ export type TriggerConfigMap = {
   project_created: ProjectCreatedTriggerConfig;
   project_task_completed: ProjectTaskCompletedTriggerConfig;
   project_member_added: ProjectMemberAddedTriggerConfig;
+  project_task_commented: ProjectTaskCommentedTriggerConfig;
   project_milestone_reached: ProjectMilestoneReachedTriggerConfig;
   project_snag_raised: ProjectSnagRaisedTriggerConfig;
   project_expense_approved: ProjectExpenseApprovedTriggerConfig;

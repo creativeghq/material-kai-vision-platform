@@ -14,7 +14,7 @@ import {
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { formatDate, formatTime, fromLocalISODate, localISODateOffset } from '@/utils/datetime';
+import { formatDate, formatTime, fromLocalISODate, localISODateOffset, toLocalISODate } from '@/utils/datetime';
 import { crmMeetingsService } from '@/services/crmMeetingsService';
 import {
   projectsService, visitStart, type ProjectVisit, type ProjectWithClient, type VisitSlot,
@@ -288,11 +288,14 @@ const RequestVisitDialog: React.FC<{
   }, [projectId]);
   useEffect(() => { if (open) { setPicked(null); loadSlots(); } }, [open, loadSlots]);
 
+  const otherZone = !!slots?.length && slots[0].time_zone !== viewerZone();
   const byDate = useMemo(() => {
-    const m = new Map<string, string[]>();
+    const m = new Map<string, Array<{ slot: VisitSlot; at: Date }>>();
     for (const s of slots ?? []) {
-      if (!m.has(s.slot_date)) m.set(s.slot_date, []);
-      m.get(s.slot_date)!.push(hhmm(s.slot_time));
+      const at = new Date(s.starts_at);
+      const day = toLocalISODate(at);
+      if (!m.has(day)) m.set(day, []);
+      m.get(day)!.push({ slot: s, at });
     }
     return [...m.entries()];
   }, [slots]);
@@ -330,8 +333,8 @@ const RequestVisitDialog: React.FC<{
               <SelectContent>{VISIT_PURPOSES.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          {slots && slots.length > 0 && slots[0].time_zone !== viewerZone() && (
-            <p className="text-xs text-muted-foreground">Times are the team's local time ({slots[0].time_zone}).</p>
+          {otherZone && (
+            <p className="text-xs text-muted-foreground">Times are shown in your time zone; the team's time ({slots![0].time_zone}) is underneath.</p>
           )}
           <div className="max-h-64 space-y-3 overflow-y-auto">
             {slots === null ? (
@@ -344,12 +347,16 @@ const RequestVisitDialog: React.FC<{
               <div key={d}>
                 <p className="mb-1 text-xs font-semibold text-muted-foreground">{formatDate(fromLocalISODate(d), { weekday: true })}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {times.map((t) => {
-                    const on = picked?.date === d && picked.time === t;
+                  {times.map(({ slot, at }) => {
+                    const t = hhmm(slot.slot_time);
+                    const on = picked?.date === slot.slot_date && picked.time === t;
                     return (
-                      <button key={t} type="button" onClick={() => setPicked({ date: d, time: t })}
+                      <button key={slot.starts_at} type="button" onClick={() => setPicked({ date: slot.slot_date, time: t })}
                         className={cn('rounded-sm border px-2.5 py-1 text-sm tabular-nums', on ? 'border-primary bg-primary/[0.08] text-primary' : 'border-hairline hover:border-primary')}
-                      >{t}</button>
+                      >
+                        {otherZone ? formatTime(at) : t}
+                        {otherZone && <span className="block text-[11px] text-muted-foreground">{t} team</span>}
+                      </button>
                     );
                   })}
                 </div>

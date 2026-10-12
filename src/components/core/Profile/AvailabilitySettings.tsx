@@ -83,6 +83,7 @@ export function AvailabilitySettings() {
       let timeZone: string | null = null;
       try { timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { /* unknown zone */ }
       if (entries.length > 0) {
+        if (!timeZone) throw new Error('Your browser did not report a time zone, so these hours cannot be saved — try another browser.');
         const { error: upsertErr } = await supabase.from('appointment_availability').upsert(
           entries.map(([date, ranges]) => ({ user_id: user.id, available_date: date, time_ranges: ranges, time_zone: timeZone })),
           { onConflict: 'user_id,available_date' },

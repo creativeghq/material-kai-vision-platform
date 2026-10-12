@@ -6,7 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate, fromLocalISODate } from '@/utils/datetime';
-import { projectsService, type ProjectDashboard } from '../services/projectsService';
+import { projectsService, type ProjectDashboard, type ProjectMaterialsRow } from '../services/projectsService';
 
 // --chart-1..3 in fixed order; dark-mode green is one step darker than the token to stay in band.
 const SEGMENTS = [
@@ -131,6 +131,9 @@ const Body: React.FC<{ data: ProjectDashboard; onOpenSection: (tab: string) => v
           ))}
           <LegendRow swatch={<span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundImage: HATCH }} />} label="On order, not billed yet" value={money(committed)} />
         </ul>
+        {parts.materials > 0 && data.materials_by_category.length > 0 && (
+          <MaterialsBreakdown rows={data.materials_by_category} total={parts.materials} money={money} />
+        )}
         {pnl.pending_expense_cost > 0 && (
           <p className="text-xs text-muted-foreground">
             {money(pnl.pending_expense_cost)} of expense claims await approval and are not counted yet.
@@ -176,6 +179,35 @@ const Body: React.FC<{ data: ProjectDashboard; onOpenSection: (tab: string) => v
     </div>
   );
 };
+
+const MATERIAL_ROW_LABEL: Record<ProjectMaterialsRow['kind'], string> = {
+  category: '',
+  uncategorised_product: 'Lines with no product category',
+  not_linked: 'Bills not linked to a purchase order line',
+};
+
+const MaterialsBreakdown: React.FC<{
+  rows: ProjectMaterialsRow[];
+  total: number;
+  money: (v: number) => string;
+}> = ({ rows, total, money }) => (
+  <div className="pt-2">
+    <h4 className="mb-1.5 text-xs font-semibold text-muted-foreground">Materials by category</h4>
+    <ul className="space-y-1.5 text-sm">
+      {rows.map((r) => (
+        <li key={r.kind + (r.category_id ?? '')} className="grid grid-cols-[minmax(0,1fr)_6rem_auto] items-center gap-3">
+          <span className={cn('truncate', r.kind !== 'category' && 'text-muted-foreground')}>
+            {r.kind === 'category' ? r.name ?? 'Unnamed category' : MATERIAL_ROW_LABEL[r.kind]}
+          </span>
+          <span className="h-1.5 overflow-hidden rounded-sm bg-surface-sunken">
+            <span className="block h-full bg-[hsl(var(--chart-2))]" style={{ width: `${Math.max(0, Math.min(100, (r.amount / total) * 100))}%` }} />
+          </span>
+          <span className="text-right tabular-nums">{money(r.amount)}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
 
 const CrewStrip: React.FC<{ crew: ProjectDashboard['crew'] }> = ({ crew }) => {
   const max = Math.max(1, ...crew.map((c) => c.workers));
