@@ -1,7 +1,9 @@
 /** Zernio Webhook Handler Edge Function */
 
 import { formIdFromToken, renderWhatsAppFormSubmission, type WhatsAppFormField } from '../_shared/whatsappForms.generated.ts';
-import { attributeProfileNumbers, chargeFirstMonth, holdNumbers } from '../_shared/channel-recurring-billing.ts';
+import {
+  FIRST_MONTH_HOLD, attributeProfileNumbers, chargeFirstMonth, holdNumbers, workspaceBillingUser,
+} from '../_shared/channel-recurring-billing.ts';
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -188,10 +190,7 @@ async function resolveAccountWorkspace(
 
 /** First active owner/admin of a workspace — the default thread owner when no campaign owner exists. */
 async function resolveWorkspaceOwner(supabase: any, workspaceId: string): Promise<string | null> {
-  const { data } = await supabase
-    .from('workspace_members').select('user_id, role')
-    .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']).limit(1).maybeSingle();
-  return data?.user_id ?? null;
+  return await workspaceBillingUser(supabase, workspaceId);
 }
 
 // `matchOrCreateContact` lived here. It was a SELECT-then-INSERT with no lock, and it is
@@ -1518,8 +1517,8 @@ async function recordActivatedNumber(supabase: any, num: any): Promise<string | 
   if (!owner) return `no owner or admin to bill in ${workspaceId}`;
   const charge = await chargeFirstMonth(supabase, { workspaceId, billingUserId: owner, zernioNumberIds: [numberId] });
   if (!charge.ok) {
-    const { held } = await holdNumbers(supabase, workspaceId, `first month unpaid: ${charge.error ?? 'refused'}`);
-    return `first month NOT charged (${charge.error}); ${held} number(s) on hold`;
+    const { held } = await holdNumbers(supabase, workspaceId, `${FIRST_MONTH_HOLD}: ${charge.error ?? 'refused'}`, [numberId]);
+    return `first month NOT charged (${charge.error}); ${held} number on hold until it is paid`;
   }
   return `charged ${charge.credits} credits`;
 }

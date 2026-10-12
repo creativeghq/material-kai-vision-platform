@@ -26,6 +26,27 @@ function basicAuth(user: string, pass: string): string {
   return `Basic ${btoa(String.fromCharCode(...bytes))}`;
 }
 
+async function readCapped(res: Response): Promise<string> {
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new WpError('The site answered with more than 2 MB. That is not a WordPress API response.');
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) { all.set(c, at); at += c.byteLength; }
+  return new TextDecoder().decode(all);
+}
+
 async function wp(creds: WpCreds, method: 'GET' | 'POST', path: string, body?: unknown): Promise<any> {
   let url: string;
   try {
@@ -47,7 +68,7 @@ async function wp(creds: WpCreds, method: 'GET' | 'POST', path: string, body?: u
   if (res.status >= 300 && res.status < 400) {
     throw new WpError(`The site redirected to ${res.headers.get('location') ?? 'another address'}. Use the final https address of the site.`, 400);
   }
-  const text = (await res.text()).slice(0, MAX_RESPONSE_BYTES);
+  const text = await readCapped(res);
   let json: any = null;
   try { json = text ? JSON.parse(text) : null; } catch { json = null; }
   if (!res.ok) {
@@ -163,9 +184,17 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
     return jsonResponse({ success: false, error: 'Connect your WordPress site first: Profile → Keys → Publishing.' }, 409);
   }
 
+  if (status === 'draft' && row.publish_external_id && row.published_at) {
+    return jsonResponse({
+      success: false,
+      error: 'This article is live on your site. Saving it as a draft would take the page down; use Publish to update it.',
+    }, 409);
+  }
+
   const title = String(row.title || row.target_keyword || 'Untitled');
   const slug = row.slug ? slugify(String(row.slug)) : slugify(title);
   let externalId = row.publish_external_id ? String(row.publish_external_id) : null;
+  let idRecorded = !!externalId;
 
   if (!externalId) {
     const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
@@ -196,15 +225,16 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
       if (!externalId) throw new WpError('WordPress did not return a post id.');
       const { error: idErr } = await supabase.from('seo_articles')
         .update({ publish_external_id: externalId, publish_target: 'wordpress' }).eq('id', articleId);
-      if (idErr) console.error('[seo-api] post created on WordPress but its id was NOT recorded', articleId, externalId, idErr.message);
+      if (idErr) console.error('[seo-publish] post created on WordPress but its id was NOT recorded', articleId, externalId, idErr.message);
+      else idRecorded = true;
     }
 
     const live = status === 'publish' && post?.status === 'publish';
     const { error: doneErr } = await supabase.from('seo_articles').update({
-      publish_started_at: null,
+      ...(idRecorded ? { publish_started_at: null } : {}),
       ...(live ? { published_url: String(post.link ?? ''), published_at: row.published_at ?? new Date().toISOString() } : {}),
     }).eq('id', articleId);
-    if (doneErr) console.error('[seo-api] published but the article row was not updated', articleId, doneErr.message);
+    if (doneErr) console.error('[seo-publish] published but the article row was not updated', articleId, doneErr.message);
     return jsonResponse({ success: true, external_id: externalId, status: post?.status ?? status, url: post?.link ?? null });
   } catch (e) {
     const err = e instanceof WpError ? e : null;

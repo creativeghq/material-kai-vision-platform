@@ -52,6 +52,16 @@ describe('#401 W3.1 — publishing is one post, however often it is retried', ()
     expect(publish.slice(create, record)).not.toMatch(/await (?!supabase)/);
   });
 
+  it('never turns a live post back into a draft, and keeps the claim until the post id is recorded', () => {
+    expect(publish).toMatch(/if \(status === 'draft' && row\.publish_external_id && row\.published_at\)/);
+    expect(publish).toContain('...(idRecorded ? { publish_started_at: null } : {})');
+  });
+
+  it('caps the size of what a site may send back', () => {
+    expect(fn).toContain('const text = await readCapped(res);');
+    expect(fn).not.toContain('await res.text()');
+  });
+
   it('a retry updates the post it already made', () => {
     expect(publish).toMatch(/if \(externalId\) \{\s*post = await wp\(creds, 'POST', `\/wp\/v2\/posts\/\$\{encodeURIComponent\(externalId\)\}`/);
   });

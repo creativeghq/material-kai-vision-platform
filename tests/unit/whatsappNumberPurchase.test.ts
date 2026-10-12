@@ -20,7 +20,7 @@ describe('#369 a workspace buys its own WhatsApp number and pays for it in credi
     expect(gate).toMatch(/\['owner', 'admin'\]\.includes/);
   });
 
-  it('debits the first month before buying and refunds when nothing was issued', () => {
+  it('debits the quote before buying and refunds when nothing was issued', () => {
     const debit = purchase.indexOf("rpc('debit_credits'");
     expect(debit).toBeGreaterThan(-1);
     expect(debit).toBeLessThan(purchase.indexOf('await purchasePhoneNumber('));
@@ -28,17 +28,38 @@ describe('#369 a workspace buys its own WhatsApp number and pays for it in credi
     expect(purchase).toMatch(/if \(outcome\.kind !== 'done'\) \{[\s\S]{0,300}await refund\(outcome\.kind\)/);
   });
 
-  it('a number paid up front is not charged again for the same month', () => {
-    expect(purchase).toMatch(/update\(\{ prepaid_through: month \}\)/);
+  it('keeps the money only for a number it CLAIMED; a replay or a webhook that got there first is refunded', () => {
+    expect(purchase).toContain('claimFirstMonth(supabaseClient, wsId, [outcome.numberId], month)');
+    expect(purchase).toContain('!outcome.alreadyPurchased');
+    expect(purchase).toMatch(/if \(!claimed\.length\) \{\s*await refund\(/);
+    const claim = billing.slice(billing.indexOf('export async function claimFirstMonth('), billing.indexOf('export async function unclaimFirstMonth('));
+    expect(claim).toContain('prepaid_through.is.null,prepaid_through.lt.');
+  });
+
+  it('the activation webhook claims before it debits, and gives the claim back when the debit fails', () => {
+    const charge = billing.slice(billing.indexOf('export async function chargeFirstMonth('));
+    const claim = charge.indexOf('await claimFirstMonth(');
+    const debit = charge.indexOf("rpc('debit_credits'");
+    expect(claim).toBeGreaterThan(-1);
+    expect(claim).toBeLessThan(debit);
+    expect(charge.slice(debit)).toMatch(/if \(debitErr \|\| !row\?\.success\) \{\s*await unclaimFirstMonth\(/);
     expect(billing).toMatch(/!\(n\.prepaid_through && n\.prepaid_through >= month\)/);
   });
 
-  it('a number that goes live later (KYC, checkout) is recorded and charged on activation, held if unpaid', () => {
+  it('an unpaid first month holds ONLY that number, and the nightly retry can lift it', () => {
     const hook = read('supabase/functions/zernio-webhook-handler/index.ts');
     const fn = hook.slice(hook.indexOf('async function recordActivatedNumber('));
-    expect(fn).toContain('attributeProfileNumbers(');
     expect(fn).toContain('chargeFirstMonth(');
-    expect(fn).toMatch(/if \(!charge\.ok\) \{\s*const \{ held \} = await holdNumbers\(/);
-    expect(billing).toMatch(/\.is\('prepaid_through', null\)/);
+    expect(fn).toMatch(/holdNumbers\(supabase, workspaceId, `\$\{FIRST_MONTH_HOLD\}[^`]*`, \[numberId\]\)/);
+    const retry = billing.slice(billing.indexOf('export async function retryFailedCharges('));
+    expect(retry).toContain('await retryUnpaidFirstMonths(supabase, workspaceId)');
+    const release = billing.slice(billing.indexOf('async function releaseHold('), billing.indexOf('async function retryUnpaidFirstMonths('));
+    expect(release).toContain("q.not('held_reason', 'like', `${FIRST_MONTH_HOLD}%`)");
+  });
+
+  it('bills an ACTIVE owner or admin, through one lookup', () => {
+    const who = billing.slice(billing.indexOf('export async function workspaceBillingUser('), billing.indexOf('export async function attributeProfileNumbers('));
+    expect(who).toContain(".eq('status', 'active')");
+    expect(billing.match(/from\('workspace_members'\)/g)).toHaveLength(1);
   });
 });

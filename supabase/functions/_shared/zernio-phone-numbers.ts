@@ -108,7 +108,7 @@ export async function listPhoneNumbers(
 export type PurchaseOutcome =
   | { kind: 'checkout'; message: string | null; checkoutUrl: string }
   | { kind: 'kyc_required'; country: string | null; numberType: string | null; kycUrl: string }
-  | { kind: 'done'; message: string | null };
+  | { kind: 'done'; message: string | null; numberId: string | null; alreadyPurchased: boolean };
 
 /** `POST /v1/phone-numbers/purchase`. */
 export async function purchasePhoneNumber(supabase: SupabaseLike, params: {
@@ -149,7 +149,12 @@ export async function purchasePhoneNumber(supabase: SupabaseLike, params: {
   if (data?.checkoutUrl) {
     return { kind: 'checkout', message: data.message ?? null, checkoutUrl: String(data.checkoutUrl) };
   }
-  return { kind: 'done', message: data?.message ?? null };
+  return {
+    kind: 'done',
+    message: data?.message ?? null,
+    numberId: String(data?.phoneNumber?.id ?? data?.numberId ?? '') || null,
+    alreadyPurchased: data?.status === 'already_purchased',
+  };
 }
 
 /**

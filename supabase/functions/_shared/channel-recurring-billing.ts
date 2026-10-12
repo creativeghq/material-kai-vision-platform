@@ -114,14 +114,15 @@ async function chargeOne(
     : { ...base, status: 'failed', error: String(error?.message ?? 'insufficient credits') };
 }
 
-/**
- * Put a workspace's rented numbers ON HOLD.
- *
- * No grace period, by decision (2026-08-24): the first failed charge stops the service. Held, not
- * released — the number stays with the carrier and the channel is deactivated so sends fail fast
- * instead of silently costing money. Paying restores the same line, which is the entire reason
- * this is a status and not a delete.
- */
+/** Who a workspace's credits are debited through: an active owner first, then an active admin. */
+export async function workspaceBillingUser(supabase: SupabaseLike, workspaceId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('workspace_members').select('user_id, role')
+    .eq('workspace_id', workspaceId).eq('status', 'active')
+    .in('role', ['owner', 'admin']).order('role', { ascending: false }).limit(1).maybeSingle();
+  return (data as { user_id?: string } | null)?.user_id ?? null;
+}
+
 export async function attributeProfileNumbers(
   supabase: SupabaseLike,
   workspaceId: string,
@@ -130,7 +131,12 @@ export async function attributeProfileNumbers(
 ): Promise<{ inserted: string[]; errors: string[] }> {
   const inserted: string[] = [];
   const errors: string[] = [];
-  const owned = await listPhoneNumbers(supabase as never, profileId);
+  let owned: Awaited<ReturnType<typeof listPhoneNumbers>>;
+  try {
+    owned = await listPhoneNumbers(supabase as never, profileId);
+  } catch (e) {
+    return { inserted, errors: [`could not list the profile's numbers: ${e instanceof Error ? e.message : String(e)}`] };
+  }
   for (const n of owned.filter((x) => !x.broughtYourOwn)) {
     const { data: existing, error: lookupErr } = await supabase
       .from('workspace_phone_numbers').select('id').eq('zernio_number_id', n.id).maybeSingle();
@@ -151,50 +157,80 @@ export async function attributeProfileNumbers(
   return { inserted, errors };
 }
 
+export interface ClaimedNumber { id: string; phone_number: string; monthly_cents: number }
+
+/** Mark these numbers paid for the month, but only those not already paid; the claim decides who charges. */
+export async function claimFirstMonth(
+  supabase: SupabaseLike,
+  workspaceId: string,
+  zernioNumberIds: string[],
+  month: string,
+): Promise<{ claimed: ClaimedNumber[]; error?: string }> {
+  if (!zernioNumberIds.length) return { claimed: [] };
+  const { data, error } = await supabase
+    .from('workspace_phone_numbers').update({ prepaid_through: month })
+    .eq('workspace_id', workspaceId).in('zernio_number_id', zernioNumberIds)
+    .or(`prepaid_through.is.null,prepaid_through.lt.${month}`).gt('monthly_cents', 0)
+    .select('id, phone_number, monthly_cents');
+  if (error) return { claimed: [], error: String(error.message ?? error) };
+  return { claimed: (data ?? []) as ClaimedNumber[] };
+}
+
+export async function unclaimFirstMonth(supabase: SupabaseLike, claimed: ClaimedNumber[]): Promise<void> {
+  if (!claimed.length) return;
+  const { error } = await supabase.from('workspace_phone_numbers')
+    .update({ prepaid_through: null }).in('id', claimed.map((r) => r.id));
+  if (error) console.error('[channel-billing] first-month claim NOT released; the number reads as paid', claimed.map((r) => r.id), error.message);
+}
+
+export const firstMonthCredits = (claimed: ClaimedNumber[]) =>
+  recurringCredits(claimed.reduce((sum, r) => sum + r.monthly_cents / 100, 0), 1);
+
 export async function chargeFirstMonth(
   supabase: SupabaseLike,
   params: { workspaceId: string; billingUserId: string; zernioNumberIds: string[]; now?: Date },
 ): Promise<{ ok: boolean; credits: number; error?: string }> {
-  if (!params.zernioNumberIds.length) return { ok: true, credits: 0 };
   const month = periodMonth(params.now ?? new Date());
-  const { data: rows, error: readErr } = await supabase
-    .from('workspace_phone_numbers').select('id, phone_number, monthly_cents')
-    .eq('workspace_id', params.workspaceId).in('zernio_number_id', params.zernioNumberIds)
-    .is('prepaid_through', null);
-  if (readErr) return { ok: false, credits: 0, error: readErr.message };
-  const due = ((rows ?? []) as Array<{ id: string; phone_number: string; monthly_cents: number | null }>)
-    .filter((r) => (r.monthly_cents ?? 0) > 0);
-  if (!due.length) return { ok: true, credits: 0 };
-  const totalUsd = due.reduce((sum, r) => sum + (r.monthly_cents ?? 0) / 100, 0);
-  const credits = recurringCredits(totalUsd, 1);
+  const { claimed, error: claimErr } = await claimFirstMonth(supabase, params.workspaceId, params.zernioNumberIds, month);
+  if (claimErr) return { ok: false, credits: 0, error: claimErr };
+  if (!claimed.length) return { ok: true, credits: 0 };
+  const credits = firstMonthCredits(claimed);
   const { data: debit, error: debitErr } = await supabase.rpc('debit_credits', {
     p_user_id: params.billingUserId,
     p_amount: credits,
     p_operation_type: 'phone_number_first_month',
-    p_description: `WhatsApp number ${due.map((r) => r.phone_number).join(', ')}: ${month.slice(0, 7)}`,
-    p_metadata: { numbers: due.map((r) => r.phone_number), total_cost_usd: totalUsd, month },
+    p_description: `WhatsApp number ${claimed.map((r) => r.phone_number).join(', ')}: ${month.slice(0, 7)}`,
+    p_metadata: { numbers: claimed.map((r) => r.phone_number), month },
     p_workspace_id: params.workspaceId,
   });
   const row = Array.isArray(debit) ? debit[0] : debit;
-  if (debitErr || !row?.success) return { ok: false, credits, error: row?.error_message ?? debitErr?.message ?? 'Insufficient credits' };
-  const { error: stampErr } = await supabase.from('workspace_phone_numbers')
-    .update({ prepaid_through: month }).in('id', due.map((r) => r.id));
-  if (stampErr) return { ok: false, credits, error: `charged but not recorded as prepaid: ${stampErr.message}` };
+  if (debitErr || !row?.success) {
+    await unclaimFirstMonth(supabase, claimed);
+    return { ok: false, credits, error: row?.error_message ?? debitErr?.message ?? 'Insufficient credits' };
+  }
   return { ok: true, credits };
 }
 
+export const FIRST_MONTH_HOLD = 'first month unpaid';
+
+/**
+ * Put a workspace's rented numbers ON HOLD — all of them for an unpaid month, or only the named
+ * ones for an unpaid first month. Held, not released: paying restores the same line.
+ */
 export async function holdNumbers(
   supabase: SupabaseLike,
   workspaceId: string,
   reason: string,
+  onlyZernioIds?: string[],
 ): Promise<{ held: number; error?: string }> {
-  const { data: held, error } = await supabase
+  let q = supabase
     .from('workspace_phone_numbers')
     .update({ status: 'on_hold', held_at: new Date().toISOString(), held_reason: reason })
     .eq('workspace_id', workspaceId)
     .is('released_at', null)
-    .eq('status', 'active')
-    .select('phone_number');
+    .eq('status', 'active');
+  if (onlyZernioIds) q = q.in('zernio_number_id', onlyZernioIds);
+  const { data: held, error } = await q.select('phone_number');
 
   if (error) return { held: 0, error: String(error.message ?? error) };
 
@@ -212,15 +248,16 @@ export async function holdNumbers(
   return { held: numbers.length };
 }
 
-/** Take them off hold once a month settles. Mirrors holdNumbers exactly, in both tables. */
-async function releaseHold(supabase: SupabaseLike, workspaceId: string): Promise<number> {
-  const { data: back } = await supabase
+/** Take numbers off hold, in both tables. A month settling never lifts an unpaid first month. */
+async function releaseHold(supabase: SupabaseLike, workspaceId: string, onlyIds?: string[]): Promise<number> {
+  let q = supabase
     .from('workspace_phone_numbers')
     .update({ status: 'active', held_at: null, held_reason: null })
     .eq('workspace_id', workspaceId)
     .is('released_at', null)
-    .eq('status', 'on_hold')
-    .select('phone_number');
+    .eq('status', 'on_hold');
+  q = onlyIds ? q.in('id', onlyIds) : q.not('held_reason', 'like', `${FIRST_MONTH_HOLD}%`);
+  const { data: back } = await q.select('phone_number');
 
   const numbers = ((back ?? []) as Array<{ phone_number: string }>).map((n) => n.phone_number);
   if (numbers.length) {
@@ -231,6 +268,29 @@ async function releaseHold(supabase: SupabaseLike, workspaceId: string): Promise
       .in('sender_id', numbers);
   }
   return numbers.length;
+}
+
+/** Numbers held because their first month was refused: charge again, and restore each one that pays. */
+async function retryUnpaidFirstMonths(supabase: SupabaseLike, workspaceId?: string): Promise<{ settled: number; stillFailing: number }> {
+  let q = supabase.from('workspace_phone_numbers').select('id, workspace_id, zernio_number_id')
+    .eq('status', 'on_hold').is('released_at', null).is('prepaid_through', null)
+    .like('held_reason', `${FIRST_MONTH_HOLD}%`);
+  if (workspaceId) q = q.eq('workspace_id', workspaceId);
+  const { data } = await q;
+  const byWorkspace = new Map<string, Array<{ id: string; zernio_number_id: string }>>();
+  for (const r of (data ?? []) as Array<{ id: string; workspace_id: string; zernio_number_id: string }>) {
+    byWorkspace.set(r.workspace_id, [...(byWorkspace.get(r.workspace_id) ?? []), r]);
+  }
+  let settled = 0, stillFailing = 0;
+  for (const [ws, rows] of byWorkspace) {
+    const payer = await workspaceBillingUser(supabase, ws);
+    const charge = payer
+      ? await chargeFirstMonth(supabase, { workspaceId: ws, billingUserId: payer, zernioNumberIds: rows.map((r) => r.zernio_number_id) })
+      : { ok: false };
+    if (charge.ok) settled += await releaseHold(supabase, ws, rows.map((r) => r.id));
+    else stillFailing += rows.length;
+  }
+  return { settled, stillFailing };
 }
 
 /**
@@ -263,15 +323,12 @@ export async function retryFailedCharges(
 
   for (const row of ((failed ?? []) as Array<Record<string, string | number | null>>)) {
     const workspaceId = String(row.workspace_id);
-    const { data: member } = await supabase
-      .from('workspace_members').select('user_id')
-      .eq('workspace_id', workspaceId).eq('status', 'active')
-      .in('role', ['owner', 'admin']).order('role').limit(1).maybeSingle();
-    if (!member?.user_id) { stillFailing++; continue; }
+    const payer = await workspaceBillingUser(supabase, workspaceId);
+    if (!payer) { stillFailing++; continue; }
 
     const credits = Number(row.credits_charged) || 0;
     const { data, error } = await supabase.rpc('debit_credits', {
-      p_user_id: member.user_id,
+      p_user_id: payer,
       p_amount: credits,
       p_operation_type: 'phone_number_monthly',
       p_description: `${row.quantity} phone number(s) — ${row.period_month} (retry)`,
@@ -299,7 +356,12 @@ export async function retryFailedCharges(
     if ((count ?? 0) === 0) restored += await releaseHold(supabase, workspaceId);
   }
 
-  return { settled, stillFailing, restored };
+  const firstMonths = await retryUnpaidFirstMonths(supabase, workspaceId);
+  return {
+    settled: settled + firstMonths.settled,
+    stillFailing: stillFailing + firstMonths.stillFailing,
+    restored: restored + firstMonths.settled,
+  };
 }
 
 /**
@@ -321,12 +383,9 @@ export async function billChannelsForMonth(
   for (const ws of ((workspaces ?? []) as Array<{ id: string; name: string }>)) {
     // Who pays. Owner first, then any admin — a workspace with neither cannot be billed, and that
     // is worth recording rather than skipping quietly.
-    const { data: member } = await supabase
-      .from('workspace_members').select('user_id, role')
-      .eq('workspace_id', ws.id).eq('status', 'active')
-      .in('role', ['owner', 'admin']).order('role').limit(1).maybeSingle();
+    const payer = await workspaceBillingUser(supabase, ws.id);
 
-    if (!member?.user_id) {
+    if (!payer) {
       lines.push({
         workspaceId: ws.id, workspaceName: ws.name, chargeType: 'number', quantity: 0,
         unitCostUsd: 0, credits: 0, status: 'skipped',
@@ -352,7 +411,7 @@ export async function billChannelsForMonth(
     if (priced.length) {
       const totalUsd = priced.reduce((sum, n) => sum + (n.monthly_cents ?? 0) / 100, 0);
       lines.push(await chargeOne(supabase, {
-        workspaceId: ws.id, workspaceName: ws.name, billingUserId: member.user_id,
+        workspaceId: ws.id, workspaceName: ws.name, billingUserId: payer,
         chargeType: 'number', quantity: priced.length,
         // The average is only the reporting unit; the CHARGE is built from the real total above,
         // so a mixed-country set bills correctly.

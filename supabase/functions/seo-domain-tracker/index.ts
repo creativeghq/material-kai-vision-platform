@@ -120,7 +120,11 @@ async function maybeAlert(
   }));
 }
 
-async function trackWebsite(supabase: any, website: { id: string; workspace_id: string; url: string }): Promise<{ ok: boolean; error?: string }> {
+async function trackWebsite(
+  supabase: any,
+  website: { id: string; workspace_id: string; url: string },
+  opts: { competitorKeywords: boolean },
+): Promise<{ ok: boolean; error?: string }> {
   const domain = domainOf(website.url);
   const { country, language } = await resolveMarket(supabase, website.id, domain);
   try {
@@ -222,7 +226,7 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     // Competitors ride the same weekly run, in the SAME market, so the lines on the
     // comparison chart are actually comparable — a competitor measured in a different
     // country is a different question wearing the same axis.
-    await trackCompetitors(supabase, website, country, language, snapshot.captured_at);
+    await trackCompetitors(supabase, website, country, language, snapshot.captured_at, opts.competitorKeywords);
 
     return { ok: true };
   } catch (e) {
@@ -242,6 +246,7 @@ async function trackCompetitors(
   country: string,
   language: string,
   capturedAt: string,
+  withKeywords: boolean,
 ): Promise<void> {
   const { data: rivals, error } = await supabase.from('seo_competitors')
     .select('id, competitor_domain')
@@ -254,24 +259,26 @@ async function trackCompetitors(
     const status: Record<string, string> = {};
     const errors: Record<string, string> = {};
     let row: any = {};
-    try {
-      const r = await dfs('labs_domain_rank_overview', {
-        target: rival.competitor_domain, country_code: country, language_code: language,
-      });
-      status.overview = r.items.length ? 'ok' : 'no_data';
-      row = r.items?.[0]?.metrics?.organic || {};
-    } catch (e) {
+    const [overview, ranked] = await Promise.allSettled([
+      dfs('labs_domain_rank_overview', { target: rival.competitor_domain, country_code: country, language_code: language }),
+      withKeywords
+        ? dfs('labs_ranked_keywords', { target: rival.competitor_domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT })
+        : Promise.resolve(null),
+    ]);
+    if (overview.status === 'fulfilled') {
+      status.overview = overview.value.items.length ? 'ok' : 'no_data';
+      row = overview.value.items?.[0]?.metrics?.organic || {};
+    } else {
       status.overview = 'failed';
-      errors.overview = String(e instanceof Error ? e.message : e).slice(0, 300);
+      errors.overview = String(overview.reason instanceof Error ? overview.reason.message : overview.reason).slice(0, 300);
       console.error(`[seo-domain-tracker] competitor ${rival.competitor_domain} failed:`, errors.overview);
     }
-
-    try {
-      const ranked = await dfs('labs_ranked_keywords', {
-        target: rival.competitor_domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT,
-      });
-      status.ranked = ranked.items.length ? 'ok' : 'no_data';
-      const rows = ranked.items.map((it: any) => {
+    if (ranked.status === 'rejected') {
+      status.ranked = 'failed';
+      errors.ranked = String(ranked.reason instanceof Error ? ranked.reason.message : ranked.reason).slice(0, 300);
+    } else if (ranked.value) {
+      status.ranked = ranked.value.items.length ? 'ok' : 'no_data';
+      const rows = ranked.value.items.map((it: any) => {
         const si = it?.ranked_serp_element?.serp_item || {};
         return {
           keyword: it?.keyword_data?.keyword ?? '', position: n(si.rank_absolute),
@@ -282,9 +289,6 @@ async function trackCompetitors(
         p_competitor_id: rival.id, p_captured_at: capturedAt, p_rows: rows,
       });
       if (kwErr) { status.ranked = 'failed'; errors.ranked = `not stored: ${kwErr.message}`.slice(0, 300); }
-    } catch (e) {
-      status.ranked = 'failed';
-      errors.ranked = String(e instanceof Error ? e.message : e).slice(0, 300);
     }
 
     const { error: upErr } = await supabase.from('seo_competitor_snapshots').upsert({
@@ -310,7 +314,7 @@ Deno.serve(withApiLogging('seo-domain-tracker', async (req: Request) => {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
     const { data: sites } = await supabase.from('user_websites').select('id, workspace_id, url').eq('is_active', true);
     let ok = 0, failed = 0;
-    for (const s of sites || []) { const r = await trackWebsite(supabase, s); if (r.ok) ok++; else failed++; }
+    for (const s of sites || []) { const r = await trackWebsite(supabase, s, { competitorKeywords: true }); if (r.ok) ok++; else failed++; }
     return json({ ok: true, tracked: ok, failed });
   }
 
@@ -324,6 +328,6 @@ Deno.serve(withApiLogging('seo-domain-tracker', async (req: Request) => {
   // Paid module — refuse before the DataForSEO snapshot (#212). Cron branch stays ungated.
   const ent = await assertEntitled(supabase, website.workspace_id, 'seo-toolkit');
   if (!ent.ok) return ent.response;
-  const r = await trackWebsite(supabase, website);
+  const r = await trackWebsite(supabase, website, { competitorKeywords: false });
   return json(r, r.ok ? 200 : 400);
 }));

@@ -38,7 +38,8 @@ import {
 } from '../_shared/whatsappForms.generated.ts';
 import { reconcileWaba } from '../_shared/whatsapp-cost-reconcile.ts';
 import {
-  attributeProfileNumbers, billChannelsForMonth, periodMonth, recurringCredits, retryFailedCharges,
+  attributeProfileNumbers, billChannelsForMonth, claimFirstMonth, firstMonthCredits, periodMonth, recurringCredits,
+  retryFailedCharges, type ClaimedNumber,
 } from '../_shared/channel-recurring-billing.ts';
 import {
   zernioApi,
@@ -1088,12 +1089,12 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const offer = (await listPurchasableCountries(supabaseClient))
           .find((c) => c.code === String(country ?? '').trim().toUpperCase());
         if (!offer) throw new HttpError(400, 'Numbers are not offered for that country.');
-        const firstMonthCredits = recurringCredits(offer.monthlyCents / 100, 1);
+        const quotedCredits = recurringCredits(offer.monthlyCents / 100, 1);
         const month = periodMonth(new Date());
 
         const { data: debitData, error: debitErr } = await supabaseClient.rpc('debit_credits', {
           p_user_id: auth.userId,
-          p_amount: firstMonthCredits,
+          p_amount: quotedCredits,
           p_operation_type: 'phone_number_first_month',
           p_description: `WhatsApp number (${offer.code}): ${month.slice(0, 7)}`,
           p_metadata: { country: offer.code, monthly_cents: offer.monthlyCents, month },
@@ -1101,12 +1102,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
         const debit = Array.isArray(debitData) ? debitData[0] : debitData;
         if (debitErr || !debit?.success) {
-          throw new HttpError(402, debit?.error_message ?? `Not enough credits: the first month is ${firstMonthCredits} credits.`);
+          throw new HttpError(402, debit?.error_message ?? `Not enough credits: the first month is ${quotedCredits} credits.`);
         }
-        const refund = async (reason: string) => {
+        const refund = async (reason: string, amount = quotedCredits) => {
+          if (!(amount > 0)) return;
           const { error } = await supabaseClient.rpc('refund_credits', {
             p_user_id: auth.userId,
-            p_amount: firstMonthCredits,
+            p_amount: amount,
             p_operation_type: 'phone_number_first_month_refund',
             p_description: `Refund: WhatsApp number not provisioned (${reason})`,
             p_metadata: { country: offer.code, reason },
@@ -1150,17 +1152,40 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           return jsonResponse({ success: true, workspace_id: wsId, profile_id: profileId, charged_credits: 0, ...outcome });
         }
 
-        const { inserted, errors: attributionErrors } = await attributeProfileNumbers(supabaseClient, wsId, profileId, auth.userId);
-        if (inserted.length) {
-          const { error: stampErr } = await supabaseClient.from('workspace_phone_numbers')
-            .update({ prepaid_through: month }).in('zernio_number_id', inserted);
-          if (stampErr) attributionErrors.push(`prepaid month not recorded: ${stampErr.message}`);
+        const { errors: attributionErrors } = await attributeProfileNumbers(supabaseClient, wsId, profileId, auth.userId);
+        const { claimed, error: claimErr } = outcome.numberId && !outcome.alreadyPurchased
+          ? await claimFirstMonth(supabaseClient, wsId, [outcome.numberId], month)
+          : { claimed: [] as ClaimedNumber[], error: undefined };
+        if (claimErr) attributionErrors.push(`first month not recorded: ${claimErr}`);
+        let charged = 0;
+        if (!claimed.length) {
+          await refund(outcome.alreadyPurchased ? 'already purchased under this intent' : 'first month already paid or number not recorded');
+        } else {
+          const actual = firstMonthCredits(claimed);
+          charged = actual;
+          if (actual < quotedCredits) {
+            await refund('priced below the country rate', Math.round((quotedCredits - actual) * 100) / 100);
+          } else if (actual > quotedCredits) {
+            const { data: extra, error: extraErr } = await supabaseClient.rpc('debit_credits', {
+              p_user_id: auth.userId,
+              p_amount: Math.round((actual - quotedCredits) * 100) / 100,
+              p_operation_type: 'phone_number_first_month',
+              p_description: `WhatsApp number (${offer.code}): difference to its own monthly price`,
+              p_metadata: { country: offer.code, month },
+              p_workspace_id: wsId,
+            });
+            const extraRow = Array.isArray(extra) ? extra[0] : extra;
+            if (extraErr || !extraRow?.success) {
+              charged = quotedCredits;
+              attributionErrors.push('the number costs more than the country rate and the difference could not be charged');
+            }
+          }
         }
         return jsonResponse({
           success: true,
           workspace_id: wsId,
           profile_id: profileId,
-          charged_credits: firstMonthCredits,
+          charged_credits: charged,
           ...outcome,
           ...(attributionErrors.length
             ? {
