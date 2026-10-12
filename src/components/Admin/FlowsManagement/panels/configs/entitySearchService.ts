@@ -172,6 +172,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'send-quote-email', label: 'send-quote-email', sublabel: 'Email a quote to a recipient with a public share link' },
   { id: 'seo-api', label: 'seo-api', sublabel: 'Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.' },
   { id: 'seo-domain-tracker', label: 'seo-domain-tracker', sublabel: 'Weekly Rankings + Backlinks snapshots for a connected website' },
+  { id: 'seo-publish', label: 'seo-publish', sublabel: 'Publish SEO articles to the workspace own WordPress site' },
   { id: 'seo-rank-tracker', label: 'seo-rank-tracker', sublabel: 'Daily positions for the keywords a workspace chose to track' },
   { id: 'seve-directory-sync', label: 'seve-directory-sync', sublabel: 'Refresh the ΣΕΒΕ exporter directory used to verify supplier identity (cron)' },
   { id: 'seo-reports', label: 'seo-reports', sublabel: 'Build a scheduled SEO report and hand it to Flows to deliver' },

@@ -2803,6 +2803,77 @@
     ]
   },
   {
+    "name": "seo-publish",
+    "tag": "SEO",
+    "summary": "Publish SEO articles to the workspace's own WordPress site",
+    "description": "Connects a workspace's WordPress site (application password stored in Vault, verified against /wp/v2/users/me) and publishes an article as a draft or live post. Every site request goes through the SSRF guard, https only, no redirects. A retry updates the post it already created (seo_articles.publish_external_id).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/seo-system.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "wordpress_connect",
+        "summary": "Verify and store the workspace's own WordPress site (owner/admin). The application password goes to Vault; the account must be able to publish posts. Pass disconnect=true to remove it.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace"
+          },
+          {
+            "name": "site_url",
+            "type": "string",
+            "required": false,
+            "desc": "https address of the site"
+          },
+          {
+            "name": "username",
+            "type": "string",
+            "required": false,
+            "desc": "WordPress username"
+          },
+          {
+            "name": "application_password",
+            "type": "string",
+            "required": false,
+            "desc": "WordPress application password"
+          },
+          {
+            "name": "disconnect",
+            "type": "boolean",
+            "required": false,
+            "desc": "Remove the connection"
+          }
+        ],
+        "response": "{success:boolean, connected:boolean, site_url?:string, site_name?:string|null}"
+      },
+      {
+        "name": "publish",
+        "summary": "Publish an article to the workspace's WordPress site as a draft or a live post (owner, admin or marketing). Markdown is rendered through the canonical escaper with Article and FAQPage JSON-LD. A retry updates the same post.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "SEO article"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": false,
+            "desc": "draft | publish"
+          }
+        ],
+        "response": "{success:boolean, external_id:string, status:string, url:string|null}"
+      }
+    ]
+  },
+  {
     "name": "seo-rank-tracker",
     "tag": "SEO",
     "summary": "Daily positions for the keywords a workspace chose to track",

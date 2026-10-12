@@ -6180,6 +6180,149 @@
         }
       }
     },
+    "/seo-publish": {
+      "post": {
+        "tags": [
+          "SEO"
+        ],
+        "summary": "Publish SEO articles to the workspace's own WordPress site",
+        "operationId": "post_seo_publish",
+        "description": "Connects a workspace's WordPress site (application password stored in Vault, verified against /wp/v2/users/me) and publishes an article as a draft or live post. Every site request goes through the SSRF guard, https only, no redirects. A retry updates the post it already created (seo_articles.publish_external_id).\n\n**Actions** (`action` in the body):\n- `wordpress_connect` — Verify and store the workspace's own WordPress site (owner/admin). The application password goes to Vault; the account must be able to publish posts. Pass disconnect=true to remove it. → `{success:boolean, connected:boolean, site_url?:string, site_name?:string|null}`\n- `publish` — Publish an article to the workspace's WordPress site as a draft or a live post (owner, admin or marketing). Markdown is rendered through the canonical escaper with Article and FAQPage JSON-LD. A retry updates the same post. → `{success:boolean, external_id:string, status:string, url:string|null}`\n\n📖 [docs/seo-system.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/seo-system.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "wordpress_connect"
+                        ],
+                        "description": "Verify and store the workspace's own WordPress site (owner/admin). The application password goes to Vault; the account must be able to publish posts. Pass disconnect=true to remove it."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Workspace"
+                      },
+                      "site_url": {
+                        "type": "string",
+                        "description": "https address of the site"
+                      },
+                      "username": {
+                        "type": "string",
+                        "description": "WordPress username"
+                      },
+                      "application_password": {
+                        "type": "string",
+                        "description": "WordPress application password"
+                      },
+                      "disconnect": {
+                        "type": "boolean",
+                        "description": "Remove the connection"
+                      }
+                    },
+                    "description": "Returns: {success:boolean, connected:boolean, site_url?:string, site_name?:string|null}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "article_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "publish"
+                        ],
+                        "description": "Publish an article to the workspace's WordPress site as a draft or a live post (owner, admin or marketing). Markdown is rendered through the canonical escaper with Article and FAQPage JSON-LD. A retry updates the same post."
+                      },
+                      "article_id": {
+                        "type": "string",
+                        "description": "SEO article"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "draft | publish"
+                      }
+                    },
+                    "description": "Returns: {success:boolean, external_id:string, status:string, url:string|null}"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/seo-rank-tracker": {
       "post": {
         "tags": [

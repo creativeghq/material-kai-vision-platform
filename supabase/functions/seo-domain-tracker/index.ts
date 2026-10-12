@@ -266,6 +266,27 @@ async function trackCompetitors(
       console.error(`[seo-domain-tracker] competitor ${rival.competitor_domain} failed:`, errors.overview);
     }
 
+    try {
+      const ranked = await dfs('labs_ranked_keywords', {
+        target: rival.competitor_domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT,
+      });
+      status.ranked = ranked.items.length ? 'ok' : 'no_data';
+      const rows = ranked.items.map((it: any) => {
+        const si = it?.ranked_serp_element?.serp_item || {};
+        return {
+          keyword: it?.keyword_data?.keyword ?? '', position: n(si.rank_absolute),
+          search_volume: n(it?.keyword_data?.keyword_info?.search_volume), etv: n(si.etv), url: si.relative_url ?? null,
+        };
+      });
+      const { error: kwErr } = await supabase.rpc('replace_seo_competitor_keywords', {
+        p_competitor_id: rival.id, p_captured_at: capturedAt, p_rows: rows,
+      });
+      if (kwErr) { status.ranked = 'failed'; errors.ranked = `not stored: ${kwErr.message}`.slice(0, 300); }
+    } catch (e) {
+      status.ranked = 'failed';
+      errors.ranked = String(e instanceof Error ? e.message : e).slice(0, 300);
+    }
+
     const { error: upErr } = await supabase.from('seo_competitor_snapshots').upsert({
       competitor_id: rival.id, website_id: website.id, workspace_id: website.workspace_id,
       captured_at: capturedAt, country_code: country, language_code: language,

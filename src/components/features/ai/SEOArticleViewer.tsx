@@ -69,6 +69,7 @@ import {
   Undo2, Wand2, RefreshCw, Plus, Pencil, Download, FileJson,
 } from 'lucide-react';
 import { articleExportFilename, buildArticleExport } from '@/services/seo/articleExport';
+import { PublishToWordPressButtons } from './PublishToWordPressButtons';
 import { CALLOUT_KIND_PATTERN, type CalloutKind } from '@/services/seo/calloutKinds';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
@@ -186,6 +187,7 @@ function ArticleExportPanel({ article }: { article: SEOArticle }) {
             <Download className="w-3 h-3 mr-1" />
             Download .json
           </Button>
+          {article.status === 'completed' && <PublishToWordPressButtons articleId={article.id} disabled={!markdown} />}
         </div>
       </CardHeader>
       <CardContent>

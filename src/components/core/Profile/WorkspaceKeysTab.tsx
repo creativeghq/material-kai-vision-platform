@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Share2, MessageCircle, ArrowRight,
-  FileImage, Landmark, Mail, Users, Truck, Code2, KeyRound,
+  FileImage, Landmark, Mail, Users, Truck, Code2, KeyRound, Globe,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +24,7 @@ import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard'
 import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
 import { ShippingCredentialsCard } from '@/modules/stock/components/ShippingCredentialsCard';
 import { EmbedKeysCard } from '@/components/core/Profile/EmbedKeysCard';
+import { WordPressConnectionCard } from '@/components/core/Profile/WordPressConnectionCard';
 import { useModule } from '@/modules/_core';
 import { isAdmin } from '@/auth/roles';
 import { HubTabNav } from '@/components/core/hub';
@@ -76,7 +77,7 @@ const SectionHead: React.FC<{ icon: React.ElementType; title: string; descriptio
   </div>
 );
 
-type SectionId = 'finance' | 'email' | 'documents' | 'hr' | 'shipping' | 'social' | 'embed';
+type SectionId = 'finance' | 'email' | 'documents' | 'hr' | 'shipping' | 'social' | 'publishing' | 'embed';
 
 export const WorkspaceKeysTab: React.FC = () => {
   const { activeWorkspaceId, workspaceRole } = useWorkspace();
@@ -86,7 +87,7 @@ export const WorkspaceKeysTab: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Deep-linkable: `/profile?tab=keys&section=email` lands on the right card (cross-module
   // "configure your key here" links target it). Falls back to finance.
-  const VALID_SECTIONS: SectionId[] = ['finance', 'email', 'documents', 'hr', 'shipping', 'social', 'embed'];
+  const VALID_SECTIONS: SectionId[] = ['finance', 'email', 'documents', 'hr', 'shipping', 'social', 'publishing', 'embed'];
   const paramSection = searchParams.get('section') as SectionId | null;
   const [active, setActive] = useState<SectionId>(
     paramSection && VALID_SECTIONS.includes(paramSection) ? paramSection : 'finance',
@@ -121,6 +122,7 @@ export const WorkspaceKeysTab: React.FC = () => {
       { id: 'hr' as const, label: 'HR & Payroll', icon: Users, available: hrModule.enabled },
       { id: 'shipping' as const, label: 'Shipping', icon: Truck, available: stockModule.enabled },
       { id: 'social' as const, label: 'Social & Messaging', icon: Share2, available: true },
+      { id: 'publishing' as const, label: 'Publishing', icon: Globe, available: true },
       { id: 'embed' as const, label: 'Website Embed', icon: Code2, available: true },
     ].filter((s) => s.available)),
     [hrModule.enabled, stockModule.enabled],
@@ -261,6 +263,17 @@ export const WorkspaceKeysTab: React.FC = () => {
                 />
               </CardContent>
             </Card>
+          </>
+        );
+      case 'publishing':
+        return (
+          <>
+            <SectionHead
+              icon={Globe}
+              title="Publishing"
+              description="Your own website, so finished SEO articles go out as a draft or a live post without copy and paste."
+            />
+            <WordPressConnectionCard workspaceId={activeWorkspaceId} />
           </>
         );
       case 'embed':

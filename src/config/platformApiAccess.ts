@@ -88,6 +88,7 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   { name: 'inbox-api', reason: 'Can reply to a customer conversation.' },
   { name: 'zernio-api', reason: 'Publishes to a connected channel the public can see.' },
   { name: 'pinterest-api', reason: 'Publishes to a public profile where anyone can see it.' },
+  { name: 'seo-publish', reason: 'Publishes an article on the workspace website, where the public reads it.' },
   { name: 'workspace-webhooks-api', reason: 'Delivers workspace data to an external endpoint.' },
   { name: 'trade-portal', reason: 'Acts on the portal a supplier sees on their side.' },
   { name: 'tender-bid-portal', reason: 'Acts on a tender counterparty portal.' },

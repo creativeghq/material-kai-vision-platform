@@ -4195,6 +4195,54 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "seo-publish",
+    "tag": "SEO",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Publish SEO articles to the workspace's own WordPress site",
+    "description": "Connects a workspace's WordPress site (application password stored in Vault, verified against /wp/v2/users/me) and publishes an article as a draft or live post. Every site request goes through the SSRF guard, https only, no redirects. A retry updates the post it already created (seo_articles.publish_external_id).",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "wordpress_connect",
+          "publish"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace"
+      },
+      "site_url": {
+        "type": "string",
+        "description": "https address of the site"
+      },
+      "username": {
+        "type": "string",
+        "description": "WordPress username"
+      },
+      "application_password": {
+        "type": "string",
+        "description": "WordPress application password"
+      },
+      "disconnect": {
+        "type": "boolean",
+        "description": "Remove the connection"
+      },
+      "article_id": {
+        "type": "string",
+        "description": "SEO article"
+      },
+      "status": {
+        "type": "string",
+        "description": "draft | publish"
+      }
+    }
+  },
+  {
     "name": "seo-rank-tracker",
     "tag": "SEO",
     "methods": [
