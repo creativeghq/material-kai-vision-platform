@@ -60,9 +60,12 @@ async function exchangeCode(code: string): Promise<any> {
 async function validAccessToken(supabase: any, conn: any): Promise<string> {
   const exp = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
   if (conn.access_token && exp - Date.now() > REFRESH_BUFFER_MS) return conn.access_token;
-  if (!conn.refresh_token) throw new Error('This calendar connection needs to be re-authorised.');
+  const { data: refresh } = conn.refresh_secret_id
+    ? await supabase.rpc('realestate_calendar_refresh_token', { p_connection_id: conn.id })
+    : { data: null };
+  if (typeof refresh !== 'string' || !refresh) throw new Error('This calendar connection needs to be re-authorised.');
   const body = new URLSearchParams({
-    refresh_token: conn.refresh_token, client_id: GOOGLE_CLIENT_ID(),
+    refresh_token: refresh, client_id: GOOGLE_CLIENT_ID(),
     client_secret: GOOGLE_CLIENT_SECRET(), grant_type: 'refresh_token',
   });
   const r = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
@@ -97,14 +100,16 @@ Deno.serve(withApiLogging('real-estate-calendar', async (req) => {
       if (!tok.refresh_token) return back('no_refresh_token');
       const who = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${tok.access_token}` } })
         .then((r) => r.json()).catch(() => ({}));
-      const { error } = await supabase.from('realestate_calendar_connections').upsert({
+      const { data: saved, error } = await supabase.from('realestate_calendar_connections').upsert({
         user_id: state.user_id, workspace_id: state.workspace_id,
         google_email: who?.email ?? null,
-        access_token: tok.access_token, refresh_token: tok.refresh_token,
+        access_token: tok.access_token,
         token_expires_at: new Date(Date.now() + Number(tok.expires_in || 3600) * 1000).toISOString(),
         is_active: true, last_sync_error: null, updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,workspace_id' });
-      if (error) return back('save_failed');
+      }, { onConflict: 'user_id,workspace_id' }).select('id').single();
+      if (error || !saved) return back('save_failed');
+      const { error: vaultErr } = await supabase.rpc('realestate_calendar_store_refresh_token', { p_connection_id: saved.id, p_token: tok.refresh_token });
+      if (vaultErr) return back('save_failed');
       return back('connected');
     } catch {
       return back('failed');
@@ -129,7 +134,7 @@ Deno.serve(withApiLogging('real-estate-calendar', async (req) => {
 
   if (action === 'status') {
     return json({
-      connected: !!conn?.is_active && !!conn?.refresh_token,
+      connected: !!conn?.is_active && !!conn?.refresh_secret_id,
       google_email: conn?.google_email ?? null,
       last_sync_at: conn?.last_sync_at ?? null,
       last_sync_error: conn?.last_sync_error ?? null,
@@ -155,13 +160,14 @@ Deno.serve(withApiLogging('real-estate-calendar', async (req) => {
   }
 
   if (action === 'disconnect') {
+    if (conn?.id) await supabase.rpc('realestate_calendar_forget_token', { p_connection_id: conn.id });
     await supabase.from('realestate_calendar_connections')
       .delete().eq('user_id', userId).eq('workspace_id', workspaceId);
     return json({ ok: true });
   }
 
   if (action === 'push-viewing') {
-    if (!conn?.refresh_token || !conn.is_active) return json({ error: 'not_connected' }, 400);
+    if (!conn?.refresh_secret_id || !conn.is_active) return json({ error: 'not_connected' }, 400);
     const viewingId = String(body?.viewing_id ?? '');
     if (!viewingId) return json({ error: 'viewing_id is required' }, 400);
 

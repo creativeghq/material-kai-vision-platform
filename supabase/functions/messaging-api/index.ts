@@ -304,7 +304,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // Send single message (1+ recipients)
       // open-whatsapp-thread — from a CRM contact's phone number to a conversation.
       case 'open-whatsapp-thread': {
-        const { workspaceId, phone, name } = requestBody;
+        const { workspaceId, phone, name, channelId } = requestBody;
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
@@ -313,25 +313,31 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (digits.length < 6) throw new HttpError(400, 'A phone number in international format is required');
         const e164 = `+${digits}`;
 
-        // Already talking to them? Then this is a navigation, not a creation.
+        let channelQuery = supabaseClient
+          .from('messaging_channels').select('zernio_account_id')
+          .eq('workspace_id', wsId).eq('channel_type', 'whatsapp').eq('is_active', true)
+          .not('zernio_account_id', 'is', null);
+        if (typeof channelId === 'string' && channelId) channelQuery = channelQuery.eq('id', channelId);
+        const { data: channel } = await channelQuery
+          .order('is_default', { ascending: false }).order('created_at', { ascending: true })
+          .limit(1).maybeSingle();
+        const accountId = (channel as { zernio_account_id?: string } | null)?.zernio_account_id;
+        if (!accountId) {
+          throw new HttpError(channelId ? 404 : 409, channelId
+            ? 'That WhatsApp number is not connected in this workspace.'
+            : 'No active WhatsApp number is connected for this workspace.');
+        }
+
+        // Already talking to them from this number? Then this is a navigation, not a creation.
         const { data: existing } = await supabaseClient
           .from('inbox_threads').select('id')
           .eq('workspace_id', wsId).eq('channel', 'whatsapp')
           .eq('metadata->>contact_phone', e164)
+          .eq('metadata->>zernio_account_id', accountId)
           .order('last_message_at', { ascending: false })
           .limit(1).maybeSingle();
         if (existing) {
           return jsonResponse({ success: true, thread_id: (existing as { id: string }).id, created: false });
-        }
-
-        const { data: channel } = await supabaseClient
-          .from('messaging_channels').select('zernio_account_id')
-          .eq('workspace_id', wsId).eq('channel_type', 'whatsapp').eq('is_active', true)
-          .not('zernio_account_id', 'is', null)
-          .limit(1).maybeSingle();
-        const accountId = (channel as { zernio_account_id?: string } | null)?.zernio_account_id;
-        if (!accountId) {
-          throw new HttpError(409, 'No active WhatsApp number is connected for this workspace.');
         }
 
         // The thread is created LOCALLY and empty. Nothing is sent — a business-initiated message

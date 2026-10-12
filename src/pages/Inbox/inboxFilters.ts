@@ -2,9 +2,15 @@
 import { CalendarDays, MessagesSquare, Tag, UserRound } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import type { InboxLabel, InboxThread } from '@/services/inboxApi';
+import { whatsAppNumberLabel, type WhatsAppNumber } from '@/modules/messaging/services/messagingService';
 import { inboxSourceKey, inboxSourceOptions } from './inboxSource';
 
-export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] = [], myUserId?: string): FilterGroupDef[] {
+export const threadWhatsAppAccount = (t: InboxThread) =>
+  (t.metadata as { zernio_account_id?: string } | null)?.zernio_account_id ?? '';
+
+export function buildInboxFilters(
+  labels: InboxLabel[], threads: InboxThread[] = [], myUserId?: string, waNumbers: WhatsAppNumber[] = [],
+): FilterGroupDef[] {
   const labelOptions: FilterOption[] = labels.map((l) => ({ value: l.id, label: l.name }));
   return [
     {
@@ -17,6 +23,13 @@ export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] =
           options: inboxSourceOptions(),
           accessor: (t: InboxThread) => inboxSourceKey(t),
         },
+        ...(waNumbers.length > 1 ? [{
+          key: 'wa_number', type: 'select' as const, label: 'WhatsApp number',
+          description: 'The business number the conversation is on.',
+          placeholder: 'All numbers',
+          options: waNumbers.map((n) => ({ value: n.zernio_account_id, label: whatsAppNumberLabel(n) })),
+          accessor: threadWhatsAppAccount,
+        }] : []),
         {
           // #342: an order read out of a conversation is the most actionable state a thread can
           // be in, so it is a first-class filter rather than something you find by scrolling.

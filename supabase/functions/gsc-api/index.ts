@@ -134,8 +134,10 @@ async function refreshToken(refresh: string): Promise<any> {
 async function validAccessToken(supabase: any, conn: any): Promise<string> {
   const exp = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
   if (conn.access_token && exp - Date.now() > REFRESH_BUFFER_MS) return conn.access_token;
-  if (!conn.refresh_token) throw new Error('no_refresh_token');
-  const t = await refreshToken(conn.refresh_token);
+  if (!conn.refresh_secret_id) throw new Error('no_refresh_token');
+  const { data: refresh, error: vaultErr } = await supabase.rpc('gsc_refresh_token', { p_website_id: conn.website_id });
+  if (vaultErr || typeof refresh !== 'string' || !refresh) throw new Error('no_refresh_token');
+  const t = await refreshToken(refresh);
   const expiresAt = new Date(Date.now() + (Number(t.expires_in || 3600) * 1000)).toISOString();
   await supabase.from('website_gsc_connections')
     .update({ access_token: t.access_token, token_expires_at: expiresAt, is_active: true, updated_at: new Date().toISOString() })
@@ -865,17 +867,19 @@ async function finishConnect(
   const { error: upErr } = await supabase.from('website_gsc_connections').upsert({
     website_id: args.websiteId, workspace_id: args.workspaceId,
     google_email: email || null, property,
-    access_token: tok.access_token, refresh_token: tok.refresh_token,
+    access_token: tok.access_token,
     token_expires_at: expiresAt, scope: tok.scope || GOOGLE_SCOPE,
     connected_by: args.userId, connected_at: new Date().toISOString(),
     is_active: true, last_sync_error: null, updated_at: new Date().toISOString(),
   }, { onConflict: 'website_id' });
   if (upErr) throw new Error(upErr.message);
+  const { error: vaultErr } = await supabase.rpc('gsc_store_refresh_token', { p_website_id: args.websiteId, p_token: tok.refresh_token });
+  if (vaultErr) throw new Error(`Could not store the Google token: ${vaultErr.message}`);
 
   if (property) {
     try {
       const { data: fresh } = await supabase.from('website_gsc_connections')
-        .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at').eq('website_id', args.websiteId).single();
+        .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at').eq('website_id', args.websiteId).single();
       const end = ymd(new Date(Date.now() - 1 * 86400000));
       const start = ymd(new Date(Date.now() - 28 * 86400000));
       await syncConnection(supabase, fresh, start, end);
@@ -927,8 +931,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
   if (action === 'cron-inspect') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
     const { data: conns } = await supabase.from('website_gsc_connections')
-      .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at')
-      .eq('is_active', true).not('property', 'is', null).not('refresh_token', 'is', null);
+      .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at')
+      .eq('is_active', true).not('property', 'is', null).not('refresh_secret_id', 'is', null);
     const results: unknown[] = [];
     for (const c of conns || []) {
       try {
@@ -950,8 +954,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
   if (action === 'cron-ga-sync') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
     const { data: conns, error: connErr } = await supabase.from('website_gsc_connections')
-      .select('website_id, workspace_id, ga_property_id, access_token, refresh_token, token_expires_at')
-      .eq('is_active', true).not('ga_property_id', 'is', null).not('refresh_token', 'is', null);
+      .select('website_id, workspace_id, ga_property_id, access_token, refresh_secret_id, token_expires_at')
+      .eq('is_active', true).not('ga_property_id', 'is', null).not('refresh_secret_id', 'is', null);
     if (connErr) return json({ ok: false, error: connErr.message }, 500);
     const results: unknown[] = [];
     for (const c of conns || []) {
@@ -968,8 +972,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
   if (action === 'cron-sync') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
     const { data: conns } = await supabase.from('website_gsc_connections')
-      .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at')
-      .eq('is_active', true).not('property', 'is', null).not('refresh_token', 'is', null);
+      .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at')
+      .eq('is_active', true).not('property', 'is', null).not('refresh_secret_id', 'is', null);
     const end = ymd(new Date(Date.now() - 1 * 86400000));
     const start = ymd(new Date(Date.now() - 5 * 86400000));
     let ok = 0, failed = 0, rows = 0;
@@ -1037,8 +1041,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
 
       case 'list_properties': {
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Not connected' }, 400);
+          .select('website_id, access_token, refresh_secret_id, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_secret_id) return json({ error: 'Not connected' }, 400);
         const token = await validAccessToken(supabase, conn);
         const sites = await listSites(token);
         return json({ ok: true, properties: (sites || []).map((s) => ({ property: s.siteUrl, permission: s.permissionLevel })) });
@@ -1051,8 +1055,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         // Verify against Google before storing (#364 EX-8) — the OAuth account must actually
         // hold the property, and the property must cover this website's domain.
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Not connected' }, 400);
+          .select('website_id, access_token, refresh_secret_id, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_secret_id) return json({ error: 'Not connected' }, 400);
         const sites = await listSites(await validAccessToken(supabase, conn));
         const claimErr = propertyClaimError(sites, property, website.url);
         if (claimErr) return json({ error: claimErr }, 403);
@@ -1066,8 +1070,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
       // ── Google Analytics 4, on the same Google grant ──
       case 'ga_list_properties': {
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+          .select('website_id, access_token, refresh_secret_id, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_secret_id) return json({ error: 'Connect Google first.' }, 400);
         const props = await listGaProperties(await validAccessToken(supabase, conn));
         return json({ ok: true, properties: props });
       }
@@ -1080,8 +1084,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           return json({ error: 'Pick a property — it must look like properties/123456789.' }, 400);
         }
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+          .select('website_id, access_token, refresh_secret_id, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_secret_id) return json({ error: 'Connect Google first.' }, 400);
 
         // Verify the connected account actually holds it before storing, same rule
         // the Search Console property follows — storing an unverified id turns a
@@ -1102,9 +1106,9 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
 
       case 'ga_realtime': {
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, ga_property_id, access_token, refresh_token, token_expires_at')
+          .select('website_id, ga_property_id, access_token, refresh_secret_id, token_expires_at')
           .eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+        if (!conn?.refresh_secret_id) return json({ error: 'Connect Google first.' }, 400);
         if (!conn.ga_property_id) return json({ error: 'No Analytics property selected for this site yet.' }, 400);
         try {
           const token = await validAccessToken(supabase, conn);
@@ -1119,9 +1123,9 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         const q = parseGaDrill(body);
         if ('error' in q) return json({ error: q.error }, 400);
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, ga_property_id, access_token, refresh_token, token_expires_at')
+          .select('website_id, ga_property_id, access_token, refresh_secret_id, token_expires_at')
           .eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ ok: false, error: 'Connect Google first.' }, 400);
+        if (!conn?.refresh_secret_id) return json({ ok: false, error: 'Connect Google first.' }, 400);
         if (!conn.ga_property_id) return json({ ok: false, error: 'No Analytics property selected for this site yet.' }, 400);
         try {
           const token = await validAccessToken(supabase, conn);
@@ -1133,9 +1137,9 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
 
       case 'ga_sync': {
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, workspace_id, ga_property_id, access_token, refresh_token, token_expires_at')
+          .select('website_id, workspace_id, ga_property_id, access_token, refresh_secret_id, token_expires_at')
           .eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+        if (!conn?.refresh_secret_id) return json({ error: 'Connect Google first.' }, 400);
         if (!conn.ga_property_id) return json({ error: 'No Analytics property selected for this site yet.' }, 400);
         const days = Math.min(Math.max(Number(body?.days) || 28, 1), 365);
         try {
@@ -1147,8 +1151,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
 
       case 'inspect_urls': {
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Not connected' }, 400);
+          .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_secret_id) return json({ error: 'Not connected' }, 400);
         if (!conn.property) return json({ error: 'No Search Console property selected for this site yet.' }, 400);
         const want = Math.min(Math.max(Number(body?.limit) || 50, 1), INSPECT_QUOTA_PER_DAY);
         try {
@@ -1164,8 +1168,8 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
       }
       case 'sync': {
         const { data: conn } = await supabase.from('website_gsc_connections')
-          .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
-        if (!conn?.refresh_token) return json({ error: 'Not connected' }, 400);
+          .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_secret_id) return json({ error: 'Not connected' }, 400);
         if (!conn.property) return json({ error: 'No Search Console property selected for this site yet.' }, 400);
         const days = Math.min(Math.max(Number(body?.days) || 28, 1), 180);
         const end = ymd(new Date(Date.now() - 1 * 86400000));
@@ -1183,9 +1187,11 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
 
       case 'disconnect': {
         const { error } = await supabase.from('website_gsc_connections')
-          .update({ is_active: false, access_token: null, refresh_token: null, token_expires_at: null, updated_at: new Date().toISOString() })
+          .update({ is_active: false, access_token: null, token_expires_at: null, updated_at: new Date().toISOString() })
           .eq('website_id', websiteId);
         if (error) return json({ error: error.message }, 400);
+        const { error: forgetErr } = await supabase.rpc('gsc_forget_token', { p_website_id: websiteId });
+        if (forgetErr) return json({ error: forgetErr.message }, 500);
         return json({ ok: true, connected: false });
       }
 

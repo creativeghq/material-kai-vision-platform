@@ -33,6 +33,16 @@ import type {
   MessagingAnalyticsResponse,
 } from './types';
 
+export interface WhatsAppNumber {
+  id: string;
+  display_name: string | null;
+  sender_id: string | null;
+  zernio_account_id: string;
+  is_default: boolean;
+}
+
+export const whatsAppNumberLabel = (n: WhatsAppNumber) => n.display_name || n.sender_id || 'WhatsApp number';
+
 export class MessagingService {
   /**
    * Send a message via the messaging-api Edge Function
@@ -595,7 +605,19 @@ export class MessagingService {
    * lets the composer's own 24-hour-window rules apply, rather than a CRM button re-implementing
    * them or a green tick claiming something we cannot know.
    */
-  async openWhatsAppThread(input: { phone: string; name?: string; workspaceId?: string }): Promise<{
+  async whatsAppNumbers(workspaceId: string): Promise<WhatsAppNumber[]> {
+    const { data, error } = await supabase
+      .from('messaging_channels')
+      .select('id, display_name, sender_id, zernio_account_id, is_default')
+      .eq('workspace_id', workspaceId).eq('channel_type', 'whatsapp').eq('is_active', true)
+      .not('zernio_account_id', 'is', null)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as WhatsAppNumber[];
+  }
+
+  async openWhatsAppThread(input: { phone: string; name?: string; workspaceId?: string; channelId?: string }): Promise<{
     success: boolean; thread_id: string; created: boolean; note?: string;
   }> {
     const { data, error } = await supabase.functions.invoke('messaging-api', {

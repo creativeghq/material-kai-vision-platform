@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlarmClock, Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText } from 'lucide-react';
+import { AlarmClock, Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText, Phone } from 'lucide-react';
+import { whatsAppNumberLabel } from '@/modules/messaging/services/messagingService';
+import { threadWhatsAppAccount } from '../inboxFilters';
 import { useToast } from '@/hooks/use-toast';
 import { inboxApi } from '@/services/inboxApi';
 import { visibleModes, modeSources } from '../inboxModes';
@@ -36,6 +38,9 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     nextCursor,
     sourceFilter,
     setSourceFilter,
+    waNumbers,
+    waNumberFilter,
+    setWaNumberFilter,
     setShowNew,
     isMember,
     loadThreads,
@@ -184,6 +189,30 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
               />
             );
           })}
+        </nav>
+        </>)}
+
+        {mode === 'whatsapp' && waNumbers.length > 1 && (<>
+        <SidebarHeading>Numbers</SidebarHeading>
+        <nav className="px-2 pb-1 space-y-0.5">
+          <NavRow
+            icon={<Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+            label="Every number"
+            dense
+            active={!waNumberFilter}
+            onClick={() => setWaNumberFilter(null)}
+          />
+          {waNumbers.map((n) => (
+            <NavRow
+              key={n.id}
+              icon={<Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+              label={whatsAppNumberLabel(n)}
+              dense
+              active={waNumberFilter === n.zernio_account_id}
+              count={`${threads.filter((t) => threadWhatsAppAccount(t) === n.zernio_account_id).length}${more}`}
+              onClick={() => setWaNumberFilter(waNumberFilter === n.zernio_account_id ? null : n.zernio_account_id)}
+            />
+          ))}
         </nav>
         </>)}
 

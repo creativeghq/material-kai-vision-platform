@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useSearchParams } from 'react-router-dom';
 import { INBOX_CARD_MAX, type InboxCardKind } from '@/modules/messaging/inboxCardKinds';
 import { supabase } from '@/integrations/supabase/client';
-import { messagingService } from '@/modules/messaging/services/messagingService';
+import { messagingService, type WhatsAppNumber } from '@/modules/messaging/services/messagingService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { castSlotFor, nameGender } from '@/utils/characterAvatar';
 import { fetchDisplayProfiles } from '@/services/displayProfilesService';
@@ -85,7 +85,19 @@ export function useInboxPage() {
   // channel and then separates same-channel sources client-side. The rest are matched
   // client-side against the loaded page. Assignee options come off the loaded threads, so the
   // group def depends on them too.
-  const filterGroups = useMemo(() => buildInboxFilters(wsLabels, threads, myUserId ?? undefined), [wsLabels, threads, myUserId]);
+  const [waNumbers, setWaNumbers] = useState<WhatsAppNumber[]>([]);
+  useEffect(() => {
+    if (!activeWorkspaceId) { setWaNumbers([]); return; }
+    let cancelled = false;
+    messagingService.whatsAppNumbers(activeWorkspaceId)
+      .then((rows) => { if (!cancelled) setWaNumbers(rows); })
+      .catch(() => { if (!cancelled) setWaNumbers([]); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+  const filterGroups = useMemo(
+    () => buildInboxFilters(wsLabels, threads, myUserId ?? undefined, waNumbers),
+    [wsLabels, threads, myUserId, waNumbers],
+  );
   const { values: filterValues, setValues: setFilterValues, filtered: matchedThreads, previewCount } =
     useFilters<InboxThread>(threads, filterGroups, { urlKey: 'f' });
   const channelFilter = channelForSource(filterValues.source as string | undefined);
@@ -108,6 +120,11 @@ export function useInboxPage() {
   // way Unread already is. The sidebar is where you MOVE around a mailbox; the modal is where
   // you stack conditions on it — but there is only one filter, so picking a source in either
   // place puts it in `?f=` and the mailbox is a link either way.
+  const waNumberFilter = (filterValues.wa_number as string) || null;
+  const setWaNumberFilter = useCallback(
+    (accountId: string | null) => setFilterValues({ ...filterValues, wa_number: accountId ?? undefined }),
+    [filterValues, setFilterValues],
+  );
   const sourceFilter = (filterValues.source as string) || null;
   const setSourceFilter = useCallback(
     (key: string | null) => setFilterValues({ ...filterValues, source: key ?? undefined }),
@@ -1078,6 +1095,9 @@ export function useInboxPage() {
   return {
     activeWorkspaceId,
     activeWorkspace,
+    waNumbers,
+    waNumberFilter,
+    setWaNumberFilter,
     isPlatformOperator,
     persona,
     toast,

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { DialogFooter } from '@/components/core/ui/dialog';
-import { messagingService } from '@/modules/messaging/services/messagingService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { messagingService, whatsAppNumberLabel, type WhatsAppNumber } from '@/modules/messaging/services/messagingService';
 
 export const ComposeWhatsAppForm: React.FC<{
   workspaceId: string;
@@ -16,13 +17,24 @@ export const ComposeWhatsAppForm: React.FC<{
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [numbers, setNumbers] = useState<WhatsAppNumber[]>([]);
+  const [channelId, setChannelId] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    messagingService.whatsAppNumbers(workspaceId)
+      .then((rows) => { if (!cancelled) { setNumbers(rows); setChannelId((cur) => cur || rows[0]?.id || ''); } })
+      .catch(() => { if (!cancelled) setNumbers([]); });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
   const valid = /^\s*(\+|00)\d[\d\s().-]{6,}$/.test(phone);
 
   const open = async () => {
     if (!valid) return;
     setBusy(true);
     try {
-      const res = await messagingService.openWhatsAppThread({ phone, name: name.trim() || undefined, workspaceId });
+      const res = await messagingService.openWhatsAppThread({
+        phone, name: name.trim() || undefined, workspaceId, channelId: numbers.length > 1 ? channelId || undefined : undefined,
+      });
       if (!res.created) toast({ title: 'You already have a conversation with this number' });
       onOpened(res.thread_id);
     } catch (e) {
@@ -33,6 +45,17 @@ export const ComposeWhatsAppForm: React.FC<{
   return (
     <>
       <div className="space-y-2.5">
+        {numbers.length > 1 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">From</Label>
+            <Select value={channelId} onValueChange={setChannelId}>
+              <SelectTrigger aria-label="Send from"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {numbers.map((n) => <SelectItem key={n.id} value={n.id}>{whatsAppNumberLabel(n)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label htmlFor="wa-phone" className="text-xs text-muted-foreground">Phone number</Label>
           <Input id="wa-phone" placeholder="+30 691 234 5678" value={phone} onChange={(e) => setPhone(e.target.value)} />
