@@ -51,7 +51,22 @@ export interface RankingPageRead {
   status: 'read' | 'failed' | 'not_attempted';
   wordCount: number | null;
   headings: string[];
+  imageCount?: number | null;
+  tableCount?: number | null;
   reason?: string;
+}
+
+export interface MetricRange { min: number; median: number; max: number }
+
+/** Targets taken from the pages that rank, as ranges over the pages READ. */
+export interface SerpGuidelines {
+  pagesRead: number;
+  wordCount: MetricRange | null;
+  headings: MetricRange | null;
+  images: MetricRange | null;
+  tables: MetricRange | null;
+  questions: string[];
+  terms: { term: string; pagesUsing: number; min: number; max: number }[];
 }
 
 export interface SubtopicCoverage {
@@ -71,6 +86,7 @@ export interface RankingContent {
   common: SubtopicCoverage[];
   distinctive: SubtopicCoverage[];
   note: string;
+  guidelines?: SerpGuidelines;
 }
 export interface SerpFeatures {
   hasAiOverview: boolean;
@@ -157,6 +173,18 @@ export interface KeywordResearchResult {
   aiModeAnswer?: { text: string; references: { url: string; domain: string; title: string }[] } | null;
   /** The guides that rank for the topic's "how to choose" form, read. */
   guideContent?: RankingContent & { query: string };
+  /** A page of the site that already serves this keyword; null when none was found, absent when not checked. */
+  existingPage?: ExistingPage | null;
+}
+
+export interface ExistingPage {
+  url: string;
+  source: 'search_console' | 'similar_page';
+  position: number | null;
+  impressions: number | null;
+  clicks: number | null;
+  similarity: number | null;
+  title: string | null;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -548,6 +576,8 @@ export interface SEOResearchResponse {
     research_id: string;
     research: KeywordResearchResult;
     credits_used: number;
+    /** True when a research run of the last 30 days for the same keyword and market was reused. */
+    cached?: boolean;
   };
   error?: string;
 }

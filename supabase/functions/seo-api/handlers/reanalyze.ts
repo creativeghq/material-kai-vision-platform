@@ -17,7 +17,7 @@ import {
   loadOwnedArticle, storedArticlePlan, persistAnalysis, reconciledFaqSchema,
 } from './article-access.ts';
 import { buildGapsGains, type GapSources } from './gaps.ts';
-import type { ArticlePlan } from '../../_shared/seo-types.ts';
+import type { ArticlePlan, KeywordResearchResult } from '../../_shared/seo-types.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -93,7 +93,10 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
       });
     }
 
-    const extra = (article.stages_data as { extra?: { site_url?: string; protected_terms?: string[] } } | null)?.extra;
+    const extra = (article.stages_data as { extra?: { site_url?: string; protected_terms?: string[]; keyword_research_id?: string } } | null)?.extra;
+    const { data: researchRow } = extra?.keyword_research_id
+      ? await supabase.from('seo_keyword_research').select('research_data').eq('id', extra.keyword_research_id).maybeSingle()
+      : { data: null };
     const analysis = analyzeContent(
       markdown,
       plan,
@@ -102,6 +105,7 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
       undefined,
       extra?.site_url ?? null,
       extra?.protected_terms ?? null,
+      (researchRow?.research_data as KeywordResearchResult | null)?.rankingContent?.guidelines ?? null,
     );
 
     // Gaps/Gains are re-derived here too. They were built from competitor PAGE TITLES with two

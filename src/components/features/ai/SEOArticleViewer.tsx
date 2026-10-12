@@ -72,6 +72,9 @@ import { articleExportFilename, buildArticleExport } from '@/services/seo/articl
 import { dueReasonText } from '@/services/seo/dueReason';
 import { PublishToWordPressButtons } from './PublishToWordPressButtons';
 import { ArticleVersionHistory } from './ArticleVersionHistory';
+import { BrandGapNotice } from './BrandGapNotice';
+import { ArticleImageSlots } from './ArticleImageSlots';
+import { ArticleRefreshControl } from './ArticleRefreshControl';
 import { CALLOUT_KIND_PATTERN, type CalloutKind } from '@/services/seo/calloutKinds';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
@@ -111,6 +114,7 @@ interface SEOArticle {
   published_url?: string | null;
   published_at?: string | null;
   website_id?: string | null;
+  workspace_id?: string | null;
   word_count: number;
   reading_time_minutes: number;
   keyword_density: any;
@@ -3161,6 +3165,14 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                       </div>
                       <ArticleUpdateControl articleId={article.id} onChanged={reloadArticle} />
                       <div className="mb-3"><ArticleVersionHistory articleId={article.id} onRestored={reloadArticle} /></div>
+                      <ArticleImageSlots markdown={article.markdown_content} workspaceId={article.workspace_id ?? null} onSave={saveMarkdown} />
+                      <ArticleRefreshControl
+                        articleId={article.id}
+                        extra={article.stages_data?.extra}
+                        currentTitle={article.title ?? null}
+                        currentMeta={article.meta_description ?? null}
+                        onChanged={reloadArticle}
+                      />
                       <ArticleSuggestionsPanel
                         articleId={article.id}
                         extra={article.stages_data?.extra}
@@ -3181,6 +3193,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
 
                 {article.optimize_data && (
                   <TabsContent value="optimize" className="mt-4 space-y-4">
+                    <BrandGapNotice analysis={article.content_analysis} websiteId={article.website_id ?? null} />
                     <ApplicableFixes
                       state={fixState}
                       applyingAnchor={applyingAnchor}

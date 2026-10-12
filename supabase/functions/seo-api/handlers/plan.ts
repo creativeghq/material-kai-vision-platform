@@ -24,6 +24,8 @@ import type {
   SEOPlanResponse,
   ArticlePlan,
   KeywordResearchResult,
+  MetricRange,
+  SerpGuidelines,
 } from '../../_shared/seo-types.ts';
 import {
   resolveBriefWithProfile,
@@ -366,12 +368,22 @@ Target each as an FAQ entry, write a tighter answer than the current one shown.`
   // states how many pages it is derived from: three pages read out of ten is a different claim
   // from ten, and a planner given a bare list cannot tell them apart.
   const rc = research.rankingContent;
+  const range = (label: string, r: MetricRange | null | undefined, unit = '') =>
+    r ? `\n${label}: ${r.min}–${r.max}${unit} (median ${r.median}${unit})` : '';
+  const guidelineLines = (g: SerpGuidelines | undefined) => !g ? '' : [
+    range('Length range of the pages read', g.wordCount, ' words'),
+    range('Headings per page', g.headings),
+    range('Images per page', g.images),
+    range('Tables per page', g.tables),
+    g.terms.length ? `\nTerms most of them use (term — pages using it — times per page):\n  - ${g.terms.slice(0, 20).map((t) => `${serpValue(t.term, 80)} — ${t.pagesUsing} of ${g.pagesRead} — ${t.min}–${t.max}`).join('\n  - ')}` : '',
+    g.questions.length ? `\nQuestions they answer as headings:\n  - ${g.questions.slice(0, 12).map((q) => serpValue(q, 200)).join('\n  - ')}` : '',
+  ].join('');
   const rankingSection = rc && rc.read > 0
     ? `
 
 === WHAT THE RANKING PAGES ACTUALLY COVER (read from ${rc.read} page(s)) ===
 ${rc.note}
-Median length of the pages read: ${rc.medianWordCount ?? 'unknown'} words.
+Median length of the pages read: ${rc.medianWordCount ?? 'unknown'} words.${guidelineLines(rc.guidelines)}
 Sections MOST of them have (cover these or say why not):
   - ${rc.common.slice(0, 15).map((c) => `${serpValue(c.label, 200)} — on ${c.pages} of ${rc.read}`).join('\n  - ') || 'none shared'}
 Sections only ONE of them has (an angle nobody else took):

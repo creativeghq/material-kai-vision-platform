@@ -2867,6 +2867,12 @@
             "type": "string",
             "required": false,
             "desc": "draft | publish"
+          },
+          {
+            "name": "user_id",
+            "type": "string",
+            "required": false,
+            "desc": "Service callers only: the member to act as"
           }
         ],
         "response": "{success:boolean, external_id:string, status:string, url:string|null}"
@@ -6607,6 +6613,12 @@
             "type": "string",
             "required": false,
             "desc": "Language code, default 'en'."
+          },
+          {
+            "name": "refresh",
+            "type": "boolean",
+            "required": false,
+            "desc": "Ignore research of the last 30 days for the same keyword and market"
           }
         ],
         "response": "{success: boolean, data: {research_id: string, research: KeywordResearchResult, credits_used: 18}}"
@@ -7058,6 +7070,31 @@
             "desc": "The article to review."
           }
         ]
+      },
+      {
+        "name": "refresh",
+        "summary": "Compare a finished article with what the ranking pages cover now (sections, terms, questions) and with newer pages of ours, and draft changes as pending suggestions. A proposed title/meta is applied and republished on its own only when the workspace allows it and the article is live on its CMS. Billed at token cost; a service caller may pass background:true to run it after the response.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "Finished SEO article"
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "required": false,
+            "desc": "Why it is being refreshed; defaults to the freshness view's due_reason"
+          },
+          {
+            "name": "background",
+            "type": "boolean",
+            "required": false,
+            "desc": "Service callers only: run after the response (202)"
+          }
+        ],
+        "response": "{success:boolean, data:{proposed:number, items:number, meta_proposed:boolean, meta_applied:boolean, suggestions:[], credits_used:number}}"
       }
     ],
     "request": {

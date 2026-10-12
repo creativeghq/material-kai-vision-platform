@@ -58,6 +58,7 @@ const SEO_CARD_TITLES: Record<string, string> = {
   seo_relevant_pages_card: 'Top pages',
   seo_score_url_card: 'Page score',
   seo_search_volume_card: 'Search volume & CPC',
+  seo_serp_content_card: 'Ranking page ranges',
   seo_sentiment_card: 'Sentiment',
   seo_serp_audit_card: 'Live SERP',
   seo_site_crawl_started_card: 'Site crawl started',
@@ -670,6 +671,45 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           </div>
         )}
         <FailedChecksAccordion checks={ip?.page_metrics?.checks ?? ip?.checks} label="On-page issues" />
+      </Card>
+    );
+  }
+
+  // ── What the ranking pages look like (#401 W2.1) ─────
+  if (t === 'seo_serp_content_card') {
+    const g = data.guidelines;
+    const rangeText = (r: any, unit = '') => (r ? `${fmtNum(r.min)}–${fmtNum(r.max)}${unit} (median ${fmtNum(r.median)})` : '—');
+    return (
+      <Card className="space-y-3">
+        <Header icon="📏" title={`Ranking pages for "${data.keyword}"`} subtitle={data.note} />
+        {g ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Words" value={rangeText(g.wordCount)} />
+              <Stat label="Headings" value={rangeText(g.headings)} />
+              <Stat label="Images" value={rangeText(g.images)} />
+              <Stat label="Tables" value={rangeText(g.tables)} />
+            </div>
+            {g.terms?.length > 0 && (
+              <div className="text-[12px]">
+                <div className="font-medium mb-1">Terms most of them use</div>
+                <div className="flex flex-wrap gap-1">
+                  {g.terms.slice(0, 24).map((term: any) => (
+                    <Pill key={term.term}>{term.term} · {term.pagesUsing}/{g.pagesRead}</Pill>
+                  ))}
+                </div>
+              </div>
+            )}
+            {g.questions?.length > 0 && (
+              <div className="text-[12px]">
+                <div className="font-medium mb-1">Questions they answer</div>
+                <ul className="list-disc pl-4 text-muted-foreground">{g.questions.slice(0, 10).map((q: string) => <li key={q}>{q}</li>)}</ul>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-sm text-muted-foreground">This research predates the ranges. Run the keyword research again to get them.</div>
+        )}
       </Card>
     );
   }

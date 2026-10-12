@@ -164,7 +164,7 @@ describe('tenant flow vocabulary', () => {
     'social_account_connected', 'social_account_disconnected',
     'whatsapp_number_status_changed', 'whatsapp_template_status_changed',
     'seo.article_refresh_due', 'seo.site_health_changed', 'seo.report_ready',
-    'seo.ranking_movement', 'seo.backlink_movement',
+    'seo.ranking_movement', 'seo.backlink_movement', 'seo.refresh_ready',
     'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
     // Opened 2026-08-31 — emitters verified to stamp workspace_id. `appointment_booked`
     // stays out for the same reason it was removed: no workspace_id on the payload.

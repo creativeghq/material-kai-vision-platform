@@ -4239,6 +4239,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "status": {
         "type": "string",
         "description": "draft | publish"
+      },
+      "user_id": {
+        "type": "string",
+        "description": "Service callers only: the member to act as"
       }
     }
   },

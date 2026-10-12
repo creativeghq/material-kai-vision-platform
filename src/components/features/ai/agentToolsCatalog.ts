@@ -543,6 +543,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'seo_serp_content_analysis', name: 'Ranking Page Ranges', category: 'SEO Research',
+    credits: 0,
+    desc: 'What the pages that rank for a keyword look like: word count, headings, images and tables as ranges, the terms most of them use and the questions they answer. Read from research already run.',
+    examples: [
+      'How long are the pages that rank for porcelain tiles?',
+      'Which terms do the ranking pages for bathroom tiles all use?',
+    ],
+  },
+  {
     id: 'seo_score_url', name: 'Page Score', category: 'SEO Research',
     credits: 1,
     desc: 'Score a page that is already live — the same 23-category content analysis and AI-citation (GEO) score we run on our own drafts. Plan-dependent checks are skipped and listed, because a live page has no article plan.',
@@ -3219,7 +3228,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
       'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
       'seo_serp_audit', 'seo_audit_url', 'seo_score_url', 'seo_historical_serps',
-      'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers',
+      'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers', 'seo_serp_content_analysis',
       'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview',
     ],
     quick_starts: [

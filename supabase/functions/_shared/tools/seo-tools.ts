@@ -373,7 +373,7 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
         website_id: z.string().optional().describe('Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.'),
         language_code: z.string().optional().describe('Language the article is researched and written in, e.g. "el" for Greek. Set it only when the user names a market; omitted, the workspace\'s business country decides (Greece → "el").'),
         location_code: z.number().optional().describe('DataForSEO location code for the market, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Set it together with language_code only when the user names a market; omitted, the business country decides.'),
-        allow_duplicate: z.boolean().optional().describe('The pipeline refuses a keyword this website already has an article on. Set true ONLY when the user explicitly asks to rewrite that article.'),
+        allow_duplicate: z.boolean().optional().describe('The pipeline refuses a keyword this website already has an article on, or that one of its pages already ranks for in Search Console (it then names the page; suggest updating it). Set true ONLY when the user explicitly asks for a new article anyway.'),
         writer_notes: z.string().optional().describe('Angle or instructions for the writer, in the words of the user. Pass their text as-is.'),
         must_cover: z.string().optional().describe('Points the article must cover, one per line or comma-separated. Pass the text of the user as-is.'),
         link_pages: z.string().optional().describe('URLs of our own pages the article must link to, separated by spaces, commas or new lines.'),

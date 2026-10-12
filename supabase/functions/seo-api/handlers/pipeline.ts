@@ -8,6 +8,7 @@ import { assertEntitled } from '../../_shared/entitlement.ts';
 import { SEO_MODULE } from './entitlement.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
+import { findExistingPage } from './existing-page.ts';
 import { runInBackground } from '../../_shared/background.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
@@ -270,6 +271,19 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
           error: `This website already has an article on "${twin.target_keyword}" ("${twin.title ?? 'untitled'}"). `
             + 'Pick a different keyword or angle, or pass allow_duplicate to rewrite it on purpose.',
           data: { existing_article_id: twin.id },
+        }, 409);
+      }
+      const ranking = await findExistingPage(supabase, {
+        userId, workspaceId, websiteId, keyword: String(body.target_keyword ?? ''), searchConsoleOnly: true,
+      });
+      if (ranking) {
+        return jsonResponse({
+          success: false,
+          error: `${ranking.url} already ranks for "${body.target_keyword}"`
+            + `${ranking.position != null ? ` (average position ${ranking.position}` : ''}`
+            + `${ranking.impressions != null ? `, ${ranking.impressions} impressions in 90 days)` : ranking.position != null ? ')' : ''}. `
+            + 'Update that page instead, or pass allow_duplicate to write a new article anyway.',
+          data: { existing_page: ranking },
         }, 409);
       }
     }
@@ -560,7 +574,21 @@ async function requiredPages(supabase: DbClient, websiteId: string | null, brief
     const { data } = await q.not('links_to', 'is', null).limit(3);
     topic = (data ?? []).map((r: { url: string }) => r.url);
   }
-  return [...new Set([...asked, ...topic])];
+  return [...new Set([...asked, ...await clusterSiblingPages(supabase, websiteId, keyword), ...topic])];
+}
+
+/** Published pages of the same topic-plan group (pillar and its clusters): an article links within its cluster first. */
+async function clusterSiblingPages(supabase: DbClient, websiteId: string, keyword: string): Promise<string[]> {
+  const { data: self } = await supabase
+    .from('seo_topic_clusters').select('id, pillar_cluster_id')
+    .eq('website_id', websiteId).ilike('primary_keyword', keyword.trim().replace(/[%_\\]/g, (c) => `\\${c}`)).maybeSingle();
+  if (!self) return [];
+  const group = (self as { id: string; pillar_cluster_id: string | null }).pillar_cluster_id ?? (self as { id: string }).id;
+  const { data: siblings } = await supabase
+    .from('seo_topic_cluster_board').select('id, published_url')
+    .eq('website_id', websiteId).or(`id.eq.${group},pillar_cluster_id.eq.${group}`)
+    .neq('id', (self as { id: string }).id).not('published_url', 'is', null).limit(4);
+  return ((siblings ?? []) as Array<{ published_url: string }>).map((r) => r.published_url);
 }
 
 /** Reads the site's unread pages on this topic first (a new category, a product nobody searched for); billed per page by the crawler. */
@@ -721,6 +749,7 @@ async function runLateStages(ctx: {
       protected_terms: [...protectedTerms],
       user_id: userId,
       serp_signals: research.serpSignals,
+      serp_guidelines: research.rankingContent?.guidelines ?? null,
     }, 60_000);
     const analysis: ContentAnalysisResult = scored.data.analysis;
     const finalWordCount = scored.data.word_count;

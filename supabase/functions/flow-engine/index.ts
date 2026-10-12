@@ -2121,7 +2121,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'agent_search_completed', 'daily_brief', 'inbox.message_received', 'inbox.thread_assigned',
   'inbox.thread_labeled', 'inbox.follow_up_due',
   'seo.ranking_movement', 'seo.backlink_movement', 'seo.site_health_changed',
-  'seo.article_refresh_due',
+  'seo.article_refresh_due', 'seo.refresh_ready',
 ]);
 
 /** Queue this event for every active tenant endpoint that opted into its type (#330). */

@@ -37,6 +37,7 @@ interface ResearchBlob {
     serpFeatureTypes?: string[];
   };
   paaQuestions?: string[];
+  existingPage?: { url: string; source: 'search_console' | 'similar_page'; position: number | null; title: string | null } | null;
   clusters?: {
     name?: string; theme?: string; clusterName?: string; keywords?: any[]; totalVolume?: number;
     primaryKeyword?: any; secondaryKeywords?: any[];
@@ -229,8 +230,20 @@ export const KeywordResearchDetail: React.FC<{
     !!siteDomain && aiSources.some((s) => (s.domain || '').replace(/^www\./, '').includes(siteDomain.replace(/^www\./, '')));
   const presentCount = inventory.verdicts.filter((v) => v.present).length;
 
+  const existing = blob?.existingPage ?? null;
+
   return (
     <div className="space-y-4">
+      {existing && (
+        <div className="flex items-start gap-2 rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-sm">
+          <Target className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span>
+            {existing.source === 'search_console'
+              ? <>You already rank for this with <a className="text-primary underline" href={existing.url} target="_blank" rel="noopener noreferrer">{existing.url}</a>{existing.position != null ? ` (average position ${existing.position})` : ''}. Updating that page usually beats a new article competing with it.</>
+              : <>A page of yours already covers this closely: <a className="text-primary underline" href={existing.url} target="_blank" rel="noopener noreferrer">{existing.title || existing.url}</a>. Consider updating it rather than writing a new one.</>}
+          </span>
+        </div>
+      )}
       {/* ── Header figures ─────────────────────────────────────────────── */}
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-3">

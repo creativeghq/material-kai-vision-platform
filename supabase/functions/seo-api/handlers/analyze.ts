@@ -21,6 +21,7 @@ import type {
   ContentFix,
   SectionScore,
   GEOScore,
+  SerpGuidelines,
   SerpSignalBlob,
 } from '../../_shared/seo-types.ts';
 
@@ -77,6 +78,7 @@ const FIX_SCOPE_BY_CATEGORY: Record<string, 'document' | 'config'> = {
   links: 'document',
   ai_overview_alignment: 'document',
   related_search_coverage: 'document',
+  serp_guidelines: 'document',
 };
 
 
@@ -168,6 +170,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     const protectedTerms = Array.isArray(body.protected_terms) ? body.protected_terms.map(String) : null;
     const analysis = analyzeContent(
       content, body.article_plan, body.serp_signals, brief, contentDatedAt, siteUrl, protectedTerms,
+      body.serp_guidelines ?? null,
     );
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
@@ -274,6 +277,8 @@ export function analyzeContent(
   siteUrl?: string | null,
   /** Our slug, category and searched terms: never flagged as foreign. */
   protectedTerms?: Iterable<string> | null,
+  /** Ranges from the pages that rank for the keyword; absent when they were not read. */
+  guidelines?: SerpGuidelines | null,
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
   const content = markdown.toLowerCase();
@@ -451,6 +456,51 @@ export function analyzeContent(
       autoFixable: false,
       applied: false,
     });
+  }
+
+  // ── Check 7b: Against the pages that rank ──
+  if (guidelines && guidelines.pagesRead > 0) {
+    const wc = guidelines.wordCount;
+    if (wc && wordCount < wc.min) {
+      fixes.push({
+        category: 'serp_guidelines',
+        severity: 'medium',
+        description: `Article is ${wordCount} words; every ranking page read is longer (${wc.min}–${wc.max}, median ${wc.median}).`,
+        suggestion: `Reach at least ${wc.min} words by answering what the ranking pages answer, not by padding.`,
+        affectedSection: null,
+        autoFixable: false,
+        applied: false,
+      });
+    }
+    const majority = Math.max(2, Math.ceil(guidelines.pagesRead / 2));
+    const missingTerms = guidelines.terms
+      .filter((t) => t.pagesUsing >= majority && !content.includes(t.term))
+      .slice(0, 8)
+      .map((t) => t.term);
+    if (missingTerms.length >= 3) {
+      fixes.push({
+        category: 'serp_guidelines',
+        severity: 'medium',
+        description: `${missingTerms.length} terms most ranking pages use do not appear: ${missingTerms.join(', ')}.`,
+        suggestion: 'Cover what these terms stand for where they fit the reader; a term list stuffed in is worse than a gap.',
+        affectedSection: null,
+        autoFixable: false,
+        applied: false,
+      });
+    }
+    const imgs = guidelines.images;
+    const ownImages = (markdown.match(/!\[[^\]]*\]\([^)]+\)/g) ?? []).length;
+    if (imgs && imgs.min > 0 && ownImages < imgs.min) {
+      fixes.push({
+        category: 'serp_guidelines',
+        severity: 'low',
+        description: `Article has ${ownImages} image(s); every ranking page read has at least ${imgs.min} (median ${imgs.median}).`,
+        suggestion: 'Add photos of the products or work the article describes.',
+        affectedSection: null,
+        autoFixable: false,
+        applied: false,
+      });
+    }
   }
 
   // ── Check 8: Meta title length ──
@@ -842,7 +892,7 @@ export function analyzeContent(
       category: 'provenance',
       severity: 'medium',
       description: `Article has ${missing.join(' and ')}. Google's helpful-content self-assessment asks who wrote it, how it was produced, and why.`,
-      suggestion: 'Set `provenance` on the content brief (author name + title, publisher, AI disclosure). The pipeline then emits schema.org author/publisher and appends a visible byline. Leaving it unset is preferable to inventing an author — this is a configuration gap, not a writing one.',
+      suggestion: 'Set the author, publisher and AI disclosure once in the Brand settings of the website; every article written after that carries them, as schema.org author/publisher and a visible byline. Leaving it unset is better than inventing an author: this is a configuration gap, not a writing one.',
       affectedSection: null,
       autoFixable: false,
       applied: false,
@@ -862,7 +912,7 @@ export function analyzeContent(
       category: 'firsthand_experience',
       severity: 'medium',
       description: 'No first-hand experience supplied — every input to this article was derived from the pages it is competing against.',
-      suggestion: 'Add `firsthandExperience` to the content brief: your own measurements, your own products/projects as examples, how you know it, and what qualifies you. This is the "Experience" in E-E-A-T and the only input that carries information Google cannot already get from the incumbent results.',
+      suggestion: 'Add your first-hand facts once in the Brand settings of the website: your own measurements, your own products or projects as examples, how you know it, and what qualifies you. This is the "Experience" in E-E-A-T, and the only input that carries information Google cannot already get from the pages that rank.',
       affectedSection: null,
       autoFixable: false,
       applied: false,
@@ -927,7 +977,7 @@ function buildSectionScores(
     h1Heading: makeScore(['h1_heading']),
     links: makeScore(['links', 'ai_overview_alignment']),
     h2h6Headings: makeScore(['h2_keyword', 'heading_hierarchy']),
-    contentDepth: makeScore(['content_depth']),
+    contentDepth: makeScore(['content_depth', 'serp_guidelines']),
     keywordDensity: makeScore(['keyword_density', 'keyword_placement']),
     helpfulContent: makeScore(['provenance', 'firsthand_experience']),
   };

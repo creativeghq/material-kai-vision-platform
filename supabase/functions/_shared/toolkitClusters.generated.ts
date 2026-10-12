@@ -151,7 +151,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video', 'generate_gemini', 'virtual_staging', 'check_generation_status', 'visualize_on_surface'],
   },
   'seo-research': {
-    tool_ids: ['seo_my_rankings', 'seo_site_report', 'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_audit_url', 'seo_score_url', 'seo_historical_serps', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers', 'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview'],
+    tool_ids: ['seo_my_rankings', 'seo_site_report', 'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_audit_url', 'seo_score_url', 'seo_historical_serps', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers', 'seo_serp_content_analysis', 'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview'],
   },
   'seo-domain': {
     tool_ids: ['seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors', 'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains', 'seo_relevant_pages', 'seo_categories_for_domain', 'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_domain_intersection'],

@@ -11,7 +11,7 @@ import { parseEdgeError } from '@/utils/edgeError';
 
 export interface ArticleSuggestion {
   id: string;
-  source: 'coverage' | 'answer_check' | 'analysis' | 'update';
+  source: 'coverage' | 'answer_check' | 'analysis' | 'update' | 'refresh';
   title: string;
   kind: 'insert' | 'replace';
   find?: string;
@@ -44,6 +44,7 @@ const SOURCE_TAG: Record<ArticleSuggestion['source'], { label: string; variant: 
   answer_check: { label: 'AI answer', variant: 'warning' },
   analysis: { label: 'Analysis', variant: 'neutral' },
   update: { label: 'Out of date', variant: 'warning' },
+  refresh: { label: 'What ranks now', variant: 'info' },
 };
 
 /** The last line of the anchor: where the new block lands. */

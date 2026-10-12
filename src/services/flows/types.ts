@@ -247,6 +247,7 @@ export type TriggerType =
   // Emitted by seo-content-freshness; payload-only. Nothing was ever revisited before
   // this existed — an article silently stopped being cited and nobody was told.
   | 'seo.article_refresh_due'
+  | 'seo.refresh_ready'
   // A scheduled SEO report finished building. Payload carries the run id and a
   // one-line summary, so a flow can mail it, post it, or notify — the report
   // itself is stored, never re-derived by the delivery path.
@@ -272,6 +273,7 @@ export interface SeoRankingMovementTriggerConfig {}
 export interface SeoBacklinkMovementTriggerConfig {}
 export interface SeoSiteHealthChangedTriggerConfig {}
 export interface SeoArticleRefreshDueTriggerConfig {}
+export interface SeoRefreshReadyTriggerConfig {}
 export interface SeoReportReadyTriggerConfig {}
 export interface HrApplicantStageChangedTriggerConfig {}
 export interface HrEmployeeAddedTriggerConfig {}
@@ -688,6 +690,7 @@ export type TriggerConfigMap = {
   'seo.backlink_movement': SeoBacklinkMovementTriggerConfig;
   'seo.site_health_changed': SeoSiteHealthChangedTriggerConfig;
   'seo.article_refresh_due': SeoArticleRefreshDueTriggerConfig;
+  'seo.refresh_ready': SeoRefreshReadyTriggerConfig;
   'seo.report_ready': SeoReportReadyTriggerConfig;
   page_watch_changed: PageWatchChangedTriggerConfig;
   'asset.service_due': AssetServiceDueTriggerConfig;

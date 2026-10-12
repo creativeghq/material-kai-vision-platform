@@ -20,6 +20,43 @@ function json(body: unknown, status = 200): Response {
 
 /** How many articles one sweep will nudge. Reported in the response, never silent. */
 const SWEEP_LIMIT = 200;
+const REFRESH_PER_SITE = 3;
+const REFRESH_REASONS = new Set(['position_drop', 'clicks_drop']);
+const REFRESH_COOLDOWN_MS = 7 * 86_400_000;
+
+/** Draft a refresh for articles that slipped in search; billed per run at its token cost inside seo-api refresh. */
+async function draftRefreshes(supabase: any, due: FreshnessRow[]): Promise<{ attempted: number; dispatched: number; errors: string[] }> {
+  const candidates = due.filter((r) => r.due_reason && REFRESH_REASONS.has(r.due_reason));
+  if (!candidates.length) return { attempted: 0, dispatched: 0, errors: [] };
+  const { data: rows } = await supabase.from('seo_articles').select('id, stages_data').in('id', candidates.map((c) => c.article_id));
+  const lastRun = new Map<string, number>(((rows ?? []) as Array<{ id: string; stages_data: any }>).map((r) => [
+    r.id, Date.parse(r.stages_data?.extra?.refresh_report?.ran_at ?? '') || 0,
+  ]));
+  const perSite = new Map<string, number>();
+  let attempted = 0, dispatched = 0;
+  const errors: string[] = [];
+  for (const row of candidates) {
+    if (Date.now() - (lastRun.get(row.article_id) ?? 0) < REFRESH_COOLDOWN_MS) continue;
+    const site = row.website_id ?? 'none';
+    if ((perSite.get(site) ?? 0) >= REFRESH_PER_SITE) continue;
+    perSite.set(site, (perSite.get(site) ?? 0) + 1);
+    attempted++;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/seo-api`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
+        body: JSON.stringify({ action: 'refresh', article_id: row.article_id, user_id: row.user_id, reason: row.due_reason, background: true }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const out = await res.json().catch(() => null);
+      if (!out?.success) errors.push(`${row.article_id}: ${out?.error ?? `HTTP ${res.status}`}`);
+      else dispatched += 1;
+    } catch (e) {
+      errors.push(`${row.article_id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { attempted, dispatched, errors };
+}
 
 interface FreshnessRow {
   article_id: string;
@@ -128,9 +165,13 @@ Deno.serve(withApiLogging('seo-content-freshness', async (req: Request) => {
     }
   }
 
-  console.log(`[seo-content-freshness] due=${due.length} notified=${emitted} failed=${failures.length}`);
+  const refreshes = await draftRefreshes(supabase, due);
+  console.log(`[seo-content-freshness] due=${due.length} notified=${emitted} failed=${failures.length} refreshes=${refreshes.dispatched}/${refreshes.attempted}`);
   return json({
     ok: true,
+    refreshes_attempted: refreshes.attempted,
+    refreshes_dispatched: refreshes.dispatched,
+    refresh_errors: refreshes.errors.slice(0, 10),
     due_count: due.length,
     already_notified: due.length - toNotify.length,
     emitted,

@@ -472,6 +472,64 @@ export const createSEOOpportunitiesTool = (
   );
 };
 
+/** What the pages that rank for a keyword look like, as ranges, from research already run (no new spend). */
+export const createSEOSerpContentAnalysisTool = (
+  _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
+) => {
+  return tool(
+    async ({ keyword }) => {
+      if (!ctx?.supabase || !ctx?.workspaceId) return JSON.stringify({ success: false, error: 'No workspace context.' });
+      const { data, error } = await ctx.supabase
+        .from('seo_keyword_research')
+        .select('id, target_keyword, created_at, research_data')
+        .eq('workspace_id', ctx.workspaceId)
+        .ilike('target_keyword', keyword.trim().replace(/[%_\\]/g, (c: string) => `\\${c}`))
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      const rc = data?.research_data?.rankingContent;
+      if (!data || !rc) {
+        return JSON.stringify({
+          success: false,
+          error: `No research has read the ranking pages for "${keyword}" yet. Run seo_research_keyword first; it reads them and this tool then reports their ranges at no extra cost.`,
+        });
+      }
+      const g = rc.guidelines ?? null;
+      onChunk?.({
+        type: 'seo_serp_content_card',
+        keyword: data.target_keyword,
+        researched_at: data.created_at,
+        research_id: data.id,
+        read: rc.read, failed: rc.failed, note: rc.note,
+        guidelines: g,
+        common: (rc.common ?? []).slice(0, 15),
+        timestamp: Date.now(),
+      });
+      return JSON.stringify({
+        success: true,
+        keyword: data.target_keyword,
+        researched_at: data.created_at,
+        pages_read: rc.read,
+        note: rc.note,
+        word_count: g?.wordCount ?? null,
+        headings: g?.headings ?? null,
+        images: g?.images ?? null,
+        tables: g?.tables ?? null,
+        top_terms: (g?.terms ?? []).slice(0, 20),
+        questions: (g?.questions ?? []).slice(0, 15),
+        common_sections: (rc.common ?? []).slice(0, 15).map((c: any) => `${c.label} (${c.pages} of ${rc.read})`),
+        ...(g ? {} : { guidelines_note: 'This research predates the ranges; run the research again to get them.' }),
+      });
+    },
+    {
+      name: 'seo_serp_content_analysis',
+      description: 'What the pages that rank for a keyword actually look like: word count, headings, images and tables as min–median–max ranges, the terms most of them use, the questions they answer and the sections most of them share. Read from the most recent keyword research, so it costs nothing; when no research has read the pages, it says so.',
+      schema: z.object({
+        keyword: z.string().describe('The keyword whose ranking pages to describe, as researched.'),
+      }),
+    },
+  );
+};
+
 export const createSEOGscTopMoversTool = (
   _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
 ) => {

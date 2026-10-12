@@ -5,6 +5,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -24,13 +25,27 @@ export const WordPressConnectionCard: React.FC<{ workspaceId: string }> = ({ wor
   const [conn, setConn] = useState<Connection | null | undefined>(undefined);
   const [form, setForm] = useState({ site_url: '', username: '', application_password: '' });
   const [busy, setBusy] = useState(false);
+  const [autoMeta, setAutoMeta] = useState(false);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('workspace_wordpress_credentials' as never)
       .select('site_url, username, site_name, verified_at, enabled').eq('workspace_id', workspaceId).maybeSingle();
     if (error) { toast({ title: 'Could not read the WordPress connection', description: error.message, variant: 'destructive' }); }
     setConn((data as Connection | null) ?? null);
+    const { data: settings } = await supabase.from('workspace_seo_settings' as never)
+      .select('auto_apply_meta').eq('workspace_id', workspaceId).maybeSingle();
+    setAutoMeta((settings as { auto_apply_meta?: boolean } | null)?.auto_apply_meta === true);
   }, [workspaceId, toast]);
+
+  const saveAutoMeta = async (next: boolean) => {
+    setAutoMeta(next);
+    const { error } = await supabase.from('workspace_seo_settings' as never)
+      .upsert({ workspace_id: workspaceId, auto_apply_meta: next } as never, { onConflict: 'workspace_id' });
+    if (error) {
+      setAutoMeta(!next);
+      toast({ title: 'Not saved', description: error.message, variant: 'destructive' });
+    }
+  };
 
   useEffect(() => { void load(); }, [load]);
 
@@ -64,6 +79,11 @@ export const WordPressConnectionCard: React.FC<{ workspaceId: string }> = ({ wor
             <span className="text-sm">{conn.site_name ? `${conn.site_name} · ` : ''}{conn.site_url}</span>
             <span className="text-xs text-muted-foreground">as {conn.username}{conn.verified_at ? `, verified ${formatDate(conn.verified_at)}` : ''}</span>
             <Button size="sm" variant="outline" className="ml-auto" onClick={() => void connect(true)} disabled={busy}>Disconnect</Button>
+            <label className="flex w-full items-center gap-2 text-xs text-muted-foreground">
+              <Switch checked={autoMeta} onCheckedChange={(v) => void saveAutoMeta(v)} />
+              When a refresh proposes a better title or meta description for a live article, apply it and republish on its own.
+              Every other change still waits for you.
+            </label>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-3">

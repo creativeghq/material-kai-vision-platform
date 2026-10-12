@@ -15,7 +15,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
-import type { SEOResearchRequest, SEOResearchResponse } from '../../_shared/seo-types.ts';
+import type { KeywordResearchResult, SEOResearchRequest, SEOResearchResponse } from '../../_shared/seo-types.ts';
 import { fetchOpportunitiesStateless } from '../../_shared/mention-opportunities-client.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
@@ -25,6 +25,7 @@ import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts
 import { refundStage, reserveStage, serviceCredits, settleStage, type StageWallet } from './stage-billing.ts';
 import { countryForLocation, marketForCountry } from './market.ts';
 import { guideQuery, readerQuestions } from './reader-questions.ts';
+import { findExistingPage } from './existing-page.ts';
 
 const SERP_SIGNALS_SERVICE = 'seo-serp-signals';
 const FIRECRAWL_SERVICE = 'firecrawl-scrape';
@@ -58,6 +59,28 @@ async function researchCeiling(supabase: DbClient, readPages: boolean): Promise<
     serviceCredits(supabase, FIRECRAWL_SERVICE, readPages ? READ_PAGES_LIMIT + GUIDE_PAGES_LIMIT : 0),
   ]);
   return parts.some((p) => p === null) ? 80 : Math.ceil(parts.reduce<number>((s, p) => s + (p ?? 0), 0));
+}
+
+const CACHE_DAYS = 30;
+
+/** The newest research of the last 30 days for this keyword and market, complete enough to reuse. */
+async function recentResearch(
+  supabase: DbClient,
+  opts: { workspaceId: string; keyword: string; locationCode: number; languageCode: string; needPages: boolean },
+): Promise<{ id: string; research: KeywordResearchResult } | null> {
+  const since = new Date(Date.now() - CACHE_DAYS * 86_400_000).toISOString();
+  const { data, error } = await supabase
+    .from('seo_keyword_research')
+    .select('id, research_data')
+    .eq('workspace_id', opts.workspaceId)
+    .ilike('target_keyword', opts.keyword.trim().replace(/[%_\\]/g, (c) => `\\${c}`))
+    .eq('location_code', opts.locationCode).eq('language_code', opts.languageCode)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (error || !data?.research_data) return null;
+  const research = data.research_data as KeywordResearchResult;
+  if (opts.needPages && !((research.rankingContent?.read ?? 0) > 0)) return null;
+  return { id: String(data.id), research };
 }
 
 export async function handleResearch(req: Request, body: any): Promise<Response> {
@@ -126,6 +149,23 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       : null;
     const locationCode = body.location_code || market?.location_code || 2840;
     const languageCode = body.language_code || market?.language_code || 'en';
+
+    const reused = body.refresh === true || !workspaceId ? null : await recentResearch(supabase, {
+      workspaceId, keyword: String(body.target_keyword), locationCode, languageCode, needPages: readPages,
+    });
+    if (reused) {
+      const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
+      const ranking = await findExistingPage(supabase, {
+        userId, workspaceId, websiteId: website?.id ?? null, keyword: String(body.target_keyword), searchConsoleOnly: true,
+      });
+      if (ranking) reused.research.existingPage = ranking;
+      console.log(`[seo-research] reused research ${reused.id} for "${body.target_keyword}" (30-day cache)`);
+      const cachedResponse: SEOResearchResponse = {
+        success: true,
+        data: { research_id: reused.id, research: reused.research, credits_used: 0, cached: true },
+      };
+      return jsonResponse(cachedResponse);
+    }
 
     // Billed to the WORKSPACE: a ceiling now, settled below to what the providers actually cost.
     wallet = { userId, workspaceId, opType: 'seo_research' };
@@ -224,6 +264,9 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
 
     // File under the connected website: explicit body.website_id, else the workspace default.
     const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
+    research.existingPage = await findExistingPage(supabase, {
+      userId, workspaceId, websiteId: website?.id ?? null, keyword: String(body.target_keyword ?? ''),
+    });
 
     // What this run consumed; a DataForSEO response with no cost keeps the ceiling.
     const spend = client.unpricedCalls > 0 ? [null] : await Promise.all([

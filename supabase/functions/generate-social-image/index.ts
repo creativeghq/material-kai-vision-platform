@@ -224,8 +224,8 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   // refund-on-failure). Never a non-atomic pre-flight read + deduct-on-success: a race
   // between the read and the charge delivers a free image.
   const debitResult = await debitExternalServiceCredits(
-    supabase, userId, serviceKey, 'social_image_generation', 1,
-    { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },
+    supabase, userId, serviceKey, body.purpose === 'article' ? 'seo_article_image' : 'social_image_generation', 1,
+    { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id, purpose: body.purpose ?? 'social' },
     // 7th arg. Omitting it sent p_workspace_id: null, so the debit ALWAYS hit the caller's
     // personal wallet — a workspace with a funded shared pool still drained individual
     // members' credits, and the per-member monthly cap never applied. Every other generator
@@ -293,7 +293,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
           })
           .eq('id', post_id);
       }
-    } else if (workspace_id) {
+    } else if (workspace_id && body.purpose !== 'article') {
       // Reported, not thrown: the credits are debited and the image is already stored, and the
       // response below hands the caller `image_url` either way — so failing here would take
       // away something they have. But a discarded result meant the draft never appeared in the

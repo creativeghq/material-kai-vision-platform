@@ -1060,6 +1060,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // First-party: the workspace's own rank tracker + Google Search Console + every report
       // the Websites dashboard derives (health, crawl, AI visibility, …)
       'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers',
+      'seo_serp_content_analysis',
       // Gap-fillers (DataForSEO data GSC can't provide)
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
@@ -1339,6 +1340,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
       'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers',
+      'seo_serp_content_analysis',
       // Core record search (see Pepper's note): every specialist the router can pick gets it.
       'find_records',
       // The platform's own API, for work no dedicated tool covers. Every specialist the router
@@ -2126,6 +2128,7 @@ async function executeAgent(
     'seo_site_review', 'seo_brand_search_audit',
     'seo_dataforseo_call',
     'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers',
+      'seo_serp_content_analysis',
     'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
     'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
     'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -2279,6 +2282,7 @@ async function executeAgent(
   const createSEOBrandSearchAuditTool = seoAgentMod?.createSEOBrandSearchAuditTool;
   const createSEOGscStrikingDistanceTool = seoAgentMod?.createSEOGscStrikingDistanceTool;
   const createSEOOpportunitiesTool = seoAgentMod?.createSEOOpportunitiesTool;
+  const createSEOSerpContentAnalysisTool = seoAgentMod?.createSEOSerpContentAnalysisTool;
   const { createWorkspaceCapabilitiesTool } = await import('../_shared/tools/capability-tools.ts');
   const createSEOGscTopMoversTool = seoAgentMod?.createSEOGscTopMoversTool;
   const createSEOMyRankingsTool = seoAgentMod?.createSEOMyRankingsTool;
@@ -2641,6 +2645,9 @@ async function executeAgent(
   // Google Search Console — reads first-party gsc_performance for the connected website.
   if (config.tools.includes('seo_opportunities') && createSEOOpportunitiesTool) {
     tools.push(createSEOOpportunitiesTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
+  }
+  if (config.tools.includes('seo_serp_content_analysis') && createSEOSerpContentAnalysisTool) {
+    tools.push(createSEOSerpContentAnalysisTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
   }
   if (config.tools.includes('seo_gsc_striking_distance') && createSEOGscStrikingDistanceTool) {
     tools.push(createSEOGscStrikingDistanceTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));

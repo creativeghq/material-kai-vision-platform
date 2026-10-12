@@ -81,6 +81,42 @@ async function wp(creds: WpCreds, method: 'GET' | 'POST', path: string, body?: u
   return json;
 }
 
+const EMPTY_IMAGE_SLOT = /^[ \t]*\[IMAGE:[^\]\n]*\][ \t]*$/gm;
+const OUR_IMAGE = /\]\((https:\/\/[^)\s]+\/storage\/v1\/object\/public\/generation-images\/[^)\s]+)\)/g;
+const MAX_IMAGE_BYTES = 15_000_000;
+
+/** Copy one of our hosted images into the site's media library; the post then never depends on our storage. */
+async function uploadImage(creds: WpCreds, ourUrl: string): Promise<string> {
+  const own = new URL(Deno.env.get('SUPABASE_URL') ?? '').host;
+  if (new URL(ourUrl).host !== own) throw new WpError('Refusing to upload an image that is not ours.', 400);
+  const img = await fetch(ourUrl, { signal: AbortSignal.timeout(20_000) });
+  if (!img.ok) throw new WpError(`Could not read the image ${ourUrl}: HTTP ${img.status}`);
+  const bytes = new Uint8Array(await img.arrayBuffer());
+  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new WpError('An image is larger than 15 MB.', 400);
+  const type = img.headers.get('content-type') || 'image/png';
+  const name = (ourUrl.split('/').pop() || 'image.png').replace(/[^A-Za-z0-9._-]/g, '_');
+  const url = await assertSafeUrl(`${creds.site_url.replace(/\/+$/, '')}/wp-json/wp/v2/media`, { allowSchemes: ['https:'] });
+  const res = await fetch(url, {
+    method: 'POST',
+    redirect: 'manual',
+    signal: AbortSignal.timeout(30_000),
+    headers: {
+      Authorization: basicAuth(creds.username, creds.password),
+      'Content-Type': type,
+      'Content-Disposition': `attachment; filename="${name}"`,
+      Accept: 'application/json',
+    },
+    body: bytes,
+  });
+  const text = await readCapped(res);
+  let json: any = null;
+  try { json = JSON.parse(text); } catch { json = null; }
+  if (!res.ok || !json?.source_url) {
+    throw new WpError(`WordPress did not accept an image: ${json?.message ? String(json.message).replace(/<[^>]*>/g, '').slice(0, 200) : `HTTP ${res.status}`}`);
+  }
+  return String(json.source_url);
+}
+
 async function memberRole(supabase: DbClient, workspaceId: string, userId: string): Promise<string | null> {
   const { data } = await supabase.from('workspace_members').select('role')
     .eq('workspace_id', workspaceId).eq('user_id', userId).eq('status', 'active').maybeSingle();
@@ -155,28 +191,36 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
   const auth = await authenticate(req);
-  if (!auth.success || !auth.userId) return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
+  const actingUser = auth.userId ?? (auth.level === 'secret' && typeof body.user_id === 'string' ? body.user_id : null);
+  if (!auth.success || !actingUser) return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
 
   const articleId = typeof body.article_id === 'string' ? body.article_id : '';
   const status = body.status === 'publish' ? 'publish' : 'draft';
   const { data: owner } = await supabase.from('seo_articles').select('workspace_id').eq('id', articleId).maybeSingle();
   const workspaceId = (owner as { workspace_id?: string | null } | null)?.workspace_id ?? null;
-  if (!workspaceId || !(await userCanAccessWorkspace(supabase, auth.userId, workspaceId))) {
+  if (!workspaceId || !(await userCanAccessWorkspace(supabase, actingUser, workspaceId))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
   const ent = await assertEntitled(supabase, workspaceId, SEO_MODULE);
   if (!ent.ok) return ent.response;
-  const role = await memberRole(supabase, workspaceId, auth.userId);
+  const role = await memberRole(supabase, workspaceId, actingUser);
   if (!['owner', 'admin', 'marketing'].includes(String(role))) {
     return jsonResponse({ success: false, error: 'Publishing to the website is for an owner, admin or marketing member.' }, 403);
   }
 
   const { data: row, error: rowErr } = await supabase.from('seo_articles')
-    .select('title, meta_description, slug, markdown_content, publish_external_id, publish_started_at, published_url, published_at, target_keyword')
+    .select('title, meta_description, slug, markdown_content, publish_external_id, publish_started_at, published_url, published_at, target_keyword, publish_media')
     .eq('id', articleId).single();
   if (rowErr || !row) return jsonResponse({ success: false, error: 'Could not read the article.' }, 500);
-  const markdown = String(row.markdown_content ?? '');
+  let markdown = String(row.markdown_content ?? '');
   if (!markdown.trim()) return jsonResponse({ success: false, error: 'This article has no content yet.' }, 409);
+  const emptySlots = (markdown.match(EMPTY_IMAGE_SLOT) ?? []).length;
+  if (emptySlots) {
+    return jsonResponse({
+      success: false,
+      error: `${emptySlots} picture slot${emptySlots === 1 ? ' is' : 's are'} still empty. Generate or remove ${emptySlots === 1 ? 'it' : 'them'} in the article first.`,
+    }, 409);
+  }
 
   const { data: credRows } = await supabase.rpc('wordpress_credentials', { p_workspace_id: workspaceId });
   const creds = (Array.isArray(credRows) ? credRows[0] : credRows) as WpCreds | undefined;
@@ -210,6 +254,15 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
     if (!externalId && row.publish_started_at && slug) {
       const found = await wp(creds, 'GET', `/wp/v2/posts?slug=${encodeURIComponent(slug)}&status=any&context=edit`);
       if (Array.isArray(found) && found[0]?.id) externalId = String(found[0].id);
+    }
+    const media: Record<string, string> = { ...((row.publish_media ?? {}) as Record<string, string>) };
+    for (const ours of new Set([...markdown.matchAll(OUR_IMAGE)].map((m) => m[1]))) {
+      if (!media[ours]) {
+        media[ours] = await uploadImage(creds, ours);
+        const { error: mediaErr } = await supabase.from('seo_articles').update({ publish_media: media }).eq('id', articleId);
+        if (mediaErr) console.error('[seo-publish] image uploaded but not recorded; a retry uploads it again', articleId, mediaErr.message);
+      }
+      markdown = markdown.split(ours).join(media[ours]);
     }
     const payload = {
       title, slug, status,

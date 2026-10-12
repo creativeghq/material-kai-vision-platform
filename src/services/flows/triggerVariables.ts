@@ -458,6 +458,14 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'refresh_interval_days', label: 'Cadence (days)', note: 'This article\u2019s own refresh interval.', example: '90' },
     { key: 'age_days', label: 'Age (days)', note: 'Days since the content was last reviewed.' },
   ]),
+  'seo.refresh_ready': withStandard([
+    { key: 'article_id', label: 'Article ID', note: 'The article the refresh was drafted for.' },
+    { key: 'article_title', label: 'Article title', note: 'Title of the article.' },
+    { key: 'target_keyword', label: 'Target keyword', note: 'The keyword the article targets.' },
+    { key: 'due_reason', label: 'Why', note: 'position_drop, clicks_drop, not_indexed or age; empty when run by hand.' },
+    { key: 'proposals', label: 'Proposals', note: 'How many changes were drafted for approval.', example: '4' },
+    { key: 'meta_applied', label: 'Meta applied', note: 'True when a new title or meta description was applied automatically.' },
+  ]),
 };
 
 /** The standard envelope every notification/email event carries. */
@@ -534,6 +542,7 @@ export const TRIGGER_TITLES: Record<string, string> = {
   'seo.site_health_changed': 'SEO Site Health Changed',
   'seo.report_ready': 'SEO Report Ready',
   'seo.article_refresh_due': 'SEO Article Due for Refresh',
+  'seo.refresh_ready': 'SEO Refresh Ready',
 };
 
 /**

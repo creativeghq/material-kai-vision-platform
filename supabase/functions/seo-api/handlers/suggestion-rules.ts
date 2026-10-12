@@ -1,6 +1,6 @@
 /** Article suggestions: which items to propose for, and whether a proposal still fits the text. Import-free (unit-tested). */
 
-export type SuggestionSource = 'coverage' | 'answer_check' | 'analysis' | 'update';
+export type SuggestionSource = 'coverage' | 'answer_check' | 'analysis' | 'update' | 'refresh';
 export type SuggestionStatus = 'pending' | 'applied' | 'dismissed';
 
 export interface SuggestionItem {

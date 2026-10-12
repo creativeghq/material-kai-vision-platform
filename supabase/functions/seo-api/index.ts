@@ -23,6 +23,7 @@ import { handleAnswerCheck } from './handlers/answer-check.ts';
 import { handleLessons } from './handlers/lessons.ts';
 import { handleSuggestionApply, handleSuggestionDismiss, handleSuggestions } from './handlers/suggestions.ts';
 import { handleUpdateArticle } from './handlers/update-article.ts';
+import { handleRefresh } from './handlers/refresh.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   research: handleResearch,
@@ -47,6 +48,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   suggestion_apply: handleSuggestionApply,
   suggestion_dismiss: handleSuggestionDismiss,
   update_article: handleUpdateArticle,
+  refresh: handleRefresh,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {
