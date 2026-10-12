@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (174)
+## 1. Supabase Edge Functions (169)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -90,7 +90,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `kb-embedding-backfill` | secret / cron / JWT | Backfill Voyage embeddings for knowledge-base documents missing them |
+| `embedding-drain` | secret / cron / JWT | Embed rows whose Voyage vector is missing or stale — one backlog per task |
 | `kb-generate-embedding` | JWT / secret | Generate or regenerate a Voyage AI 1024D embedding for a kb_docs row |
 
 **Finance**
@@ -135,7 +135,6 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `revolut-merchant-webhooks` | JWT / revolutSignature | Revolut Merchant (checkout) webhook receiver + per-workspace webhook setup |
 | `stripe-api` | JWT | Stripe Checkout and Customer Portal session creator |
-| `stripe-connect` | JWT | Stripe Connect onboarding and status for per-workspace payouts |
 | `stripe-webhooks` | sig | Stripe webhook receiver for subscription, payment, and invoice events |
 | `viva-config-test` | JWT | Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone |
 | `viva-webhooks` _(GET + POST)_ | public | Viva.com payment webhook receiver + verification-key handshake (multi-tenant BYOK) |
@@ -157,7 +156,6 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `asset-service-reminders-cron` | cron | Cron: emit equipment service-due, service-overdue and warranty-expiring flow events (#343). |
 | `crm-api` _(GET + POST)_ | JWT / secret | REST CRM resource router for companies, contacts, users, and Stripe. |
-| `crm-company-embedding-backfill` | secret / cron / JWT | Embed CRM companies so lookalike search has something to rank |
 | `crm-lead-score` | JWT | AI lead + health scoring for any CRM contact (canonical platform scorer) |
 | `crm-meeting-reminders` | cron | Cron: send reminders for upcoming CRM meetings whose reminder time has arrived. |
 | `customer-assets-api` | JWT | Installed base: a customer's equipment, its warranties and its recurring service schedules (#343). |
@@ -327,18 +325,15 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `canonicalize-attributes` | public | Proxy product attribute canonicalization to MIVAA facet service |
-| `facets-recanonicalize` | service_role | Bulk facet re-canonicalization sweep (proxy to MIVAA) |
+| `canonicalize-attributes` | service_role | Proxy to MIVAA facet canonicalization: one product, or the re-canonicalization sweep |
 
 **Commerce**
 
 | Function | Auth | Summary |
 |---|---|---|
 | `product-feed` _(GET)_ | token | Serves a workspace's product catalogue as an XML feed for a marketplace importer. |
-| `store-document-writeback` | JWT | Hands the issued fiscal document back to the store the order came from. |
-| `store-orders-sync` | JWT | Pulls recent orders from a connected store to close the gap a missed webhook leaves. |
+| `store-api` | JWT | Operator actions on a connected sales channel: pull orders, work the Skroutz queue, hand a document back. |
 | `store-orders-webhook` | storeWebhookSignature | Receives orders from a connected sales channel (Shopify, WooCommerce, generic). |
-| `store-skroutz-orders` | JWT | Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document. |
 
 **Customs**
 
@@ -468,7 +463,7 @@ Reference: the JARVIS agent exposes `seo_*` sub-agent tools that call these.
 |----------|--------|------|---------|
 | `kb-generate-embedding` | POST | JWT or service-role | Generate Voyage AI 1024D embedding for a `kb_docs` row (triggered on insert/content change). Idempotent via content hash. |
 | `canonicalize-attributes` | POST | internal (agents) | Thin proxy → MIVAA `/api/admin/facets/canonicalize`. Called by `material-tagger` / `product-enrichment` agents to canonicalize raw product attributes (3-layer facet pipeline: normalize → Voyage cosine cluster → `facet_canonical_values`). Local-fast-path then external MIVAA URL. |
-| `facets-recanonicalize` | POST | internal (cron / service-role) | Thin proxy → MIVAA `/api/admin/facets/recanonicalize`, the **bulk** sweep (#316). Replays `products.attributes_raw` so a threshold change, a curated alias, or an outage-degraded product can be repaired without re-ingesting any PDF. `degraded_only` defaults to **true** — the nightly `facets-recanonicalize-degraded` cron (03:40) fixes what is broken now; a full catalog re-sweep costs a Voyage embedding per raw value and must be asked for explicitly (`degraded_only: false`, after bumping `CURRENT_FACET_CANONICALIZATION_VERSION` in MIVAA). Returns `remaining`, so the caller knows whether to go again. Backstopped by `catalog.facet_canonicalization_degraded`, which fires only after the cron has had two goes — so it measures the janitor, not the arrival of the mess. |
+| `canonicalize-attributes` (`action: recanonicalize`) | POST | internal (cron / service-role) | Proxy → MIVAA `/api/admin/facets/recanonicalize`, the **bulk** sweep (#316). Replays `products.attributes_raw` so a threshold change, a curated alias, or an outage-degraded product can be repaired without re-ingesting any PDF. `degraded_only` defaults to **true** — the nightly `facets-recanonicalize-degraded` cron (03:40) fixes what is broken now; a full catalog re-sweep costs a Voyage embedding per raw value and must be asked for explicitly (`degraded_only: false`, after bumping `CURRENT_FACET_CANONICALIZATION_VERSION` in MIVAA). Returns `remaining`, so the caller knows whether to go again. Backstopped by `catalog.facet_canonicalization_degraded`, which fires only after the cron has had two goes — so it measures the janitor, not the arrival of the mess. |
 
 ### 1.5 Search & Re-rank
 
@@ -541,7 +536,7 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | `finance-fiscal-offline-recovery` | POST | `x-cron-secret` | Backfill MARK on offline documents |
 | `finance-digest-aggregate` | POST | Flows / `x-cron-secret` / admin | AR/AP + P&L + follow-up digest |
 | `finance-storefront` | POST | public (slug) | Mini-store meta/products/checkout |
-| `stripe-connect` | POST | owner/admin JWT | Workspace Stripe Express onboarding/status |
+| `stripe-api` (`connect-onboard` / `connect-status`) | POST | owner/admin JWT | Workspace Stripe Express onboarding/status |
 
 ### 1.10 Quotes
 

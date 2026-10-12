@@ -24,11 +24,11 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const { createWorkflowEmitter, STEPS } = await import('./_workflow-chunks.ts');
 const { researchWithQwen } = await import('../ai-client.ts');
 const { compareResearchRuns } = await import('../research-validation.ts');
+const { resolveSecret } = await import('../secrets.ts');
 type ManufacturerRecord = import('../research-validation.ts').ManufacturerRecord;
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type B2BChunkSink = ((chunk: any) => void) | undefined;
@@ -359,7 +359,8 @@ export const createB2BManufacturerSearchTool = (
       emitter.plan({ title: `${category} manufacturers`, subtitle: country || region || 'global', metadata: { country, region, category, limit } });
       emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'running', status_line: `Searching for ${category} manufacturers…`, input: { country, region, category, limit } });
       try {
-        if (!ANTHROPIC_API_KEY) {
+        const anthropicKey = (await resolveSecret(supabase, 'ANTHROPIC_API_KEY')).value;
+        if (!anthropicKey) {
           emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: 'ANTHROPIC_API_KEY not configured.' });
           return JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured.' });
         }
@@ -401,7 +402,7 @@ export const createB2BManufacturerSearchTool = (
         const response = await postAnthropicWithRetry({
           method: 'POST',
           headers: {
-            'x-api-key': ANTHROPIC_API_KEY,
+            'x-api-key': anthropicKey,
             'anthropic-version': '2023-06-01',
             'Content-Type': 'application/json',
           },

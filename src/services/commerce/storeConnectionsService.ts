@@ -125,8 +125,8 @@ export const storeConnectionsService = {
 };
 
 export async function sendDocumentToStore(invoiceId: string): Promise<{ link: string; number: string; platform: string }> {
-  const { data, error } = await supabase.functions.invoke('store-document-writeback', {
-    body: { invoice_id: invoiceId },
+  const { data, error } = await supabase.functions.invoke('store-api', {
+    body: { action: 'document_writeback', invoice_id: invoiceId },
   });
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error ?? 'The store did not accept the document.');

@@ -54,7 +54,7 @@ POST-only, **no auth**, always service-role, discriminated by `action`:
 
 ## 4. Stripe Connect checkout
 
-**Onboarding** (`stripe-connect` edge function, owner/admin JWT): `onboard` creates a Stripe Express account, stores it on `workspace_payment_config.stripe_connect_account_id` with `payout_mode='connect'`, returns an account-onboarding link; `status` refreshes `charges_enabled` / `details_submitted` live from Stripe.
+**Onboarding** (`stripe-api` edge function, owner/admin JWT): `connect-onboard` creates a Stripe Express account, stores it on `workspace_payment_config.stripe_connect_account_id` with `payout_mode='connect'`, returns an account-onboarding link; `connect-status` refreshes `charges_enabled` / `details_submitted` live from Stripe.
 
 **Checkout session** (`finance-pay-invoice`): resolves the Connect account via `get_workspace_payout_account(workspace_id)` (returns the account only when `payout_mode='connect' AND charges_enabled`), then `stripe.checkout.sessions.create({ mode:'payment', payment_intent_data:{ transfer_data:{ destination: accountId }, metadata:{ type:'invoice_payment', invoice_id, workspace_id, internal_number } } })`.
 

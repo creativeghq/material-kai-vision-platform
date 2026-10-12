@@ -20,6 +20,41 @@
       "reason": "Read a product off an arbitrary product page and created it in the catalogue (#474). Withdrawn with the store import. Version 2 is a 410 stub. Never used against a real workspace.",
       "version": 2,
       "wayOut": "supabase functions delete product-from-url --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> product-from-url -> Delete. Needs a management token, which this environment does not have."
+    },
+    "kb-embedding-backfill": {
+      "reason": "Merged into embedding-drain?task=kb-docs on 2026-10-12 to cut duplicate deploy units; the KB admin button and the kb-embedding-backfill-drain cron job now call the new function. The deployed copy keeps answering its old callers until it is deleted, which is why it was recorded rather than turned into a 410 stub.",
+      "version": 93,
+      "wayOut": "supabase functions delete kb-embedding-backfill --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> kb-embedding-backfill -> Delete. Safe once the deploy that shipped its replacement is live; nothing in the repo or in cron.job calls it after that."
+    },
+    "crm-company-embedding-backfill": {
+      "reason": "Merged into embedding-drain?task=crm-companies on 2026-10-12 to cut duplicate deploy units; the crm-company-embedding-drain cron job now calls the new function. The deployed copy keeps answering its old callers until it is deleted, which is why it was recorded rather than turned into a 410 stub.",
+      "version": 30,
+      "wayOut": "supabase functions delete crm-company-embedding-backfill --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> crm-company-embedding-backfill -> Delete. Safe once the deploy that shipped its replacement is live; nothing in the repo or in cron.job calls it after that."
+    },
+    "facets-recanonicalize": {
+      "reason": "Merged into canonicalize-attributes as action 'recanonicalize' on 2026-10-12 to cut duplicate deploy units; the facets-recanonicalize-degraded cron job now calls canonicalize-attributes. The deployed copy keeps answering its old callers until it is deleted, which is why it was recorded rather than turned into a 410 stub.",
+      "version": 43,
+      "wayOut": "supabase functions delete facets-recanonicalize --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> facets-recanonicalize -> Delete. Safe once the deploy that shipped its replacement is live; nothing in the repo or in cron.job calls it after that."
+    },
+    "stripe-connect": {
+      "reason": "Merged into stripe-api as actions 'connect-onboard' / 'connect-status' on 2026-10-12 to cut duplicate deploy units; paymentRoutingService now calls stripe-api. The deployed copy keeps answering its old callers until it is deleted, which is why it was recorded rather than turned into a 410 stub.",
+      "version": 98,
+      "wayOut": "supabase functions delete stripe-connect --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> stripe-connect -> Delete. Safe once the deploy that shipped its replacement is live; nothing in the repo or in cron.job calls it after that."
+    },
+    "store-orders-sync": {
+      "reason": "Merged into store-api as action 'sync_orders' on 2026-10-12 to cut duplicate deploy units; ConnectionSettingsCard now calls store-api. The deployed copy keeps answering its old callers until it is deleted, which is why it was recorded rather than turned into a 410 stub.",
+      "version": 8,
+      "wayOut": "supabase functions delete store-orders-sync --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> store-orders-sync -> Delete. Safe once the deploy that shipped its replacement is live; nothing in the repo or in cron.job calls it after that."
+    },
+    "store-skroutz-orders": {
+      "reason": "Merged into store-api as actions 'skroutz_*' on 2026-10-12 to cut duplicate deploy units; SkroutzQueueCard now calls store-api. The deployed copy keeps answering its old callers until it is deleted, which is why it was recorded rather than turned into a 410 stub.",
+      "version": 4,
+      "wayOut": "supabase functions delete store-skroutz-orders --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> store-skroutz-orders -> Delete. Safe once the deploy that shipped its replacement is live; nothing in the repo or in cron.job calls it after that."
+    },
+    "store-document-writeback": {
+      "reason": "Merged into store-api as action 'document_writeback' on 2026-10-12 to cut duplicate deploy units; storeConnectionsService and store-orders-webhook now call store-api. The deployed copy keeps answering its old callers until it is deleted, which is why it was recorded rather than turned into a 410 stub.",
+      "version": 8,
+      "wayOut": "supabase functions delete store-document-writeback --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> store-document-writeback -> Delete. Safe once the deploy that shipped its replacement is live; nothing in the repo or in cron.job calls it after that."
     }
   }
 }

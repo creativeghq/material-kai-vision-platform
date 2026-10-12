@@ -25,7 +25,6 @@ const DEFAULT_ACTIONS: Record<string, string> = {
   'seo-domain-tracker': 'run',                // `cron-run` is the branch; the user path is the default
   'seo-rank-tracker': 'run',
   'seo-site-audit': 'run',
-  'stripe-connect': 'onboard',                // `status` is the branch
   'taric-reference-sync': 'import',           // `stats` is the branch
   'taric-classify': 'classify',               // `mode: 'backfill'` is the branch
   'finance-customer-documents': 'overview',   // literally `body?.action ?? 'overview'`

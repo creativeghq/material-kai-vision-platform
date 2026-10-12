@@ -11,70 +11,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
-
-// ── Cron expression parser (minute, hour, day-of-month, month, day-of-week) ──
-
-function cronMatchesNow(cron: string, now: Date): boolean {
-  const parts = cron.trim().split(/\s+/);
-  if (parts.length < 5) return false;
-
-  const [minPart, hourPart, domPart, monPart, dowPart] = parts;
-  const minute = now.getMinutes();
-  const hour = now.getHours();
-  const dayOfMonth = now.getDate();
-  const month = now.getMonth() + 1; // 1-based
-  const dayOfWeek = now.getDay(); // 0=Sun
-
-  return (
-    fieldMatches(minPart, minute, 0, 59) &&
-    fieldMatches(hourPart, hour, 0, 23) &&
-    fieldMatches(domPart, dayOfMonth, 1, 31) &&
-    fieldMatches(monPart, month, 1, 12) &&
-    fieldMatches(dowPart, dayOfWeek, 0, 6)
-  );
-}
-
-function fieldMatches(field: string, value: number, min: number, max: number): boolean {
-  if (field === '*') return true;
-
-  for (const part of field.split(',')) {
-    // Handle step values: */5 or 1-10/2
-    if (part.includes('/')) {
-      const [rangePart, stepStr] = part.split('/');
-      const step = parseInt(stepStr, 10);
-      if (isNaN(step) || step <= 0) continue;
-
-      let start = min;
-      let end = max;
-      if (rangePart !== '*') {
-        if (rangePart.includes('-')) {
-          const [s, e] = rangePart.split('-').map(Number);
-          start = s;
-          end = e;
-        } else {
-          start = parseInt(rangePart, 10);
-          end = max;
-        }
-      }
-      for (let i = start; i <= end; i += step) {
-        if (i === value) return true;
-      }
-      continue;
-    }
-
-    // Handle ranges: 1-5
-    if (part.includes('-')) {
-      const [start, end] = part.split('-').map(Number);
-      if (value >= start && value <= end) return true;
-      continue;
-    }
-
-    // Plain value
-    if (parseInt(part, 10) === value) return true;
-  }
-
-  return false;
-}
+import { cronMatchesNow } from '../_shared/cron-match.ts';
 
 // ── Main handler ──
 

@@ -1,6 +1,6 @@
 /**
  * Shared lazy Stripe + Supabase client factories for every edge function that
- * touches Stripe (stripe-webhooks, stripe-api handlers, stripe-connect,
+ * touches Stripe (stripe-webhooks, stripe-api handlers,
  * finance-pay-invoice, the bank feed, the payments provider registry).
  */
 

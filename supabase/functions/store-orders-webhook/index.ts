@@ -89,13 +89,13 @@ Deno.serve(withApiLogging('store-orders-webhook', async (req) => {
       document = doc ?? null;
       const invoiceId = (doc as Record<string, unknown> | null)?.invoice_id as string | undefined;
       if (conn.auto_send_document_back && invoiceId && (doc as Record<string, unknown>)?.outcome === 'issued') {
-        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/store-document-writeback`, {
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/store-api`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
           },
-          body: JSON.stringify({ invoice_id: invoiceId }),
+          body: JSON.stringify({ action: 'document_writeback', invoice_id: invoiceId }),
         }).catch(() => { });
       }
     }

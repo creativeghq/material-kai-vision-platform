@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { jsonResponse as json } from '../_shared/http.ts';
-import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, getUserId, userCanAccessWorkspace } from '../_shared/auth.ts';
-import { ADAPTERS, type AdapterConnection } from '../_shared/commerce/adapters.ts';
-import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
+import { HttpError } from '../../_shared/api-logger.ts';
+import { jsonResponse as json } from '../../_shared/http.ts';
+import { authenticate, getUserId, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { ADAPTERS, type AdapterConnection } from '../../_shared/commerce/adapters.ts';
+import { assertSafeUrl, SSRFError } from '../../_shared/ssrf-guard.ts';
 
 type Row = Record<string, unknown>;
 
@@ -68,11 +67,8 @@ function observedKeys(platform: string, orders: readonly unknown[]): { key: stri
     .slice(0, 25);
 }
 
-Deno.serve(withApiLogging('store-orders-sync', async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
-  if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
-
-  const body = await req.json().catch(() => ({}));
+/** `sync_orders` — pull the last N days from Shopify / WooCommerce through the webhook's own upsert. */
+export async function handleSyncOrders(req: Request, body: Row): Promise<Response> {
   const connectionId = String(body?.connection_id ?? '');
   const days = Math.min(Math.max(Number(body?.days ?? 7), 1), 90);
   const discoverOnly = Boolean(body?.discover_only);
@@ -130,4 +126,4 @@ Deno.serve(withApiLogging('store-orders-sync', async (req) => {
     .eq('id', conn.id);
 
   return json({ ok: true, scanned: orders.length, created, duplicate, review, failed, keys, note });
-}));
+}

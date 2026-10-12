@@ -36,13 +36,12 @@ export const PLATFORM_API_BLOCKED: readonly BlockedEndpoint[] = [
       + 'reviews each proposal in Finance → Spend; an agent call is that review skipped.',
   },
   { name: 'xml-import-orchestrator', reason: 'Bulk supplier import — creates and updates products at scale.' },
-  { name: 'crm-company-embedding-backfill', reason: 'Bulk embedding backfill over every company in the CRM.' },
+  { name: 'embedding-drain', reason: 'Bulk embedding backfill over the whole knowledge base or every company in the CRM.' },
   {
     name: 'supplier-einvoice-details',
     reason: 'Bulk read of suppliers\' e-invoice provider sites that fills CRM fields; the providers rate-limit '
       + 'by IP. Run from a supplier\'s Bank Accounts card.',
   },
-  { name: 'kb-embedding-backfill', reason: 'Bulk backfill over the whole knowledge base.' },
   { name: 'trigger-factory-enrichment', reason: 'Bulk enrichment across the whole product catalogue.' },
   { name: 'taric-reference-sync', reason: 'Bulk sync of the whole TARIC customs reference set.' },
   { name: 'revolut-sync', reason: 'Bulk bank-feed sync; the reconciliation it feeds is per-leg and manual.' },
@@ -76,12 +75,13 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   // Money.
   { name: 'finance-send-payment', reason: 'Instructs a real transfer out of the bank account.' },
   { name: 'finance-pay-invoice', reason: 'Opens a payment session against an invoice.' },
-  { name: 'stripe-api', reason: 'Moves real money through the Stripe account.' },
-  { name: 'stripe-connect', reason: 'Changes the workspace payment account.' },
+  { name: 'stripe-api', reason: 'Moves real money through the Stripe account, and changes the workspace payment account.' },
   { name: 'revolut-api', reason: 'Acts directly on the business bank account.' },
-  { name: 'store-document-writeback', reason: 'Writes a customer-visible note and a document link into the merchant\'s own store.' },
-  { name: 'store-skroutz-orders', reason: 'Accepts or rejects a real marketplace order on a clock, and uploads a fiscal document to Skroutz.' },
-  { name: 'store-orders-sync', reason: 'Calls the merchant\'s own Shopify or WooCommerce store and creates orders in bulk from what it finds.' },
+  {
+    name: 'store-api',
+    reason: 'Pulls and creates orders in bulk from the merchant\'s own store, accepts or rejects a real Skroutz order '
+      + 'on a clock, and writes a customer-visible document link into the store.',
+  },
   // Reaches a customer or the public.
   { name: 'finance-send-invoice-email', reason: 'Sends an email to the customer named on the invoice.' },
   { name: 'finance-send-statement', reason: 'Emails a customer their account statement.' },

@@ -48,8 +48,8 @@ export const ConnectionSettingsCard: React.FC<{
   const run = async (action: 'discover' | 'backfill') => {
     setBusy(action);
     try {
-      const { data, error } = await supabase.functions.invoke('store-orders-sync', {
-        body: { connection_id: connection.id, days: 30, discover_only: action === 'discover' },
+      const { data, error } = await supabase.functions.invoke('store-api', {
+        body: { action: 'sync_orders', connection_id: connection.id, days: 30, discover_only: action === 'discover' },
       });
       if (error) throw error;
       if (action === 'discover') {

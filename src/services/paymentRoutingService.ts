@@ -19,16 +19,16 @@ export const paymentRoutingService = {
   },
 
   async onboard(workspaceId: string, returnUrl: string): Promise<{ url: string }> {
-    const { data, error } = await supabase.functions.invoke('stripe-connect', {
-      body: { action: 'onboard', workspace_id: workspaceId, return_url: returnUrl },
+    const { data, error } = await supabase.functions.invoke('stripe-api', {
+      body: { action: 'connect-onboard', workspace_id: workspaceId, return_url: returnUrl },
     });
     if (error) throw await edgeError(error);
     return data as { url: string };
   },
 
   async refreshStatus(workspaceId: string): Promise<{ configured: boolean; charges_enabled: boolean; details_submitted?: boolean }> {
-    const { data, error } = await supabase.functions.invoke('stripe-connect', {
-      body: { action: 'status', workspace_id: workspaceId },
+    const { data, error } = await supabase.functions.invoke('stripe-api', {
+      body: { action: 'connect-status', workspace_id: workspaceId },
     });
     if (error) throw await edgeError(error);
     return data as any;

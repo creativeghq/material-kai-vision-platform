@@ -96,8 +96,8 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
   const call = async (action: string, orderCode?: string, invoiceId?: string) => {
     setBusy(orderCode ?? action);
     try {
-      const { data, error } = await supabase.functions.invoke('store-skroutz-orders', {
-        body: { action, connection_id: connection.id, order_code: orderCode, invoice_id: invoiceId },
+      const { data, error } = await supabase.functions.invoke('store-api', {
+        body: { action: `skroutz_${action}`, connection_id: connection.id, order_code: orderCode, invoice_id: invoiceId },
       });
       if (error) throw error;
       await load();

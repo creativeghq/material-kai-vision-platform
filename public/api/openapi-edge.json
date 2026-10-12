@@ -932,9 +932,9 @@
         "tags": [
           "Internal"
         ],
-        "summary": "Proxy product attribute canonicalization to MIVAA facet service",
+        "summary": "Proxy to MIVAA facet canonicalization: one product, or the re-canonicalization sweep",
         "operationId": "post_canonicalize_attributes",
-        "description": "Internal-only thin proxy called by background agents (material-tagger, product-enrichment) to canonicalize raw product attributes through MIVAA's POST /api/admin/facets/canonicalize. Keeps MIVAA credentials in one place so background agents do not need to carry them. No auth enforced at the edge layer — network-level restriction applies.\n\n**Response:** (`application/json`)",
+        "description": "Internal-only proxy to MIVAA's facet service under the platform key. action 'canonicalize' (default) canonicalizes one product's raw attributes (POST /api/admin/facets/canonicalize) — called by the material-tagger and product-enrichment agents and catalog promotion. action 'recanonicalize' replays products.attributes_raw through the canonicalizer (POST /api/admin/facets/recanonicalize, #316) so a threshold change, a curated alias or an outage-degraded product is repaired without re-ingesting a PDF; driven nightly by the facets-recanonicalize-degraded cron with degraded_only=true. Requires service-role or x-cron-secret — an open proxy here is open Voyage spend. An upstream failure is a 502.\n\n**Actions** (`action` in the body):\n- `canonicalize` — Canonicalize one product's raw attributes (the default action). → `{attributes, attributes_raw, resolutions_count, actions_by_type}`\n- `recanonicalize` — Bulk re-canonicalization sweep. Check `remaining` to decide whether to call again. → `{scanned, updated, degraded, skipped_no_raw, failed, remaining}`\n\n**Response:** (`application/json`)",
         "security": [],
         "responses": {
           "200": {
@@ -973,25 +973,77 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "product_id": {
-                    "type": "string",
-                    "description": "Optional — enables diff-before-canonicalize in MIVAA"
-                  },
-                  "raw_attributes": {
+                "oneOf": [
+                  {
                     "type": "object",
-                    "description": "Record of raw attribute key→value pairs to canonicalize"
+                    "required": [
+                      "action",
+                      "raw_attributes",
+                      "source"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "canonicalize"
+                        ],
+                        "description": "Canonicalize one product's raw attributes (the default action)."
+                      },
+                      "product_id": {
+                        "type": "string",
+                        "description": "Optional — enables diff-before-canonicalize in MIVAA"
+                      },
+                      "raw_attributes": {
+                        "type": "object",
+                        "description": "Record of raw attribute key→value pairs to canonicalize"
+                      },
+                      "source": {
+                        "type": "string",
+                        "description": "Caller identifier e.g. 'agent_material_tagger'"
+                      }
+                    },
+                    "description": "Returns: {attributes, attributes_raw, resolutions_count, actions_by_type}"
                   },
-                  "source": {
-                    "type": "string",
-                    "description": "Caller identifier e.g. 'agent_material_tagger'"
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "recanonicalize"
+                        ],
+                        "description": "Bulk re-canonicalization sweep. Check `remaining` to decide whether to call again."
+                      },
+                      "degraded_only": {
+                        "type": "boolean",
+                        "description": "Default TRUE. Only replay products flagged degraded by a failed run. Pass false for a full catalog re-sweep after a rules change."
+                      },
+                      "max_products": {
+                        "type": "integer",
+                        "description": "Hard cap for one call (1-5000, default 200). Check `remaining` in the response to decide whether to call again."
+                      },
+                      "batch_size": {
+                        "type": "integer",
+                        "description": "Rows fetched per batch (1-200, default 25)"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Optional — scope the sweep to one tenant"
+                      },
+                      "target_version": {
+                        "type": "integer",
+                        "description": "Optional — sweep products below this facet_canonicalization_version. Defaults to MIVAA's CURRENT_FACET_CANONICALIZATION_VERSION."
+                      }
+                    },
+                    "description": "Returns: {scanned, updated, degraded, skipped_no_raw, failed, remaining}"
                   }
-                },
-                "required": [
-                  "raw_attributes",
-                  "source"
-                ]
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
               }
             }
           }
@@ -2209,95 +2261,6 @@
         }
       }
     },
-    "/crm-company-embedding-backfill": {
-      "post": {
-        "tags": [
-          "CRM"
-        ],
-        "summary": "Embed CRM companies so lookalike search has something to rank",
-        "operationId": "post_crm_company_embedding_backfill",
-        "description": "Drains the derived embedding backlog for crm_companies: every row whose stored embedding_source_hash differs from the hash of crm_company_embedding_text(id) right now. Sequential, small batches, idempotent. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.\n\n**Response:** `{success, processed, succeeded, skipped, failed, remaining, remaining_capped}`",
-        "security": [
-          {
-            "apiKeySecret": []
-          },
-          {
-            "cronSecret": []
-          },
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "limit": {
-                    "type": "integer",
-                    "description": "Max companies to process this run (clamped to an internal MAX_LIMIT of 200)"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/email-api": {
       "post": {
         "tags": [
@@ -2859,81 +2822,6 @@
                   "created_at",
                   "data"
                 ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/facets-recanonicalize": {
-      "post": {
-        "tags": [
-          "Internal"
-        ],
-        "summary": "Bulk facet re-canonicalization sweep (proxy to MIVAA)",
-        "operationId": "post_facets_recanonicalize",
-        "description": "Internal-only proxy to MIVAA's POST /api/admin/facets/recanonicalize (#316). Replays products.attributes_raw through the canonicalizer so a similarity-threshold change, a curated alias, or an outage-degraded product can be repaired without re-ingesting any source PDF. Driven nightly at 03:40 by the facets-recanonicalize-degraded cron with degraded_only=true; a full catalog re-sweep costs a Voyage embedding per raw value and must be requested explicitly. Requires service-role or x-cron-secret (isCronAuthorized) — an open proxy here would be an open Voyage spend. Returns `remaining` so the caller knows whether to run again.\n\n**Response:** (`application/json`)",
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "degraded_only": {
-                    "type": "boolean",
-                    "description": "Default TRUE. Only replay products flagged degraded by a failed run. Pass false for a full catalog re-sweep after a rules change."
-                  },
-                  "max_products": {
-                    "type": "integer",
-                    "description": "Hard cap for one call (1-5000, default 200). Check `remaining` in the response to decide whether to call again."
-                  },
-                  "batch_size": {
-                    "type": "integer",
-                    "description": "Rows fetched per batch (1-200, default 25)"
-                  },
-                  "workspace_id": {
-                    "type": "string",
-                    "description": "Optional — scope the sweep to one tenant"
-                  },
-                  "target_version": {
-                    "type": "integer",
-                    "description": "Optional — sweep products below this facet_canonicalization_version. Defaults to MIVAA's CURRENT_FACET_CANONICALIZATION_VERSION."
-                  }
-                }
               }
             }
           }
@@ -14390,7 +14278,7 @@
         ],
         "summary": "Stripe Checkout and Customer Portal session creator",
         "operationId": "post_stripe_api",
-        "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured.\n\n**Actions** (`action` in the body):\n- `activate-module` — Start (or complete) paid activation of a module for a workspace. Returns a Stripe Checkout URL for a paid module; activates directly when the module is free or already paid. → `{success:boolean, url?:string, activated?:boolean}`\n- `deactivate-module` — Deactivate a module for a workspace and cancel its Stripe subscription line. → `{success:boolean}`\n- `request-module` — Register interest in a module that has no self-serve price yet. Notifies the operator. → `{success:boolean}`\n- `request-self-hosting` — Self-hosting enquiry from the pricing page. Files the lead and notifies the operator. → `{success:boolean}`\n- `list-stripe-products` — Admin: list the live Stripe products and prices, so the module catalogue can be checked against what Stripe actually sells. → `{success:boolean, products:[]}`\n- `verify-catalogue-prices` — Admin: reconcile every module’s configured price id against Stripe and report the ones that do not resolve. A module priced against a deleted price id sells at no price at all. → `{success:boolean, checked:number, problems:[]}`\n- `create-addon-product` — Admin: create the Stripe product + recurring price for a module add-on. Was routable and unlisted for its whole life — an action the error message denies existing is an action nobody calls. → `{success:boolean, product:object, price:object}`\n- `checkout` — Create a Stripe Checkout session for credit purchase or subscription → `{url}`\n- `customer_portal` — Create a Stripe Customer Portal session for subscription management → `{url}`",
+        "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured. 'connect-onboard' / 'connect-status' manage the workspace's Stripe Express account for per-workspace payouts (destination charges).\n\n**Actions** (`action` in the body):\n- `activate-module` — Start (or complete) paid activation of a module for a workspace. Returns a Stripe Checkout URL for a paid module; activates directly when the module is free or already paid. → `{success:boolean, url?:string, activated?:boolean}`\n- `deactivate-module` — Deactivate a module for a workspace and cancel its Stripe subscription line. → `{success:boolean}`\n- `request-module` — Register interest in a module that has no self-serve price yet. Notifies the operator. → `{success:boolean}`\n- `request-self-hosting` — Self-hosting enquiry from the pricing page. Files the lead and notifies the operator. → `{success:boolean}`\n- `list-stripe-products` — Admin: list the live Stripe products and prices, so the module catalogue can be checked against what Stripe actually sells. → `{success:boolean, products:[]}`\n- `verify-catalogue-prices` — Admin: reconcile every module’s configured price id against Stripe and report the ones that do not resolve. A module priced against a deleted price id sells at no price at all. → `{success:boolean, checked:number, problems:[]}`\n- `create-addon-product` — Admin: create the Stripe product + recurring price for a module add-on. Was routable and unlisted for its whole life — an action the error message denies existing is an action nobody calls. → `{success:boolean, product:object, price:object}`\n- `checkout` — Create a Stripe Checkout session for credit purchase or subscription → `{url}`\n- `customer_portal` — Create a Stripe Customer Portal session for subscription management → `{url}`\n- `connect-onboard` — Stripe Connect: Get or create a Stripe Express account and return an onboarding link. Caller must be workspace owner or admin; otherwise 404. → `{url, account_id}`\n- `connect-status` — Stripe Connect: Refresh and return Stripe Connect account flags for a workspace. Caller must be workspace owner or admin; otherwise 404. → `{configured, charges_enabled, details_submitted?}`",
         "security": [
           {
             "supabaseJwt": []
@@ -14705,88 +14593,7 @@
                       }
                     },
                     "description": "Returns: {url}"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "action"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/stripe-connect": {
-      "post": {
-        "tags": [
-          "Payments"
-        ],
-        "summary": "Stripe Connect onboarding and status for per-workspace payouts",
-        "operationId": "post_stripe_connect",
-        "description": "Manages Stripe Express accounts for per-workspace destination charges. 'onboard' gets or creates an Express account and returns an onboarding link; 'status' refreshes charges_enabled and details_submitted flags. Caller must be workspace owner or admin.\n\n**Actions** (`action` in the body):\n- `onboard` — Get or create a Stripe Express account and return an onboarding link → `{url, account_id}`\n- `status` — Refresh and return Stripe Connect account flags for a workspace → `{configured, charges_enabled, details_submitted?}`",
-        "security": [
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
+                  },
                   {
                     "type": "object",
                     "required": [
@@ -14797,9 +14604,9 @@
                       "action": {
                         "type": "string",
                         "enum": [
-                          "onboard"
+                          "connect-onboard"
                         ],
-                        "description": "Get or create a Stripe Express account and return an onboarding link"
+                        "description": "Stripe Connect: Get or create a Stripe Express account and return an onboarding link. Caller must be workspace owner or admin; otherwise 404."
                       },
                       "workspace_id": {
                         "type": "string",
@@ -14822,9 +14629,9 @@
                       "action": {
                         "type": "string",
                         "enum": [
-                          "status"
+                          "connect-status"
                         ],
-                        "description": "Refresh and return Stripe Connect account flags for a workspace"
+                        "description": "Stripe Connect: Refresh and return Stripe Connect account flags for a workspace. Caller must be workspace owner or admin; otherwise 404."
                       },
                       "workspace_id": {
                         "type": "string",
@@ -18767,99 +18574,6 @@
         }
       }
     },
-    "/kb-embedding-backfill": {
-      "post": {
-        "tags": [
-          "Knowledge Base"
-        ],
-        "summary": "Backfill Voyage embeddings for knowledge-base documents missing them",
-        "operationId": "post_kb_embedding_backfill",
-        "description": "Re-embeds kb_docs that have no/stale embedding via the embeddings service, bounded by a limit. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.\n\n**Response:** `{success, processed, embedded, failed}`",
-        "security": [
-          {
-            "apiKeySecret": []
-          },
-          {
-            "cronSecret": []
-          },
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "limit": {
-                    "type": "integer",
-                    "description": "Max docs to process this run (clamped to an internal MAX_LIMIT)"
-                  },
-                  "workspace_id": {
-                    "type": "string",
-                    "description": "Restrict backfill to one workspace (string (uuid))"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/hr-api": {
       "post": {
         "tags": [
@@ -21288,6 +21002,99 @@
                 ],
                 "discriminator": {
                   "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/embedding-drain": {
+      "post": {
+        "tags": [
+          "Knowledge Base"
+        ],
+        "summary": "Embed rows whose Voyage vector is missing or stale — one backlog per task",
+        "operationId": "post_embedding_drain",
+        "description": "Sequential, small-batch, idempotent embedding drains through MIVAA /api/embeddings/clip-text. `?task=kb-docs` embeds kb_docs with no vector (pending or failed); `?task=crm-companies` drains crm_companies_embedding_backlog so lookalike search has something to rank, recording an empty company as 'skipped' rather than leaving it pending. Logged per task. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.\n\n**Response:** `{success, task, processed, succeeded, failed, remaining, ...} — crm-companies adds skipped and remaining_capped; kb-docs adds backlog_before and sample_errors`",
+        "security": [
+          {
+            "apiKeySecret": []
+          },
+          {
+            "cronSecret": []
+          },
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "description": "Rows to process this run. kb-docs: default 12, max 50. crm-companies: default 25, max 200."
+                  },
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "kb-docs only: restrict the drain to one workspace. (string (uuid))"
+                  }
                 }
               }
             }
@@ -32560,14 +32367,14 @@
         }
       }
     },
-    "/store-orders-sync": {
+    "/store-api": {
       "post": {
         "tags": [
           "Commerce"
         ],
-        "summary": "Pulls recent orders from a connected store to close the gap a missed webhook leaves.",
-        "operationId": "post_store_orders_sync",
-        "description": "A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held returns skipped_dupe. The store URL is operator-supplied, so the fetch goes through the shared SSRF guard: https only, DNS-resolved, private and link-local ranges refused. With discover_only it ingests nothing and instead returns the note_attribute / meta_data keys that actually appear on recent orders, counted, so the VAT-number and invoice-request keys are picked from what the shop really sends rather than guessed.",
+        "summary": "Operator actions on a connected sales channel: pull orders, work the Skroutz queue, hand a document back.",
+        "operationId": "post_store_api",
+        "description": "`sync_orders` — A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held returns skipped_dupe. The store URL is operator-supplied, so the fetch goes through the shared SSRF guard: https only, DNS-resolved, private and link-local ranges refused. With discover_only it ingests nothing and instead returns the note_attribute / meta_data keys that actually appear on recent orders, counted, so the VAT-number and invoice-request keys are picked from what the shop really sends rather than guessed.\n\n`skroutz_*` — Skroutz is not a passive feed like a webshop — it pushes an order and starts a clock. An order must be accepted or rejected, and since 30/03/2026 dispatch needs an explicit set_as_ready; an order left open expires, and an expired order is a lost sale. `skroutz_pull` fetches the open queue and ingests through the same upsert_inbound_order every other channel uses. `skroutz_upload_document` re-uploads the RENDERED PDF as a file, because Skroutz takes the file itself rather than a link, capped at 7MB on their side. All calls carry the Bearer token and the vnd.skroutz version header; note Skroutz allows ONE active API key per shop, so generating a new one expires the old and is a breaking event.\n\n`document_writeback` — Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guard, https only. A draft is refused. Every attempt, successful or not, lands in store_order_sync_log. Also called by store-orders-webhook with the service role when a connection auto-sends documents back.\n\nThe inbound order webhook (store-orders-webhook) stays a separate function: its URL is registered with each store.\n\n**Actions** (`action` in the body):\n- `sync_orders` — Pulls recent orders from a connected store to close the gap a missed webhook leaves. → `{ok, scanned, created, duplicate, review, failed, keys, note}`\n- `skroutz_pull` — Fetch the open Skroutz queue and ingest it through upsert_inbound_order. → `{ok, scanned, created, duplicate, review, failed}`\n- `skroutz_accept` — accept a Skroutz order. → `{ok, action, order_code, state}`\n- `skroutz_reject` — reject a Skroutz order. → `{ok, action, order_code, state}`\n- `skroutz_set_as_ready` — set as ready a Skroutz order. → `{ok, action, order_code, state}`\n- `skroutz_upload_document` — Upload the rendered PDF of an issued invoice to a Skroutz order (7MB cap). → `{ok, action, order_code, uploaded}`\n- `document_writeback` — Hands the issued fiscal document back to the store the order came from. → `{ok, link, number, platform}`",
         "security": [
           {
             "supabaseJwt": []
@@ -32630,24 +32437,191 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "connection_id": {
-                    "type": "string",
-                    "description": "The store_connections id to pull for. Membership is checked against the verified JWT."
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "connection_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "sync_orders"
+                        ],
+                        "description": "Pulls recent orders from a connected store to close the gap a missed webhook leaves."
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "description": "The store_connections id to pull for. Membership is checked against the verified JWT."
+                      },
+                      "days": {
+                        "type": "number",
+                        "description": "How far back to pull, 1-90. Default 7."
+                      },
+                      "discover_only": {
+                        "type": "boolean",
+                        "description": "Return the observed attribute keys without ingesting anything."
+                      }
+                    },
+                    "description": "Returns: {ok, scanned, created, duplicate, review, failed, keys, note}"
                   },
-                  "days": {
-                    "type": "number",
-                    "description": "How far back to pull, 1-90. Default 7."
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "connection_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "skroutz_pull"
+                        ],
+                        "description": "Fetch the open Skroutz queue and ingest it through upsert_inbound_order."
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "description": "The store_connections id to pull for. Membership is checked against the verified JWT."
+                      }
+                    },
+                    "description": "Returns: {ok, scanned, created, duplicate, review, failed}"
                   },
-                  "discover_only": {
-                    "type": "boolean",
-                    "description": "Return the observed attribute keys without ingesting anything."
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "connection_id",
+                      "order_code"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "skroutz_accept"
+                        ],
+                        "description": "accept a Skroutz order."
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "description": "The Skroutz store_connections id. Membership is checked against the verified JWT."
+                      },
+                      "order_code": {
+                        "type": "string",
+                        "description": "Skroutz order code. Required for everything but pull."
+                      }
+                    },
+                    "description": "Returns: {ok, action, order_code, state}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "connection_id",
+                      "order_code"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "skroutz_reject"
+                        ],
+                        "description": "reject a Skroutz order."
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "description": "The Skroutz store_connections id. Membership is checked against the verified JWT."
+                      },
+                      "order_code": {
+                        "type": "string",
+                        "description": "Skroutz order code. Required for everything but pull."
+                      }
+                    },
+                    "description": "Returns: {ok, action, order_code, state}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "connection_id",
+                      "order_code"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "skroutz_set_as_ready"
+                        ],
+                        "description": "set as ready a Skroutz order."
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "description": "The Skroutz store_connections id. Membership is checked against the verified JWT."
+                      },
+                      "order_code": {
+                        "type": "string",
+                        "description": "Skroutz order code. Required for everything but pull."
+                      }
+                    },
+                    "description": "Returns: {ok, action, order_code, state}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "connection_id",
+                      "order_code",
+                      "invoice_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "skroutz_upload_document"
+                        ],
+                        "description": "Upload the rendered PDF of an issued invoice to a Skroutz order (7MB cap)."
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "description": "The Skroutz store_connections id. Membership is checked against the verified JWT."
+                      },
+                      "order_code": {
+                        "type": "string",
+                        "description": "Skroutz order code. Required for everything but pull."
+                      },
+                      "invoice_id": {
+                        "type": "string",
+                        "description": "The issued invoice to upload. Required for upload_document."
+                      }
+                    },
+                    "description": "Returns: {ok, action, order_code, uploaded}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "invoice_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "document_writeback"
+                        ],
+                        "description": "Hands the issued fiscal document back to the store the order came from."
+                      },
+                      "invoice_id": {
+                        "type": "string",
+                        "description": "The issued invoice to hand back. Its order must have come from a channel."
+                      }
+                    },
+                    "description": "Returns: {ok, link, number, platform}"
                   }
-                },
-                "required": [
-                  "connection_id"
-                ]
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
               }
             }
           }
@@ -32714,172 +32688,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/store-document-writeback": {
-      "post": {
-        "tags": [
-          "Commerce"
-        ],
-        "summary": "Hands the issued fiscal document back to the store the order came from.",
-        "operationId": "post_store_document_writeback",
-        "description": "Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guard, https only. A draft is refused. Every attempt, successful or not, lands in store_order_sync_log.",
-        "security": [
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "invoice_id": {
-                    "type": "string",
-                    "description": "The issued invoice to hand back. Its order must have come from a channel."
-                  }
-                },
-                "required": [
-                  "invoice_id"
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/store-skroutz-orders": {
-      "post": {
-        "tags": [
-          "Commerce"
-        ],
-        "summary": "Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document.",
-        "operationId": "post_store_skroutz_orders",
-        "description": "Skroutz is not a passive feed like a webshop — it pushes an order and starts a clock. An order must be accepted or rejected, and since 30/03/2026 dispatch needs an explicit set_as_ready; an order left open expires, and an expired order is a lost sale. `pull` fetches the open queue and ingests through the same upsert_inbound_order every other channel uses. `upload_document` re-uploads the RENDERED PDF as a file, because Skroutz takes the file itself rather than a link, capped at 7MB on their side. All calls carry the Bearer token and the vnd.skroutz version header; note Skroutz allows ONE active API key per shop, so generating a new one expires the old and is a breaking event.",
-        "security": [
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [],
-                "discriminator": {
-                  "propertyName": "action"
                 }
               }
             }

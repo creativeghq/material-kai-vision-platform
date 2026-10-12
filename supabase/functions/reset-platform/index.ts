@@ -2,11 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isPlatformOperator, isServiceRoleRequest } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -684,13 +684,14 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     console.log('\n🗑️  STEP 5: Clear MIVAA server /tmp folder');
     results.server_tmp = { called: false };
     try {
+      const mivaaApiKey = (await resolveSecret(supabase, 'MIVAA_API_KEY')).value;
       const tmpRes = await fetch(
         `${MIVAA_GATEWAY_URL}/api/system/cleanup-temp-files?max_age_hours=0&dry_run=false`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(MIVAA_API_KEY ? { Authorization: `Bearer ${MIVAA_API_KEY}` } : {}),
+            ...(mivaaApiKey ? { Authorization: `Bearer ${mivaaApiKey}` } : {}),
           },
         },
       );

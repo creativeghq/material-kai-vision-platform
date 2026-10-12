@@ -1,5 +1,5 @@
 // Unified Stripe API (admin/customer-facing actions).
-// Body: { action: 'checkout' | 'customer_portal', ...params }
+// Body: { action: 'checkout' | 'customer_portal' | 'connect-onboard' | 'connect-status' | <module action>, ...params }
 // stripe-webhooks stays separate — it's the public webhook receiver registered
 // in the Stripe dashboard; that URL must not change.
 // crm-stripe-api is reachable through crm-api as { resource: 'stripe' }.
@@ -10,6 +10,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { handleCheckout } from './handlers/checkout.ts';
 import { handleCustomerPortal } from './handlers/customer-portal.ts';
 import { handleModuleAction } from './handlers/modules.ts';
+import { handleConnect } from './handlers/connect.ts';
 
 Deno.serve(withApiLogging('stripe-api', async (req) => {
   // Populate Deno.env from platform_secrets BEFORE dispatching — handlers
@@ -40,6 +41,9 @@ Deno.serve(withApiLogging('stripe-api', async (req) => {
       return handleCheckout(req, body);
     case 'customer_portal':
       return handleCustomerPortal(req, body);
+    case 'connect-onboard':
+    case 'connect-status':
+      return handleConnect(req, body);
     case 'activate-module':
     case 'deactivate-module':
     case 'request-module':
@@ -53,7 +57,8 @@ Deno.serve(withApiLogging('stripe-api', async (req) => {
         // Listed exhaustively and kept in step with the switch above: 'create-addon-product' was
         // routable and unlisted for its whole life, so the only way to discover it was to read
         // the source. An action the error message denies existing is an action nobody calls.
-        error: `Unknown action '${action}'. Available: checkout, customer_portal, activate-module, `
+        error: `Unknown action '${action}'. Available: checkout, customer_portal, connect-onboard, connect-status, `
+          + `activate-module, `
           + `deactivate-module, request-module, list-stripe-products, create-addon-product, `
           + `verify-catalogue-prices, request-self-hosting`,
       }), {

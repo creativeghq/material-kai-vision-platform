@@ -485,21 +485,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     ]
   },
   {
-    "name": "crm-company-embedding-backfill",
-    "tag": "CRM",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Embed CRM companies so lookalike search has something to rank",
-    "description": "Drains the derived embedding backlog for crm_companies: every row whose stored embedding_source_hash differs from the hash of crm_company_embedding_text(id) right now. Sequential, small batches, idempotent. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.",
-    "fields": {
-      "limit": {
-        "type": "integer",
-        "description": "Max companies to process this run (clamped to an internal MAX_LIMIT of 200)"
-      }
-    }
-  },
-  {
     "name": "crm-lead-score",
     "tag": "CRM",
     "methods": [
@@ -723,6 +708,25 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "set": {
         "type": "object",
         "description": "{open_tracking?:boolean, click_tracking?:boolean} — applied before the values are read back."
+      }
+    }
+  },
+  {
+    "name": "embedding-drain",
+    "tag": "Knowledge Base",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Embed rows whose Voyage vector is missing or stale — one backlog per task",
+    "description": "Sequential, small-batch, idempotent embedding drains through MIVAA /api/embeddings/clip-text. `?task=kb-docs` embeds kb_docs with no vector (pending or failed); `?task=crm-companies` drains crm_companies_embedding_backlog so lookalike search has something to rank, recording an empty company as 'skipped' rather than leaving it pending. Logged per task. Auth: service-role bearer (cron / internal), s",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "description": "Rows to process this run. kb-docs: default 12, max 50. crm-companies: default 25, max 200."
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "kb-docs only: restrict the drain to one workspace. (string (uuid))"
       }
     }
   },
@@ -2696,25 +2700,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
-    "name": "kb-embedding-backfill",
-    "tag": "Knowledge Base",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Backfill Voyage embeddings for knowledge-base documents missing them",
-    "description": "Re-embeds kb_docs that have no/stale embedding via the embeddings service, bounded by a limit. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.",
-    "fields": {
-      "limit": {
-        "type": "integer",
-        "description": "Max docs to process this run (clamped to an internal MAX_LIMIT)"
-      },
-      "workspace_id": {
-        "type": "string",
-        "description": "Restrict backfill to one workspace (string (uuid))"
-      }
-    }
-  },
-  {
     "name": "kb-generate-embedding",
     "tag": "Knowledge Base",
     "methods": [
@@ -4296,33 +4281,30 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
-    "name": "store-document-writeback",
+    "name": "store-api",
     "tag": "Commerce",
     "methods": [
       "POST"
     ],
-    "summary": "Hands the issued fiscal document back to the store the order came from.",
-    "description": "Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guar",
+    "summary": "Operator actions on a connected sales channel: pull orders, work the Skroutz queue, hand a document back.",
+    "description": "`sync_orders` — A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything alr",
     "fields": {
-      "invoice_id": {
+      "action": {
         "type": "string",
+        "enum": [
+          "sync_orders",
+          "skroutz_pull",
+          "skroutz_accept",
+          "skroutz_reject",
+          "skroutz_set_as_ready",
+          "skroutz_upload_document",
+          "document_writeback"
+        ],
         "required": true,
-        "description": "The issued invoice to hand back. Its order must have come from a channel."
-      }
-    }
-  },
-  {
-    "name": "store-orders-sync",
-    "tag": "Commerce",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Pulls recent orders from a connected store to close the gap a missed webhook leaves.",
-    "description": "A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held return",
-    "fields": {
+        "description": "Which operation to run"
+      },
       "connection_id": {
         "type": "string",
-        "required": true,
         "description": "The store_connections id to pull for. Membership is checked against the verified JWT."
       },
       "days": {
@@ -4332,17 +4314,16 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "discover_only": {
         "type": "boolean",
         "description": "Return the observed attribute keys without ingesting anything."
+      },
+      "order_code": {
+        "type": "string",
+        "description": "Skroutz order code. Required for everything but pull."
+      },
+      "invoice_id": {
+        "type": "string",
+        "description": "The issued invoice to upload. Required for upload_document."
       }
     }
-  },
-  {
-    "name": "store-skroutz-orders",
-    "tag": "Commerce",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Works the Skroutz order queue: fetch, accept, reject, set as ready, upload the document.",
-    "description": "Skroutz is not a passive feed like a webshop — it pushes an order and starts a clock. An order must be accepted or rejected, and since 30/03/2026 dispatch needs an explicit set_as_ready; an order left open expires, and an expired order is a lost sale. `pull` fetches the open queue and ingests through the same upsert_inbound_order every other channel uses. `upload_document` re-uploads the RENDERED "
   },
   {
     "name": "stripe-api",
@@ -4351,7 +4332,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Stripe Checkout and Customer Portal session creator",
-    "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured.",
+    "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured. 'connect-onboard' / 'connect-status' manage the workspace's Stripe Express account for per-workspace payouts (destin",
     "fields": {
       "action": {
         "type": "string",
@@ -4364,7 +4345,9 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "verify-catalogue-prices",
           "create-addon-product",
           "checkout",
-          "customer_portal"
+          "customer_portal",
+          "connect-onboard",
+          "connect-status"
         ],
         "required": true,
         "description": "Which operation to run"
@@ -4432,31 +4415,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "returnUrl": {
         "type": "string",
         "description": "URL to return to after portal session."
-      }
-    }
-  },
-  {
-    "name": "stripe-connect",
-    "tag": "Payments",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Stripe Connect onboarding and status for per-workspace payouts",
-    "description": "Manages Stripe Express accounts for per-workspace destination charges. 'onboard' gets or creates an Express account and returns an onboarding link; 'status' refreshes charges_enabled and details_submitted flags. Caller must be workspace owner or admin.",
-    "fields": {
-      "action": {
-        "type": "string",
-        "enum": [
-          "onboard",
-          "status"
-        ],
-        "required": true,
-        "description": "Which operation to run"
-      },
-      "workspace_id": {
-        "type": "string",
-        "required": true,
-        "description": "Workspace to onboard. (string (uuid))"
       },
       "return_url": {
         "type": "string",

@@ -1,9 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { jsonResponse as json } from '../_shared/http.ts';
-import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, getUserId, userCanAccessWorkspace, isServiceRoleRequest } from '../_shared/auth.ts';
-import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
+import { HttpError } from '../../_shared/api-logger.ts';
+import { jsonResponse as json } from '../../_shared/http.ts';
+import { authenticate, getUserId, userCanAccessWorkspace, isServiceRoleRequest } from '../../_shared/auth.ts';
+import { assertSafeUrl, SSRFError } from '../../_shared/ssrf-guard.ts';
 
 type Row = Record<string, unknown>;
 
@@ -57,11 +56,8 @@ async function pushWoo(store: string, creds: Record<string, string>,
   });
 }
 
-Deno.serve(withApiLogging('store-document-writeback', async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
-  if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
-
-  const body = await req.json().catch(() => ({}));
+/** `document_writeback` — hand the issued document back to the store the order came from. */
+export async function handleDocumentWriteback(req: Request, body: Row): Promise<Response> {
   const invoiceId = String(body?.invoice_id ?? '');
   if (!invoiceId) throw new HttpError(400, 'invoice_id is required');
 
@@ -143,4 +139,4 @@ Deno.serve(withApiLogging('store-document-writeback', async (req) => {
   } as Row);
 
   return json({ ok: true, link, number, platform: conn.platform });
-}));
+}

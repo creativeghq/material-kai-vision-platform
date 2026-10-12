@@ -1,25 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
-import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { jsonResponse as json } from '../_shared/http.ts';
-import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, getUserId, userCanAccessWorkspace } from '../_shared/auth.ts';
-import { fromSkroutz, skroutzFetch } from '../_shared/commerce/skroutz.ts';
-import type { AdapterConnection } from '../_shared/commerce/adapters.ts';
+import { HttpError } from '../../_shared/api-logger.ts';
+import { jsonResponse as json } from '../../_shared/http.ts';
+import { authenticate, getUserId, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { fromSkroutz, skroutzFetch } from '../../_shared/commerce/skroutz.ts';
+import type { AdapterConnection } from '../../_shared/commerce/adapters.ts';
 
 type Row = Record<string, unknown>;
 
-const ACTIONS = ['pull', 'accept', 'reject', 'set_as_ready', 'upload_document'] as const;
-type Action = (typeof ACTIONS)[number];
+export const SKROUTZ_ACTIONS = new Set([
+  'skroutz_pull', 'skroutz_accept', 'skroutz_reject', 'skroutz_set_as_ready', 'skroutz_upload_document',
+]);
+type Op = 'pull' | 'accept' | 'reject' | 'set_as_ready' | 'upload_document';
 
-Deno.serve(withApiLogging('store-skroutz-orders', async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
-  if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
-
-  const body = await req.json().catch(() => ({}));
-  const action = String(body?.action ?? 'pull') as Action;
+/** The Skroutz queue: an order starts a clock, so it must be accepted or rejected, then set ready. */
+export async function handleSkroutz(req: Request, body: Row): Promise<Response> {
+  const op = String(body.action).slice('skroutz_'.length) as Op;
   const connectionId = String(body?.connection_id ?? '');
   if (!connectionId) throw new HttpError(400, 'connection_id is required');
-  if (!ACTIONS.includes(action)) throw new HttpError(400, `unknown action: ${action}`);
 
   const auth = await authenticate(req, { requireUser: true });
   const userId = getUserId(auth);
@@ -43,10 +40,10 @@ Deno.serve(withApiLogging('store-skroutz-orders', async (req) => {
   const log = (outcome: string, message: string, extra: Row = {}) => admin
     .from('store_order_sync_log').insert({
       workspace_id: conn.workspace_id, connection_id: conn.id, platform: 'skroutz',
-      event_type: action, outcome, message, ...extra,
+      event_type: op, outcome, message, ...extra,
     } as Row);
 
-  if (action === 'pull') {
+  if (op === 'pull') {
     const res = await skroutzFetch({ token, path: '/merchants/ecommerce/orders?state=open&per=50' });
     if (!res.ok) {
       await log('error', `Skroutz refused the pull: ${res.status}`);
@@ -79,13 +76,13 @@ Deno.serve(withApiLogging('store-skroutz-orders', async (req) => {
   const code = String(body?.order_code ?? '');
   if (!code) throw new HttpError(400, 'order_code is required');
 
-  if (action === 'accept' || action === 'reject' || action === 'set_as_ready') {
-    const path = `/merchants/ecommerce/orders/${encodeURIComponent(code)}/${action}`;
+  if (op === 'accept' || op === 'reject' || op === 'set_as_ready') {
+    const path = `/merchants/ecommerce/orders/${encodeURIComponent(code)}/${op}`;
     const res = await skroutzFetch({ token, path, method: 'POST', body: body?.payload ?? {} });
     const text = await res.text();
     if (!res.ok) {
-      await log('error', `Skroutz refused ${action} on ${code}: ${res.status} ${text}`, { external_order_id: code });
-      throw new HttpError(502, `Skroutz refused ${action}: ${res.status} ${text}`);
+      await log('error', `Skroutz refused ${op} on ${code}: ${res.status} ${text}`, { external_order_id: code });
+      throw new HttpError(502, `Skroutz refused ${op}: ${res.status} ${text}`);
     }
     let state: string | null = null;
     try { state = JSON.parse(text)?.order?.state ?? null; } catch { }
@@ -93,8 +90,8 @@ Deno.serve(withApiLogging('store-skroutz-orders', async (req) => {
       await admin.from('store_orders').update({ external_state: state, synced_at: new Date().toISOString() })
         .eq('connection_id', conn.id).eq('external_order_id', code);
     }
-    await log('updated', `${action} on ${code}${state ? ` — now ${state}` : ''}`, { external_order_id: code });
-    return json({ ok: true, action, order_code: code, state });
+    await log('updated', `${op} on ${code}${state ? ` — now ${state}` : ''}`, { external_order_id: code });
+    return json({ ok: true, action: op, order_code: code, state });
   }
 
   const invoiceId = String(body?.invoice_id ?? '');
@@ -131,5 +128,5 @@ Deno.serve(withApiLogging('store-skroutz-orders', async (req) => {
 
   await log('updated', `Uploaded ${inv.internal_number ?? invoiceId} to Skroutz order ${code}.`,
     { external_order_id: code, invoice_id: invoiceId });
-  return json({ ok: true, action, order_code: code, uploaded: inv.internal_number });
-}));
+  return json({ ok: true, action: op, order_code: code, uploaded: inv.internal_number });
+}

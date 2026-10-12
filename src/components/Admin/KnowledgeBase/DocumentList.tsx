@@ -493,8 +493,8 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   const runBackfill = async () => {
     setBackfilling(true);
     try {
-      const { data, error } = await supabase.functions.invoke('kb-embedding-backfill', {
-        body: { workspace_id: workspaceId, limit: 25 },
+      const { data, error } = await supabase.functions.invoke('embedding-drain', {
+        body: { task: 'kb-docs', workspace_id: workspaceId, limit: 25 },
       });
       if (error) throw await edgeError(error);
       toast({

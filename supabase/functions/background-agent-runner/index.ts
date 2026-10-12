@@ -1,10 +1,8 @@
 /** Background Agent Runner */
 
-const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const SUPABASE_URL             = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL        = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const MIVAA_API_KEY            = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { corsHeaders }        from '../_shared/cors.ts';
 import { authenticate }       from '../_shared/auth.ts';
@@ -16,6 +14,7 @@ import { DelegateToMivaaError, CancelledError } from '../_shared/agents/types.ts
 import type { BackgroundAgentRecord, AgentRunRecord, AgentRunContext } from '../_shared/agents/types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { captureMessage } from '../_shared/sentry.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 
 /** An agent that RETURNED `success:false` failed as surely as one that threw. */
 class AgentReportedFailure extends Error {
@@ -25,6 +24,9 @@ class AgentReportedFailure extends Error {
 const { createClient } = await import('@supabase/supabase-js');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+/** Admin-editable keys: read through the resolver, because Deno.env never sees a platform_secrets value. */
+const secretValue = async (key: string) => (await resolveSecret(supabase, key)).value ?? '';
 
 Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -267,8 +269,8 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
     workspaceId:     effectiveWorkspaceId,
     actingUserId,
     mivaaGatewayUrl: MIVAA_GATEWAY_URL,
-    mivaaApiKey:     MIVAA_API_KEY,
-    anthropicApiKey: ANTHROPIC_API_KEY(),
+    mivaaApiKey:     await secretValue('MIVAA_API_KEY'),
+    anthropicApiKey: await secretValue('ANTHROPIC_API_KEY'),
     log,
     heartbeat,
   };
@@ -633,7 +635,7 @@ async function delegateToMivaa(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+        'Authorization': `Bearer ${await secretValue('MIVAA_API_KEY')}`,
       },
       body: JSON.stringify({
         run_id:       runId,

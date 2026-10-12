@@ -10,6 +10,8 @@ import { describeUpstreamError } from '../tool-result-shape.ts';
 import { assertSafeUrl } from '../ssrf-guard.ts';
 // Invariant 9 — third-party text inside a structured result (#352 A17).
 import { UNTRUSTED_FIELDS_NOTE } from '../untrusted.ts';
+import { createClient } from '@supabase/supabase-js';
+import { resolveSecret } from '../secrets.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -28,7 +30,11 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+/** Resolved per call: an admin-saved CRON_SECRET lives only in platform_secrets, which Deno.env never sees. */
+async function cronSecret(): Promise<string> {
+  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  return (await resolveSecret(db, 'CRON_SECRET')).value ?? '';
+}
 
 /**
  * Connected-website context threaded into the SEO agent tools so a research pass
@@ -53,7 +59,8 @@ async function callSEOAgentRoute(
   path: string,
   body: Record<string, any>,
 ): Promise<{ ok: boolean; data?: any; error?: string }> {
-  if (!CRON_SECRET) return { ok: false, error: 'CRON_SECRET not configured' };
+  const secret = await cronSecret();
+  if (!secret) return { ok: false, error: 'CRON_SECRET not configured' };
   const attribution = body?.attribution as SeoAttribution | undefined;
   const gate = await openSpendGate(`composite_${path}`, attribution?.user_id, body, attribution?.workspace_id);
   if (!gate.ok) return { ok: false, error: gate.message };
@@ -62,7 +69,7 @@ async function callSEOAgentRoute(
       `${MIVAA_GATEWAY_URL}/api/v1/seo-agent/${path}`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
+        headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
         // A composite fans out to several DataForSEO calls under ONE reservation, so the flag
         // has to reach every one of them — MIVAA charged its unit on each leg.
         body: JSON.stringify(attribution ? { ...body, attribution: meteredAttribution(gate, attribution) } : body),
@@ -129,7 +136,8 @@ async function callOpportunitiesStateless(
   data?: any;
   error?: string;
 }> {
-  if (!CRON_SECRET) {
+  const secret = await cronSecret();
+  if (!secret) {
     return { ok: false, error: 'CRON_SECRET not configured on edge function — cannot call /opportunities-stateless' };
   }
   // This endpoint fans out to DataForSEO SERP + Labs on the operator's account. The header
@@ -144,7 +152,7 @@ async function callOpportunitiesStateless(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-cron-secret': CRON_SECRET,
+          'x-cron-secret': secret,
         },
         body: JSON.stringify(body),
       },
