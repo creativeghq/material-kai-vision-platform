@@ -3165,20 +3165,6 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                         metaDescription={article.meta_description}
                         slug={article.slug}
                       />
-                      {!initialArticle && article.status === 'completed' && (
-                        <ArticlePerformance
-                          articleId={article.id}
-                          publishedUrl={article.published_url ?? null}
-                          onSetPublishedUrl={setPublishedUrl}
-                        />
-                      )}
-                      {!initialArticle && article.status === 'completed' && article.markdown_content && (
-                        <ArticleSearchPerformance
-                          articleId={article.id}
-                          websiteId={article.website_id ?? null}
-                          publishedUrl={article.published_url ?? null}
-                        />
-                      )}
                       <ArticleContent
                         markdown={article.markdown_content}
                         onSaveMarkdown={initialArticle ? undefined : saveMarkdown}
@@ -3188,15 +3174,29 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                         readingTimeMinutes={article.reading_time_minutes}
                       />
                     </div>
-                    {!initialArticle && article.status === 'completed' && article.markdown_content && (
+                    {!initialArticle && article.status === 'completed' && (
                       <aside className="min-w-0 space-y-4">
-                        <ArticleImageSlots markdown={article.markdown_content} workspaceId={article.workspace_id ?? null} onSave={saveMarkdown} />
-                        <ArticleSuggestionsPanel
+                        <ArticlePerformance
                           articleId={article.id}
-                          extra={article.stages_data?.extra}
-                          onChanged={reloadArticle}
+                          publishedUrl={article.published_url ?? null}
+                          onSetPublishedUrl={setPublishedUrl}
                         />
-                        <WriterLessonsPanel articleId={article.id} />
+                        {article.markdown_content && (
+                          <>
+                            <ArticleSearchPerformance
+                              articleId={article.id}
+                              websiteId={article.website_id ?? null}
+                              publishedUrl={article.published_url ?? null}
+                            />
+                            <ArticleImageSlots markdown={article.markdown_content} workspaceId={article.workspace_id ?? null} onSave={saveMarkdown} />
+                            <ArticleSuggestionsPanel
+                              articleId={article.id}
+                              extra={article.stages_data?.extra}
+                              onChanged={reloadArticle}
+                            />
+                            <WriterLessonsPanel articleId={article.id} />
+                          </>
+                        )}
                       </aside>
                     )}
                   </div>
