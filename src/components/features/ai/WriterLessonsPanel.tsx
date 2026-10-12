@@ -74,7 +74,7 @@ export function WriterLessonsPanel({ articleId, published = true }: { articleId:
   const decided = (lessons ?? []).filter((l) => l.status !== 'proposed');
 
   return (
-    <div className="mb-4 rounded-md border border-hairline bg-card">
+    <div className="rounded-md border border-hairline bg-card">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-hairline px-3 py-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold">Lessons from the published version</p>

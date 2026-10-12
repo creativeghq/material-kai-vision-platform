@@ -202,7 +202,7 @@ export function ArticleSuggestionsPanel({ articleId, extra, onChanged }: {
   );
 
   return (
-    <div className="mb-4 rounded-md border border-hairline bg-card">
+    <div className="rounded-md border border-hairline bg-card">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-hairline px-3 py-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold">Article Suggestions</p>
@@ -227,7 +227,7 @@ export function ArticleSuggestionsPanel({ articleId, extra, onChanged }: {
       {pending.length === 0 ? (
         <HubEmptyState
           icon={Lightbulb}
-          className="py-8"
+          className="py-6"
           title="No suggestions yet"
           description="Ask for concrete edits: each one is shown before anything in the article changes. Uses credits."
           action={suggestButton}

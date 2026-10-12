@@ -41,7 +41,7 @@ export const ArticleImageSlots: React.FC<{
   };
 
   return (
-    <div className="mb-3 rounded-sm border border-hairline bg-card p-3">
+    <div className="rounded-md border border-hairline bg-card p-3">
       <p className="text-xs font-semibold">Picture slots ({slots.length})</p>
       <p className="mb-2 text-[11px] text-muted-foreground">
         The writer asked for a picture where none of your own photos fitted. Generate one, or remove the slot. An article with an

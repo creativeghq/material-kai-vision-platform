@@ -2411,9 +2411,10 @@ interface FreshnessRow {
   clicks_now: number | null; clicks_prev: number | null;
 }
 
-function ArticleUpdateControl({ articleId, onChanged }: {
+function ArticleUpdateControl({ articleId, onChanged, children }: {
   articleId: string;
   onChanged: () => Promise<void> | void;
+  children?: React.ReactNode;
 }) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -2456,19 +2457,24 @@ function ArticleUpdateControl({ articleId, onChanged }: {
 
   const stale = fresh?.is_due === true;
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
-      <Button size="sm" variant={stale ? 'secondary' : 'outline'} onClick={run} disabled={busy} className="gap-1.5">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-hairline bg-surface-sunken px-3 py-2">
+      <Button
+        size="sm"
+        variant={stale ? 'secondary' : 'outline'}
+        onClick={run}
+        disabled={busy}
+        className="gap-1.5"
+        title="Checks prices, sizes and dates against the linked pages; free when nothing is out of date."
+      >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
         {busy ? 'Reviewing' : 'Update article'}
       </Button>
-      {stale && fresh && (
-        <Badge variant="warning">Due for refresh: {dueReasonText(fresh)}</Badge>
-      )}
-      <span className="text-[11px] text-muted-foreground">
+      {children}
+      <span className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+        {stale && fresh && <Badge variant="warning">Due for refresh: {dueReasonText(fresh)}</Badge>}
         {fresh?.last_reviewed_at
           ? `Last reviewed ${formatDate(fresh.last_reviewed_at)}`
-          : `Not reviewed since it was written${fresh?.content_dated_at ? ` (${formatDate(fresh.content_dated_at)})` : ''}`}
-        . Checks prices, sizes and dates against the linked pages; free when nothing is out of date.
+          : `Not reviewed since written${fresh?.content_dated_at ? ` (${formatDate(fresh.content_dated_at)})` : ''}`}
       </span>
     </div>
   );
@@ -3023,7 +3029,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
 
       {/* Modal with full article details */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-5xl w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="max-w-[1440px] w-[calc(100%-2rem)] max-h-[94vh] overflow-y-auto p-0">
           {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
               warning without one and, more importantly, a screen reader announces the dialog with
               no name at all. (audit #302 finding 5) */}
@@ -3139,33 +3145,9 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                   <ArticleExportPanel article={article} />
                 </TabsContent>
 
-                <TabsContent value="content" className="mt-4">
-                  <SearchAppearance
-                    metaTitle={article.meta_title}
-                    metaDescription={article.meta_description}
-                    slug={article.slug}
-                  />
-                  {!initialArticle && article.status === 'completed' && (
-                    <div className="my-4">
-                      <ArticlePerformance
-                        articleId={article.id}
-                        publishedUrl={article.published_url ?? null}
-                        onSetPublishedUrl={setPublishedUrl}
-                      />
-                    </div>
-                  )}
+                <TabsContent value="content" className="mt-4 space-y-4">
                   {!initialArticle && article.status === 'completed' && article.markdown_content && (
-                    <>
-                      <div className="mb-4">
-                        <ArticleSearchPerformance
-                          articleId={article.id}
-                          websiteId={article.website_id ?? null}
-                          publishedUrl={article.published_url ?? null}
-                        />
-                      </div>
-                      <ArticleUpdateControl articleId={article.id} onChanged={reloadArticle} />
-                      <div className="mb-3"><ArticleVersionHistory articleId={article.id} onRestored={reloadArticle} /></div>
-                      <ArticleImageSlots markdown={article.markdown_content} workspaceId={article.workspace_id ?? null} onSave={saveMarkdown} />
+                    <ArticleUpdateControl articleId={article.id} onChanged={reloadArticle}>
                       <ArticleRefreshControl
                         articleId={article.id}
                         extra={article.stages_data?.extra}
@@ -3173,22 +3155,51 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                         currentMeta={article.meta_description ?? null}
                         onChanged={reloadArticle}
                       />
-                      <ArticleSuggestionsPanel
-                        articleId={article.id}
-                        extra={article.stages_data?.extra}
-                        onChanged={reloadArticle}
-                      />
-                      <WriterLessonsPanel articleId={article.id} />
-                    </>
+                      <ArticleVersionHistory articleId={article.id} onRestored={reloadArticle} />
+                    </ArticleUpdateControl>
                   )}
-                  <ArticleContent
-                    markdown={article.markdown_content}
-                    onSaveMarkdown={initialArticle ? undefined : saveMarkdown}
-                    title={article.title}
-                    metaDescription={article.meta_description}
-                    wordCount={article.word_count}
-                    readingTimeMinutes={article.reading_time_minutes}
-                  />
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+                    <div className="min-w-0 space-y-4">
+                      <SearchAppearance
+                        metaTitle={article.meta_title}
+                        metaDescription={article.meta_description}
+                        slug={article.slug}
+                      />
+                      {!initialArticle && article.status === 'completed' && (
+                        <ArticlePerformance
+                          articleId={article.id}
+                          publishedUrl={article.published_url ?? null}
+                          onSetPublishedUrl={setPublishedUrl}
+                        />
+                      )}
+                      {!initialArticle && article.status === 'completed' && article.markdown_content && (
+                        <ArticleSearchPerformance
+                          articleId={article.id}
+                          websiteId={article.website_id ?? null}
+                          publishedUrl={article.published_url ?? null}
+                        />
+                      )}
+                      <ArticleContent
+                        markdown={article.markdown_content}
+                        onSaveMarkdown={initialArticle ? undefined : saveMarkdown}
+                        title={article.title}
+                        metaDescription={article.meta_description}
+                        wordCount={article.word_count}
+                        readingTimeMinutes={article.reading_time_minutes}
+                      />
+                    </div>
+                    {!initialArticle && article.status === 'completed' && article.markdown_content && (
+                      <aside className="min-w-0 space-y-4">
+                        <ArticleImageSlots markdown={article.markdown_content} workspaceId={article.workspace_id ?? null} onSave={saveMarkdown} />
+                        <ArticleSuggestionsPanel
+                          articleId={article.id}
+                          extra={article.stages_data?.extra}
+                          onChanged={reloadArticle}
+                        />
+                        <WriterLessonsPanel articleId={article.id} />
+                      </aside>
+                    )}
+                  </div>
                 </TabsContent>
 
                 {article.optimize_data && (

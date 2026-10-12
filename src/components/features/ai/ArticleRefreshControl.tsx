@@ -54,13 +54,13 @@ export const ArticleRefreshControl: React.FC<{
   };
 
   return (
-    <div className="mb-3 space-y-2">
+    <>
       <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void refresh()} disabled={!!busy}>
         {busy === 'refresh' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
         {busy === 'refresh' ? 'Comparing with search' : 'Compare with what ranks now'}
       </Button>
       {pendingMeta && (
-        <div className="rounded-sm border border-hairline bg-card p-3 text-sm">
+        <div className="order-last basis-full rounded-sm border border-hairline bg-card p-3 text-sm">
           <p className="text-xs font-semibold">Proposed title and meta</p>
           {pendingMeta.title && <p className="mt-1"><span className="text-muted-foreground">Title:</span> {pendingMeta.title}</p>}
           {pendingMeta.description && <p className="mt-1"><span className="text-muted-foreground">Meta:</span> {pendingMeta.description}</p>}
@@ -69,6 +69,6 @@ export const ArticleRefreshControl: React.FC<{
           </Button>
         </div>
       )}
-    </div>
+    </>
   );
 };
