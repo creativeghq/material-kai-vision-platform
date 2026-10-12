@@ -37,6 +37,7 @@ describe('a link says what it points at', () => {
     const out = applySiteAssetRules(md, 'tiles.example', new Set(), new Map());
     expect(out.markdown).toBe('Δείτε τον οδηγό και το [ΦΕΚ](https://www.gov.gr/x).');
     expect(out.unlinked).toBe(1);
+    expect(out.unwrapped).toEqual([{ text: 'οδηγό', url: 'https://youbath.gr/odigos', why: 'another site' }]);
   });
 
   it('a site link whose anchor names another place is unwrapped', () => {
@@ -78,6 +79,14 @@ describe('the writer and the reviewer state only true facts about us', () => {
     const code = src('review.ts');
     expect(code).toContain("getToolPrompt(supabase, 'seo_consistency_check')");
     expect(code.indexOf('const consistency = await consistencyPass(')).toBeGreaterThan(code.indexOf('const body = applyReviewEdits('));
+  });
+
+  it('pages the brief asks to link, and pages named by the topic, are always link targets with their products', () => {
+    expect(src('pipeline.ts')).toContain('mustInclude: await requiredPages(supabase, websiteId, brief, body.target_keyword)');
+    expect(src('pipeline.ts')).toContain('Link this page of ours:');
+    const sitePages = src('site-pages.ts');
+    expect(sitePages).toContain('const forced = await forcedPages(');
+    expect(sitePages).toContain(".not('specs', 'is', null)");
   });
 
   it('lessons reserve before the model call and come from a DB prompt', () => {

@@ -6,7 +6,7 @@ vi.mock('../../supabase/functions/_shared/ai-client.ts', () => ({ callClaudeMess
 vi.mock('../../supabase/functions/_shared/prompt-utils.ts', () => ({ getToolPrompt: vi.fn() }));
 vi.mock('../../supabase/functions/seo-api/handlers/stage-billing.ts', () => ({}));
 
-const { fixGreekPunctuation, visibleGreekWords } = await import('../../supabase/functions/seo-api/handlers/lexicon.ts');
+const { applyLexiconEdits, fixGreekPunctuation, replaceWordInProse, visibleGreekWords } = await import('../../supabase/functions/seo-api/handlers/lexicon.ts');
 
 const src = blankComments(readFileSync(join(process.cwd(), 'supabase/functions/seo-api/handlers/lexicon.ts'), 'utf-8'));
 
@@ -68,5 +68,39 @@ describe('enforceLexicon — source guards', () => {
   it('constrains the reply by schema and never salvages a refusal or a truncated one', () => {
     expect(src).toMatch(/output_config:\s*\{\s*(effort:\s*'low',\s*)?format:\s*\{\s*type:\s*'json_schema'/);
     expect(src).toMatch(/stop_reason === 'refusal' \|\| res\.stop_reason === 'max_tokens'/);
+  });
+});
+
+describe('a dictionary correction', () => {
+  it('fixes every occurrence of a misspelt word in the prose, never inside a link target', () => {
+    const md = 'Ρεκτιφιαρισμένα πλακάκια. Τα ρεκτιφιαρισμένα [πλακάκια](https://tiles.example/ρεκτιφιαρισμένα) είναι ίσια.';
+    const out = replaceWordInProse(md, 'ρεκτιφιαρισμένα', 'ρεκτιφιέ');
+    expect(out.count).toBe(2);
+    expect(out.markdown).toBe('Ρεκτιφιέ πλακάκια. Τα ρεκτιφιέ [πλακάκια](https://tiles.example/ρεκτιφιαρισμένα) είναι ίσια.');
+  });
+
+  it('applies a repeated one-word edit and says why any other edit was dropped', () => {
+    const out = applyLexiconEdits('Το φορμά και το φορμά. Ένα κείμενο.', [
+      { find: 'φορμά', replace: 'φορμά', kind: 'lexicon' },
+      { find: 'φορμά', replace: 'φόρμα', kind: 'lexicon' },
+      { find: 'δεν υπάρχει εδώ', replace: 'κάτι', kind: 'lexicon' },
+    ]);
+    expect(out.markdown).toBe('Το φόρμα και το φόρμα. Ένα κείμενο.');
+    expect(out.corrected).toEqual([{ from: 'φορμά', to: 'φόρμα' }]);
+    expect(out.skipped.map((s) => s.why)).toEqual(['empty or unchanged', 'text not found']);
+  });
+
+  it('approved glossary lessons are applied before the model is asked', () => {
+    expect(src.indexOf('approvedGlossary(supabase')).toBeLessThan(src.indexOf('callClaudeMessages('));
+  });
+});
+
+describe('what the guides cover', () => {
+  it('uses the sections most guides share, and each guide\'s own sections when they share none', async () => {
+    const { guideSectionsToCover } = await import('../../supabase/functions/seo-api/handlers/coverage.ts');
+    const label = (l: string) => ({ label: l, pages: 1 });
+    expect(guideSectionsToCover({ read: 4, common: [{ label: 'Αντοχή', pages: 3 }], distinctive: [label('Τιμές')] } as never)).toEqual(['Αντοχή']);
+    expect(guideSectionsToCover({ read: 4, common: [], distinctive: [label('Τιμές'), label('Αρμόστοκοι')] } as never)).toEqual(['Τιμές', 'Αρμόστοκοι']);
+    expect(guideSectionsToCover(undefined)).toEqual([]);
   });
 });

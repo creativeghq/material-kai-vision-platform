@@ -134,6 +134,14 @@ export function anchorNamesOtherPlace(anchor: string, target: string): boolean {
   });
 }
 
+export interface UnwrappedLink {
+  text: string;
+  url: string;
+  why: 'another site' | 'anchor names another place' | 'page already linked' | 'not a live page of the site';
+}
+
+export interface SiteAssetResult { markdown: string; removedImages: number; unlinked: number; unwrapped: UnwrappedLink[] }
+
 export function applySiteAssetRules(
   markdown: string,
   siteHost: string,
@@ -142,9 +150,13 @@ export function applySiteAssetRules(
   photos: Map<string, string>,
   /** Our page URL (no trailing slash) → its title, for checking what an anchor names. */
   titles: Map<string, string> = new Map(),
-): { markdown: string; removedImages: number; unlinked: number } {
+): SiteAssetResult {
   let removedImages = 0;
-  let unlinked = 0;
+  const unwrapped: UnwrappedLink[] = [];
+  const unwrap = (text: string, url: string, why: UnwrappedLink['why']) => {
+    unwrapped.push({ text, url, why });
+    return text;
+  };
   const placed = new Set<string>();
   // A caption is the model describing a photo it never saw: the line right under an image goes.
   let out = markdown.replace(CAPTION_RE, '$1');
@@ -161,21 +173,16 @@ export function applySiteAssetRules(
   out = out.replace(LINK_RE, (link, text: string, url: string) => {
     if (hostOf(url) !== siteHost) {
       if (isOfficialHost(hostOf(url))) return link;
-      unlinked += 1;
-      return text;
+      return unwrap(text, url, 'another site');
     }
     const key = trimSlash(url);
     const title = titles.get(key);
-    if (title && anchorNamesOtherPlace(text, `${title} ${key}`)) {
-      unlinked += 1;
-      return text;
-    }
+    if (title && anchorNamesOtherPlace(text, `${title} ${key}`)) return unwrap(text, url, 'anchor names another place');
     if (livePages.has(key) && !linked.has(key)) {
       linked.add(key);
       return link;
     }
-    unlinked += 1;
-    return text;
+    return unwrap(text, url, linked.has(key) ? 'page already linked' : 'not a live page of the site');
   });
-  return { markdown: out, removedImages, unlinked };
+  return { markdown: out, removedImages, unlinked: unwrapped.length, unwrapped };
 }

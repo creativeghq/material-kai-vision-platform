@@ -433,6 +433,7 @@ async function runPipelineStages(ctx: {
       limit: SITE_LINK_TARGETS,
       languageCode: body.language_code ?? null,
       photoUsage: photoHold.ok ? photoUsage : undefined,
+      mustInclude: await requiredPages(supabase, websiteId, brief, body.target_keyword),
     });
     if (photoHold.ok) {
       const priced = await Promise.all(photoUsage.map((u) => tokenCredits(supabase, u.model, u)));
@@ -521,6 +522,7 @@ async function runPipelineStages(ctx: {
       markdown_content: contentMarkdown,
       word_count: wordCount,
       progress_percentage: 70,
+      links_unwrapped_after_write: written.unwrapped,
     }, `Article written: ${wordCount} words (${written.unlinked} unverified site links unwrapped, ${written.removedImages} photos not from our pages removed)`);
 
     // One isolate cannot run every stage inside the background wall clock, so review onward runs in a fresh one.
@@ -544,6 +546,21 @@ async function runPipelineStages(ctx: {
     if (!handOffResult?.success) {
       throw new Error(`Could not continue after writing: ${handOffResult?.error ?? `HTTP ${handOff.status}`}`);
     }
+}
+
+/** Pages the article must use: those the brief asks to link, and the site's pages whose URL names every word of the topic. */
+async function requiredPages(supabase: DbClient, websiteId: string | null, brief: NormalizedBrief | null, keyword: string): Promise<string[]> {
+  if (!websiteId) return [];
+  const asked = (brief?.extraContext ?? []).flatMap((l) => /^Link this page of ours:\s*(\S+)/.exec(l)?.[1] ?? []);
+  const words = slugTerms(keyword);
+  let topic: string[] = [];
+  if (words.length) {
+    let q = supabase.from('user_website_pages').select('url').eq('website_id', websiteId).eq('is_active', true);
+    for (const w of words) q = q.ilike('url', `%${w}%`);
+    const { data } = await q.not('links_to', 'is', null).limit(3);
+    topic = (data ?? []).map((r: { url: string }) => r.url);
+  }
+  return [...new Set([...asked, ...topic])];
 }
 
 /** Reads the site's unread pages on this topic first (a new category, a product nobody searched for); billed per page by the crawler. */
@@ -679,6 +696,7 @@ async function runLateStages(ctx: {
       progress_percentage: 88,
       review: reviewed.report,
       lexicon: lexicon.report,
+      links_unwrapped_after_review: fixed.unwrapped,
       grammar: grammar.report,
       arithmetic: { checked: arithmetic.checked, corrected: arithmetic.wrong },
     }, reviewed.report.failed
@@ -957,9 +975,6 @@ function splitByColumn(updates: Record<string, any>): { cols: Record<string, any
 
 async function updateArticle(
   supabase: any,
-  // `string | null` because the caller's `articleId` is nullable until the row is created.
-  // Accepting the nullable type here (and no-opping on null) is what lets all 12 call
-  // sites typecheck without sprinkling non-null assertions through the pipeline.
   articleId: string | null,
   rawUpdates: Record<string, any>,
   logMessage: string,

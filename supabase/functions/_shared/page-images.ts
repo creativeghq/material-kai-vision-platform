@@ -33,11 +33,11 @@ export function photoCheckCurrent(im: PageImage, lang: string): boolean {
   return im.seen?.[lang]?.v === PHOTO_CHECK_VERSION;
 }
 
-/** 90% of the width the site itself displays its photos at (median of declared widths), else MIN_PHOTO_WIDTH. */
+/** 75% of the width the site itself displays its photos at (median of declared widths), else MIN_PHOTO_WIDTH. */
 export function siteMinPhotoWidth(images: PageImage[]): number {
   const widths = images.map((i) => i.display_width ?? 0).filter((w) => w >= MIN_DECLARED_PX).sort((a, b) => a - b);
   if (widths.length < 5) return MIN_PHOTO_WIDTH;
-  return Math.round(widths[Math.floor(widths.length / 2)] * 0.9);
+  return Math.round(widths[Math.floor(widths.length / 2)] * 0.75);
 }
 
 /** Checked at the current version, wide enough for the site, and any text baked into it is in the article's language. */

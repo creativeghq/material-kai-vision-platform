@@ -408,7 +408,7 @@ Sections most of them have:
   - ${gc.common.slice(0, 15).map((c) => `${serpValue(c.label, 200)} — on ${c.pages} of ${gc.read}`).join('\n  - ') || 'none shared'}
 Sections only one has:
   - ${gc.distinctive.slice(0, 10).map((c) => serpValue(c.label, 200)).join('\n  - ') || 'none'}
-MUST COVER the shared ones. Never cite, link or name these sites.`
+MUST COVER the shared ones; when none is shared, cover the sections only one has that a buyer of this topic needs. Never cite, link or name these sites.`
     : '';
 
   const intentSection = signals?.keywordIntents && Object.keys(signals.keywordIntents).length

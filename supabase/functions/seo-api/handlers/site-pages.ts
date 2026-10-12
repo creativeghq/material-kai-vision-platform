@@ -7,7 +7,7 @@ import {
   extractContentImages, photoCheckCurrent, photoOffered, siteMinPhotoWidth, type PageImage,
 } from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
-import { applySiteAssetRules, hostOf, pageFacts, siteLinkUrls, trimSlash } from './site-assets.ts';
+import { applySiteAssetRules, hostOf, pageFacts, siteLinkUrls, trimSlash, type SiteAssetResult } from './site-assets.ts';
 import { verifyPhoto, type PhotoUsage } from './photo-verify.ts';
 import { productSpecsLines } from './site-catalogue.ts';
 
@@ -73,6 +73,8 @@ export async function findSitePages(
     queryText: string; limit: number; languageCode?: string | null;
     /** Receives the token usage of every photo check, so the caller can bill it. */
     photoUsage?: PhotoUsage[];
+    /** Pages the article must use (asked for in the brief, or named by the topic), placed first with their product pages. */
+    mustInclude?: string[];
   },
 ): Promise<SitePage[]> {
   if (!opts.websiteId) return [];
@@ -124,7 +126,6 @@ export async function findSitePages(
         langPath: !!opts.languageCode && new URL(url).pathname.startsWith(`/${opts.languageCode}/`),
       });
     }
-    // Same-slug copies: the page Google shows, the article's language path, the section Google shows most.
     const parentWeight = new Map<string, number>();
     for (const c of [...groups.values()].flat()) {
       const parent = parentOf(c.url);
@@ -154,6 +155,11 @@ export async function findSitePages(
     );
 
     await consolidateMatrixPicks(supabase, opts.websiteId, picked, sectionScore);
+    if (opts.mustInclude?.length) {
+      const forced = await forcedPages(supabase, opts.websiteId, opts.mustInclude, opts.languageCode ?? null);
+      const forcedUrls = new Set(forced.map((p) => trimSlash(p.url)));
+      picked.splice(0, picked.length, ...[...forced, ...picked.filter((p) => !forcedUrls.has(trimSlash(p.url)))].slice(0, Math.max(opts.limit, forced.length)));
+    }
     const { data: texts } = await supabase
       .from('user_website_pages').select('id, content_text, specs').in('id', picked.map((p) => p.id));
     const rowById = new Map((texts ?? []).map((t: { id: string; content_text: string | null; specs: unknown }) => [t.id, t]));
@@ -166,11 +172,9 @@ export async function findSitePages(
     await refreshImages(supabase, picked.filter((p) => p.stale));
     const lang = opts.languageCode || 'en';
     const minWidth = siteMinPhotoWidth(picked.flatMap((p) => p.images));
-    // No usage sink = nothing reserved for the checks: run none, offer only photos checked before.
     if (opts.photoUsage) {
       await verifyPhotos(supabase, picked, lang, { userId: opts.userId, workspaceId: opts.workspaceId }, opts.photoUsage);
     }
-    // Only checked photos that pass the text and size verdicts leave this function; their alt IS what the check saw.
     return picked.map(({ id: _id, stale: _stale, impressions: _i, langPath: _l, ...page }) => ({
       ...page,
       images: page.images.slice(0, PHOTOS_PER_PAGE)
@@ -181,6 +185,47 @@ export async function findSitePages(
     console.warn('[seo-site-pages] failed:', (e as Error).message);
     return [];
   }
+}
+
+const MEMBERS_PER_FORCED_PAGE = 6;
+
+/** The required pages, each followed by up to MEMBERS_PER_FORCED_PAGE product pages it links to that state specs. */
+async function forcedPages(
+  supabase: DbClient,
+  websiteId: string,
+  urls: string[],
+  languageCode: string | null,
+): Promise<(SitePage & { id: string; stale: boolean; impressions: number; langPath: boolean })[]> {
+  const cols = 'id, url, title, description, images, images_fetched_at, http_status, links_to, specs';
+  const wanted = [...new Set(urls.map(trimSlash))];
+  const { data: heads } = await supabase.from('user_website_pages').select(cols)
+    .eq('website_id', websiteId).in('url', [...wanted, ...wanted.map((u) => `${u}/`)]);
+  const memberUrls = (heads ?? []).flatMap((h: { links_to: string[] | null }) => h.links_to ?? []);
+  const { data: members } = memberUrls.length
+    ? await supabase.from('user_website_pages').select(cols).eq('website_id', websiteId)
+      .in('url', memberUrls.slice(0, 200)).not('specs', 'is', null)
+    : { data: [] };
+  const memberByUrl = new Map((members ?? []).map((m: { url: string }) => [m.url, m]));
+  const rows: Record<string, unknown>[] = [];
+  for (const h of (heads ?? []) as Record<string, unknown>[]) {
+    rows.push(h);
+    ((h.links_to as string[] | null) ?? []).map((u) => memberByUrl.get(u)).filter(Boolean)
+      .slice(0, MEMBERS_PER_FORCED_PAGE).forEach((m) => rows.push(m as Record<string, unknown>));
+  }
+  return rows.filter((r) => Number(r.http_status ?? 0) < 400).map((r) => {
+    const fetchedAt = r.images_fetched_at ? new Date(String(r.images_fetched_at)).getTime() : 0;
+    return {
+      id: String(r.id),
+      url: String(r.url),
+      title: (r.title as string | null) ?? null,
+      description: (r.description as string | null) ?? null,
+      similarity: 1,
+      images: Array.isArray(r.images) ? (r.images as PageImage[]) : [],
+      stale: !r.images_fetched_at || Date.now() - fetchedAt > IMAGE_REFRESH_MS,
+      impressions: 0,
+      langPath: !!languageCode && new URL(String(r.url)).pathname.startsWith(`/${languageCode}/`),
+    };
+  });
 }
 
 /** A picked slug that exists in 3+ sections becomes its live copy in the section with most impressions. */
@@ -329,9 +374,9 @@ export async function enforceSiteAssets(
   siteUrl: string | null,
   markdown: string,
   pages: SitePage[],
-): Promise<{ markdown: string; removedImages: number; unlinked: number }> {
+): Promise<SiteAssetResult> {
   const siteHost = siteUrl ? hostOf(siteUrl) : null;
-  if (!websiteId || !siteHost) return { markdown, removedImages: 0, unlinked: 0 };
+  if (!websiteId || !siteHost) return { markdown, removedImages: 0, unlinked: 0, unwrapped: [] };
 
   const photos = new Map(pages.flatMap((p) => p.images.map((i) => [i.src, i.alt] as const)));
   const linked = siteLinkUrls(markdown, siteHost);
@@ -348,7 +393,7 @@ export async function enforceSiteAssets(
     if (error) {
       // Unverifiable is not the same as wrong: keep the links rather than strip good ones.
       console.warn('[seo-site-pages] link check unavailable:', error.message);
-      return { markdown, removedImages: 0, unlinked: 0 };
+      return { markdown, removedImages: 0, unlinked: 0, unwrapped: [] };
     }
     for (const r of (data ?? []) as { url: string; http_status: number | null }[]) {
       if ((r.http_status ?? 0) < 400) live.add(trimSlash(r.url));

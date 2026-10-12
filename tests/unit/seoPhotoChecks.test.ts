@@ -78,7 +78,7 @@ describe('photoOffered — which checked photos the writer may place', () => {
 
   it('takes the minimum from the width the site itself displays photos at', () => {
     const shown = (w: number): PageImage => ({ src: 'https://site.gr/' + w + Math.random(), alt: 'a', display_width: w });
-    expect(siteMinPhotoWidth([760, 760, 760, 760, 160, 760].map(shown))).toBe(684);
+    expect(siteMinPhotoWidth([760, 760, 760, 760, 160, 760].map(shown))).toBe(570);
     expect(siteMinPhotoWidth([760, 760].map(shown)), 'too few to tell').toBe(MIN_PHOTO_WIDTH);
   });
 

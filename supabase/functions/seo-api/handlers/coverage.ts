@@ -39,11 +39,20 @@ export interface CoverageReport {
   failed?: string;
 }
 
+const DISTINCTIVE_WHEN_NONE_SHARED = 8;
+
+/** The sections most guides share; when they share none, each guide's own sections stand in. */
+export function guideSectionsToCover(gc: KeywordResearchResult['guideContent']): string[] {
+  if (!gc) return [];
+  const common = (gc.common ?? []).map((c) => c.label);
+  return common.length ? common : (gc.distinctive ?? []).slice(0, DISTINCTIVE_WHEN_NONE_SHARED).map((c) => c.label);
+}
+
 export function mustCoverFrom(research: KeywordResearchResult): MustCover {
   return {
     aiAnswer: research.aiModeAnswer?.text ?? research.serpSignals?.aiOverviewText ?? null,
     questions: research.readerQuestions ?? [],
-    guideSections: (research.guideContent?.common ?? []).map((c) => c.label),
+    guideSections: guideSectionsToCover(research.guideContent),
     paa: research.paaQuestions ?? [],
   };
 }
@@ -57,7 +66,7 @@ function mustCoverBlock(m: MustCover): string {
     '<must_cover>',
     m.aiAnswer ? `ANSWER ENGINE (source ai_answer) — each point it makes is an item:\n${serpValue(m.aiAnswer, 3500)}` : '',
     list('READER QUESTIONS (source reader_question)', m.questions),
-    list('SECTIONS THE GUIDES SHARE (source guides)', m.guideSections),
+    list('SECTIONS THE GUIDES COVER (source guides)', m.guideSections),
     list('PEOPLE ALSO ASK (source paa)', m.paa),
     '</must_cover>',
   ].filter(Boolean).join('\n');

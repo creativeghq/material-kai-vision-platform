@@ -104,6 +104,8 @@ export interface LexiconReport {
   checked: number;
   unknown_before: string[];
   corrected: { from: string; to: string }[];
+  kept: string[];
+  skipped: { find: string; replace: string; why: string }[];
   unverified: string[];
   credits: number;
   failed?: string;
@@ -154,6 +156,54 @@ function sentencesWith(markdown: string, words: Set<string>): string[] {
   return out;
 }
 
+const ONE_GREEK_WORD = /^\p{Script=Greek}[\p{Script=Greek}\p{M}]*$/u;
+
+/** Every whole-word occurrence of `from` in the prose replaced by `to`, keeping a leading capital. */
+export function replaceWordInProse(markdown: string, from: string, to: string): { markdown: string; count: number } {
+  const lower = from.toLowerCase();
+  let count = 0;
+  const text = segments(markdown).map((s) => !s.prose ? s.text : s.text.replace(GREEK_WORD, (w) => {
+    if (w.toLowerCase() !== lower) return w;
+    count++;
+    return w[0] !== w[0].toLowerCase() ? to[0].toUpperCase() + to.slice(1) : to;
+  })).join('');
+  return { markdown: text, count };
+}
+
+/** A one-word correction applies wherever the word appears; anything longer must match exactly once. */
+export function applyLexiconEdits(markdown: string, edits: ReviewEdit[]) {
+  let out = markdown;
+  const corrected: { from: string; to: string }[] = [];
+  const skipped: { find: string; replace: string; why: string }[] = [];
+  for (const e of edits) {
+    const find = e.find.trim();
+    const replace = e.replace.trim();
+    if (ONE_GREEK_WORD.test(find) && ONE_GREEK_WORD.test(replace) && find !== replace) {
+      const r = replaceWordInProse(out, find, replace);
+      if (r.count) {
+        out = r.markdown;
+        corrected.push({ from: find, to: replace });
+      } else skipped.push({ find, replace, why: 'word not found in the prose' });
+      continue;
+    }
+    const one = applyReviewEdits(out, [e]);
+    out = one.markdown;
+    corrected.push(...correctedPairs(one.applied));
+    skipped.push(...one.skipped.map((x) => ({ find: x.find, replace: x.replace, why: x.why })));
+  }
+  return { markdown: out, corrected, skipped };
+}
+
+async function approvedGlossary(supabase: DbClient, workspaceId: string | null, language: string): Promise<{ from: string; to: string }[]> {
+  if (!workspaceId) return [];
+  const { data, error } = await supabase.from('seo_writer_lessons').select('from_text, to_text')
+    .eq('workspace_id', workspaceId).eq('language_code', language).eq('kind', 'glossary').eq('status', 'approved').limit(200);
+  if (error) return [];
+  return (data ?? []).flatMap((l: { from_text: string | null; to_text: string | null }) =>
+    l.from_text && l.to_text && ONE_GREEK_WORD.test(l.from_text.trim()) && ONE_GREEK_WORD.test(l.to_text.trim())
+      ? [{ from: l.from_text.trim(), to: l.to_text.trim() }] : []);
+}
+
 function correctedPairs(applied: ReviewEdit[]): { from: string; to: string }[] {
   return applied.flatMap((e) => {
     const a = visibleGreekWords(e.find);
@@ -169,14 +219,19 @@ export async function enforceLexicon(
   opts: { markdown: string; languageCode: string | null; websiteId: string | null; workspaceId: string | null; userId: string },
 ): Promise<{ markdown: string; report: LexiconReport }> {
   const language = baseLanguage(opts.languageCode);
-  const empty: LexiconReport = { checked: 0, unknown_before: [], corrected: [], unverified: [], credits: 0 };
+  const empty: LexiconReport = { checked: 0, unknown_before: [], corrected: [], kept: [], skipped: [], unverified: [], credits: 0 };
   let markdown = opts.markdown;
   try {
     if (!(await hasLexicon(supabase, language))) return { markdown, report: empty };
     if (language === 'el') markdown = fixGreekPunctuation(markdown);
+    const house: { from: string; to: string }[] = [];
+    for (const g of await approvedGlossary(supabase, opts.workspaceId, language)) {
+      const r = replaceWordInProse(markdown, g.from, g.to);
+      if (r.count) { markdown = r.markdown; house.push(g); }
+    }
     const words = visibleGreekWords(markdown);
     const unknown = await unknownWords(supabase, language, opts.websiteId, opts.workspaceId, words);
-    const report: LexiconReport = { ...empty, checked: words.length, unknown_before: unknown, unverified: unknown };
+    const report: LexiconReport = { ...empty, checked: words.length, unknown_before: unknown, corrected: house, unverified: unknown };
     if (!unknown.length) return { markdown, report };
 
     const sentences = sentencesWith(markdown, new Set(unknown));
@@ -217,14 +272,17 @@ export async function enforceLexicon(
     }
     const credits = await settleStage(supabase, wallet, ceiling, actual, { unknown: unknown.length, edits: edits.length });
 
-    const applied = applyReviewEdits(markdown, edits);
+    const applied = applyLexiconEdits(markdown, edits);
     markdown = applied.markdown;
-    const corrected = correctedPairs(applied.applied);
+    const corrected = [...house, ...applied.corrected];
+    const touched = new Set(edits.flatMap((e) => visibleGreekWords(e.find).map((w) => w.toLowerCase())));
+    const kept = unknown.filter((w) => !touched.has(w.toLowerCase()));
+    const skipped = applied.skipped;
     try {
       const unverified = await unknownWords(supabase, language, opts.websiteId, opts.workspaceId, visibleGreekWords(markdown));
-      return { markdown, report: { ...report, corrected, unverified, credits } };
+      return { markdown, report: { ...report, corrected, kept, skipped, unverified, credits } };
     } catch (e) {
-      return { markdown, report: { ...report, corrected, credits, failed: `not re-checked: ${(e as Error).message.slice(0, 200)}` } };
+      return { markdown, report: { ...report, corrected, kept, skipped, credits, failed: `not re-checked: ${(e as Error).message.slice(0, 200)}` } };
     }
   } catch (e) {
     return { markdown, report: { ...empty, failed: (e as Error).message.slice(0, 200) } };
