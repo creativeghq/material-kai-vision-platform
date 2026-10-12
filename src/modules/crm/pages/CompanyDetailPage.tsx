@@ -153,6 +153,9 @@ interface Company {
   tax_office?: string | null;
   vat_validated?: boolean | null;
   vat_validated_at?: string | null;
+  peppol_participant_id?: string | null;
+  peppol_accepts_invoices?: boolean | null;
+  peppol_checked_at?: string | null;
   vat_validated_name?: string | null;
   vat_validated_address?: string | null;
   /** Derived Latin transliteration; only set when the register answered in a non-Latin script. */
@@ -207,6 +210,7 @@ export const CompanyDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
+  const [peppolBusy, setPeppolBusy] = useState(false);
   const [aadeBusy, setAadeBusy] = useState(false);
   // Sub-phase label while the research chain runs ("Checking ΓΕΜΗ registry…").
   const [researchStatus, setResearchStatus] = useState<string | null>(null);
@@ -384,6 +388,24 @@ export const CompanyDetailPage: React.FC = () => {
    * persists vat_validated* back onto crm_companies, so we reload to pick up the
    * authoritative snapshot. Greek ΑΦΜ numbers carry an "EL" prefix in VIES.
    */
+  const handlePeppol = async () => {
+    if (!id || isNew) return;
+    setPeppolBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(`crm-api/companies/${id}/peppol-lookup`, { method: 'POST' });
+      if (error) throw error;
+      const r = (data as { data?: { participant: string | null } }).data;
+      toast(r?.participant
+        ? { title: 'Listed on Peppol', description: r.participant }
+        : { title: 'Not listed on Peppol', description: 'The Peppol Directory has no participant for this VAT number.' });
+      await loadCompany();
+    } catch (err) {
+      toast({ title: 'Peppol check failed', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+    } finally {
+      setPeppolBusy(false);
+    }
+  };
+
   const handleVies = async () => {
     if (!company || !company.vat_number?.trim() || !company.country_code?.trim()) {
       toast({ title: 'VAT number required', description: 'Enter a country code and VAT number first.', variant: 'destructive' });
@@ -957,6 +979,17 @@ export const CompanyDetailPage: React.FC = () => {
                               {viesBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldCheck className="h-4 w-4"/>}
                               Validate (VIES)
                             </Button>
+                            <Button type="button" variant="outline" onClick={() => void handlePeppol()} disabled={peppolBusy || isNew || !company.vat_number?.trim()}>
+                              {peppolBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
+                              Check Peppol
+                            </Button>
+                            {company.peppol_participant_id ? (
+                              <Badge variant={company.peppol_accepts_invoices ? 'success' : 'warning'} title={company.peppol_participant_id}>
+                                {company.peppol_accepts_invoices ? 'Peppol: receives invoices' : 'Peppol: listed, no invoice type'}
+                              </Badge>
+                            ) : company.peppol_checked_at ? (
+                              <Badge variant="neutral">Not on Peppol · {formatDate(company.peppol_checked_at)}</Badge>
+                            ) : null}
                             {company.vat_validated === true && (
                               <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">{company.vat_validation_source === 'aade' ? 'AADE Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${formatDate(company.vat_validated_at)}` : ''}</Badge>
                             )}

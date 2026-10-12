@@ -10,6 +10,8 @@ import { foldForSearch } from '../../_shared/searchFold.ts';
 // Generated mirror of src/services/crm/vatNormalize.ts — the receipt key (#353 CRM-7).
 import { normalizeVat } from '../../_shared/crm/vatNormalize.generated.ts';
 import { guardDuplicateParty } from './_partyDedupe.ts';
+import { fetchTextGuarded } from '../../_shared/fetch-image.ts';
+import { toVatPrefix } from '../../_shared/vatCountries.generated.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -456,6 +458,43 @@ export async function handleCompanies(req: Request): Promise<Response> {
         JSON.stringify({ data }),
         { status: 200, headers: corsHeaders },
       );
+    }
+
+    if (method === 'POST' && path.length === 2 && path[1] === 'peppol-lookup') {
+      const { data: company } = await supabase.from('crm_companies')
+        .select('id, workspace_id, vat_number, country_code, billing_country_code').eq('id', path[0]).maybeSingle();
+      if (!company || !scopeAllows(scope, company.workspace_id)) {
+        return new Response(JSON.stringify({ error: 'Company not found' }), { status: 404, headers: corsHeaders });
+      }
+      const compact = String(company.vat_number ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      if (!compact) {
+        return new Response(JSON.stringify({ error: 'This company has no VAT number to look up.' }), { status: 400, headers: corsHeaders });
+      }
+      const query = /^[A-Z]{2}[0-9A-Z]/.test(compact) && !/^[0-9]/.test(compact)
+        ? compact
+        : `${toVatPrefix(company.billing_country_code || company.country_code || 'GR')}${compact}`;
+      let found: { participant: string | null; acceptsInvoices: boolean } | null = null;
+      try {
+        const { text } = await fetchTextGuarded(
+          `https://directory.peppol.eu/search/1.0/json?q=${encodeURIComponent(query)}&rpc=5`,
+          { maxBytes: 512 * 1024, timeoutMs: 15_000, headers: { Accept: 'application/json' } },
+        );
+        const body = JSON.parse(text) as { matches?: Array<{ participantID?: { scheme?: string; value?: string }; docTypes?: Array<{ value?: string }> }> };
+        const m = (body.matches ?? []).find((x) => x.participantID?.value);
+        found = {
+          participant: m ? `${m.participantID!.scheme}::${m.participantID!.value}` : null,
+          acceptsInvoices: !!m?.docTypes?.some((d) => /Invoice-2::Invoice##.*poacc:billing:3\.0/.test(String(d.value ?? ''))),
+        };
+      } catch (e) {
+        return new Response(JSON.stringify({ error: `The Peppol Directory could not be reached: ${e instanceof Error ? e.message : String(e)}` }), { status: 502, headers: corsHeaders });
+      }
+      const { error: upErr } = await supabase.from('crm_companies').update({
+        peppol_participant_id: found.participant,
+        peppol_accepts_invoices: found.participant ? found.acceptsInvoices : null,
+        peppol_checked_at: new Date().toISOString(),
+      }).eq('id', company.id);
+      if (upErr) return new Response(JSON.stringify({ error: upErr.message }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ data: { query, ...found } }), { status: 200, headers: corsHeaders });
     }
 
     // PATCH /api/companies/{id} - Update company
