@@ -4218,6 +4218,7 @@ export type Database = {
           field_sources: Json
           own_brands: string[]
           supplier_type: string | null
+          supply_relationship: string | null
           seve_slug: string | null
           finance_statement_opt_out: boolean
           gemi_data: Json | null
@@ -4304,6 +4305,7 @@ export type Database = {
           field_sources?: Json
           own_brands?: string[]
           supplier_type?: string | null
+          supply_relationship?: string | null
           seve_slug?: string | null
           finance_statement_opt_out?: boolean
           gemi_data?: Json | null
@@ -4390,6 +4392,7 @@ export type Database = {
           field_sources?: Json
           own_brands?: string[]
           supplier_type?: string | null
+          supply_relationship?: string | null
           seve_slug?: string | null
           finance_statement_opt_out?: boolean
           gemi_data?: Json | null
@@ -27891,6 +27894,60 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_article_answer_checks: {
+        Row: {
+          answer_references: Json
+          answer_text: string | null
+          article_id: string
+          checked_at: string
+          credits: number
+          engine: string
+          error: string | null
+          id: string
+          keyword: string
+          missing: Json
+          our_domain_cited: boolean | null
+          page_fetched_at: string | null
+          page_url: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          answer_references?: Json
+          answer_text?: string | null
+          article_id: string
+          checked_at?: string
+          credits?: number
+          engine?: string
+          error?: string | null
+          id?: string
+          keyword: string
+          missing?: Json
+          our_domain_cited?: boolean | null
+          page_fetched_at?: string | null
+          page_url: string
+          status: string
+          workspace_id: string
+        }
+        Update: {
+          answer_references?: Json
+          answer_text?: string | null
+          article_id?: string
+          checked_at?: string
+          credits?: number
+          engine?: string
+          error?: string | null
+          id?: string
+          keyword?: string
+          missing?: Json
+          our_domain_cited?: boolean | null
+          page_fetched_at?: string | null
+          page_url?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       seo_articles: {
         Row: {
           completed_at: string | null
@@ -28427,6 +28484,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      seo_writer_lessons: {
+        Row: {
+          article_id: string | null
+          category: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          evidence: Json
+          from_text: string | null
+          id: string
+          kind: string
+          language_code: string
+          rule_text: string | null
+          status: string
+          to_text: string | null
+          workspace_id: string
+        }
+        Insert: {
+          article_id?: string | null
+          category: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          evidence?: Json
+          from_text?: string | null
+          id?: string
+          kind: string
+          language_code: string
+          rule_text?: string | null
+          status?: string
+          to_text?: string | null
+          workspace_id: string
+        }
+        Update: {
+          article_id?: string | null
+          category?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          evidence?: Json
+          from_text?: string | null
+          id?: string
+          kind?: string
+          language_code?: string
+          rule_text?: string | null
+          status?: string
+          to_text?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
       }
       seve_members: {
         Row: {

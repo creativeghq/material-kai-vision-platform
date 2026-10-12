@@ -20,6 +20,8 @@ import { latinTerms } from './foreign-words.ts';
 import { marketForCountry } from './market.ts';
 import { reviewArticle } from './review.ts';
 import { checkCoverage, mustCoverFrom } from './coverage.ts';
+import { approvedLessonLines } from './lessons.ts';
+import { accentKeywords, enforceLexicon } from './lexicon.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { PHOTOS_PER_PAGE } from './site-pages.ts';
 import { PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, PHOTO_VERIFY_MODEL, type PhotoUsage } from './photo-verify.ts';
@@ -243,6 +245,8 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         marketSource = 'workspace_country';
       }
     }
+    // Approved lessons from earlier published articles reach the writer and the reviewer through the brief.
+    if (brief && workspaceId) brief.extraContext.push(...await approvedLessonLines(supabase, workspaceId, body.language_code || 'en'));
 
     // A second article on one keyword for one site competes for the same ranking: refused unless a deliberate rewrite.
     if (websiteId && body.allow_duplicate !== true) {
@@ -342,13 +346,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
   }
 }
 
-/**
- * Stages 1-5, run AFTER the response has been sent.
- *
- * Nothing in here may return a Response — there is no longer a request to answer. The
- * `seo_articles` row IS the result: every stage updates `status` / `progress_percentage` /
- * `current_stage`, and the viewer polls until one of them is terminal.
- */
+/** Research → write, run after the response; the seo_articles row is the only result. */
 async function runPipelineStages(ctx: {
   supabase: DbClient;
   req: Request;
@@ -487,6 +485,10 @@ async function runPipelineStages(ctx: {
       current_stage: 'write',
     }, 'Writing article with Claude Opus...');
 
+    // Searches are typed without accents; the writer gets the correctly spelled form.
+    plan.secondaryKeywords = await accentKeywords(supabase, body.language_code ?? null, plan.secondaryKeywords);
+    const secondaries = research.recommendedSecondaries.slice(0, 5);
+    const accented = await accentKeywords(supabase, body.language_code ?? null, secondaries.map((k) => k.term));
     const writeResult = await callStage('write', req, {
       article_plan: plan,
       content_brief: brief,
@@ -495,7 +497,7 @@ async function runPipelineStages(ctx: {
       keyword_research_summary: {
         targetKeyword: research.targetKeyword,
         recommendedPrimary: research.recommendedPrimary,
-        recommendedSecondaries: research.recommendedSecondaries.slice(0, 5),
+        recommendedSecondaries: secondaries.map((k, i) => ({ ...k, term: accented[i] ?? k.term })),
         paaQuestions: research.paaQuestions,
         serpSignals: research.serpSignals,
       },
@@ -650,7 +652,11 @@ async function runLateStages(ctx: {
     const correctedPhotos = new Map([...imageAlts(reviewed.markdown)].filter(([src, alt]) => before.has(src) && before.get(src) !== alt));
     await saveCorrectedPhotoDescriptions(supabase, websiteId, sitePages, correctedPhotos, resume.language_code ?? 'en');
     const fixed = await enforceSiteAssets(supabase, websiteId, website?.url ?? null, reviewed.markdown, sitePages);
-    const finalMarkdown = fixed.markdown;
+    // A model cannot verify its own words; the dictionary (+ our site's and approved trade terms) can.
+    const lexicon = await enforceLexicon(supabase, { markdown: fixed.markdown, languageCode: resume.language_code, websiteId, workspaceId, userId });
+    totalCredits += lexicon.report.credits;
+    creditsByStage.lexicon = lexicon.report.credits;
+    const finalMarkdown = lexicon.markdown;
     await updateArticle(supabase, articleId, {
       markdown_content: finalMarkdown,
       title: plan.title,
@@ -658,9 +664,11 @@ async function runLateStages(ctx: {
       meta_description: plan.metaDescription,
       progress_percentage: 88,
       review: reviewed.report,
+      lexicon: lexicon.report,
     }, reviewed.report.failed
       ? `Review did not run: ${reviewed.report.failed}`
-      : `Reviewed: ${reviewed.report.applied.length} corrections applied (${correctedPhotos.size} photo descriptions), ${reviewed.report.skipped.length} could not be placed`);
+      : `Reviewed: ${reviewed.report.applied.length} corrections applied (${correctedPhotos.size} photo descriptions), ${reviewed.report.skipped.length} could not be placed; `
+        + `dictionary: ${lexicon.report.unknown_before.length} unknown words, ${lexicon.report.corrected.length} corrected, ${lexicon.report.unverified.length} left to verify`);
 
     const coverage = await checkCoverage(supabase, {
       text: finalMarkdown, mustCover: mustCoverFrom(research), languageCode: resume.language_code, userId, workspaceId,
@@ -865,12 +873,7 @@ async function runLateStages(ctx: {
     // Calculate processing time and credits
     const processingTimeMs = Date.now() - startTime;
 
-    // Final update. Routed through updateArticle so the column allowlist applies: the real
-    // columns are written, and the 14 non-columns this used to name (reading_time_minutes,
-    // content_analysis, overall_score, keyword_density, schema_markup,
-    // faq_schema, optimize_data, brief_data, gaps_gains_data, research_tab_data,
-    // fix_iterations, geo_score, credits_used, processing_time_ms) are preserved in
-    // stages_data.extra instead of taking the whole statement down with them.
+    // Through updateArticle: non-columns land in stages_data.extra instead of failing the write.
     await updateArticle(supabase, articleId, {
       markdown_content: publishedMarkdown,
       word_count: finalWordCount,
@@ -900,8 +903,6 @@ async function runLateStages(ctx: {
 
     console.log(`[seo-pipeline] Complete! Article ${articleId}: score ${analysis.overallScore}/100, ${finalWordCount} words, ${processingTimeMs}ms`);
 
-    // Nothing is returned. The response went out before this function started, so the row is
-    // the only result there is — the viewer polls it and stops on `completed` or `failed`.
 }
 
 // ════════════════════════════════════════════════════════════════

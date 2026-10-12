@@ -29,7 +29,7 @@ const COMPANY_WRITABLE_COLUMNS = [
   'linkedin', 'twitter', 'facebook', 'description',
   'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
   'factory_names', // supplier↔factory pin (ingested metadata.factory_name values)
-  'supplier_type', 'is_manufacturer', 'own_brands', 'brands_carried',
+  'supplier_type', 'supply_relationship', 'is_manufacturer', 'own_brands', 'brands_carried',
   'user_level_key', // Pricing level
   'prices_vat_inclusive', // Show this customer gross (VAT-incl) prices
 

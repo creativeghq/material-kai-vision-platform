@@ -1,3 +1,5 @@
+import { articleBlocks, type StructuredArticle } from './articleBlocks';
+
 export const ARTICLE_EXPORT_SCHEMA = 'materialshub.seo-article.v1';
 
 export interface ExportableArticle {
@@ -46,6 +48,7 @@ export interface ArticleExport {
   content_type: string | null;
   excerpt: string | null;
   content: { markdown: string; html: string | null; word_count: number | null; reading_time_minutes: number | null };
+  structured: StructuredArticle;
   outline: { level: number; text: string }[];
   faq: { question: string; answer: string }[];
   images: { src: string; alt: string }[];
@@ -132,6 +135,7 @@ export function buildArticleExport(
       word_count: num(article.word_count),
       reading_time_minutes: num(article.reading_time_minutes),
     },
+    structured: articleBlocks(markdown, article.site_url ?? null),
     outline: [...markdown.matchAll(/^(#{1,6})\s+(.+)$/gm)].map((m) => ({ level: m[1].length, text: m[2].trim() })),
     faq: (article.faq_schema ?? []).filter((f) => f?.question),
     images,

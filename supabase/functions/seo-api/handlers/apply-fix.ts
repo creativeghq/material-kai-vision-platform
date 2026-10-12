@@ -10,6 +10,7 @@ import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, typ
 import { getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { normalizeContentBrief, briefList } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
+import { basisOf, storedSuggestions, type ArticleSuggestion } from './suggestion-rules.ts';
 import {
   loadOwnedArticle, storedArticlePlan, persistAnalysis, reconciledFaqSchema,
 } from './article-access.ts';
@@ -121,6 +122,31 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
     if (next === markdown) {
       // Nothing to save, and charging for a no-op would be charging for nothing.
       throw new Error('The rewrite came back identical — nothing was changed.');
+    }
+
+    // Preview: the paid rewrite becomes a pending suggestion; the article changes only when the user adds it.
+    if (body.preview === true) {
+      const { data: current } = await supabase.from('seo_articles').select('stages_data').eq('id', articleId).single();
+      const stored = (current?.stages_data ?? {}) as { extra?: Record<string, unknown> };
+      const suggestion: ArticleSuggestion = {
+        id: crypto.randomUUID(),
+        source: 'analysis',
+        title: instruction.slice(0, 120),
+        kind: 'replace',
+        find: anchor,
+        replace: revised,
+        basis: basisOf({ source: 'analysis', point: instruction, anchor }),
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+      const others = storedSuggestions(stored.extra?.suggestions).filter((s) => !(s.status === 'pending' && s.basis === suggestion.basis));
+      const { error: saveErr } = await supabase.from('seo_articles')
+        .update({ stages_data: { ...stored, extra: { ...(stored.extra ?? {}), suggestions: [...others, suggestion] } } })
+        .eq('id', articleId);
+      if (saveErr) throw new Error(`Could not store the preview: ${saveErr.message}`);
+      const creditsUsed = await settleStage(supabase, wallet, reserved, actualCredits, { article_id: articleId, model: result.model, preview: true });
+      reserved = 0;
+      return jsonResponse({ success: true, data: { article_id: articleId, suggestion, credits_used: creditsUsed } });
     }
 
     // Re-analyse. `analyzeContent` is pure TypeScript with no model call, so this is free and

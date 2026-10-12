@@ -7,11 +7,13 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { FIELD_SOURCE_LABEL, MATCH_LABEL, SUPPLIER_TYPES, type SupplierType } from '@/modules/crm/supplierTypes';
+import { SUPPLY_RELATIONSHIPS, type SupplyRelationship } from '@/modules/crm/supplyRelationship';
 
 export interface FieldProvenance { src?: string; by?: string; at?: string }
 
 export interface SupplierProfile {
   supplier_type?: string | null;
+  supply_relationship?: string | null;
   own_brands?: string[] | null;
   brands_carried?: string[] | null;
   field_sources?: Record<string, FieldProvenance> | null;
@@ -128,6 +130,19 @@ export const SupplierProfileCard: React.FC<{
             </SelectContent>
           </Select>
           {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="supply-relationship">How we supply them</Label>
+          <Select
+            value={(value.supply_relationship ?? 'to_order') as SupplyRelationship}
+            onValueChange={(v) => onSave({ supply_relationship: v })}
+          >
+            <SelectTrigger id="supply-relationship" className="max-w-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {SUPPLY_RELATIONSHIPS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">{SUPPLY_RELATIONSHIPS.find((r) => r.value === (value.supply_relationship ?? 'to_order'))?.hint}</p>
         </div>
         <TagEditor id="own-brands" label="Own brands" values={value.own_brands ?? []} onChange={(v) => onSave({ own_brands: v })} />
         <TagEditor

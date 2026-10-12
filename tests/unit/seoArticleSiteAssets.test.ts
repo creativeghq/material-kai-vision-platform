@@ -12,16 +12,16 @@ import {
 } from '../../supabase/functions/seo-api/handlers/site-assets.ts';
 import { foreignWords, latinTerms } from '../../supabase/functions/seo-api/handlers/foreign-words.ts';
 
-const PAGE = 'https://materialshub.gr/el/proionta/plakakia/atlas-concorde';
+const PAGE = 'https://tiles.example/el/proionta/plakakia/atlas-concorde';
 
 describe('extractContentImages — what an article may lift from one of our pages', () => {
   it('keeps described, photo-sized images as absolute https URLs', () => {
     const html = `
       <img src="/assets/brave.webp" alt="Πλακάκια Atlas Concorde Brave — πέτρα, 75×150 cm" width="760" height="760">
-      <img src="https://media.materialshub.gr/products/norde.webp" alt="Norde">`;
+      <img src="https://media.tiles.example/products/norde.webp" alt="Norde">`;
     expect(extractContentImages(html, PAGE)).toEqual([
-      { src: 'https://materialshub.gr/assets/brave.webp', alt: 'Πλακάκια Atlas Concorde Brave — πέτρα, 75×150 cm' },
-      { src: 'https://media.materialshub.gr/products/norde.webp', alt: 'Norde' },
+      { src: 'https://tiles.example/assets/brave.webp', alt: 'Πλακάκια Atlas Concorde Brave — πέτρα, 75×150 cm' },
+      { src: 'https://media.tiles.example/products/norde.webp', alt: 'Norde' },
     ]);
   });
 
@@ -45,54 +45,54 @@ describe('extractContentImages — what an article may lift from one of our page
 });
 
 describe('applySiteAssetRules — the published article points only at what exists', () => {
-  const live = new Set(['https://materialshub.gr/el/proionta/plakakia', 'https://materialshub.gr/el/idees/lebites-aeriou']);
-  const photos = new Map([['https://media.materialshub.gr/products/norde.webp', 'Γκρι πορσελανάτο πλακάκι τύπου πέτρας']]);
+  const live = new Set(['https://tiles.example/el/proionta/plakakia', 'https://tiles.example/el/idees/lebites-aeriou']);
+  const photos = new Map([['https://media.tiles.example/products/norde.webp', 'Γκρι πορσελανάτο πλακάκι τύπου πέτρας']]);
 
   it('removes a page URL pasted as a photo, and a photo placed twice keeps its first place', () => {
     const md = [
       'Intro.',
       '',
-      '![Norde](https://media.materialshub.gr/products/norde.webp)',
+      '![Norde](https://media.tiles.example/products/norde.webp)',
       '',
-      '![Deck](https://materialshub.gr/athens/deck-exoterikou-chorou)',
+      '![Deck](https://tiles.example/athens/deck-exoterikou-chorou)',
       '',
       'Text.',
       '',
-      '![Norde again](https://media.materialshub.gr/products/norde.webp)',
+      '![Norde again](https://media.tiles.example/products/norde.webp)',
     ].join('\n');
-    const out = applySiteAssetRules(md, 'materialshub.gr', live, photos);
+    const out = applySiteAssetRules(md, 'tiles.example', live, photos);
     expect(out.removedImages).toBe(2);
     expect(out.markdown.match(/!\[/g)).toHaveLength(1);
     expect(out.markdown).not.toContain('athens/deck');
   });
 
-  it('unwraps a link to a page of ours that does not exist, and leaves other sites alone', () => {
-    const md = 'See [tiles](https://materialshub.gr/el/proionta/plakakia/) and [made up](https://www.materialshub.gr/el/invented) '
-      + 'and [AADE](https://www.aade.gr/x).';
-    const out = applySiteAssetRules(md, 'materialshub.gr', live, photos);
-    expect(out.unlinked).toBe(1);
+  it('unwraps a link to a page of ours that does not exist, keeps an official site and unwraps any other', () => {
+    const md = 'See [tiles](https://tiles.example/el/proionta/plakakia/) and [made up](https://www.tiles.example/el/invented) '
+      + 'and [the programme](https://exoikonomo.gov.gr/x) and [a shop](https://www.aade-shop.gr/x).';
+    const out = applySiteAssetRules(md, 'tiles.example', live, photos);
+    expect(out.unlinked).toBe(2);
     expect(out.markdown).toBe(
-      'See [tiles](https://materialshub.gr/el/proionta/plakakia/) and made up and [AADE](https://www.aade.gr/x).',
+      'See [tiles](https://tiles.example/el/proionta/plakakia/) and made up and [the programme](https://exoikonomo.gov.gr/x) and a shop.',
     );
   });
 });
 
 describe('applySiteAssetRules — a photo is published with what it shows, never a caption', () => {
   it('replaces the writer alt with the checked description and drops the caption under it', () => {
-    const photos = new Map([['https://materialshub.gr/assets/hero-2.webp', 'Έπιπλο μπάνιου με φωτιζόμενο καθρέπτη']]);
+    const photos = new Map([['https://tiles.example/assets/hero-2.webp', 'Έπιπλο μπάνιου με φωτιζόμενο καθρέπτη']]);
     const md = [
-      '![Εφαρμογή στεγανωτικής μεμβράνης](https://materialshub.gr/assets/hero-2.webp)',
+      '![Εφαρμογή στεγανωτικής μεμβράνης](https://tiles.example/assets/hero-2.webp)',
       '*Η στεγανοποίηση πριν την πλακόστρωση είναι προϋπόθεση.*',
       '',
       'Κείμενο.',
     ].join('\n');
-    const out = applySiteAssetRules(md, 'materialshub.gr', new Set(), photos);
-    expect(out.markdown).toBe('![Έπιπλο μπάνιου με φωτιζόμενο καθρέπτη](https://materialshub.gr/assets/hero-2.webp)\n\nΚείμενο.');
+    const out = applySiteAssetRules(md, 'tiles.example', new Set(), photos);
+    expect(out.markdown).toBe('![Έπιπλο μπάνιου με φωτιζόμενο καθρέπτη](https://tiles.example/assets/hero-2.webp)\n\nΚείμενο.');
   });
 
   it('leaves an ordinary italic sentence that is not directly under a photo', () => {
     const md = 'Κείμενο.\n*Σημείωση σε πλάγια.*';
-    expect(applySiteAssetRules(md, 'materialshub.gr', new Set(), new Map()).markdown).toBe(md);
+    expect(applySiteAssetRules(md, 'tiles.example', new Set(), new Map()).markdown).toBe(md);
   });
 });
 
@@ -101,9 +101,9 @@ describe('foreignWords — English left in a Greek article', () => {
     const md = [
       '# Πλακάκια μπάνιου',
       '> [!tldr]',
-      '> Ένα accent τοίχος με [Bisazza Marmo Lux](https://materialshub.gr/el/proionta/plakakia/bisazza-marmo-lux).',
+      '> Ένα accent τοίχος με [Bisazza Marmo Lux](https://tiles.example/el/proionta/plakakia/bisazza-marmo-lux).',
       'Ντουζιέρα walk-in, terrazzo και spa αισθητική, πλάκες 120x260 cm, χρώμα Sage Green.',
-      '![Πλακάκι](https://media.materialshub.gr/products/x-slab.webp)',
+      '![Πλακάκι](https://media.tiles.example/products/x-slab.webp)',
     ].join('\n');
     expect(foreignWords(md)).toEqual(['accent', 'walk-in']);
   });
@@ -141,7 +141,7 @@ describe('pageFacts — what a page states, not its navigation', () => {
 });
 
 describe('applyReviewEdits — the editor fixes words, never links', () => {
-  const md = 'Η Aparici είναι ιταλικό εργοστάσιο. Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel) σε ματ.';
+  const md = 'Η Aparici είναι ιταλικό εργοστάσιο. Δείτε τη [σειρά Marinel](https://tiles.example/el/proionta/plakakia/cersanit-marinel) σε ματ.';
 
   it('applies an edit whose text occurs exactly once', () => {
     const out = applyReviewEdits(md, [{ find: 'Η Aparici είναι ιταλικό εργοστάσιο.', replace: 'Η Aparici είναι ισπανικό εργοστάσιο.', kind: 'wrong_fact' }]);
@@ -151,7 +151,7 @@ describe('applyReviewEdits — the editor fixes words, never links', () => {
 
   it('refuses an edit that would drop a link, or text that is absent', () => {
     const out = applyReviewEdits(md, [
-      { find: 'Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel) σε ματ.', replace: 'Η σειρά Marinel είναι γυαλιστερή.', kind: 'wrong_fact' },
+      { find: 'Δείτε τη [σειρά Marinel](https://tiles.example/el/proionta/plakakia/cersanit-marinel) σε ματ.', replace: 'Η σειρά Marinel είναι γυαλιστερή.', kind: 'wrong_fact' },
       { find: 'δεν υπάρχει', replace: 'x', kind: 'language' },
     ]);
     expect(out.applied).toHaveLength(0);
@@ -161,8 +161,8 @@ describe('applyReviewEdits — the editor fixes words, never links', () => {
 
   it('keeps the link when the edit carries it over', () => {
     const out = applyReviewEdits(md, [{
-      find: 'Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel) σε ματ.',
-      replace: 'Δείτε τη [σειρά Marinel](https://materialshub.gr/el/proionta/plakakia/cersanit-marinel), γυαλιστερή και ανάγλυφη.',
+      find: 'Δείτε τη [σειρά Marinel](https://tiles.example/el/proionta/plakakia/cersanit-marinel) σε ματ.',
+      replace: 'Δείτε τη [σειρά Marinel](https://tiles.example/el/proionta/plakakia/cersanit-marinel), γυαλιστερή και ανάγλυφη.',
       kind: 'wrong_fact',
     }]);
     expect(out.applied).toHaveLength(1);
@@ -171,18 +171,18 @@ describe('applyReviewEdits — the editor fixes words, never links', () => {
 
 describe('applySiteAssetRules — one link per page', () => {
   it('keeps the first link to a page and unwraps repeats', () => {
-    const live = new Set(['https://materialshub.gr/el/proionta/plakakia']);
-    const md = '[one](https://materialshub.gr/el/proionta/plakakia) then [two](https://materialshub.gr/el/proionta/plakakia/)';
-    const out = applySiteAssetRules(md, 'materialshub.gr', live, new Map());
+    const live = new Set(['https://tiles.example/el/proionta/plakakia']);
+    const md = '[one](https://tiles.example/el/proionta/plakakia) then [two](https://tiles.example/el/proionta/plakakia/)';
+    const out = applySiteAssetRules(md, 'tiles.example', live, new Map());
     expect(out.unlinked).toBe(1);
-    expect(out.markdown).toBe('[one](https://materialshub.gr/el/proionta/plakakia) then two');
+    expect(out.markdown).toBe('[one](https://tiles.example/el/proionta/plakakia) then two');
   });
 });
 
 describe('countSiteLinks — real links to our own pages are internal links', () => {
   it('counts links to the site host (www or not), never images or other hosts', () => {
-    const md = '[a](https://materialshub.gr/a) [b](https://www.materialshub.gr/b) ![c](https://materialshub.gr/c.webp) [d](https://x.gr/d)';
-    expect(countSiteLinks(md, 'https://materialshub.gr')).toBe(2);
+    const md = '[a](https://tiles.example/a) [b](https://www.tiles.example/b) ![c](https://tiles.example/c.webp) [d](https://x.gr/d)';
+    expect(countSiteLinks(md, 'https://tiles.example')).toBe(2);
     expect(countSiteLinks(md, null)).toBe(0);
   });
 });
@@ -201,9 +201,9 @@ describe('slugTerms — an article topic as the words of our URL slugs', () => {
 
 describe('which of our pages a review section uses', () => {
   const pages = [
-    { url: 'https://materialshub.gr/el/proionta/plakakia/cersanit-terrazzo-stone-2-0', images: [{ src: 'https://cdn.x/c.webp' }] },
-    { url: 'https://materialshub.gr/el/proionta/plakakia/pamesa-terrazzo', images: [] },
-    { url: 'https://materialshub.gr/el/proionta/plakakia/typou-terrazzo', images: [] },
+    { url: 'https://tiles.example/el/proionta/plakakia/cersanit-terrazzo-stone-2-0', images: [{ src: 'https://cdn.x/c.webp' }] },
+    { url: 'https://tiles.example/el/proionta/plakakia/pamesa-terrazzo', images: [] },
+    { url: 'https://tiles.example/el/proionta/plakakia/typou-terrazzo', images: [] },
   ];
 
   it('reads a page name from its slug', () => {

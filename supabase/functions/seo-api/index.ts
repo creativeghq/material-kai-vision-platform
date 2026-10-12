@@ -20,6 +20,8 @@ import { handleCitability } from './handlers/citability.ts';
 import { handleLlmMentions } from './handlers/llm-mentions.ts';
 import { handleAiKeywordVolume } from './handlers/ai-keyword-volume.ts';
 import { handleAnswerCheck } from './handlers/answer-check.ts';
+import { handleLessons } from './handlers/lessons.ts';
+import { handleSuggestionApply, handleSuggestionDismiss, handleSuggestions } from './handlers/suggestions.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   research: handleResearch,
@@ -39,6 +41,10 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   llm_mentions: handleLlmMentions,
   ai_keyword_volume: handleAiKeywordVolume,
   answer_check: handleAnswerCheck,
+  lessons: handleLessons,
+  suggestions: handleSuggestions,
+  suggestion_apply: handleSuggestionApply,
+  suggestion_dismiss: handleSuggestionDismiss,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {

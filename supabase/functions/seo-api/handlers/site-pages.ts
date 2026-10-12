@@ -3,7 +3,9 @@
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { fetchTextGuarded } from '../../_shared/fetch-image.ts';
-import { extractContentImages, type PageImage } from '../../_shared/page-images.ts';
+import {
+  extractContentImages, photoCheckCurrent, photoOffered, type PageImage,
+} from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
 import { applySiteAssetRules, hostOf, pageFacts, siteLinkUrls, trimSlash } from './site-assets.ts';
 import { verifyPhoto, type PhotoUsage } from './photo-verify.ts';
@@ -27,6 +29,7 @@ const MATRIX_MIN = 3;
 const SINGLE_PAGE_BONUS = 0.05;
 /** Photos per page offered to the writer — and therefore checked by vision. */
 export const PHOTOS_PER_PAGE = 2;
+export { MIN_PHOTO_WIDTH } from '../../_shared/page-images.ts';
 
 function sectionOf(url: string): string {
   try {
@@ -160,11 +163,11 @@ export async function findSitePages(
     if (opts.photoUsage) {
       await verifyPhotos(supabase, picked, lang, { userId: opts.userId, workspaceId: opts.workspaceId }, opts.photoUsage);
     }
-    // Only checked photos leave this function, and their alt IS what the check saw.
+    // Only checked photos that pass the text and size verdicts leave this function; their alt IS what the check saw.
     return picked.map(({ id: _id, stale: _stale, impressions: _i, langPath: _l, ...page }) => ({
       ...page,
       images: page.images.slice(0, PHOTOS_PER_PAGE)
-        .filter((im) => im.seen?.[lang])
+        .filter((im) => photoOffered(im, lang))
         .map((im) => ({ src: im.src, alt: im.seen![lang].text })),
     }));
   } catch (e) {
@@ -223,7 +226,7 @@ async function verifyPhotos(
   usageSink?: PhotoUsage[],
 ): Promise<void> {
   const jobs = pages.flatMap((page) =>
-    page.images.slice(0, PHOTOS_PER_PAGE).filter((im) => !im.seen?.[lang]).map((im) => ({ page, im })));
+    page.images.slice(0, PHOTOS_PER_PAGE).filter((im) => !photoCheckCurrent(im, lang)).map((im) => ({ page, im })));
   const touched = new Set<SitePage & { id: string }>();
   const worker = async () => {
     for (let job = jobs.shift(); job; job = jobs.shift()) {
@@ -345,7 +348,8 @@ export async function enforceSiteAssets(
     }
   }
 
-  return applySiteAssetRules(markdown, siteHost, live, photos);
+  const titles = new Map(pages.filter((p) => p.title).map((p) => [trimSlash(p.url), p.title as string] as const));
+  return applySiteAssetRules(markdown, siteHost, live, photos, titles);
 }
 
 /** One page per line for a prompt — every value is crawled page content, so it is fenced as data. */

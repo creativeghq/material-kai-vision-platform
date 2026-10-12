@@ -17,6 +17,8 @@ import { supabase } from '@/integrations/supabase/client';
 // Import-free so it can be unit-tested as a value — importing this file boots the Supabase
 // client, which is why the verdict was never covered while it lived here.
 import { fixListState, FIX_STATE_COPY, type FixListState } from './seoFixState';
+import { ArticleSuggestionsPanel } from './ArticleSuggestionsPanel';
+import { WriterLessonsPanel } from './WriterLessonsPanel';
 import {
   findConclusionLine, findFaqSection, sectionLabelsFor, type SectionLabels,
 } from '@/services/seo/articleSections';
@@ -565,7 +567,7 @@ function ApplicableFixes({ state, applyingAnchor, onApply, canRevert, onRevert, 
                   className="shrink-0 gap-1.5"
                 >
                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                  {busy ? 'Applying' : 'Apply'}
+                  {busy ? 'Preparing' : 'Preview fix'}
                 </Button>
               </div>
             );
@@ -2581,23 +2583,24 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
 
   const isInProgress = article && !['completed', 'failed'].includes(article.status);
 
+  const reloadArticle = useCallback(async () => {
+    if (!articleId) return;
+    const { data, error } = await supabase
+      .from('seo_articles')
+      .select('*')
+      .eq('id', articleId)
+      .single();
+
+    if (!error && data) {
+      setArticle(hydrateArticle(data) as SEOArticle);
+    }
+  }, [articleId]);
+
   // Initial fetch — skipped when initialArticle is provided (demo mode)
   useEffect(() => {
     if (initialArticle || !articleId) return;
-    const fetchArticle = async () => {
-      const { data, error } = await supabase
-        .from('seo_articles')
-        .select('*')
-        .eq('id', articleId)
-        .single();
-
-      if (!error && data) {
-        setArticle(hydrateArticle(data) as SEOArticle);
-      }
-      setLoading(false);
-    };
-    fetchArticle();
-  }, [articleId, initialArticle]);
+    void reloadArticle().finally(() => setLoading(false));
+  }, [articleId, initialArticle, reloadArticle]);
 
   // Adaptive polling while in progress — disabled in demo mode
   useAdaptivePolling(
@@ -2677,6 +2680,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
           article_id: article.id,
           anchor: fix.anchor,
           instruction: fix.suggestion,
+          preview: true,
         },
       });
       if (error || !data?.success) {
@@ -2689,28 +2693,15 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
         });
         return;
       }
-      setArticle((prev) => (prev ? {
-        ...prev,
-        markdown_content: data.data.markdown_content,
-        seo_score: data.data.seo_score ?? prev.seo_score,
-        overall_score: data.data.seo_score ?? prev.overall_score,
-        readability_score: data.data.readability_score ?? prev.readability_score,
-        // The fix we just applied rewrote the paragraph its anchor pointed at, so that anchor is
-        // gone from the article. Keeping the old list would leave the applied fix on screen with
-        // a button that can only answer "that paragraph is no longer in the article".
-        content_analysis: data.data.analysis ?? prev.content_analysis,
-        previous_markdown_at: data.data.reverts_to,
-      } : prev));
+      await reloadArticle();
       toast({
-        title: 'Applied',
-        description: data.data.seo_score != null
-          ? `Score is now ${data.data.seo_score}/100. You can revert this.`
-          : 'You can revert this.',
+        title: 'Preview ready',
+        description: 'Nothing changed yet: see it under Article Suggestions on the Content tab, then add or dismiss it.',
       });
     } finally {
       setApplyingAnchor(null);
     }
-  }, [article, applyingAnchor, toast]);
+  }, [article, applyingAnchor, toast, reloadArticle]);
 
   const revertFix = useCallback(async () => {
     if (!article?.id) return;
@@ -3081,6 +3072,16 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                         onSetPublishedUrl={setPublishedUrl}
                       />
                     </div>
+                  )}
+                  {!initialArticle && article.status === 'completed' && article.markdown_content && (
+                    <>
+                      <ArticleSuggestionsPanel
+                        articleId={article.id}
+                        extra={article.stages_data?.extra}
+                        onChanged={reloadArticle}
+                      />
+                      <WriterLessonsPanel articleId={article.id} />
+                    </>
                   )}
                   <ArticleContent
                     markdown={article.markdown_content}

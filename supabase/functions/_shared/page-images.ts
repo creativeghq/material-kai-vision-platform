@@ -1,10 +1,42 @@
 /** Content photos on a crawled page — what an article may place when it links to that page. */
 
+export interface PhotoSeen {
+  text: string;
+  site_alt_ok: boolean;
+  at: string;
+  /** Words or letters are part of the image itself, in `text_language` (null: no language, e.g. a brand mark). */
+  has_text?: boolean;
+  text_language?: string | null;
+  /** Real pixel size read from the file; null when the header could not be read. */
+  width?: number | null;
+  height?: number | null;
+  v?: number;
+}
+
 export interface PageImage {
   src: string;
   alt: string;
   /** What a vision check saw, per article language — the only description an article may print. */
-  seen?: Record<string, { text: string; site_alt_ok: boolean; at: string }>;
+  seen?: Record<string, PhotoSeen>;
+}
+
+/** A cached check older than this lacks the text and size verdicts, so it is run again. */
+export const PHOTO_CHECK_VERSION = 2;
+/** Narrower than this a photo is a catalogue thumbnail, and an article stretches it across the page. */
+export const MIN_PHOTO_WIDTH = 1000;
+
+const baseLang = (code: string) => code.toLowerCase().split(/[-_]/)[0];
+
+export function photoCheckCurrent(im: PageImage, lang: string): boolean {
+  return im.seen?.[lang]?.v === PHOTO_CHECK_VERSION;
+}
+
+/** Checked at the current version, wide enough, and any text baked into it is in the article's language. */
+export function photoOffered(im: PageImage, lang: string): boolean {
+  const s = im.seen?.[lang];
+  if (!s || s.v !== PHOTO_CHECK_VERSION) return false;
+  if (!(Number(s.width) >= MIN_PHOTO_WIDTH)) return false;
+  return !(s.has_text && s.text_language && baseLang(s.text_language) !== baseLang(lang));
 }
 
 /** Below this many pixels on the longer declared side an image is an icon, a logo or a chip. */

@@ -10,6 +10,7 @@ import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { loadOwnedArticle } from './article-access.ts';
 import { checkCoverage } from './coverage.ts';
+import { extractLessons } from './lessons.ts';
 import { hostOf, trimSlash } from './site-assets.ts';
 import { reserveStage, serviceCredits, settleStage, type StageWallet } from './stage-billing.ts';
 
@@ -24,7 +25,7 @@ const AI_MODE_CEILING_UNITS = 10;
 
 interface CheckableArticle {
   id: string; user_id: string; workspace_id: string | null; website_id: string | null;
-  slug: string | null; target_keyword: string | null; keyword_research_id: string | null;
+  slug: string | null; target_keyword: string | null; keyword_research_id: string | null; markdown_content: string | null;
   stages_data: { extra?: Record<string, unknown> } | null;
 }
 
@@ -53,6 +54,8 @@ async function checkArticle(supabase: DbClient, a: CheckableArticle) {
   const page = await publishedPage(supabase, a);
   if (!page || !a.workspace_id || !a.target_keyword) return { article_id: a.id, skipped: page ? 'no workspace or keyword' : 'not published' };
 
+  // The first check after publishing also reads what the editor changed, once per article.
+  if (!a.stages_data?.extra?.lessons) await extractLessons(supabase, a, page);
   const extra = a.stages_data?.extra ?? {};
   const languageCode = String(extra.language_code ?? 'en');
   const locationCode = Number(extra.location_code ?? 2840);
@@ -113,7 +116,7 @@ async function checkArticle(supabase: DbClient, a: CheckableArticle) {
   return { article_id: a.id, status: coverage.failed ? 'failed' : 'ok', cited, missing: coverage.missing.length };
 }
 
-const ARTICLE_COLUMNS = 'id, user_id, workspace_id, website_id, slug, target_keyword, keyword_research_id, stages_data';
+const ARTICLE_COLUMNS = 'id, user_id, workspace_id, website_id, slug, target_keyword, keyword_research_id, markdown_content, stages_data';
 
 export async function handleAnswerCheck(req: Request, body: any): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

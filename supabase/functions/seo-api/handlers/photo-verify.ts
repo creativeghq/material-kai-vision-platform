@@ -4,8 +4,9 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { callClaudeMessages } from '../../_shared/ai-client.ts';
 import { getToolPrompt } from '../../_shared/prompt-utils.ts';
 import { fetchImageGuardedOrNull } from '../../_shared/fetch-image.ts';
-import type { PageImage } from '../../_shared/page-images.ts';
+import { PHOTO_CHECK_VERSION, type PageImage, type PhotoSeen } from '../../_shared/page-images.ts';
 import { serpValue } from './untrusted.ts';
+import { imageSize } from './image-size.ts';
 
 export const PHOTO_VERIFY_MODEL = 'claude-sonnet-5';
 export const PHOTO_VERIFY_MAX_INPUT_TOKENS = 2500;
@@ -22,8 +23,10 @@ const SCHEMA = {
   properties: {
     description: { type: 'string' },
     site_description_accurate: { type: 'boolean' },
+    has_text: { type: 'boolean' },
+    text_language: { type: ['string', 'null'] },
   },
-  required: ['description', 'site_description_accurate'],
+  required: ['description', 'site_description_accurate', 'has_text', 'text_language'],
   additionalProperties: false,
 };
 
@@ -41,9 +44,10 @@ export async function verifyPhoto(
   img: PageImage,
   languageCode: string,
   who: { userId: string; workspaceId: string | null },
-): Promise<{ seen: { text: string; site_alt_ok: boolean } | null; usage: PhotoUsage | null }> {
+): Promise<{ seen: Omit<PhotoSeen, 'at'> | null; usage: PhotoUsage | null }> {
   const file = await fetchImageGuardedOrNull(img.src, { maxBytes: MAX_IMAGE_BYTES, timeoutMs: 10_000 });
   if (!file || !VISION_MIME.has(file.mimeType)) return { seen: null, usage: null };
+  const size = imageSize(file.bytes);
 
   const res = await callClaudeMessages({
     model: PHOTO_VERIFY_MODEL,
@@ -73,8 +77,24 @@ export async function verifyPhoto(
   try {
     const out = JSON.parse(res.content?.find((b) => b.type === 'text')?.text ?? '');
     const text = String(out?.description ?? '').trim();
-    if (!text || typeof out?.site_description_accurate !== 'boolean') return { seen: null, usage };
-    return { seen: { text: text.slice(0, 300), site_alt_ok: out.site_description_accurate }, usage };
+    if (!text || typeof out?.site_description_accurate !== 'boolean' || typeof out?.has_text !== 'boolean') {
+      return { seen: null, usage };
+    }
+    const textLanguage = typeof out.text_language === 'string' && /^[a-z]{2}$/i.test(out.text_language.trim())
+      ? out.text_language.trim().toLowerCase()
+      : null;
+    return {
+      seen: {
+        text: text.slice(0, 300),
+        site_alt_ok: out.site_description_accurate,
+        has_text: out.has_text,
+        text_language: out.has_text ? textLanguage : null,
+        width: size?.width ?? null,
+        height: size?.height ?? null,
+        v: PHOTO_CHECK_VERSION,
+      },
+      usage,
+    };
   } catch {
     return { seen: null, usage };
   }

@@ -11,6 +11,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** [source, target] pairs, repo-relative. One line per vocabulary. */
 export const VOCABULARIES = [
   [
+    'src/modules/crm/supplyRelationship.ts',
+    'supabase/functions/_shared/crm/supplyRelationship.generated.ts',
+  ],
+  [
     'src/utils/emailMarkup.ts',
     'supabase/functions/_shared/emailMarkup.generated.ts',
   ],

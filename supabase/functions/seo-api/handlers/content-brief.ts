@@ -316,11 +316,11 @@ export async function resolveBriefWithProfile(
     .maybeSingle();
   // A profile we could not read is not an empty profile. Return the caller's brief untouched and
   // let the checks report honestly, rather than silently writing defaults we did not load.
-  if (error || !p) return brief;
+  if (error || !p) return withSupplyContext(supabase, workspaceId, brief);
 
   const base = brief ?? emptyBrief({});
 
-  return {
+  return withSupplyContext(supabase, workspaceId, {
     ...base,
     brandVoice: {
       toneAttributes:         filled(base.brandVoice.toneAttributes)         ?? (p.tone_attributes ?? []),
@@ -355,6 +355,36 @@ export async function resolveBriefWithProfile(
           }
         : null
     ),
+  });
+}
+
+/** Claims about us: which makers we supply as authorised dealers (CRM supplier card); everything else is to order. */
+async function withSupplyContext(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  workspaceId: string,
+  brief: NormalizedBrief | null,
+): Promise<NormalizedBrief | null> {
+  const { data, error } = await supabase
+    .from('crm_companies')
+    .select('name, own_brands')
+    .eq('workspace_id', workspaceId)
+    .eq('is_supplier', true)
+    .eq('supply_relationship', 'authorised')
+    .limit(200);
+  // An unreadable list leaves the safe claim (to order), never no rule at all.
+  const authorised = (error ? [] : data ?? []).flatMap((c: { name: string; own_brands: string[] | null }) => [c.name, ...(c.own_brands ?? [])]).filter(Boolean);
+  const base = brief ?? emptyBrief({});
+  return {
+    ...base,
+    extraContext: [
+      ...base.extraContext,
+      authorised.length
+        ? `Supply (claims about us): we are an authorised supplier of ${authorised.join(', ')}. Every other maker's products we supply to order.`
+        : "Supply (claims about us): we supply every maker's products to order.",
+      `Date of writing: ${new Date().toISOString().slice(0, 7)} — date catalogue prices and counts with this month, in the article's language.`,
+      'Never write that we import, distribute, stock, hold a warehouse for, partner with or buy directly from a maker, and never state a delivery time, stock level or warranty, unless this business context or our page facts say so.',
+    ],
   };
 }
 

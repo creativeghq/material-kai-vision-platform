@@ -6772,6 +6772,66 @@
             "desc": "Required with a user JWT; ignored in cron mode."
           }
         ]
+      },
+      {
+        "name": "lessons",
+        "summary": "Compare a published article with the draft we generated and propose general lessons (glossary pairs and rules) from what the editor changed. Proposals are stored in seo_writer_lessons for a member to approve or dismiss; approved ones reach the writer and the reviewer of every later article. Billed per run (one Sonnet call). 409 when the article is not published on its website yet.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The article, which the caller must be able to access."
+          }
+        ]
+      },
+      {
+        "name": "suggestions",
+        "summary": "Propose concrete edits to an article (Article Suggestions): one insert or replace per open reader expectation (coverage check, latest answer check) and per paragraph-scoped analyzer fix, at most 12. Each proposal is validated against the current text (its anchor must occur exactly once) and stored in stages_data.extra.suggestions as pending, replacing older pending ones. Billed: credits reserved before the model call, settled after, refunded on failure.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The article to propose edits for."
+          }
+        ]
+      },
+      {
+        "name": "suggestion_apply",
+        "summary": "Apply one pending suggestion. Re-validates it against the current article (409 if its anchor moved or is no longer unique), snapshots the previous body so revert_fix undoes it, marks it applied and re-runs the analysis. Free.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The article."
+          },
+          {
+            "name": "suggestion_id",
+            "type": "string",
+            "required": true,
+            "desc": "The suggestion to apply."
+          }
+        ]
+      },
+      {
+        "name": "suggestion_dismiss",
+        "summary": "Dismiss one pending suggestion so it is not proposed again. Free.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The article."
+          },
+          {
+            "name": "suggestion_id",
+            "type": "string",
+            "required": true,
+            "desc": "The suggestion to dismiss."
+          }
+        ]
       }
     ],
     "request": {

@@ -112,12 +112,36 @@ export function countSiteLinks(markdown: string, siteUrl?: string | null): numbe
  * site only if it names a live page, and only its first link. An offending link is unwrapped to its
  * anchor text, so the sentence survives. Links to other sites are not ours to judge here.
  */
+/** Government, EU and standards-body sites: the only links an article may make outside its own site. */
+const OFFICIAL_HOST = /(^|\.)(gov|gouv|gob|govt)(\.[a-z]{2,3})?$|\.gov\.[a-z]{2}$|(^|\.)(europa\.eu|iso\.org|cen\.eu|cenelec\.eu|iec\.ch|din\.de|elot\.gr|bsigroup\.com|ansi\.org)$/;
+
+export function isOfficialHost(host: string | null): boolean {
+  return !!host && OFFICIAL_HOST.test(host);
+}
+
+/**
+ * The anchor names something (a capitalised name, not its first word) that the target page's title
+ * and URL never mention: «πλακάκια στο Ρέθυμνο» pointing at the Athens copy of a page.
+ */
+export function anchorNamesOtherPlace(anchor: string, target: string): boolean {
+  const fold = (x: string) => x.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  const haystack = fold(target);
+  const words = anchor.trim().split(/\s+/).slice(1);
+  return words.some((w) => {
+    const clean = w.replace(/[^\p{L}]/gu, '');
+    if (clean.length < 4 || clean[0] !== clean[0].toUpperCase() || clean[0] === clean[0].toLowerCase()) return false;
+    return !haystack.includes(fold(clean).slice(0, 5));
+  });
+}
+
 export function applySiteAssetRules(
   markdown: string,
   siteHost: string,
   livePages: Set<string>,
   /** Offered photo URL → the description it is published with (its checked alt). */
   photos: Map<string, string>,
+  /** Our page URL (no trailing slash) → its title, for checking what an anchor names. */
+  titles: Map<string, string> = new Map(),
 ): { markdown: string; removedImages: number; unlinked: number } {
   let removedImages = 0;
   let unlinked = 0;
@@ -135,8 +159,17 @@ export function applySiteAssetRules(
   if (removedImages) out = out.replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, '\n\n');
   const linked = new Set<string>();
   out = out.replace(LINK_RE, (link, text: string, url: string) => {
-    if (hostOf(url) !== siteHost) return link;
+    if (hostOf(url) !== siteHost) {
+      if (isOfficialHost(hostOf(url))) return link;
+      unlinked += 1;
+      return text;
+    }
     const key = trimSlash(url);
+    const title = titles.get(key);
+    if (title && anchorNamesOtherPlace(text, `${title} ${key}`)) {
+      unlinked += 1;
+      return text;
+    }
     if (livePages.has(key) && !linked.has(key)) {
       linked.add(key);
       return link;

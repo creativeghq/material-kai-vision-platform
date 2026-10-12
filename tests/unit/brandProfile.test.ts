@@ -48,7 +48,8 @@ describe('a profile we could not read is not an empty profile', () => {
   it('returns the brief untouched on error', () => {
     // Writing defaults we failed to load would be inventing provenance — the one field where an
     // invented value is worse than an absent one.
-    expect(BRIEF).toMatch(/if \(error \|\| !p\) return brief;/);
+    // The supply context is not a profile default: it comes from the CRM and defaults to the safe claim.
+    expect(BRIEF).toContain('if (error || !p) return withSupplyContext(supabase, workspaceId, brief);');
   });
 });
 
