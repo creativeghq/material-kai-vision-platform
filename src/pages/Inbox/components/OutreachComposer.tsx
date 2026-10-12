@@ -21,7 +21,9 @@ const NEXT_GAP = [3, 5, 7, 14, 14];
 const BUSINESS_HOURS_KEY = 'inbox.followup.businessHours';
 
 function readBusinessHours(): boolean {
-  try { return localStorage.getItem(BUSINESS_HOURS_KEY) !== 'off'; } catch { return true; }
+  let stored: string | null = null;
+  try { stored = localStorage.getItem(BUSINESS_HOURS_KEY); } catch { stored = null; }
+  return stored !== 'off';
 }
 
 /** Write a follow-up chain: what each step says and when it goes, unless they reply first. */
