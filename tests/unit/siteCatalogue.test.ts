@@ -76,3 +76,19 @@ describe('source guards', () => {
     expect(src).toMatch(/serpValue\(k, 80\)/);
   });
 });
+
+describe('the catalogue facts budget', () => {
+  it('keeps the first link target whole and drops later ones once the facts would be too long', () => {
+    const big = (i: number): CatalogueSummary => ({
+      ...SUMMARY,
+      category_url: `https://tiles.example/el/c${i}`,
+      attributes: Object.fromEntries(Array.from({ length: 20 }, (_, k) => [`Label ${k}`, {
+        present: 50, distinct: 12, values: Object.fromEntries(Array.from({ length: 12 }, (_, v) => [`value ${v} ${'x'.repeat(20)}`, 4])),
+      }])),
+    });
+    const text = renderCatalogueFacts(Array.from({ length: 14 }, (_, i) => big(i)), new Date())!;
+    expect(text).toContain('tiles.example/el/c0');
+    expect(text).not.toContain('tiles.example/el/c13');
+    expect(text.length).toBeLessThan(20_000);
+  });
+});

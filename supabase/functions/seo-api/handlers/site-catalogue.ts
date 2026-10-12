@@ -16,6 +16,8 @@ const MAX_CATEGORIES = 16;
 const VALUES_PER_LABEL = 12;
 const LABELS_PER_CATEGORY = 20;
 const MAX_PRODUCT_LINES = 30;
+/** The facts ride on every writer and reviewer call, so they get a total budget; link targets come first. */
+const MAX_CATALOGUE_CHARS = 9000;
 
 /** One category's summary as prompt lines; empty when no member page states a spec. */
 export function catalogueSummaryLines(s: CatalogueSummary): string[] {
@@ -39,8 +41,16 @@ export function catalogueSummaryLines(s: CatalogueSummary): string[] {
 }
 
 export function renderCatalogueFacts(summaries: CatalogueSummary[], countedOn: Date): string | null {
-  const bodies = summaries.map(catalogueSummaryLines).filter((l) => l.length);
-  if (!bodies.length) return null;
+  const all = summaries.map(catalogueSummaryLines).filter((l) => l.length);
+  if (!all.length) return null;
+  const bodies: string[][] = [];
+  let size = 0;
+  for (const lines of all) {
+    const n = lines.join('\n').length;
+    if (bodies.length && size + n > MAX_CATALOGUE_CHARS) continue;
+    bodies.push(lines);
+    size += n;
+  }
   return [
     `CATALOGUE FACTS (counted from our own pages on ${countedOn.toISOString().slice(0, 10)})`,
     'Each count is how many of our product pages state that value, exactly as the page words it. Value (count).',

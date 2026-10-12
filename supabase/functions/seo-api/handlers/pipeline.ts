@@ -711,7 +711,7 @@ async function runLateStages(ctx: {
     creditsByStage.coverage = coverage.credits;
     await updateArticle(supabase, articleId, { coverage }, coverage.failed
       ? `Coverage check did not run: ${coverage.failed}`
-      : `Coverage: ${coverage.missing.length} of ${coverage.checked} reader expectations not answered`);
+      : `Coverage: ${coverage.missing.length} reader expectations not answered across ${coverage.checked} sources checked`);
 
     const scored = await callStage('analyze', req, {
       article_plan: plan,
