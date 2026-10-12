@@ -304,31 +304,40 @@ export function useInboxPage() {
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
   useEffect(() => { setSelectedIds(new Set()); }, [listRequest]);
 
-  const runBulkAction = useCallback(async (action: 'read' | 'done' | 'open' | 'archive' | 'label' | 'assign_me' | 'follow_up', labelId?: string, plan?: SendFollowUpPlan) => {
+  const runBulkAction = useCallback(async (action: 'read' | 'done' | 'open' | 'archive' | 'restore' | 'delete_forever' | 'label' | 'assign_me' | 'follow_up', labelId?: string, plan?: SendFollowUpPlan) => {
     const byId = new Map(threads.map((t) => [t.id, t]));
     const onThread = (id: string) => (byId.get(id)?.assignees ?? []).some((a) => a.user_id === myUserId);
-    const ids = action === 'read' ? [...selectedIds].filter(onThread) : [...selectedIds];
+    const ownWorkspace = (id: string) => byId.get(id)?.workspace_id === activeWorkspaceId;
+    const ids = action === 'read' ? [...selectedIds].filter(onThread)
+      : action === 'delete_forever' ? [...selectedIds].filter(ownWorkspace)
+      : [...selectedIds];
     const skipped = selectedIds.size - ids.length;
     if (bulkBusy || !selectedIds.size) return;
     if (!ids.length) {
-      toast({ title: 'Nothing to mark read', description: 'You are not on any of these conversations, so they have no read state for you.' });
+      toast(action === 'read'
+        ? { title: 'Nothing to mark read', description: 'You are not on any of these conversations, so they have no read state for you.' }
+        : { title: 'Nothing to delete', description: 'None of these conversations belong to this workspace.' });
       return;
     }
     setBulkBusy(true);
-    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Archived', label: 'Labelled', assign_me: 'Assigned to you', follow_up: 'Follow-up set' } as const;
+    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Deleted', restore: 'Restored', delete_forever: 'Deleted permanently', label: 'Labelled', assign_me: 'Assigned to you', follow_up: 'Follow-up set' } as const;
     try {
       const r = await runBulk(ids, (id) => {
         if (action === 'read') return inboxApi.markRead(id);
         if (action === 'done') return inboxApi.setStatus(id, 'closed');
         if (action === 'open') return inboxApi.setStatus(id, 'open');
         if (action === 'archive') return inboxApi.archiveThread(id);
+        if (action === 'restore') return inboxApi.restoreThread(id);
+        if (action === 'delete_forever') return inboxApi.deleteThreadForever(id);
         if (action === 'follow_up') return plan ? applyPlatformPlan(id, plan) : Promise.reject(new Error('No follow-up chosen'));
         if (action === 'assign_me') return myUserId ? inboxApi.setAssignee(id, myUserId) : Promise.reject(new Error('Not signed in'));
         const current = (byId.get(id)?.labels ?? []).map((l) => l.id);
         return current.includes(labelId as string) ? Promise.resolve() : inboxApi.setThreadLabels(id, [...current, labelId as string]);
       });
       const summary = bulkSummary(verbs[action], r);
-      const skipNote = skipped ? `${skipped} skipped: you are not on them.` : undefined;
+      const skipNote = !skipped ? undefined
+        : action === 'delete_forever' ? `${skipped} skipped: they belong to another workspace.`
+        : `${skipped} skipped: you are not on them.`;
       toast({
         title: summary.title,
         description: [summary.description, skipNote].filter(Boolean).join(' ') || undefined,
@@ -337,7 +346,7 @@ export function useInboxPage() {
       setSelectedIds(new Set(r.failed.map((f) => f.id)));
       await loadThreads({ silent: true });
     } finally { setBulkBusy(false); }
-  }, [selectedIds, bulkBusy, threads, myUserId, toast, loadThreads]);
+  }, [selectedIds, bulkBusy, threads, myUserId, activeWorkspaceId, toast, loadThreads]);
 
   const loadMoreThreads = useCallback(async () => {
     if (!nextCursor || loadingMore) return;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlarmClock, Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
+import { AlarmClock, Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, ArchiveRestore, Trash2, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
 import { visibleModes, modeSources } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/core/ui/alert-dialog';
 import { labelDot } from '../inboxFormat';
 import { FilterBar } from '@/components/core/filters';
 import { inboxSourceMeta, inboxThreadSource, SOURCE_FILTER_ORDER } from '../inboxSource';
@@ -69,6 +70,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     setSelectedIds,
     runBulkAction,
     bulkBusy,
+    canManageLabels,
     wsLabels,
     sourceCounts,
     threadDisplayName,
@@ -166,8 +168,38 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             )}
             <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('assign_me')}>Assign to me</Button>
             {view !== 'archived' && <BulkFollowUp disabled={bulkBusy} onPlan={(plan) => runBulkAction('follow_up', undefined, plan)} />}
-            {view !== 'archived' && (
-              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('archive')}>Archive</Button>
+            {view !== 'archived' ? (
+              <Button size="sm" variant="outline" className="h-7 text-xs hover:text-destructive" disabled={bulkBusy} title="Delete — moves to Archived for 30 days, then permanently removed" onClick={() => runBulkAction('archive')}>
+                <Trash2 className="w-3.5 h-3.5 mr-1" />Delete
+              </Button>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkBusy} onClick={() => runBulkAction('restore')}>
+                  <ArchiveRestore className="w-3.5 h-3.5 mr-1" />Restore
+                </Button>
+                {canManageLabels && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="h-7 text-xs text-destructive hover:text-destructive" disabled={bulkBusy}>
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />Delete forever
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {selectedIds.size} conversation{selectedIds.size === 1 ? '' : 's'} permanently?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Every message, note and attachment in them is removed now and cannot be restored.
+                          It only leaves this Inbox: the other person still has their copy.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => { void runBulkAction('delete_forever'); }}>Delete forever</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
             )}
             {bulkBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
             <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={clearSelection}>Clear</Button>
