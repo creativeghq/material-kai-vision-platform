@@ -24,6 +24,7 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts';
 import { refundStage, reserveStage, serviceCredits, settleStage, type StageWallet } from './stage-billing.ts';
 import { countryForLocation, marketForCountry } from './market.ts';
+import { guideQuery, readerQuestions } from './reader-questions.ts';
 
 const SERP_SIGNALS_SERVICE = 'seo-serp-signals';
 const FIRECRAWL_SERVICE = 'firecrawl-scrape';
@@ -44,6 +45,7 @@ async function dataforseoCredentials(supabase: { from: (t: string) => any }): Pr
 }
 
 const READ_PAGES_LIMIT = 5;
+const GUIDE_PAGES_LIMIT = 4;
 
 /** Ceiling on provider-reported DataForSEO spend for one research run, in $0.001 units (measured ~135). */
 const DATAFORSEO_CEILING_UNITS = 400;
@@ -53,7 +55,7 @@ async function researchCeiling(supabase: DbClient, readPages: boolean): Promise<
   const parts = await Promise.all([
     serviceCredits(supabase, DATAFORSEO_SERVICE, DATAFORSEO_CEILING_UNITS),
     serviceCredits(supabase, SERP_SIGNALS_SERVICE, 1),
-    serviceCredits(supabase, FIRECRAWL_SERVICE, readPages ? READ_PAGES_LIMIT : 0),
+    serviceCredits(supabase, FIRECRAWL_SERVICE, readPages ? READ_PAGES_LIMIT + GUIDE_PAGES_LIMIT : 0),
   ]);
   return parts.some((p) => p === null) ? 80 : Math.ceil(parts.reduce<number>((s, p) => s + (p ?? 0), 0));
 }
@@ -139,7 +141,8 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     // DataForSEO research and MIVAA SERP signals (PAA, AI Overview, related searches) IN PARALLEL.
     const client = new DataForSEOClient(dfs.login, dfs.password);
     const countryCode = countryForLocation(locationCode) ?? 'US';
-    const [research, serpSignals] = await Promise.all([
+    const guideForm = guideQuery(body.target_keyword, languageCode);
+    const [research, serpSignals, aiMode, guideSerp] = await Promise.all([
       client.researchKeyword(
         body.target_keyword,
         body.topic,
@@ -156,7 +159,23 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
         console.warn(`[seo-research] opportunities enrichment failed: ${(e as Error).message}`);
         return null;
       }),
+      client.aiModeAnswer(body.target_keyword, locationCode, languageCode).catch((e) => {
+        console.warn(`[seo-research] AI Mode answer unavailable: ${(e as Error).message}`);
+        return undefined;
+      }),
+      readPages
+        ? client.serpOrganic(guideForm, locationCode, languageCode).catch((e) => {
+          console.warn(`[seo-research] guide-form SERP unavailable: ${(e as Error).message}`);
+          return [];
+        })
+        : Promise.resolve([]),
     ]);
+
+    research.aiModeAnswer = aiMode;
+    research.readerQuestions = readerQuestions(
+      research.clusters.flatMap((c) => [c.primaryKeyword, ...c.secondaryKeywords]).filter(Boolean),
+      languageCode,
+    );
 
     if (serpSignals) {
       research.serpSignals = serpSignals;
@@ -192,6 +211,15 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
         `[seo-research] ranking pages: ${ranking.read} read, ${ranking.failed} failed, ` +
         `${ranking.common.length} shared subtopics, median ${ranking.medianWordCount ?? 'n/a'} words`,
       );
+
+      // Where the topic's own results are shops, its "how to choose" results are the guides readers learn from.
+      const alreadyRead = new Set(targets.map((t) => t.url));
+      const guideTargets = guideSerp.filter((c) => !!c.url && !alreadyRead.has(c.url)).map((c) => ({ url: c.url, position: c.position }));
+      if (guideTargets.length) {
+        const guides = await readRankingPages(guideTargets, { limit: GUIDE_PAGES_LIMIT });
+        research.guideContent = { ...guides, query: guideForm };
+        pagesRead += guides.read;
+      }
     }
 
     // File under the connected website: explicit body.website_id, else the workspace default.

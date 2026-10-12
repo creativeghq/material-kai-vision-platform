@@ -19,6 +19,7 @@ import { latinTerms } from './foreign-words.ts';
 
 import { marketForCountry } from './market.ts';
 import { reviewArticle } from './review.ts';
+import { checkCoverage, mustCoverFrom } from './coverage.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { PHOTOS_PER_PAGE } from './site-pages.ts';
 import { PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, PHOTO_VERIFY_MODEL, type PhotoUsage } from './photo-verify.ts';
@@ -660,6 +661,15 @@ async function runLateStages(ctx: {
     }, reviewed.report.failed
       ? `Review did not run: ${reviewed.report.failed}`
       : `Reviewed: ${reviewed.report.applied.length} corrections applied (${correctedPhotos.size} photo descriptions), ${reviewed.report.skipped.length} could not be placed`);
+
+    const coverage = await checkCoverage(supabase, {
+      text: finalMarkdown, mustCover: mustCoverFrom(research), languageCode: resume.language_code, userId, workspaceId,
+    });
+    totalCredits += coverage.credits;
+    creditsByStage.coverage = coverage.credits;
+    await updateArticle(supabase, articleId, { coverage }, coverage.failed
+      ? `Coverage check did not run: ${coverage.failed}`
+      : `Coverage: ${coverage.missing.length} of ${coverage.checked} reader expectations not answered`);
 
     const scored = await callStage('analyze', req, {
       article_plan: plan,

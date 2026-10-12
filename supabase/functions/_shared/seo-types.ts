@@ -151,6 +151,12 @@ export interface KeywordResearchResult {
   serpSignals?: SerpSignalBlob;
   /** The ranking pages, read. Absent when the reader was not run for this research. */
   rankingContent?: RankingContent;
+  /** Searches phrased as questions or comparisons, most-searched first. */
+  readerQuestions?: string[];
+  /** Google AI Mode's answer for the keyword; null when Google gave none, absent when not asked. */
+  aiModeAnswer?: { text: string; references: { url: string; domain: string; title: string }[] } | null;
+  /** The guides that rank for the topic's "how to choose" form, read. */
+  guideContent?: RankingContent & { query: string };
 }
 
 // ════════════════════════════════════════════════════════════════

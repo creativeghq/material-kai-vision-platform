@@ -19,6 +19,7 @@ import { handleScoreUrl } from './handlers/score-url.ts';
 import { handleCitability } from './handlers/citability.ts';
 import { handleLlmMentions } from './handlers/llm-mentions.ts';
 import { handleAiKeywordVolume } from './handlers/ai-keyword-volume.ts';
+import { handleAnswerCheck } from './handlers/answer-check.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   research: handleResearch,
@@ -37,6 +38,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   citability: handleCitability,
   llm_mentions: handleLlmMentions,
   ai_keyword_volume: handleAiKeywordVolume,
+  answer_check: handleAnswerCheck,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {

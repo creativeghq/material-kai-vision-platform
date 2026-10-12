@@ -96,7 +96,7 @@ describe('the reader is actually wired in', () => {
     // exercises until it is wrong.
     expect(src.match(/reserveStage\(/g) ?? []).toHaveLength(1);
     expect(src).not.toMatch(/rpc\(\s*\n?\s*'debit_credits'/);
-    expect(src).toMatch(/serviceCredits\(supabase, FIRECRAWL_SERVICE, readPages \? READ_PAGES_LIMIT : 0\)/);
+    expect(src).toMatch(/serviceCredits\(supabase, FIRECRAWL_SERVICE, readPages \? READ_PAGES_LIMIT \+ GUIDE_PAGES_LIMIT : 0\)/);
     expect(src).toMatch(/serviceCredits\(supabase, FIRECRAWL_SERVICE, pagesRead\)/);
     // Declared outside the try, because the refund lives in the catch.
     const declare = src.indexOf('let reserved = 0;');

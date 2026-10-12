@@ -383,6 +383,34 @@ Sections only ONE of them has (an angle nobody else took):
 ${rc.note} Plan from the keyword and SERP data below, and do not assert what competitors cover.`
       : '';
 
+  const aiModeSection = research.aiModeAnswer?.text
+    ? `
+
+=== GOOGLE AI MODE'S ANSWER (what an answer engine tells readers today) ===
+${serpValue(research.aiModeAnswer.text, 3000)}
+MUST COVER: every point this answer makes is a point the article covers, in its own words and with our facts where we have them.`
+    : '';
+
+  const questionsSection = research.readerQuestions?.length
+    ? `
+
+=== QUESTIONS READERS SEARCH (most-searched first) ===
+  - ${research.readerQuestions.slice(0, 15).map((q) => serpValue(q, 200)).join('\n  - ')}
+MUST COVER: answer each one in the body or the FAQ; never name a shop, retailer or brand we do not carry.`
+    : '';
+
+  const gc = research.guideContent;
+  const guideSection = gc && gc.read > 0
+    ? `
+
+=== WHAT THE GUIDES COVER (read from ${gc.read} page(s) ranking for "${serpValue(gc.query, 200)}") ===
+Sections most of them have:
+  - ${gc.common.slice(0, 15).map((c) => `${serpValue(c.label, 200)} — on ${c.pages} of ${gc.read}`).join('\n  - ') || 'none shared'}
+Sections only one has:
+  - ${gc.distinctive.slice(0, 10).map((c) => serpValue(c.label, 200)).join('\n  - ') || 'none'}
+MUST COVER the shared ones. Never cite, link or name these sites.`
+    : '';
+
   const intentSection = signals?.keywordIntents && Object.keys(signals.keywordIntents).length
     ? `
 
@@ -416,7 +444,7 @@ ${competitorHeadings}
 
 === PEOPLE ALSO ASK ===
   - ${paaList}
-${rankingSection}${aiOverviewSection}${featuredSnippetSection}${relatedSection}${paaSection}${intentSection}`)}
+${rankingSection}${guideSection}${aiOverviewSection}${aiModeSection}${questionsSection}${featuredSnippetSection}${relatedSection}${paaSection}${intentSection}`)}
 
 === TOTAL ADDRESSABLE VOLUME ===
 ${research.totalAddressableVolume} monthly searches across all related keywords

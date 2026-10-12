@@ -435,6 +435,30 @@ export class DataForSEOClient {
   }
 
   /** 5. SERP Regular — top 10 organic competitors */
+  /** Google AI Mode's answer for a query: the generative answer readers see. Null when Google gives none. */
+  async aiModeAnswer(
+    keyword: string,
+    locationCode: number,
+    languageCode: string,
+  ): Promise<{ text: string; references: { url: string; domain: string; title: string }[] } | null> {
+    const data = await this.apiCall('/serp/google/ai_mode/live/advanced', [
+      { keyword, location_code: locationCode, language_code: languageCode },
+    ]);
+    const item = (data?.tasks?.[0]?.result?.[0]?.items || []).find((i: any) => i?.markdown || i?.items?.length);
+    if (!item) return null;
+    const text = String(item.markdown || (item.items || []).map((s: any) => s?.text || '').join('\n')).trim();
+    if (!text) return null;
+    const references = (item.references || []).slice(0, 10).map((r: any) => ({
+      url: String(r?.url || ''), domain: String(r?.domain || ''), title: String(r?.title || ''),
+    }));
+    return { text: text.slice(0, 4000), references };
+  }
+
+  /** The organic results for any query (the guide form of a topic, for instance). */
+  serpOrganic(keyword: string, locationCode: number, languageCode: string): Promise<CompetitorData[]> {
+    return this.getSerpRegular(keyword, locationCode, languageCode);
+  }
+
   private async getSerpRegular(
     keyword: string,
     locationCode: number,

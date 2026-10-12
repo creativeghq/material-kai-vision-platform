@@ -6734,6 +6734,18 @@
             "desc": "Defaults to en."
           }
         ]
+      },
+      {
+        "name": "answer_check",
+        "summary": "Check a published article against Google AI Mode's answer for its keyword: whether our domain is cited, and which points the live page does not cover. Stores one seo_article_answer_checks row per check. JWT: one article the caller can access (article_id). x-cron-secret: the weekly batch of articles not checked in 7 days. Billed per check (AI Mode call + coverage check).",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": false,
+            "desc": "Required with a user JWT; ignored in cron mode."
+          }
+        ]
       }
     ],
     "request": {
