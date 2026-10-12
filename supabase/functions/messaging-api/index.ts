@@ -32,7 +32,9 @@ import {
 } from '../_shared/whatsapp-templates.ts';
 import { checkChannelSeat } from '../_shared/channel-seats.ts';
 import { reconcileWaba } from '../_shared/whatsapp-cost-reconcile.ts';
-import { billChannelsForMonth, retryFailedCharges } from '../_shared/channel-recurring-billing.ts';
+import {
+  attributeProfileNumbers, billChannelsForMonth, periodMonth, recurringCredits, retryFailedCharges,
+} from '../_shared/channel-recurring-billing.ts';
 import {
   zernioApi,
   zernioKey,
@@ -52,6 +54,7 @@ import {
   purchasePhoneNumber,
   releasePhoneNumber,
   assertOwnProfile,
+  listPurchasableCountries,
 } from '../_shared/zernio-phone-numbers.ts';
 
 interface SendMessageRequest {
@@ -238,12 +241,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
       'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
       'open-whatsapp-thread', 'sync-avatars', 'zernio-probe', 'generate-avatar-cast',
-      // Buying a number puts a recurring charge on the OPERATOR's Zernio/Stripe subscription and
-      // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
-      // platform's money and the platform's lifecycle, so they sit with the other operator
-      // actions. Searching availability and listing what a workspace already has are reads.
-      // 'release-phone-number' is deliberately absent.
-      'purchase-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
       // 'retry-failed-charges' is deliberately absent for the same reason as release: a
@@ -1029,73 +1026,104 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         return jsonResponse({ success: true, numbers, profile_id: profileId });
       }
 
+      case 'phone-number-countries': {
+        const countries = await listPurchasableCountries(supabaseClient);
+        return jsonResponse({
+          success: true,
+          countries: countries.map((c) => ({ ...c, monthly_credits: recurringCredits(c.monthlyCents / 100, 1) })),
+        });
+      }
+
+      case 'phone-number-kyc-link': {
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        if (!isAdminAccess(auth)) {
+          const { data: role } = await supabaseClient
+            .from('workspace_members').select('role')
+            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
+          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
+            throw new HttpError(403, 'Only a workspace owner or admin can start a number verification');
+          }
+        }
+        const country = String(requestBody.country ?? '').trim().toUpperCase();
+        if (!/^[A-Z]{2}$/.test(country)) throw new HttpError(400, 'country is required');
+        const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
+        await assertOwnProfile(supabaseClient, wsId, profileId);
+        const res = await zernioApi('POST', '/phone-numbers/kyc/share', {
+          profileId,
+          country,
+          ...(requestBody.areaCode ? { areaCode: String(requestBody.areaCode) } : {}),
+          language: 'en',
+        });
+        const data = res?.data ?? res;
+        if (!data?.url) throw new HttpError(502, 'Zernio did not return a verification link');
+        return jsonResponse({ success: true, url: data.url, expires_at: data.expiresAt ?? null });
+      }
+
       case 'purchase-phone-number': {
         const { country, numberType, areaCode, wantsSms, purchaseIntentId } = requestBody;
         const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
 
+        if (!isAdminAccess(auth)) {
+          const { data: role } = await supabaseClient
+            .from('workspace_members').select('role')
+            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
+          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
+            throw new HttpError(403, 'Only a workspace owner or admin can buy a number');
+          }
+        }
+        if (!auth.userId) throw new HttpError(400, 'A signed-in owner or admin is needed to pay for the number');
+
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
-        // Never spend into a profile this workspace shares with other tenants.
         await assertOwnProfile(supabaseClient, wsId, profileId);
 
+        const offer = (await listPurchasableCountries(supabaseClient))
+          .find((c) => c.code === String(country ?? '').trim().toUpperCase());
+        if (!offer) throw new HttpError(400, 'Numbers are not offered for that country.');
+        const firstMonthCredits = recurringCredits(offer.monthlyCents / 100, 1);
+        const month = periodMonth(new Date());
+
+        const { data: debitData, error: debitErr } = await supabaseClient.rpc('debit_credits', {
+          p_user_id: auth.userId,
+          p_amount: firstMonthCredits,
+          p_operation_type: 'phone_number_first_month',
+          p_description: `WhatsApp number (${offer.code}): ${month.slice(0, 7)}`,
+          p_metadata: { country: offer.code, monthly_cents: offer.monthlyCents, month },
+          p_workspace_id: wsId,
+        });
+        const debit = Array.isArray(debitData) ? debitData[0] : debitData;
+        if (debitErr || !debit?.success) {
+          throw new HttpError(402, debit?.error_message ?? `Not enough credits: the first month is ${firstMonthCredits} credits.`);
+        }
+        const refund = async (reason: string) => {
+          const { error } = await supabaseClient.rpc('refund_credits', {
+            p_user_id: auth.userId,
+            p_amount: firstMonthCredits,
+            p_operation_type: 'phone_number_first_month_refund',
+            p_description: `Refund: WhatsApp number not provisioned (${reason})`,
+            p_metadata: { country: offer.code, reason },
+            p_workspace_id: wsId,
+          });
+          if (error) console.error('[messaging-api] first-month refund FAILED', wsId, error.message);
+        };
+
+        let outcome: Awaited<ReturnType<typeof purchasePhoneNumber>>;
         try {
-          const outcome = await purchasePhoneNumber(supabaseClient, {
+          outcome = await purchasePhoneNumber(supabaseClient, {
             profileId,
             country,
             numberType,
             areaCode,
             wantsSms: Boolean(wantsSms),
-            // A number bought from inside the WhatsApp screen is for WhatsApp. Buying one that
-            // then has to be connected by hand is the same dead end in two steps.
             connectWhatsapp: true,
             wantsWhatsapp: true,
             purchaseIntentId,
           });
-          // Record it against the workspace that will be billed. Only on a completed purchase —
-          // a checkout URL means nothing exists yet, and a row for a number that was never paid
-          // for is a phantom line on somebody's invoice.
-          const attributionErrors: string[] = [];
-          if (outcome.kind === 'done') {
-            const owned = await listPhoneNumbers(supabaseClient, profileId);
-            for (const n of owned.filter((x) => !x.broughtYourOwn)) {
-              const { error: attrErr } = await supabaseClient.from('workspace_phone_numbers').upsert({
-                workspace_id: wsId,
-                zernio_number_id: n.id,
-                phone_number: n.phoneNumber,
-                country: n.country,
-                // What Zernio charges US. The tenant price is derived from it at billing time;
-                // storing both would be two copies of one money quantity.
-                monthly_cents: n.monthlyCents,
-                status: n.status ?? 'active',
-                purchased_by: auth.userId ?? null,
-              }, { onConflict: 'zernio_number_id' });
-              // The number is already bought and already costing us money. A failed attribution
-              // row means a recurring charge with NOBODY to bill it to, and the purchase cannot
-              // be un-done to make that safe — so it is reported loudly rather than swallowed
-              // behind a success the operator would never question.
-              if (attrErr) {
-                console.error('[messaging-api] phone number attribution FAILED', n.id, attrErr);
-                attributionErrors.push(`${n.phoneNumber}: ${attrErr.message}`);
-              }
-            }
-          }
-          return jsonResponse({
-            success: true,
-            workspace_id: wsId,
-            profile_id: profileId,
-            ...outcome,
-            ...(attributionErrors.length
-              ? {
-                  warning: 'The number was purchased but could not be attributed to this workspace '
-                    + 'for billing. It is costing the platform money with nobody to bill — fix the '
-                    + 'workspace_phone_numbers row before the next invoice.',
-                  attribution_errors: attributionErrors,
-                }
-              : {}),
-          });
         } catch (err) {
-          // Zernio's specific refusals are actionable and a generic 500 throws that away.
+          await refund('purchase refused');
           const status = (err as { status?: number })?.status;
           const text = err instanceof Error ? err.message : String(err);
           if (status === 402) {
@@ -1109,6 +1137,34 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           }
           throw err;
         }
+
+        if (outcome.kind !== 'done') {
+          // Nothing exists yet (KYC or checkout pending). The first month is charged when the
+          // number activates (zernio-webhook-handler), never for a number that may not arrive.
+          await refund(outcome.kind);
+          return jsonResponse({ success: true, workspace_id: wsId, profile_id: profileId, charged_credits: 0, ...outcome });
+        }
+
+        const { inserted, errors: attributionErrors } = await attributeProfileNumbers(supabaseClient, wsId, profileId, auth.userId);
+        if (inserted.length) {
+          const { error: stampErr } = await supabaseClient.from('workspace_phone_numbers')
+            .update({ prepaid_through: month }).in('zernio_number_id', inserted);
+          if (stampErr) attributionErrors.push(`prepaid month not recorded: ${stampErr.message}`);
+        }
+        return jsonResponse({
+          success: true,
+          workspace_id: wsId,
+          profile_id: profileId,
+          charged_credits: firstMonthCredits,
+          ...outcome,
+          ...(attributionErrors.length
+            ? {
+                warning: 'The number was purchased but could not be fully recorded against this workspace '
+                  + 'for billing. Fix the workspace_phone_numbers row before the next invoice.',
+                attribution_errors: attributionErrors,
+              }
+            : {}),
+        });
       }
 
       case 'release-phone-number': {

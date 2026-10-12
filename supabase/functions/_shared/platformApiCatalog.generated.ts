@@ -2768,6 +2768,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "reconcile-whatsapp-costs",
           "search-phone-numbers",
           "list-phone-numbers",
+          "phone-number-countries",
+          "phone-number-kyc-link",
           "purchase-phone-number",
           "release-phone-number",
           "plan-status",

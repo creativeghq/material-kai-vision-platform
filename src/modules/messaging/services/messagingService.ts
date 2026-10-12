@@ -605,6 +605,21 @@ export class MessagingService {
    * lets the composer's own 24-hour-window rules apply, rather than a CRM button re-implementing
    * them or a green tick claiming something we cannot know.
    */
+  async phoneNumberCountries(): Promise<Array<{ code: string; monthlyCents: number; monthly_credits: number; needsKyc: boolean }>> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', { body: { action: 'phone-number-countries' } });
+    if (error) throw error;
+    return (data?.countries ?? []) as Array<{ code: string; monthlyCents: number; monthly_credits: number; needsKyc: boolean }>;
+  }
+
+  async phoneNumberKycLink(workspaceId: string, country: string, areaCode?: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'phone-number-kyc-link', workspaceId, country, areaCode },
+    });
+    if (error) throw error;
+    if (!data?.url) throw new Error(data?.error || 'No verification link was returned');
+    return data.url as string;
+  }
+
   async whatsAppNumbers(workspaceId: string): Promise<WhatsAppNumber[]> {
     const { data, error } = await supabase
       .from('messaging_channels')

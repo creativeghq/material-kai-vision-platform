@@ -202,3 +202,18 @@ export async function assertOwnProfile(
     throw new Error('The resolved Zernio profile does not belong to this workspace.');
   }
 }
+
+export interface PurchasableCountry { code: string; monthlyCents: number; needsKyc: boolean; tier: number | null }
+
+export async function listPurchasableCountries(supabase: SupabaseLike): Promise<PurchasableCountry[]> {
+  await ensureZernioSecrets(supabase);
+  const data = await zernioApi('GET', '/phone-numbers/countries');
+  return ((data?.countries ?? []) as Array<Record<string, unknown>>)
+    .map((c) => ({
+      code: String(c.code ?? '').toUpperCase(),
+      monthlyCents: Number(c.monthlyCents ?? 0),
+      needsKyc: c.needsKyc === true,
+      tier: typeof c.tier === 'number' ? c.tier : null,
+    }))
+    .filter((c) => c.code && c.monthlyCents > 0);
+}

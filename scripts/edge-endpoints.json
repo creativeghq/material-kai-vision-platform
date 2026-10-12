@@ -4351,8 +4351,39 @@
         "response": "{success:boolean, numbers:[], profile_id:string}"
       },
       {
+        "name": "phone-number-countries",
+        "summary": "Countries a number can be bought in, with the monthly price in credits and whether an identity check is required.",
+        "params": [],
+        "response": "{success:boolean, countries:[{code, monthlyCents, monthly_credits, needsKyc, tier}]}"
+      },
+      {
+        "name": "phone-number-kyc-link",
+        "summary": "Create a Zernio identity-verification link for a country that requires KYC (owner/admin).",
+        "params": [
+          {
+            "name": "workspaceId",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace buying the number"
+          },
+          {
+            "name": "country",
+            "type": "string",
+            "required": true,
+            "desc": "ISO country code"
+          },
+          {
+            "name": "areaCode",
+            "type": "string",
+            "required": false,
+            "desc": "Area code"
+          }
+        ],
+        "response": "{success:boolean, url:string, expires_at:string|null}"
+      },
+      {
         "name": "purchase-phone-number",
-        "summary": "Buy a number at Zernio and file it against the workspace. Reports a warning when the purchase succeeded but the local attribution write did not — the platform must not silently pay for an unattributed number.",
+        "summary": "Buy a number for the workspace (owner/admin). The first month is debited in credits before the purchase and refunded when nothing is issued; a number that needs KYC or checkout is charged when it activates. Warns when the purchase succeeded but the local attribution write did not.",
         "params": [
           {
             "name": "workspaceId",
@@ -4391,7 +4422,7 @@
             "desc": "Idempotency key"
           }
         ],
-        "response": "{success:boolean, workspace_id:string, profile_id:string, warning?:string}"
+        "response": "{success:boolean, workspace_id:string, profile_id:string, charged_credits:number, warning?:string}"
       },
       {
         "name": "release-phone-number",

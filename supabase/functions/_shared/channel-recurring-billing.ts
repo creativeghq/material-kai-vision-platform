@@ -1,5 +1,6 @@
 /** Bill the recurring line the platform records and never charged for: rented phone numbers. */
 import { CREDIT_SALE_PRICE_USD, MARKUP_MULTIPLIER } from './pricing-constants.ts';
+import { listPhoneNumbers } from './zernio-phone-numbers.ts';
 
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = { from: (t: string) => any; rpc: (fn: string, args: Record<string, unknown>) => any };
@@ -121,7 +122,68 @@ async function chargeOne(
  * instead of silently costing money. Paying restores the same line, which is the entire reason
  * this is a status and not a delete.
  */
-async function holdNumbers(
+export async function attributeProfileNumbers(
+  supabase: SupabaseLike,
+  workspaceId: string,
+  profileId: string,
+  purchasedBy: string | null,
+): Promise<{ inserted: string[]; errors: string[] }> {
+  const inserted: string[] = [];
+  const errors: string[] = [];
+  const owned = await listPhoneNumbers(supabase as never, profileId);
+  for (const n of owned.filter((x) => !x.broughtYourOwn)) {
+    const { data: existing, error: lookupErr } = await supabase
+      .from('workspace_phone_numbers').select('id').eq('zernio_number_id', n.id).maybeSingle();
+    if (lookupErr) { errors.push(`${n.phoneNumber}: ${lookupErr.message}`); continue; }
+    if (existing) continue;
+    const { error } = await supabase.from('workspace_phone_numbers').insert({
+      workspace_id: workspaceId,
+      zernio_number_id: n.id,
+      phone_number: n.phoneNumber,
+      country: n.country,
+      monthly_cents: n.monthlyCents,
+      status: n.status ?? 'active',
+      purchased_by: purchasedBy,
+    });
+    if (error) errors.push(`${n.phoneNumber}: ${error.message}`);
+    else inserted.push(n.id);
+  }
+  return { inserted, errors };
+}
+
+export async function chargeFirstMonth(
+  supabase: SupabaseLike,
+  params: { workspaceId: string; billingUserId: string; zernioNumberIds: string[]; now?: Date },
+): Promise<{ ok: boolean; credits: number; error?: string }> {
+  if (!params.zernioNumberIds.length) return { ok: true, credits: 0 };
+  const month = periodMonth(params.now ?? new Date());
+  const { data: rows, error: readErr } = await supabase
+    .from('workspace_phone_numbers').select('id, phone_number, monthly_cents')
+    .eq('workspace_id', params.workspaceId).in('zernio_number_id', params.zernioNumberIds)
+    .is('prepaid_through', null);
+  if (readErr) return { ok: false, credits: 0, error: readErr.message };
+  const due = ((rows ?? []) as Array<{ id: string; phone_number: string; monthly_cents: number | null }>)
+    .filter((r) => (r.monthly_cents ?? 0) > 0);
+  if (!due.length) return { ok: true, credits: 0 };
+  const totalUsd = due.reduce((sum, r) => sum + (r.monthly_cents ?? 0) / 100, 0);
+  const credits = recurringCredits(totalUsd, 1);
+  const { data: debit, error: debitErr } = await supabase.rpc('debit_credits', {
+    p_user_id: params.billingUserId,
+    p_amount: credits,
+    p_operation_type: 'phone_number_first_month',
+    p_description: `WhatsApp number ${due.map((r) => r.phone_number).join(', ')}: ${month.slice(0, 7)}`,
+    p_metadata: { numbers: due.map((r) => r.phone_number), total_cost_usd: totalUsd, month },
+    p_workspace_id: params.workspaceId,
+  });
+  const row = Array.isArray(debit) ? debit[0] : debit;
+  if (debitErr || !row?.success) return { ok: false, credits, error: row?.error_message ?? debitErr?.message ?? 'Insufficient credits' };
+  const { error: stampErr } = await supabase.from('workspace_phone_numbers')
+    .update({ prepaid_through: month }).in('id', due.map((r) => r.id));
+  if (stampErr) return { ok: false, credits, error: `charged but not recorded as prepaid: ${stampErr.message}` };
+  return { ok: true, credits };
+}
+
+export async function holdNumbers(
   supabase: SupabaseLike,
   workspaceId: string,
   reason: string,
@@ -281,10 +343,11 @@ export async function billChannelsForMonth(
     // Numbers are priced from what Zernio actually charges for each one, captured at purchase —
     // a $3 Greek line and a $21 line must not be billed at one blended rate.
     const { data: numbers } = await supabase
-      .from('workspace_phone_numbers').select('phone_number, monthly_cents')
+      .from('workspace_phone_numbers').select('phone_number, monthly_cents, prepaid_through')
       .eq('workspace_id', ws.id).is('released_at', null);
 
-    const owned = (numbers ?? []) as Array<{ phone_number: string; monthly_cents: number | null }>;
+    const owned = ((numbers ?? []) as Array<{ phone_number: string; monthly_cents: number | null; prepaid_through: string | null }>)
+      .filter((n) => !(n.prepaid_through && n.prepaid_through >= month));
     const priced = owned.filter((n) => (n.monthly_cents ?? 0) > 0);
     if (priced.length) {
       const totalUsd = priced.reduce((sum, n) => sum + (n.monthly_cents ?? 0) / 100, 0);

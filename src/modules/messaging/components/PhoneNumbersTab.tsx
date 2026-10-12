@@ -137,6 +137,27 @@ export const PhoneNumbersTab: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
+  const [prices, setPrices] = useState<Record<string, { monthly_credits: number; needsKyc: boolean }>>({});
+  const [kycBusy, setKycBusy] = useState(false);
+  useEffect(() => {
+    messagingService.phoneNumberCountries()
+      .then((rows) => setPrices(Object.fromEntries(rows.map((r) => [r.code, { monthly_credits: r.monthly_credits, needsKyc: r.needsKyc }]))))
+      .catch(() => setPrices({}));
+  }, []);
+  const price = prices[String(country).toUpperCase()];
+
+  const openKycLink = async () => {
+    if (!activeWorkspaceId) return;
+    setKycBusy(true);
+    try {
+      window.open(await messagingService.phoneNumberKycLink(activeWorkspaceId, country, areaCode || undefined), '_blank', 'noopener');
+    } catch (err) {
+      toast({ title: 'Could not create the verification link', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    } finally {
+      setKycBusy(false);
+    }
+  };
+
   // Which countries we offer is DATA (`phone_number_countries`), not a constant: Zernio sells in
   // 54 and which of them this platform is willing to buy in is an operator decision that must not
   // need a deploy. No fallback list — an empty select says "nobody configured this", which is the
@@ -452,9 +473,8 @@ export const PhoneNumbersTab: React.FC = () => {
             <Search className="h-4 w-4" /> Get a number
           </CardTitle>
           <CardDescription>
-            $3–$21 per month depending on the country, charged to the platform&rsquo;s Zernio
-            subscription. WhatsApp is enabled on it automatically — a number you then have to
-            connect by hand is the same dead end in two steps.
+            Charged to this workspace&rsquo;s credits: the first month when the number is issued, then
+            every month until you release it. WhatsApp is enabled on it automatically.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -553,22 +573,28 @@ export const PhoneNumbersTab: React.FC = () => {
             </div>
           )}
 
-          {isOperator ? (
-            <div className="flex items-center gap-3 border-t border-hairline pt-4">
-              <Button onClick={() => void buy()} disabled={buying || !country}>
+          {isWorkspaceManager || isOperator ? (
+            <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-4">
+              <Button onClick={() => void buy()} disabled={buying || !country || !price}>
                 {buying
                   ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Buying…</>
                   : <>Buy a {countries.find(c => c.value === country)?.label ?? country} number</>}
               </Button>
+              {price?.needsKyc && (
+                <Button variant="outline" onClick={() => void openKycLink()} disabled={kycBusy || !country}>
+                  {kycBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Identity check link
+                </Button>
+              )}
               <span className="text-xs text-muted-foreground">
-                Recurring charge. Released any time, from the table above.
+                {price
+                  ? `${price.monthly_credits} credits a month${price.needsKyc ? ' · this country needs an identity check, done on Zernio\'s page, and is charged when the number goes live' : ''}. Release any time from the table above.`
+                  : 'This country is not offered for purchase.'}
               </span>
             </div>
           ) : (
             <div className="border-t border-hairline pt-4 text-sm text-muted-foreground">
-              Checking availability is open to you; buying puts a recurring charge on the platform
-              account, so it is done by a platform administrator. Send them the country and area
-              code you need.
+              Checking availability is open to you; buying a number is done by a workspace owner or admin,
+              because it is a monthly charge on the workspace&rsquo;s credits.
             </div>
           )}
         </CardContent>

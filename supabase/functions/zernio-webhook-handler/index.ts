@@ -1,5 +1,6 @@
 /** Zernio Webhook Handler Edge Function */
 
+import { attributeProfileNumbers, chargeFirstMonth, holdNumbers } from '../_shared/channel-recurring-billing.ts';
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -1491,6 +1492,27 @@ async function handleLeadReceived(supabase: any, payload: any): Promise<{ thread
   return { thread_id: threadId };
 }
 
+/** A bought number went live (after KYC or the operator's checkout): record it and charge its first month. */
+async function recordActivatedNumber(supabase: any, num: any): Promise<string | null> {
+  const profileId = String(num?.profileId ?? '');
+  const numberId = String(num?.id ?? '');
+  if (!profileId || !numberId) return null;
+  const { data: prof } = await supabase.from('social_zernio_profiles')
+    .select('workspace_id').eq('zernio_profile_id', profileId).maybeSingle();
+  const workspaceId = (prof as { workspace_id?: string } | null)?.workspace_id;
+  if (!workspaceId) return `no workspace for profile ${profileId}`;
+  const { errors } = await attributeProfileNumbers(supabase, workspaceId, profileId, null);
+  if (errors.length) console.error('[zernio-webhook] number attribution errors', workspaceId, errors);
+  const owner = await resolveWorkspaceOwner(supabase, workspaceId);
+  if (!owner) return `no owner or admin to bill in ${workspaceId}`;
+  const charge = await chargeFirstMonth(supabase, { workspaceId, billingUserId: owner, zernioNumberIds: [numberId] });
+  if (!charge.ok) {
+    const { held } = await holdNumbers(supabase, workspaceId, `first month unpaid: ${charge.error ?? 'refused'}`);
+    return `first month NOT charged (${charge.error}); ${held} number(s) on hold`;
+  }
+  return `charged ${charge.credits} credits`;
+}
+
 /** Best-effort: find which user a contact's most recent outbound campaign belonged to. */
 async function resolveCampaignOwner(supabase: any, phone: string): Promise<string | null> {
   const { data: log } = await supabase
@@ -2008,6 +2030,11 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       }
       if (!isHealthy) {
         console.warn(`[zernio-webhook] ${event} for account ${zernioAccountId} — channel deactivated`);
+      }
+
+      if (event === 'whatsapp.number.activated') {
+        const activation = await recordActivatedNumber(supabase, (payload as any).number);
+        if (activation) console.log(`[zernio-webhook] number activation: ${activation}`);
       }
 
       // The single highest-value alert on this whole surface: a declined or suspended number
