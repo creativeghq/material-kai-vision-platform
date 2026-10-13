@@ -12,7 +12,7 @@ import type {
   FiscalParty,
   FiscalTaxTotal,
 } from './types.ts';
-import { isUnnamedLineName } from './types.ts';
+import { isUnnamedLineName, mydataCountry } from './types.ts';
 import {
   movePurposeLabel,
   isMydataMovePurpose,
@@ -137,7 +137,7 @@ function correlatedEntitiesFrom(raw: unknown): FiscalInvoiceInput['header']['oth
       : undefined;
     return [{
       vatNumber,
-      country: String(e?.country ?? e?.country_code ?? 'GR'),
+      country: mydataCountry(e?.country ?? e?.country_code),
       branch: Number(e?.branch ?? e?.branch_code ?? 0) || 0,
       ...(e?.name ? { name: String(e.name) } : {}),
       ...(address ? { address } : {}),
@@ -216,7 +216,7 @@ function partyFromCrm(c: any): FiscalParty {
   const name = (hasBilling && c.billing_name)
     || c.name
     || `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
-  const country = (hasBilling && c.billing_country_code) || c.country_code || 'GR';
+  const country = mydataCountry((hasBilling && c.billing_country_code) || c.country_code);
   return {
     vatNumber: fiscalVatNumber((hasBilling && c.billing_vat) || c.vat_number, country),
     country,
@@ -241,7 +241,7 @@ function partyFromCrm(c: any): FiscalParty {
  * self-billed one it is the counterpart, because the document is the supplier's.
  */
 function partyFromFinanceSettings(fs: any, branchCode: unknown): FiscalParty {
-  const country = fs?.business_country_code ?? 'GR';
+  const country = mydataCountry(fs?.business_country_code);
   return {
     vatNumber: fiscalVatNumber(fs?.business_vat, country),
     country,
@@ -343,7 +343,7 @@ async function applyCounterpartAddressUnit(
       number: u.street_number ?? '',
       postalCode: u.postal_code ?? '',
       city: u.city ?? '',
-      country: u.country_code ?? counterpart.country ?? 'GR',
+      country: u.country_code ? mydataCountry(u.country_code) : counterpart.country,
     },
   };
 }

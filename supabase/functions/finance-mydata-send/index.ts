@@ -4,6 +4,7 @@ import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
+import { mydataCountry } from '../_shared/fiscal/types.ts';
 import {
   buildExpenseEnvelope, expenseEnvelopeProblems, parseSendResponse,
   type ExpenseEnvelopeInput, type ExpenseLine,
@@ -141,7 +142,7 @@ Deno.serve(withApiLogging('finance-mydata-send', async (req) => {
           ? { vatNumber: ourVat, country: 'GR', branch: 0, name: fs?.business_name ?? undefined }
           : {
             vatNumber: String(doc.issuer_vat ?? '').trim(),
-            country: String(doc.issuer_country ?? 'GR').toUpperCase(),
+            country: mydataCountry(doc.issuer_country),
             branch: 0,
             name: doc.issuer_name ?? undefined,
           },

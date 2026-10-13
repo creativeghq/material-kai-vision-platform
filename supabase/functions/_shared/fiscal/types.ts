@@ -8,6 +8,12 @@ export type { FiscalCapability } from './fiscalVocabulary.generated.ts';
 // Also imported: a re-export does not bind the name locally.
 import type { FiscalCapability } from './fiscalVocabulary.generated.ts';
 
+/** AADE's CountryType is ISO 3166-1, but the CRM stores Greece under its VIES prefix `EL`. */
+export function mydataCountry(code: unknown): string {
+  const cc = String(code ?? '').trim().toUpperCase();
+  return cc === 'EL' ? 'GR' : (cc || 'GR');
+}
+
 export interface FiscalAddress {
   street?: string;
   number?: string;

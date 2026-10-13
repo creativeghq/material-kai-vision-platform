@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 
 import { buildNovusPayload } from '../../supabase/functions/_shared/fiscal/novus.ts';
-import type { FiscalInvoiceInput } from '../../supabase/functions/_shared/fiscal/types.ts';
+import { mydataCountry, type FiscalInvoiceInput } from '../../supabase/functions/_shared/fiscal/types.ts';
 import {
   mydataIncomeClassificationType,
   mydataIncomeClassificationCategory,
@@ -455,5 +455,21 @@ describe('the finance-manager check is called with the argument the function dec
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('a party country is ISO 3166-1, never the VIES prefix', () => {
+  it('maps EL to GR, keeps other codes, and defaults an empty one to GR', () => {
+    expect(mydataCountry('EL')).toBe('GR');
+    expect(mydataCountry(' el ')).toBe('GR');
+    expect(mydataCountry('CY')).toBe('CY');
+    expect(mydataCountry(null)).toBe('GR');
+  });
+
+  it('routes every country_code the envelope builder reads through mydataCountry', () => {
+    const src = stripComments(readFileSync('supabase/functions/_shared/fiscal/invoice-builder.ts', 'utf8'));
+    const reads = src.split('\n').filter((l) => /country_code/.test(l) && /country\s*[:=]/.test(l));
+    expect(reads.length).toBeGreaterThan(0);
+    for (const l of reads) expect(l).toMatch(/mydataCountry\(/);
   });
 });
