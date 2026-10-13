@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
-import { BookVsLedgerCard } from '@/modules/finance/components/BookVsLedgerCard';
+import { BookVsLedgerDialog } from '@/modules/finance/components/BookVsLedgerDialog';
 import {
   hasFigures,
   mydataBookService,
@@ -275,6 +275,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
                 />
               </>
             )}
+            {workspaceId && <BookVsLedgerDialog workspaceId={workspaceId} from={range.from} to={range.to} />}
             <Button size="sm" variant="secondary" onClick={refresh} disabled={refreshing || loading}>
               {refreshing ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
               Refresh from AADE
@@ -482,7 +483,6 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
           </CardContent>
         )}
       </Card>
-      {workspaceId && <BookVsLedgerCard workspaceId={workspaceId} from={range.from} to={range.to} />}
     </div>
   );
 };
