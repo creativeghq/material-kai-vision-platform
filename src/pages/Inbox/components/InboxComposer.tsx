@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Loader2, Paperclip, StickyNote, X, MessagesSquare, Reply, ReplyAll, Sparkles, ShoppingCart, AlertTriangle,
-  Package, Wrench, ChevronDown, Type, Trash2, FileText, Image as ImageIcon,
+  Package, Wrench, ChevronDown, Type, Trash2, FileText, Image as ImageIcon, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -53,7 +53,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
     aiDrafting, aiDraftShown, setAiDraftShown, draftSteer, setDraftSteer, draftSteerOpen, setDraftSteerOpen,
     pendingCards, setPendingCards, slashMenu, setSlashMenu, isMember, waBlocked, send, sendAndClose,
     discardDraft, aiSuggest, chooseSlashCommand, togglePendingCard, composerSettings, includeSignature, setIncludeSignature,
-    sendFollowUp, setSendFollowUp,
+    sendFollowUp, setSendFollowUp, isMobile,
   } = s;
   const { toast } = useToast();
   const [formatOpen, setFormatOpen] = useState(readFormatPref);
@@ -66,6 +66,9 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
   };
   const { dragging, dropProps } = useFileDrop(addFiles);
   const [scrolled, setScrolled] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  useEffect(() => { setToolsOpen(false); }, [activeId]);
+  const mobileTools = toolsOpen ? 'max-md:flex max-md:order-last max-md:flex-wrap max-md:items-center max-md:gap-0.5' : 'max-md:hidden';
   const { suggestion, dismiss } = useReplyAutocomplete({
     optedIn: composerSettings.settings.autocomplete_enabled,
     enabled: isMember && !isNote && !waBlocked && !emailPreview && !slashMenu,
@@ -123,7 +126,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
       );
 
   return (
-    <div {...dropProps} className="border-t border-hairline bg-surface-sunken p-3 space-y-2 shrink-0">
+    <div {...dropProps} className="border-t border-hairline bg-card md:bg-surface-sunken p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:p-3 space-y-2 shrink-0">
       {isPublicComment && !isNote && (
         <div className="text-xs bg-pink-500/10 dark:bg-pink-500/15 border border-pink-500/25 dark:border-pink-500/30 text-pink-700 dark:text-pink-300 rounded-sm px-3 py-2 flex items-start gap-1.5">
           <MessagesSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -348,7 +351,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
                     : isMember ? 'Write a reply… type /product or /service to suggest one'
                       : 'Type a message…'
               }
-              className="min-h-[76px] max-h-[40vh] [field-sizing:content] border-0 bg-transparent px-3 py-2.5 hover:border-0 focus-visible:ring-0 focus-visible:border-0"
+              className="min-h-[44px] md:min-h-[76px] max-h-[30vh] md:max-h-[40vh] [field-sizing:content] border-0 bg-transparent px-3 py-2.5 max-md:text-base hover:border-0 focus-visible:ring-0 focus-visible:border-0"
               disabled={waBlocked}
             />
             </div>
@@ -398,6 +401,15 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
         )}
 
         <div className="flex flex-wrap items-center gap-0.5 px-1.5 py-1.5 border-t border-hairline">
+          <button
+            type="button" onClick={() => setToolsOpen((v) => !v)} aria-expanded={toolsOpen}
+            aria-label={toolsOpen ? 'Hide tools' : 'More tools'}
+            className="md:hidden p-2 rounded-sm text-muted-foreground active:bg-surface-hover"
+          >
+            {toolsOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+          </button>
+          {toolsOpen && <span className="md:hidden order-last basis-full h-0" aria-hidden />}
+          <span className={`${mobileTools} md:contents`}>
           {isMember && !isNote && (
             <Popover open={draftSteerOpen} onOpenChange={setDraftSteerOpen}>
               <PopoverTrigger asChild>
@@ -455,6 +467,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
             </button>
           )}
           <EmojiPicker disabled={waBlocked} onPick={(e) => setDraft((d) => d + e)} />
+          </span>
           {takesFiles && (
             <label className={`p-2 rounded-sm hover:bg-surface-hover ${waBlocked ? 'opacity-40 pointer-events-none' : 'cursor-pointer'}`} title="Attach files (or paste / drop them)">
               <Paperclip className="w-4 h-4 text-muted-foreground" />
@@ -465,6 +478,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
               />
             </label>
           )}
+          <span className={`${mobileTools} md:contents`}>
           {isMember && !isNote && (
             <button
               type="button"
@@ -479,6 +493,7 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
           )}
 
           {isMember && <ComposerSettingsPopover settings={composerSettings.settings} save={composerSettings.save} />}
+          </span>
 
           <span className="ml-auto flex items-center gap-1.5">
             <span className="hidden xl:inline text-[11px] text-muted-foreground">
@@ -491,10 +506,10 @@ export const InboxComposer: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            {isMember && !isNote && activeThread.channel !== 'internal' && (
+            {isMember && !isNote && activeThread.channel !== 'internal' && (toolsOpen || sendFollowUp || !isMobile) && (
               <FollowUpOnSend value={sendFollowUp} onChange={setSendFollowUp} whatsappThreadId={activeThread.channel === 'whatsapp' ? activeThread.id : null} />
             )}
-            {activeThread.channel === 'email' && !isNote && <WritingScore body={draft} />}
+            {activeThread.channel === 'email' && !isNote && <span className="max-md:hidden"><WritingScore body={draft} /></span>}
             <SendSplitButton
               label={isNote ? 'Add note' : 'Send'}
               sending={sending}

@@ -48,6 +48,8 @@ const InboxPage: React.FC = () => {
     setShowAdd,
     showDetails,
     setShowDetails,
+    showMailbox,
+    setShowMailbox,
     isMobile,
     isMember,
     loadThreads,
@@ -56,6 +58,7 @@ const InboxPage: React.FC = () => {
   const showMemberControls = isMember && !!activeThread;
   return (
     <div className="flex-1 min-h-0 flex flex-col">
+      <div className="hidden md:block">
       <PageHeader
         icon={InboxIcon}
         title="Inbox"
@@ -73,10 +76,11 @@ const InboxPage: React.FC = () => {
           ) : undefined
         }
       />
+      </div>
 
-      {/* Desktop: 3-pane grid. Mobile: single-pane drill-in (list ↔ conversation),
-          with the details rail moved into a slide-up sheet. */}
-      <div className="flex flex-col md:grid md:grid-cols-12 gap-4 flex-1 min-h-0 px-4 sm:px-6 py-4">
+      {/* Desktop: 3-pane grid. Mobile: an app — full-bleed list, the conversation as a full
+          screen above it, the mailbox in a drawer and the details in a bottom sheet. */}
+      <div className="flex flex-col md:grid md:grid-cols-12 md:gap-4 flex-1 min-h-0 md:px-6 md:py-4">
         {mode === 'gmail' ? <GmailInbox mode={mode} setMode={setMode} /> : (<>
         {/* ── Column 0 · Mailbox sidebar (Compose · views · sources · labels) ── */}
         <InboxSidebar s={s} />
@@ -105,6 +109,14 @@ const InboxPage: React.FC = () => {
         */}
       </div>
 
+      {isMobile && mode !== 'gmail' && (
+        <Sheet open={showMailbox} onOpenChange={setShowMailbox}>
+          <SheetContent side="left" className="p-0 w-[85vw] max-w-xs bg-card">
+            <SheetTitle className="sr-only">Mailbox</SheetTitle>
+            <InboxSidebar s={s} variant="drawer" />
+          </SheetContent>
+        </Sheet>
+      )}
       {showScheduled && <ScheduledDialog onClose={() => setShowScheduled(false)} />}
       {showNew && activeWorkspaceId && (
         <NewThreadDialog

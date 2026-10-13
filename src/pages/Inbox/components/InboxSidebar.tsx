@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlarmClock, Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText, Phone } from 'lucide-react';
+import { AlarmClock, Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText, Phone, Globe } from 'lucide-react';
 import { whatsAppNumberLabel } from '@/modules/messaging/services/messagingService';
 import { threadWhatsAppAccount } from '../inboxFilters';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +14,7 @@ import { LabelManagerPopover, LabelSidebarRow } from './InboxLabels';
 import type { InboxPageState } from '../useInboxPage';
 
 
-export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
+export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'drawer' }> = ({ s, variant = 'rail' }) => {
   const {
     isPlatformOperator,
     activeWorkspaceId,
@@ -49,7 +49,21 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
     sourceCounts,
     threadTotal,
     query,
+    setShowMailbox,
+    allWorkspaces,
+    setAllWorkspaces,
   } = s;
+  const drawer = variant === 'drawer';
+  // In the drawer, picking where to go IS the end of the visit — even the row you are already on.
+  const asideRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = asideRef.current;
+    if (!drawer || !el) return;
+    const close = (e: MouseEvent) => { if ((e.target as HTMLElement).closest('[data-nav-row]')) setShowMailbox(false); };
+    el.addEventListener('click', close);
+    return () => el.removeEventListener('click', close);
+  }, [drawer, setShowMailbox]);
+  const thenClose = (fn: () => void) => () => { fn(); if (drawer) setShowMailbox(false); };
   const unfiltered = !assignmentView && !sourceFilter && !String(query ?? '').trim();
   const more = nextCursor ? '+' : '';
   const mineCount = unfiltered ? `${threads.filter((t) => t.assigned_user_id === myUserId).length}${more}` : undefined;
@@ -67,7 +81,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
   const allowedSources = modeSources(mode);
   const sources = allowedSources ? SOURCE_FILTER_ORDER.filter((k) => allowedSources.includes(k)) : SOURCE_FILTER_ORDER;
   return (
-    <aside className="dashboard-card md:col-span-3 lg:col-span-2 hidden md:flex flex-col overflow-hidden p-0">
+    <aside ref={asideRef} className={drawer ? 'h-full flex flex-col overflow-hidden bg-card' : 'dashboard-card md:col-span-3 lg:col-span-2 hidden md:flex flex-col overflow-hidden p-0'}>
       {/* Workspace header. Flat: the ladder is bg-background → bg-card → bg-surface-sunken,
           and a gradient block here would be the only thing on the page that is not on it. */}
       <div className="px-3 py-2.5 flex items-center gap-2 border-b border-hairline bg-surface-sunken shrink-0">
@@ -79,10 +93,17 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <div className="text-[11px] text-muted-foreground leading-tight">Inbox</div>
         </div>
       </div>
+      {drawer && isPlatformOperator && (
+        <div className="px-3 pt-3">
+          <Button variant={allWorkspaces ? 'default' : 'outline'} size="sm" className="w-full" onClick={thenClose(() => setAllWorkspaces((v) => !v))}>
+            <Globe className="w-4 h-4 mr-1.5" /> All workspaces
+          </Button>
+        </div>
+      )}
 
       <div role="tablist" aria-label="Inbox source" className="flex items-center gap-3 px-3 border-b border-hairline shrink-0">
         {visibleModes(isPlatformOperator).map((m) => (
-          <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-2">
+          <button key={m.key} role="tab" data-nav-row aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-2">
             {m.label}
           </button>
         ))}
@@ -105,7 +126,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
         )}
         {isMember && (
           <div className="p-3">
-            <Button className="w-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
+            <Button className="w-full" onClick={thenClose(() => setShowNew(true))} disabled={!activeWorkspaceId}>
               <Plus className="w-4 h-4 mr-1.5" /> Compose
             </Button>
           </div>
@@ -131,7 +152,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <NavRow icon={<Star className="w-4 h-4 shrink-0" />} label="Starred" active={view === 'starred'} onClick={() => goToView('starred')} />
           <NavRow icon={<FilePen className="w-4 h-4 shrink-0" />} label="Drafts" active={view === 'drafts'} onClick={() => goToView('drafts')} />
           <NavRow icon={<Send className="w-4 h-4 shrink-0" />} label="Sent" active={view === 'sent'} onClick={() => goToView('sent')} />
-          <NavRow icon={<CalendarClock className="w-4 h-4 shrink-0" />} label="Scheduled" active={false} onClick={() => setShowScheduled(true)} />
+          <NavRow icon={<CalendarClock className="w-4 h-4 shrink-0" />} label="Scheduled" active={false} onClick={thenClose(() => setShowScheduled(true))} />
           <NavRow icon={<TextSearch className="w-4 h-4 shrink-0" />} label="Search messages" active={showMessageSearch} onClick={() => setShowMessageSearch(!showMessageSearch)} />
           <NavRow icon={<Archive className="w-4 h-4 shrink-0" />} label="Archived" active={view === 'archived'} onClick={() => goToView('archived')} />
         </nav>

@@ -1,6 +1,6 @@
 import React from 'react';
-import { AlarmClock, ChevronRight, Folder as FolderIcon, FolderOpen, Inbox as InboxIcon, Plus, Loader2, MessageSquare, Bot, Search, Mail, Archive, ArchiveRestore, Trash2, Clock, ShoppingCart, Star, Send, FilePen, Paperclip } from 'lucide-react';
-import { visibleModes, modeSources } from '../inboxModes';
+import { AlarmClock, ChevronRight, Folder as FolderIcon, FolderOpen, Loader2, MessageSquare, Bot, Search, ArchiveRestore, Trash2, Clock, ShoppingCart, Send, Paperclip, Menu, X, PenSquare } from 'lucide-react';
+import { visibleModes } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
@@ -13,18 +13,23 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/core/ui/alert-dialog';
 import { labelDot } from '../inboxFormat';
 import { FilterBar } from '@/components/core/filters';
-import { inboxSourceMeta, inboxThreadSource, SOURCE_FILTER_ORDER } from '../inboxSource';
+import { inboxSourceMeta, inboxThreadSource } from '../inboxSource';
 import { type InboxThread, type InboxThreadStatus } from '@/services/inboxApi';
 import { whatsAppFolders } from '../whatsappFolders';
 import { timeAgo } from '../inboxFormat';
 import { formatDate } from '@/utils/datetime';
-import { LabelChips, MobileChip, SourceWord, ThreadAvatar } from './InboxPrimitives';
+import { LabelChips, SourceWord, ThreadAvatar } from './InboxPrimitives';
 import type { InboxPageState } from '../useInboxPage';
 import { FollowUpStatsLine } from './FollowUpStatsLine';
 import { BulkFollowUp } from './BulkFollowUp';
 
 
 const FOLDER_VIEW_KEY = 'inbox.whatsapp.layout';
+
+const VIEW_TITLE: Record<string, string> = {
+  all: 'Inbox', followup: 'Follow up', unread: 'Unread', starred: 'Starred', sent: 'Sent', drafts: 'Drafts', archived: 'Archived',
+};
+const LONG_PRESS_MS = 450;
 
 const EMPTY_VIEW = {
   all: { title: 'No conversations yet', description: 'Email, WhatsApp, social and enquiries from your public profile all land here, each tagged with where it came from.' },
@@ -58,7 +63,6 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     view,
     goToView,
     sourceFilter,
-    setSourceFilter,
     setShowNew,
     isMember,
     openThread,
@@ -75,10 +79,37 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     bulkBusy,
     canManageLabels,
     wsLabels,
-    sourceCounts,
     threadDisplayName,
     labelIds,
+    setShowMailbox,
+    inboxUnread,
   } = s;
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  // Long-press selects, the way a phone list does; the click that ends the press must not also open.
+  const press = React.useRef<{ timer: ReturnType<typeof setTimeout> | null; fired: boolean }>({ timer: null, fired: false });
+  const cancelPress = () => {
+    if (press.current.timer) clearTimeout(press.current.timer);
+    press.current.timer = null;
+  };
+  React.useEffect(() => cancelPress, []);
+  const pressHandlers = (id: string) => ({
+    onTouchStart: (e: React.TouchEvent) => {
+      cancelPress();
+      press.current.fired = false;
+      if (e.touches.length > 1) return;
+      press.current.timer = setTimeout(() => {
+        press.current.timer = null;
+        press.current.fired = true;
+        toggleSelected(id);
+        navigator.vibrate?.(10);
+      }, LONG_PRESS_MS);
+    },
+    onTouchMove: cancelPress,
+    onTouchEnd: cancelPress,
+    onTouchCancel: cancelPress,
+    onContextMenu: (e: React.MouseEvent) => { if (press.current.fired) e.preventDefault(); },
+  });
+  const sourceLabel = sourceFilter ? inboxSourceMeta(sourceFilter as Parameters<typeof inboxSourceMeta>[0]).label : null;
   const [folderView, setFolderView] = React.useState<boolean>(() => {
     try { return localStorage.getItem(FOLDER_VIEW_KEY) !== 'list'; } catch { return true; }
   });
@@ -104,15 +135,19 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               const selected = selectedIds.has(t.id);
               return (
                 <div key={t.id} className="group relative">
-                <span className={`absolute left-1 top-1/2 -translate-y-1/2 z-10 ${selectedIds.size > 0 || selected ? 'flex' : 'hidden md:group-hover:flex'}`}>
+                <span className={`absolute left-1.5 md:left-1 top-1/2 -translate-y-1/2 z-10 ${selectedIds.size > 0 || selected ? 'flex' : 'hidden md:group-hover:flex'}`}>
                   <Checkbox aria-label={`Select ${name}`} checked={selected} onCheckedChange={() => toggleSelected(t.id)} />
                 </span>
                 <button
-                  onClick={() => (selectedIds.size > 0 ? toggleSelected(t.id) : openThread(t.id))}
-                  className={`w-full text-left ${selectedIds.size > 0 ? 'pl-8 pr-4' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${selected ? 'bg-primary/[0.06]' : ''} ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
+                  {...pressHandlers(t.id)}
+                  onClick={() => {
+                    if (press.current.fired) { press.current.fired = false; return; }
+                    if (selectedIds.size > 0) toggleSelected(t.id); else void openThread(t.id);
+                  }}
+                  className={`w-full text-left select-none md:select-auto [-webkit-touch-callout:none] md:[-webkit-touch-callout:default] ${selectedIds.size > 0 ? 'pl-9 md:pl-8 pr-4' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors active:bg-surface-hover ${selected ? 'bg-primary/[0.06]' : ''} ${active ? 'md:bg-surface-hover md:border-l-primary border-l-transparent' : 'border-l-transparent hover:bg-surface-hover'}`}
                 >
                   <div className="relative shrink-0 mt-0.5">
-                    <ThreadAvatar thread={t} name={name} className="h-9 w-9" showMood />
+                    <ThreadAvatar thread={t} name={name} className="h-12 w-12 md:h-9 md:w-9" showMood />
                     {/* Solid, not tinted: at 16px a 15% wash reads as grey in every theme,
                         and the glyph inside it needs a ground to sit on. */}
                     <span
@@ -125,29 +160,29 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                      <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{name}</span>
-                      <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{timeAgo(t.last_message_at)}</span>
+                      <span className={`flex-1 truncate text-[15px] md:text-sm ${t.unread ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{name}</span>
+                      <span className={`text-xs md:text-[11px] shrink-0 tabular-nums ${t.unread ? 'text-primary font-medium md:font-normal md:text-muted-foreground' : 'text-muted-foreground'}`}>{timeAgo(t.last_message_at)}</span>
                     </div>
                     {t.channel === 'email' && t.subject && t.subject !== name && (
                       <div className={`text-sm truncate ${t.unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}`}>{t.subject}</div>
                     )}
                     {t.last_message_preview && (
-                      <div className={`text-xs truncate mt-0.5 ${t.unread ? 'text-foreground/70' : 'text-muted-foreground'}`}>{t.last_message_preview}</div>
+                      <div className={`text-sm md:text-xs truncate mt-0.5 ${t.unread ? 'text-foreground/70' : 'text-muted-foreground'}`}>{t.last_message_preview}</div>
                     )}
                     <div className="flex items-center gap-x-2 gap-y-1 mt-1.5 flex-wrap">
-                      <SourceWord source={source} />
+                      <SourceWord source={source} className="hidden md:inline-flex" />
                       {t.has_attachments && (
-                        <span className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground">
+                        <span className="hidden md:inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground">
                           <Paperclip className="w-3 h-3" />Files
                         </span>
                       )}
                       {assignee ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80 truncate max-w-[9rem]" title={`Assigned to ${assignee}`}>
+                        <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-foreground/80 truncate max-w-[9rem]" title={`Assigned to ${assignee}`}>
                           <UserAvatar userId={t.assigned_user_id} name={assignee} className="h-4 w-4 text-[8px]" />
                           <span className="truncate">{assignee}</span>
                         </span>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">Unassigned</span>
+                        <span className="hidden md:inline text-[11px] text-muted-foreground">Unassigned</span>
                       )}
                       {t.outreach?.length ? (
                         <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80" title={t.outreach[0].preview}>
@@ -196,9 +231,42 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
   const folders = showFolders ? whatsAppFolders(visibleThreads, wsLabels) : [];
 
   return (
-    <div className={`dashboard-card md:col-span-4 lg:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
-      <div className="p-3 border-b border-hairline bg-surface-sunken space-y-3 shrink-0">
-        <div className="flex items-center gap-2">
+    <div className={`md:dashboard-card bg-card md:col-span-4 lg:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
+      <div className="md:hidden flex items-center gap-1 h-14 px-1.5 border-b border-hairline bg-card shrink-0">
+        {searchOpen ? (
+          <>
+            <button type="button" aria-label="Close search" onClick={() => { setSearchOpen(false); setQuery(''); }}
+              className="h-11 w-11 flex items-center justify-center rounded-sm text-muted-foreground active:bg-surface-hover">
+              <X className="w-5 h-5" />
+            </button>
+            <Input
+              autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search conversations" className="h-10 flex-1 text-base"
+            />
+          </>
+        ) : (
+          <>
+            <button type="button" aria-label="Open mailbox" onClick={() => setShowMailbox(true)}
+              className="h-11 w-11 flex items-center justify-center rounded-sm text-foreground active:bg-surface-hover">
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex-1 min-w-0 px-1">
+              <div className="text-lg font-semibold leading-tight truncate">
+                {VIEW_TITLE[view] ?? 'Inbox'}{sourceLabel ? <span className="text-muted-foreground font-normal"> · {sourceLabel}</span> : null}
+              </div>
+              {inboxUnread > 0 && view === 'all' && (
+                <div className="text-xs text-primary leading-tight tabular-nums">{inboxUnread}{nextCursor ? '+' : ''} unread</div>
+              )}
+            </div>
+            <button type="button" aria-label="Search conversations" onClick={() => setSearchOpen(true)}
+              className="h-11 w-11 flex items-center justify-center rounded-sm text-foreground active:bg-surface-hover">
+              <Search className="w-5 h-5" />
+            </button>
+          </>
+        )}
+      </div>
+      <div className="px-3 pt-1 pb-2 md:p-3 border-b border-hairline bg-card md:bg-surface-sunken space-y-2 md:space-y-3 shrink-0">
+        <div className="hidden md:flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
@@ -207,55 +275,13 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               className="pl-9 h-9"
             />
           </div>
-          {/* Mobile compose — the sidebar (with its Compose) is desktop-only */}
-          {isMember && (
-            <Button size="icon" className="h-9 w-9 shrink-0 md:hidden" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId} title="Compose">
-              <Plus className="w-4 h-4" />
-            </Button>
-          )}
         </div>
-        {/* Mobile views + sources (they live in the sidebar on desktop). Squared, not pills:
-            a pill is the silhouette of a primary button, so "where I am" and "what to press"
-            would be the same object on the one breakpoint with no room to tell them apart. */}
-        <div role="tablist" aria-label="Inbox source" className="flex md:hidden items-center gap-3 border-b border-hairline">
+        <div role="tablist" aria-label="Inbox source" className="flex md:hidden items-center gap-5 overflow-x-auto border-b border-hairline -mx-3 px-3">
           {visibleModes(isPlatformOperator).map((m) => (
-            <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-xs py-1.5">
+            <button key={m.key} role="tab" aria-selected={mode === m.key} onClick={() => setMode(m.key)} className="text-sm py-2.5 shrink-0">
               {m.label}
             </button>
           ))}
-        </div>
-        <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-0.5">
-          <MobileChip active={view === 'all'} onClick={() => goToView('all')}>
-            <InboxIcon className="w-3 h-3" />Inbox
-          </MobileChip>
-          <MobileChip active={view === 'followup'} onClick={() => goToView('followup')}>
-            <AlarmClock className="w-3 h-3" />Follow up
-          </MobileChip>
-          <MobileChip active={view === 'unread'} onClick={() => goToView('unread')}>
-            <Mail className="w-3 h-3" />Unread
-          </MobileChip>
-          <MobileChip active={view === 'starred'} onClick={() => goToView('starred')}>
-            <Star className="w-3 h-3" />Starred
-          </MobileChip>
-          <MobileChip active={view === 'drafts'} onClick={() => goToView('drafts')}>
-            <FilePen className="w-3 h-3" />Drafts
-          </MobileChip>
-          <MobileChip active={view === 'sent'} onClick={() => goToView('sent')}>
-            <Send className="w-3 h-3" />Sent
-          </MobileChip>
-          <MobileChip active={view === 'archived'} onClick={() => goToView('archived')}>
-            <Archive className="w-3 h-3" />Archived
-          </MobileChip>
-          {SOURCE_FILTER_ORDER.filter((key) => modeSources(mode)?.includes(key) ?? true).map((key) => {
-            const meta = inboxSourceMeta(key);
-            const n = sourceCounts?.get(key) ?? null;
-            if (sourceCounts && !n && sourceFilter !== key) return null;
-            return (
-              <MobileChip key={key} active={sourceFilter === key} onClick={() => setSourceFilter(sourceFilter === key ? null : key)}>
-                <span className={`w-1.5 h-1.5 rounded-full ${meta.tone.dot}`} />{meta.label}
-              </MobileChip>
-            );
-          })}
         </div>
         {/* Status tabs (Open / Follow-up / Done) narrow the working set; they are hidden in the
             Unread / Archived views, where status is not the axis. The filter bar stays put in
@@ -454,7 +480,16 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             </Button>
           </div>
         )}
+        {isMember && <div className="h-20 md:hidden" aria-hidden />}
       </div>
+      {isMember && selectedIds.size === 0 && (
+        <Button
+          onClick={() => setShowNew(true)} disabled={!activeWorkspaceId} aria-label="New conversation"
+          className="md:hidden fixed right-4 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] z-30 h-14 w-14 p-0 shadow-overlay"
+        >
+          <PenSquare className="w-5 h-5" />
+        </Button>
+      )}
     </div>
   );
 };

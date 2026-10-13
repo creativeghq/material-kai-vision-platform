@@ -184,7 +184,8 @@ describe('Open tracking', () => {
 
   it('a customer never learns they were tracked — receipts go to members only', () => {
     expect(inbox).toContain('message_opens: isMember ? await messageOpens(db, ids) : {}');
-    expect(inbox).toMatch(/message_opens: isMember && thread\.channel === 'email' \? await messageOpens/);
+    expect(inbox).toMatch(/isMember && thread\.channel === 'email' && !peek \? messageOpens\(db, messageIds\)/);
+    expect(inbox).toContain('message_opens: opens,');
   });
 
   it('the pixel answers the same GIF for every token and counts only through the service-role RPC', () => {

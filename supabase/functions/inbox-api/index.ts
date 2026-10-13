@@ -3278,7 +3278,7 @@ async function handleJwtAction(
       const peek = payload.peek === true && isMember;
 
       /** A customer gets the same projection the PUBLIC token path gives them (#359 CM-10). */
-      const { data: participants } = await db
+      const participantsP = db
         .from('inbox_participants')
         .select(isMember ? '*' : 'id, participant_type, thread_role')
         .eq('thread_id', threadId)
@@ -3303,7 +3303,7 @@ async function handleJwtAction(
       }
       mq = mq.limit(pageSize + 1);
       if (!isMember) mq = mq.neq('message_type', 'note'); // customers never see notes
-      const { data: messagesRaw, error: msgErr } = await mq;
+      const [{ data: participants }, { data: messagesRaw, error: msgErr }] = await Promise.all([participantsP, mq]);
       if (msgErr) throw new HttpError(500, `Could not load messages: ${msgErr.message}`);
       const newestFirst = (messagesRaw || []) as unknown as Array<Record<string, unknown>>;
       const hasOlder = newestFirst.length > pageSize;
@@ -3361,10 +3361,46 @@ async function handleJwtAction(
       // the claim uses — this only compares. A draft written before the customer wrote again
       // answers the previous question, and a stale draft is a perfectly valid string, so nothing
       // downstream would otherwise notice.
-      let draftIsCurrent = false;
-      if (isMember && thread.agent_draft) {
-        const { data: newestId } = await db.rpc('inbox_newest_inbound_message_id', { p_thread_id: threadId });
-        draftIsCurrent = !!newestId && newestId === thread.agent_draft_for_message_id;
+      const messageIds = ((messages || []) as unknown as Array<{ id: string }>).map((m) => m.id);
+      const [draftIsCurrent, wa, starredMessageIds, pinnedMessage, opens] = await Promise.all([
+        isMember && thread.agent_draft
+          ? db.rpc('inbox_newest_inbound_message_id', { p_thread_id: threadId })
+            .then(({ data: newestId }) => !!newestId && newestId === thread.agent_draft_for_message_id)
+          : Promise.resolve(false),
+        thread.channel === 'whatsapp' ? whatsappWindow(db, threadId, thread) : Promise.resolve(null),
+        // MY stars only: a shared inbox must not show one colleague another's bookmarks.
+        messageIds.length
+          ? db.from('inbox_message_stars').select('message_id').eq('user_id', userId).in('message_id', messageIds)
+            .then(({ data: stars }) => ((stars || []) as Array<{ message_id: string }>).map((r) => r.message_id))
+          : Promise.resolve([] as string[]),
+        isMember && olderCursor && !peek
+          ? db.from('inbox_messages').select('*')
+            .eq('thread_id', threadId).is('deleted_at', null).not('metadata->>pinned_at', 'is', null)
+            .order('metadata->>pinned_at', { ascending: false }).limit(1).maybeSingle()
+            .then(({ data: pin }) => (pin as Record<string, unknown> | null) ?? null)
+          : Promise.resolve(null),
+        isMember && thread.channel === 'email' && !peek ? messageOpens(db, messageIds) : Promise.resolve({}),
+        access.participant && !peek
+          ? db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id)
+          : Promise.resolve(null),
+      ]);
+
+      // The provider read receipt is a third-party round trip the operator must not wait on.
+      if (access.participant && !peek) {
+        const meta = ((thread.metadata as Json) || {}) as Record<string, unknown>;
+        const convId = String(meta.zernio_conversation_id || '');
+        if (convId && (thread.channel === 'whatsapp' || thread.channel === 'social')) {
+          runInBackground((async () => {
+            // Per-number choice; absent = ON.
+            const channelId = String(meta.channel_id || '');
+            if (thread.channel === 'whatsapp' && channelId) {
+              const { data: ch } = await db.from('messaging_channels')
+                .select('config').eq('id', channelId).maybeSingle();
+              if (((ch?.config || {}) as Record<string, unknown>).send_read_receipts === false) return;
+            }
+            await markConversationRead(convId);
+          })(), `inbox-read-receipt:${threadId}`);
+        }
       }
 
       const threadForCaller = isMember ? {
@@ -3384,39 +3420,6 @@ async function handleJwtAction(
         created_at: thread.created_at,
       };
 
-      if (access.participant && !peek) {
-        await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id);
-
-        // ...and tell the PLATFORM, not just our own table.
-        const meta = ((thread.metadata as Json) || {}) as Record<string, unknown>;
-        const convId = String(meta.zernio_conversation_id || '');
-        if (convId && (thread.channel === 'whatsapp' || thread.channel === 'social')) {
-          // Per-number choice, because "they can see I read it" is a business decision, not a
-          // technical default. A sales team often wants the blue ticks; a support desk triaging
-          // overnight often does not, because a read receipt with no reply reads worse than
-          // silence. Absent = ON, which is what the receipt fix shipped as.
-          let sendReceipt = true;
-          const channelId = String(meta.channel_id || '');
-          if (thread.channel === 'whatsapp' && channelId) {
-            const { data: ch } = await db.from('messaging_channels')
-              .select('config').eq('id', channelId).maybeSingle();
-            const cfg = (ch?.config || {}) as Record<string, unknown>;
-            sendReceipt = cfg.send_read_receipts !== false;
-          }
-          if (sendReceipt) await markConversationRead(convId);
-        }
-      }
-      const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId, thread) : null;
-      // MY stars on this thread's messages. Personal by construction (see `star_message`), so
-      // they are resolved for the caller rather than attached to the message rows — a shared
-      // inbox must not show one colleague another's bookmarks.
-      const messageIds = ((messages || []) as unknown as Array<{ id: string }>).map((m) => m.id);
-      let starredMessageIds: string[] = [];
-      if (messageIds.length) {
-        const { data: stars } = await db.from('inbox_message_stars')
-          .select('message_id').eq('user_id', userId).in('message_id', messageIds);
-        starredMessageIds = ((stars || []) as Array<{ message_id: string }>).map((r) => r.message_id);
-      }
       if (peek) {
         // The one transcript derivation (attachments named, provider placeholders rewritten,
         // offered cards listed) — `buildTranscript` takes newest-first rows, as the draft path
@@ -3433,17 +3436,10 @@ async function handleJwtAction(
           whatsapp_window: wa, starred_message_ids: starredMessageIds, transcript, message_count: count ?? null,
         });
       }
-      let pinnedMessage: Record<string, unknown> | null = null;
-      if (isMember && olderCursor) {
-        const { data: pin } = await db.from('inbox_messages').select('*')
-          .eq('thread_id', threadId).is('deleted_at', null).not('metadata->>pinned_at', 'is', null)
-          .order('metadata->>pinned_at', { ascending: false }).limit(1).maybeSingle();
-        pinnedMessage = (pin as Record<string, unknown> | null) ?? null;
-      }
       return json({
         thread: threadForCaller, participants: participantsForCaller, messages: messages || [], older_cursor: olderCursor, pinned_message: pinnedMessage,
         whatsapp_window: wa, starred_message_ids: starredMessageIds,
-        message_opens: isMember && thread.channel === 'email' ? await messageOpens(db, messageIds) : {},
+        message_opens: opens,
       });
     }
 

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2, MessageSquare, User as UserIcon, ArrowLeft, Archive, Pin, CalendarClock, AlertTriangle } from 'lucide-react';
+import { useVisualViewport } from '../useVisualViewport';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { inboxThreadSource } from '../inboxSource';
@@ -52,7 +54,12 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     threadDisplayName,
     activeCount,
     pinnedMessage,
+    isMobile,
   } = s;
+  // Mobile: the conversation is its own full screen over the app chrome, sized to what the
+  // keyboard leaves visible so the composer stays in view while typing.
+  const fullScreen = isMobile && !!activeId;
+  const viewport = useVisualViewport(fullScreen);
   const showMemberControls = isMember && !!activeThread;
   // Only the newest handoff of an unowned thread offers "Assign to me"; older cards are history.
   const lastHandoffId = [...messages].reverse().find((m) => m.message_type === 'system' && (m.metadata as Record<string, unknown> | null)?.agent_handoff)?.id ?? null;
@@ -61,8 +68,14 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
   useEffect(() => { setOpenMail(new Set()); }, [activeId]);
   const mailIds = isEmail ? messages.filter((x) => x.message_type === 'text' || x.message_type === 'agent').map((x) => x.id) : [];
   const lastMailId = mailIds[mailIds.length - 1];
-  return (
-    <div className={`dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
+  // Portaled on a phone: <main> is its own stacking context, so nothing inside it can rise above
+  // the app's top bar and tab bar.
+  const pane = (
+    <div
+      className={`md:dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'} ${
+        fullScreen ? 'fixed inset-x-0 top-0 z-50 h-[100dvh] bg-background' : ''}`}
+      style={fullScreen && viewport ? { height: viewport.height, transform: `translateY(${viewport.top}px)` } : undefined}
+    >
       {!activeThread ? (
         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
           <MessageSquare className="w-10 h-10 opacity-30" />
@@ -70,13 +83,13 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
         </div>
       ) : (
         <>
-          <div className="px-3 sm:px-4 py-3 border-b border-hairline bg-surface-sunken flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="px-1.5 md:px-4 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] md:py-3 border-b border-hairline bg-card md:bg-surface-sunken flex items-center gap-2 md:gap-3 shrink-0">
             {/* Mobile: back to the conversation list */}
             <button
               type="button"
               onClick={backToList}
               aria-label="Back to conversations"
-              className="md:hidden shrink-0 h-9 w-9 -ml-1 flex items-center justify-center rounded-sm text-muted-foreground hover:bg-surface-hover"
+              className="md:hidden shrink-0 h-11 w-9 flex items-center justify-center rounded-sm text-foreground active:bg-surface-hover"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -96,7 +109,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               <ThreadAvatar
                 thread={activeThread}
                 name={threadDisplayName(activeThread)}
-                className="h-10 w-10"
+                className="h-9 w-9 md:h-10 md:w-10"
                 fallbackClassName={`text-sm ${avatarTint(threadDisplayName(activeThread))}`}
                 showMood
               />
@@ -118,12 +131,16 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               {/* Here the source DOES get a tag: it stands alone with room around it, and
                   this is the one place that has to answer "what am I about to reply on"
                   before the operator starts typing. */}
-              <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              <div className="hidden md:flex items-center gap-1.5 flex-wrap mt-1">
                 <SourceTag source={inboxThreadSource(activeThread)} />
                 <span className="text-xs text-muted-foreground">
                   {activeCount} participant{activeCount === 1 ? '' : 's'}
                 </span>
                 <LabelChips labels={activeThreadLabels} />
+              </div>
+              <div className="md:hidden text-xs text-muted-foreground truncate leading-tight">
+                {inboxThreadSource(activeThread).label}
+                {activeCount > 2 ? ` · ${activeCount} participants` : ''}
               </div>
             </div>
             {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
@@ -136,7 +153,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               onClick={() => setShowDetails(true)}
               title="Customer profile — contact, quotes, invoices & projects"
               aria-label="Customer profile"
-              className="shrink-0 gap-1.5"
+              className="shrink-0 gap-1.5 max-md:h-10 max-md:w-10 max-md:p-0 max-md:border-0"
             >
               <UserIcon className="w-4 h-4" /> <span className="hidden sm:inline">Profile</span>
             </Button>
@@ -227,7 +244,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
 
           <div
             ref={listRef}
-            className="flex-1 overflow-y-auto overflow-x-hidden p-4"
+            className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3 md:p-4"
             onScroll={(e) => {
               // "Near enough" rather than exact: a fractional scrollHeight (any zoom level,
               // any sub-pixel row height) never satisfies an equality check, so an exact
@@ -258,7 +275,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
               </h1>
             )}
             {loadingThread ? (
-              <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 animate-spin" /></div>
+              <MessageSkeleton />
             ) : messages.map((m) => (isEmail && (m.message_type === 'text' || m.message_type === 'agent') ? (
               <EmailMessageCard
                 key={m.id} m={m}
@@ -339,4 +356,13 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
       )}
     </div>
   );
+  return fullScreen ? createPortal(pane, document.body) : pane;
 };
+
+const MessageSkeleton: React.FC = () => (
+  <div className="space-y-3 animate-pulse" aria-label="Loading messages" role="status">
+    {['w-2/3', 'w-1/2 ml-auto', 'w-3/5', 'w-2/5 ml-auto', 'w-1/2'].map((w, i) => (
+      <div key={i} className={`h-12 rounded-md bg-surface-sunken ${w}`} />
+    ))}
+  </div>
+);

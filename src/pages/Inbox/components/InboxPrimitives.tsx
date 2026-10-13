@@ -75,6 +75,7 @@ export const NavRow: React.FC<{
 }> = ({ icon, label, active, onClick, count, dense, emphasiseCount }) => (
   <button
     type="button"
+    data-nav-row
     onClick={onClick}
     aria-current={active ? 'true' : undefined}
     className={`w-full flex items-center gap-2.5 rounded-sm text-sm transition-colors ${
@@ -90,20 +91,6 @@ export const NavRow: React.FC<{
         ? <span className="text-[11px] rounded-xs bg-primary text-primary-foreground px-1.5 tabular-nums shrink-0">{count}</span>
         : <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{count}</span>
     )}
-  </button>
-);
-
-/** The mobile stand-in for one sidebar row. Squared, never a pill — see the call site. */
-export const MobileChip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-pressed={active}
-    className={`shrink-0 inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-xs border transition-colors ${
-      active ? 'bg-primary text-primary-foreground border-transparent' : 'border-hairline text-muted-foreground hover:bg-surface-hover'
-    }`}
-  >
-    {children}
   </button>
 );
 
