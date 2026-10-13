@@ -49,6 +49,13 @@
   </table>
   </div>
 
+  <h2>Two sides: issued and received</h2>
+  <p>Credit notes exist on both sides of the trade, so the toolbar starts with a switch: <strong>Issued to customers</strong> / <strong>Received from suppliers</strong>.</p>
+  <ul class="feat">
+    <li><strong>Issued to customers</strong> — the list above, with <strong>New</strong>. Each row's actions include submit/retransmit to myDATA, <strong>Download PDF</strong>, and — while it hasn't been transmitted — a card button, <strong>Refund to the card on a terminal</strong> (sign → refund on the terminal → enter the transaction id → file it).</li>
+    <li><strong>Received from suppliers</strong> — a supplier's credit note is <em>received</em>, not authored, so there is no New here. Instead, <strong>Fetch from myDATA</strong> (or <strong>Fetch N from myDATA</strong> when some are waiting) records the ones AADE already holds; a banner says how many received credit notes are not in the books yet, because the list is incomplete until you fetch them. Columns: Number, Date, Reason, Status, Net, VAT, Total.</li>
+  </ul>
+
   <h2>How to create a credit note — step by step</h2>
   <ol>
     <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Credit notes</strong> tab.</li>
@@ -59,6 +66,7 @@
     <li>Save; issue/transmit when ready.</li>
   </ol>
 
+  <div class="callout"><p><strong>The credit follows the invoice.</strong> A credit line's VAT rate comes from the credited invoice line itself (from its own VAT amount when the line has no catalogue VAT category), so a 24% line is never printed or transmitted as 0%. A credit note against a <strong>retail receipt</strong> is an <strong>11.4</strong> and, when transmitted through the provider, is filed standalone rather than correlated to the receipt — the provider refuses that correlation.</p></div>
   <div class="callout tip"><p><strong>Worked example — crediting a returned item.</strong> A customer returns goods from an invoice you already issued. Open <strong>Finance → Credit notes</strong> → click <strong>New</strong> → set the <strong>Type</strong> → write the <strong>Reason</strong> ("returned goods") → pick the original invoice in the <strong>Invoice</strong> field. The credit note counter-balances that invoice, and both documents stay on file.</p></div>
 
   <h2>What it affects elsewhere</h2>

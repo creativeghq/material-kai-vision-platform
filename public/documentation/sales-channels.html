@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Channels | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Sales Channels</div>
+  <h1>Sales Channels — Shopify, WooCommerce, Skroutz &amp; product feeds</h1>
+  <div class="routes"><span class="badge route">/commerce</span> <span class="badge gated">Pro add-on · Shopify / WooCommerce / Skroutz Marketplace</span></div>
+  <p class="lead">Sales Channels connects the marketplaces and webshops you sell through to Finance. An order placed on <strong>Shopify</strong>, <strong>WooCommerce</strong> or <strong>Skroutz</strong> lands here as an ordinary <a href="finance-doc-orders.html">sales order</a> — with the cost of each line and an income category already on it — so it counts in every profit report like any other sale. The same page publishes <strong>product feeds</strong> (Google / Shopify / WooCommerce, Skroutz and BestPrice.gr dialects) so those marketplaces can list your catalogue, runs the <strong>Skroutz order queue</strong>, and records the <strong>payouts</strong> a channel sends you.</p>
+
+  <div class="callout"><p><strong>Where:</strong> enable a channel module — <strong>Shopify</strong>, <strong>WooCommerce</strong> or <strong>Skroutz Marketplace</strong> — from the <a href="apps.html">App Launcher</a> / <a href="account-modules.html">Modules</a>. Each one adds <strong>Sales Channels</strong> to your workspace navigation (<span class="badge route">/commerce</span>); the channel's own entry opens the page filtered to it (<code>/commerce?platform=shopify</code> and so on). The shared engine behind them, <em>Commerce Core</em>, is not sold on its own — any channel module grants it.</p></div>
+
+  <h2>What's on the screen</h2>
+  <p>The header reads <em>"Marketplaces and webshops that send orders into Finance."</em> with a <strong>Connect a channel</strong> button. A tab strip filters everything below by platform: <strong>All · Skroutz · Shopify · WooCommerce · Generic</strong>. Top to bottom:</p>
+  <ul class="feat">
+    <li><strong>Channel comparison</strong> — the last 30 days per channel: orders, revenue, cost, fees, margin and how many orders have an issued document. Appears once a channel has delivered orders.</li>
+    <li><strong>One card per connection</strong> — on/off switch, webhook endpoint, what happens when an order arrives, credentials and <strong>Settings</strong>.</li>
+    <li><strong>Product feeds</strong> — the XML links marketplaces poll to list your products.</li>
+    <li><strong>Skroutz orders</strong> — the accept/reject queue, shown for each enabled Skroutz connection.</li>
+    <li><strong>Payouts</strong> — the lump-sum transfers a channel pays you, matched to the orders they cover.</li>
+    <li><strong>Sync activity</strong> — every inbound order and what was done with it. <em>"This is the first thing to read when orders stop."</em></li>
+  </ul>
+
+  <h2>Connect a channel</h2>
+  <p><strong>What it is —</strong> a connection stores the store's address, its API credentials and a webhook signing secret. <strong>Why it matters —</strong> the credentials let the platform read orders and write documents back; the secret proves that an order really came from your store. Credentials are stored server-side and <strong>never read back into the screen</strong> — afterwards you only see <em>Credentials stored</em> / <em>No credentials</em>.</p>
+  <ol>
+    <li>Click <strong>Connect a channel</strong>. Pick the <strong>Platform</strong>, give it a <strong>Name</strong> (e.g. "Our Shopify store") and the <strong>Store URL</strong>.</li>
+    <li>Paste the credentials the platform asks for:
+      <ul>
+        <li><strong>Shopify</strong> — an <em>Admin API access token</em> with <code>read_orders</code> and <code>write_orders</code>.</li>
+        <li><strong>WooCommerce</strong> — a <em>Consumer key</em> and <em>Consumer secret</em>.</li>
+        <li><strong>Skroutz</strong> — the <em>Smart Cart API token</em> (Skroutz Merchants → Services → Skroutz Marketplace; generating a new token expires the previous one).</li>
+      </ul>
+    </li>
+    <li>A <strong>Webhook secret</strong> is generated for you (<strong>Regenerate</strong> for another). Keep it — you paste it into the store.</li>
+    <li>Click <strong>Save connection</strong>. The channel is saved <strong>switched off</strong>; turn it on with its switch when you're ready.</li>
+    <li>Copy the connection's <strong>Webhook endpoint</strong> (<strong>Copy</strong>) into the store, following the hint under it:
+      <ul>
+        <li>Shopify → Settings → Notifications → Webhooks — subscribe <code>orders/create</code>, <code>orders/updated</code>, <code>orders/paid</code> and <code>orders/cancelled</code>.</li>
+        <li>WooCommerce → Settings → Advanced → Webhooks — topics <code>order.created</code> and <code>order.updated</code>, the endpoint as Delivery URL, the secret as Secret.</li>
+        <li>Skroutz Merchants → Smart Cart webhook settings.</li>
+      </ul>
+    </li>
+  </ol>
+  <div class="callout warn"><p><strong>Don't hand-edit the secret with <code>&amp; ' " &lt; &gt;</code>.</strong> WooCommerce decodes those characters before signing, so a secret containing one fails every delivery's signature check with nothing to read. The generated secret avoids them, and the form refuses one that contains them.</p></div>
+  <p>Later, <strong>Replace credentials</strong> (or <strong>Add credentials</strong>) on the card swaps the token and, optionally, the webhook secret — leave the secret blank to keep the current one. The trash icon removes the connection. If the last call to the store failed, its error is shown at the top of the card.</p>
+
+  <h2>What happens when an order arrives</h2>
+  <p>Four switches per connection decide how far the platform goes on its own:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Switch</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Create or match the customer in CRM</strong></td><td>Finds the buyer in <a href="crm.html">CRM</a> or creates them.</td></tr>
+      <tr><td><strong>Issue the fiscal document automatically</strong></td><td>Issues the receipt or invoice the buyer asked for and transmits it to ΑΑΔΕ.</td></tr>
+      <tr><td><strong>Send the document back to the channel</strong></td><td>When a document is issued automatically, writes a link to it (and its number) onto the order in the store — Shopify order metafields, WooCommerce order meta plus a customer-visible note. The link is stable and always opens a freshly signed copy; a draft is never sent. (For Skroutz, send the PDF from the Skroutz queue — see below.)</td></tr>
+      <tr><td><strong>Reserve stock</strong></td><td>Reserves the ordered quantities in the warehouse chosen in Settings.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><p><strong>Leave automatic issuing off at first.</strong> A fiscal document is numbered sequentially and transmitted to ΑΑΔΕ — issuing can't be undone, only credited. Let the first orders land, check that they read correctly, then switch it on.</p></div>
+  <p><strong>How an order is read —</strong> every delivery's signature is verified before anything is processed, and a repeated delivery of the same order is recognised and skipped (<em>skipped dupe</em>), so a store's retries never create a second order. Prices are read as VAT-inclusive or VAT-exclusive from the order itself, shipping becomes its own taxed line, and the platform re-adds the lines and compares the total <em>and</em> the VAT against what the store says. If either is off by more than a cent, the order lands <strong>for review</strong> instead of being issued.</p>
+  <p><strong>Matching lines to your products —</strong> each line is matched to a catalogue product by the store's product id, then by SKU or barcode — but only when exactly one product matches. A line that matches nothing (or several) is left unmatched: it has <strong>no cost</strong>, and the sync log says how much of the order is unmatched, because that is exactly how much its margin is overstated.</p>
+  <p><strong>Which document —</strong> the platform issues what the <em>buyer</em> asked for. An order flagged at intake, or one where it can't tell whether the buyer wanted a receipt or an invoice, is <strong>held</strong> rather than defaulting to a receipt (a business buyer can't deduct one). An order that arrived already paid is issued, not left as a draft. Skroutz states the requested document on the order itself.</p>
+
+  <h2>Connection settings</h2>
+  <p>Click <strong>Settings</strong> on a connection card — <em>"Where an order from this channel lands, and what the buyer asked for."</em></p>
+  <ul class="feat">
+    <li><strong>Warehouse orders draw from</strong> — the warehouse stock is reserved in.</li>
+    <li><strong>Income category</strong> — defaults to <strong>eCommerce</strong>; change it only if you keep your own chart of accounts. Commission from payouts goes to <strong>eCommerce Fees</strong>.</li>
+    <li><strong>Receipt code</strong> / <strong>Invoice code</strong> — the document types issued for this channel.</li>
+    <li><strong>Where this shop keeps the ΑΦΜ</strong> (Shopify / WooCommerce only) — neither platform has a VAT-number field, so it lives under whatever key the shop's invoicing plugin uses. <strong>Scan recent orders</strong> lists the custom fields that actually appear on recent orders, with how often; type the right one into <strong>VAT-number field</strong> and <strong>Invoice-requested field</strong>. Until these are set, every order from the shop lands for review.</li>
+    <li><strong>Pull the last 30 days</strong> — fetches recent orders straight from the store and ingests any the webhook never delivered. The result names how many were new, already held, need review or failed.</li>
+  </ul>
+
+  <h2>Product feeds</h2>
+  <p><strong>What it is —</strong> a feed is an XML link a marketplace polls to list your catalogue. <strong>Why it matters —</strong> it's how your products appear on Skroutz, BestPrice.gr, Google Merchant Center or another shop without retyping them. Anyone holding the link can read your published products, so <strong>Rotate</strong> it to revoke access — the old link stops working immediately.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Dialect</th><th>Use it for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Google / Shopify / WooCommerce</strong></td><td>RSS 2.0 with the <code>g:</code> namespace — what Google Merchant Center and both webshop importers read.</td></tr>
+      <tr><td><strong>Skroutz</strong></td><td>Skroutz's own <code>&lt;mywebstore&gt;</code> format. Skroutz silently drops a product missing any mandatory attribute.</td></tr>
+      <tr><td><strong>BestPrice.gr</strong></td><td>A <code>&lt;store&gt;</code> document with BestPrice's own tag names. BestPrice sends the buyer to your shop rather than taking the order, so it needs the feed and nothing else — there's no channel to connect.</td></tr>
+      <tr><td><strong>Generic</strong></td><td>The same RSS document, for any other importer that accepts it.</td></tr>
+    </tbody>
+  </table></div>
+  <ol>
+    <li>Click <strong>New feed</strong>, name it (e.g. "Skroutz listing"), pick the <strong>Dialect</strong> and <strong>Create</strong>.</li>
+    <li><strong>Copy</strong> the link into the marketplace's merchant settings and switch the feed <strong>live</strong>.</li>
+    <li>Click <strong>Choose what it lists</strong>: <em>Everything published</em>, <em>Chosen categories</em> or <em>Chosen products</em>, plus two switches — <strong>Published prices only</strong> and <strong>List products that are out of stock</strong>.</li>
+    <li>Watch the line under the link: <em>Last read … · N reads · N products</em>, or <em>Never read</em> — if the importer is configured and this stays empty, it isn't reaching you.</li>
+  </ol>
+  <p>Prices are sent <strong>VAT-inclusive</strong>, using each product's own VAT category. Stock comes from the warehouse: a counted zero is withheld unless you list out-of-stock products, and a product with <strong>no warehouse record</strong> has <em>unknown</em> stock, so it's listed as <strong>on order</strong> rather than claimed as in stock.</p>
+  <div class="callout warn"><p><strong>Three reasons a feed comes out short or empty — each one is named on the page:</strong></p>
+  <ul>
+    <li><strong>Your storefront is closed.</strong> Every product link in every feed points at your public store, so with it closed the feed <strong>refuses to build</strong>. Open it at <a href="finance-settings-online-store.html">Finance → Settings → Online Store</a>.</li>
+    <li><strong>Nothing is published.</strong> "N priced products, none published" — publish them in <a href="finance-settings-online-store.html">Online Store</a>, or turn off <em>Published prices only</em> for the feed.</li>
+    <li><strong>Products the marketplace will drop.</strong> After each build the feed says e.g. <em>"42 of 310 will be dropped on arrival for a missing attribute — mpn (38), ean (22)"</em>. The feed still returns normally, so without this the listing would simply be short. Skroutz and BestPrice require different attributes (BestPrice needs neither EAN nor description).</li>
+  </ul></div>
+
+  <h3>From a supplier import to a marketplace listing</h3>
+  <p>Products loaded from a supplier XML now arrive with everything a feed needs: a <strong>price row</strong> (a re-import updates it in place rather than duplicating it), their <strong>category</strong>, their <strong>image</strong>, and mappable <strong>MPN</strong>, <strong>barcode</strong> and <strong>weight</strong> fields. They still need <strong>publishing</strong> before a feed with <em>Published prices only</em> lists them — the page tells you when products are priced but none are published.</p>
+
+  <h2>Skroutz orders</h2>
+  <p><strong>What it is —</strong> unlike a webshop, Skroutz starts a clock: each order has to be <strong>accepted or rejected</strong>, and since 30/03/2026 dispatch needs an explicit <strong>Set as ready</strong>. <strong>Why it matters —</strong> an order left open <strong>expires</strong>, and an expired order is a lost sale nobody tells you about. So Skroutz is a queue with a count of what's waiting on you, not just a log.</p>
+  <ol>
+    <li>Click <strong>Fetch orders</strong> to pull what's open (until a Skroutz webhook is registered, this is how you see them).</li>
+    <li>For an <strong>open</strong> order, click <strong>Accept</strong> or <strong>Reject</strong>.</li>
+    <li>For an <strong>accepted</strong> order, click <strong>Set as ready</strong> when it's packed.</li>
+    <li>Once its document is issued, <strong>Send &lt;number&gt;</strong> uploads the rendered PDF to the order on Skroutz (7&nbsp;MB limit).</li>
+  </ol>
+  <p>The table shows each order's <strong>State</strong> (open, accepted, dispatched, delivered, expired, returned…), what the buyer <strong>Asked for</strong> (receipt or invoice), and when it was seen; the order number links to the sales order in Finance.</p>
+
+  <h2>Payouts</h2>
+  <p><strong>What it is —</strong> a channel doesn't pay per order: it pays in one lump, net of its commission, covering many orders. <strong>Why it matters —</strong> matched naively, the orders never show as paid and the commission never appears, so margin is overstated by exactly the commission. Recording the payout here settles the covered orders in full and books the commission as a <strong>cost</strong> (eCommerce Fees), not as a discount off revenue.</p>
+  <ol>
+    <li>Click <strong>Record a payout</strong>: pick the <strong>Channel</strong>, enter <strong>Their reference</strong>, <strong>Paid on</strong>, the <strong>Period from / to</strong>, <strong>Gross collected</strong>, <strong>Commission and fees</strong> and <strong>Net received</strong> (defaults to gross − fees).</li>
+    <li><strong>Save and match</strong> attaches the channel's orders from that period automatically — skipping any already on another payout.</li>
+    <li>Click the payout to see the covered orders (each with its document number, or <em>not issued</em>). Remove any that don't belong, or <strong>Match orders</strong> again after widening the period.</li>
+    <li>Click <strong>Settle</strong>. The orders are marked paid and the commission is booked. If gross − fees doesn't equal the net, the payout is marked <strong>discrepancy</strong> with a note instead of absorbing the difference.</li>
+  </ol>
+  <p>A <strong>reconciled</strong> payout can't have orders removed from it — the payments already exist.</p>
+
+  <h2>Channel comparison</h2>
+  <p>Margin per channel is revenue less the cost on the lines and the commission on the payouts — so it's only a fact when the lines carry a cost. A channel whose lines have no cost shows margin as <strong>unknown</strong> (with the reason), never the revenue figure dressed as margin; a channel where only some lines matched shows <strong>partial</strong> and names how much is unmatched.</p>
+
+  <h2>Sync activity</h2>
+  <p>Every inbound order with its <strong>Outcome</strong>: <em>created</em>, <em>updated</em>, <em>skipped dupe</em> (a repeated delivery), <em>needs review</em> or <em>error</em>, plus the detail of why. The order number links to the sales order. With more than a few entries you can search and filter by channel and outcome.</p>
+
+  <h2>What it affects elsewhere</h2>
+  <ul class="feat">
+    <li><strong><a href="finance-doc-orders.html">Orders</a></strong> — channel orders are ordinary sales orders. On a channel order with an issued document, the invoice row offers <strong>Send to channel</strong>, so a document you issued by hand can still be pushed back to a Shopify or WooCommerce store. The order's <strong>Shipping</strong> tab records the carrier and tracking number (see <a href="finance-op-dispatch.html">Dispatch</a>).</li>
+    <li><strong>Document numbering</strong> — under <a href="finance-settings-documents.html">Finance → Settings → Documents</a>, a series can be set to <em>Applies to</em> one channel (Skroutz, Shopify + WooCommerce, Shopify only, WooCommerce only, Own online store, Register (POS)), so a marketplace can be numbered apart from your shop. A Shopify or WooCommerce order uses an exact-channel range first, then a <em>Shopify + WooCommerce</em> range, then <em>All sales</em>; Skroutz is never grouped with the webshops.</li>
+    <li><strong>Profit &amp; reports</strong> — because each line carries its cost and the eCommerce category, channel sales flow into the P&amp;L and every profit report automatically.</li>
+    <li><strong>Your <a href="finance-settings-online-store.html">Online Store</a></strong> — feeds link to it, so it must be open.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Worked example — first week on Skroutz.</strong> Enable <em>Skroutz Marketplace</em> → <strong>Connect a channel</strong> with your Smart Cart token, leave <em>Issue the fiscal document automatically</em> off → open your store in Online Store and publish your products → <strong>New feed</strong> in the Skroutz dialect, fix what the "will be dropped" line names, and give Skroutz the link → when orders come in, <strong>Fetch orders</strong>, <strong>Accept</strong>, issue the document from the order, <strong>Send</strong> it, <strong>Set as ready</strong> → when Skroutz pays, <strong>Record a payout</strong> and <strong>Settle</strong>. Once the first orders read correctly, switch automatic issuing on.</p></div>
+
+  <div class="callout"><p><strong>Not the same as…</strong> the surplus/last-stock <a href="discover-marketplace.html">Marketplace</a> on Discover (selling to other trade members on this platform), or the <em>Greek Marketplaces</em> add-on of Price Monitoring (reading Skroutz/BestPrice prices to watch the market).</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

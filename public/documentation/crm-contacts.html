@@ -14,7 +14,7 @@
   <p class="lead">The Contacts tab is where you keep the individual people you deal with — a buyer, an architect, a site contact, a supplier rep. A contact is not just an address-book entry: it carries its own pricing, billing and VAT details, so when Finance issues a quote or an invoice the document is already addressed to the right party with the right legal name, VAT number and terms — no re-keying, no mismatched names. This guide walks the Contacts list and every group of the New Contact form: <strong>what it captures, why it matters, how to fill it in, and what it changes elsewhere on the platform.</strong></p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>CRM</strong> → the <strong>Contacts</strong> tab. A toolbar <strong>Add Contact</strong> button (also labelled <strong>New Contact</strong>) opens the form, and a search box (<em>"Search contacts…"</em>) filters the list. Clicking any row opens that person's detail page at <span class="badge route">/crm/contacts/:id</span>.</p>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Contacts</strong> tab. The toolbar <strong>Add contact</strong> button (and the App Launcher's <em>New Contact</em> chip) first asks <em>“What Are You Adding?”</em>, then opens the form. A search box (<em>"Search contacts…"</em>) filters the list — it matches the name and the text of the <strong>notes</strong> written on a contact. Clicking any row opens that person's detail page at <span class="badge route">/crm/contacts/:id</span>.</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-contacts.png" alt="CRM Contacts tab">
@@ -31,14 +31,14 @@
       <tr><td><strong>Email</strong></td><td>Primary email address.</td></tr>
       <tr><td><strong>Phone</strong></td><td>Phone number.</td></tr>
       <tr><td><strong>Company</strong></td><td>The business the contact is attached to (shown by name — it links through to that company's <a href="crm-companies.html">Account</a>).</td></tr>
-      <tr><td><strong>Type</strong></td><td>The contact type. There's a <strong>Type</strong> filter (plus filters for status, company, kind and category) above the list.</td></tr>
+      <tr><td><strong>Activity</strong></td><td>The person's declared line of work (their professional type). The filter above the list narrows by <strong>Status</strong>, <strong>Lifecycle stage</strong>, <strong>Relationship</strong> (customer / supplier), <strong>Attached company</strong> and <strong>Category</strong>.</td></tr>
       <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the contact.</td></tr>
     </tbody>
   </table>
   </div>
 
   <h2>The contact detail page — Activity, notes &amp; attached business</h2>
-  <p><strong>What it is —</strong> opening a contact shows a <strong>two-column</strong> layout (with collapsible sidebar sections) where the main column is a unified <strong>Activity</strong> feed.</p>
+  <p><strong>What it is —</strong> opening a contact shows a <strong>two-column</strong> layout (with collapsible sidebar sections). The main column's tabs are <strong>Activity</strong>, <strong>Details</strong> (with its own side list: <em>Lead</em>, <em>Address &amp; Phone</em>, <em>Categories</em>, <em>Linked Account</em>, <em>Commercial &amp; VAT</em>), <strong>Account</strong> (or, when attached to a company, <strong>Company</strong> instead) and <strong>Work</strong> — the person's projects, equipment and other records, grouped the same way as on a <a href="crm-companies.html">company</a>.</p>
   <ul class="feat">
     <li><strong>Activity feed + inline notes.</strong> The contact's quotes, invoices and notes appear together in one time-ordered feed, and you add a <strong>note inline</strong> right there — there's no separate Notes tab anymore.</li>
     <li><strong>Role &amp; Birthday on the contact.</strong> The customer/supplier <strong>Role</strong> sits in Contact Information (and is inherited from an attached business), and there's a <strong>Birthday</strong> field.</li>
@@ -49,7 +49,7 @@
   <p>The New Contact form is organised into groups. Required fields are marked with <strong>*</strong>. The quick path is short; the field-by-field walkthrough below explains every group.</p>
   <ol>
     <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Contacts</strong> tab.</li>
-    <li>Click <strong>Add Contact</strong> (also labelled <strong>New Contact</strong>) to open the New Contact form.</li>
+    <li>Click <strong>Add contact</strong>. In <em>“What Are You Adding?”</em> pick <strong>Customer · Private Person</strong> (buys for themselves — retail receipt, no VAT number) or <strong>Other Contact</strong> (a lead, partner or colleague). The form opens with customer/supplier and contact type already set. (A <em>business</em> card creates a company instead — see <a href="crm-companies.html">Companies</a>; a sole trader found there can still be added as a person.)</li>
     <li>Fill in <strong>Full Name</strong> (required) under <strong>Contact Information</strong>, then add <strong>Email</strong>, <strong>Phone</strong> and any other details you have.</li>
     <li>Work down the groups that apply — <strong>Lead Information</strong>, <strong>Address</strong>, <strong>Linked User Account</strong>, <strong>Pricing</strong>, <strong>Invoicing &amp; VAT</strong>, <strong>Tax &amp; VAT</strong> and <strong>Role</strong>.</li>
     <li>Optionally assign a <strong>category</strong> to segment the contact and link them to a <strong>company</strong>.</li>
@@ -73,7 +73,7 @@
       <tr><td><strong>Email</strong></td><td>Primary email address.</td></tr>
       <tr><td><strong>Phone</strong></td><td>Landline / main phone number.</td></tr>
       <tr><td><strong>Mobile</strong></td><td>Mobile number.</td></tr>
-      <tr><td><strong>Position/Title</strong></td><td>Job title or role.</td></tr>
+      <tr><td><strong>Position / Title</strong></td><td>Job title or role. This is the one place a person's title is kept: when you attach them to a company, the title you enter there is saved here too, and a company's contact list shows this value.</td></tr>
       <tr><td><strong>Department</strong></td><td>Department within their organisation.</td></tr>
     </tbody>
   </table>
@@ -127,7 +127,7 @@
     <li>If they don't, click <strong>Create &amp; Invite User</strong> — this creates a login for the contact and invites them in as a user, so the record you keep and the person who logs in are the same.</li>
     <li><strong>Save.</strong> The contact and the user are now the same person on the platform.</li>
   </ol>
-  <p><strong>What it affects elsewhere:</strong> a linked user appears in the <a href="crm.html">CRM → Users</a> tab; if you grant them the <em>dealer</em> or <em>factory</em> role there, they automatically fall into the role-linked categories (Dealer Accounts / Factory Accounts).</p>
+  <p><strong>What it affects elsewhere:</strong> the person can sign in as themselves, and the <em>Linked account</em> card shows their profile photo next to their email.</p>
 
   <h3>Pricing</h3>
   <p><strong>What it is —</strong> the commercial terms you've agreed with this contact. <strong>Why it matters —</strong> a <strong>default discount %</strong> is applied automatically so you don't re-negotiate on every quote, and a <strong>credit limit</strong> protects you from over-extending an account — Finance can <em>warn</em> or even <em>block</em> an invoice that would push the buyer past it.</p>
@@ -187,7 +187,7 @@
     <tbody>
       <tr><td><strong>This is a supplier</strong></td><td>Mark the contact as a supplier.</td></tr>
       <tr><td><strong>This is a customer</strong></td><td>Mark the contact as a customer (either or both can apply).</td></tr>
-      <tr><td><strong>Contact type</strong></td><td>The kind of contact.</td></tr>
+      <tr><td><strong>Contact type</strong></td><td><em>Private (B2C)</em> or <em>Company (B2B)</em> — set for you by the card you picked when adding the contact. It decides whether they're invoiced against a VAT number or given a retail receipt. A value written by another module (Real Estate's <em>buyer</em> / <em>seller</em>) is shown as it is rather than as “Not set”, so it isn't overwritten by accident.</td></tr>
     </tbody>
   </table>
   </div>
@@ -197,7 +197,7 @@
   <p>Click any row in the Contacts list (or use the per-row <strong>Actions</strong>) to open the contact's detail page at <span class="badge route">/crm/contacts/:id</span>. This is where the whole relationship lives in one view. From there you can:</p>
   <ul class="feat">
     <li><strong>Edit core information</strong> — name, email, phone, address, VAT/tax details, pricing and notes — using the same grouped form described above.</li>
-    <li><strong>Assign categories</strong> — apply the segment labels you defined in the <a href="crm.html">Categories</a> tab, so the contact joins the audiences used for outreach.</li>
+    <li><strong>Assign categories</strong> — on <em>Details → Categories</em>, pick from the colour-coded <a href="crm-categories.html">Categories</a> list (owners and admins can create a new one right there), and tag <strong>What they deal in</strong> from the product categories.</li>
     <li><strong>Link or change the login</strong> — attach an existing user, or use <strong>Create &amp; Invite User</strong> to give the person access.</li>
     <li><strong>See associated records</strong> — the company the contact belongs to, and the documents and activity tied to them, so the whole relationship is in one place.</li>
   </ul>
@@ -208,12 +208,12 @@
     <li><strong>Credit control</strong> — the <strong>credit limit</strong> drives the warn/block rules in <a href="finance-settings.html">Finance settings → General</a>.</li>
     <li><strong>Payables</strong> — a contact flagged <strong>This is a supplier</strong> becomes available on the purchases/payables side and the supplier account overview.</li>
     <li><strong>Greek clientele reporting (ΜΥΦ)</strong> — <strong>Include in ΜΥΦ</strong> adds the contact's transactions to your MyData clientele summary.</li>
-    <li><strong>Platform access</strong> — a contact linked via <strong>Create &amp; Invite User</strong> appears in <a href="crm.html">CRM → Users</a> with a manageable role and subscription.</li>
+    <li><strong>Platform access</strong> — a contact linked via <strong>Create &amp; Invite User</strong> gets their own login; what they can reach is decided by the access you invited them with (see <a href="crm.html">CRM → Inviting people</a>).</li>
   </ul>
 
-  <div class="callout tip"><p><strong>Worked example — adding a customer who can also log in.</strong> Open <strong>CRM → Contacts → Add Contact</strong>. Under <strong>Contact Information</strong> enter the buyer's <em>Full Name</em>, <em>Email</em> and <em>Phone</em>. In <strong>Pricing</strong> set a <em>Default discount %</em> you've agreed and a <em>Credit limit</em> so Finance can guard the account. In <strong>Invoicing &amp; VAT</strong> fill the <em>Billing name</em>, <em>Billing VAT (ΑΦΜ)</em>, <em>Tax office (ΔΟΥ)</em> and billing address, pick the right <em>Segment</em>, and (for a Greek customer) switch on <em>Include in ΜΥΦ</em>. Under <strong>Role</strong> tick <em>This is a customer</em>. Finally, in <strong>Linked User Account</strong> click <strong>Create &amp; Invite User</strong> so they get a login to the shared project. <strong>Save.</strong> The person is now a billing-ready customer whose invoices are correctly addressed, capped to their credit limit, reported in your ΜΥΦ — and who can log in to the platform.</p></div>
+  <div class="callout tip"><p><strong>Worked example — adding a customer who can also log in.</strong> Open <strong>CRM → Contacts → Add contact</strong> and pick the card that fits. Under <strong>Contact Information</strong> enter the buyer's <em>Full Name</em>, <em>Email</em> and <em>Phone</em>. In <strong>Pricing</strong> set a <em>Default discount %</em> you've agreed and a <em>Credit limit</em> so Finance can guard the account. In <strong>Invoicing &amp; VAT</strong> fill the <em>Billing name</em>, <em>Billing VAT (ΑΦΜ)</em>, <em>Tax office (ΔΟΥ)</em> and billing address, pick the right <em>Segment</em>, and (for a Greek customer) switch on <em>Include in ΜΥΦ</em>. Under <strong>Role</strong> tick <em>This is a customer</em>. Finally, in <strong>Linked User Account</strong> click <strong>Create &amp; Invite User</strong> so they get a login to the shared project. <strong>Save.</strong> The person is now a billing-ready customer whose invoices are correctly addressed, capped to their credit limit, reported in your ΜΥΦ — and who can log in to the platform.</p></div>
 
-  <div class="callout"><p>For the other CRM tabs (Users, Companies, Categories) and the Greek ΑΑΔΕ company lookup, see <a href="crm.html">CRM</a>. For what happens once you invoice a contact, see <a href="finance.html">Finance &amp; Invoicing</a>; for the segments, VAT-exemption categories and credit-limit rules referenced above, see <a href="finance-settings.html">Finance settings</a>.</p></div>
+  <div class="callout"><p>For the other CRM tabs (Pipeline, Companies, Categories) and the Greek ΑΑΔΕ company lookup, see <a href="crm.html">CRM</a>. For what happens once you invoice a contact, see <a href="finance.html">Finance &amp; Invoicing</a>; for the segments, VAT-exemption categories and credit-limit rules referenced above, see <a href="finance-settings.html">Finance settings</a>.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Projects: Other tabs | MaterialsHub Documentation</title>
+<title>Projects: The stages | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Other tabs</div>
-  <h1>Projects · Other tabs</h1>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / The stages</div>
+  <h1>Projects · The stages &amp; who sees what</h1>
   <div class="routes"><span class="badge route">/projects/:id</span></div>
-  <p class="lead">A project's detail page is organised into tabs that cover the work and its deliverables. This guide summarises the remaining tabs — the ones beyond <a href="projects-rooms.html">Rooms</a> and the <a href="projects-client-view.html">Client View</a> — in one line each, and shows how to bring teammates and clients into a project with an invite link.</p>
+  <p class="lead">A project's detail page is organised into <strong>seven stages</strong>, each holding a few sections. This guide maps every section to its stage, explains who sees which (the owner, the <a href="projects-overview.html#team">project team</a>, or an invited client), and shows how to bring a client in with an invite.</p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>Projects</strong> → open a project to reach its detail page (<span class="badge route">/projects/:id</span>). The tabs run across the project's detail page. The set you see depends on your role — some tabs are owner-only or shown only when their module is enabled, and shared collaborators get a reduced set.</p>
+  <p>Apps menu → <strong>Projects Hub</strong> → <strong>Projects</strong> → open a project to reach its detail page (<span class="badge route">/projects/:id</span>). The stages run across the top of the page; the selected stage lists its sections in a <strong>rail beside the content</strong> (a strip above it on a narrow screen). The set you see depends on who you are on the project and on which modules are enabled.</p>
 
   <h2>What's on the screen — seven stages</h2>
   <p>The detail page groups its sections into <strong>seven stages</strong> on one row (you don't have to use them in order — they just gather related sections). A stage you can only see one section of shows as that section.</p>
@@ -22,38 +22,43 @@
   <table>
     <thead><tr><th>Stage</th><th>Sections under it</th></tr></thead>
     <tbody>
-      <tr><td><strong>Overview</strong></td><td>A summary of the project — client, budget and deadline, status, key counts.</td></tr>
+      <tr><td><strong>Overview</strong></td><td>The cover with description, client, deadline, budget and tasks; <a href="projects-overview.html#cost">Cost &amp; margin</a>, Rooms, <a href="projects-overview.html#visits">Visits &amp; meetings</a>, task progress and milestones, and the <a href="projects-overview.html#team">Team</a>. See <a href="projects-overview.html">Overview, costs, visits &amp; team</a>.</td></tr>
       <tr><td><strong>Design</strong></td><td><a href="projects-rooms.html">Rooms</a>, <a href="moodboards.html">Moodboards</a>, <a href="projects-technical-plans.html">Sheets</a> (presentation &amp; technical plans).</td></tr>
-      <tr><td><strong>Specification</strong></td><td>Products <span class="badge gated">owner</span>, <a href="projects-plan.html">Plan</a> (the estimating engine) <span class="badge gated">owner</span>, Purchases (made-to-order joinery + supplier sheet).</td></tr>
-      <tr><td><strong>Commercial</strong></td><td><a href="quotes.html">Quotes</a>, <a href="contracts.html">Contracts</a>, Billing, and <strong>Finance</strong> — which holds the <a href="construction-commercial.html">construction money chain</a> (BoQ, variations/CVR, valuations/retention, tenders, labour). <span class="badge gated">owner · finance.manage</span></td></tr>
-      <tr><td><strong>Delivery</strong></td><td><a href="construction-programme.html">Tasks &amp; Programme</a>, <a href="construction-site.html">Site</a> (diary, inspections, snags), <a href="construction-drawings.html">Drawings</a>.</td></tr>
-      <tr><td><strong>Client</strong></td><td><a href="projects-client-view.html">Client View</a> <span class="badge gated">owner</span>, <a href="construction-requests.html">Requests</a> (RFIs &amp; submittals), Handover (<a href="crm-installed-base.html">warranties</a>).</td></tr>
-      <tr><td><strong>Review</strong></td><td><a href="ai-assessment.html">AI Assessment</a>, Timeline <span class="badge gated">owner</span>.</td></tr>
+      <tr><td><strong>Specification</strong></td><td>Products <span class="badge gated">team</span>, <a href="projects-plan.html">Plan</a> (the estimating engine) <span class="badge gated">team</span>, Purchases (made-to-order joinery + supplier sheet) <span class="badge gated">team</span>.</td></tr>
+      <tr><td><strong>Commercial</strong></td><td><a href="quotes.html">Quotes</a>, <a href="contracts.html">Contracts</a> <span class="badge gated">team</span>, Billing <span class="badge gated">manager</span>, and <strong>Finance</strong> — which holds the <a href="construction-commercial.html">construction money chain</a> (BoQ, variations/CVR, valuations/retention, tenders, labour). <span class="badge gated">manager · finance.manage</span></td></tr>
+      <tr><td><strong>Delivery</strong></td><td><a href="projects-tasks.html">Tasks</a> (List, Board, Calendar and the <a href="construction-programme.html">Schedule</a>), <a href="construction-site.html">Site</a> (diary, inspections, snags), Documents (including <a href="construction-drawings.html">Drawings</a>).</td></tr>
+      <tr><td><strong>Client</strong></td><td><a href="projects-client-view.html">Client View</a> <span class="badge gated">team</span>, <a href="construction-requests.html">Requests</a> (RFIs &amp; submittals), Handover (<a href="crm-installed-base.html">warranties</a>) <span class="badge gated">team</span>.</td></tr>
+      <tr><td><strong>Review</strong></td><td><a href="ai-assessment.html">AI Assessment</a> <span class="badge gated">team</span>, Timeline <span class="badge gated">team</span>.</td></tr>
     </tbody>
   </table>
   </div>
-  <p>Several sections have their own guides: <a href="projects-rooms.html">Rooms</a>, the <a href="projects-plan.html">Plan &amp; Estimating</a> engine, <a href="projects-technical-plans.html">Technical Plans</a>, the <a href="projects-client-view.html">Client View</a>, and the whole <a href="construction.html">Construction &amp; Contracting</a> toolset (Commercial, Delivery and Client stages). What you see depends on your role: a shared collaborator gets a reduced set (the owner-only sections stay private).</p>
+  <p>Several sections have their own guides: <a href="projects-rooms.html">Rooms</a>, the <a href="projects-plan.html">Plan &amp; Estimating</a> engine, <a href="projects-technical-plans.html">Technical Plans</a>, the <a href="projects-client-view.html">Client View</a>, and the whole <a href="construction.html">Construction &amp; Contracting</a> toolset (Commercial, Delivery and Client stages). A <span class="badge gated">team</span> section is open to the owner and the project team but never to an invited client; <span class="badge gated">manager</span> means the owner and project managers only. Coming back to a stage reopens the section you left it on.</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-overview.png" alt="A project's Overview tab">
     <figcaption>A project's Overview tab.</figcaption>
   </figure>
 
-  <h2>Inviting collaborators &amp; clients</h2>
-  <p><strong>What it is —</strong> a way to bring other people — teammates or the client — into a project via an invite link (<span class="badge route">/projects/invite/:token</span>).</p>
-  <p><strong>Why it matters —</strong> projects are collaborative: you may want a colleague working alongside you in the same boards and quotes, or the client looking in on progress. Invitations let you do that without handing over your whole workspace — shared users see the project marked as shared and get a reduced set of sections, so the owner-only ones (Products, Plan, Purchases, Billing, Finance, Contracts, Client View, Handover, Timeline and Assessment) stay private.</p>
+  <h2 id="who">Who sees what</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Who</th><th>What they get</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Owner</strong></td><td>Everything, including <strong>Delete</strong> and handing the project over.</td></tr>
+      <tr><td><strong>Project manager</strong></td><td>Every section, including Billing and (with finance access) Finance; edits the project, archives it, invites clients and manages the team.</td></tr>
+      <tr><td><strong>Team member</strong></td><td>Every section except Billing and Finance — the working surface without the money.</td></tr>
+      <tr><td><strong>Invited client</strong></td><td>A read-only slice: Overview, Rooms, Moodboards, Sheets, Quotes, Tasks marked <em>Client visible</em>, Site, Documents and Requests. Never Products, Plan, Purchases, Contracts, Billing, Finance, Client View, Handover, Timeline or the AI Assessment.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Teammates are added on the Overview's <a href="projects-overview.html#team">Team panel</a>. Clients are invited by email, below.</p>
 
-  <h2>How to invite a collaborator — step by step</h2>
+  <h2 id="client">Inviting the client</h2>
+  <p><strong>What it is —</strong> a passwordless email invitation that lets your client look in on the project (<span class="badge route">/projects/invite/:token</span>). <strong>Why it matters —</strong> the client follows progress, sees what you choose to share and can <a href="projects-overview.html#visits">request a visit</a>, without you handing over your workspace.</p>
   <ol>
-    <li><strong>Create an invite</strong> for the teammate or client you want to bring into the project.</li>
-    <li><strong>Share the invite link</strong> (<span class="badge route">/projects/invite/:token</span>) with them.</li>
-    <li>The invitee lands on a <strong>public landing page</strong> and <strong>accepts</strong> the invite after signing in, gaining access to the project.</li>
+    <li>In the project header, press <strong>Invite client</strong> (owner and managers). The dialog is <em>“Invite Clients to View This Project”</em>.</li>
+    <li>Enter the client's <strong>Email address</strong>, an optional <strong>Personal message</strong>, and press <strong>Send invitation</strong>.</li>
+    <li>The client opens the link, signs in with a one-time code sent to that email, and accepts. The dialog lists each invite as <em>Pending</em>, <em>Active</em>, <em>Expired</em> or <em>Revoked</em>; you can copy the link, re-send it or revoke access.</li>
   </ol>
-  <p><strong>What it affects:</strong> accepted invitees gain access to the project's non-private tabs and see it flagged as shared; the owner-only tabs remain hidden from them.</p>
-
-  <div class="callout tip"><p><strong>Worked example — bringing in a colleague.</strong> Create an invite for the teammate → send them the link at <span class="badge route">/projects/invite/:token</span> → they open the public landing page, sign in, and accept. They now see the project's non-private sections (Overview, Rooms, Moodboards, Sheets, Quotes, Tasks, Site, Documents, Requests) marked as shared, while the owner-only ones (Products, Plan, Purchases, Billing, Finance, Contracts, Client View, Handover, Timeline, Assessment) stay private to you.</p></div>
-
-  <div class="callout"><p><strong>In short:</strong> the tabs keep a project's many moving parts separated but reachable from one place; <a href="projects-rooms.html">Rooms</a> and the <a href="projects-client-view.html">Client View</a> have their own guides, and invite links bring teammates and clients in with a reduced, owner-safe set of tabs.</p></div>
+  <div class="callout tip"><p><strong>Worked example.</strong> Add your site supervisor to the <a href="projects-overview.html#team">team</a> as a <strong>Member</strong> so they can run tasks and the site diary, then <strong>Invite client</strong> with the homeowner's email. The supervisor works in the project like you do (minus the money); the homeowner sees progress, client-visible tasks and documents, and can ask for a showroom visit — but never your costs, your plan or your internal task comments.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

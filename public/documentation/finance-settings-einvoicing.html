@@ -10,38 +10,63 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / e-Invoicing</div>
   <h1>Settings · e-Invoicing</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">This section is a simple progress tracker for switching your account on to electronic invoicing through Novus to myDATA. It does not transmit anything itself — it just records where you are in the activation process so anyone on the team can see the current state at a glance. The actual sending of invoices to myDATA happens elsewhere, once activation is complete.</p>
+  <div class="routes"><span class="badge route">/finance?tab=settings</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">This section answers two questions: <strong>is this VAT number registered with the e-invoicing provider</strong> (Novus) so it may issue legal documents at all, and <strong>is the connection set up</strong> to transmit them to myDATA. Registration is now a tracked, step-by-step ladder driven by Novus's own answers — not a status you type in.</p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>e-Invoicing</strong> (in the row of settings sub-tabs). The heading on the panel reads <strong>"e-Invoicing (Novus → myDATA)"</strong>.</p>
+  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> → <strong>e-Invoicing</strong>. The same registration card is also the <strong>e-Invoicing</strong> step of <strong>Start Here</strong> (for workspace managers with <code>finance.manage</code>), placed first because the signature and Novus's review take time.</p>
+  <div class="callout warn"><p><strong>Why it is urgent —</strong> from <strong>1 October 2026</strong>, a B2B invoice issued straight out of an ERP does not legally count as issued. Novus files a provider declaration with ΑΑΔΕ against your VAT number, and until that clears, this business cannot issue a legal invoice through the platform.</p></div>
 
-  <h2>What's on the screen</h2>
-  <p>The panel is deliberately small — three controls, top to bottom:</p>
+  <h2>Card 1 — Register for e-invoicing</h2>
+  <p><strong>What it is —</strong> the application to Novus and every step after it, each with a verdict badge. The overall badge at the top reads <em>Not started</em>, <em>In progress</em>, <em>Needs attention</em>, or <em>Active — this VAT can issue</em>. A refresh button re-checks with Novus.</p>
+  <h3>The application</h3>
   <ul class="feat">
-    <li><strong>Status</strong> — the main control. It starts at <em>"Not requested"</em> and tracks how far along your Novus → myDATA activation is. You move it forward as each step in the activation completes, so the rest of the team can see whether e-invoicing is still being set up or is live.</li>
-    <li><strong>Note</strong> (optional) — a free-text field for the details worth remembering about the activation: the contract number, the date you submitted the request, or who handled it. Nothing here is sent anywhere — it's a memo for your own records.</li>
-    <li><strong>Save status</strong> — the button that stores the current Status and Note. Nothing you change takes effect until you click it.</li>
+    <li><strong>Administrator — full name</strong> and <strong>Administrator — ΑΦΜ</strong> — the person who signs (their own ΑΦΜ, not the company's).</li>
+    <li><strong>What this business issues</strong> — <em>Invoices to businesses (B2B)</em> and/or <em>Receipts to consumers (B2C)</em>. B2G is a separate arrangement and is not handled here. Choosing B2C asks for your <strong>Internet provider</strong>, <strong>their contract number</strong> and <strong>contract date</strong>.</li>
+    <li><strong>Save</strong> keeps the draft; <strong>Send to Novus</strong> submits it. Sending is disabled while Business Identity details are missing — the card lists what is still needed with a link to <a href="finance-settings-business-identity.html">Business Identity</a>.</li>
   </ul>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-e-invoicing.png" alt="e-Invoicing section: Status control starting at Not requested, an optional Note field, and the Save status button">
-    <figcaption>The e-Invoicing (Novus → myDATA) panel: the Status control (starting at "Not requested"), the optional Note field for contract/date/handler details, and the Save status button.</figcaption>
-  </figure>
+  <div class="callout"><p><strong>Send it once.</strong> Sending creates a real contract at Novus with its own number. If a reply goes missing, the platform replays the same request rather than opening a second contract.</p></div>
 
-  <h2>How to record activation progress — step by step</h2>
-  <ol>
-    <li>Go to <strong>Finance → Settings → e-Invoicing</strong>.</li>
-    <li>Open the <strong>Status</strong> control. It begins at <em>"Not requested"</em> — that's the state before you've asked Novus to switch you on.</li>
-    <li>As your activation moves forward, set the <strong>Status</strong> to match where you actually are (for example, once you've submitted the request to Novus, advance it from <em>"Not requested"</em>).</li>
-    <li>In the <strong>Note</strong> field, jot down anything worth keeping — the contract number, the date you submitted, or the name of the person who handled it. This is optional but makes the record useful later.</li>
-    <li>Click <strong>Save status</strong>. The Status and Note are stored and visible to the rest of the team the next time they open this panel.</li>
-    <li>Repeat as the process advances — update the Status (and the Note) each time something changes, then Save again.</li>
-  </ol>
+  <h3>The seven steps</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Step</th><th>Who</th><th>What you do here</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Your business details</strong></td><td>You</td><td>Complete Business Identity.</td></tr>
+      <tr><td><strong>Send the application to Novus</strong></td><td>You</td><td>The form above.</td></tr>
+      <tr><td><strong>Get the contract to the signer</strong></td><td>Manual</td><td><strong>Download the contract</strong>, hand it over, then <strong>Mark done</strong>.</td></tr>
+      <tr><td><strong>Sign it and send it back</strong></td><td>Manual</td><td><strong>Upload the signed PDF</strong>.</td></tr>
+      <tr><td><strong>Novus checks and approves</strong></td><td>Novus</td><td>Nothing — wait.</td></tr>
+      <tr><td><strong>Novus activates the client</strong></td><td>Novus</td><td>Nothing — wait.</td></tr>
+      <tr><td><strong>Accept the provider declaration at ΑΑΔΕ</strong></td><td>Manual — the business, at ΑΑΔΕ</td><td>Accept it in myAADE, then <strong>Mark done</strong>.</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="feat">
+    <li><strong>Step states</strong> — <em>Done</em>, <em>Your turn</em>, <em>In progress</em>, <em>Waiting on Novus</em>, <em>Marked done</em>, <em>Earlier step first</em>, <em>Not yet</em>, <em>Not needed</em>, <em>Needs attention</em>.</li>
+    <li><strong>“Mark done” is a note, not a verdict.</strong> It records who clicked and when. Where Novus can confirm a step itself, the step reads <em>Waiting on Novus</em> until it does; a self-reported step says <em>“Marked done here on … — self-reported, not confirmed by Novus.”</em> <strong>Not done after all</strong> undoes it.</li>
+    <li><strong>What has happened so far</strong> — expands Novus's history of the request (who did what, when).</li>
+    <li><strong>Cancel the application</strong> — available until the registration is active.</li>
+    <li><strong>Sandbox</strong> — a sandbox registration is labelled as such: it proves the flow works but does not let this VAT issue a real document.</li>
+    <li>If Novus can't be reached, the card says so and shows the steps <em>as of</em> the last successful check.</li>
+  </ul>
 
-  <div class="callout tip"><p><strong>Worked example — kicking off activation.</strong> Open e-Invoicing → the Status reads <em>"Not requested"</em> → you submit your activation request to Novus → come back here, move the <strong>Status</strong> forward, type the contract number and today's date into the <strong>Note</strong> (e.g. "Contract #4471, submitted 20/06, handled by Maria"), and click <strong>Save status</strong>. Now anyone on the team who checks this panel can see the request is in flight and who to ask about it.</p></div>
+  <h2>Card 2 — e-Invoicing (Novus → myDATA)</h2>
+  <ul class="feat">
+    <li><strong>Provider connection</strong> — <em>Connected · Live / Sandbox</em>, or <em>Master key not configured</em>. Documents transmit through the platform's single Novus provider key; there is no per-business key to enter here.</li>
+    <li><strong>Transmit invoices to myDATA</strong> — on by default. When on, issuing an invoice can transmit it to AADE via Novus.</li>
+    <li><strong>Issuer identity</strong> — lists any mandatory issuer field still missing (company name, VAT, activity, ΔΟΥ, street, number, postal code, city, country); myDATA rejects transmission until they are filled. <strong>Go to Business Identity</strong> jumps there.</li>
+    <li><strong>Provider registration</strong> — points back to Card 1 (whether this VAT may transmit is Novus's answer), with an <strong>Open Novus portal</strong> link.</li>
+  </ul>
+
+  <h2>Card 3 — B2B e-invoicing mandate</h2>
+  <p><strong>What it is —</strong> whether you are actually meeting the mandate: how many B2B invoices since the mandate date went through the provider, through timologio, as an ERP fallback, or with no recorded channel. It records the <strong>Δήλωση Έναρξης Ηλεκτρονικής Έκδοσης Στοιχείων</strong> (<em>Filed on</em>, <em>Declared start date</em>, <strong>Record the filing</strong>), shows any open <strong>loss of connection</strong> (while open, B2B invoices may lawfully go out on the ERP channel — re-transmit them once it closes), and the inbound side: documents received, structured, pulled from myDATA.</p>
+
+  <h2>Card 4 — Self-billing (αυτοτιμολόγηση)</h2>
+  <p>Invoices you raise in a supplier's name: the supplier is the issuer and you are the counterpart, so each is booked as a purchase with a supplier bill. Each supplier gets its own series that never mixes with your own sales numbering.</p>
+
+  <div class="callout tip"><p><strong>Worked example —</strong> open Finance → Settings → e-Invoicing → fill the administrator's name and ΑΦΜ, tick B2B → <strong>Send to Novus</strong> → <strong>Download the contract</strong>, give it to the administrator, <strong>Mark done</strong> → when it comes back signed, <strong>Upload the signed PDF</strong> → wait for Novus to approve and activate → accept the declaration in myAADE and <strong>Mark done</strong>. When the top badge reads <em>Active — this VAT can issue</em>, you are ready to transmit.</p></div>
 
   <h2>What it affects</h2>
-  <p>This panel only records the state of your activation — it's documentation, not the transmission mechanism. Once activation is complete and e-invoices are flowing, the actual sending to myDATA is driven from the transmission flow. For how invoices are transmitted (and how to read their myDATA status), see <a href="finance-einvoicing.html">Finance → e-Invoicing</a>.</p>
+  <p>Registration decides whether issued documents can legally go out through the provider; the connection card decides whether they are transmitted. For how issuing and transmitting work day to day, see <a href="finance-einvoicing.html">Greek e-invoicing (myDATA)</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Citations | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="seo.html">SEO &amp; Content</a> / <a href="seo-websites.html">Connected Websites</a> / AI Citations</div>
+  <h1>AI Citations</h1>
+  <div class="routes"><span class="badge route">/websites/:id?section=ai</span></div>
+  <p class="lead">More buyers now start with an AI assistant than with a search box. <strong>AI Citations</strong> asks <strong>ChatGPT</strong>, <strong>Claude</strong>, <strong>Perplexity</strong> and <strong>Gemini</strong> the questions your customers ask, and records two different things for each answer: whether it <strong>named</strong> you, and whether it <strong>cited</strong> you, i.e. linked your site as a source. It then shows <strong>who was cited instead of you</strong>, and for each question you lost, <strong>which page of yours should have won and what that page is missing</strong>. Figures cover the last 90 days.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open a website (<a href="seo-websites.html">Profile → Websites</a> → click the site) → <strong>Visibility</strong> → <strong>AI Citations</strong>. This section used to be called <em>AI Visibility</em> and led with share of voice. It now leads with citation. Share of voice is now the <strong>Named rate</strong>.</p></div>
+
+  <h2>Getting started</h2>
+  <p>If nothing is being asked yet, the section says <em>Nothing is being asked yet</em> and offers <strong>Track this site's brand</strong>. Once the brand is tracked, the questions run on a schedule. <strong>Run probes now</strong> (top right) runs them immediately. If monitoring has stalled, a banner names the fix: <em>Track this site's brand</em>, <em>Switch {brand} back on</em> or <em>Run probes now</em>.</p>
+
+  <h3>Choosing the questions and who answers</h3>
+  <p><strong>Edit questions</strong> (on <em>Question by question</em>) opens <strong>What we ask the assistants</strong>. In it you set:</p>
+  <ul class="feat">
+    <li><strong>Questions</strong> — your own prompts, one per line.</li>
+    <li><strong>Also known as</strong> — other names for the brand.</li>
+    <li><strong>Languages</strong> and <strong>Countries</strong>. Set a country: without one, the DataForSEO and scraped answers are searched from the United States, and a warning says so.</li>
+    <li><strong>Who answers</strong> — <em>Cheap tier · vendor APIs</em>, <em>Frontier tier</em>, <em>DataForSEO · 4 engines, your country</em> (the default when you track a brand from this section), or <em>Scraped · as a buyer sees it</em>.</li>
+    <li>A checkbox to also ask the stock questions.</li>
+  </ul>
+  <p>Click <strong>Save questions</strong>. The probe list holds up to 12 questions.</p>
+
+  <h2>Reading the section, top to bottom</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Part</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Headline tiles</strong></td><td><strong>Named rate</strong>, <strong>Cited rate</strong>, <strong>Answered</strong> (X of Y), <strong>Carried sources</strong>, <strong>Avg rank when named</strong> and <strong>Subjects asked about</strong>, plus a <em>Named rate, week by week</em> sparkline. The header also shows how many questions were answered and what the probes cost.</td></tr>
+      <tr><td><strong>One card per assistant</strong></td><td>Its <strong>Citation rate</strong> and <strong>Named rate</strong>, and a bar splitting every probe into <em>cited you</em> / <em>named you</em> / <em>left you out</em> / <em>failed</em>. It also shows the top three it <em>cites</em> or <em>names</em> instead, its last error, and when it was last asked. The same assistant reached three ways (direct, <em>via DataForSEO</em>, <em>as a buyer sees it</em>) gets three separate cards, and their rates are never merged. An assistant with no key configured still gets a card saying it never answered.</td></tr>
+      <tr><td><strong>Cited instead of you</strong></td><td>The pages an assistant linked as its source in answers that didn't link yours. This is the page you have to beat.</td></tr>
+      <tr><td><strong>Named instead of you</strong></td><td>The brands the assistants reached for in answers that never mentioned you.</td></tr>
+      <tr><td><strong>In the wider corpus</strong></td><td>DataForSEO's index of real AI answers to <em>other people's</em> questions, kept as a separate sample and never merged with your own probes. <strong>Read the corpus</strong> fetches it. It shows <em>Mentions in AI answers</em>, <em>AI search volume</em>, a month-by-month trend, what's cited and named alongside you, and the most-mentioned domains, brands and pages in your market. It comes separately for Google AI Overview and ChatGPT. (ChatGPT mention data covers the United States only, so a Greek market can legitimately read empty there.)</td></tr>
+      <tr><td><strong>Questions you already show up for</strong></td><td>Two tabs. <strong>AI cites you</strong>: real questions where an AI answer already cites your site, with the engine, AI search volume and the page cited. <strong>You rank in Google</strong>: question-shaped searches from your <a href="seo-websites.html#gsc">Search Console</a>, with whether Google's AI Overview cites you or others. <strong>Track</strong> adds a question to your probe list.</td></tr>
+      <tr><td><strong>Why you were not cited</strong></td><td>See below.</td></tr>
+      <tr><td><strong>Question by question</strong></td><td>One chip per assistant for each question: <em>Cited you</em>, <em>Named you · #N</em>, <em>Left you out</em>, <em>Failed</em> or <em>Not run</em>. <strong>Show answer</strong> reveals the full reply. <strong>Edit questions</strong> lives here.</td></tr>
+      <tr><td><strong>By subject</strong>, <strong>Named rate by question</strong>, <strong>How they talk about you</strong></td><td>The same results by tracked subject and by question, and the tone of the answers that mention you.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Why you were not cited — fixing the page that lost</h2>
+  <p><strong>What it is —</strong> every question an assistant answered without linking you, the page of yours that should have won it, and what that page is missing. <strong>How to use it —</strong> click <strong>Find the page</strong> on a question; the platform reads your best-matching page and scores it from 0 to 100 on eight things answer engines favour:</p>
+  <ul class="feat">
+    <li>Answers in the opening</li>
+    <li>Headings ask the question</li>
+    <li>FAQ or Q&amp;A block</li>
+    <li>Concrete facts and figures</li>
+    <li>Comparison or spec table</li>
+    <li>Cites its sources</li>
+    <li>Named author or company credentials</li>
+    <li>Visibly current</li>
+  </ul>
+  <p>It lists up to three fixes. If the page is already well shaped, it says so: the gap is authority or awareness, not the page. <strong>Re-read page</strong> checks it again after you've changed it.</p>
+
+  <h2>Failed is not absent</h2>
+  <p>A probe that got no answer is <strong>excluded</strong> from every rate, never counted as a miss. An assistant whose calls all failed reads <strong>Unknown</strong>, never 0%. When 10% or more of the latest checks failed, a warning says so. If no answer carried a source, <em>Cited instead of you</em> says that is unknown, not "nobody beat you".</p>
+
+  <div class="callout tip"><p><strong>AI search volume</strong> — how often a term is asked of an assistant rather than typed into Google — also appears as an <em>Asked of AI</em> tile in <a href="seo-websites.html#keyword-research">Keyword Research</a>. Click <strong>Check AI volume</strong> there to fetch it. It's fetched only on request, because each lookup is a paid call.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -11,191 +11,270 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Inbox</div>
   <h1>Inbox</h1>
   <div class="routes"><span class="badge route">/inbox</span> <span class="badge gated">inbox.use</span></div>
-  <p class="lead">The Inbox is one place for every conversation your team relies on — internal chats between colleagues, customer threads, <strong>WhatsApp</strong> messages and <strong>email</strong> — organised, searchable, and assigned to the right person. Every member even gets their <strong>own email address</strong> that files straight into the Inbox, and an order that arrives as a message can be turned into a <strong>real order</strong> without re-typing it. An <strong>AI assistant</strong> can answer customer threads (and, if you switch it on, your email) automatically and step aside the moment a human replies. This guide walks every part of it: what each control is, why it matters, exactly how to use it, and what it changes elsewhere in the platform.</p>
+  <p class="lead">The Inbox is one place for every conversation your team relies on — team chats, customer threads, <strong>WhatsApp</strong>, <strong>email</strong>, <strong>social DMs and comments</strong> and <strong>lead-form</strong> submissions — organised, searchable, and assigned to the right person. Every member gets their <strong>own email address</strong> that files straight into the Inbox, each conversation can have an <strong>owner</strong>, and you can <strong>follow up</strong> automatically when nobody answers. An order that arrives as a message becomes a <strong>real order</strong> without re-typing, a supplier's PDF becomes a <strong>bill</strong> in two clicks, and an <strong>AI assistant</strong> can draft or send replies and hand the thread to your team when it should. This guide walks every part of it: what each control is, why it matters, how to use it, and what it changes elsewhere in the platform.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Inbox</strong>.</p></div>
 
-  <div class="callout tip"><p><strong>Recommended reading order</strong> (each part builds on the last): the <strong>filters &amp; All-workspaces controls</strong> → <strong>starting an internal conversation</strong> → <strong>WhatsApp</strong> (connecting a number, assign-on-reply, templates &amp; the 24-hour window) → <strong>sharing a public thread</strong>. The first parts work the moment you have access; WhatsApp needs a connected number.</p></div>
+  <div class="callout tip"><p><strong>Recommended reading order</strong>: <strong>the sidebar &amp; list</strong> → <strong>replying</strong> (the reply box, signature, Insert menu) → <strong>assigning &amp; labels</strong> → <strong>Follow up</strong> → <strong>WhatsApp</strong> → <strong>the AI assistant</strong>. The first parts work the moment you have access; WhatsApp needs a connected number (see <a href="account-social.html">Profile → Social Accounts</a>).</p></div>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/inbox.png" alt="The Inbox showing the conversation list, search box, and All / Internal / WhatsApp filters">
-    <figcaption>The Inbox with the conversation count, the <em>Search conversations</em> box, the All / Internal / WhatsApp / Email filters, and the conversation list.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/inbox.png" alt="The Inbox showing the conversation list, search box, and filters">
+    <figcaption>The Inbox: the sidebar, the conversation list with <em>Search conversations</em>, and the open conversation.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p><strong>What it is —</strong> a single view that brings together the conversations your team relies on so they don't end up scattered across separate apps: internal discussions between colleagues, customer threads, and WhatsApp messages you can read and reply to. <strong>Why it matters —</strong> when conversations live in one searchable, assigned place, nothing falls through the cracks and the right person always picks up the right thread. The Inbox is <strong>multi-tenant aware</strong>: by default it shows the conversations for the workspace you're working in, and — where you're permitted — it can show conversations across all the workspaces you belong to.</p>
+  <p><strong>What it is —</strong> a single view that brings together the conversations your team relies on so they don't end up scattered across separate apps. <strong>Why it matters —</strong> when conversations live in one searchable, assigned place, nothing falls through the cracks and the right person always picks up the right thread. By default it shows the conversations of the workspace you're working in.</p>
 
-  <h2>Layout &amp; the header controls</h2>
-  <p><strong>What it is —</strong> the conversation list on the left and the open conversation on the right; the header holds everything you need to find and start conversations. Selecting a conversation opens it on the right, where you read the message history and reply. <strong>Why it matters —</strong> these controls are how you cut a long list down to exactly the thread you need, and how you decide whether you're looking at one workspace or all of them.</p>
+  <h2>Layout — sidebar, list, conversation</h2>
+  <p><strong>What it is —</strong> three columns: the <strong>sidebar</strong> (what to show), the <strong>conversation list</strong>, and the <strong>open conversation</strong>. The customer's details open in a drawer from the <strong>Profile</strong> button in the conversation header. On a phone it's one column at a time, and the views become chips above the list.</p>
+
+  <h3>The sidebar</h3>
   <ul class="feat">
-    <li><strong>The rail (left)</strong> — <strong>Compose</strong> to start a thread, then <strong>All Inboxes</strong> (with an unread count), <strong>Unread</strong> and <strong>Archived</strong> to switch what the list shows, and a <strong>Labels</strong> section for your own tags.</li>
-    <li><strong>Status tabs — Open / Follow-Up / Done</strong> — above the list, these move a thread through its lifecycle: work it in <em>Open</em>, park it in <em>Follow-Up</em>, close it to <em>Done</em>.</li>
-    <li><strong>Search</strong> — a box to filter the list by what you're looking for.</li>
-    <li><strong>Filters</strong> — the Filters button narrows the list by <strong>channel</strong> (All / Internal / WhatsApp / Email) and isolates threads that carry a detected <strong>Order</strong>. Each thread in the list shows a <strong>channel badge</strong> (e.g. <em>Email</em>) so you can tell at a glance where it came from.</li>
-    <li><strong>All workspaces</strong> — a toggle (top-right) to switch between a single workspace and a combined view across the workspaces you're allowed to see. If you only belong to one workspace, this has no effect.</li>
+    <li><strong>Source tabs — All / Platform / WhatsApp</strong> — at the top. <em>Platform</em> is your email, team chats, social messages and customer threads; <em>WhatsApp</em> is only WhatsApp. Under <em>Platform</em> your own Inbox email address is shown with a copy button.</li>
+    <li><strong>Compose</strong> — starts a new conversation (see below).</li>
+    <li><strong>Views</strong> — <strong>Inbox</strong> (with a count), <strong>Follow up</strong>, <strong>Unread</strong>, <strong>Starred</strong>, <strong>Drafts</strong>, <strong>Sent</strong>, <strong>Scheduled</strong> (messages waiting to go out), <strong>Search messages</strong> and <strong>Archived</strong>. A count reading <em>“120+”</em> means more pages exist.</li>
+    <li><strong>Assignment — Mine / Unassigned</strong> — conversations you own, and ones nobody owns yet.</li>
+    <li><strong>Sources</strong> — the door each conversation came through: <em>Public profile</em>, <em>Lead form</em>, <em>Email</em>, <em>WhatsApp</em>, <em>Social DM</em>, <em>Social comments</em>, <em>Customer</em>, <em>Dealer</em>, <em>Team</em>, each with a count. Empty sources hide themselves.</li>
+    <li><strong>Numbers</strong> — on the WhatsApp tab, when your workspace has more than one WhatsApp number: <em>Every number</em> or one number at a time. A <strong>Message templates</strong> link takes you to your approved WhatsApp templates.</li>
+    <li><strong>Labels</strong> — your workspace's labels, each with the number of <em>open</em> conversations carrying it (see <a href="#labels">Labels</a>).</li>
   </ul>
-  <p><strong>What it affects:</strong> the tabs, filters and search only change what's shown to you — they don't move or hide anything for teammates. The <strong>All workspaces</strong> toggle changes the scope of the whole list, so a thread you can't find in one workspace may simply be in another.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/new-conversation.png" alt="Starting a conversation from the Inbox"><figcaption>Starting a conversation from <strong>Compose</strong>.</figcaption></figure>
 
-  <div class="callout tip"><p><strong>Tip —</strong> reach for the <strong>filters</strong> first and the <strong>search</strong> second: filtering to WhatsApp (or Internal) shortens the list before you type, so the search has less to wade through.</p></div>
+  <h3>The list</h3>
+  <ul class="feat">
+    <li><strong>Status tabs — Open / Follow up / Done</strong> — work what's open, park what you're waiting on, close what's finished. Done is not one-way: a new message from the customer reopens it.</li>
+    <li><strong>Search conversations</strong> — searches every conversation on the server (subject, preview, sender, phone and message text — never private notes), not just the page you've loaded.</li>
+    <li><strong>Filter conversations</strong> — narrow by <em>Source</em>, <em>WhatsApp number</em>, <em>Order</em> (<em>Waiting for approval</em> / <em>Approved</em> / <em>Dismissed</em>), <em>Type</em> and labels (several at once).</li>
+    <li><strong>Each row</strong> shows the source, the owner (or <em>Unassigned</em>), a subject line on email, a <strong>Files</strong> chip when it holds attachments, an <strong>AI</strong> tag when the assistant is on, and when a follow-up is due. The list loads more as you scroll (or <strong>Load older conversations</strong>).</li>
+  </ul>
+  <p><strong>What it affects:</strong> views, tabs, filters and search only change what <em>you</em> see — they don't move or hide anything for teammates.</p>
+  <div class="callout"><p><strong>All workspaces</strong> (top-right) is a <strong>platform-operator</strong> control that shows conversations across every workspace. Regular members always see the active workspace only — switch workspace to see another one's conversations.</p></div>
+
+  <h2>Acting on several conversations at once</h2>
+  <p><strong>What it is —</strong> tick the checkbox on rows (or the header box to select everything shown) and a bar appears: <strong>Mark read</strong>, <strong>Done</strong> (or <strong>Reopen</strong> on the Done tab), <strong>Label</strong>, <strong>Assign to me</strong>, <strong>Follow up</strong> and <strong>Delete</strong>. In <strong>Archived</strong> the bar offers <strong>Restore</strong> and, for owners and admins, <strong>Delete forever</strong>. <strong>Why it matters —</strong> tidying fifty threads after a campaign is one action, not fifty. If some fail, the bar says how many (e.g. <em>“10 of 12 — 2 failed”</em>) and keeps the failed ones selected.</p>
+  <div class="callout warn"><p><strong>Delete vs Delete forever.</strong> <strong>Delete</strong> moves a conversation to <strong>Archived</strong> for 30 days, then it's removed. <strong>Delete forever</strong> (owners/admins, from Archived only, behind a confirmation) removes every message, note and attachment now. It only leaves <em>this</em> Inbox — the other person still has their copy.</p></div>
 
   <h2>The conversation channels</h2>
-  <p><strong>What it is —</strong> every thread in the Inbox belongs to one channel. <strong>Why it matters —</strong> knowing the channel tells you who can see it and how to reach the other party.</p>
   <div class="cards">
-    <div class="card"><div class="ico">👥</div><h3>Internal</h3><p>Discussions between members of your team — questions, hand-offs, and notes that stay inside the workspace.</p></div>
-    <div class="card"><div class="ico">💬</div><h3>WhatsApp</h3><p>Messages exchanged with customers over a connected WhatsApp number, read and answered in the Inbox.</p></div>
-    <div class="card"><div class="ico">✉️</div><h3>Email</h3><p>Mail sent to your personal workspace address lands here as a thread you can reply to — see below.</p></div>
-    <div class="card"><div class="ico">🔗</div><h3>Customer / shared</h3><p>Threads opened to an outside party through a link, so they can take part without creating an account.</p></div>
+    <div class="card"><div class="ico">👥</div><h3>Team</h3><p>Private discussions between members of your team — visible only to the people in them.</p></div>
+    <div class="card"><div class="ico">💬</div><h3>WhatsApp</h3><p>Messages on a connected WhatsApp number, read and answered here.</p></div>
+    <div class="card"><div class="ico">✉️</div><h3>Email</h3><p>Mail sent to your personal workspace address lands here as a thread you reply to.</p></div>
+    <div class="card"><div class="ico">📣</div><h3>Social DM &amp; comments</h3><p>DMs and comments under your own posts on connected social accounts. A comment reply is <strong>public</strong>; the message's DM button answers the person privately instead.</p></div>
+    <div class="card"><div class="ico">📋</div><h3>Lead form</h3><p>A Meta Instant Form submission arrives as a thread holding the answers. There's no conversation to reply into, so contact them with the details they gave or <strong>Add to CRM</strong>.</p></div>
+    <div class="card"><div class="ico">🔗</div><h3>Customer / shared</h3><p>Threads opened to an outside party through a link, so they can take part without an account.</p></div>
   </div>
 
-  <h2>Starting an internal conversation</h2>
-  <p><strong>What it is —</strong> a private thread between members of your team that stays inside the workspace. <strong>Why it matters —</strong> it keeps questions, hand-offs and notes alongside your customer and WhatsApp threads instead of in a separate chat app, so context isn't lost.</p>
-  <h3>How to start one</h3>
-  <ol>
-    <li>Open the <span class="badge route">/inbox</span> and click <strong>Compose</strong> — this opens the new-conversation dialog.</li>
-    <li>Give the conversation a <strong>subject</strong> so colleagues can recognise it in the list.</li>
-    <li>Pick the <strong>participants</strong> — the team members who should take part.</li>
-    <li>Send your <strong>first message</strong> to start the thread; it appears in the conversation list under the <strong>Internal</strong> filter.</li>
-  </ol>
-  <p><strong>What it affects:</strong> the new thread shows up for the participants you chose, under the <strong>Internal</strong> filter, in this workspace.</p>
+  <h2>Starting a conversation — Compose</h2>
+  <p><strong>Compose</strong> opens <em>New Conversation</em> with four tabs:</p>
+  <ul class="feat">
+    <li><strong>Team</strong> — a <em>Topic</em> and the teammates in it.</li>
+    <li><strong>Customer</strong> — pick a CRM contact, an optional subject and first message. You can copy a private share link for them afterwards.</li>
+    <li><strong>Email</strong> — sent <em>from your own Inbox address</em>: To (with contact suggestions), Cc / Bcc, Subject, the message (with formatting) and several attachments.</li>
+    <li><strong>WhatsApp</strong> — a <em>Phone number</em> and optional name (plus a <strong>From</strong> picker when you have more than one number). This opens the conversation without sending anything; the first message must be an approved template.</li>
+  </ul>
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/new-conversation.png" alt="Starting a conversation from the Inbox"><figcaption>Starting a conversation from <strong>Compose</strong>.</figcaption></figure>
+
+  <h2>Reading a conversation</h2>
+  <ul class="feat">
+    <li><strong>It opens on the newest messages</strong>, at the bottom, 20 at a time. Scroll up (or <strong>Load earlier messages</strong>) for older ones.</li>
+    <li><strong>Email reads like mail.</strong> The subject sits on top, earlier emails fold to one line you open on click, and the latest shows the sender, To and Cc as people chips, the body as the sender formatted it, and <strong>Attachments</strong> as cards. Remote images are held back until you press <strong>Show images</strong> or <strong>Always for</strong> that sender. WhatsApp, social and team chats stay as chat bubbles.</li>
+    <li><strong>Timeline events</strong> — assignment, Done / reopen, labels and the assistant switching on or off appear as small event cards in the thread. When the assistant hands a conversation to the team, the card says so and why, and an unowned thread offers <strong>Assign to me</strong>.</li>
+    <li><strong>The message menu</strong> — <strong>Reply</strong>, <strong>React</strong>, <strong>Copy text</strong> and, under <strong>More</strong>: <strong>Forward</strong> (into another conversation you can write to), <strong>Pin to top</strong>, <strong>Star</strong>, <strong>Add text to note</strong> and <strong>Remove from this inbox</strong> (removes our copy; WhatsApp has no unsend).</li>
+    <li><strong>Links are links</strong> — a pasted URL is clickable and shows a preview of the page.</li>
+  </ul>
+
+  <h2>Replying — the reply box</h2>
+  <p><strong>What it is —</strong> one card at the bottom of the conversation. <strong>Why it matters —</strong> everything you need to answer well (the right recipients, a signature, a ready-made answer, a later send time, a follow-up) is in the same place, and the box says in words whether you're writing to the customer or to your team.</p>
+  <ul class="feat">
+    <li><strong>Reply / Reply all / Private note</strong> — the menu at the top-left. <em>Reply all</em> appears on email when others were copied in. A <strong>Private note</strong> turns the box amber and is seen only by your team.</li>
+    <li><strong>Cc / Bcc</strong> and <strong>Track opens</strong> — on email replies (see <a href="#tracking">Open tracking</a>).</li>
+    <li><strong>The toolbar</strong> — <strong>Suggest reply</strong> (the assistant drafts one for you to edit; 1 credit; you can tell it what the reply should do), <strong>Improve</strong> (<em>Rewrite clearly</em> / <em>Make it shorter</em> / <em>Make it formal</em>, keeping every fact, price and date), <strong>Insert</strong>, formatting, emoji, attach, and the product/service cart.</li>
+    <li><strong>Formatting</strong> — email takes bold, italic, links, lists and quotes, with a preview; it's sent as HTML only when you use formatting.</li>
+    <li><strong>Files</strong> — up to 10 files (20&nbsp;MB) per message by the paperclip, drag-and-drop or paste. Social replies are text only.</li>
+    <li><strong>Send</strong> is a split button: <strong>Send</strong>, <strong>Send and mark done</strong> (<kbd>Ctrl/⌘</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd>), and <strong>Send later</strong> — <em>Tomorrow morning</em>, <em>Tomorrow afternoon</em>, <em>Monday morning</em> or <em>Pick a date and time…</em>. Scheduled messages are listed under <strong>Scheduled</strong> in the sidebar, where a waiting one can be cancelled.</li>
+    <li><strong>Keyboard</strong> — <kbd>Ctrl/⌘</kbd>+<kbd>Enter</kbd> sends everywhere. On chat channels <kbd>Enter</kbd> sends; on email <kbd>Enter</kbd> is a new line.</li>
+    <li><strong>Drafts</strong> — an unsent reply is saved as you type and comes back when you return (on any device); it's listed under <strong>Drafts</strong>. The discard button (with the bin icon) throws it away.</li>
+    <li><strong>Writing score</strong> — on email, a score beside Send says how likely the message is to get a reply (length, questions, sentence length, a short subject) and what to change.</li>
+    <li><strong>Follow up</strong> — the alarm-clock button beside Send sets a follow-up that starts once this message has gone (see <a href="#followup">Follow up</a>).</li>
+  </ul>
+
+  <h3>Reply settings — signature &amp; AI autocomplete</h3>
+  <p>The settings icon in the reply box opens <strong>Reply settings</strong>:</p>
+  <ul class="feat">
+    <li><strong>Email signature</strong> — shows who you're signing as and links to <strong>Profile → Profile → Email signature</strong> to design or edit it. Under an email reply the signature is previewed with an <em>Include my signature</em> tick, so you can leave it off one message.</li>
+    <li><strong>AI autocomplete</strong> — off by default. When on, it suggests how to finish your sentence when you pause; press <kbd>Tab</kbd> to accept. Each suggestion uses a small amount of credits.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Designing your signature.</strong> In <strong>Profile → Profile</strong>, the <strong>Email signature</strong> card → <strong>Design your signature</strong>: Name, Job title, Company, Phone, Email, Website, Location, Tagline, a Logo image URL (https) and an optional confidentiality note, with a live preview. It's added under every email you send from the Inbox — replies, new emails, scheduled emails and follow-ups. <strong>Copy for Gmail / Outlook</strong> copies the same design for your mail app. Inbox emails go out as a plain personal email with your signature, not wrapped in a branded newsletter layout.</p></div>
+
+  <h3>The Insert menu</h3>
+  <ul class="feat">
+    <li><strong>My booking link</strong> — your public profile's booking page. If online booking is off it tells you to turn it on in <em>Profile → Availability</em>.</li>
+    <li><strong>Propose meeting times</strong> — three free slots in the next two weeks, inside the hours you set in Availability and clear of your bookings and CRM meetings.</li>
+    <li><strong>A project task</strong> — pick an open task; its title, due date and link go into the message.</li>
+    <li><strong>Snippets</strong> — reusable replies with <code>{first_name}</code>, <code>{name}</code> and <code>{email}</code> filled in for the recipient. <strong>Save this message as a snippet</strong> creates one; tick <em>Share with my team</em> to make it shared. Most-used come first.</li>
+  </ul>
+
+  <h2 id="tracking">Open tracking (opt-in)</h2>
+  <p><strong>What it is —</strong> a <strong>Track opens</strong> toggle on every email composer. A tracked email shows <em>“Opened 3× · last …”</em> or <em>“No open recorded yet”</em> on your copy — visible to your team only, never to the customer. Your choice is remembered in your browser. <strong>Why it matters —</strong> you know whether a quote was looked at before you chase it.</p>
+  <div class="callout warn"><p>The count is <strong>approximate</strong>: some mail apps load images automatically (counting an open nobody made), others block them (hiding a real one).</p></div>
+
+  <h2 id="assign">Owners — assigning a conversation</h2>
+  <p><strong>What it is —</strong> each conversation can have <strong>one owner</strong>. The <strong>Assign</strong> button in the conversation header lists your team; pick someone, yourself, or <strong>Unassign</strong>. <strong>Why it matters —</strong> “who's answering this?” has one answer. The owner shows on the list row, <strong>Mine</strong> / <strong>Unassigned</strong> filter on it, and new mail to a person's own address is assigned to them automatically. Assigning someone gives them access to the conversation and is recorded in the timeline.</p>
+
+  <h2 id="labels">Labels</h2>
+  <p><strong>What it is —</strong> colour-coded tags for conversations, created per workspace by owners and admins. Tag a conversation from the <strong>Labels</strong> button in its header (or several at once from the bulk bar). <strong>Why it matters —</strong> labels filter the list, show live counts in the sidebar, can <strong>drive a <a href="flows.html">Flow</a></strong> (a label added fires an automation), can target a <strong>WhatsApp campaign</strong>, and the <a href="agent-hub.html">assistant</a> can read and set them.</p>
+  <ul class="feat">
+    <li><strong>Manage them in the sidebar.</strong> Hover a label for <strong>Rename</strong>, <strong>Colour</strong> and <strong>Delete</strong> (the label comes off every conversation; the conversations and messages stay). The <strong>Manage labels</strong> icon by the heading creates new ones.</li>
+    <li><strong>Auto-apply.</strong> The ⚡ on a label opens <em>Auto-apply</em>: <strong>Keywords</strong> (comma-separated, matched anywhere in the customer's message ignoring case and accents — free) and/or <strong>Describe when it applies (AI)</strong> (a sentence the AI checks new messages against; uses credits), limited to chosen <strong>Channels</strong> or all. It only labels <em>new</em> incoming messages — nothing already in the Inbox is relabelled — and it only ever adds a label.</li>
+  </ul>
+
+  <h2>Search messages &amp; export</h2>
+  <p><strong>What it is —</strong> <strong>Search messages</strong> in the sidebar turns the list into a message search: every matching <em>message</em> across the workspace, newest first, by words, channel (WhatsApp / Email / Social / Team), <strong>Received</strong> or <strong>Sent</strong>, date range (From / To), labels and <em>With files</em>. Click a row to jump to its conversation. <strong>Export CSV</strong> downloads the results (very large exports are capped — narrow the filters for the rest). <strong>Why it matters —</strong> “which customer asked about the oak decking last spring?” is one search, not an afternoon of scrolling.</p>
+
+  <h2 id="followup">Follow up — Boomerang and Automatic outreach</h2>
+  <p><strong>What it is —</strong> the alarm-clock button in the conversation header (and beside Send, and in the bulk bar) offers two kinds of follow-up. <strong>Why it matters —</strong> a quote you sent and never heard back about comes back to you, or gets chased for you, without a reminder in someone's head.</p>
+  <div class="cards">
+    <div class="card"><div class="ico">🪃</div><h3>Boomerang</h3><p>Takes the conversation out of the list and brings it back <strong>to the top, unread</strong> on the day you pick — <em>Tomorrow</em>, <em>In 3 days</em>, <em>In a week</em>, <em>In 2 weeks</em> or a date and time — with an optional note to yourself. <strong>Bring back now</strong> cancels it.</p></div>
+    <div class="card"><div class="ico">📨</div><h3>Automatic outreach</h3><p>Up to <strong>5</strong> follow-up messages sent as replies on the days you set (<em>If no reply in…</em>, then <em>Sends N days after the one before</em>). The moment they write back, the rest is cancelled — an <strong>out-of-office reply does not count</strong>. Each step can be written for you from the conversation.</p></div>
+  </div>
+  <ul class="feat">
+    <li><strong>Timing</strong> — tick <em>Only on working days, 09:00–18:00</em>, and <em>Send at their best time</em> (when this person usually writes to you) when there's enough history.</li>
+    <li><strong>While sending</strong> — the Follow up button beside Send: <em>Back on top if no reply in…</em> (a Boomerang) or <em>Send follow-ups if no reply…</em>; it starts after the message goes out. Not available with Send later.</li>
+    <li><strong>In bulk</strong> — select conversations → <strong>Follow up</strong> → a Boomerang day, or <em>Send a follow-up to each…</em>; each conversation stops on its own when that person answers.</li>
+    <li><strong>The Follow up view</strong> (sidebar) lists everything waiting, split into <strong>Boomerang</strong> and <strong>Automatic outreach</strong>, ordered by when each fires, under a results line: <em>sent · got a reply · answered before the nudge</em> over the last 90 days. The same follow-ups show on the CRM contact and deal.</li>
+    <li><strong>A follow-up that fails</strong> is reported in the conversation and brings it back on top — never silently dropped.</li>
+  </ul>
+  <div class="callout warn"><p><strong>On WhatsApp</strong> a follow-up usually lands outside the 24-hour window, where free text is refused. Pick an approved template under <em>“If WhatsApp's 24-hour window has closed, send this approved template instead”</em> and it goes out as that template (billed like any template); otherwise the Inbox warns you when you schedule it.</p></div>
 
   <h2>WhatsApp conversations</h2>
-  <p><strong>What it is —</strong> customer messages on a connected WhatsApp number, read and answered without leaving the Inbox. When your workspace has a WhatsApp number connected, its conversations appear here alongside everything else. <strong>Why it matters —</strong> customers increasingly expect to reach a business on WhatsApp, and handling those threads in the same place as the rest of your conversations means replies are fast and nothing is missed.</p>
+  <p><strong>What it is —</strong> customer messages on your connected WhatsApp numbers, read and answered here. <strong>Why it matters —</strong> customers expect to reach a business on WhatsApp, and handling those threads beside everything else means fast replies and nothing missed.</p>
   <ul class="feat">
-    <li><strong>Connected numbers show up automatically</strong> — once a number is set up, its threads flow into the Inbox without any extra step.</li>
-    <li><strong>Customer replies become conversations</strong> — when a customer messages or replies, a conversation is created (or updated) and <strong>assigned to the right owner</strong> so the correct person picks it up. This is the <em>assign-on-reply</em> behaviour: you don't have to manually route an incoming message; it lands with the person responsible.</li>
-    <li><strong>Outbound &amp; marketing sends use approved templates</strong> — to start or re-open a conversation outside the active reply window, WhatsApp requires a pre-approved message template. Day-to-day replies inside the 24-hour window can be free-form; messages sent outside that window must use one of the approved templates.</li>
+    <li><strong>Folders or List.</strong> The WhatsApp tab opens in <strong>Folders</strong> — one folder per label plus <em>No label</em> (a conversation with two labels is in both). The folder with the newest message is on top, and one holding unread conversations turns green with the count and a preview. Switch to <strong>List</strong> for the plain list; your choice is remembered.</li>
+    <li><strong>Several numbers.</strong> When the workspace has more than one number, the sidebar's <strong>Numbers</strong> section and the <em>WhatsApp number</em> filter separate them, and New conversation asks which number to send <strong>From</strong>. One customer writing to two of your numbers is two conversations.</li>
+    <li><strong>Assigned on reply.</strong> When a customer messages, the conversation is created (or updated) and lands with the right owner.</li>
+    <li><strong>Calls</strong> — a WhatsApp call that ended, was missed or failed, and a call-permission request, appear as events in that customer's conversation.</li>
+    <li><strong>Send a WhatsApp form</strong> — the form button in the reply box sends one of your published <a href="account-social.html">WhatsApp forms</a>. The customer fills in fields inside WhatsApp, and the answers arrive as a message in the conversation — an order form is read by order intake exactly like a typed order.</li>
   </ul>
 
-  <h3>Why marketing sends need an approved template and a 24-hour window</h3>
-  <p>WhatsApp draws a clear line between <em>answering a customer who contacted you</em> and <em>reaching out to a customer first</em>. The rule exists to protect people from unsolicited business messages:</p>
+  <h3>Templates and the 24-hour window</h3>
+  <p>WhatsApp draws a line between <em>answering a customer who contacted you</em> and <em>reaching out first</em>:</p>
   <ul class="feat">
-    <li><strong>Inside the 24-hour window</strong> — the customer has messaged you recently, so they're expecting a conversation. You can reply <strong>free-form</strong>: any text, in your own words, for 24 hours after their last message.</li>
-    <li><strong>Outside the 24-hour window</strong> — the conversation has gone quiet, so a new message from you is effectively an unsolicited approach. WhatsApp only allows it if the wording was <strong>reviewed and approved in advance</strong> as a template. This is what stops the channel becoming a spam firehose, and it's why a marketing or "just checking in" send always has to go through an approved template — there's no recent customer message to open a free-form window.</li>
+    <li><strong>Inside 24 hours</strong> of the customer's last message you can reply <strong>free-form</strong>.</li>
+    <li><strong>Outside it</strong> (or before they've ever written), only a template <strong>approved in advance</strong> by Meta can be sent. The reply box says the window is closed and offers <strong>Send a template</strong>: pick an approved template, fill its variables, preview, send. Private notes are always allowed, and you can still message them from the WhatsApp Business app on your phone — it syncs back into the thread.</li>
   </ul>
-  <div class="callout warn"><p>WhatsApp's <strong>24-hour window</strong> rule is set by WhatsApp, not by MaterialsHub. Inside 24&nbsp;hours of the customer's last message you can reply freely; after that, you can only reach out using an approved template. The Inbox follows these rules for you.</p></div>
-
-  <h3>How to handle a WhatsApp reply</h3>
-  <ol>
-    <li>Open the <strong>WhatsApp</strong> filter to narrow the list to WhatsApp threads only.</li>
-    <li>Open the incoming conversation — on the customer's first reply it is created (or updated) and <strong>assigned to the right owner</strong>, so it lands with the correct person.</li>
-    <li><strong>Reply from the Inbox.</strong> Inside the 24-hour window you can reply free-form; outside it, outbound marketing sends use an approved template.</li>
-    <li>Optionally <strong>share a public thread link</strong> (<span class="badge route">/i/:token</span>) so an outside party can take part without a MaterialsHub account — see <a href="public-pages.html">Public &amp; Shared Pages</a>.</li>
-  </ol>
-  <p><strong>What it affects:</strong> connecting a number makes its threads appear under the <strong>WhatsApp</strong> filter; incoming replies are assigned automatically, and whether a send goes free-form or via template depends entirely on the 24-hour window above.</p>
+  <div class="callout warn"><p>The <strong>24-hour window</strong> is WhatsApp's rule, not ours. The Inbox follows it for you — and so does the AI assistant, which won't try to answer a conversation whose window has closed.</p></div>
 
   <h2>Email — your own address, in the Inbox</h2>
-  <p><strong>What it is —</strong> every member gets a <strong>personal email address</strong> that delivers straight into the Inbox as a thread. <strong>Why it matters —</strong> customer email stops living in a separate mail client — it's threaded, searchable and assignable alongside your WhatsApp and internal chats, and the AI assistant can help with it too.</p>
+  <p><strong>What it is —</strong> every member gets a <strong>personal email address</strong> that delivers straight into the Inbox. <strong>Why it matters —</strong> customer email is threaded, searchable and assignable beside your WhatsApp and team chats.</p>
   <ul class="feat">
-    <li><strong>You get it just by opening the Inbox.</strong> The address is created the first time you open the Inbox — there's no button to press and nothing to set up. It takes the form <code>firstname.lastname@mail.materialshub.gr</code>, derived from your profile name (Greek names are transliterated automatically).</li>
-    <li><strong>If your name's taken, you pick your own.</strong> Because everyone shares the one receiving domain, a name clash means you're asked to choose your own local part — the platform never appends a number, so you'll never get <em>firstname.lastname2@…</em>.</li>
-    <li><strong>Find it in Inbox settings.</strong> The <strong>gear (Settings)</strong> popover shows <em>“Your email address”</em> with a copy button.</li>
-    <li><strong>Already have an address customers use?</strong> Keep it — just <strong>forward</strong> that mailbox here, rather than changing your MX records.</li>
+    <li><strong>You get it by opening the Inbox</strong> — in the form <code>firstname.lastname@mail.materialshub.gr</code>, from your profile name (Greek names are transliterated). It's shown under the <em>Platform</em> tab and in the assistant settings popover (<em>Your email address</em>) with a copy button.</li>
+    <li><strong>If your name's taken, you pick your own</strong> — the platform never appends a number.</li>
+    <li><strong>Already have an address customers use?</strong> Forward that mailbox here.</li>
+    <li><strong>Replying</strong> — goes to the customer's Reply-To if they set one; <em>Reply all</em> copies everyone else on their email. Cc/Bcc and attachments are sent as you'd expect, and a send that fails says so rather than silently dropping.</li>
   </ul>
-  <p><strong>Replying —</strong> answer an email thread straight from the Inbox composer; your reply goes out by email and stays threaded (a hidden reply tag keeps the customer's responses landing back on the same conversation). If a send can't be delivered, the Inbox tells you clearly rather than silently dropping it.</p>
-  <div class="callout"><p><strong>One-time operator setup.</strong> Receiving mail on <code>mail.materialshub.gr</code> relies on a small mail worker your operator sets up once (DNS + a sending domain). Once that's in place, every member's address just works. Sending stays outbound-only through the platform's mail provider — inbound and outbound are separate paths.</p></div>
+  <div class="callout"><p><strong>One-time operator setup.</strong> Receiving mail on <code>mail.materialshub.gr</code> relies on a mail worker your operator sets up once. After that every member's address just works.</p></div>
 
-  <h2>Orders that arrive as a message → real orders</h2>
-  <p><strong>What it is —</strong> when a customer emails or WhatsApps you what is effectively an order (“send me 2 boxes of the grey 60×60 and a tube of adhesive”), the platform reads it into a <strong>proposed order</strong> attached to the thread — which a member can turn into a real <a href="finance-doc-orders.html">order</a> in a click. <strong>Why it matters —</strong> it takes the retyping (and the transcription errors) out of turning an enquiry into a sale, while keeping a human in charge of what actually gets raised.</p>
+  <h2>The customer drawer — Profile, Mood and JARVIS</h2>
+  <p><strong>What it is —</strong> the <strong>Profile</strong> button (or the contact's name) in the conversation header opens <em>Customer profile</em>. <strong>Why it matters —</strong> you answer with the customer's history in view, and act on it without leaving the conversation.</p>
   <ul class="feat">
-    <li><strong>It's a proposal, not an order yet.</strong> The extracted lines live on the thread — nothing is written to your orders, no number is burned — until someone approves it. Threads with a detected order show an <strong>Order</strong> badge and appear under the <strong>Order</strong> filter.</li>
-    <li><strong>Lines are matched and priced from your catalogue.</strong> Each requested item is matched against your products (by text, and even by a photo the customer sent — “2 boxes of <em>this</em>”) and priced with <em>your</em> pricing rules. An item that can't be matched or priced is <strong>flagged for review</strong>, never guessed.</li>
-    <li><strong>Approve as a pre-order.</strong> The thread's <strong>Order</strong> panel shows the proposed lines, a customer picker and needs-review markers. <strong>Approve as pre-order</strong> creates a draft sales order you then confirm the normal way; <strong>Dismiss</strong> drops the proposal. Approving can also send the customer a confirmation on whichever channel is open.</li>
+    <li><strong>Profile tab</strong> — the contact and company (with copy buttons on email and phone), status and owner, <strong>Customer value</strong>, <strong>Open invoices</strong>, <strong>Orders</strong> (with <em>“owes …”</em> when something's outstanding), <strong>Quotes</strong>, <strong>Projects</strong>, <strong>Deals</strong>, <strong>Coming up</strong> (meetings and appointments), <strong>Recent conversations</strong> with the same person, and participants.</li>
+    <li><strong>Quick actions</strong> — <strong>New order</strong> (prefilled with this customer), <strong>Meeting</strong> (puts it on the calendar with a reminder, and can email the customer a calendar invite) and <strong>Task</strong>. <strong>Update a project</strong> changes a project's status in place, shows its open tasks, and adds a task linked back to this conversation.</li>
+    <li><strong>Not in your CRM</strong> — an email sender you don't know can be added in one step (an existing contact with that address is reused first).</li>
+    <li><strong>WhatsApp / Social tab</strong> — the service-window state, the WhatsApp profile, and adding them to the CRM.</li>
+    <li><strong>Mood tab</strong> — <strong>Analyse conversation</strong> reads the conversation's sentiment and suggests a tone.</li>
+    <li><strong>JARVIS tab</strong> — <strong>Summarise</strong>, <strong>Action items</strong> (owner and deadline per line), and a free question about the conversation. Billed to the person asking.</li>
   </ul>
-  <div class="callout"><p><strong>Who can approve &amp; turning it on.</strong> Order intake is a <strong>workspace opt-in</strong> (reading each message into a proposal spends credits, so it's off until you enable it). The <strong>Approve</strong> button is limited to <strong>owner / admin / sales / sales-manager</strong> — other members see the proposal but can't raise the order.</p></div>
+  <p>The <strong>Ask JARVIS</strong> button in the header opens the <a href="agent-hub.html">Agent Hub</a> about this conversation instead.</p>
 
-  <h2>Find the business behind a conversation</h2>
-  <p><strong>What it is —</strong> a WhatsApp or email thread often starts as just a name and a number. When a conversation isn't yet tied to a <a href="crm-companies.html">company</a>, a <strong>Find the business</strong> button identifies who's behind it and files it as one. <strong>Why it matters —</strong> once a thread belongs to a business, its pricing, statement and history all line up — and the next conversation from that number resolves on its own.</p>
-  <ul class="feat">
-    <li><strong>Known number first (free)</strong> — it checks whether the number is already on a company or a person you know before spending anything on research.</li>
-    <li><strong>Otherwise it researches</strong> — from the name, the phone's country, any web addresses in the transcript and what's been written, returning a verdict — <em>a business</em> / <em>looks like an individual</em> / <em>not enough to tell</em> / <em>could not check</em> — with the evidence and a pre-filled draft. <strong>Nothing is filed until you say so</strong>, and it probes for duplicates as you edit.</li>
-    <li><strong>Add or link</strong> — create the business (tagging it <em>supplies us</em> / <em>buys from us</em> / <em>both</em>) or link to an existing match. Filing it sets the company on the thread, links the contact to it, and records the phone number on the company so it's recognised next time.</li>
-  </ul>
-
-  <h2>Suggesting products &amp; services in a reply — the /product and /service cards</h2>
-  <p><strong>What it is —</strong> a way to drop a proper <strong>product or service card</strong> — picture, name, price, and a link the customer can open — straight into a reply, instead of typing a price from memory. <strong>Why it matters —</strong> the customer sees a real catalogue item priced <em>for them</em>, and it renders in whatever shape the channel supports.</p>
-  <ul class="feat">
-    <li><strong>Type <code>/</code> at the start of a line</strong> to open the command menu (<em>“Commands · Enter picks the first”</em>): <strong>/product</strong> — <em>“Suggest a product from the catalog”</em> — and <strong>/service</strong> — <em>“Suggest one of your services.”</em> (A slash mid-line, as in a URL, is ignored.) There's also a <strong>cart button</strong> by the composer that opens the same picker.</li>
-    <li><strong>Pick from the catalogue.</strong> The picker searches this workspace's products/services as you type; queue up to <strong>10</strong> and they show as removable chips above the composer. You can send cards with no message text at all. If you've nothing to pick, it points you at <em>Finance → Settings → Services</em> or your <a href="discover-products.html">Products</a>.</li>
-    <li><strong>Priced for the customer, on send.</strong> The price in the picker is just orientation — the real figure is resolved for <em>this thread's customer</em> when you send, using the same engine a <a href="quotes-build.html">quote</a> line uses: <strong>net (excl. VAT) for a VAT-registered business, gross (incl. VAT) for a consumer</strong>, or <em>“Price on request”</em> when the item isn't priced.</li>
-    <li><strong>Each channel gets its own shape.</strong> On <strong>WhatsApp</strong> it's an interactive card with an image, the facts, and a <em>View product</em> / <em>View service</em> button (one send per card). By <strong>email</strong> it's a tidy HTML table (thumbnail · name · price · button) with a plain-text alternative. In-app and on the shared <span class="badge route">/i/:token</span> page it renders as a card with the reference and price line. The link points at your <a href="finance-settings-online-store.html">online store</a> when the item is published there, otherwise your public profile.</li>
-  </ul>
-  <div class="callout tip"><p><strong>Orders on the rail.</strong> The conversation's details rail now has an <strong>Orders</strong> section — the customer's sales orders, newest first, each linking to the <a href="finance-doc-orders.html">order</a> with its date, total, payment status and <em>“owes …”</em> when something's outstanding. An order approved from this very thread shows up here. The <a href="agent-hub.html">assistant</a> can read these too, and <strong>Draft with AI</strong> (1 credit) writes a reply — grounded in the customer's orders, quotes and invoices — for you to edit before sending.</p></div>
+  <h2>Files in a conversation — orders, bills and payments</h2>
+  <p><strong>What it is —</strong> hover an attachment for its actions menu: <strong>Create an order</strong> (the New Order dialog, prefilled with the customer), <strong>Book as a supplier bill</strong> and <strong>Pay this invoice</strong> (the expense form opens with the file read and attached as the receipt; an unpaid bill then offers <strong>Pay via Revolut</strong> or <strong>Pay later</strong>), <strong>File in supplier documents</strong>, and <strong>Download</strong>. Members only. <strong>Why it matters —</strong> a supplier's emailed invoice becomes a booked bill — and a payment ready for approval — without downloading and re-uploading it.</p>
 
   <h2>Reading what customers send in — voice notes, documents &amp; spreadsheets</h2>
-  <p><strong>What it is —</strong> when a customer sends a <strong>voice note</strong>, a <strong>document</strong> (PDF/photo) or a <strong>spreadsheet</strong>, the Inbox understands it on the way in rather than leaving you to open every attachment. <strong>Why it matters —</strong> the gist is in front of you before you click, and a supplier document can become an expense in one step. This happens automatically on inbound WhatsApp and email (and the files land in a private document bucket, not a public one).</p>
+  <p>On inbound WhatsApp and email the Inbox understands attachments on the way in (files land in a private bucket):</p>
   <ul class="feat">
-    <li><strong>A voice note is transcribed.</strong> Under the audio player a <strong>Transcript</strong> block shows the words (and the spoken text rides in the notification and the list preview). If it hasn't run, a <strong>Transcribe</strong> button does it on demand.</li>
-    <li><strong>A document is read and tagged.</strong> A PDF or photo gets a badge naming what it is (e.g. <em>supplier invoice</em>) with a confidence figure (<em>“· unsure”</em> when low), plus the facts printed on it — issuer, number, date, total — and a masked <em>“bank details printed · IBAN ending NNNN”</em> chip. For a supplier invoice or receipt, an <strong>Add as expense</strong> button opens the <a href="finance-doc-expenses.html">expense</a> form with the supplier, description and bank details prefilled (the amount is left blank for you to confirm, since the printed total is gross). A <strong>Read it</strong> button covers anything not yet processed.</li>
-    <li><strong>A spreadsheet can be asked a question.</strong> A CSV/XLSX the customer sent can be queried through the <a href="agent-hub.html">assistant</a> (<em>“what's the total quantity in column D?”</em>): it loads the sheet and answers, showing the answer alongside the rows it used. This is a metered action (it spends credits) and the person who asks pays.</li>
+    <li><strong>A voice note is transcribed.</strong> A <strong>Transcript</strong> block sits under the audio player; <strong>Transcribe</strong> runs it on demand if it hasn't.</li>
+    <li><strong>A document is read and tagged.</strong> A PDF or photo gets a badge naming what it is (e.g. <em>supplier invoice</em>, <em>“· unsure”</em> when low-confidence), the facts printed on it, and a masked <em>“bank details printed · IBAN ending NNNN”</em> chip. A supplier invoice or receipt offers <strong>Add as expense</strong>; <strong>Read it</strong> covers anything not yet processed.</li>
+    <li><strong>A spreadsheet can be asked a question</strong> through the <a href="agent-hub.html">assistant</a> (metered; the person who asks pays).</li>
   </ul>
 
-  <h2>The AI assistant in the Inbox (auto-replies)</h2>
-  <p><strong>What it is —</strong> an AI assistant that can <strong>answer customer threads for you automatically</strong>. When a customer message comes in (in-app customer thread or WhatsApp), the assistant replies first — grounded in <em>that customer's own data</em> (their statement, invoices and quotes, scoped to the thread's customer) — so routine questions are handled instantly, day or night. <strong>Why it matters —</strong> it covers first response when no one's at the desk, but is built to <strong>step aside the moment a human steps in</strong>, so it never talks over your team.</p>
-
-  <h3>Human takeover — the assistant gets out of the way</h3>
+  <h2>Orders that arrive as a message → real orders</h2>
+  <p><strong>What it is —</strong> when a customer emails or WhatsApps what is effectively an order (or fills in a WhatsApp order form), the platform reads it into a <strong>proposed order</strong> on the thread, which a member turns into a real <a href="finance-doc-orders.html">order</a>. <strong>Why it matters —</strong> it takes the retyping out of turning an enquiry into a sale, with a human in charge.</p>
   <ul class="feat">
-    <li><strong>A staff reply pauses the bot.</strong> The instant a team member sends a <strong>text reply</strong> in a conversation, the assistant is <strong>paused</strong> for that thread — it stops auto-replying so it won't talk over the human who just took over.</li>
-    <li><strong>Private notes don't pause it.</strong> Internal <em>notes</em> are private and don't count as taking over, so jotting a note won't switch the bot off.</li>
-    <li><strong>Resume with the Bot toggle.</strong> When you're done and want the assistant to handle the thread again, flip the conversation's <strong>Bot</strong> toggle back on.</li>
-    <li><strong>No double-replies, no loops.</strong> The assistant only fires when the <em>most recent</em> message is a fresh inbound <strong>customer</strong> message — never in response to itself, a teammate, or a system event — and it's only charged when it actually replies (skipped turns cost nothing).</li>
-    <li><strong>Audit trail.</strong> When the assistant auto-engages it posts a system note (<em>“The AI assistant is responding…”</em>) into the thread, so the transcript shows the hand-off just like a manual one — on both the in-app and WhatsApp paths.</li>
+    <li><strong>A proposal, not an order yet.</strong> Nothing is written to your orders and no number is used until someone approves it. Threads with a proposal show an <strong>Order</strong> badge and match the <em>Order</em> filter.</li>
+    <li><strong>Matched and priced from your catalogue</strong> (by text, and by a photo the customer sent), with <em>your</em> pricing rules. An item that can't be matched or priced is <strong>flagged for review</strong>, never guessed.</li>
+    <li><strong>Review it.</strong> The <strong>Order</strong> panel shows the lines, a customer picker and needs-review markers; <strong>Edit lines</strong> changes quantities, repoints a line to another product, sets a price, removes or adds lines. <strong>Approve as pre-order</strong> creates a draft sales order (and can confirm to the customer on whichever channel is open); <strong>Dismiss</strong> drops it.</li>
+  </ul>
+  <div class="callout"><p><strong>Who can approve &amp; turning it on.</strong> Order intake is a <strong>workspace opt-in</strong> (it spends credits reading each message). <strong>Approve</strong> is limited to <strong>owner / admin / sales / sales-manager</strong>.</p></div>
+
+  <h2>Find the business behind a conversation</h2>
+  <p>When a thread isn't tied to a <a href="crm-companies.html">company</a>, <strong>Find the business</strong> identifies who's behind it: a known number first (free), otherwise research that returns a verdict — <em>a business</em> / <em>looks like an individual</em> / <em>not enough to tell</em> / <em>could not check</em> — with a pre-filled draft. <strong>Nothing is filed until you say so</strong>; you create the business or link an existing match, and the number is remembered for next time.</p>
+
+  <h2>Suggesting products &amp; services — the /product and /service cards</h2>
+  <ul class="feat">
+    <li><strong>Type <code>/</code> at the start of a line</strong> for <strong>/product</strong> or <strong>/service</strong>, or use the <strong>cart button</strong>. Queue up to <strong>10</strong> cards; you can send cards with no text.</li>
+    <li><strong>Priced for this customer on send</strong> — the same engine as a <a href="quotes-build.html">quote</a> line: net for a VAT-registered business, gross for a consumer, or <em>“Price on request”</em>.</li>
+    <li><strong>Each channel gets its own shape</strong> — an interactive card per item on WhatsApp, an HTML table by email, text lines on social. The link goes to your <a href="finance-settings-online-store.html">online store</a> when the item is published there, otherwise your public profile. Cards can't be scheduled with Send later.</li>
   </ul>
 
-  <h3>Settings — control what the assistant does <span class="badge gated">owner / admin / operator</span></h3>
-  <p>Open the <strong>gear (Settings)</strong> in the Inbox header for two live switches (any member can read them; owners/admins/operators can change them):</p>
-  <div class="table-wrap">
-  <table>
+  <h2>The AI assistant in the Inbox</h2>
+  <p><strong>What it is —</strong> an AI assistant that can draft or send replies, grounded in <em>that customer's own data</em> (their statement, invoices, quotes and orders). <strong>Why it matters —</strong> it covers first response when nobody's at the desk, and steps aside the moment a human steps in.</p>
+
+  <h3>Per conversation — the assistant button</h3>
+  <p>The robot button in the conversation header cycles through three settings:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Setting</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Off</strong></td><td>The assistant does nothing in this conversation.</td></tr>
+      <tr><td><strong>Drafts replies</strong></td><td>It writes a reply for you to edit and send — you'll find it waiting in the reply box. <strong>Nothing goes out without you.</strong> A draft that answered an earlier message (because they wrote again) is set aside, not loaded.</td></tr>
+      <tr><td><strong>Answers directly</strong></td><td>Replies are sent to the customer without review.</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="feat">
+    <li><strong>A staff reply pauses it.</strong> When a team member sends a reply on a conversation the assistant was answering, it stops so it won't talk over them. Private notes don't pause it. Click the button to bring it back.</li>
+    <li><strong>It hands off for real.</strong> When a question needs a person, the assistant pauses the conversation, records why, and notifies the team — shown as an event card with <strong>Assign to me</strong>.</li>
+    <li><strong>It never sends a failure.</strong> If it can't answer (credits, a provider problem, a closed WhatsApp window), the customer gets nothing and your team gets a note in the thread.</li>
+    <li><strong>It knows who it's talking to</strong> — supplier or customer, and who started the conversation — so it won't offer a supplier their “account balance”.</li>
+    <li><strong>Public comments are never auto-answered</strong>, and account details are never shared under a public post.</li>
+    <li><strong>Charged per turn</strong>, only when it actually replies.</li>
+  </ul>
+
+  <h3>Workspace settings <span class="badge gated">owner / admin</span></h3>
+  <p>The <strong>AI assistant settings</strong> button in the conversation header (any member can read; owners/admins change):</p>
+  <div class="table-wrap"><table>
     <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><strong>Auto-respond to new chats</strong></td><td>Whether the assistant answers inbound customer chats automatically. Turn off to make every thread human-first (the assistant only helps when you ask).</td></tr>
-      <tr><td><strong>Answer account &amp; billing</strong></td><td>Whether the assistant may answer account/billing questions using the customer's own statement/invoices/quotes. The helper text flags the <strong>WhatsApp phone-identity caveat</strong> — on WhatsApp a sender is identified only by phone number — so you decide, informed, whether billing answers should go out on that channel.</td></tr>
+      <tr><td><strong>Auto-respond to new chats</strong></td><td>The assistant answers first on every new customer conversation — WhatsApp, social DMs, and email to addresses that have <em>Assistant answers email</em> on. <strong>Off unless you turn it on.</strong></td></tr>
+      <tr><td><strong>Answer account &amp; billing</strong></td><td>Lets it share the customer's own statement, open invoices and pay links. On WhatsApp the customer is identified by phone number — decide accordingly.</td></tr>
     </tbody>
-  </table>
-  </div>
-  <div class="callout"><p><strong>Editable persona.</strong> The assistant's tone and instructions (its system prompt) are <strong>configurable without a redeploy</strong> — an admin can tune the inbox assistant's persona the same way the main KAI agent's prompt is edited. There's a sensible built-in default if you change nothing.</p></div>
-  <div class="callout"><p><strong>“Assistant answers email” is a separate, per-person switch.</strong> The two settings above cover <em>customer chats and WhatsApp</em> for the whole workspace. Automatic replies to <em>your</em> email address are controlled by a <strong>per-member</strong> toggle on your own <em>“Your email address”</em> section in the same settings popover — and it's <strong>off by default</strong>. Turn it on and mail sent to your address gets an automatic first reply (grounded in the customer's own data, like the chat assistant); leave it off and your email waits for you.</p></div>
-  <div class="callout tip"><p>Auto-respond is <strong>on by default</strong> per workspace. Each auto-reply uses credits; pausing (a human reply) or turning off <em>Auto-respond</em> stops the charges.</p></div>
+  </table></div>
+  <div class="callout"><p><strong>“Assistant answers email” is per person.</strong> In the same popover, under <em>Your email address</em>, it answers new mail sent to <em>your</em> address without waiting for you, when the workspace's auto-respond is on. Off by default. Any single conversation can also be handed to it with the assistant button.</p></div>
 
   <h2>Sharing a customer / public thread</h2>
-  <p><strong>What it is —</strong> a way to open a conversation up to someone outside your team. When a thread is shared, the platform creates a <strong>token link</strong> (<span class="badge route">/i/:token</span> <span class="badge public">Public</span>) that the outside party can open in a browser to read and reply — no MaterialsHub account required. <strong>Why it matters —</strong> it lets a customer, supplier or contractor take part in the exact thread you're already working in, instead of starting a separate email chain. This is the same approach used for other shared customer-facing pages, so the experience is familiar to recipients.</p>
-  <div class="table-wrap">
-  <table>
+  <p><strong>What it is —</strong> a private <strong>share link</strong> (<span class="badge route">/i/:token</span> <span class="badge public">Public</span>) that lets an outside party read and reply in one thread without an account. Copy it from the conversation header. To <em>write</em>, the recipient confirms a one-time code sent to the address the link was issued for, so a forwarded link can read but not post as them.</p>
+  <div class="table-wrap"><table>
     <thead><tr><th>Surface</th><th>Who uses it</th><th>Access</th></tr></thead>
     <tbody>
       <tr><td><span class="badge route">/inbox</span></td><td>Your team (signed in)</td><td><span class="badge gated">inbox.use</span></td></tr>
       <tr><td><span class="badge route">/i/:token</span></td><td>An outside party you've shared a thread with</td><td><span class="badge public">Public link</span></td></tr>
     </tbody>
-  </table>
-  </div>
-  <p><strong>What it affects:</strong> anyone holding the link can read and reply to that one thread — so treat it like any shared customer-facing link. For more about how these links are shared and revoked, see <a href="public-pages.html">Public &amp; Shared Pages</a>.</p>
+  </table></div>
+  <p>See <a href="public-pages.html">Public &amp; Shared Pages</a> for how these links are shared and revoked.</p>
 
-  <h2>Working a thread — statuses, labels &amp; the message menu</h2>
-  <p><strong>Statuses are a real queue now.</strong> <strong>Open</strong>, <strong>Follow-Up</strong> and <strong>Done</strong> move a thread through its lifecycle: work what's <em>Open</em>, park what you're waiting on in <em>Follow-Up</em> (a queue you come back to), and close finished threads to <em>Done</em> — which is <strong>not</strong> one-way, you can reopen any thread. The tab that sets the status and the tabs that filter by it now use the same words, so setting and finding a status line up.</p>
-  <p><strong>Labels do something.</strong> Create colour-coded labels and assign them to threads — and they're more than a filter: a label can <strong>drive an automation</strong> (mark a thread <em>Urgent</em> and a <a href="flows.html">Flow</a> can react — notify someone, escalate), and the <a href="agent-hub.html">assistant</a> can both read and set them (“tag this urgent”).</p>
-  <p><strong>The message menu.</strong> Each message has a menu, matching the WhatsApp one:</p>
-  <ul class="feat">
-    <li><strong>Forward</strong> — send a message into another conversation. Both ends are permission-checked (you must be allowed to <em>write</em> to the destination, and a customer participant can't be a target); attachments are re-relayed and re-signed, so it genuinely delivers.</li>
-    <li><strong>Pin</strong> / <strong>Star</strong> — keep an important message to hand.</li>
-    <li><strong>Note</strong> — attach a private note (internal, never sent to the customer).</li>
-    <li><strong>Remove</strong> — take a message out of the thread.</li>
-  </ul>
-  <p><strong>Links are links.</strong> A URL a customer pastes is now a <strong>clickable link</strong> (shortened label, full destination), and the conversation pane shows a <strong>preview of the page</strong> it points at — so “is your decking like this one?” with a link is answerable without leaving the Inbox.</p>
+  <h2>Gmail <span class="badge gated">platform operator only</span></h2>
+  <p>A <strong>Gmail</strong> source tab lets a connected Gmail account be worked live inside the Inbox — folders and labels, search, read, reply, compose, Boomerang, Automatic outreach, reminders, shared mailboxes with assignees, scheduled send, JARVIS summaries and drafts. It is currently shown only to the platform operator while Google's verification for Gmail access completes; it will open to workspaces after that.</p>
 
   <h2>A typical workflow</h2>
-  <p>Putting the parts together, a normal day in the Inbox looks like this:</p>
   <ol>
-    <li>Open <span class="badge route">/inbox</span> and use the filters or search to find the conversation you need.</li>
-    <li>Pick a thread to read its history; reply directly — internal note, customer message, or WhatsApp.</li>
-    <li>When a customer replies on WhatsApp, the conversation is assigned to the right owner so it lands with the correct person.</li>
-    <li>To involve an outside party, share the thread and send them the <span class="badge route">/i/:token</span> link.</li>
-    <li>Switch <strong>All workspaces</strong> on or off depending on whether you want one workspace or the combined view.</li>
+    <li>Open <span class="badge route">/inbox</span>, check <strong>Mine</strong> and <strong>Follow up</strong>, and use sources, labels or search to find what you need.</li>
+    <li>Open a thread — the newest messages are at the bottom; open <strong>Profile</strong> for the customer's history.</li>
+    <li>Reply (with a snippet, a product card or your booking link), <strong>Send and mark done</strong>, or send later.</li>
+    <li>Waiting on them? Set a <strong>Boomerang</strong> or <strong>Automatic outreach</strong>.</li>
+    <li>Book an emailed supplier invoice from its file menu; approve an order proposal from the Order panel.</li>
   </ol>
 
   <h2>Access &amp; availability</h2>
-  <div class="callout"><p>The Inbox requires the <code>inbox.use</code> capability and the <strong>messaging module</strong> being enabled for your workspace. WhatsApp conversations only appear once a WhatsApp number is connected. If you don't see the Inbox, ask your workspace administrator to grant access or enable the module.</p></div>
+  <div class="callout"><p>The Inbox requires the <code>inbox.use</code> capability and the <strong>messaging module</strong>. WhatsApp conversations appear once a WhatsApp number is connected or bought (<a href="account-social.html">Profile → Social Accounts</a>). If you don't see the Inbox, ask your workspace administrator.</p></div>
 
-  <div class="callout tip"><p>Looking for the assistant instead of person-to-person chat? The AI workspace lives in the <a href="agent-hub.html">Agent Hub</a>. To browse what's available across the platform, start from <a href="discover.html">Discover</a>.</p></div>
+  <div class="callout tip"><p>Looking for the assistant instead of person-to-person chat? The AI workspace lives in the <a href="agent-hub.html">Agent Hub</a> — which can also search, read and reply to your Inbox mail and book an emailed invoice as a bill, asking you to approve before it sends or books.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects: Overview, costs, visits &amp; team | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Overview, costs, visits &amp; team</div>
+  <h1>Projects · Overview, costs, visits &amp; team</h1>
+  <div class="routes"><span class="badge route">/projects/:id</span></div>
+  <p class="lead">A project's <strong>Overview</strong> is the page you land on when you open it. It answers the questions you would otherwise go and look up one by one: what is this job, how far along is it, what has it cost against what we agreed, when are we next meeting the client, and who is working on it.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open any project from <a href="projects.html">Projects</a> — the <strong>Overview</strong> stage is the first one and opens by default.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-overview.png" alt="A project's Overview tab">
+    <figcaption>A project's Overview.</figcaption>
+  </figure>
+
+  <h2>The layout</h2>
+  <ul class="feat">
+    <li><strong>The hero.</strong> The project's cover picture runs across the top with its status and category, the name, the <strong>description</strong> (long ones fold, with <em>Show more</em>) and the key facts — <strong>Client</strong>, <strong>Deadline</strong>, <strong>Budget</strong> and <strong>Tasks</strong> — laid over the image. <strong>Change cover</strong> picks a different picture.</li>
+    <li><strong>The main column</strong> holds the working panels: <a href="#cost">Cost &amp; margin</a>, <strong>Rooms</strong> (with budget per room when rooms carry one), and <a href="#visits">Visits &amp; meetings</a>.</li>
+    <li><strong>The sidebar</strong> holds <strong>Details</strong> (client, category and linked property — change the category or attach the project to a property here), <strong>Tasks</strong> (a progress bar, Todo / Active / Blocked / Done counts, a <strong>Milestones</strong> strip showing <em>“N/M reached”</em> and the next one, and what is <em>Next due</em>) and the <a href="#team">Team</a>.</li>
+  </ul>
+  <p>The page header carries <strong>All projects</strong>, <strong>Invite client</strong> (managers) and a <strong>More</strong> (⋯) menu with <strong>Save as template</strong>, <strong>Archive</strong> (managers) and <strong>Delete</strong> (the owner only).</p>
+
+  <h2 id="cost">Cost &amp; margin</h2>
+  <p><strong>What it is —</strong> what the job has actually cost so far, set against what you agreed to be paid for it. <em>“Supplier bills, labour, expenses and open purchase orders tagged to this project, net of VAT.”</em> <strong>Why it matters —</strong> you find out a job is losing money while there is still time to do something, not when you close it. It reads the same figures as the project's <strong>Finance</strong> section, so the two never disagree; <strong>Job cost detail</strong> takes you there.</p>
+  <ul class="feat">
+    <li><strong>Four figures</strong> — <strong>Contract value</strong> (accepted quotes), <strong>Spent so far</strong> (with the share of the contract value, or of the budget when there is no contract), <strong>On order</strong> (purchase orders not billed yet) and <strong>Forecast margin</strong> (shown red when negative; <em>“Needs an accepted quote”</em> when there is no contract yet).</li>
+    <li><strong>A spend bar</strong> split into <strong>Materials &amp; suppliers</strong>, <strong>Labour</strong> and <strong>Expenses</strong>, with what is <strong>on order, not billed yet</strong> hatched on the end — and a line saying how much is left of the contract or budget, or how far over it you are.</li>
+    <li><strong>Materials by category.</strong> The materials figure is broken down by the product category of what was bought (tiles, sanitary, lighting…). A supplier bill is spread over the lines of its purchase order; what no product line explains shows as <em>“Bills not linked to a purchase order line”</em> or <em>“Lines with no product category”</em>, so the rows always add up to the materials total.</li>
+    <li><strong>Material deliveries</strong> — open purchase orders with supplier, amount and expected arrival date, tagged <strong>Late</strong> once the date has passed or <strong>No ETA</strong> when the supplier gave none.</li>
+    <li><strong>Crew on the job, last 7 days</strong> — who logged time on the project each day. Hours come from <strong>Log time</strong> on a <a href="projects-tasks.html">task</a>.</li>
+  </ul>
+  <div class="callout warn"><p><strong>Unknown is never shown as zero.</strong> If the figures cannot be loaded the panel says <em>“They are unknown, not zero.”</em> A budget in a different currency from the costs is not compared, and the panel says why; expense claims still awaiting approval are listed separately and not counted yet.</p></div>
+  <p><strong>Who sees it:</strong> the owner and project <strong>managers</strong> who also have finance access — the same people who see the Finance section.</p>
+
+  <h2 id="visits">Visits &amp; meetings</h2>
+  <p><strong>What it is —</strong> the showroom visits, site surveys, design presentations and calls for this project, in one list with <strong>Upcoming</strong> and <strong>Past</strong>. <strong>Why it matters —</strong> a client asking “when are we choosing tiles?” has an answer on the project itself, and the client can ask for a slot without phoning.</p>
+  <p>A visit has a purpose: <strong>Showroom visit</strong>, <strong>Material selection</strong>, <strong>Design presentation</strong>, <strong>Site survey &amp; measurement</strong>, <strong>Delivery / installation</strong> or <strong>Call</strong>.</p>
+  <h3>The team books a visit</h3>
+  <ol>
+    <li>On the Overview, press <strong>Book a visit</strong>.</li>
+    <li>Choose <strong>What for</strong>, the <strong>Date</strong> and <strong>Time</strong> — <em>“You're free at”</em> suggests times from your published hours (<a href="account-schedule.html">Profile → Schedule</a>); any time can still be booked.</li>
+    <li>Add <strong>Where</strong> (showroom, site address or a call link) and <strong>Notes</strong>, and tick <strong>Remind me by email an hour before</strong> if you want it.</li>
+    <li>Save. A calendar invite goes to the client.</li>
+  </ol>
+  <h3>The client requests a visit</h3>
+  <p>A client you invited sees <strong>Request a visit</strong> on the project instead. They pick what it is for and a day, choose one of the <strong>free times</strong> — the project owner's published hours, minus anything already booked — and can add a message. Times are shown in the <strong>client's own time zone</strong>, with the team's time beneath. The request appears as <strong>Requested</strong> in your list, with <strong>Confirm</strong> and <strong>Decline</strong> — the client is told <em>“They confirm it and you get a notification.”</em></p>
+  <div class="callout"><p><strong>Set your time zone.</strong> Free slots are worked out from the owner's availability in their time zone. Availability settings now refuse to save hours without a time zone, so a client in another country never books against the wrong clock.</p></div>
+  <p>Booked visits also appear on the project's <a href="projects-tasks.html">task Calendar</a>.</p>
+
+  <h2 id="team">Project team</h2>
+  <p><strong>What it is —</strong> the people from your workspace who work on this project. You choose them one by one — it is not the whole workspace — and give each a role. <strong>Why it matters —</strong> before, only the owner could open a project; a colleague given work on it could not even read it. Clients are separate: they are invited with <strong>Invite client</strong> and see a read-only slice (see <a href="projects-tabs.html#client">the stages</a>).</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Role</th><th>What they can do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Owner</strong></td><td>Everything. Only the owner can hand the project over or delete it.</td></tr>
+      <tr><td><strong>Manager</strong></td><td><em>“Works on everything, sees the money, edits the project and manages its team”</em> — including Billing, Finance (with finance access), archiving, inviting clients and adding or removing teammates.</td></tr>
+      <tr><td><strong>Member</strong></td><td><em>“Works on tasks, rooms, documents, site and requests.”</em> The working sections of the project, without the money.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>How to add someone</h3>
+  <ol>
+    <li>On the Overview's <strong>Team</strong> panel, choose a person in <strong>Add a teammate…</strong> (anyone in your workspace team; new people are invited from <strong>Profile → Team</strong> first — see <a href="finance-settings-team.html">Team</a>).</li>
+    <li>Pick their <strong>Role</strong> — Manager or Member — and press <strong>Add</strong>.</li>
+    <li>They get a notification and the project appears in their Projects list, with a <em>Project manager</em> or <em>Team member</em> badge in the header.</li>
+  </ol>
+  <ul class="feat">
+    <li>Each person shows how many <strong>open tasks</strong> they hold on the project — a quick read of who is loaded.</li>
+    <li><strong>Assigned work, not on the team</strong> lists anyone holding open tasks on the project who is not on its team (an HR employee, or a colleague given one task), so nothing is quietly sitting with someone outside it.</li>
+    <li>A teammate can <strong>Leave this project</strong> themselves. Someone suspended or removed from the workspace loses access straight away and shows as <em>No longer in the workspace</em>.</li>
+  </ul>
+  <div class="callout tip"><p>The “added to a project” and “someone commented on a task” notifications are platform defaults. A workspace owner can switch either off, or keep only the bell, in <a href="flows.html#defaults">Automations → Platform defaults</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

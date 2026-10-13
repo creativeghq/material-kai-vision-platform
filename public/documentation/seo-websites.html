@@ -10,131 +10,164 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="seo.html">SEO &amp; Content</a> / Connected Websites</div>
   <h1>Connected Websites &amp; Search Console</h1>
-  <div class="routes"><span class="badge route">/profile?tab=websites</span></div>
-  <p class="lead">Connecting a website is the foundation of the whole SEO feature. You point the platform at your site, it reads your <strong>sitemap</strong>, fetches each page and builds a <strong>semantic index</strong> of your content — without ever publishing or changing anything on your site. That index is what lets the <a href="seo-toolkit.html">SEO assistant</a> suggest internal links back to your own pages when it writes articles, and it gives you a <strong>per-site dashboard</strong> that gathers all your SEO work in one place, including your real <strong>Google Search Console</strong> performance. This page covers adding a site, the preview-then-crawl safety step, the dashboard's tabs, and connecting Search Console.</p>
+  <div class="routes"><span class="badge route">/profile?tab=websites</span> <span class="badge route">/websites/:id</span></div>
+  <p class="lead">Connecting a website is the foundation of the whole SEO feature. You point the platform at your site, it reads your <strong>sitemap</strong>, fetches each page and builds a <strong>semantic index</strong> of your content, without ever publishing or changing anything on your site. Each connected site then gets <strong>its own page</strong>: a dashboard that gathers your search performance (<strong>Google Search Console</strong>), your audience (<strong>Google Analytics</strong>), your rankings, your visibility in AI assistants, your articles and your technical health. Every section says plainly when a figure is unknown rather than showing a zero.</p>
 
-  <div class="callout"><p><strong>Where:</strong> your <a href="account-profile.html">Profile</a> → the <strong>Websites</strong> tab (<span class="badge route">/profile?tab=websites</span>), between <em>Social Accounts</em> and <em>Keys</em>. Unlike the SEO Toolkit, this tab is <strong>open to any signed-in user</strong> — you don't need the Pro add-on to connect a site (though crawling spends credits).</p></div>
+  <div class="callout"><p><strong>Where:</strong> your <a href="account-profile.html">Profile</a> → <strong>Websites</strong> (<span class="badge route">/profile?tab=websites</span>) lists your sites. <strong>Click a site to open its own page</strong> at <span class="badge route">/websites/:id</span>, with breadcrumbs back to <em>My Profile › Websites</em>. The list is <strong>open to any signed-in user</strong>; the paid research sections need the <a href="seo-toolkit.html">SEO Toolkit</a> add-on, and crawling spends credits.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/connected-websites.png" alt="The Connected Websites tab">
-    <figcaption>Connected Websites — each site shows a <strong>Default</strong> badge, an index status (<em>“44 pages indexed”</em>), the last crawl time and sitemap, plus per-row actions: open dashboard, preview, recrawl, edit, remove.</figcaption>
+    <figcaption>Your Websites — each site with its <strong>Default</strong> badge, index status, page count and last crawl. Click a row to open the site's own page.</figcaption>
   </figure>
 
-  <h2>What the crawler does (and doesn't do)</h2>
-  <p><strong>What it is —</strong> a read-only crawler that reads your sitemap, fetches each listed page, and builds a semantic index of the content. <strong>Why it matters —</strong> that index is how the assistant knows what pages you already have, so it can suggest genuinely relevant internal links. <strong>It never publishes or modifies anything on your site</strong> — it only reads. The crawl re-runs on a schedule (roughly daily) to keep the index fresh, and you can force a fresh crawl any time with <strong>Recrawl</strong>.</p>
+  <h2>The website list</h2>
+  <p>The <strong>Your Websites</strong> card lists each site with <strong>Status</strong> (<em>Indexed</em>, <em>No pages found</em>, <em>Crawl failed</em> with the error shown under the URL, or <em>Not crawled</em>), <strong>Pages</strong> and <strong>Last crawl</strong>. On each row:</p>
+  <ul class="feat">
+    <li><strong>Click the row</strong> to open the website's page. Older links that used <code>?website=</code> redirect there.</li>
+    <li>The recrawl icon runs <strong>Recrawl now (full)</strong>.</li>
+    <li>The <strong>More</strong> menu has <strong>Preview (sample 5 pages)</strong>, <strong>Edit</strong> and <strong>Remove</strong>. Remove deletes the site and all its indexed pages.</li>
+  </ul>
 
   <h2>Adding a website</h2>
-  <p>Click <strong>Add Website</strong> and fill in:</p>
+  <p>Click <strong>Add website</strong> and fill in:</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
     <tbody>
       <tr><td><strong>Website URL *</strong></td><td>Your domain, e.g. <code>https://yourdomain.com</code>.</td></tr>
-      <tr><td><strong>Sitemap URL</strong></td><td>Optional — leave blank and the platform auto-detects it (it tries <code>/sitemap.xml</code>, <code>/sitemap_index.xml</code>, then <code>robots.txt</code>).</td></tr>
-      <tr><td><strong>Display Name</strong></td><td>Optional friendly name for the site.</td></tr>
-      <tr><td><strong>Max pages to index</strong></td><td>How many pages to crawl (default <strong>50</strong>, minimum 10, hard cap 1000). This bounds the cost of the crawl.</td></tr>
-      <tr><td><strong>Use as default</strong></td><td>Make this the site that inter-linking suggestions pull from when you write a new article. One site is your default.</td></tr>
+      <tr><td><strong>Sitemap URL (optional)</strong></td><td>Leave blank and it's auto-detected from <code>/sitemap.xml</code> or <code>robots.txt</code>.</td></tr>
+      <tr><td><strong>Display Name (optional)</strong></td><td>A friendly name for the site.</td></tr>
+      <tr><td><strong>Max pages to index</strong></td><td>How many pages to crawl, which bounds the crawl's cost. The default is <strong>50</strong>, enough for most blogs. Raise it for a larger site; the preview tells you if your sitemap holds more than the cap.</td></tr>
+      <tr><td><strong>Use as default</strong></td><td>Inter-linking suggestions for new articles pull from this site.</td></tr>
     </tbody>
   </table></div>
 
   <h3>Preview before the full crawl</h3>
-  <p>Because the crawler is charged per page (it fetches each one through Firecrawl), adding a site doesn't immediately crawl everything. Saving runs <strong>Add &amp; Preview</strong> — a <strong>Sitemap Preview</strong> that reads your sitemap, reports the <strong>total URLs</strong> found and how many it <em>will</em> crawl, and fetches a <strong>sample of 5 pages</strong> so you can confirm titles and descriptions come through cleanly. If it looks right, click <strong>Proceed with Full Crawl</strong>. This preview-then-commit step means you never spend credits on a full crawl of a site whose sitemap was wrong.</p>
-  <div class="callout tip"><p>You can re-run the 5-page <strong>Preview</strong> any time from the row's action icons, and <strong>Recrawl now (full)</strong> forces a complete fresh index. <strong>Remove</strong> deletes the site and all its indexed pages.</p></div>
+  <p>The crawler is charged per page read, so saving with <strong>Add &amp; Preview</strong> doesn't crawl everything straight away. It opens a <strong>Sitemap Preview</strong> showing <strong>Total URLs</strong>, <strong>Will crawl up to</strong>, and <strong>Sample success</strong> for 5 sample pages, so you can check that titles and descriptions come through. A warning appears if the sitemap holds more pages than your cap. If it looks right, click <strong>Proceed with full crawl</strong>. You never spend credits crawling a site whose sitemap was wrong.</p>
+  <p>After that the crawl keeps the index fresh on its own. It reads the pages search demand points to first, then uses spare capacity on each run to work through sitemap pages it hasn't read yet. The article writer also reads unread pages on its topic before writing.</p>
 
-  <h2>The per-site SEO dashboard</h2>
-  <p>Click a site (or its <strong>Open SEO dashboard</strong> icon) to open its dashboard. The header shows the domain, page count and last-crawl time with a <strong>Recrawl</strong> button and <strong>four headline counters</strong> (Articles, Keyword research, Toolkit runs, Tracked domains). The dashboard is now a <strong>section rail</strong> that has grown well past the original five: <strong>Overview</strong>, <strong>AI Visibility</strong>, <strong>Rank Tracker</strong>, <strong>Competitors</strong>, <strong>Articles</strong>, <strong>Keyword Research</strong>, <strong>Toolkit Runs</strong>, <strong>Domain Audits</strong>, <strong>Search Performance</strong>, <strong>Rankings &amp; Links</strong>, <strong>Site Health</strong> and <strong>llms.txt</strong>. The main lists are:</p>
+  <h2>The website page</h2>
+  <p>The header shows the domain, the page count and last crawl, with <strong>Visit</strong> and <strong>Recrawl</strong>. A failed crawl shows as a red banner. Four counters (<strong>Articles</strong>, <strong>Keyword research</strong>, <strong>Toolkit runs</strong>, <strong>Tracked domains</strong>) each open their section. A rail on the left (a strip on a phone) groups the sections. The open one is in the address as <code>?section=…</code>, so any section can be bookmarked or linked.</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/website-dashboard.png" alt="The per-site SEO dashboard">
-    <figcaption>The per-site dashboard — headline counters plus the section rail (Overview, AI Visibility, Rank Tracker, Competitors, Articles, Keyword Research, Toolkit Runs, Domain Audits, Search Performance, Rankings &amp; Links, Site Health, llms.txt).</figcaption>
+    <figcaption>The website record page (<code>/websites/:id</code>) — headline counters, the section rail grouped into Search, Audience, Visibility, Content, Technical and Activity, and the Overview opening on <strong>What to do next</strong>.</figcaption>
   </figure>
 
   <div class="table-wrap"><table>
-    <thead><tr><th>Section</th><th>What it shows</th></tr></thead>
+    <thead><tr><th>Group</th><th>Sections</th></tr></thead>
     <tbody>
-      <tr><td><strong>Rank Tracker</strong></td><td>Daily Google positions for the keywords <em>you</em> chose to follow (see below).</td></tr>
-      <tr><td><strong>Articles</strong></td><td>Every SEO article written for this site — title, target keyword, SEO score, word count, status. Click a row to open the full article viewer. (Empty until you ask the assistant to write one.)</td></tr>
-      <tr><td><strong>Keyword Research</strong></td><td>Saved keyword-research runs — target keyword, topic, number of keywords, volume.</td></tr>
-      <tr><td><strong>Toolkit Runs</strong></td><td>A log of the assistant's research/audit tool runs against this site — subject, kind, country, result.</td></tr>
-      <tr><td><strong>Domain Audits</strong></td><td>Tracked domains — domain, rank, organic traffic, last audit — from the domain-snapshot tools.</td></tr>
-      <tr><td><strong>Search Performance</strong></td><td>Your real <strong>Google Search Console</strong> data (see below).</td></tr>
+      <tr><td>—</td><td><a href="#overview"><strong>Overview</strong></a></td></tr>
+      <tr><td><strong>Search</strong></td><td><a href="#gsc">Search Console</a> · <a href="#cannibalisation">Cannibalisation</a> · <a href="#rank-tracker">Rank Tracker</a> · <a href="#serp-features">SERP Features</a></td></tr>
+      <tr><td><strong>Audience</strong></td><td>Overview · Pages · Geography · Devices &amp; events · Products &amp; ads · Funnel · Retention. All from Google Analytics; see <a href="seo-website-analytics.html">Website Analytics</a>.</td></tr>
+      <tr><td><strong>Visibility</strong></td><td><a href="seo-ai-citations.html">AI Citations</a> · <a href="#backlinks">Backlinks</a> · <a href="#competitors">Competitors</a> · <a href="#domain-audits">Domain Audits</a></td></tr>
+      <tr><td><strong>Content</strong></td><td>Articles (with the Topic plan) · <a href="#keyword-research">Keyword Research</a> · Brand Profile. See the <a href="seo-articles.html">SEO Article Writer</a>.</td></tr>
+      <tr><td><strong>Technical</strong></td><td><a href="#crawl">Site Crawl</a> · <a href="#health">Page Health</a> · <a href="#llms">llms.txt</a></td></tr>
+      <tr><td><strong>Activity</strong></td><td>Toolkit Runs · <a href="#reports">Reports</a></td></tr>
     </tbody>
   </table></div>
 
-  <h2 id="gsc">Google Search Console — real search performance</h2>
-  <p><strong>What it is —</strong> a direct connection to your property in Google Search Console, so the <strong>Search Performance</strong> tab shows the numbers Google actually reports for your site rather than third-party estimates. <strong>Why it matters —</strong> it's the ground truth for how you're doing in search, and it powers the assistant's <em>striking-distance</em> and <em>top-movers</em> tools.</p>
+  <h2 id="statuses">A figure is a number, or the reason there isn't one</h2>
+  <p><strong>What it is —</strong> every tile on these pages either shows a number or says why it can't. <strong>Why it matters —</strong> "we couldn't fetch your backlinks" and "you have no backlinks" are very different, and a zero would hide which one you're looking at. Where a number would be, you'll see:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Word</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>None</strong></td><td>The source answered and genuinely has nothing for this site yet.</td></tr>
+      <tr><td><strong>Unknown</strong> (amber)</td><td>The source failed, so the figure is unknown. It is not zero. A refused data-provider call reads this way too.</td></tr>
+      <tr><td><strong>Not measured</strong></td><td>Never collected for this site. Run it to fill it in.</td></tr>
+      <tr><td><strong>Not connected</strong></td><td>Needs a connection (e.g. Search Console) before any data can arrive.</td></tr>
+      <tr><td><strong>Not available</strong></td><td>The source doesn't report this until it's set up (e.g. ecommerce events in Analytics).</td></tr>
+    </tbody>
+  </table></div>
 
-  <h3>How to connect Search Console</h3>
-  <ol>
-    <li>Open the site's dashboard → <strong>Search Performance</strong> tab → <strong>Connect Search Console</strong>.</li>
-    <li>You're sent to Google to grant read-only access (the <em>webmasters.readonly</em> scope). The sign-in and callback happen <strong>server-side</strong> — Google returns to the platform, not into the app — so the connection is handled securely and you land back on the Websites tab.</li>
-    <li>If your Google account has more than one property, <strong>pick the Search Console property</strong> that matches this site. The platform also tries to auto-match it to your domain.</li>
-    <li>It backfills the last 28 days immediately, then refreshes nightly. Use <strong>Sync</strong> to pull more history on demand, or <strong>Disconnect</strong> to stop (your historical rows are kept).</li>
-  </ol>
-  <div class="callout warn"><p><strong>Operator setup required.</strong> Search Console uses Google OAuth, so a platform operator must have configured the Google client credentials (under <em>Operations → Keys</em>). If they haven't, the <em>Connect</em> action tells you so instead of failing silently.</p></div>
-
-  <h3>What the Search Performance tab shows</h3>
-  <p>Once connected, the tab presents your last-28-day performance:</p>
+  <h2 id="overview">Overview</h2>
   <ul class="feat">
-    <li><strong>Four headline tiles</strong> — <strong>Clicks</strong>, <strong>Impressions</strong>, <strong>Average CTR</strong> and <strong>Average position</strong>.</li>
-    <li><strong>Clicks trend</strong> — a sparkline of daily clicks across the window.</li>
-    <li><strong>Devices</strong> — clicks split by device (mobile / desktop / tablet), each with its share.</li>
-    <li><strong>Breakdown</strong> — a table you can switch between <strong>Queries</strong>, <strong>Pages</strong>, <strong>Countries</strong> and <strong>Appearance</strong>, each row showing Clicks, Impressions, CTR and Position. Page rows link out to the live page.</li>
+    <li><strong>What to do next</strong> — one ranked list of actions, built from Search Console, the crawl, your articles and your competitors. Each row says why it's there and is tagged <em>Quick win</em>, <em>Refresh</em>, <em>Consolidate</em>, <em>New page</em>, <em>Not crawled</em>, <em>Crawled, not indexed</em> or <em>Fix page</em>. Its button takes you to the place to act: <strong>Write it</strong> starts a new article with the keyword filled in. Data sources that are missing are listed underneath.</li>
+    <li><strong>Search presence</strong> — domain rank, organic keywords, estimated monthly traffic, traffic value, referring domains, backlinks, broken backlinks and spam score. Use <strong>Take first snapshot</strong> or <strong>Refresh</strong>; it warns when the figures are stale.</li>
+    <li><strong>Ranking profile</strong> and <strong>Top ranking keywords</strong> — where your keywords sit, and what improved, declined, appeared or was lost week on week.</li>
+    <li>Summary cards for <strong>Search Console</strong>, <strong>AI assistants</strong> and <strong>Technical health</strong>, each with a button into the full section.</li>
   </ul>
 
+  <h2 id="gsc">Search Console — real search performance</h2>
+  <p><strong>What it is —</strong> a direct, read-only connection to your property in Google Search Console, so you see the numbers Google actually reports rather than third-party estimates. It also powers the assistant's <em>striking-distance</em> and <em>top-movers</em> tools, the <em>What to do next</em> list and each article's search card.</p>
+  <h3>How to connect</h3>
+  <ol>
+    <li>Open the website → <strong>Search Console</strong> → <strong>Connect Search Console</strong>.</li>
+    <li>Grant read-only access at Google. You come back to the website's Search Console section.</li>
+    <li>If it can't match a property to your domain, choose one under <strong>Pick a Search Console Property</strong> (<strong>Load my properties</strong>).</li>
+    <li><strong>Sync</strong> pulls on demand. The disconnect icon stops the connection and keeps your history.</li>
+  </ol>
+  <div class="callout warn"><p><strong>Operator setup required.</strong> Search Console uses Google sign-in, so a platform operator must have configured the Google client credentials. If they haven't, <em>Connect</em> tells you so instead of failing silently.</p></div>
+  <h3>What it shows</h3>
+  <ul class="feat">
+    <li>A <strong>Day / Week / Month / Quarter</strong> range, and four tiles: <strong>Clicks</strong>, <strong>Impressions</strong>, <strong>Avg CTR</strong> and <strong>Avg position</strong>.</li>
+    <li>A clicks trend, a <strong>Devices</strong> split, and a <strong>Breakdown</strong> table with <strong>Queries</strong>, <strong>Pages</strong>, <strong>Countries</strong> and <strong>Appearance</strong> tabs. Queries can be filtered by <strong>Page</strong> and <strong>Segment</strong> (all countries and devices, one device, or one country).</li>
+    <li><strong>Drill down:</strong> click a query to see the pages Google showed for it, with a warning when several pages split the impressions, which is a cannibalisation signal. Click a page to see the queries that brought it impressions, then <strong>Filter Queries by this page</strong>.</li>
+  </ul>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/gsc.png" alt="The Search Performance (Google Search Console) tab">
-    <figcaption>Search Performance — Clicks / Impressions / Avg CTR / Avg position tiles and a clicks trend, with a Devices breakdown and a switchable Queries / Pages / Countries / Appearance table below. (Search Console reports with a 2–3 day lag.)</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/gsc.png" alt="The Search Console section">
+    <figcaption>Search Console — Clicks / Impressions / Avg CTR / Avg position tiles and a clicks trend, with a Devices split and the switchable Queries / Pages / Countries / Appearance table.</figcaption>
   </figure>
+  <div class="callout"><p><strong>Reporting lag.</strong> Search Console data lands 2–3 days behind, so the most recent days may look sparse. That's Google's lag, not a sync problem.</p></div>
 
-  <div class="callout"><p><strong>Reporting lag.</strong> Google Search Console data lands a couple of days behind, so the most recent 2–3 days may look sparse — that's Google's lag, not a sync problem.</p></div>
+  <h2 id="cannibalisation">Cannibalisation — your pages competing with each other</h2>
+  <p><strong>Pages competing with each other</strong> lists the queries where Google shows more than one of your pages, with a severity, impressions, the number of pages and the best position. It flags when Google's main page isn't the one earning the clicks. Filter by severity or click split and sort as you like. <strong>Consolidate</strong> lets you pick the page to keep and copies the redirects for the others (Apache <code>.htaccess</code> format).</p>
 
   <h2 id="rank-tracker">Rank Tracker — the keywords you chose, followed daily</h2>
-  <p><strong>What it is —</strong> the <strong>Rank Tracker</strong> section follows a <em>fixed set of keywords you pick</em> and checks each one's <strong>Google organic position every day</strong>, building a trend over time. <strong>Why it matters —</strong> Search Console tells you how you're already doing; the domain-audit tools tell you what a domain ranks for right now; Rank Tracker is the one that answers <em>“are the keywords I care about moving up or down?”</em> — a stable list watched daily, not a snapshot. <span class="badge gated">Pro add-on</span> — it needs the <a href="seo-toolkit.html">SEO Toolkit</a> entitlement.</p>
-
+  <p><strong>What it is —</strong> the <strong>Rankings</strong> card follows a fixed set of keywords you pick and checks each one's Google position every day. <strong>Why it matters —</strong> it's the one section that answers <em>"are the keywords I care about moving up or down?"</em> <span class="badge gated">Pro add-on</span></p>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/rank-tracker.png" alt="The Rank Tracker section of the per-site SEO dashboard">
-    <figcaption>Rank Tracker — the <strong>Rankings</strong> card (<em>“The keywords you chose, followed daily”</em>) with <strong>Add keywords</strong> and <strong>Check now</strong>; once the daily check has run, the Visibility / Avg. position tiles, the distribution and the tracked-keywords table fill in.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/rank-tracker.png" alt="The Rank Tracker section">
+    <figcaption>Rank Tracker — the <strong>Rankings</strong> card with <strong>Add keywords</strong> and <strong>Check now</strong>; once checks have run, the tiles, the distribution and the tracked-keywords table fill in.</figcaption>
   </figure>
-
-  <h3>Adding keywords</h3>
-  <p>Click <strong>Add keywords</strong>, type them <strong>one per line or comma-separated</strong>, and <strong>Track these</strong>. They're checked <strong>daily in Greek results</strong> (desktop). Up to 200 can be added at once; <strong>Check now</strong> runs an immediate check instead of waiting for the nightly one, and the trash icon on a keyword stops tracking it.</p>
-
-  <h3>What it shows</h3>
-  <p>The <strong>Rankings</strong> card — <em>“The keywords you chose, followed daily”</em> — leads with four tiles:</p>
   <ul class="feat">
-    <li><strong>Visibility</strong> — the share of your tracked keywords sitting in the <strong>top 10</strong>.</li>
-    <li><strong>Avg. position</strong> — averaged across the ones that actually rank.</li>
-    <li><strong>Ranking</strong> — how many rank, and how many are <em>outside the top 100</em>.</li>
-    <li><strong>Could not check</strong> — checks that failed. Crucially, a failed check is <strong>“unknown”, not “lost”</strong>, and a keyword outside the top 100 is <strong>not</strong> counted as position 101 — neither is allowed to poison the averages.</li>
+    <li><strong>Add keywords</strong> — one per line or comma-separated. Choose the device (<strong>Desktop</strong> / <strong>Mobile</strong>) and the location (<strong>All of GR</strong> or one city), then <strong>Track these</strong>. Keywords are checked daily in Greek results. <strong>Check now</strong> runs a check immediately. <em>Change device or location</em> on a row moves an existing keyword.</li>
+    <li><strong>Tiles</strong> — <strong>Visibility</strong> (share of tracked keywords in the top 10), <strong>Avg. position</strong>, <strong>Ranking</strong> (how many rank, how many are outside the top 100) and <strong>Could not check</strong>. A failed check is <em>unknown, not unranked</em>, and neither failures nor unranked keywords distort the averages.</li>
+    <li><strong>Visibility over time</strong>, the distribution across bands (Top 3 · 4–10 · 11–30 · 31–100 · Not ranking), and the <strong>Tracked keywords</strong> table with position, change, trend and ranking page. You can filter it by country, device, location and source.</li>
+    <li><strong>Found in Search Console</strong> — keywords your site already shows up for, with a verdict (<em>Earning clicks</em>, <em>Recurring</em>, <em>Near page one</em>, <em>Below the bar</em>). Switch on <strong>Add qualifying keywords automatically</strong> to have them tracked up to a ceiling you set. Stopping tracking a keyword also stops it being suggested back.</li>
   </ul>
-  <p>Below: a <strong>Visibility over time</strong> sparkline, a <strong>“Where the tracked set sits”</strong> distribution across bands (<em>Top 3 · 4–10 · 11–30 · 31–100 · Not ranking</em>), and a <strong>Tracked keywords</strong> table — <em>best position first</em> — with each keyword's <strong>Position</strong>, its <strong>Change</strong> against the previous check (<strong>up means up the page</strong>), a per-keyword <strong>Trend</strong> sparkline, and the actual <strong>ranking page</strong> URL.</p>
-  <div class="callout"><p><strong>Drops are surfaced, not just recorded.</strong> When keywords fall out of the <strong>top 10</strong>, the platform raises a <a href="flows.html">Flow</a> event (“N keywords left the top 10”) to owners/admins — so a slide gets your attention instead of waiting to be noticed on the dashboard.</p></div>
+  <div class="callout"><p><strong>Drops are surfaced.</strong> When keywords fall out of the top 10, the platform raises a <a href="flows.html">Flow</a> event to owners and admins.</p></div>
 
-  <h2>AI Visibility — are the assistants recommending you?</h2>
-  <p><strong>What it is —</strong> the <strong>AI Visibility</strong> section asks the big AI assistants the questions your customers ask them (<em>“best porcelain tile brands in Greece”</em>) and records, for each one, <strong>whether it named you, where you ranked in its answer, and who it named instead</strong>. <strong>Why it matters —</strong> more buyers now start with an assistant than with a search box; this is the one place that tells you if those assistants know you exist. <span class="badge gated">Pro add-on</span></p>
-  <ul class="feat">
-    <li><strong>Which assistants</strong> — <strong>ChatGPT</strong>, <strong>Claude</strong>, <strong>Perplexity</strong> and <strong>Gemini</strong>. The header shows the roster; an assistant with no API key configured is marked <em>“— no key configured”</em> and simply sits out the run rather than skewing the numbers.</li>
-    <li><strong>The headline tiles</strong> — <strong>Share of voice</strong> (<em>named in X of Y answers</em>), <strong>Avg. mention rank</strong>, <strong>Subjects probed</strong> and <strong>Answers citing you</strong>, over a weekly sparkline. Run it yourself with <strong>Run probes now</strong>; if the feed has stalled, a banner names the one fix (<em>Track this site's brand</em> / <em>Switch it back on</em> / <em>Run probes now</em>).</li>
-    <li><strong>By assistant</strong> — a table of Answered / Failed / Named you / Avg. rank / Share of voice per assistant. An assistant that never answered reads <strong>“No verdict”</strong>, never a misleading 0% — a failed probe is <em>unknown</em>, not <em>absent</em>, and failed probes are excluded rather than counted as zero.</li>
-    <li><strong>Who they name instead</strong> — the competitor brands the assistants mentioned in the same answers.</li>
-    <li><strong>Questions we asked</strong> — every prompt, with <em>one row per assistant</em> showing its verdict (<em>named you · #position · linked</em> / <em>did not name you</em> / <em>failed</em>), the competitors it named, and a <strong>Show answer</strong> toggle to read the assistant's full reply and any URLs it cited.</li>
-  </ul>
-  <p><strong>Ask your own questions.</strong> <strong>Edit questions</strong> opens <em>“What we ask the assistants”</em> — a list of custom prompts (one per line, with placeholders like <code>{brand}</code>, <code>{product_type}</code>, <code>{competitors}</code>), plus aliases, languages and countries, and a switch to also ask the four stock questions. Save and the next run asks yours.</p>
+  <h2 id="serp-features">SERP Features</h2>
+  <p>For your tracked keywords: which search features appear on the results page (AI Overview, featured snippet, People Also Ask, image pack…), whether each one <strong>cites you</strong>, and which keywords show the feature <strong>without</strong> you. A feature you're absent from is a finding, not a gap in the list. Counters show how many keywords were <em>Checked</em>, are <em>Unknown</em> (the latest check failed) or were <em>Never checked</em>. <strong>Refresh</strong> re-reads them.</p>
 
-  <h2>Keyword ideas for one of your pages</h2>
-  <p><strong>What it is —</strong> on the dashboard's <strong>Keyword Research</strong> section, the <strong>“Suggested from your pages”</strong> card turns a single page of your site into a keyword shortlist. <strong>Why it matters —</strong> it answers <em>“what else should this exact page rank for?”</em> using your own data first.</p>
+  <h2 id="backlinks">Backlinks</h2>
+  <p>From the backlink index: <strong>Backlinks</strong>, <strong>Referring domains</strong>, <strong>Referring main domains</strong>, <strong>Domain rank</strong>, <strong>Spam score</strong> and <strong>Broken backlinks</strong>, plus a <strong>Referring domains</strong> list (linking site, its rank, anchor, which of your pages it links to, first seen). Use <strong>Snapshot now</strong> or <strong>Refresh</strong>. If the list can't be fetched it says <em>Unknown, not zero</em>. (Ranking keywords used to sit here; they're now on Overview.)</p>
+
+  <h2 id="competitors">Competitors</h2>
+  <p>A one-year chart of you against your rivals, switchable between organic traffic, keywords, traffic value, referring domains and domain rank. Under <strong>Tracked domains</strong>, rivals are measured on the same weekly run and in the same market as you. Some are <em>suggested</em>; add your own with <strong>Add competitor</strong>. Their keywords are kept, and feed the <em>New page</em> ideas in <em>What to do next</em>.</p>
+
+  <h2 id="domain-audits">Domain Audits</h2>
+  <p>Weekly tracking of your own domain. Click <strong>Track this domain</strong> to start. It shows rank, organic traffic and the last audit, plus a history of each audit (rank, keywords, traffic, referring domains, backlinks, spam, cost).</p>
+
+  <h2 id="keyword-research">Keyword Research</h2>
+  <p>Your saved research runs: target keyword, topic, volume, difficulty, CPC, competition, opportunity, trend and more. Each row has a <strong>Track</strong> icon; <strong>New research</strong> starts one. Opening a run shows its <em>Keyword clusters</em>, which you can <strong>Save as plan</strong> into the <a href="seo-articles.html#topic-plan">Topic plan</a>. If a page of yours already ranks for the keyword, it warns you before you write a competing article. The <em>Asked of AI</em> tile (<strong>Check AI volume</strong>) shows how often the term is asked of AI assistants.</p>
+  <h3>Keyword ideas for one of your pages</h3>
   <ol>
-    <li>Type part of a <strong>page title or URL</strong> (e.g. <em>πλακάκια</em>, or <code>/thessaloniki/marmaro</code>) and pick the page from the dropdown.</li>
-    <li>You immediately see, <strong>for free</strong>, <em>“Queries Google already shows this page for (90 days)”</em> — pulled from the <a href="#gsc">Search Console</a> data you've connected: Query, Impressions, Clicks and Position.</li>
-    <li>Click <strong>Get keyword ideas</strong> for the paid half — <em>“Keyword ideas around this page's title”</em> (Greek market): Keyword, Volume, CPC and Competition, seeded from the page's own title.</li>
+    <li>In <strong>Suggested from your pages</strong>, type part of a page title or URL and pick the page.</li>
+    <li>You immediately see, for free, <em>Queries Google already shows this page for (90 days)</em> from your <a href="#gsc">Search Console</a> data.</li>
+    <li><strong>Get keyword ideas</strong> (paid) adds <em>Keyword ideas around this page's title</em>: volume, CPC and competition.</li>
   </ol>
-  <p>Every row on both tables has <strong>Research</strong> (open the full keyword research) and <strong>Track</strong> (add it to the <a href="#rank-tracker">Rank Tracker</a>) buttons. The page has to be in the site's index first — if it isn't, the card asks you to <strong>Recrawl</strong>.</p>
+  <p>Every row has <strong>Research</strong> and <strong>Track</strong> buttons. Below, <em>Page titles not yet tracked or researched</em> lists pages you haven't worked on yet.</p>
+
+  <h2 id="crawl">Site Crawl</h2>
+  <p><strong>Full site crawl</strong> audits your pages for technical problems. Click <strong>Crawl the site</strong> (later <strong>Crawl again</strong>). It shows pages read, an on-page score, issues (with the change since the last crawl) and pages affected. Issues are grouped: <em>Cannot be indexed</em>, <em>Broken links</em>, <em>Redirect chains</em>, <em>Duplicate titles or descriptions</em>, <em>Duplicate content</em>, <em>Pages returning an error</em>. Each group has a <strong>Fix:</strong> line and <strong>Show all</strong>. Pages that couldn't be fetched are flagged as unknown, not clean.</p>
+
+  <h2 id="health">Page Health</h2>
+  <p>The <strong>Site Health</strong> card runs a Lighthouse (Core Web Vitals) and on-page audit of your homepage. Use <strong>Run check</strong> or <strong>Re-check</strong>. It shows On-page SEO, Performance, Accessibility and Best practices gauges, and <em>What we checked</em>, group by group. An audit that returned no data shows as <strong>Audit failed</strong> with the cause, never as a clean score.</p>
+
+  <h2 id="llms">llms.txt</h2>
+  <p>Builds an <code>llms.txt</code> file from your crawled pages, leaving out pages that return errors or have left the sitemap. Use <strong>Rebuild</strong>, <strong>Copy</strong> or <strong>Download</strong>, then host it yourself at <code>/llms.txt</code>. The platform never writes to your site.</p>
+
+  <h2 id="reports">Toolkit Runs and Reports</h2>
+  <ul class="feat">
+    <li><strong>Toolkit Runs</strong> — a log of the research and audit runs the assistant made for this website.</li>
+    <li><strong>Reports</strong> — <strong>New report</strong> builds a saved report from the sections you tick: Search presence, Rank tracker, Search Console, Analytics, Site health, Full site crawl, AI visibility, Competitors and Competing pages. Choose <em>Every month</em>, <em>Every week</em> or <em>Only when I ask</em>. Each build is frozen with its own period, so an old report keeps its own numbers. <strong>Build now</strong> builds one immediately.</li>
+  </ul>
 
   <h2>What it affects elsewhere</h2>
   <ul class="feat">
-    <li>Your <strong>default</strong> connected site is what the <a href="seo-toolkit.html">SEO Toolkit</a> uses for internal-link suggestions when writing articles.</li>
-    <li>Articles, keyword research and tool runs the assistant produces are <strong>filed under the site</strong>, so they show up on this dashboard.</li>
-    <li>Connected <strong>Search Console</strong> data feeds the assistant's first-party GSC tools (striking-distance, top-movers).</li>
+    <li>Your <strong>default</strong> site is what new articles pull internal-link suggestions from.</li>
+    <li>Articles, keyword research and tool runs from the assistant are <strong>filed under the site</strong> and show up on its page.</li>
+    <li>Connected <strong>Search Console</strong> data feeds the assistant's first-party tools, <em>What to do next</em>, and each article's search card.</li>
   </ul>
 </main>
 <script src="assets/nav.js"></script>

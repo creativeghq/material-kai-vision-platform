@@ -34,3 +34,17 @@ Folder layout in the bucket mirrors the docs (e.g. `dashboard/`, `finance/`, `to
 
 This guide covers **end-user** pages only. Admin (`/admin/*`) screens are intentionally
 out of scope.
+
+## Keeping it current
+
+The guide is refreshed in sweeps. Each sweep records the last commit it covered here, so the
+next one starts from exactly that point:
+
+```
+git log <last-synced>..HEAD --no-merges --format="%h %s" | grep -E " (feat|fix)"
+```
+
+Read each change against the page that describes its area, correct what moved or was renamed,
+add what is new, then update the marker below in the same commit as the page edits.
+
+**Last synced through:** `c6c2a0f91` (2026-10-13)

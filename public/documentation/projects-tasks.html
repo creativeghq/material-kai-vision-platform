@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects: Tasks, board &amp; My tasks | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Tasks, board &amp; My tasks</div>
+  <h1>Projects · Tasks, board &amp; My tasks</h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=tasks</span> <span class="badge route">/projects/:id?tab=tasks&amp;task=:taskId</span> <span class="badge route">/projects/my-tasks</span></div>
+  <p class="lead">A project's work is a set of <strong>tasks</strong> — with subtasks, an assignee, a priority, dates and a discussion. You can look at the same tasks four ways (<strong>List, Board, Calendar, Schedule</strong>), open any one of them in a <strong>task drawer</strong> to see and change everything about it, and see everything on <em>your</em> plate across every project on one <strong>My tasks</strong> page.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open a project → the <strong>Delivery</strong> stage → <strong>Tasks</strong>. <strong>My tasks</strong> is the button on the <a href="projects.html">Projects</a> list header, and a shortcut under <strong>Projects Hub</strong> in the Apps menu.</p></div>
+
+  <h2>Four views of the same tasks</h2>
+  <p><strong>What it is —</strong> a view switcher at the top of the Tasks section. <strong>Why it matters —</strong> a list is best for writing tasks down, a board for moving work along, a calendar for seeing what falls due when, and the schedule for a timeline. They are four views of <em>one</em> set of tasks, so a change in one shows in all of them.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>View</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>List</strong></td><td>Tasks and their subtasks, with quick add (<em>“Add a task…”</em>, <em>“Add a subtask…”</em>).</td></tr>
+      <tr><td><strong>Board</strong></td><td>One column per status — <strong>To do · In progress · Blocked · Done</strong>. <strong>Drag a card to another column</strong> to change its status (<em>“Drop a task here”</em>). From the keyboard, Space picks a card up and Enter opens it.</td></tr>
+      <tr><td><strong>Calendar</strong></td><td>A month grid placing each task on its due date (or its end date when it has no due date), with previous/next month arrows. Booked <a href="projects-overview.html#visits">visits &amp; meetings</a> for the project appear on it too.</td></tr>
+      <tr><td><strong>Schedule</strong></td><td>The Gantt timeline of start and end dates — see <a href="construction-programme.html">Programme</a>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The task drawer</h2>
+  <p><strong>What it is —</strong> click any task, in any view, and it opens in a drawer at the side. The drawer has its own link (<span class="badge route">?tab=tasks&amp;task=…</span>), so you can paste it to a colleague and it opens straight on that task. <strong>Why it matters —</strong> before, a task could not be opened at all; now everything about it is in one place.</p>
+  <ul class="feat">
+    <li><strong>Properties</strong> — <strong>Status</strong>, <strong>Priority</strong> (<em>Urgent · High · Medium · Low</em>, or <em>Not set</em>), <strong>Assignee</strong> (a workspace member or an HR employee, or <em>Unassigned</em>), <strong>Room</strong>, <strong>Start</strong> and <strong>Due</strong> dates, a <strong>Milestone</strong> switch and a <strong>Client visible</strong> switch (off by default — an internal task is never shown to the client).</li>
+    <li><strong>Description</strong> — <em>“What needs doing, and what does done look like?”</em></li>
+    <li><strong>Subtasks</strong> — add and tick off subtasks; a subtask's drawer says which task it belongs to.</li>
+    <li><strong>Time logged</strong> — the hours booked against the task, with a <strong>Log time</strong> button. Those hours feed the crew strip on the project's <a href="projects-overview.html#cost">cost panel</a>.</li>
+    <li><strong>Comments</strong> — the task's discussion (below).</li>
+  </ul>
+  <div class="callout warn"><p><strong>Mandatory steps still apply.</strong> If a task has mandatory steps outstanding, moving it to <em>Done</em> is refused with <em>“Mandatory steps outstanding”</em> — whether you do it from the list, the board, the calendar or the drawer.</p></div>
+
+  <h2>Comments on a task</h2>
+  <p><strong>What it is —</strong> a discussion thread inside each task (<em>“Start the discussion — a question, or a note for whoever picks this up”</em>). It is marked <em>internal, never shown to the client</em>: a client you invited never sees it. You can delete your own comments.</p>
+  <p><strong>Who is told —</strong> when someone comments, the task's <strong>assignee</strong>, the project <strong>owner</strong> and <strong>everyone who commented earlier</strong> get a notification — never the person who wrote it, and only people still on the project team. It is one of the platform's default notifications, so a workspace owner can switch it off or silence one channel in <a href="flows.html#defaults">Automations → Platform defaults</a> (<em>Task Commented</em>).</p>
+
+  <h2>Priority</h2>
+  <p>Every task can carry a priority — <strong>Urgent</strong>, <strong>High</strong>, <strong>Medium</strong> or <strong>Low</strong> — shown as a coloured tag on the card and in the list. Leave it unset when it doesn't matter; <em>Not set</em> is a real answer, not a default of Medium.</p>
+
+  <h2 id="my-tasks">My tasks — everything on your plate</h2>
+  <p><strong>What it is —</strong> one page, <span class="badge route">/projects/my-tasks</span>, titled <em>“Everything on your plate, across every project.”</em> <strong>Why it matters —</strong> if you work on several jobs, you no longer open each project to find out what is yours.</p>
+  <ul class="feat">
+    <li><strong>Two scopes.</strong> <strong>All my work</strong> — tasks assigned to you, plus unassigned tasks in projects you run. <strong>Assigned to me</strong> — only tasks someone gave you.</li>
+    <li><strong>Grouped by when.</strong> <em>Overdue · Today · Tomorrow · Next 7 days · Later · No date</em>, each task showing its project.</li>
+    <li><strong>Hide done / Show done</strong> keeps finished tasks out of the way.</li>
+    <li><strong>Change status from here.</strong> Each row has a status picker, so you move your tasks along without opening the project. Clicking a task in a project you own opens it in that project's task drawer; a task you were only assigned opens its discussion right on this page.</li>
+  </ul>
+  <p>An empty page reads <em>“Nothing on your plate”</em>, with a link back to <strong>Open Projects</strong>.</p>
+
+  <h2>Who can see and change tasks</h2>
+  <ul class="feat">
+    <li>The project <strong>owner</strong> and the <a href="projects-overview.html#team">project team</a> (managers and members) work on every task.</li>
+    <li>A workspace member who is <strong>not</strong> on the team but has been assigned a task can read and comment on that one task, and move its status from My tasks.</li>
+    <li>A <strong>client</strong> you invited sees only tasks marked <strong>Client visible</strong>, and never the comments.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Worked example.</strong> On the Board, drag <em>“Order worktop”</em> from <em>To do</em> to <em>In progress</em>. Open it, set Priority to <strong>High</strong>, assign it to Maria and write <em>“Supplier says 3 weeks — confirm the template date”</em> in the comments. Maria gets a notification, finds the task under <em>Today</em> on her My tasks page, and replies in the same thread — and the owner is told about her reply.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

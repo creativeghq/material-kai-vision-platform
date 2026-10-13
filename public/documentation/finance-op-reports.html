@@ -10,50 +10,57 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-operations.html">Operations &amp; Reports</a> / Reports</div>
   <h1>Operations · Reports</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">Reports are financial summaries and exports across your data. This is the bridge to your accountant: the journals and the VAT summary are the standard views an accountant expects, and the CSV export hands them the raw numbers without you re-keying anything. Owners use the same reports for their own analysis.</p>
+  <div class="routes"><span class="badge route">/finance?tab=reports</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">Reports are financial summaries and exports across your data. This is the bridge to your accountant: the journals and the VAT summary are the standard files an accountant expects, and every on-screen report exports to CSV without you re-keying anything. Owners use the same reports for their own analysis — including what each partner was paid.</p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>Finance</strong> → <strong>Reports</strong> tab.</p>
+  <p>Top navigation → <strong>Finance</strong> → <strong>Reports</strong> (under <em>Tools</em> in the section rail). The VAT return itself has its own section — see <a href="finance-op-vat-return.html">VAT Return</a>.</p>
 
   <h2>What's on the screen</h2>
-  <p>A report builder with three controls and the on-screen result:</p>
   <ul class="feat">
-    <li><strong>Report type</strong> — choose one of <em>Sales journal</em>, <em>Purchases journal</em>, <em>VAT summary</em>, or <em>Sales per day</em>.</li>
-    <li><strong>Period selector</strong> — <em>This month</em>, <em>Last month</em>, or a custom range.</li>
-    <li><strong>Export CSV</strong> — downloads the current report for your accountant or spreadsheet.</li>
-    <li><strong>On-screen summary</strong> — the report itself, rendered for the type and period you picked.</li>
+    <li><strong>Accounting export</strong> — download the <strong>Sales journal</strong>, <strong>Purchases journal</strong> or <strong>VAT summary</strong> for a period, ready for your accountant.</li>
+    <li><strong>Report</strong> — a picker of on-screen reports, grouped (see the table below).</li>
+    <li><strong>Period</strong> — <em>This month</em>, <em>Last month</em>, <em>Last 3 months</em>, <em>Year to date</em>, <em>Last year</em> or <em>Custom range</em>. Snapshot reports (outstanding balances, open tasks) have no period. <strong>Refresh</strong> re-runs the report.</li>
+    <li><strong>The result</strong> — the report table with its totals, and <strong>Export CSV</strong> to download the raw rows.</li>
   </ul>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-reports.png" alt="Reports tab: report type (Sales journal, Purchases journal, VAT summary, Sales per day), period selector and Export CSV">
-    <figcaption>The Reports tab — the report-type choice, the <em>This month</em> / <em>Last month</em> / custom period selector, and the <strong>Export CSV</strong> button.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-reports.png" alt="Reports tab: report picker, period selector and Export CSV">
+    <figcaption>The Reports tab — the <strong>Accounting export</strong> downloads on top, then the report picker, the period selector, and the <strong>Export CSV</strong> button.</figcaption>
   </figure>
 
-  <h2>The report types</h2>
+  <h2>The reports</h2>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Report type</th><th>What it shows</th></tr></thead>
+      <thead><tr><th>Group</th><th>Reports</th></tr></thead>
       <tbody>
-        <tr><td><strong>Sales journal</strong></td><td>Your sales documents over the chosen period.</td></tr>
-        <tr><td><strong>Purchases journal</strong></td><td>Your purchase documents over the chosen period.</td></tr>
-        <tr><td><strong>VAT summary</strong></td><td>The standard VAT view an accountant expects for the period.</td></tr>
-        <tr><td><strong>Sales per day</strong></td><td>Sales broken down day by day across the period.</td></tr>
+        <tr><td><strong>Overview (cash &amp; P&amp;L)</strong></td><td>Daily cash flow · P&amp;L by category · Profit taken · <strong>Paid to owners (per partner)</strong></td></tr>
+        <tr><td><strong>Sales</strong></td><td>Sales per day · per customer · per brand · per product · per category · per designer</td></tr>
+        <tr><td><strong>Purchases</strong></td><td>Purchases per product · Receipts per product · Spend per supplier</td></tr>
+        <tr><td><strong>Payments (cash movements)</strong></td><td>Money sent (per supplier) · Money out (by category) · Money received (per customer)</td></tr>
+        <tr><td><strong>VAT / myDATA</strong></td><td>VAT analysis (by rate) · <strong>VAT analysis (by myDATA code)</strong> · myDATA reconciliation · MYF summary (per counterparty)</td></tr>
+        <tr><td><strong>Customs (Intrastat)</strong></td><td>Intrastat — dispatches (sales) · Intrastat — arrivals (purchases)</td></tr>
+        <tr><td><strong>Outstanding (snapshot)</strong></td><td>Top outstanding customers · Top outstanding suppliers</td></tr>
+        <tr><td><strong>Tasks</strong></td><td>Open tasks / Follow-ups</td></tr>
       </tbody>
     </table>
   </div>
 
-  <h2>How to run a VAT summary and export CSV — step by step</h2>
+  <h3>Paid to owners (per partner)</h3>
+  <p><strong>What it is —</strong> what each partner was paid in the period, per owner category, from the payments where that partner is the payee. <strong>Why it matters —</strong> money paid to a partner counts as a business expense whatever your legal form, so the P&amp;L shows it inside Expenses; this report is where you see it split by person. It reads the three built-in categories <strong>Owner &amp; partner pay</strong>, <strong>Profit split</strong> and <strong>Partner withdrawals</strong> (see <a href="finance-settings-categories.html">Settings → Categories</a>) — so set the partner as the <em>payee</em> when you record the payment.</p>
+
+  <h3>VAT analysis (by myDATA code)</h3>
+  <p>Both sides of AADE's classification table: your sales lines <em>and</em> the received expense documents, with a <strong>Side</strong> column. Where an expense document carries several classifications, its VAT is split by each one's share of the net.</p>
+
+  <h2>How to export last month's journals — step by step</h2>
   <ol>
     <li>Open <strong>Finance → Reports</strong>.</li>
-    <li>Choose the report type: <strong>VAT summary</strong> (the other types are <em>Sales journal</em>, <em>Purchases journal</em> and <em>Sales per day</em>).</li>
-    <li>Set the <strong>period</strong> with the selector — <em>This month</em>, <em>Last month</em>, or a custom range.</li>
-    <li>Read the on-screen summary, then click <strong>Export CSV</strong> to download it for your accountant or spreadsheet.</li>
+    <li>In <strong>Accounting export</strong>, pick last month and click <strong>Sales journal</strong>, <strong>Purchases journal</strong> and <strong>VAT summary</strong> in turn.</li>
+    <li>For a breakdown, pick a report (for example <em>P&amp;L by category</em>), set the <strong>Period</strong> to <em>Last month</em>, read the result, then click <strong>Export CSV</strong>.</li>
   </ol>
-
-  <div class="callout tip"><p><strong>Worked example — last month's VAT for the accountant.</strong> Open <strong>Reports</strong> → set the report type to <strong>VAT summary</strong> → set the period to <em>Last month</em> → read the on-screen figures to sanity-check them → click <strong>Export CSV</strong> and send the file to your accountant. No re-keying — they get the raw numbers straight from your documents.</p></div>
+  <div class="callout tip"><p><strong>Worked example — what did each partner take this year?</strong> Pick <strong>Paid to owners (per partner)</strong>, period <em>Year to date</em>. Each partner appears with their total per category — pay, profit split, withdrawals. The same total is the <em>Paid to owners</em> figure on the Dashboard P&amp;L.</p></div>
 
   <h2>What it affects elsewhere</h2>
-  <p>The breakdowns here lean on your <strong>Categories</strong> (income/expense buckets) — set those up in Settings so revenue and cost aren't reported as one undifferentiated lump.</p>
+  <p>The category breakdowns lean on your <a href="finance-settings-categories.html">Categories</a> and on filing each supplier under one (<a href="finance-doc-expenses.html#by-supplier">Expenses → By Supplier</a>). Expenses still sitting in the inlet category read as one undifferentiated lump.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

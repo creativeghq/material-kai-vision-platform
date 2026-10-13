@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / General</div>
   <h1>Settings · General</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">The General section is where you set the defaults that every new document inherits — the wording on outgoing emails, the payment terms, the VAT rate and the catalogue markup — plus a handful of safety rules that decide what happens at the moment you issue a document. Set these once and you stop re-typing them on every invoice; the toggles then act as guardrails so risky documents are caught before they go out.</p>
+  <p class="lead">The General section is where you set the defaults that every new document inherits — the payment terms, the VAT rate and the catalogue markup — how often you file your VAT return, plus a handful of safety rules that decide what happens at the moment you issue a document. Set these once and you stop re-typing them on every invoice; the toggles then act as guardrails so risky documents are caught before they go out.</p>
 
   <h2>Where it is</h2>
   <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>General</strong> (in the row of settings sub-tabs).</p>
@@ -19,7 +19,7 @@
   <h2>What's on the screen</h2>
   <p>Two areas, top to bottom:</p>
   <ul class="feat">
-    <li><strong>Default fields</strong> — a set of inline fields holding the values applied to new documents: email subject and body, payment terms, VAT % and catalogue markup %.</li>
+    <li><strong>Default fields</strong> — inline fields for payment terms, VAT %, the VAT return (Φ.2) filing frequency and catalogue markup %. (The statement email subject and body moved to <a href="finance-settings-accounts-payments.html">Accounts &amp; Payments → Statements</a>.)</li>
     <li><strong>Order &amp; credit rules</strong> — buyer-VAT and credit-limit switches <em>plus</em> a default credit/balance hold and a minimum order value. These are the <strong>defaults</strong>; each customer can override them in CRM.</li>
   </ul>
   <p>Everything is edited in place; a single <strong>Save settings</strong> button at the bottom commits your changes.</p>
@@ -28,16 +28,15 @@
     <figcaption>The General settings section.</figcaption>
   </figure>
 
-  <h2>The five default fields, explained</h2>
-  <p>These values pre-fill on every new document so you don't have to type them each time. You can still override any of them on an individual document.</p>
+  <h2>The default fields, explained</h2>
+  <p>Payment terms, VAT % and markup pre-fill on every new document so you don't have to type them each time; you can still override them on an individual document. The filing frequency drives the VAT Return page.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Field</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><strong>Default email subject</strong></td><td>The subject line used when a document is emailed to a customer. Pre-filled on each send so outgoing mail is consistent without retyping.</td></tr>
-      <tr><td><strong>Default email body</strong></td><td>The message body that accompanies an emailed document. Acts as your standard cover note for every send.</td></tr>
       <tr><td><strong>Default payment terms (days)</strong></td><td>The number of days used to calculate a new document's due date. Sets the payment window applied by default to invoices.</td></tr>
       <tr><td><strong>Default VAT %</strong></td><td>The VAT rate applied to new document lines by default.</td></tr>
+      <tr><td><strong>VAT return (Φ.2) filing</strong></td><td><em>Monthly</em> (default) or <em>Quarterly</em> — how often this business files its VAT return. The <a href="finance-op-vat-return.html">VAT Return</a> page opens on your last finished period of that kind, and the “VAT return ready” reminder is sent once per period.</td></tr>
       <tr><td><strong>Default catalog markup %</strong></td><td>The markup applied when converting a catalogue product's cost into a sell price on a document. This is the platform-wide default — per-category rules set in <a href="finance-settings-pricing.html">Settings → Pricing</a> override it.</td></tr>
     </tbody>
   </table>
@@ -72,7 +71,7 @@
   <div class="callout tip"><p><strong>Worked example — standard 30-day net invoices with a VAT guardrail.</strong> Open General → set <strong>Default payment terms (days)</strong> to <em>30</em> → set <strong>Default VAT %</strong> to your standard rate → turn on <strong>Block issuance when the buyer VAT number is ΑΑΔΕ-inactive</strong> → click <strong>Save settings</strong>. From now on every new invoice is dated 30 days out with the right VAT pre-filled, and if you ever try to issue one to a buyer whose VAT has gone inactive, issuance is stopped before the document goes out.</p></div>
 
   <h2>What it affects</h2>
-  <p>The five fields pre-fill <strong>every new document</strong> you create — so the values flow through to each invoice, receipt and other document at creation time (see <a href="finance-documents.html">Finance → Documents</a>). The four toggles don't change a document's content; they run as <strong>checks at the moment you issue</strong>, either warning you or blocking the issue when the buyer's VAT or credit limit fails the rule you enabled. Catalogue markup feeds the cost-to-sell-price conversion, which per-category rules in <a href="finance-settings-pricing.html">Settings → Pricing</a> can override, and the credit limit each check measures against lives on the customer in the <a href="crm.html">CRM</a>.</p>
+  <p>Payment terms, VAT % and markup pre-fill <strong>every new document</strong> you create — so the values flow through to each invoice, receipt and other document at creation time (see <a href="finance-documents.html">Finance → Documents</a>). The four toggles don't change a document's content; they run as <strong>checks at the moment you issue</strong>, either warning you or blocking the issue when the buyer's VAT or credit limit fails the rule you enabled. Catalogue markup feeds the cost-to-sell-price conversion, which per-category rules in <a href="finance-settings-pricing.html">Settings → Pricing</a> can override, and the credit limit each check measures against lives on the customer in the <a href="crm.html">CRM</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

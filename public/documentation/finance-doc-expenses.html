@@ -10,47 +10,110 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-documents.html">Documents</a> / Expenses</div>
   <h1>Documents · Expenses</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">Expenses is where you capture your business costs and categorise them, so the money you spend (or owe) is tracked the same way as the money you take in. It's one of the document tabs on the Finance page; this guide explains what it is, where to find it, how the list is laid out, how to record an expense step by step, and what it changes elsewhere.</p>
+  <div class="routes"><span class="badge route">/finance?tab=doc_expenses</span> <span class="badge route">/finance?tab=expense_suppliers</span> <span class="badge route">/finance?tab=expense_kinds</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">Expenses is where every cost of the business lands — supplier invoices filed against your ΑΦΜ in myDATA, rent, contracts, payroll and your own year-end entries, purchases from outside Greece, and the bills you record yourself. Three sections in the Finance rail read the same inbox three ways: <strong>Expenses</strong> (document by document), <strong>By Supplier</strong> (file and book a whole supplier at once) and <strong>By Kind &amp; VAT</strong> (what the year's costs are made of). This guide covers all three, how a document becomes an expense, how to pay or settle it, and how to record and file an expense document with ΑΑΔΕ yourself.</p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>Finance</strong> → the <strong>Expenses</strong> tab. Each tab on the Finance page is one document type; Expenses is the one for business costs.</p>
+  <p>Top navigation → <strong>Finance</strong> → under <strong>Documents</strong> in the section rail: <strong>Expenses</strong>, <strong>By Supplier</strong> and <strong>By Kind &amp; VAT</strong>.</p>
 
-  <div class="callout"><p><strong>What an expense is for —</strong> every time you pay (or owe) a supplier — materials, rent, subscriptions, services. Assign an <strong>expense category</strong> so the cost lands in the right report bucket.</p></div>
+  <div class="callout"><p><strong>The one rule to remember —</strong> a received document is <em>not</em> an expense until it is <strong>booked</strong>. Until then it is in no report, no P&amp;L and no VAT return. Your own entries (payroll, depreciation, year-end regularisations) are the exception: they count from the document, because they can never become a supplier bill.</p></div>
 
-  <h2>What's on the screen</h2>
-  <p><strong>What it is —</strong> the list of your business costs, captured and categorised. <strong>When you'd use it —</strong> to record a cost, to pull in documents suppliers already filed against your VAT number, or to find a specific cost you've already logged. <strong>How —</strong> use <strong>Sync from myDATA</strong> to pull in expense documents suppliers already filed against your VAT number, or record them manually; assign an <strong>Expense category</strong> so the cost lands in the right report bucket. Search by supplier or VAT number to find a specific cost.</p>
+  <h2>Expenses — the inbox</h2>
+  <p><strong>What it is —</strong> every received document, one row each, with its supplier, kind, VAT treatment, origin and whether it is handled. <strong>When you'd use it —</strong> to pull in what suppliers filed against you, to book or pay a single document, or to find one.</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-expenses.png" alt="Expenses tab"><figcaption>The Expenses tab.</figcaption></figure>
 
   <h3>Toolbar</h3>
-  <p>Sync from myDATA · Expense category (manage list) · All categories filter · search by supplier / VAT.</p>
-  <div class="feat">
-  <ul>
-    <li><strong>Sync from myDATA</strong> — pulls the documents the tax authority already has on file for your business, so incoming expenses can be reconciled <em>without re-keying them</em>. This is how documents others issued to you appear automatically. Clicking it opens a short dialog asking <strong>which period to fetch</strong> — pick a preset (last 7 days, this month, last month, last 3 months, year to date) or set your own <em>From</em> and <em>To</em> dates, then <strong>Sync</strong>. Only documents issued inside that window are pulled, so a sync never drags in years of history. Documents already in your Inbox are left untouched, so re-running an overlapping period is safe. It only works once you've entered your myDATA inbox credentials in <a href="finance-settings.html">Finance Settings → Documents</a>.</li>
-    <li><strong>Expense category</strong> — opens the manager for the category list used across the document lists, filters and reports. These same categories are also editable inline on a document header, so you can keep your books consistent without leaving the document you're working on. See <a href="finance-settings.html">Finance settings</a>.</li>
-    <li><strong>All categories filter</strong> — narrow the list down to one expense category to review everything in one bucket.</li>
-    <li><strong>Search by supplier / VAT</strong> — finance histories grow fast; search by supplier or VAT number to re-open a specific cost.</li>
+  <ul class="feat">
+    <li><strong>Every expense, by kind</strong> — opens the <a href="#by-kind">By Kind &amp; VAT</a> section.</li>
+    <li><strong>Record an expense document</strong> — create a 13.x–17.x document here and, optionally, file it with ΑΑΔΕ (see <a href="#record">below</a>).</li>
+    <li><strong>Sync from myDATA</strong> — pulls the documents ΑΑΔΕ already holds for your business. Pick a period (a preset or your own <em>From</em>/<em>To</em>) and <strong>Sync</strong>; documents already in the inbox are left untouched, so re-running an overlapping period is safe. It needs your myDATA inbox credentials in <a href="account-keys.html">Profile → Keys</a>.</li>
+    <li><strong>By supplier</strong> — jumps to the <a href="#by-supplier">By Supplier</a> section.</li>
+    <li><strong>Expense category</strong> — add an expense category without leaving the list (the full list is in <a href="finance-settings-categories.html">Settings → Categories</a>).</li>
+    <li><strong>Add expense</strong> — record a cost directly: category, supplier/payee, net, VAT and total, date, currency, due date and <strong>Repeat</strong>. With <em>Paid now</em> on (the default) it books the cost and the money going out in one step; set <em>Repeat</em> to also create a recurring bill template.</li>
+    <li><strong>Upload supplier invoice</strong> — drop a supplier's PDF and the platform reads its header and lines. If it matches a myDATA document you already have (same supplier, date and net total) the file is attached there, never filed twice. Otherwise it is filed <em>for confirmation</em> and is never booked on its own — check it and press <strong>Confirm document</strong> in the row menu. More on delivery-note matching, supplier PDFs and foreign-currency documents: <a href="finance-doc-received-documents.html">Received supplier documents</a>.</li>
+    <li><strong>Filter</strong> — three groups: <em>General</em> (search, handled, detail), <em>Kind &amp; VAT</em> (expense kind, VAT treatment, where it came from, ΑΑΔΕ document type) and <em>Supplier</em> (issuer, category, source), plus amount and issue date. The issue-date filter queries the database, so older documents beyond the first 2,000 shown are reachable by narrowing it.</li>
   </ul>
-  </div>
 
-  <h2>How to record an expense — step by step</h2>
-  <p>Expenses are quicker than invoices — there's no PDF to send, just a cost to capture and categorise:</p>
+  <h3>The row menu</h3>
+  <p>Each document's three-dots menu groups what you can do with it:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Item</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Preview</strong> · <strong>Supplier's document</strong></td><td>Read the document; the second opens the supplier PDF when one is attached.</td></tr>
+      <tr><td><strong>Confirm document</strong></td><td>Only on a document read from a file — moves it into the normal queue.</td></tr>
+      <tr><td><strong>Add issuer to CRM</strong> · <strong>Attach supplier PDF</strong> · <strong>Add line detail</strong> · <strong>Receive into warehouse</strong></td><td>Bring the document into the rest of the platform. An attached PDF adds its lines when they foot to the myDATA net total.</td></tr>
+      <tr><td><strong>Add to Expenses</strong> · <strong>Bill an existing order…</strong></td><td>Book it: raise the purchase and its bill, or attach the bill to a purchase order you already have. Payroll (17.1) reads <em>Payroll — recorded in HR</em> and a document cancelled at ΑΑΔΕ cannot be booked.</td></tr>
+      <tr><td><strong>Pay it now…</strong></td><td>Send the money — bank transfer or Revolut — through the one payment form.</td></tr>
+      <tr><td><strong>Record a payment already made</strong> · <strong>View payments</strong></td><td>Record money that already left, or read back what was paid.</td></tr>
+      <tr><td><strong>Mark as paid…</strong> / <strong>Count it again</strong></td><td>Settle the document in one step, or settle it outside the books (see below). <em>Count it again</em> undoes an outside-the-books settlement.</td></tr>
+      <tr><td><strong>Dismiss</strong></td><td>Take a document out of the queue.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="settle">Mark as paid — in the books, or outside them</h3>
+  <p><strong>What it is —</strong> one action with two outcomes, and the <strong>Paid from</strong> account decides which. <strong>Why it matters —</strong> purchases paid before the platform held your books should not be counted a second time.</p>
+  <ul class="feat">
+    <li><strong>Pick an account</strong> — the purchase is booked as an expense and the payment leaves that account in the same step (<strong>Book and pay</strong>, or just <strong>Pay</strong> when it is already booked). It counts in the P&amp;L, the VAT return and that balance.</li>
+    <li><strong>No account — settled outside the books</strong> — nothing is booked and no money moves. The cost is kept <em>out</em> of the P&amp;L, expenses and the VAT return, and reported separately beside the P&amp;L (and on the supplier's CRM record) so it is never hidden. Add a note saying why. This option is disabled on a document that is already an expense — reverse those with a supplier credit note instead.</li>
+  </ul>
+
+  <h3>Recurring expenses</h3>
+  <p>Bills that repeat (created with <em>Repeat</em> on <strong>Add expense</strong>) are listed under the inbox, where you can pause, resume or remove each template. A bill template creates a categorised supplier bill every period. For a reminder that books nothing until you settle it, use a recurring <em>plan</em> in <a href="finance-op-planning.html">Planning → Recurring</a> instead.</p>
+
+  <h2 id="record">Record an expense document and file it with ΑΑΔΕ</h2>
+  <p><strong>What it is —</strong> a form for the expense-side documents that are yours to file — rent, a foreign purchase, a contract, your own payroll entry. These go straight to myDATA under your workspace's own ΑΑΔΕ credentials, not through an e-invoicing provider. <strong>Why it matters —</strong> without it, every one of these had to be typed into myAADE by hand.</p>
   <ol>
-    <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Expenses</strong> tab.</li>
-    <li>Start a new expense.</li>
-    <li>Pick the supplier.</li>
-    <li>Enter the amount and VAT.</li>
-    <li>Assign an <strong>expense category</strong> from the document header so it reports correctly.</li>
-    <li>Save. The expense feeds <a href="finance-receivables-payables.html">Payables</a> and the finance <a href="finance-operations.html">Reports</a>.</li>
+    <li>On the Expenses tab, click <strong>Record an expense document</strong>.</li>
+    <li>Choose the <strong>Document type</strong>, then fill <strong>Series</strong>, <strong>Number</strong>, <strong>Issue date</strong> and <strong>Net amount</strong>.</li>
+    <li>Where the type needs one, enter the supplier: <strong>Supplier ΑΦΜ / VAT number</strong>, <strong>Supplier name</strong>, <strong>Country</strong>.</li>
+    <li>Set the <strong>VAT category</strong> and <strong>VAT amount</strong> (and the exemption reason on a 0% line), plus the <strong>Expense classification type</strong> and <strong>category</strong>.</li>
+    <li>Click <strong>Record only</strong> to keep it in Expenses unfiled, or <strong>Record and file with ΑΑΔΕ</strong>. A filed document shows its <strong>MARK</strong>; if ΑΑΔΕ refuses it, the reasons are shown and the document stays so you can correct it.</li>
   </ol>
-  <div class="callout tip"><p>Instead of typing expenses one by one, try <strong>Sync from myDATA</strong> on the Expenses tab to pull in documents your suppliers already filed against your VAT number — then you only need to categorise them.</p></div>
+  <div class="callout tip"><p>Not sure your myDATA subscription may <em>file</em> as well as read? <strong>Check my ΑΑΔΕ rights</strong> in the same dialog asks ΑΑΔΕ without creating anything.</p></div>
+  <div class="callout warn"><p>A MARK cannot be withdrawn. Check the figures before you press <strong>Record and file with ΑΑΔΕ</strong>.</p></div>
 
-  <h2>Worked example — recording a materials bill from a supplier</h2>
-  <div class="callout tip"><p>Open <strong>Finance → Expenses</strong> → start a new expense → pick the supplier → enter the amount and VAT → set the <strong>expense category</strong> to the right cost bucket → <strong>Save</strong>. The cost now shows in <a href="finance-receivables-payables.html">Payables</a> as something you owe, and counts towards the matching category in your finance <a href="finance-operations.html">Reports</a>. If the supplier had already filed the document against your VAT number, you could have used <strong>Sync from myDATA</strong> to pull it in instead of keying it, then only needed to categorise it.</p></div>
+  <h2 id="by-supplier">By Supplier — categorise and book a whole supplier</h2>
+  <p><strong>What it is —</strong> the same inbox grouped by issuer. <strong>Why it matters —</strong> documents arrive under the inlet they came through (the built-in <em>myAADE</em> category), which says nothing about what the money bought. Filing is done once per <em>supplier</em>, and it sticks: everything that arrives from them later is filed the same way automatically.</p>
+  <h3>Categorise the inlet</h3>
+  <p>Click <strong>Suggest categories</strong>. The platform proposes one category per supplier, each with its reason, and writes nothing until you apply it. The decision comes from, in order:</p>
+  <ol>
+    <li><strong>Document type</strong> — a 17.1 is payroll, decided without anything else being consulted.</li>
+    <li><strong>Registered activity (ΚΑΔ)</strong> — what the supplier told ΑΑΔΕ it does, where the CRM holds their ΚΑΔ.</li>
+    <li><strong>Classifier</strong> — a model reading the trade name, only where neither of the above answers.</li>
+  </ol>
+  <p>Low-confidence proposals arrive unticked, and a supplier that could not be read comes back undecided. Change any category before applying (it then reads <em>Your decision</em>), tick the rows you agree with and press <strong>Apply</strong>. Applying only touches documents still in the inlet, so a category somebody chose by hand is never overwritten; correcting a supplier's category does move the documents that rule filed.</p>
+  <h3>Waiting to become expenses</h3>
+  <p>The bookable documents per supplier, with the total that will book. <strong>Book N</strong> files and books a supplier's documents together, because a document books into the category its supplier is filed to. Documents that cannot book are listed under <em>Not bookable, and why</em> (cancelled at ΑΑΔΕ, payroll, credit notes, delivery notes with no money…).</p>
+  <h3>Expenses by supplier</h3>
+  <p>Every supplier with <em>Docs</em>, <em>To file</em>, <em>Net</em> and the date span. Pick a category in <strong>File as</strong> and press <strong>File N</strong>. Filing a supplier is permanent — the next invoice from them files itself.</p>
+
+  <h2 id="by-kind">By Kind &amp; VAT — what the year's costs are made of</h2>
+  <p>A full-width breakdown for a chosen year. Four totals — <strong>Received</strong>, <strong>In the P&amp;L</strong>, <strong>Waiting on you</strong>, <strong>Not an expense</strong> — then <strong>By where it came from</strong> (Greece, EU, outside the EU, not stated, with <em>All expenses</em> summed), <strong>By VAT treatment</strong>, and <strong>Every segment</strong>: one row per kind, VAT treatment and origin, with what reached the books and what is still waiting.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Kind</th><th>What it covers</th></tr></thead>
+    <tbody>
+      <tr><td>Purchases</td><td>Invoices a supplier issued to you.</td></tr>
+      <tr><td>Retail &amp; self-recorded</td><td>Till receipts and the expenses you record against yourself.</td></tr>
+      <tr><td>From outside Greece</td><td>The supplier charged no VAT; you declare and reclaim it in the same return.</td></tr>
+      <tr><td>Contracts · Rent</td><td>No VAT by nature.</td></tr>
+      <tr><td>Your own entries</td><td>Payroll, depreciation and year-end regularisations — in the P&amp;L, though ΑΑΔΕ keeps them out of its expense book.</td></tr>
+      <tr><td>Supplier credit notes</td><td>These reduce an expense rather than being one.</td></tr>
+      <tr><td>Delivery notes · Other documents</td><td>Goods moved with no money, payment receipts and levies — not a purchase.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Origin comes from the supplier's country on the document, not from the VAT number.</p>
+
+  <h2>Paying an expense from an order</h2>
+  <p>On a purchase or sales order, each attached expense with something still due has a pay button (wallet icon) on its row. It opens the same payment form with that bill's supplier, currency and amount due — bank transfer, Revolut, or just record it. Rows with nothing due have no button. See <a href="finance-doc-orders.html">Orders</a>.</p>
 
   <h2>What it affects elsewhere</h2>
-  <p>Expenses are your business costs, categorised; they feed <a href="finance-receivables-payables.html">Payables</a> (what you owe) and the finance <a href="finance-operations.html">Reports</a>. Categorising them well is what makes those reports meaningful — without categories every figure is one undifferentiated lump.</p>
-  <div class="callout"><p><strong>Nothing here is a dead end</strong> — every expense you record moves a balance or a report. See also: <a href="finance-receivables-payables.html">Receivables &amp; Payables</a> and <a href="finance-operations.html">Reports</a>.</p></div>
+  <ul class="feat">
+    <li><strong>The P&amp;L and Spend</strong> on the <a href="finance.html">Dashboard</a> — booked documents and your own entries count; settled-outside costs are stated separately.</li>
+    <li><strong><a href="finance-rp-payables.html">Payables</a></strong> — a booked, unpaid expense is something you owe.</li>
+    <li><strong>The <a href="finance-op-vat-return.html">VAT return</a></strong> — received documents nobody booked appear as a cause of difference against ΑΑΔΕ.</li>
+    <li><strong><a href="finance-op-reports.html">Reports</a></strong> — category breakdowns are only as good as the supplier filing above.</li>
+    <li><strong>Notifications</strong> — <em>Expense Booked</em>, <em>Expense Settled Outside the Books</em> and <em>Supplier Credit Note Received</em> are <a href="flows.html">flow events</a> with a default notification.</li>
+  </ul>
 </main>
 <script src="assets/nav.js"></script>
 </body>

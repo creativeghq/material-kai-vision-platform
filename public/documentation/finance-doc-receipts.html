@@ -46,6 +46,8 @@
 
   <div class="callout"><p><strong>Receipts from the POS:</strong> a receipt doesn't have to be typed into the editor — every sale rung up at the till produces one directly. Use <strong>Open POS</strong> on the toolbar to ring up a sale, and the resulting receipt appears in this list like any other. See the <a href="pos.html">POS</a> guide for the till flow.</p></div>
 
+  <div class="callout"><p><strong>Numbering and the QR.</strong> Retail receipts have their own numbering range (mnemonic ΑΛΠ), so a receipt never takes a number out of your invoice sequence; it is created automatically on the first receipt. If you want the till or a webshop numbered apart, add a range for <em>Register (POS)</em>, <em>Own online store</em>, <em>Skroutz</em> and so on in <a href="finance-settings-documents.html">Settings → Documents</a>. The QR printed on a POS receipt opens the provider's filed copy of it.</p></div>
+
   <h2>How to create a receipt — step by step</h2>
   <ol>
     <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Receipts</strong> tab.</li>
@@ -59,6 +61,8 @@
   <div class="callout tip"><p>Receipts and invoices both count as income, so both carry an <strong>Income category</strong>. The difference is intent: an invoice is a demand for payment (it can sit unpaid in Receivables), a receipt records that payment was made.</p></div>
 
   <div class="callout tip"><p><strong>Worked example — a walk-in sale at the counter.</strong> Open <strong>Finance → Receipts</strong> → click <strong>Open POS</strong> → ring up the items the customer is buying → take payment. The till produces a receipt and it drops straight into the Receipts list, already carrying its number, date and total — no re-keying.</p></div>
+
+  <div class="callout tip"><p><strong>Wholesale paid by card?</strong> A business customer's invoice settled on a terminal needs an <strong>8.4 card receipt</strong> linked to the invoice, not a retail receipt — the invoice detail page offers <strong>Issue the 8.4</strong>. See <a href="finance-compliance.html">Compliance → POS interconnection</a>.</p></div>
 
   <h2>What it affects elsewhere</h2>
   <p>Receipts you issue here count as income: they feed <a href="finance-receivables-payables.html">Receivables</a> and the <a href="finance.html">Dashboard</a> automatically, and (when enabled) transmit to <a href="finance-einvoicing.html">ΑΑΔΕ / myDATA</a> on issue — that's what the <strong>mD</strong> column reflects. Nothing here is a dead end; every issued document moves a balance or a report.</p>

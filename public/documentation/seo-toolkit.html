@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="seo.html">SEO &amp; Content</a> / The SEO Toolkit</div>
   <h1>The SEO Toolkit — Edith <span class="badge gated">Pro add-on</span></h1>
   <div class="routes"><span class="badge route">/agent-hub?capability=seo-research</span> <span class="badge route">/agent-hub?capability=seo-article</span></div>
-  <p class="lead">The SEO Toolkit is an <strong>AI studio</strong>, not a form-driven screen. You work through <strong>Edith</strong>, the SEO assistant, in plain language — “research <em>porcelain floor tiles</em>”, “audit this URL”, “write me an article on underfloor heating”. Behind Edith sits a large set of search-marketing tools (SERP and keyword research, competitor and backlink analysis, site audits, traffic estimates) plus a full <strong>article-writing pipeline</strong> that drafts, scores and <strong>inserts internal links to your own pages</strong>. Every tool is <strong>website-aware</strong>: it defaults to your connected site and files its results under it.</p>
+  <p class="lead">The SEO Toolkit is an <strong>AI studio</strong>, not a form-driven screen. You work through <strong>Edith</strong>, the SEO assistant, in plain language — “research <em>porcelain floor tiles</em>”, “audit this URL”, “write me an article on underfloor heating”. Behind Edith sits a large set of search-marketing tools (SERP and keyword research, competitor and backlink analysis, site audits, traffic estimates) plus the <strong>article writer</strong>, which works from your own pages and links back to them (see <a href="seo-articles.html">SEO Article Writer</a>). Every tool is <strong>website-aware</strong>: it defaults to your connected site and files its results under it.</p>
 
   <div class="callout"><p><strong>Where:</strong> the <strong>SEO &amp; Content</strong> tile in the <a href="apps.html">App Launcher</a> (Marketing hub) opens the studio at <span class="badge route">/agent-hub?capability=seo-research</span>. The launcher also offers a direct <strong>“Write an article”</strong> entry (<span class="badge route">/agent-hub?capability=seo-article</span>). It's a <strong>Pro add-on</strong> — the workspace needs the <code>seo-toolkit</code> module enabled.</p></div>
 
@@ -28,68 +28,27 @@
   <div class="table-wrap"><table>
     <thead><tr><th>Family</th><th>What you can ask for</th></tr></thead>
     <tbody>
-      <tr><td><strong>Keyword research</strong></td><td>Full SERP snapshots (with AI-Overview and People-Also-Ask), keyword suggestions and difficulty, search-intent classification, and related-keyword expansion with volumes.</td></tr>
-      <tr><td><strong>First-party (GSC)</strong></td><td><strong>Striking-distance</strong> (queries just off page one) and <strong>top-movers</strong> (biggest week-on-week changes) — read straight from your connected Search Console data.</td></tr>
-      <tr><td><strong>Page &amp; site audits</strong></td><td>Audit a URL (technical + on-page issues, with a Lighthouse pass), start a full-site crawl and check its status, and a plain-language site review.</td></tr>
+      <tr><td><strong>Your own site first</strong></td><td><strong>What should I work on?</strong> (one ranked list of quick wins, refreshes, consolidations and pages to add, each with its reason), <strong>My rankings</strong> (what your site ranks for, from the rank tracker and Search Console) and <strong>Site report</strong> (health, crawl, Search Console and AI visibility in one read). All of these come from your own website's data.</td></tr>
+      <tr><td><strong>First-party (GSC)</strong></td><td><strong>Striking-distance</strong> (queries just off page one) and <strong>top-movers</strong> (biggest week-on-week changes), read straight from your connected Search Console data.</td></tr>
+      <tr><td><strong>Keyword research</strong></td><td>Full SERP snapshots (with AI Overview and People Also Ask), keyword suggestions and difficulty, search-intent classification, related-keyword expansion with volumes, and <strong>Ranking Page Ranges</strong>: what the pages that rank for a keyword look like (word count, headings, images and tables as ranges, the terms most of them use, the questions they answer), read from research you've already run.</td></tr>
+      <tr><td><strong>Page &amp; site audits</strong></td><td>Audit a URL (technical and on-page issues, with a Lighthouse pass), start a full-site crawl and check its status, and a plain-language site review.</td></tr>
       <tr><td><strong>Competitor &amp; domain analysis</strong></td><td>Domain snapshots, ranked keywords, domain competitors, keyword gaps between you and a rival, and traffic estimates.</td></tr>
       <tr><td><strong>Backlinks</strong></td><td>Backlink summaries, anchor-text profiles and referring domains.</td></tr>
-      <tr><td><strong>Visibility &amp; extras</strong></td><td>Google Trends, local-pack checks, brand-search audits, LLM-mention searches, YouTube search, content sentiment and a site's detected technologies.</td></tr>
+      <tr><td><strong>AI search visibility</strong></td><td>The <strong>AI Search Visibility</strong> toolkit: <em>Where do AI answers put us?</em>, <em>Are we in the AI Overview?</em>, <em>Who do LLMs cite instead?</em>, plus <strong>AI search volume</strong> (how often a term is asked of an assistant rather than typed). The full picture lives on the website's <a href="seo-ai-citations.html">AI Citations</a> section.</td></tr>
+      <tr><td><strong>Extras</strong></td><td>Google Trends, local-pack checks, brand-search audits, YouTube and Reddit search, content sentiment and a site's detected technologies.</td></tr>
     </tbody>
   </table></div>
   <p>Each run renders as an <strong>inline card</strong> on the canvas and (where relevant) is saved to the site's <strong>Toolkit Runs</strong> / <strong>Keyword Research</strong> / <strong>Domain Audits</strong> tabs so you can come back to it.</p>
   <div class="callout warn"><p><strong>These tools debit credits.</strong> The research and audit tools call paid data providers, so each run draws on your workspace <a href="account-credits.html">credit pool</a>. Reading the saved results later is free.</p></div>
 
   <h2>Writing an SEO article</h2>
-  <p>The headline capability is the <strong>article pipeline</strong>. Ask Edith to write an article (from the studio, or the launcher's <em>“Write an article”</em> entry) and it runs an end-to-end job whose <strong>progress you watch live on the canvas</strong> — a stage strip walks <strong>Research → Planning → Writing → Analyzing → Done</strong>, each with a caption of what it's doing (<em>“Researching keywords with DataForSEO…”</em>, <em>“Writing article with Claude Opus…”</em>):</p>
-  <ol>
-    <li><strong>Research</strong> — pulls the SERP, related searches and competitor angles for your target keyword.</li>
-    <li><strong>Plan</strong> — builds an outline / brief from that research.</li>
-    <li><strong>Write</strong> — drafts the full article (on Claude Opus).</li>
-    <li><strong>Analyze</strong> — scores the draft for SEO and readability, and locates the fixes you can apply.</li>
-  </ol>
-  <p>The pipeline <strong>outlives the tool call</strong>: you can leave the run going and the article keeps building, then opens on the canvas as a first-class artifact (with a <em>“SEO article”</em> chip in the chat rail) when it's ready. It's <strong>filed under your connected website</strong> and also appears on the site dashboard's <strong>Articles</strong> tab.</p>
-
-  <h2>The article editor — six tabs</h2>
-  <p>Opening an article launches the editor. It's organised into six tabs:</p>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Tab</th><th>What's on it</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Content</strong></td><td>The <strong>Search appearance</strong> block (below) on top of the rendered article — a Markdown / Rendered toggle, <strong>Copy Markdown</strong>, and the editorial body with callouts and an FAQ accordion.</td></tr>
-      <tr><td><strong>Optimize</strong></td><td>The <strong>score gauges</strong> and the <strong>“Fixes you can apply here”</strong> card (both below).</td></tr>
-      <tr><td><strong>Brief</strong></td><td>The writer's brief — target word count and headings, the content outline, key terms, and the FAQ questions with an <strong>Add a question</strong> control.</td></tr>
-      <tr><td><strong>Gaps/Gains</strong></td><td>Topics competitors cover that you don't (gaps) and ones you already do (gains), each with its search volume and an <strong>Add section</strong> button.</td></tr>
-      <tr><td><strong>Research</strong></td><td>The SERP behind the article — features present (AI Overview, Featured Snippet, People Also Ask), plus Key Terms / Competition / Questions / Statistics, each addable to the draft.</td></tr>
-      <tr><td><strong>Inter-Linking</strong></td><td>Internal-link suggestions to your own pages (below).</td></tr>
-    </tbody>
-  </table></div>
-
-  <h3>Search appearance — the meta title &amp; description</h3>
-  <p>At the top of the <strong>Content</strong> tab, the <strong>Search appearance</strong> block shows how the page will look in results: the <strong>meta title</strong> (with a live <em>length / 60</em> counter that warns when it'll be truncated) and the <strong>meta description</strong> (up to ~155 characters). A <strong>missing one is stated, not silently blank</strong> — <em>“No meta title — search engines will invent one from the page”</em>, or <em>“No meta description — search engines will pull an arbitrary sentence from the body instead”</em> — so you always know when there's one to write.</p>
-
-  <h3>The scores — what they actually measure</h3>
-  <p>The <strong>Optimize</strong> tab leads with gauges: an <strong>SEO Score</strong> out of 100 and, for AI-answer readiness, a <strong>GEO Score</strong>, shown next to the competitors' average and top scores. The SEO score measures <em>the article</em> — it's 100 minus weighted penalties for the issues found, and each distinct problem is <strong>counted once</strong> however many paragraphs it touches, so splitting one issue across rows no longer double-docks you. Readability (Flesch reading ease) is computed too, and it deliberately reads <strong>no score</strong> for a Greek (non-Latin) article rather than print a confident but meaningless number.</p>
-
-  <h3>Fixes you can apply — one paragraph at a time, and undo</h3>
-  <p><strong>What it is —</strong> the analyzer doesn't just grade; where a fix belongs to a single paragraph it offers to make it. The <strong>“Fixes you can apply here”</strong> card (top of Optimize) lists each such recommendation with the suggestion, the section it's under, and a two-line quote of <em>the exact words at stake</em>, plus an <strong>Apply</strong> button. <strong>Why it matters —</strong> you improve the draft in place, surgically, instead of rewriting by hand or re-generating the whole thing. (Document-wide findings like a missing meta tag still show, but without an Apply button — there's no single paragraph to rewrite.)</p>
-  <ul class="feat">
-    <li><strong>Apply</strong> rewrites <em>only that paragraph</em> (on Claude, in the article's own brand voice) and splices it back — everything else stays byte-for-byte identical. The score updates and the toast confirms <em>“Score is now X/100. You can revert this.”</em> Each apply costs a small credit charge (refunded if it fails).</li>
-    <li><strong>Revert last</strong> puts the previous wording back — and the revert is itself undoable (it swaps rather than discards), so you can toggle a change in and out. Reverting is free.</li>
-    <li><strong>Re-analyse</strong> (free) re-scores the current draft and refreshes which fixes apply — so the card always tells you where you stand, even when there's nothing left to apply.</li>
-  </ul>
-
-  <h3>Inter-linking — internal links inserted into the draft</h3>
-  <p><strong>What it is —</strong> the reason connecting your site matters. On the <strong>Inter-linking</strong> tab, the article viewer shows <em>“Suggested Internal Links from Your Site”</em> — pages from your <a href="seo-websites.html">connected site's index</a> that semantically match the article, each with a <strong>% match</strong> and a suggested anchor phrase. <strong>Why it matters —</strong> internal links are core SEO, and here they're <em>real</em> links to <em>your</em> pages, not invented ones.</p>
-  <ul class="feat">
-    <li><strong>Insert</strong> — finds the first unlinked occurrence of the anchor phrase in the draft and turns it into a Markdown link to your page, saving it into the article. The button then reflects whether it was <em>inserted</em>, <em>already there</em>, or the anchor wasn't <em>found</em>.</li>
-    <li><strong>Copy MD link</strong> — grabs the Markdown link to paste wherever you like.</li>
-    <li>If you haven't connected a site, the tab shows a prompt to <em>“Connect your website's sitemap”</em> first — no connected pages means no suggestions.</li>
-  </ul>
-  <div class="callout tip"><p><strong>Worked example:</strong> connect your site in <a href="seo-websites.html">Profile → Websites</a> and let it crawl → open <strong>SEO &amp; Content</strong> and ask Edith to <em>“write an article targeting ‘bathroom tile ideas'”</em> → when it's ready, open it from the site's <strong>Articles</strong> tab → on the <strong>Inter-linking</strong> tab, click <strong>Insert</strong> on the strongest matches to weave links to your own tile pages into the copy → export or publish the finished Markdown.</p></div>
+  <p>Writing an article now has its own guide: <a href="seo-articles.html"><strong>SEO Article Writer</strong></a>. In short, there is <strong>one way</strong> to make an article: the <strong>Generate full article</strong> quick-start in the <strong>SEO Article Pipeline</strong> toolkit (<span class="badge route">/agent-hub?capability=seo-article</span>), also reached from a website's <strong>Articles → New article</strong>. You give it a target keyword, an optional market, the website, notes for the writer, points it must cover and pages it must link. It researches the topic, reads your own pages on it, plans, writes, runs an editor review that checks every claim, and finishes with an analysis report. You watch it on the canvas as <strong>Research → Planning → Writing → Analyzing → Done</strong>. The finished article opens in the article viewer, where you refine it, keep it current and publish it to your WordPress site.</p>
+  <p>The toolkit's other quick-start, <strong>Just research</strong>, stops after the keyword-research stage.</p>
 
   <h2>Gating &amp; cost recap</h2>
   <ul class="feat">
     <li><strong>Pro add-on.</strong> The toolkit needs the <code>seo-toolkit</code> module enabled on the workspace (plus everyday <code>agent.use</code>). Without it, the launcher shows an upsell card.</li>
-    <li><strong>Metered.</strong> Research/audit tools debit credits per run; the article pipeline debits for the Claude Opus write. Reading saved dashboards and re-opening articles is free.</li>
+    <li><strong>Metered.</strong> Research and audit tools debit credits per run. An article bills what each stage actually uses (typically about 90 credits), and the total is shown on the article. Reading saved dashboards and re-opening articles is free.</li>
     <li><strong>Better with a connected site.</strong> Connecting a website (free to do; crawling spends credits) unlocks internal-link suggestions and first-party Search Console tools — see <a href="seo-websites.html">Connected Websites</a>.</li>
   </ul>
 </main>

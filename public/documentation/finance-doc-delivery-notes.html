@@ -23,7 +23,6 @@
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-delivery-notes.png" alt="Delivery notes tab"><figcaption>The Delivery notes tab.</figcaption></figure>
 
   <h3>Toolbar</h3>
-  <p>New.</p>
   <div class="feat">
   <ul>
     <li><strong>New</strong> — start a delivery note: pick the delivery note <strong>Type</strong> and record the dispatch.</li>
@@ -37,12 +36,20 @@
     <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td><strong>Number</strong></td><td>The delivery note number.</td></tr>
-      <tr><td><strong>Type</strong></td><td>The delivery note type.</td></tr>
+      <tr><td><strong>Type</strong></td><td><em>Dispatch</em> or <em>Receipt</em>.</td></tr>
       <tr><td><strong>Date</strong></td><td>The dispatch date.</td></tr>
-      <tr><td><strong>Status</strong></td><td>The document status.</td></tr>
+      <tr><td><strong>Job</strong></td><td>The job its order belongs to.</td></tr>
+      <tr><td><strong>Status</strong></td><td>The document status, with <em>myDATA ✓</em> once it carries a MARK (hover for the MARK).</td></tr>
     </tbody>
   </table>
   </div>
+
+  <h2>Row actions — PDF and the movement lifecycle</h2>
+  <ul class="feat">
+    <li><strong>Download PDF</strong> — the printed delivery note.</li>
+    <li><strong>Movement lifecycle</strong> (truck icon) — once the note has left draft, the legs of the movement (start / tranship, return, outcome, recipient rejection, confirmed return) under the digital delivery note rules (ΨΔΑ). <strong>Record &amp; file with AADE</strong> files each leg you declare straight to myDATA under your own AADE credentials, and every leg shows <em>filed</em> (with its MARK), <em>sending</em>, <em>outcome unknown</em>, <em>refused by AADE</em> or <em>not filed</em>. An unanswered filing is never re-sent blind — <strong>Check with AADE</strong> settles it first. Details: <a href="finance-compliance.html">Compliance → ΨΔΑ Phase Β</a>.</li>
+  </ul>
+  <div class="callout"><p><strong>Numbering.</strong> Delivery notes have their own range (mnemonic ΔΑ), created automatically on the first one if you haven't set one up — they never share a sequence with invoices or receipts.</p></div>
 
   <h2>How to create a delivery note — step by step</h2>
   <ol>
@@ -57,6 +64,7 @@
 
   <h2>What it affects elsewhere</h2>
   <p>Delivery notes are often tied into the dispatch/warehouse flow — the record of goods leaving your premises. For how dispatch and warehouse movements fit into the wider picture, see <a href="finance-operations.html">Operations</a>.</p>
+  <p><strong>Delivery notes you receive</strong> from suppliers are a different list: they arrive through myDATA into Expenses and are matched one-to-one to the supplier invoice that bills them — see <a href="finance-doc-received-documents.html">Received supplier documents</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

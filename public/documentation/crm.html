@@ -11,22 +11,40 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / CRM</div>
   <h1>CRM</h1>
   <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/contacts/:id</span> <span class="badge route">/crm/companies/:id</span> <span class="badge gated">crm.view</span></div>
-  <p class="lead">CRM is your relationship hub — the people and companies you do business with, plus the platform users in your workspace. It's organised into four tabs, and each is documented in full (every column, every form field, how to add and edit records, and how it feeds invoicing and outreach) on its own page below.</p>
+  <p class="lead">CRM is your relationship hub — the people and companies you do business with, the deals you are working, and the lists you file them under. It's organised into tabs, and each is documented in full (every column, every form field, how to add and edit records, and how it feeds invoicing and outreach) on its own page below.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>CRM</strong>. Switch between the <strong>Users</strong>, <strong>Contacts</strong>, <strong>Companies</strong> and <strong>Categories</strong> tabs. A summary strip across the top shows Total Users, Active Users, Total Contacts and Total Companies.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>CRM</strong>. Switch between the <strong>Pipeline</strong>, <strong>Contacts</strong>, <strong>Companies</strong> and <strong>Categories</strong> tabs. A summary strip across the top shows <strong>Total Contacts</strong> and <strong>Total Companies</strong>. Platform operators also see a <strong>Users</strong> tab and the Total Users / Active Users tiles — for everyone else they are hidden, and a <code>?tab=users</code> link opens Contacts instead.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm.png" alt="CRM Management with the four tabs and summary counts">
-    <figcaption>CRM Management — summary counts and the Users / Contacts / Companies / Categories tabs.</figcaption>
+    <figcaption>CRM Management — summary counts and the tabs (shown as a platform operator, who also sees Users).</figcaption>
   </figure>
 
-  <h2>The four tabs</h2>
+  <h2>The tabs</h2>
   <div class="cards">
-    <a class="card" href="crm-users.html"><div class="ico">🧑‍💻</div><h3>Users</h3><p>Platform users in the workspace — roles, subscription, credits, status. Add or manage logins.</p></a>
-    <a class="card" href="crm-contacts.html"><div class="ico">📇</div><h3>Contacts</h3><p>Individual people — full contact form: lead info, pricing, invoicing &amp; VAT, Create &amp; Invite User.</p></a>
-    <a class="card" href="crm-companies.html"><div class="ico">🏢</div><h3>Companies</h3><p>Organisations, suppliers &amp; customers — with VIES VAT validation and billing details.</p></a>
-    <a class="card" href="crm-categories.html"><div class="ico">🗂️</div><h3>Categories</h3><p>Group people/companies into lists for "Send to Customers" outreach and filtering.</p></a>
+    <a class="card" href="crm-deals.html"><div class="ico">📊</div><h3>Pipeline</h3><p>Deals moving through per-type stages, with a weighted forecast (Pro add-on).</p></a>
+    <a class="card" href="crm-contacts.html"><div class="ico">📇</div><h3>Contacts</h3><p>Individual people — lead info, pricing, invoicing &amp; VAT, linked login, what they deal in.</p></a>
+    <a class="card" href="crm-companies.html"><div class="ico">🏢</div><h3>Companies</h3><p>Organisations, suppliers &amp; customers — ΑΑΔΕ/ΓΕΜΗ, VIES and Peppol checks, bank accounts, agencies &amp; the factories they represent.</p></a>
+    <a class="card" href="crm-categories.html"><div class="ico">🗂️</div><h3>Categories</h3><p>Your own colour-coded categories and the shared Industry / lead lists, in one table.</p></a>
+    <a class="card" href="crm-users.html"><div class="ico">🧑‍💻</div><h3>Users</h3><p>Platform user administration — account tiers, subscriptions, credits. Platform operators only.</p></a>
   </div>
+
+  <h2>Adding a person or a business — one question first</h2>
+  <p><strong>What it is —</strong> every <strong>Add contact</strong> / <strong>Add company</strong> button (and the App Launcher's <em>New Contact</em> chip) opens the same dialog, <strong>“What Are You Adding?”</strong>, before any form. <strong>Why it matters —</strong> the answer decides which side of the trade the party is on and whether they are invoiced against a VAT number or given a retail receipt — a contact nobody classified is treated as a private consumer by every fiscal path. The cards are grouped:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Group</th><th>Card</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="2"><strong>A person</strong></td><td><strong>Customer · Private Person</strong></td><td>Opens the contact form as a customer with contact type <em>Private (B2C)</em> — retail receipt, no VAT number.</td></tr>
+      <tr><td><strong>Other Contact</strong></td><td>Opens the contact form for a lead, partner or colleague you don't trade with yet.</td></tr>
+      <tr><td rowspan="2"><strong>A business</strong></td><td><strong>Customer · Business</strong></td><td>A business you invoice against their ΑΦΜ / VAT number.</td></tr>
+      <tr><td><strong>Supplier</strong></td><td>A business you buy from.</td></tr>
+    </tbody>
+  </table></div>
+  <p>A <strong>business</strong> card goes to a second step: enter the name and VAT number and research it (for a Greek ΑΦΜ, ΑΑΔΕ then ΓΕΜΗ), check the identity it found, and press <strong>Continue</strong> to open the company form already filled in. If the ΑΦΜ turns out to belong to a sole trader, <strong>“This is a sole trader — add as a person instead”</strong> opens the contact form with the VAT number, country and trading name carried over.</p>
+  <div class="callout tip"><p><strong>“New” fills in where you are.</strong> When a list is filtered to one value — a single category, status, lifecycle stage, company, industry or profession — or you start from a record page, the new party opens with that value already set (a filtered category is joined on first save). From a customers-only or suppliers-only place, only the matching cards are offered, with <strong>Show all types</strong> for the rest. Nothing is locked; change any pre-filled value.</p></div>
+
+  <h2>Finding people — search reaches your notes too</h2>
+  <p>The search boxes on the Contacts and Companies lists, and the global <strong>Spotlight</strong> search (⌘K / Ctrl+K), match a party's name and trading name <em>and also</em> the text of the <strong>notes</strong> written on it — so “the one who wanted the oak samples” finds the company whose note says so.</p>
 
   <h2>Inviting people into the picture — members, customers &amp; guests</h2>
   <p>From a CRM <a href="crm-contacts.html">contact</a> or <a href="crm-companies.html">company</a>, the <strong>Invite</strong> button sends a sign-up link — <em>“Nobody has an account created for them.”</em> The kind of access you pick matters, because a workspace <strong>member</strong> can read your CRM, costs and pipeline, while an outsider sees only what's theirs:</p>
@@ -54,7 +72,7 @@
     <li>Categories power targeted email outreach such as "Send to Customers" on catalogs.</li>
   </ul>
 
-  <div class="callout"><p>CRM is gated by the <code>crm.view</code> capability. An <strong>Admin</strong> sub-view (visible to operators) adds platform-wide user management beyond the standard CRM.</p></div>
+  <div class="callout"><p>CRM is gated by the <code>crm.view</code> capability. Platform user administration (account tiers, subscriptions, credits, <em>Add user</em>) belongs to the platform operator: the <strong>Users</strong> tab appears only for operators, and an ordinary member never lands on it.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

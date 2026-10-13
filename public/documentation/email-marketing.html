@@ -74,12 +74,20 @@
       <tr><td><strong>Send now / Scheduled</strong></td><td>Send immediately, or pick a <strong>Send Date &amp; Time</strong> to schedule it (a background processor sends scheduled campaigns when they're due).</td></tr>
     </tbody>
   </table></div>
-  <p>Your <a href="crm-categories.html">CRM categories</a> are how you segment — build the audience there once and reuse it across campaigns.</p>
+  <p>Your <a href="crm-categories.html">CRM categories</a> are how you segment — build the audience there once and reuse it across campaigns. The picker offers the categories of the <strong>active workspace</strong> (your own categories plus the shared platform ones). For WhatsApp broadcasts, see <a href="account-social.html">WhatsApp campaigns</a>.</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/email-marketing/contacts.png" alt="Email Marketing — Contacts tab">
-    <figcaption>The <strong>Contacts</strong> tab shows the audience your campaigns draw from — resolved from your <a href="crm.html">CRM</a> contacts and categories at send time.</figcaption>
+    <figcaption>The <strong>Contacts</strong> tab shows your <em>Resend Audience</em> — the CRM addresses synced into your own Resend account.</figcaption>
   </figure>
+
+  <h3>The Contacts tab — syncing your CRM to Resend</h3>
+  <p><strong>What it is —</strong> the <strong>Resend Audience</strong>: your <a href="crm.html">CRM</a> addresses copied into your own Resend account. <strong>Sync now</strong> pushes both CRM <strong>contacts and companies</strong> that have an email (one entry per address); <strong>Auto-sync CRM contacts and companies to Resend</strong> does it daily. <strong>Why it matters —</strong> the audience in Resend matches who you can actually mail.</p>
+  <ul class="feat">
+    <li><strong>Consent is respected.</strong> An address that has unsubscribed or may not be mailed is added (or kept) as <em>Unsubscribed</em>, never <em>Subscribed</em> — the same verdict campaigns send on.</li>
+    <li><strong>Failures are shown.</strong> The status line reads <em>“Last synced … · N added”</em>, or <em>“Last sync failed: …”</em> with the reason. A very large sync is capped — run it again for the rest.</li>
+    <li>The list below (<em>Contacts in Resend</em>) shows each address with its Subscribed / Unsubscribed status. Until your Resend key is set up the tab asks you to configure it on the <strong>Setup</strong> tab first.</li>
+  </ul>
 
   <h2>Step 5 — Track delivery</h2>
   <p>Each campaign shows <strong>Delivery stats</strong> pulled back from Resend — how many were delivered, and the outcomes — so you can see how a send actually performed rather than just that it was queued.</p>

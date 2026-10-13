@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEO Article Writer | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="seo.html">SEO &amp; Content</a> / SEO Article Writer</div>
+  <h1>SEO Article Writer <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/agent-hub?capability=seo-article</span> <span class="badge route">/websites/:id?section=articles</span> <span class="badge route">/profile?tab=keys</span></div>
+  <p class="lead">The article writer turns a target keyword into a finished, publishable article about <em>your</em> business. It researches what ranks and what readers ask, <strong>reads your own pages on the topic</strong> so it works from your real products, prices and photos, writes the article, runs an <strong>editor review</strong> that checks every claim, and finishes with an analysis report. You then refine it in the article viewer, keep it current with <strong>Update article</strong> and <strong>Compare with what ranks now</strong>, and publish it straight to your own <strong>WordPress</strong> site.</p>
+
+  <div class="callout"><p><strong>Where:</strong> a website's <strong>Articles</strong> section (<span class="badge route">/websites/:id?section=articles</span>) → <strong>New article</strong>, or the <strong>Generate full article</strong> quick-start in the <strong>SEO Article Pipeline</strong> toolkit of the <a href="seo-toolkit.html">AI studio</a>. It needs the <code>seo-toolkit</code> add-on. Articles open in the article viewer from the Articles list.</p></div>
+
+  <h2>Starting an article</h2>
+  <p><strong>What it is —</strong> there is <strong>one way</strong> to make an article: the <strong>Generate full article</strong> form (<em>“Research, read our pages on the topic, plan, write, editor review, then an analysis report”</em>). <strong>Why it matters —</strong> every article goes through the same path, so every article gets your pages, your facts and the editor review.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Target keyword</strong> *</td><td>The search the article should win, e.g. <em>recycled concrete aggregates</em>.</td></tr>
+      <tr><td><strong>Target market (blank = your business country)</strong></td><td>The country to research and write for. Left blank, it follows your business's own country.</td></tr>
+      <tr><td><strong>Website</strong></td><td>The connected site the article belongs to. Its pages, photos and brand voice are used, and the article is filed under it.</td></tr>
+      <tr><td><strong>Angle / notes for the writer</strong></td><td>Free-text direction: the angle, the audience, what to stress.</td></tr>
+      <tr><td><strong>Must cover</strong></td><td>Points the article has to include. One point per line.</td></tr>
+      <tr><td><strong>Pages of ours to link (URLs)</strong></td><td>Pages the article must link to. One URL per line.</td></tr>
+    </tbody>
+  </table></div>
+  <p>You can also start the form already filled in: <strong>Write</strong> on a <a href="#topic-plan">Topic plan</a> row, or <strong>Write it</strong> on a <em>New page</em> row of the website Overview's <a href="seo-websites.html#overview">What to do next</a> list.</p>
+
+  <h3>When it refuses to start</h3>
+  <p>Before anything is charged, the writer checks three things and tells you plainly if it won't go ahead:</p>
+  <ul class="feat">
+    <li><strong>Not enough credits</strong> — an article needs a reserve available while it's written; you're charged only what it actually uses (<em>typically about 90 credits</em>).</li>
+    <li><strong>Same keyword already written</strong> — the website already has an article on that keyword. Pick a different keyword or angle.</li>
+    <li><strong>One of your pages already ranks</strong> for the keyword — it names the page and its average position and suggests updating that page instead of writing a competing one.</li>
+  </ul>
+  <p>The <strong>Keyword Research</strong> detail warns about the last case too: <em>“You already rank for this with …”</em> or <em>“A page of yours already covers this closely … Consider updating it rather than writing a new one.”</em></p>
+
+  <h2>What happens while it writes</h2>
+  <p>The progress strip walks <strong>Research → Planning → Writing → Analyzing → Done</strong>, with a caption for each step (<em>“Researching keywords with DataForSEO…”</em>, <em>“Writing article with Claude Opus…”</em>, <em>“Finalizing report…”</em>). Behind those five steps:</p>
+  <ul class="feat">
+    <li><strong>Research</strong> reads the search results, the questions readers ask, and what the answer engines tell searchers about the topic. The article is later checked against those reader expectations.</li>
+    <li><strong>Your own pages</strong> on the topic are read first, including ones the crawler had not read yet. The writer works from their facts, links only pages that exist, and places <strong>your real photos</strong>.</li>
+    <li><strong>Writing</strong> follows the website's <a href="#brand-profile">Brand Profile</a> voice and your brief. Your brand name, slugs, material names and search terms are never translated.</li>
+    <li><strong>Editor review</strong> runs section by section and fixes what it finds, including the search snippet. It never invents a citation or a supply claim. Greek articles also pass a dictionary and grammar gate.</li>
+    <li><strong>Analysis</strong> scores the finished article and <em>only reports</em>. Nothing rewrites the whole article after the review.</li>
+  </ul>
+  <p>The job keeps running if you leave. A failed run shows its error rather than an empty article.</p>
+
+  <h2>The article viewer</h2>
+  <p>Opening an article shows a wide viewer. The header carries the title, status, slug and schema type, and a stats bar shows <strong>Score: N/100</strong>, word count, reading time and <strong>the credits this article cost</strong>. Below are tabs. Each one appears only when it has something to show: <strong>Content</strong>, <strong>Optimize</strong>, <strong>Brief</strong>, <strong>Gaps/Gains</strong>, <strong>Research</strong>, <strong>Inter-Linking</strong> and <strong>Export</strong>.</p>
+
+  <h3>Content — the article, with a sidebar</h3>
+  <p>One action row sits across the top: <strong>Update article</strong>, <strong>Compare with what ranks now</strong> and <strong>History</strong>, with a <strong>Due for refresh</strong> badge (and its reason) when the article needs attention, and <em>“Last reviewed …”</em> beside it.</p>
+  <ul class="feat">
+    <li><strong>Search appearance</strong> — the <strong>Meta title</strong> (/60), <strong>Meta description</strong> (/155) and <strong>URL</strong>. Over-long fields say <em>“will be truncated”</em>; an empty one carries a <strong>Missing</strong> badge.</li>
+    <li><strong>The article body</strong> — <strong>View Markdown</strong> / <strong>View Rendered</strong>, <strong>Copy Markdown</strong>, and <strong>Edit</strong>, which you finish with <strong>Save and re-score</strong>.</li>
+  </ul>
+  <p>The sidebar on the right holds, top to bottom:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Card</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>How it is doing in search</strong></td><td>Once the article is live, enter its URL and click <strong>Watch this page</strong>. After that it shows a verdict with clicks, position and change.</td></tr>
+      <tr><td><strong>Search Console, last 90 days</strong></td><td>Clicks, impressions, average position and a weekly-impressions sparkline for the live page (needs <a href="seo-websites.html#gsc">Search Console</a>).</td></tr>
+      <tr><td><strong>Picture slots</strong></td><td>Places where the writer wanted a picture and none of your own photos fitted. <strong>Generate</strong> one, or remove the slot. <strong>An article with an empty slot is not published.</strong></td></tr>
+      <tr><td><strong>Article Suggestions</strong></td><td><strong>Suggest improvements</strong> proposes edits for what readers expect and what the analysis found, tagged <em>Reader expectation</em>, <em>AI answer</em>, <em>Analysis</em>, <em>Out of date</em> or <em>What ranks now</em>. Each one shows the old text struck through next to the new; <strong>+</strong> adds it, <strong>X</strong> dismisses it. A <em>Reader expectations</em> line shows coverage and whether Google AI Mode, ChatGPT and Perplexity cite you. Suggesting uses credits; adding and dismissing are free.</td></tr>
+      <tr><td><strong>Lessons from the published version</strong></td><td><strong>Learn from the published version</strong> compares what you finally published with what was written and proposes lessons: <em>Glossary</em> (<em>“Write «x», never «y»”</em>) or <em>Rule</em>. Approved lessons feed the website's voice for every future article.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Optimize — scores and fixes</h3>
+  <p>The SEO and GEO score gauges, and the <strong>Fixes you can apply here</strong> card. Each fix now has a <strong>Preview fix</strong> button: <em>nothing changes yet</em>, and the proposed rewrite appears under <strong>Article Suggestions</strong> on the Content tab for you to add or dismiss. <strong>Re-analyse</strong> re-scores the current text and <strong>Revert last</strong> puts the previous draft back. If the gap is about authorship or first-hand experience, a notice says it is <em>“Not a writing problem”</em> and points you to the <a href="#brand-profile">Brand Profile</a>, where you set it once for every article.</p>
+
+  <h3>Brief, Gaps/Gains, Research, Inter-Linking</h3>
+  <ul class="feat">
+    <li><strong>Brief</strong> — target length, headings, outline, key terms and the FAQ. You can add a question to the FAQ; leave the answer blank and it's written for you (about 2–3 credits).</li>
+    <li><strong>Gaps/Gains</strong> — topics competitors cover that you don't, and the ones you already do.</li>
+    <li><strong>Research</strong> — the search results behind the article: SERP features, key terms, competition, questions and statistics.</li>
+    <li><strong>Inter-Linking</strong> — internal-link suggestions to pages in your <a href="seo-websites.html">connected site's index</a>, with <strong>Insert</strong> and <strong>Copy MD link</strong>.</li>
+  </ul>
+
+  <h2>Keeping an article current</h2>
+  <ul class="feat">
+    <li><strong>Update article</strong> — checks prices, sizes and dates against the pages the article links to. It is <em>free when nothing is out of date</em>. Anything stale comes back as proposed updates in <strong>Article Suggestions</strong>, never as a silent rewrite.</li>
+    <li><strong>Compare with what ranks now</strong> — compares the article with the pages ranking today and drafts changes as suggestions. It can also propose a new title and meta description, with an <strong>Apply</strong> button. After applying, publish again to send them to your site.</li>
+    <li><strong>History</strong> — <em>Article History</em> keeps the text before each change, newest first (the last 30). Each entry is labelled (Edited, Fix applied, Refreshed, Updated, Restored, Regenerated). <strong>View</strong> → <strong>Restore this version</strong> brings one back, and the text you replaced stays in the history.</li>
+    <li><strong>Why an article is due</strong> — the Articles list, the article itself and the weekly nudge give a reason: it <em>slipped from position X to Y</em>, <em>dropped out of the results</em>, <em>clicks fell</em>, has <em>no Search Console rows 28 days after publishing</em>, or is simply past its refresh interval. <strong>Mark reviewed</strong> clears it.</li>
+  </ul>
+
+  <h2 id="topic-plan">The Topic plan</h2>
+  <p><strong>What it is —</strong> a card on the website's <strong>Articles</strong> section: one page per keyword cluster, under its pillar. <strong>How to fill it —</strong> open a keyword research run and press <strong>Save as plan</strong> on its <em>Keyword clusters</em>. Each page moves through <strong>Idea → Briefed → Writing → Written → Published</strong>. You set <strong>Mark briefed</strong> (or <strong>Back to idea</strong>) yourself; the later steps follow on their own when an article for the keyword exists, is finished, and goes live. <strong>Write</strong> starts the article with the keyword filled in.</p>
+
+  <h2 id="brand-profile">Brand Profile — the website's voice</h2>
+  <p><strong>What it is —</strong> the website's <strong>Brand Profile</strong> section (<span class="badge route">/websites/:id?section=brand</span>) holds the voice the writer uses. By default every website shares the <em>workspace default voice</em>. Click <strong>Give this website its own voice</strong> to give one site its own, or <strong>Use the workspace default instead</strong> to go back. A brief that names its own author always wins.</p>
+  <ul class="feat">
+    <li><strong>Voice</strong> — Tone, Personality, Preferred terminology, Words to avoid, Writing style, and <strong>Learned from your edits</strong> (lessons you approved, each removable).</li>
+    <li><strong>Who is writing</strong> — Author name, title and page URL, Publisher, Reviewed by, <strong>AI disclosure</strong> (Not stated / Human written / AI assisted / AI generated) and Author bio.</li>
+    <li><strong>First-hand experience</strong> — Proprietary data, Owned examples, Methodology, Credentials.</li>
+  </ul>
+  <p>Changes apply to new articles from the next run. Only a workspace admin can change the brand profile.</p>
+
+  <h2 id="wordpress">Publishing to WordPress</h2>
+  <p><strong>Connect once:</strong> <a href="account-profile.html">Profile</a> → <strong>Keys</strong> → <strong>Publishing</strong> → the <strong>WordPress</strong> card. Create an application password in WordPress (<em>Users → Profile → Application Passwords</em>; your normal password is never used), enter <strong>Site address</strong>, <strong>Username</strong> and <strong>Application password</strong>, and click <strong>Verify and connect</strong>. The WordPress user must be an Author, Editor or Administrator. A switch lets a refresh's better title or meta description be applied and republished on its own for live articles; every other change still waits for you.</p>
+  <p><strong>Publish:</strong> in the article viewer's <strong>Export</strong> tab, click <strong>WordPress draft</strong> or <strong>Publish</strong>.</p>
+  <div class="callout warn"><p><strong>Publish cannot unpublish.</strong> Once an article is live, <strong>WordPress draft</strong> is refused, because saving as a draft would take the page down. Use <strong>Publish</strong> to update it. An article with an empty picture slot is refused too. Connecting a site needs an owner or admin; publishing needs an owner, admin or marketing member.</p></div>
+
+  <h2>Export</h2>
+  <p>The <strong>Export</strong> tab's <strong>Publish anywhere</strong> card packages the article as one JSON document: title, meta, URL suggestion, the content as Markdown <em>and</em> HTML (with real tables, lists and callouts, built from the article as it reads now), outline, FAQ, images, links, JSON-LD schema and cost. Use <strong>Copy JSON</strong> or <strong>Download .json</strong>, or <strong>Copy Markdown</strong> on the Content tab.</p>
+
+  <h2>What it costs</h2>
+  <ul class="feat">
+    <li>Each article stage bills what it actually used. The total is shown on the article's stats bar.</li>
+    <li>Suggestions, lessons, <strong>Compare with what ranks now</strong>, generating a picture and writing an FAQ answer each use credits, and the result says how many. Adding or dismissing a suggestion is free, and so is <strong>Update article</strong> when nothing is out of date.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Worked example:</strong> run keyword research, then <strong>Save as plan</strong> on its clusters → on <strong>Articles → Topic plan</strong>, click <strong>Write</strong> on a page → add a note and the pages you want linked → when it's done, fill any picture slots and review the suggestions → <strong>Export → Publish</strong> to your WordPress site → enter its URL under <strong>Watch this page</strong> so you can see how it does in search.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

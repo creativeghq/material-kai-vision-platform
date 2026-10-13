@@ -10,13 +10,13 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-operations.html">Operations &amp; Reports</a> / Warehouse</div>
   <h1>Operations · Warehouse</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <div class="routes"><span class="badge route">/warehouse</span> <span class="badge gated">warehouse.manage</span></div>
   <p class="lead">The Warehouse is the stock side of the business: the inventory that backs your products and links into delivery and dispatch. If you sell and ship physical materials, on-hand quantities have to match reality or you'll oversell, miss reorders, or ship what you don't have.</p>
 
-  <div class="callout warn"><p><strong>Now its own module.</strong> Inventory has been <strong>extracted from Finance into the dedicated <a href="stock.html">Stock Management</a></strong> add-on — with multi-warehouse movements, stock counts, an AI resupply forecast and container tracking. Enable it from the <a href="apps.html">App Launcher</a>. This page describes the core warehouse concepts; the fuller, current capabilities live on the <a href="stock.html">Stock Management</a> page.</p></div>
+  <div class="callout warn"><p><strong>Now its own module.</strong> Inventory has been <strong>extracted from Finance into the dedicated <a href="stock.html">Warehouse</a></strong> add-on — with multi-warehouse movements, stock counts, an AI resupply forecast and container tracking. Enable it from the <a href="apps.html">App Launcher</a>. This page describes the core warehouse concepts; the fuller, current capabilities live on the <a href="stock.html">Warehouse</a> page.</p></div>
 
   <h2>Where it is</h2>
-  <p>The inventory now lives in the <a href="stock.html">Stock Management</a> module at <span class="badge route">/stock</span> (formerly the Finance → Warehouse tab).</p>
+  <p>The inventory now lives in the <a href="stock.html">Warehouse</a> module at <span class="badge route">/warehouse</span> (formerly the Finance → Warehouse tab).</p>
 
   <div class="callout tip"><p>This tab shines for <strong>product / stock-based businesses</strong>. If it looks empty, it isn't broken — it just means there are no stock entries yet. Add items and the tab fills itself in.</p></div>
 
@@ -49,7 +49,7 @@
 
   <h2>How to receive stock into the Warehouse — step by step</h2>
   <ol>
-    <li>Open <strong>Finance → Warehouse</strong>.</li>
+    <li>Open <strong>Warehouse</strong> (<span class="badge route">/warehouse</span>) → <strong>Inventory</strong>.</li>
     <li>Use the <strong>Warehouse selector</strong> to choose where the stock lives — switch between <strong>Main (default)</strong> and <strong>Warehouse</strong>.</li>
     <li>Click <strong>Add item</strong> to register a new stock item.</li>
     <li>Fill in the item's details (see the columns above) — its name, SKU, where it sits, and the quantity you have on hand.</li>
@@ -59,7 +59,7 @@
   <div class="callout tip"><p><strong>Worked example — what you can still promise.</strong> An item shows <em>On hand</em> 40 and <em>Reserved</em> 30. The headline quantity looks healthy, but <em>On hand</em> minus <em>Reserved</em> is what you can actually still promise to a customer — here that's only 10. Watch the gap, not just the headline quantity.</p></div>
 
   <h2>What it affects elsewhere</h2>
-  <p>Stock here backs your products and links into the delivery/dispatch flow — what you have <em>On hand</em> versus <em>Reserved</em> is what dispatch and delivery draw against. Keeping it current is what makes the <strong>Dispatch board</strong> trustworthy.</p>
+  <p>Stock here backs your products and links into the delivery/dispatch flow — what you have <em>On hand</em> versus <em>Reserved</em> is what dispatch and delivery draw against. Keeping it current is what makes the <a href="finance-op-dispatch.html">Dispatch board</a> trustworthy. A <a href="sales-channels.html">sales channel</a> can also <strong>reserve stock</strong> in a chosen warehouse when an online order arrives, and <a href="sales-channels.html">product feeds</a> read stock from here — a product with no stock record is listed as <em>on order</em>, a counted zero is withheld.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

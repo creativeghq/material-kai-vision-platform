@@ -13,20 +13,33 @@
   <div class="routes"><span class="badge route">/profile</span> <span class="badge route">/billing/subscriptions</span> <span class="badge route">/billing/credits</span></div>
   <p class="lead">Everything about <em>you</em> on MaterialsHub: your public profile and the services you offer, your messages, appointments and reviews, plus the credits, subscription, API keys and billing that power the platform. Each tab is documented in full on its own page below.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> click your <strong>Profile</strong> menu at the top-right of any page. The workspace switcher (showing your role and plan) sits next to it.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> click your <strong>profile menu</strong> at the top-right of any page — it shows your photo and your name. The workspace switcher (showing your role and plan) sits next to it.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile.png" alt="My Profile with its tabs">
-    <figcaption>My Profile — the tabs: Profile, Inbox, Appointments, Reviews, Subscription, Credits, Billing, Social Accounts.</figcaption>
+    <figcaption>My Profile — the grouped side rail of sections (Profile, Account &amp; billing, Connections, Workspace) beside the open section.</figcaption>
   </figure>
+
+  <h2>The side rail</h2>
+  <p>My Profile's sections sit in one side rail, grouped by the question they answer. Every <code>?tab=</code> link (from a notification, the App Launcher or a bookmark) still lands on the same section. Below a large screen the rail becomes a scrollable strip across the top.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Group</th><th>Sections</th></tr></thead>
+    <tbody>
+      <tr><td><em>(you)</em></td><td><a href="account-profile.html">Profile</a> (where the page opens), <a href="account-ambassador.html">Ambassador</a>, <a href="account-schedule.html">Schedule</a>, <a href="account-appointments-reviews.html">Reviews</a></td></tr>
+      <tr><td><strong>Account &amp; billing</strong></td><td><a href="account-subscription.html">Subscription</a>, <a href="account-credits.html">Credits</a>, <a href="account-billing.html">Billing</a>, My Account</td></tr>
+      <tr><td><strong>Connections</strong></td><td><a href="account-social.html">Social Accounts</a>, <a href="seo-websites.html">Websites</a>, <a href="account-keys.html">Keys</a>, <a href="account-webhooks.html">Webhooks</a></td></tr>
+      <tr><td><strong>Workspace</strong></td><td>Team, <a href="account-modules.html">Modules</a>, Supplier Portal — each shown only to those it applies to.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><p><strong>One rail at a time.</strong> A section with several panes of its own — Schedule, Social Accounts, Keys — shows them as a tab strip across the top of the section, never as a second sidebar. A website you open from <strong>Websites</strong> gets its own page at <span class="badge route">/websites/:id</span>, with breadcrumbs back to the list; old <code>?website=</code> links redirect there.</p></div>
 
   <h2>The tabs</h2>
   <div class="cards">
-    <a class="card" href="account-profile.html"><div class="ico">🪪</div><h3>Profile</h3><p>Your public profile: appearance, personal info, business (ΑΑΔΕ), services, skills, factories, availability.</p></a>
+    <a class="card" href="account-profile.html"><div class="ico">🪪</div><h3>Profile</h3><p>Your public profile around a hero card: photo, visibility, profile strength, about you, email signature, business (ΑΑΔΕ), services, skills.</p></a>
     <a class="card" href="account-subscription.html"><div class="ico">📦</div><h3>Subscription &amp; API keys</h3><p>Your plan + generating and testing kai_* API keys for the partner APIs.</p></a>
     <a class="card" href="account-credits.html"><div class="ico">🎟️</div><h3>Credits</h3><p>Balance, allowance, and buying credit packs (with volume discounts).</p></a>
     <a class="card" href="account-billing.html"><div class="ico">🧾</div><h3>Billing</h3><p>The transaction ledger — every credit debit and purchase.</p></a>
-    <a class="card" href="account-keys.html"><div class="ico">🔑</div><h3>Keys &amp; Connections</h3><p>Connect social, WhatsApp, Stripe payouts and bring-your-own-key — per workspace.</p></a>
+    <a class="card" href="account-keys.html"><div class="ico">🔑</div><h3>Keys &amp; Connections</h3><p>Email, finance &amp; tax, documents, social &amp; messaging, publishing and website-embed keys — per workspace.</p></a>
     <a class="card" href="account-modules.html"><div class="ico">🧩</div><h3>Modules</h3><p>Turn optional modules on per workspace — included or purchasable add-ons; members can request activation.</p></a>
     <a class="card" href="account-social.html"><div class="ico">🔗</div><h3>Social Accounts</h3><p>Connect social platforms for publishing.</p></a>
     <a class="card" href="account-appointments-reviews.html"><div class="ico">📅</div><h3>Appointments &amp; Reviews</h3><p>Your bookings and the reviews clients leave (you can reply).</p></a>

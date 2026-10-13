@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Flows</div>
   <h1>Flows (Automations) <span class="badge gated">Pro add-on</span></h1>
   <div class="routes"><span class="badge route">/automations</span></div>
-  <p class="lead">Flows are <strong>workspace automations</strong>: “when <em>this</em> happens, do <em>that</em>.” Pick a <strong>trigger</strong> — an invoice is paid, a payment comes in, a quote is approved, a product is added, an inbox message arrives, an appointment is booked, or a <strong>schedule</strong> — and an <strong>action</strong> — send an email, a WhatsApp, an in-app notification, an agent message, or fire an <a href="email-marketing.html">Email Marketing</a> campaign. You build them by <strong>chatting with the assistant</strong>, no builder to learn, and they run on the platform's automation engine <strong>scoped to your workspace only</strong>. This page explains the triggers, the actions, how to create one, and how runs are metered.</p>
+  <p class="lead">Flows are <strong>workspace automations</strong>: “when <em>this</em> happens, do <em>that</em>.” Pick a <strong>trigger</strong> — an invoice is paid, a quote is approved, a supplier bill is booked, a VAT return is ready, an email lands in a shared mailbox, someone comments on your post, or a <strong>schedule</strong> — and an <strong>action</strong> — send an email, a WhatsApp, an in-app notification, create a task, label an email, reply to a comment, or fire an <a href="email-marketing.html">Email Marketing</a> campaign. You build them by <strong>chatting with the assistant</strong>, no builder to learn, and they run on the platform's automation engine <strong>scoped to your workspace only</strong>. This page explains the triggers, the actions, how to create one, and how runs are metered.</p>
 
   <div class="callout"><p><strong>Where:</strong> enable <strong>Flows</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on); it appears in your navigation as <strong>Automations</strong> at <span class="badge route">/automations</span>. Build flows in the visual builder there, or just describe one to the <a href="agent-hub.html">assistant</a>.</p></div>
 
@@ -21,45 +21,57 @@
   </figure>
 
   <h2>Triggers — when a flow fires</h2>
-  <p>A flow starts from one of these:</p>
+  <p>A flow starts from one event. The builder's palette groups them by area; the main ones:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Area</th><th>Triggers</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Finance</strong></td><td>Invoice paid, payment received or sent, a payment reversed, an unmatched bank payment, card spend over a threshold, a finance follow-up — and five more below.</td></tr>
+      <tr><td><strong>Quotes &amp; orders</strong></td><td>Quote approved, rejected or sent; order created, status changed or dispatched; purchase order sent or received; low stock; RFQ lines requested or priced.</td></tr>
+      <tr><td><strong><a href="inbox.html">Inbox</a> &amp; mail</strong></td><td>Inbox message received, thread assigned or labelled, follow-up due, an order ready for intake — and <strong>Email Received (Shared Gmail)</strong>.</td></tr>
+      <tr><td><strong>CRM &amp; deals</strong></td><td>Contact or company created, contract signed, review received, deal won, lost or moved stage.</td></tr>
+      <tr><td><strong>HR</strong></td><td>Employee added, departure recorded, absence requested or reviewed, overtime recorded, applicant moved stage, late check-in.</td></tr>
+      <tr><td><strong>Social &amp; marketing</strong></td><td>Social post published or failed, <strong>Social Comment Received</strong>, account connected or disconnected, campaign sent, catalogue sent, client-view feedback, a watched page changed.</td></tr>
+      <tr><td><strong>Other</strong></td><td>Installed-base service due/overdue and warranty expiring, SEO movements and reports, real-estate buyer matches, and <strong>Schedule (cron)</strong> or a <strong>manual</strong> run.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>New: finance events that come to you</h3>
+  <p><strong>What it is —</strong> five events that turn the books into notifications, so the P&amp;L reaches you instead of waiting to be visited. Each is also on by default as a <a href="#defaults">platform default</a>.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Trigger</th><th>Fires when…</th></tr></thead>
     <tbody>
-      <tr><td><strong>Invoice paid</strong></td><td>an invoice is settled.</td></tr>
-      <tr><td><strong>Payment received</strong></td><td>money comes in.</td></tr>
-      <tr><td><strong>Quote approved</strong></td><td>a customer accepts a quote.</td></tr>
-      <tr><td><strong>Product added</strong></td><td>a new product is created.</td></tr>
-      <tr><td><strong>Inbox message</strong></td><td>a message arrives in the <a href="inbox.html">Inbox</a>.</td></tr>
-      <tr><td><strong>Appointment booked</strong></td><td>someone books an appointment.</td></tr>
-      <tr><td><strong>Schedule (cron)</strong></td><td>on a recurring time schedule you set.</td></tr>
+      <tr><td><strong>Expense Booked</strong></td><td>a received myDATA document became a supplier bill.</td></tr>
+      <tr><td><strong>Expense Settled Outside the Books</strong></td><td>a cost was marked paid outside the platform and kept out of the P&amp;L.</td></tr>
+      <tr><td><strong>Supplier Credit Note Received</strong></td><td>credit notes a supplier issued you were brought in from myDATA.</td></tr>
+      <tr><td><strong>Planned Payment Due Tomorrow</strong></td><td>a scheduled payment or expected receipt in your <a href="finance-op-planning.html">cash plan</a> falls due tomorrow.</td></tr>
+      <tr><td><strong>VAT Return Ready</strong></td><td>a closed period has ΑΑΔΕ figures on both sides and can be filed. Its default notification cannot be switched off — a filing deadline is a legal obligation.</td></tr>
     </tbody>
   </table></div>
-  <p>Under the hood a flow can be reached four ways — a business <strong>event</strong> (the triggers above), a <strong>schedule</strong>, an inbound <strong>webhook</strong>, or a <strong>manual</strong> run — but the ones you'll build from chat are the events and schedules.</p>
+
+  <h3>New: Email Received (Shared Gmail)</h3>
+  <p>Fires for each new message arriving in a <strong>shared</strong> Gmail mailbox of your workspace, carrying the sender, subject, a snippet and — when the sender is in your CRM — the contact. A person's <strong>personal</strong> mailbox never triggers a workspace flow. Pair it with a condition and the <strong>Label / Archive Email</strong> action to build mail rules (<em>Email Received → condition → Label / Archive Email</em>). By default, a mailbox's owner gets a bell when a known CRM contact writes; mail from strangers stays quiet.</p>
+
+  <p>Under the hood a flow can be reached four ways — a business <strong>event</strong> (the triggers above), a <strong>schedule</strong>, an inbound <strong>webhook</strong>, or a <strong>manual</strong> run — but the ones you'll build are the events and schedules.</p>
 
   <h2>Actions — what a flow does</h2>
-  <p><strong>Messaging actions</strong> reach out to someone:</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Action</th><th>What it does</th></tr></thead>
     <tbody>
       <tr><td><strong>Send email</strong></td><td>Email someone (e.g. a customer or a teammate).</td></tr>
       <tr><td><strong>Send WhatsApp</strong></td><td>Message a WhatsApp contact (needs WhatsApp connected — see <a href="inbox.html">Inbox</a>).</td></tr>
-      <tr><td><strong>In-app notification</strong></td><td>Post a bell notification to a user.</td></tr>
-      <tr><td><strong>Agent message</strong></td><td>Have the assistant post a message.</td></tr>
-      <tr><td><strong>Dispatch an Email Marketing campaign</strong></td><td>Kick off an <a href="email-marketing.html">Email Marketing</a> campaign.</td></tr>
+      <tr><td><strong>In-App Notification</strong></td><td>Post a bell notification to a user.</td></tr>
+      <tr><td><strong>Send Agent Message</strong></td><td>Have the assistant post a message.</td></tr>
+      <tr><td><strong>Dispatch Email Campaign</strong></td><td>Kick off an <a href="email-marketing.html">Email Marketing</a> campaign.</td></tr>
+      <tr><td><strong>Create Task</strong></td><td>Put work on a <a href="projects-tasks.html">project task list</a>.</td></tr>
+      <tr><td><strong>Move Deal Stage</strong></td><td>Advance a <a href="crm-deals.html">deal</a> along its pipeline.</td></tr>
+      <tr><td><strong>Add Note</strong></td><td>Attach a note to a record.</td></tr>
+      <tr><td><strong>Assign Owner</strong></td><td>Assign a team member as owner of a contact, quote or product.</td></tr>
+      <tr><td><strong>Label / Archive Email</strong> <span class="badge gated">new</span></td><td>On the Gmail thread that triggered the flow: add or remove labels by name (a missing label is created), archive, mark read or star. Works only on an active shared mailbox of your own workspace.</td></tr>
+      <tr><td><strong>Reply to Comment</strong> <span class="badge gated">new</span></td><td>Answer the social comment that triggered the flow, <strong>publicly</strong> under the post.</td></tr>
+      <tr><td><strong>Reply by DM</strong> <span class="badge gated">new</span></td><td>Answer that comment <strong>privately</strong> by direct message — once per comment, which is all the platforms allow.</td></tr>
     </tbody>
   </table></div>
-  <p><strong>CRM &amp; commerce actions</strong> update your data — so a flow can <em>do</em> work, not just notify:</p>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Action</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Add tag</strong></td><td>Tag a <a href="crm.html">CRM</a> contact (e.g. tag everyone who books an appointment).</td></tr>
-      <tr><td><strong>Add note</strong></td><td>Attach a note to a CRM contact/company.</td></tr>
-      <tr><td><strong>Update contact</strong></td><td>Change a field on a CRM contact.</td></tr>
-      <tr><td><strong>Assign owner</strong></td><td>Assign a contact/record to a team member.</td></tr>
-      <tr><td><strong>Approve quote</strong></td><td>Approve a <a href="quotes.html">quote</a> automatically.</td></tr>
-      <tr><td><strong>Update product</strong></td><td>Change a field on a product.</td></tr>
-    </tbody>
-  </table></div>
+  <div class="callout"><p><strong>Comment automation.</strong> Start from <strong>Social Comment Received</strong>, add a condition on the comment text for a keyword rule (<em>“if the comment contains ‘price’…”</em>), then <strong>Reply to Comment</strong> or <strong>Reply by DM</strong>. Each comment is answered at most once, and what was sent is recorded on the comment's thread. Nothing like this is switched on for you — an automatic reply only ever runs from a flow you built.</p></div>
   <div class="callout"><p><strong>Branch with A/B split.</strong> Between the trigger and the action you can drop an <strong>A/B Split</strong> — it randomly sends each run down path <em>A</em> or <em>B</em>, so you can test two versions (e.g. two email subjects) and compare. Each branch then runs its own action.</p></div>
 
   <h2>How to create a flow</h2>
@@ -71,10 +83,19 @@
   <div class="callout warn"><p><strong>Email actions need a connected sender.</strong> A flow that sends email uses <em>your</em> connected email (BYOK Resend — see <a href="account-keys.html">Keys &amp; Connections</a>). If the workspace hasn't connected one, the flow can't send and tells you clearly to connect email first, rather than failing silently.</p></div>
   <div class="callout"><p><strong>Scoped &amp; safe.</strong> Chat-built flows are <strong>workspace-scoped</strong> — they only ever see and act on <em>your</em> workspace's data and run under your permissions. They're a deliberately simple, guard-railed subset of the platform's full automation engine.</p></div>
 
+  <h2 id="defaults">Platform defaults — the notifications you get out of the box</h2>
+  <p><strong>What it is —</strong> below your own automations, the <strong>Platform defaults</strong> section lists the notifications that are <em>“on for every workspace out of the box”</em> — for example the daily brief, “you were added to a project”, a comment on a project task, a known contact emailing a shared mailbox, and the finance events above. <strong>Why it matters —</strong> you decide what reaches your team without asking us to change anything.</p>
+  <ul class="feat">
+    <li><strong>Switch one off</strong> for the whole workspace with its toggle.</li>
+    <li><strong>Silence one channel</strong> — keep the in-app bell but stop the email, say — by clicking that channel (<em>In-app</em>, <em>Email</em>, <em>WhatsApp</em>).</li>
+    <li><strong>Reuse</strong> copies a default into <em>Your automations</em> to edit however you like, and switches the original off so nothing is sent twice. Your copy is billed per run like any automation you build; delete it and the default comes back.</li>
+  </ul>
+  <p>Only a workspace owner or admin can change these. Notifications about a legal or delivery obligation — such as a VAT return being ready — cannot be switched off.</p>
+
   <h2>Metering — what a run costs</h2>
   <p>Because flows do real work (send mail, message, dispatch campaigns), tenant flow runs are <strong>metered against your workspace <a href="account-credits.html">credit pool</a></strong>: a <strong>base cost per run</strong> plus the cost of the <strong>action</strong> it performs (e.g. an email or a campaign dispatch). That keeps automations honest — a flow that fires a thousand times has a visible, bounded cost — and it draws from the shared workspace pool like other metered work.</p>
 
-  <div class="callout tip"><p><strong>Good first flows:</strong> “thank-you email when an invoice is paid,” “notify me when a big quote is approved,” “post to the team when an appointment is booked,” or a “weekly newsletter” on a schedule. Start with one, watch it run, then add more.</p></div>
+  <div class="callout tip"><p><strong>Good first flows:</strong> “thank-you email when an invoice is paid,” “notify me when a big quote is approved,” “label every email from a supplier in the shared mailbox,” “DM anyone who comments ‘price’ on a post,” or a “weekly newsletter” on a schedule. Start with one, watch it run, then add more.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

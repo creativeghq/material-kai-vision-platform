@@ -10,37 +10,102 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Social Accounts</div>
   <h1>Account · Social Accounts</h1>
-  <div class="routes"><span class="badge route">/profile</span></div>
-  <p class="lead">Social Accounts is the tab where you connect social media platforms to your account. Once a platform is connected, you can publish content to it directly from MaterialsHub instead of switching apps. This guide covers <strong>what it is</strong>, <strong>why it matters</strong>, <strong>exactly how to connect a platform</strong>, and <strong>what connecting enables</strong>.</p>
+  <div class="routes"><span class="badge route">/profile?tab=social-accounts</span></div>
+  <p class="lead">Social Accounts is where you connect your social media accounts and — for workspace owners and admins — run <strong>WhatsApp</strong>: get a number, write templates and forms, send campaigns and watch delivery. Connected accounts become publishing targets, and their DMs, comments and lead-form submissions arrive in the <a href="inbox.html">Inbox</a>. This guide covers <strong>what each section is</strong>, <strong>why it matters</strong>, <strong>how to use it</strong>, and <strong>what it changes</strong>.</p>
 
   <h2>Where it is</h2>
-  <p>Open your <strong>Profile</strong> menu at the top-right of any page, or go straight to <span class="badge route">/profile</span>, then select the <strong>Social Accounts</strong> tab from the row of tabs along the top of the page.</p>
-
-  <h2>What's on the screen</h2>
-  <p><strong>What it is —</strong> the tab where you connect social media platforms to your account. <strong>Why it matters —</strong> once a platform is connected, you can publish content to it directly from MaterialsHub instead of switching apps.</p>
-  <ul class="feat">
-    <li><strong>Connect</strong> — links a new platform to your account.</li>
-    <li><strong>Refresh</strong> — re-syncs a connected account if it falls out of date.</li>
-  </ul>
-  <p>Connecting and disconnecting accounts is managed entirely from this tab.</p>
+  <p>Open your <strong>Profile</strong> (top-right menu, or <span class="badge route">/profile</span>) and select the <strong>Social Accounts</strong> tab. A strip of sections runs along the top:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Section</th><th>Who sees it</th><th>What it's for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>My accounts</strong></td><td>Everyone</td><td>Connect and disconnect your social accounts; start a <strong>New post</strong>.</td></tr>
+      <tr><td><strong>Workspace accounts</strong></td><td>Owners / admins</td><td>Every account connected by anyone in the workspace.</td></tr>
+      <tr><td><strong>Post analytics</strong></td><td>Everyone</td><td>How your published posts perform.</td></tr>
+      <tr><td><strong>WhatsApp channel</strong></td><td rowspan="9">Owners / admins, with the Messaging module</td><td>Connect a WhatsApp Business number and its settings.</td></tr>
+      <tr><td><strong>Get a number</strong></td><td>Buy a phone number for WhatsApp, paid in credits.</td></tr>
+      <tr><td><strong>WhatsApp templates</strong></td><td>Messages approved by Meta for use outside the 24-hour window.</td></tr>
+      <tr><td><strong>WhatsApp forms</strong></td><td>Forms a customer fills in inside WhatsApp.</td></tr>
+      <tr><td><strong>WhatsApp campaigns</strong></td><td>Send an approved template to a segment.</td></tr>
+      <tr><td><strong>Message log</strong></td><td>Every WhatsApp send and its delivery status.</td></tr>
+      <tr><td><strong>WhatsApp analytics</strong></td><td>Delivery, read and response figures.</td></tr>
+      <tr><td><strong>Opt-outs</strong></td><td>People who replied STOP — they're left out of campaigns.</td></tr>
+      <tr><td><strong>Push notifications</strong></td><td>Push notification settings.</td></tr>
+    </tbody>
+  </table></div>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/social-accounts.png" alt="Social Accounts tab">
     <figcaption>The Social Accounts tab — connect platforms for publishing.</figcaption>
   </figure>
 
-  <h2>How to connect an account — step by step</h2>
+  <h2>My accounts — connecting a platform</h2>
+  <p><strong>What it is —</strong> the list of your <strong>Connected</strong> accounts, then a card per platform you haven't connected yet (Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, X (Twitter), Threads, Google Business and WhatsApp). <strong>Why it matters —</strong> once connected, you publish to it from MaterialsHub instead of switching apps, and its messages reach your Inbox.</p>
   <ol>
-    <li>Open your <strong>Profile</strong> (<span class="badge route">/profile</span>) and select the <strong>Social Accounts</strong> tab.</li>
-    <li>Click <strong>Connect</strong> to link a new platform.</li>
-    <li>Use <strong>Refresh</strong> to re-sync a connected account if it falls out of date.</li>
-    <li>Connecting and disconnecting accounts is managed entirely from this tab.</li>
+    <li>Open <strong>Profile → Social Accounts → My accounts</strong>.</li>
+    <li>Click <strong>Connect</strong> on the platform and approve access on the platform's own page; you're brought back here.</li>
+    <li>Use the bin icon on a connected account to disconnect it, and <strong>Refresh</strong> to re-sync the list.</li>
+    <li><strong>New post</strong> (top-right) opens the assistant ready to publish a post.</li>
   </ol>
+  <div class="callout"><p><strong>Google reviews on your profile.</strong> A connected Google Business location offers <em>Show these reviews on my public profile</em> — off by default. They appear in their own section, clearly marked as Google reviews, never mixed into the rating clients leave here.</p></div>
 
-  <div class="callout tip"><p><strong>Worked example — connecting a platform you publish to.</strong> Open <strong>Profile → Social Accounts</strong> → click <strong>Connect</strong> to link the platform → if a connected account later falls out of date, click <strong>Refresh</strong> to re-sync it. From then on, that platform is available as a publishing target whenever you create and send social content.</p></div>
+  <h2>What connecting brings into the Inbox</h2>
+  <p>Connected accounts don't just publish — what people send them reaches a person:</p>
+  <ul class="feat">
+    <li><strong>DMs and comments</strong> under your own posts become Inbox conversations (sources <em>Social DM</em> and <em>Social comments</em>). A reply to a comment is public; you can answer the person by DM instead.</li>
+    <li><strong>Lead forms</strong> — a Meta Instant Form submission becomes an Inbox conversation (source <em>Lead form</em>) holding the answers. Nothing is added to your CRM silently; <strong>Add to CRM</strong> in the side panel runs the duplicate search first.</li>
+    <li><strong>Where they came from</strong> — when a DM started from an ad or an ig.me / m.me link, that entry point is kept on the conversation.</li>
+    <li><strong>WhatsApp calls</strong> — an ended, missed or failed call shows as an event in that customer's conversation.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Automatic comment replies.</strong> In <a href="flows.html">Flows</a>, the <em>Social Comment Received</em> trigger can be followed by <strong>Reply to Comment</strong> (public) or <strong>Reply by DM</strong> (private) — add a condition on the comment text for keywords (“price”, “where can I buy”). Each comment is answered at most once. Nothing like this runs unless you build the flow.</p></div>
 
-  <h2>What it enables</h2>
-  <p>Once a platform is connected, you can publish content to it directly from MaterialsHub instead of switching apps. Connected platforms become available as publishing targets when you create and send social content.</p>
-  <p><strong>What it affects:</strong> connected platforms become available as publishing targets when you create and send social content.</p>
+  <h2>Post analytics</h2>
+  <p><strong>What it is —</strong> how each published post performs, per network. Figures are kept as a <strong>daily history</strong>, so you can see a post's numbers change over time rather than only the latest. A post removed on a network after it was published is marked <em>deleted</em> for that network. <strong>Why it matters —</strong> you can see which content keeps working and which fades.</p>
+
+  <h2>WhatsApp channel <span class="badge gated">owner / admin</span></h2>
+  <p><strong>What it is —</strong> where you connect a WhatsApp Business number. <strong>Connect WhatsApp</strong> runs Meta's own sign-up, where you pick the business account and number; <em>I already have Meta credentials</em> is the alternative. Each connected number shows its settings — <strong>Send read receipts</strong> (the blue tick, per number), default number, quota — and you can sync, check its health, or import earlier conversation history. <strong>What it affects:</strong> its conversations appear under the Inbox's <strong>WhatsApp</strong> tab; with more than one number the Inbox gets a number switcher.</p>
+
+  <h2>Get a number <span class="badge gated">owner / admin</span></h2>
+  <p><strong>What it is —</strong> buy a phone number for WhatsApp without leaving MaterialsHub. <strong>Why it matters —</strong> connecting WhatsApp used to assume you already owned a suitable number.</p>
+  <ol>
+    <li>Pick a <strong>Country</strong>, <strong>Type</strong> (Local / Mobile / National / Toll-free) and optional <strong>Area code</strong>, then <strong>Check availability</strong>.</li>
+    <li>The price is shown as <em>credits a month</em>. Click <strong>Buy a … number</strong>. The first month is taken from the workspace's credits when the number is issued (and refunded if nothing is issued); WhatsApp is enabled on it automatically.</li>
+    <li>Some countries need an <strong>identity check</strong>: use <strong>Identity check link</strong> / <strong>Open KYC form</strong>, complete it on Zernio's page, then buy again — such a number is charged when it goes live.</li>
+  </ol>
+  <ul class="feat">
+    <li><strong>Your numbers</strong> lists what the workspace holds. Bought numbers are billed monthly in credits and can be <strong>released</strong> here; a number you connected yourself is not billed by us.</li>
+    <li><strong>Monthly charges</strong> shows each month's rental. A charge that failed (not enough credits) is marked and still owed — top up and use <strong>Retry the charge</strong> to settle it and bring a held number back.</li>
+  </ul>
+
+  <h2>WhatsApp templates</h2>
+  <p>Pre-approved messages Meta requires for anything sent outside the 24-hour reply window — a campaign, a first message, or a follow-up days later. <strong>Create template</strong> submits one to Meta from here (no trip to WhatsApp Manager); once approved they're offered in the Inbox (<strong>Send a template</strong>), in follow-ups and in campaigns.</p>
+
+  <h2>WhatsApp forms</h2>
+  <p><strong>What it is —</strong> a form that opens <strong>inside WhatsApp</strong>, so a customer answers in fields instead of a paragraph. The answers land in the conversation as a message — an <strong>order form</strong> feeds Inbox order intake exactly like a typed order. <strong>Why it matters —</strong> structured answers (quantity, size, delivery date) instead of a message you have to decode.</p>
+  <ol>
+    <li><strong>New form</strong>: a <strong>Title</strong>, a <strong>Purpose</strong> (<em>Order request</em>, <em>Lead capture</em>, <em>Booking request</em>, <em>Support request</em>, <em>Survey</em>, <em>Other</em>), the <strong>WhatsApp number</strong>, the <strong>Message sent with the form</strong>, the button texts, and the <strong>Fields</strong> (each with a type, required or not, options for a dropdown, and an optional hint).</li>
+    <li>It's saved as a <strong>draft</strong> and checked by WhatsApp; <strong>preview</strong> it in WhatsApp's renderer.</li>
+    <li><strong>Publish</strong> it — it becomes sendable and is frozen. Change a published form with <strong>New version</strong>; retire one so customers can no longer open it (its answers stay).</li>
+    <li>Send it from any WhatsApp conversation in the <a href="inbox.html">Inbox</a> while the 24-hour window is open (the form button in the reply box).</li>
+  </ol>
+  <p><strong>Latest answers</strong> lists the last 50 submissions, each linking to its conversation.</p>
+
+  <h2>WhatsApp campaigns</h2>
+  <p><strong>What it is —</strong> send an approved template to a segment. <strong>Create campaign</strong> opens <em>New WhatsApp Campaign</em>:</p>
+  <ul class="feat">
+    <li><strong>Name</strong>, <strong>Send from</strong> (the number) and <strong>Template</strong> (approved templates only).</li>
+    <li><strong>Audience</strong> — anyone matching <em>any</em> of: <em>Everyone who has messaged us on WhatsApp</em>, WhatsApp conversations with chosen <strong>Inbox labels</strong>, CRM contacts in chosen <a href="crm-categories.html">categories</a>, or CRM contacts with given tags.</li>
+    <li>A <strong>live count</strong> shows who'll receive it and who is left out (opted out, or numbers with no country code), with a few example names.</li>
+    <li><strong>Send at (optional)</strong> — leave empty to save it as a draft you <strong>Start</strong> yourself. Each message is charged at WhatsApp's rate for the recipient's country.</li>
+  </ul>
+  <p>Campaigns can be started, paused, resumed and cancelled from the list. <strong>Nothing is sent until you start it.</strong></p>
+
+  <h2>Message log, analytics &amp; opt-outs</h2>
+  <ul class="feat">
+    <li><strong>Message log</strong> — every WhatsApp send with its status (sent, delivered, read, failed).</li>
+    <li><strong>WhatsApp analytics</strong> — delivery and read rates, plus two-way figures: conversation volume and how fast your team responds.</li>
+    <li><strong>Opt-outs</strong> — a customer who replies STOP is recorded here and excluded from campaigns and template sends; START reverses it.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Worked example — WhatsApp from zero.</strong> <strong>Get a number</strong> → buy a local number → write a template under <strong>WhatsApp templates</strong> and wait for approval → build an <em>Order request</em> form under <strong>WhatsApp forms</strong> and publish it → customers' messages arrive in the <a href="inbox.html">Inbox</a>, where you reply, send the form, and approve the order it produces.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

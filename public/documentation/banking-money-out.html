@@ -10,10 +10,10 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="payments.html">Payment Providers</a> / <a href="banking.html">Revolut</a> / Money-out &amp; payouts</div>
   <h1>Money-out &amp; payouts</h1>
-  <div class="routes"><span class="badge route">/finance → Settings → Accounts</span> <span class="badge gated">finance.manage</span></div>
+  <div class="routes"><span class="badge route">/finance → Settings → Accounts &amp; Payments → Money out</span> <span class="badge gated">finance.manage</span></div>
   <p class="lead">Money-out is how you <strong>pay people</strong> from your connected <a href="banking.html">Revolut</a> account without leaving the platform — a supplier, a CRM counterparty, a whole run of due bills, or someone who has no IBAN at all. Every instruction is <strong>audited before Revolut is even called</strong>, and — because paying the wrong account is unrecoverable — the platform puts a <strong>Verification-of-Payee (VoP)</strong> name check in front of it. By default it prepares a <strong>draft</strong> that a human approves in the Revolut app, so nothing moves money unattended.</p>
 
-  <div class="callout"><p><strong>Where:</strong> <strong>Finance → Settings → Accounts</strong> → the <strong>Money-out</strong> card (below the bank feed; shown only when the connection is live). Each instruction you send is listed there with its state.</p></div>
+  <div class="callout"><p><strong>Where:</strong> <strong>Finance → Settings → Accounts &amp; Payments</strong> → the <strong>Money out</strong> pane (the <em>Revolut Treasury</em> card; shown only when the connection is live). Each instruction you send is listed there with its state. You can also pay a single bill with <strong>Pay it now…</strong> on an <a href="finance-doc-expenses.html">expense</a>, <strong>Pay now</strong> on a <a href="finance-op-planning.html">planned payment</a>, or the pay button on an expense attached to an order — all open the same payment form.</p></div>
 
   <h2>Verification of Payee — the gate in front of every payment</h2>
   <p><strong>What it is —</strong> before you can pay a CRM bank account, it must be registered with Revolut as a <strong>counterparty</strong>, and creating one runs a <strong>name check</strong>: Revolut compares the holder name you have on file against the name the receiving bank has for that IBAN. <strong>Why it matters —</strong> a bank transfer to the wrong account is gone; VoP catches a typo'd IBAN or a mismatched name <em>before</em> the money leaves. The verdict is one of:</p>
@@ -46,7 +46,7 @@
 
   <div class="callout"><p><strong>Everything is audited first.</strong> Each instruction — draft, direct payment, bill run, payout link, exchange — is written to the money-out log with a unique request id <em>before</em> Revolut is called, so a network hiccup can never create a duplicate payment, and you always have a record of what was instructed and its current state.</p></div>
 
-  <div class="callout tip"><p><strong>Worked example — paying a supplier safely.</strong> In <a href="crm-companies.html">CRM</a>, open the supplier's bank account and click <strong>Verify holder</strong> → it comes back <em>Matches</em>. Later, in <strong>Finance → Settings → Accounts → Money-out</strong>, choose that counterparty, enter the amount and the bill reference, leave it as a <strong>draft</strong>, and send. Approve the one draft in your Revolut app; when it clears, the platform reconciles it against the bill and marks it paid.</p></div>
+  <div class="callout tip"><p><strong>Worked example — paying a supplier safely.</strong> In <a href="crm-companies.html">CRM</a>, open the supplier's bank account and click <strong>Verify holder</strong> → it comes back <em>Matches</em>. Later, in <strong>Finance → Settings → Accounts &amp; Payments → Money out</strong>, choose that counterparty, enter the amount and the bill reference, leave it as a <strong>draft</strong>, and send. Approve the one draft in your Revolut app; when it clears, the platform reconciles it against the bill and marks it paid.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

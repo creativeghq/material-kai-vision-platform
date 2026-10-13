@@ -9,32 +9,23 @@
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-operations.html">Operations &amp; Reports</a> / Marketplace</div>
-  <h1>Operations · Marketplace</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">The Marketplace tab is the link between Finance and the platform's surplus / last-stock <a href="discover.html">marketplace</a>. If you move surplus or last-stock through the marketplace, that activity is part of your financial picture too — this tab surfaces it alongside your other figures instead of leaving it siloed.</p>
+  <h1>Operations · Marketplace sales</h1>
+  <div class="routes"><span class="badge route">/commerce</span> <span class="badge route">/discover</span></div>
+  <p class="lead">Finance no longer has a separate <em>Marketplace</em> tab. Selling through marketplaces now happens in two places, depending on <strong>who you sell to</strong> — and in both cases the sale lands in Finance as an ordinary order, so it is already part of your revenue, profit and reports.</p>
 
-  <h2>Where it is</h2>
-  <p>Top navigation → <strong>Finance</strong> → <strong>Marketplace</strong> tab.</p>
+  <h2>Selling to the public on Skroutz, Shopify or WooCommerce</h2>
+  <p><strong>What it is —</strong> the <a href="sales-channels.html">Sales Channels</a> page (<span class="badge route">/commerce</span>) connects your Skroutz, Shopify and WooCommerce stores and publishes product feeds for Skroutz, BestPrice.gr and Google. <strong>Why it matters for Finance —</strong> each channel order arrives as a sales order with the cost of every line and the <strong>eCommerce</strong> income category on it, the fiscal document can be issued and sent back to the store, and a channel's lump-sum <strong>payout</strong> settles the orders it covers while booking the commission to <strong>eCommerce Fees</strong>. A per-channel comparison shows revenue, cost, fees and margin side by side.</p>
+  <p><strong>How:</strong> enable a channel module (Shopify, WooCommerce or Skroutz Marketplace) from the <a href="apps.html">App Launcher</a>, then open <strong>Sales Channels</strong>. Full guide: <a href="sales-channels.html">Sales Channels</a>.</p>
 
-  <h2>What's on the screen</h2>
-  <p>Your surplus / last-stock marketplace activity, tied into your financial view:</p>
-  <ul class="feat">
-    <li><strong>Marketplace activity</strong> — the surplus / last-stock activity you run through the <a href="discover.html">marketplace</a>, shown here inside Finance rather than only on the Discover side.</li>
-  </ul>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-marketplace.png" alt="Marketplace tab: surplus / last-stock marketplace activity tied into the financial view">
-    <figcaption>The Marketplace tab — surplus / last-stock marketplace activity surfaced inside Finance.</figcaption>
-  </figure>
-
-  <h2>How to use it — step by step</h2>
-  <ol>
-    <li>Open <strong>Finance → Marketplace</strong> to see your surplus / last-stock marketplace activity tied into your financial view.</li>
-  </ol>
-
-  <div class="callout tip"><p><strong>Worked example — keeping surplus sales in the financial picture.</strong> If you list last-stock items on the surplus <a href="discover.html">marketplace</a> over on Discover, open <strong>Finance → Marketplace</strong> to see that same activity surfaced next to your other figures — so the money side of surplus stays connected to the rest of your finances instead of living only on the Discover page.</p></div>
+  <h2>Selling surplus to other trade members</h2>
+  <p><strong>What it is —</strong> the surplus / last-stock <a href="discover-marketplace.html">Marketplace</a> on Discover, where you list leftover warehouse stock for other businesses on the platform. <strong>How:</strong> see <a href="discover-marketplace.html">Discover → Marketplace</a>.</p>
 
   <h2>What it affects elsewhere</h2>
-  <p>It ties <a href="discover.html">marketplace</a> activity into Finance, so the two stay connected rather than tracked separately.</p>
+  <ul class="feat">
+    <li><a href="finance-doc-orders.html">Orders</a> — channel orders appear here; their invoice row offers <strong>Send to channel</strong>, and the <strong>Shipping</strong> tab records carrier and tracking.</li>
+    <li><a href="finance-settings-documents.html">Settings → Documents</a> — a numbering range can apply to one sales channel only.</li>
+    <li><a href="finance-settings-online-store.html">Settings → Online Store</a> — product feeds link to your storefront, so it must be open and its products published.</li>
+  </ul>
 </main>
 <script src="assets/nav.js"></script>
 </body>

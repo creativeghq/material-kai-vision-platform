@@ -10,11 +10,13 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Users</div>
   <h1>CRM · Users</h1>
-  <div class="routes"><span class="badge route">/crm</span> <span class="badge gated">crm.view</span></div>
+  <div class="routes"><span class="badge route">/crm?tab=users</span> <span class="badge gated">platform operator</span></div>
   <p class="lead">The Users tab is where you <strong>manage the platform users in your workspace</strong> — the people who actually have a login. It lists each user alongside their role, subscription tier and credit balance, so the access and spend of every account is visible at a glance. This is the tab you use to keep access correct: a user's role is the gate on what they can see and do across the platform, and the subscription and credit columns tell you what each account can spend.</p>
 
+  <div class="callout warn"><p><strong>Platform operators only.</strong> Account tiers, subscriptions, credits and creating logins are platform administration, so this tab — and the Total Users / Active Users tiles above the CRM — appear only for a platform operator. A workspace member with CRM access doesn't see it, and a <code>?tab=users</code> link opens Contacts for them. To bring a colleague into <em>your</em> workspace, invite them from <a href="finance-settings-team.html">Team</a> instead.</p></div>
+
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>CRM</strong> → the <strong>Users</strong> tab (the first of the four CRM tabs: Users, Contacts, Companies, Categories).</p>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Users</strong> tab (operators only, beside Pipeline, Contacts, Companies and Categories).</p>
 
   <div class="callout"><p><strong>Users vs. Contacts —</strong> a <em>user</em> has login access to your workspace; a <em>contact</em> is a record of a person you deal with who may or may not have a login. Most users arrive on their own once you invite them (see <a href="finance-settings-team.html">Team invites</a>); this tab is where you see and manage them once they're in.</p></div>
 
@@ -38,12 +40,12 @@
     <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td><strong>Email</strong></td><td>The user's login email address — this is also what the search box matches on.</td></tr>
-      <tr><td><strong>Role</strong></td><td>The user's <strong>account role</strong> — this is the <em>access tier</em> (see the box below). Editable <strong>inline</strong> from this column.</td></tr>
+      <tr><td><strong>Account tier</strong></td><td>The user's <strong>account role</strong> — this is the <em>access tier</em> (see the box below). Editable <strong>inline</strong> from this column.</td></tr>
       <tr><td><strong>Type</strong></td><td>The account/professional type of the user.</td></tr>
       <tr><td><strong>Subscription</strong></td><td>The user's subscription tier (free, pro, …).</td></tr>
       <tr><td><strong>Credits</strong></td><td>The user's current credit balance — what the account has left to spend.</td></tr>
       <tr><td><strong>Status</strong></td><td>The account status (e.g. active).</td></tr>
-      <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the user.</td></tr>
+      <tr><td><strong>Actions</strong></td><td><strong>Reset password</strong> (key icon) and <strong>Delete user</strong> (bin).</td></tr>
     </tbody>
   </table>
   </div>

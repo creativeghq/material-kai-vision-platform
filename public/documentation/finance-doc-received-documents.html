@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Received Supplier Documents | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-documents.html">Documents</a> / Received supplier documents</div>
+  <h1>Received supplier documents — ΔΑ matching &amp; supplier PDFs</h1>
+  <div class="routes"><span class="badge route">/finance?tab=doc_expenses</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">The <a href="finance-doc-expenses.html">Expenses</a> tab is the inbox of documents your suppliers filed against your VAT number in myDATA. Two things now make those documents complete: a supplier's <strong>delivery note (ΔΑ)</strong> is matched — one to one — to the <strong>invoice</strong> that bills it, and the supplier's <strong>own PDF</strong> can be attached so a value-only myDATA record gets its real lines and the supplier's own invoice number.</p>
+
+  <div class="callout"><p><strong>Where:</strong> Finance → <strong>Expenses</strong>. The table's columns are <strong>Date</strong>, <strong>Number</strong>, <strong>Issuer</strong>, <strong>Type</strong>, <strong>Category</strong>, <strong>Net</strong>, <strong>VAT</strong>, <strong>Gross</strong>, <strong>Detail</strong>, <strong>Handled</strong> and the row menu. The same matching appears in <strong>By Supplier</strong>.</p></div>
+
+  <h2>The Detail column — what goes with what</h2>
+  <p><strong>What it is —</strong> one cell that says how this document relates to the other half of the purchase. A supplier often sends a delivery note when the goods move and an invoice later; the ΔΑ names the items, the invoice names the money.</p>
+  <ul class="feat">
+    <li><strong>Needs detail</strong> — the document has only value lines; nothing on it can be received into the warehouse or turned into a product until someone says what was on it.</li>
+    <li><strong>Detail on ΔΑ …</strong> / <strong>Invoiced by …</strong> — a settled link: either stated by the issuer on myDATA, or one somebody already accepted.</li>
+    <li><strong>ΔΑ …?</strong> (with a question mark) — a <em>suggested</em> match. Click it to review; <strong>✗</strong> dismisses it and it is never suggested again.</li>
+  </ul>
+
+  <h2>Review a suggested match side by side</h2>
+  <p><strong>How to —</strong> click the suggestion. The review shows <strong>This document</strong> and <strong>Suggested match</strong> next to each other — issue date, dispatch date, vehicle, total (a ΔΑ “prices nothing”), and their own lines — then a checklist:</p>
+  <ul class="feat">
+    <li>whether the delivery note is <strong>already the detail for another invoice</strong> (and which, when, and by whom);</li>
+    <li>whether the <strong>dispatch dates</strong> are the same, and how many days after the ΔΑ the invoice was issued;</li>
+    <li>any <strong>rival candidates</strong> on either side;</li>
+    <li>the <strong>items on the delivery note</strong> — what the invoice would be billing, beside its total.</li>
+  </ul>
+  <p>Then <strong>Link them</strong>, <strong>Not a match</strong>, or <strong>Close</strong>. Accepting only happens here, with both documents on screen.</p>
+  <div class="callout warn"><p><strong>One ΔΑ, one invoice.</strong> A delivery note can be the detail for only one invoice. If it is already linked elsewhere, the button reads <em>Already on …</em> and is disabled — unlink it there first. Suggestions whose ΔΑ is already invoiced are no longer offered.</p></div>
+
+  <h2>Linked invoices expand to show their delivery</h2>
+  <p>An invoice with a linked ΔΑ gets a <strong>chevron</strong>. Expand it to see the delivery note nested under it and a panel with the dispatch date, vehicle, how it was linked (<em>Stated by the issuer on myDATA</em>, <em>Matched by us</em>, <em>Linked by an operator</em>) and when, the items, and the billed total — with <strong>Open …</strong> and <strong>Unlink</strong> (not offered for a link the issuer stated on myDATA). A ΔΑ whose invoice is in the same list folds inside it.</p>
+
+  <h2>The supplier's own invoice — attach, upload, or forward it</h2>
+  <p><strong>Why it matters —</strong> a myDATA record often carries a single value-only line and no supplier invoice number. The supplier's PDF has both. The platform reads its header and lines (each file read spends credits) and stores it with the document.</p>
+  <ul class="feat">
+    <li><strong>Attach supplier PDF</strong> (row menu; <strong>Replace supplier PDF</strong> once one is there) — attaches the file to that document. Its lines are written only if they <strong>add up to the myDATA net</strong>; otherwise the file is attached and you're told the lines don't foot. <strong>Supplier's document</strong> in the same menu opens it.</li>
+    <li><strong>Upload supplier invoice</strong> (above the Expenses table) — PDF or image. If it matches an existing myDATA document by supplier VAT, date and net, it is attached there (<em>“Matched to a document you already have”</em>) — never filed twice. Otherwise it is filed as a new document <strong>To confirm</strong>.</li>
+    <li><strong>File in supplier documents</strong> — the same, from an attachment's menu in the <a href="inbox.html">Inbox</a>.</li>
+    <li><strong>File emailed supplier invoices automatically</strong> — an opt-in switch on the <strong>myDATA Inbox (Received Documents)</strong> card (Profile → Keys). An invoice or credit note arriving at your platform address is read and filed to confirm, or attached to the document it matches. Nothing is booked or paid on its own.</li>
+  </ul>
+  <div class="callout"><p><strong>To confirm —</strong> a document read from a file, not filed with AADE, shows <em>To confirm</em> in the Handled column and is never turned into an expense automatically. Check it, then <strong>Confirm document</strong> in the row menu to move it into the normal queue. Booking it as a bill uses the supplier's own invoice number.</p></div>
+
+  <h2>Foreign-currency documents</h2>
+  <p>A received document in a currency other than EUR is stamped with the <strong>ECB reference rate</strong> for its date (the latest working-day rate on or before it) and that rate is carried to the supplier bill. If no rate exists, it is left missing and flagged — never assumed to be 1.</p>
+
+  <div class="callout tip"><p><strong>Worked example —</strong> a supplier's ΔΑ arrived on the 3rd and their invoice on the 10th. In Expenses, the invoice's Detail cell reads <em>ΔΑ 2944?</em>. Click it: same dispatch date, issued 7 days later, the ΔΑ isn't on any other invoice, and its 12 items are what the invoice bills. <strong>Link them</strong>. The invoice now has a chevron; expand it to see the delivery underneath. Then <strong>Attach supplier PDF</strong> from the row menu so the invoice carries the supplier's own lines and number.</p></div>
+
+  <h2>What it affects</h2>
+  <p>A linked ΔΑ gives the invoice its items, which is what lets goods be <a href="stock.html">received into the warehouse</a> and costs reach products. Supplier credit notes received through myDATA are on <a href="finance-doc-credit-notes.html">Credit notes → Received from suppliers</a>. AADE's monthly totals for these documents are compared with the ledger on the <a href="finance-mydata-book.html">myDATA Book</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

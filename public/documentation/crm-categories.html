@@ -10,76 +10,79 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Categories</div>
   <h1>CRM · Categories</h1>
-  <div class="routes"><span class="badge route">/crm</span> <span class="badge gated">crm.view</span></div>
-  <p class="lead">Categories are the reusable labels you create to group the people and organisations you work with — platform <strong>users</strong>, CRM <strong>contacts</strong> and <strong>companies</strong> — into lists. They aren't just tidy tags: those lists are what the rest of the platform targets for outreach. Most directly, the <strong>"Send to Customers"</strong> action on catalogs and other email outreach send to a <em>category</em> rather than to individuals, so a well-kept set of categories is the backbone of your segmentation — get them right and outreach reaches exactly the audience you intend.</p>
+  <div class="routes"><span class="badge route">/crm?tab=categories</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">Categories are the labels you use to group the <strong>contacts</strong> and <strong>companies</strong> you work with into lists. They aren't just tidy tags: those lists are what the rest of the platform targets — the <strong>"Send to Customers"</strong> action on catalogs, email and WhatsApp campaigns and workflows all send to a <em>category</em> rather than to individuals — and they're a filter on the CRM lists. Your workspace's own <strong>Custom</strong> categories sit in the same table as the <strong>shared</strong> lists every workspace uses (industries and the lead vocabularies), each tagged with its type.</p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>CRM</strong> → the <strong>Categories</strong> tab (alongside the <em>Users</em>, <em>Contacts</em> and <em>Companies</em> tabs). If you're starting fresh, it's worth building your categories first, so you have segments to file people and organisations under as you add them.</p>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Categories</strong> tab. If you're starting fresh, it's worth creating a few categories first, so you have lists to file people and organisations under as you add them.</p>
 
-  <h2>What's on the screen</h2>
-  <p>The Categories tab lists every category you've created, each shown as a <strong>stat card</strong>. The headline figure on each card is its <strong>member count, split by Users / Contacts / Companies</strong>, so you can see at a glance how many of each kind of record a category covers. A toolbar across the top carries the create, edit, resync and search controls.</p>
-  <ul class="feat">
-    <li><strong>The category cards</strong> — one card per category, each with its name and the Users / Contacts / Companies member-count split.</li>
-    <li><strong>The toolbar</strong> — <strong>New Category</strong>, <strong>Edit</strong>, <strong>Resync auto</strong> and a <strong>Search categories</strong> box.</li>
-  </ul>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-categories.png" alt="CRM Categories tab — category cards with member counts split by Users / Contacts / Companies, and the toolbar">
-    <figcaption>The Categories tab — each category is a stat card whose member count is split by Users / Contacts / Companies, with the New Category / Edit / Resync auto / Search toolbar above.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-categories.png" alt="CRM Categories tab">
+    <figcaption>The Categories tab — one table of custom and shared categories, with Type, member counts per contacts / companies / users, and the product-category match on each industry.</figcaption>
   </figure>
 
-  <h2>The toolbar, control by control</h2>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+  <h2>Two kinds of category</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Type</th><th>Who sees it</th><th>Who can change it</th></tr></thead>
     <tbody>
-      <tr><td><strong>New Category</strong></td><td>Create a new category — name it and set its type.</td></tr>
-      <tr><td><strong>Edit</strong></td><td>Modify an existing category (for example rename it or change its type).</td></tr>
-      <tr><td><strong>Search categories</strong></td><td>Filters the list so you can find a category quickly.</td></tr>
+      <tr><td><strong>Custom</strong></td><td>Only the members of <em>your</em> workspace — another workspace never sees your custom categories or who is in them.</td><td>The workspace <strong>owner</strong> or an <strong>admin</strong> creates, edits and deletes them.</td></tr>
+      <tr><td><strong>Industry</strong>, <strong>Lead status</strong>, <strong>Lead source</strong> <span class="badge">shared</span></td><td>Every workspace — they're the common vocabulary behind the Industry field and the Lead Status / Lead Source dropdowns.</td><td>The platform operator only.</td></tr>
     </tbody>
-  </table>
-  </div>
+  </table></div>
+  <p>The platform operator also sees <em>derived</em> lists (Access role, Employment, Professional type) marked <strong>auto</strong> — their members are worked out from other records, never typed by hand. Ordinary members don't see them.</p>
 
-  <h2>How to add a category — step by step</h2>
+  <h2>What's on the screen</h2>
+  <p>One card with a filter bar and one table — your own categories first, then the shared lists.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Category</strong></td><td>The category as a <strong>colour chip</strong> — the same colour it shows wherever it's assigned. A lock icon marks an inactive one.</td></tr>
+      <tr><td><strong>Type</strong></td><td><em>Custom</em>, or the shared kind (<em>Industry</em>, <em>Lead status</em>, <em>Lead source</em>) with “shared”.</td></tr>
+      <tr><td><strong>Description</strong></td><td>What the category is for.</td></tr>
+      <tr><td><strong>Contacts</strong> / <strong>Companies</strong></td><td>How many of each are in it. Lead status / source options show <strong>—</strong>: they're a value picked on a contact, not a list with members.</td></tr>
+      <tr><td>Edit / Delete</td><td>The pencil and bin, on the rows you're allowed to change.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Above the table: the <strong>filter bar</strong> (with a <em>Search categories</em> box) and <strong>New category</strong>. If your workspace has no custom category yet, a one-line nudge offers <strong>Create your first</strong>.</p>
+
+  <h2>How to create a category — step by step</h2>
   <ol>
-    <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Categories</strong> tab.</li>
-    <li>Click <strong>New Category</strong>.</li>
-    <li><strong>Name</strong> the category (for example, <em>Architects in Athens</em>).</li>
-    <li>Set its <strong>type</strong>.</li>
-    <li><strong>Save.</strong></li>
-    <li><strong>Assign the category</strong> on a contact or company — open the record's detail page and apply the label there. (A category you've just created starts empty; it fills up as you assign it.)</li>
+    <li>Open <strong>CRM → Categories</strong> and click <strong>New category</strong>.</li>
+    <li>Enter a <strong>Name</strong> (for example <em>VIP customers</em> or <em>Architects in Athens</em>).</li>
+    <li>Pick a <strong>Colour</strong> from the swatches — a preview chip shows how it will look.</li>
+    <li>Optionally add a <strong>Description</strong>.</li>
+    <li>Click <strong>Create</strong>. It's a <em>Custom</em> category, private to your workspace.</li>
   </ol>
-  <p><strong>What it affects elsewhere:</strong> once a category exists and has members, it becomes a selectable audience for the <strong>Send to Customers</strong> action on catalogs and for other email outreach, and a filter for grouping your contacts and companies.</p>
+  <p>Editing adds an <strong>Active</strong> checkbox — untick it to retire a category without deleting it.</p>
+  <div class="callout tip"><p><strong>Create it where you need it.</strong> You don't have to come to this tab first: the category picker on a contact or company has a <strong>Create “…”</strong> option at the bottom — type a name that doesn't exist yet, pick a colour, and it's created and assigned in one go (owners and admins).</p></div>
+  <div class="callout"><p><strong>New pre-fills the filter.</strong> If you've filtered this table to one Type before clicking <strong>New category</strong>, the dialog opens with that type already chosen.</p></div>
 
-  <h2>What Edit does</h2>
-  <p><strong>Edit</strong> is for the categories you create and curate by hand — use it to rename a category or change its type as your segmentation evolves. The members of a hand-curated category are the records you've assigned the label to on their detail pages.</p>
-  <div class="callout"><p><strong>Changed in 2026-06:</strong> categories no longer carry a <em>role</em>, and the old auto-populated <em>Dealer Accounts</em> / <em>Factory Accounts</em> role-linked categories were <strong>retired</strong> when roles were consolidated (dealer/factory → <strong>Supplier</strong>). Access is now driven by a user's account <a href="crm-users.html">Role</a>, not by category membership. Categories are purely the audiences <em>you</em> curate for outreach and filtering.</p></div>
-
-  <h2>Seeded example categories</h2>
-  <p>MaterialsHub ships with a set of starter categories you can use straight away or adapt — so you're not segmenting from a blank slate:</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Category</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Architecture and design professionals</strong></td><td>Architects, designers and interior designers.</td></tr>
-      <tr><td><strong>Industry consultants</strong></td><td>Consultants working in the industry.</td></tr>
-      <tr><td><strong>B2B sourcing agents</strong></td><td>Agents who source products on behalf of businesses.</td></tr>
-      <tr><td><strong>Suppliers, manufacturers, brands and distributors</strong></td><td>Anyone who supplies products.</td></tr>
-      <tr><td><strong>Other professional types</strong></td><td>A catch-all for professionals who don't fit the categories above.</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>What categories affect</h2>
-  <p>Categories are an audience, not just a label. Once a category has members, it surfaces wherever the platform sends to a segment:</p>
+  <h2>Adding people to a category</h2>
   <ul class="feat">
-    <li><strong>Send to Customers on catalogs</strong> — the most direct use. The action sends a catalog to a chosen <em>category</em> rather than to individuals, so the right segment receives it in one step.</li>
-    <li><strong>Other email outreach</strong> — targeted emails go to a category, so you reach exactly the audience you intend without hand-picking recipients each time.</li>
-    <li><strong>Filtering and grouping</strong> — categories are a filter for grouping your contacts and companies inside the CRM.</li>
+    <li><strong>From the record</strong> — open a contact or company → <strong>Details</strong> → <strong>Categories</strong>. The <em>Categories</em> card is a searchable, colour-coded multi-select (<em>“Add categories…”</em>): tick the ones that apply.</li>
+    <li><strong>From the category</strong> — click a row in this table to open its members. Search contacts and companies by name or email and press <strong>Add</strong>; the list underneath shows who's already in.</li>
+    <li><strong>In bulk</strong> — select rows on the Contacts or Companies list and use <strong>Add to category</strong>.</li>
+    <li><strong>From a filtered list</strong> — when the Contacts or Companies list is filtered to one category, a party you add there joins that category on first save.</li>
   </ul>
 
-  <div class="callout tip"><p><strong>Worked example — building an "Architects in Athens" list to email a catalog.</strong> Open <strong>CRM → Categories</strong> → click <strong>New Category</strong> → name it <em>Architects in Athens</em>, set its type / role → <strong>Save</strong>. Now open each relevant contact or company and, on its detail page, <strong>assign</strong> the <em>Architects in Athens</em> category. As you assign it, the category card's member count climbs (split by Users / Contacts / Companies). When the list is built, run <strong>Send to Customers</strong> on the catalog you want to share and pick <em>Architects in Athens</em> as the audience — every member of that list receives the catalog, and no one outside it does.</p></div>
+  <h2>Industries are the product-import categories</h2>
+  <p><strong>What it is —</strong> “what a supplier deals in” and “what a product is filed under when it's imported” are one vocabulary. Each shared <strong>Industry</strong> is matched to one of the catalogue's product categories (Tiles, Sanitary, Electrical, Plumbing &amp; Pipework…), so tagging a supplier with <em>Tiles</em> and importing their tile catalogue use the same word. <strong>Why it matters —</strong> a hand-typed list next to the catalogue drifts (misspelt twins like “Sanity” split “who supplies sanitaryware” in half). An industry with no product category — haulage, scaffolding hire — is still legitimate and stays pickable under <strong>Other</strong>.</p>
+  <ul class="feat">
+    <li><strong>On a record</strong> — the <strong>What they deal in</strong> card (contact or company → Details → Categories) shows <em>Product categories</em> and <em>Other</em> as chips. On a company it also marks (with a package icon) the categories they already have products filed under, and warns when they have products in a category they aren't tagged with.</li>
+    <li><strong>The Industry field</strong> in a company's sidebar edits the same industry list as <em>What they deal in</em>.</li>
+    <li><strong>Operator tools</strong> — the operator sees which product category each industry matches, can change the match from <strong>Edit</strong>, and has <strong>Match product categories</strong> to bring new product categories in as Industry lists (an existing industry with the same meaning is adopted, keeping its members, rather than duplicated).</li>
+  </ul>
 
-  <div class="callout"><p>Categories segment the people you keep in the CRM. To manage the records you're filing under them, see <a href="crm.html">CRM</a> (Users, Contacts and Companies); for what happens to a company once you start invoicing it, see <a href="finance.html">Finance &amp; Invoicing</a>.</p></div>
+  <h2>What categories affect</h2>
+  <ul class="feat">
+    <li><strong>Send to Customers on catalogs</strong> — sends a catalog to a chosen category in one step.</li>
+    <li><strong>Campaigns and workflows</strong> — email and WhatsApp campaigns and agent workflows pick their audience from your workspace's categories.</li>
+    <li><strong>Filtering</strong> — every category is a filter on the Contacts and Companies lists.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Worked example — an "Architects in Athens" list to email a catalog.</strong> Open <strong>CRM → Categories</strong> → <strong>New category</strong> → name it <em>Architects in Athens</em>, pick a colour → <strong>Create</strong>. Click the new row, search for each architect and press <strong>Add</strong> (or tag them from their own pages). When the list is built, run <strong>Send to Customers</strong> on the catalog and pick <em>Architects in Athens</em> — every member receives it, and nobody outside it does.</p></div>
+
+  <div class="callout"><p>Access is decided by a person's workspace <strong>role</strong>, not by category membership — categories are purely lists for outreach and filtering. For the records you file under them, see <a href="crm-contacts.html">Contacts</a> and <a href="crm-companies.html">Companies</a>.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

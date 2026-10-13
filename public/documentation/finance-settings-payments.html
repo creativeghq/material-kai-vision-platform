@@ -8,12 +8,12 @@
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Payments</div>
-  <h1>Settings · Payments</h1>
-  <div class="routes"><span class="badge route">/finance → Settings → Payments</span> <span class="badge gated">finance.manage · owner to activate</span></div>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / <a href="finance-settings-accounts-payments.html">Accounts &amp; Payments</a> / Payment providers</div>
+  <h1>Settings · Payment providers</h1>
+  <div class="routes"><span class="badge route">/finance → Settings → Accounts &amp; Payments</span> <span class="badge gated">finance.manage · owner to activate</span></div>
   <p class="lead">The Payments section is where you connect the <strong>payment providers</strong> that let your customers settle invoices online — and where you see your <strong>bank connections</strong>. Each provider is a separate <strong>bring-your-own-account</strong> add-on: you connect <em>your own</em> Stripe, Viva or Revolut merchant account, and the methods you enable here are what a customer is offered on the public pay page. Set it up once and every invoice you send gives the recipient a way to pay.</p>
 
-  <div class="callout"><p><strong>Where:</strong> <strong>Finance → Settings</strong> tab → <strong>Payments</strong> (in the row of settings sub-tabs, alongside <em>Accounts</em>). Only a workspace <strong>owner</strong> can activate a paid provider; other finance managers can request one.</p></div>
+  <div class="callout"><p><strong>Where:</strong> <strong>Finance → Settings</strong> → <a href="finance-settings-accounts-payments.html"><strong>Accounts &amp; Payments</strong></a>. This one section now holds what used to be three: an underline strip switches between <strong>Bank accounts · Money out · Payment providers · Statements · Digest</strong>, one pane at a time (old links to the Payments or Digest sections land on their pane). The providers below are on the <strong>Payment providers</strong> pane, with <strong>Payout Routing</strong> (Stripe Connect) under them. Only a workspace <strong>owner</strong> can activate a paid provider; other finance managers can request one.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-payments.png" alt="The Payments settings — providers and bank connections">
@@ -35,14 +35,18 @@
   <h3>The Greek RF bank-transfer method</h3>
   <p>Via <strong>Viva</strong>, you can offer a <strong>bank-transfer with an RF reference</strong> — a structured payment code. Its power is <strong>automatic reconciliation</strong>: because the code is minted per invoice, when the customer's transfer arrives it's recognised and the invoice is <strong>settled without anyone matching it by hand</strong>. The RF code also <strong>prints on the invoice/proforma PDF and email</strong>, so a customer who never opens the pay link can still pay by transfer with the right reference — see <a href="finance-doc-invoices.html">Invoices</a> for how it appears on the document.</p>
 
+  <h2>Direct bank transfer — your bank accounts</h2>
+  <p><strong>What it is —</strong> on the <strong>Bank accounts</strong> pane, an account marked <strong>Show on invoice</strong> prints its name and IBAN in the payment details on your invoices — and, for an active account in the document's currency, makes the pay page offer <strong>Direct bank transfer</strong> with no provider at all. The account form now has a <strong>BIC / SWIFT</strong> field, shown to the customer next to the IBAN. <strong>Why it matters —</strong> the customer copies your beneficiary, IBAN, BIC, the order number as reference and the amount, then uploads their transfer receipt, which is checked automatically against the order. Confirming and booking it is covered on <a href="payments.html">Payment Providers → Direct bank transfer</a>.</p>
+
   <h2>Bank connections</h2>
   <p>Below the checkout providers, the <strong>Bank connections</strong> section lists <a href="banking.html">Revolut Business</a> — your <em>own</em> bank account. It uses the same enable/configure mechanics but is labelled “not a checkout method”, because it isn't about customers paying you: it's the bank feed, reconciliation, money-out and team cards documented under <a href="banking.html">Banking</a>. Enabling it here is the same as enabling the Banking add-on.</p>
 
   <h2>How to set up online payments — step by step</h2>
   <ol>
-    <li>Go to <strong>Finance → Settings → Payments</strong>.</li>
+    <li>Go to <strong>Finance → Settings → Accounts &amp; Payments → Payment providers</strong>.</li>
     <li>Pick a provider (<a href="payments-stripe.html">Stripe</a>, <a href="payments-viva.html">Viva</a> or <a href="banking.html">Revolut Checkout</a>), click <strong>Configure</strong>, and complete its setup — Connect onboarding for Stripe, or your own credentials + a verified webhook for Viva and Revolut.</li>
     <li>For Viva, enable the <strong>RF bank-transfer</strong> method if you want auto-reconciling transfers and the RF code on your documents.</li>
+    <li>To offer plain bank transfer as well, on <strong>Bank accounts</strong> mark an active account <strong>Show on invoice</strong> and fill in its BIC / SWIFT.</li>
     <li>Email an invoice to a customer, then open its <span class="badge route">/pay/:token</span> link yourself to confirm the methods appear.</li>
   </ol>
 

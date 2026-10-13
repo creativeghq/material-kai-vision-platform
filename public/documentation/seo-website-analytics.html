@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website Analytics | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="seo.html">SEO &amp; Content</a> / <a href="seo-websites.html">Connected Websites</a> / Website Analytics</div>
+  <h1>Website Analytics (Google Analytics 4)</h1>
+  <div class="routes"><span class="badge route">/websites/:id?section=analytics</span> <span class="badge route">?section=analytics-pages</span> <span class="badge route">?section=analytics-geo</span> <span class="badge route">?section=analytics-tech</span> <span class="badge route">?section=analytics-commerce</span> <span class="badge route">?section=analytics-funnel</span> <span class="badge route">?section=analytics-retention</span></div>
+  <p class="lead">Search Console tells you how people <em>find</em> your site; Google Analytics tells you what they <em>do once they arrive</em>. Connect a GA4 property to a <a href="seo-websites.html">connected website</a> and its dashboard gains an <strong>Audience</strong> group of seven sections: <strong>Overview</strong>, <strong>Pages</strong>, <strong>Geography</strong>, <strong>Devices &amp; events</strong>, <strong>Products &amp; ads</strong>, <strong>Funnel</strong> and <strong>Retention</strong>. Every table can be broken down further, live, one level at a time.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open a website from <a href="account-profile.html">Profile</a> → <strong>Websites</strong>, then pick a section under <strong>Audience</strong> in the dashboard's rail. Each section has its own address (<code>?section=…</code>), so you can bookmark or share one.</p></div>
+
+  <h2>Connecting a GA4 property</h2>
+  <ol>
+    <li>Analytics uses the same Google connection as <a href="seo-websites.html#gsc">Search Console</a>. If your Google connection predates Analytics, the Overview section offers <strong>Reconnect Google to include Analytics</strong>. Run it once.</li>
+    <li>Click <strong>Choose an Analytics property</strong> and pick from the list (<em>Pick a property…</em>). Each entry shows the property name, its measurement ID (<code>G-…</code>) and the account. If the list is empty, the Google account has no access to a GA4 property. Give it at least Viewer access in Google Analytics.</li>
+    <li>Picking a property pulls the last 28 days straight away. After that, it syncs <strong>every hour</strong> on its own; <strong>Sync</strong> pulls immediately.</li>
+    <li>Picked the wrong one? The button now reads <strong>Change Analytics property</strong>.</li>
+  </ol>
+  <p>The Overview card's subtitle names the property, its measurement ID and when it last synced. Compare that ID with the tag on your site to be sure you're reading the right property.</p>
+
+  <h2>The seven sections</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Section</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Overview</strong></td><td>Six tiles: <strong>Sessions</strong>, <strong>Active users</strong>, <strong>New users</strong>, <strong>Engaged sessions</strong>, <strong>Conversions</strong> and <strong>Revenue</strong>, each with its change vs the previous period. Below them: <em>Where the sessions came from</em> (top channel groups), the <strong>Right now</strong> card, and a <strong>Sources</strong> table (source / medium, sessions, trend, new users, average time, conversions).</td></tr>
+      <tr><td><strong>Pages</strong></td><td><strong>Pages</strong>: every page with a recorded view, busiest first. <strong>Landing pages</strong>: where sessions <em>started</em>. A page high on the landing list and low on the pages list is a doorway people leave from. Page names open the live page.</td></tr>
+      <tr><td><strong>Geography</strong></td><td>A world map, <em>Where your visitors are</em> (hover a country for its sessions), then <strong>Countries</strong>, <strong>Cities</strong>, <strong>Age</strong> and <strong>Gender</strong> tables. Age and gender are a Google sample and won't add up to your sessions.</td></tr>
+      <tr><td><strong>Devices &amp; events</strong></td><td><strong>Devices</strong>, <strong>New vs returning</strong>, <strong>Events</strong>, <strong>Browsers</strong>, <strong>Operating systems</strong>, <strong>Languages</strong> and <strong>Hostnames</strong>. A hostname you don't recognise is a staging copy, or someone else reporting into your property.</td></tr>
+      <tr><td><strong>Products &amp; ads</strong></td><td><strong>Products</strong> (viewed, added, bought, revenue). This stays empty unless your store sends GA4 ecommerce events. <strong>Ad campaigns</strong> (sessions, cost, clicks, conversions, revenue, ROAS) needs a linked Google Ads account. Cost is never guessed from sessions.</td></tr>
+      <tr><td><strong>Funnel</strong></td><td>Where people leave (see below).</td></tr>
+      <tr><td><strong>Retention</strong></td><td>Weekly return rates (see below).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Working with the tables</h2>
+  <ul class="feat">
+    <li><strong>Search, sort and window</strong> — every table has a search box, sortable columns and a <strong>7d / 28d / 90d</strong> switch. 28 days is read from the stored sync. 7 and 90 days are asked of Google live, and the footer says so.</li>
+    <li><strong>Break a row down</strong> — click any row (or its chevron) to open a side panel on that slice, asked of Google Analytics live. Choose <strong>Break down by…</strong> (by city, by source / medium, …) to go one level deeper. Use the breadcrumbs (e.g. <em>Country: Greece › City: Athens</em>) to jump back. The panel has its own search and its own date switch.</li>
+  </ul>
+
+  <h3>Right now</h3>
+  <p>The <strong>Right now</strong> card on Overview shows active users in the last 30 minutes, with the top pages, countries and devices. It refreshes every minute and is read live, never stored.</p>
+
+  <h2>Funnel — where people leave</h2>
+  <p><strong>What it is —</strong> the steps visitors take, the share who reach each one, and how many left at each step. <strong>How the steps are chosen —</strong> you don't define them. On each sync the platform checks which events your property actually reports and picks the journey that fits: a <strong>purchase</strong> journey (session start → item list → item → add to cart → checkout → purchase) or an <strong>enquiry</strong> journey (session start → page view → search results → lead). Only the steps your site really fires are drawn. If fewer than three fire, the Funnel reads <strong>Not available</strong> and names the events it looked for. A brochure site isn't shown a shop's funnel.</p>
+
+  <h2>Retention — who comes back</h2>
+  <p>Of the people who first arrived in a given week, how many came back in the weeks after. There are six weekly cohorts (<em>Week of …</em>), each with Week 0 to Week 5. Week 0 is always 100%. Hover a cell for <em>X of Y</em>. A week that hasn't happened yet shows <strong>—</strong>, never 0%.</p>
+
+  <h2>When a figure is missing</h2>
+  <p>Analytics follows the same rule as the rest of the website dashboard: a missing figure is <strong>never shown as 0</strong>. It reads <strong>None</strong> (Google answered and there's genuinely nothing), <strong>Unknown</strong> (the read failed, so the figure is unknown, not zero), <strong>Not measured</strong> (never collected yet) or <strong>Not available</strong> (your property doesn't report it, e.g. no ecommerce events or no linked Ads account). Each dimension is collected on its own, so one failure doesn't empty the other tables. A failed sync clears the old rows rather than leaving last week's numbers on screen as if they were current.</p>
+  <div class="callout tip"><p><strong>Worked example:</strong> on <strong>Pages</strong>, find a landing page with lots of sessions but little engagement → click it and <strong>Break down by</strong> source / medium to see which channel sends the visitors who leave → check the <strong>Funnel</strong> to see which step they drop at → improve that page, or write an article that answers what they came for (see the <a href="seo-articles.html">article writer</a>).</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
