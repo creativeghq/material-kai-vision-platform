@@ -107,8 +107,8 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
    * The bank block the reader found on the document, held until the party is known.
    *
    * This is the whole reason it can be filed at all: the document states an account, and the FORM
-   * is where a person says whose account it is. Nothing is written until Save, and what is written
-   * is a suggestion on the party's card — never a payable destination.
+   * is where a person says whose account it is. Nothing is written until Save; then a checksum-valid
+   * IBAN joins the party's bank accounts (primary only if they had none) and a failing one waits for review.
    */
   const [scannedBank, setScannedBank] = useState<ScannedBank | null>(null);
   const receiptInput = useRef<HTMLInputElement | null>(null);
@@ -758,7 +758,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 Bank details on this document
                 {scannedBank.bank.iban ? ` (IBAN ending ${scannedBank.bank.iban.slice(-4)})` : ''}
                 {party && party.type !== 'adhoc'
-                  ? ` — filed for review on ${party.label}'s page when you save. Not payable until you confirm it there.`
+                  ? ` — added to ${party.label}'s bank accounts when you save. It becomes their primary account only if they have none yet; an IBAN that fails its check waits for review on their page.`
                   : ' — pick the supplier in CRM to keep it on their record. A one-off payee cannot hold bank details.'}
               </span>
             )}
