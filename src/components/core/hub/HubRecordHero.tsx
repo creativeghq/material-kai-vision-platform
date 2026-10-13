@@ -37,7 +37,7 @@ export const HubRecordHero: React.FC<HubRecordHeroProps> = ({
   const long = (description?.length ?? 0) > CLAMP_AT;
 
   return (
-    <section className={cn('relative overflow-hidden rounded-md border border-hairline bg-surface-sunken', className)}>
+    <section className={cn('on-photo relative overflow-hidden rounded-md border border-hairline bg-surface-sunken', className)}>
       {imageUrl ? (
         <img src={imageUrl} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
       ) : (

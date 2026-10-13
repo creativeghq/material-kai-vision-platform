@@ -1607,7 +1607,11 @@ html.light [class*="from-slate-7"] .text-white, html.light [class*="from-slate-8
 html.light [class*="from-zinc-7"] .text-white, html.light [class*="from-zinc-8"] .text-white, html.light [class*="from-zinc-9"] .text-white,
 html.light [class*="from-neutral-7"] .text-white, html.light [class*="from-neutral-8"] .text-white, html.light [class*="from-neutral-9"] .text-white,
 html.light [class*="bg-black"] [class*="text-white\/"],
-html.light [class*="from-black"] [class*="text-white\/"] { color: #fff; }
+html.light [class*="from-black"] [class*="text-white\/"],
+html.light .on-photo .text-white,
+html.light .on-photo [class*="text-white\/"] { color: #fff; }
+/* `.on-photo` marks a container whose scrim is a SIBLING layer, not an ancestor of its text. */
+html.light .on-photo .border-white\/20 { border-color: rgba(255,255,255,0.2); }
 
 /* ---- 7b. Saturated colored surfaces keep white text ----
    White text on a brand/semantic/colored fill (plum buttons, colored
