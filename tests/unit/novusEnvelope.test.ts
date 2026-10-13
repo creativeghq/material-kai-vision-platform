@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 
 import { buildNovusPayload } from '../../supabase/functions/_shared/fiscal/novus.ts';
-import { mydataCountry, type FiscalInvoiceInput } from '../../supabase/functions/_shared/fiscal/types.ts';
+import { fiscalDate, mydataCountry, type FiscalInvoiceInput } from '../../supabase/functions/_shared/fiscal/types.ts';
+import { assertLineVatAgrees } from '../../supabase/functions/_shared/fiscal/invoice-builder.ts';
 import {
   mydataIncomeClassificationType,
   mydataIncomeClassificationCategory,
@@ -495,5 +496,24 @@ describe('otherCorrelatedEntities is a header fact, and 1.5 moves no goods', () 
     const movement = src.slice(src.indexOf('const movement = inv.has_shipping'), src.indexOf('const b2gRaw'));
     expect(movement).not.toMatch(/inv\.correlated_entities/);
     expect(src).toMatch(/correlatedEntitiesFrom\(inv\.correlated_entities\)/);
+  });
+});
+
+describe('the filed date and the filed VAT are the ones in our books (#479 F2, F3)', () => {
+  it('dates a document by the Athens day, not the UTC one', () => {
+    expect(fiscalDate('2026-10-12T22:30:00Z')).toBe('2026-10-13');
+    expect(fiscalDate('2026-10-13T10:00:00Z')).toBe('2026-10-13');
+  });
+
+  it('no builder slices issued_at into a UTC date', () => {
+    const src = stripComments(readFileSync('supabase/functions/_shared/fiscal/invoice-builder.ts', 'utf8'));
+    expect(src).not.toMatch(/issued_at[^\n]*\.slice\(0,\s*10\)/);
+  });
+
+  it('refuses a line whose stored VAT is at another rate than the one it would be filed at', () => {
+    expect(() => assertLineVatAgrees(13, 100, 24, 24, 'invoice X line 1')).toThrow(/stored VAT is 13\.00/);
+    expect(assertLineVatAgrees(13, 100, 13, 13, 'x')).toBe(13);
+    expect(assertLineVatAgrees(24.01, 100, 24, 24, 'x')).toBe(24);
+    expect(assertLineVatAgrees(null, 100, 24, 24, 'x')).toBe(24);
   });
 });

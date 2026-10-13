@@ -14,6 +14,12 @@ export function mydataCountry(code: unknown): string {
   return cc === 'EL' ? 'GR' : (cc || 'GR');
 }
 
+/** A document's date of record: the Athens calendar day of the timestamp, never the UTC one. */
+export function fiscalDate(value?: unknown): string {
+  const d = value == null ? new Date() : new Date(String(value));
+  return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Athens' });
+}
+
 export interface FiscalAddress {
   street?: string;
   number?: string;

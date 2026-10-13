@@ -12,7 +12,7 @@ import type {
   FiscalParty,
   FiscalTaxTotal,
 } from './types.ts';
-import { isUnnamedLineName, mydataCountry } from './types.ts';
+import { fiscalDate, isUnnamedLineName, mydataCountry } from './types.ts';
 import {
   movePurposeLabel,
   isMydataMovePurpose,
@@ -190,6 +190,19 @@ const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17,
  * could never emit categories 5/6, producing a category↔percent pair myDATA rejects.)
  */
 const VAT_PCT_TO_CATEGORY: Record<number, number> = { 24: 1, 13: 2, 6: 3, 17: 4, 9: 5, 4: 6, 0: 7 };
+/** The filed VAT must be the VAT in our books: a stored amount at another rate is refused, never re-rated. */
+export function assertLineVatAgrees(stored: unknown, net: number, pct: number, filed: number, label: string): number {
+  if (stored == null || stored === '') return filed;
+  const books = Number(stored);
+  if (Math.abs(books - filed) > Math.max(0.02, Math.abs(net) * 0.005)) {
+    throw new Error(
+      `Refusing to transmit ${label}: its stored VAT is ${books.toFixed(2)}, but at ${pct}% on ${net.toFixed(2)} ` +
+        `it would be filed as ${filed.toFixed(2)}. Set the line's VAT rate to the one the customer was charged.`,
+    );
+  }
+  return filed;
+}
+
 function vatCategory(pct: number): number {
   const r = Math.round(pct);
   const exact = VAT_PCT_TO_CATEGORY[r];
@@ -495,6 +508,7 @@ export async function buildInvoiceInputFromDb(
     // Recompute VAT deterministically from net × percent — don't trust a possibly-drifted
     // stored vat_amount (rounding drift here is the #1 myDATA ValidationError cause).
     const vat = round2((net * linePct) / 100);
+    assertLineVatAgrees(it.vat_amount, net, linePct, vat, `invoice ${invoiceId} line ${i + 1}`);
     return {
       lineNumber: i + 1,
       code: it.sku ?? undefined,
@@ -562,7 +576,7 @@ export async function buildInvoiceInputFromDb(
       + 'Issue the document through the numbering path so document_series assigns both.',
     );
   }
-  const issueDate = String(inv.issued_at ?? inv.created_at ?? new Date().toISOString()).slice(0, 10);
+  const issueDate = fiscalDate(inv.issued_at ?? inv.created_at);
 
   // Digital transaction fee (Ψηφιακό Τέλος Συναλλαγής) rides in the other-taxes bucket for myDATA.
   const digitalFee = Number(inv.digital_transaction_fee ?? 0);
@@ -832,7 +846,7 @@ export async function buildCreditNoteInputFromDb(
       netValue: net,
       vatCategory: lineCat,
       vatPercent: linePct,
-      vatAmount: round2((net * linePct) / 100),
+      vatAmount: assertLineVatAgrees(it.vat_amount, net, linePct, round2((net * linePct) / 100), `credit note ${creditNoteId} line ${i + 1}`),
       // Carry the exemption reason on 0%/exempt lines — myDATA rejects a cat-7/8 line
       // without it (mirrors the main-invoice line mapping above). The column this reads did
       // not exist until 2026-08-29: the mapping was here, the fact never arrived, and the
@@ -885,7 +899,7 @@ export async function buildCreditNoteInputFromDb(
     header: {
       series: overrides.series ?? (cn.series || fs?.invoice_number_prefix || 'A'),
       aa: overrides.aa ?? String(cn.series_number ?? cn.credit_note_number ?? ''),
-      issueDate: String(cn.issued_at ?? cn.created_at ?? new Date().toISOString()).slice(0, 10),
+      issueDate: fiscalDate(cn.issued_at ?? cn.created_at),
       invoiceType: creditDocType,
       currency: cn.currency ?? inv.currency ?? 'EUR',
       // Inherited from the credited document, like its type and its parties. Without it the
@@ -1034,7 +1048,7 @@ export async function buildDeliveryNoteInputFromDb(
     postalCode: dn.ship_to_postal || toUnit?.postal_code || counterpart.address?.postalCode || '',
     city: dn.ship_to_city || toUnit?.city || counterpart.address?.city || '',
   };
-  const issueDate = String(dn.issued_at ?? dn.created_at ?? new Date().toISOString()).slice(0, 10);
+  const issueDate = fiscalDate(dn.issued_at ?? dn.created_at);
 
   return {
     issuer,

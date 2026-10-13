@@ -11,7 +11,7 @@ import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
 import { emitDocumentIssued } from '../_shared/fiscal/document-issued.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import type { FiscalConnector, FiscalConnectorContext, FiscalInvoiceInput, FiscalSubmissionResult } from '../_shared/fiscal/types.ts';
+import { fiscalDate, type FiscalConnector, type FiscalConnectorContext, type FiscalInvoiceInput, type FiscalSubmissionResult } from '../_shared/fiscal/types.ts';
 import { resolveBillingUser } from '../_shared/finance/billing-user.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
@@ -352,8 +352,7 @@ async function stampInvoiceFromSubmission(
     .eq('id', invoiceId);
 }
 
-/** Fiscal "today" — the operator's calendar day, never UTC (CLAUDE.md rule 1b). */
-const fiscalToday = (): string => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Athens' });
+const fiscalToday = (): string => fiscalDate();
 
 /** The provider's filed copy of THIS document — same series, number and gross — or null. */
 async function findFiledCopy(
