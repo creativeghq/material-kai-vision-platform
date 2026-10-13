@@ -601,7 +601,6 @@ export async function buildInvoiceInputFromDb(
           // default rather than guessing the issuing branch at both ends.
           loadingBranch: inv.ship_from_branch_code ?? Number(inv.branch_code ?? 0) ?? 0,
           ...(inv.ship_to_branch_code != null ? { deliveryBranch: Number(inv.ship_to_branch_code) } : {}),
-          ...(correlatedEntitiesFrom(inv.correlated_entities) ? { otherCorrelatedEntities: correlatedEntitiesFrom(inv.correlated_entities) } : {}),
           loadingAddress: {
             street: inv.ship_from || issuer.address?.street || '',
             number: issuer.address?.number ?? '', postalCode: issuer.address?.postalCode ?? '', city: issuer.address?.city ?? '',
@@ -668,6 +667,7 @@ export async function buildInvoiceInputFromDb(
       selfPricing: !!selfBilledSupplierId || !!inv.self_pricing,
       exchangeRate: inv.exchange_rate ?? undefined,
       ...(movement ?? {}),
+      ...(correlatedEntitiesFrom(inv.correlated_entities) ? { otherCorrelatedEntities: correlatedEntitiesFrom(inv.correlated_entities) } : {}),
       // AADE §8.19 / §8.18 — stated on any invoice, not only one carrying goods.
       ...(inv.special_invoice_category != null
         ? { specialInvoiceCategory: Number(inv.special_invoice_category) }

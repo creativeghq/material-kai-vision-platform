@@ -166,6 +166,13 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     );
   }
 
+  if (header.invoiceType === '1.5' && carriesTransport) {
+    throw new Error(
+      'Refusing to transmit a 1.5 with transport details: a clearance of third-party sales moves no goods, '
+        + 'so it carries no otherDeliveryNoteHeader. Remove the shipping block from this document.',
+    );
+  }
+
   // §8.18 is an ERP-channel fact: AADE answers 205 "InvoiceVariationType is forbidden … for invoice
   // sent by provider channel" whatever the type (sandbox, 2026-09-27).
   if (header.invoiceVariationType != null) {

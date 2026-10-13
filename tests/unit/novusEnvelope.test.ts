@@ -473,3 +473,27 @@ describe('a party country is ISO 3166-1, never the VIES prefix', () => {
     for (const l of reads) expect(l).toMatch(/mydataCountry\(/);
   });
 });
+
+describe('otherCorrelatedEntities is a header fact, and 1.5 moves no goods', () => {
+  const hdr = { series: 'MK', aa: '1', issueDate: '2026-09-06', currency: 'EUR' };
+  const principal = { vatNumber: '094019245', country: 'GR', branch: 0, type: 1 };
+  const addr = { street: 'Ζωγράφου', number: '5', postalCode: '11527', city: 'Αθήνα' };
+
+  it('emits it on a 1.4 with no transport block at all', () => {
+    const d = doc(invoice({ header: { ...hdr, invoiceType: '1.4', otherCorrelatedEntities: [principal] } as any }));
+    expect(d.invoiceHeader.otherCorrelatedEntities[0].entityData.vatNumber).toBe('094019245');
+    expect(d.invoiceHeader.otherDeliveryNoteHeader).toBeUndefined();
+  });
+
+  it('refuses a 1.5 carrying transport details', () => {
+    expect(() => doc(invoice({ header: { ...hdr, invoiceType: '1.5', movePurpose: 1, loadingAddress: addr, deliveryAddress: addr } as any })))
+      .toThrow(/1\.5/);
+  });
+
+  it('the builder reads correlated_entities outside the has_shipping block', () => {
+    const src = stripComments(readFileSync('supabase/functions/_shared/fiscal/invoice-builder.ts', 'utf8'));
+    const movement = src.slice(src.indexOf('const movement = inv.has_shipping'), src.indexOf('const b2gRaw'));
+    expect(movement).not.toMatch(/inv\.correlated_entities/);
+    expect(src).toMatch(/correlatedEntitiesFrom\(inv\.correlated_entities\)/);
+  });
+});
