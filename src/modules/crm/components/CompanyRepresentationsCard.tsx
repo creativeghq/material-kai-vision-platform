@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/core/errors/utils';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, toLocalISODate } from '@/utils/datetime';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { REPRESENTATION_KINDS, type RepresentationKind } from '@/modules/crm/supplierTypes';
 
@@ -40,6 +40,60 @@ const SELECT = `id, kind, territory, last_contact_on, notes, agent_company_id, p
     people:crm_company_contacts(is_primary, contact:crm_contacts(id, name, email, phone, mobile, position))),
   principal:crm_companies!crm_company_representations_principal_company_id_fkey(id, name, commercial_title, country_code, industry),
   contact:crm_contacts(id, name, email, phone, mobile, position)`;
+
+type LastContactSource = 'manual' | 'call' | 'meeting' | 'email_sent' | 'email_received' | 'whatsapp_received';
+interface LastContact { at: string; source: LastContactSource | string }
+const SOURCE_LABEL: Record<string, string> = {
+  manual: 'set by hand', call: 'call', meeting: 'meeting', email_sent: 'email sent',
+  email_received: 'email received', whatsapp_received: 'WhatsApp received',
+};
+
+/** The derived date, from crm_representation_last_contact; click to set a date by hand. */
+function LastContactCell({ rep, last, onSaved, prefix }: {
+  rep: Representation; last: LastContact | undefined; onSaved: () => void; prefix?: string;
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const shown = last ? toLocalISODate(new Date(last.at)) : '';
+
+  const save = async (value: string) => {
+    setEditing(false);
+    if (value === (rep.last_contact_on ?? '') || (value && value === shown)) return;
+    setSaving(true);
+    const { error } = await supabase.from('crm_company_representations')
+      .update({ last_contact_on: value || null }).eq('id', rep.id);
+    setSaving(false);
+    if (error) { toast({ title: 'Could not save the date', description: getErrorMessage(error), variant: 'destructive' }); return; }
+    if (value && last && last.source !== 'manual' && value < shown) {
+      toast({ title: 'Saved', description: `A later ${SOURCE_LABEL[last.source] ?? last.source} on ${formatDate(last.at)} still shows as the last contact.` });
+    }
+    onSaved();
+  };
+
+  if (editing) {
+    return (
+      <Input type="date" autoFocus defaultValue={shown} className="h-7 w-[140px] text-xs" aria-label="Last contact"
+        onBlur={(e) => void save(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setEditing(false);
+        }} />
+    );
+  }
+  return (
+    <button type="button" onClick={() => setEditing(true)} disabled={saving}
+      title="Latest of: a date set by hand, calls and emails logged in CRM, past meetings, and Inbox messages received from the agency. Click to set a date."
+      className="rounded-sm px-1 -mx-1 text-left hover:bg-surface-sunken">
+      {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : last ? (
+        <>
+          {prefix}{formatDate(last.at)}
+          <span className="block text-[11px] text-muted-foreground">{SOURCE_LABEL[last.source] ?? last.source}</span>
+        </>
+      ) : <span className="text-muted-foreground">{prefix ? `${prefix}—` : 'Set date'}</span>}
+    </button>
+  );
+}
 
 const kindLabel = (k: RepresentationKind) => REPRESENTATION_KINDS.find((x) => x.value === k)?.label ?? k;
 const display = (p: PartyRef | null) => (p ? p.commercial_title || p.name : '—');
@@ -217,13 +271,20 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
   const [rows, setRows] = useState<Representation[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState<'principal' | 'agent' | null>(null);
+  const [lastContact, setLastContact] = useState<Map<string, LastContact>>(new Map());
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('crm_company_representations').select(SELECT)
       .or(`agent_company_id.eq.${companyId},principal_company_id.eq.${companyId}`);
     if (error) toast({ title: 'Could not load agency links', description: getErrorMessage(error), variant: 'destructive' });
-    setRows((data ?? []) as unknown as Representation[]);
+    const list = (data ?? []) as unknown as Representation[];
+    setRows(list);
     setLoading(false);
+    if (list.length === 0) { setLastContact(new Map()); return; }
+    const { data: lc, error: lcError } = await supabase.rpc('crm_representation_last_contact' as never, { p_ids: list.map((r) => r.id) } as never);
+    if (lcError) { toast({ title: 'Could not work out the last contact dates', description: getErrorMessage(lcError), variant: 'destructive' }); return; }
+    setLastContact(new Map(((lc ?? []) as { representation_id: string; last_contact_at: string; source: string }[])
+      .map((x) => [x.representation_id, { at: x.last_contact_at, source: x.source }])));
   }, [companyId, toast]);
 
   useEffect(() => { void load(); }, [load]);
@@ -278,7 +339,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                       <TableCell>{r.principal?.country_code ?? '—'}</TableCell>
                       <TableCell className="max-w-[16rem] text-muted-foreground">{r.principal?.industry ?? '—'}</TableCell>
                       <TableCell><PersonCell person={r.contact} /></TableCell>
-                      <TableCell className="whitespace-nowrap">{r.last_contact_on ? formatDate(r.last_contact_on) : '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap"><LastContactCell rep={r} last={lastContact.get(r.id)} onSaved={() => void load()} /></TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" aria-label={`Unlink ${display(r.principal)}`} onClick={() => void remove(r.id)}><Trash2 className="h-4 w-4" /></Button>
                       </TableCell>
@@ -316,7 +377,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                   {r.notes && <p className="max-w-prose text-xs text-muted-foreground">{r.notes}</p>}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {r.last_contact_on && <span>Last contact {formatDate(r.last_contact_on)}</span>}
+                  <LastContactCell rep={r} last={lastContact.get(r.id)} onSaved={() => void load()} prefix="Last contact " />
                   <Button variant="ghost" size="icon" aria-label={`Unlink ${display(r.agent)}`} onClick={() => void remove(r.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
