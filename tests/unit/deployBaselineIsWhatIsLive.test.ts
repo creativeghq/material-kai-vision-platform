@@ -92,6 +92,17 @@ describe('deploy wiring', () => {
     }
   });
 
+  it('builds beside the gates but ships only behind them', () => {
+    // build-frontend has no gates in its `needs`, which is only safe while it never deploys.
+    const build = jobBlock('build-frontend');
+    expect(build).not.toMatch(/vercel (deploy|promote|alias)/);
+    expect(build).toMatch(/upload-artifact/);
+    const ship = jobBlock('deploy-frontend');
+    expect(ship).toMatch(/needs:\s*\[[^\]]*\bbuild-frontend\b/);
+    expect(ship).toMatch(/download-artifact/);
+    expect(ship).not.toMatch(/vercel build/);
+  });
+
   it('serializes every job that touches a shared external resource', () => {
     // There is no workflow-level group any more, so this is the ONLY thing stopping two runs
     // building against the same Vercel project, aliasing out of order, or running two

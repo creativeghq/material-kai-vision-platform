@@ -402,6 +402,15 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
+      # tsc `incremental` keys on file CONTENT hashes, so restored state is as sound as a cold check.
+      - id: week
+        run: echo "bucket=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore tsc incremental state
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/tsc
+          key: tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'tsconfig*.json') }}-${{ steps.week.outputs.bucket }}
+          restore-keys: tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'tsconfig*.json') }}-
       - run: npm run typecheck
 
   # ────────────────────────────────────────────────────────────────────
@@ -488,26 +497,13 @@ jobs:
       - run: npm run gen:all
       - run: npm run lint:a11y
 
-  # ────────────────────────────────────────────────────────────────────
-  # deploy-frontend: prebuilt Vercel upload (no double build).
-  # ────────────────────────────────────────────────────────────────────
-  deploy-frontend:
-    # `unit-tests` was an orphan: it ran `npm test`, `npm run lint` and `lint:a11y`
-    # and NOTHING depended on it, so a red suite still shipped to production and the
-    # failure was a report rather than a gate. It gates now — and `lint`, which was split
-    # out of it, must stay listed here for the same reason.
-    needs: [changes, typecheck, unit-tests, lint, a11y]
+  # build-frontend: the slow half of the frontend deploy, run BESIDE the gates rather than
+  # behind them. It uploads nothing to Vercel — deploy-frontend, which keeps every gate,
+  # ships this artifact, so the release order is exactly what it was.
+  build-frontend:
+    needs: changes
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # One build+upload against the Vercel project at a time; newest push wins. A cancelled
-    # upload never gets aliased (--skip-domain), so there is nothing to unwind, and the
-    # `deployed/frontend` marker stays put so the next run rebuilds it.
-    concurrency:
-      group: deploy-frontend-vercel
-      cancel-in-progress: true
-    environment: production
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -534,6 +530,74 @@ jobs:
 
       - name: 🏗️ Build (Vercel, local)
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      # This repo is public, so its artifacts are readable by any signed-in GitHub user.
+      - name: 🔒 Refuse to upload a bundle that carries a secret
+        env:
+          S1: ${{ secrets.VERCEL_TOKEN }}
+          S2: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          S3: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          S4: ${{ secrets.MIVAA_CRON_SECRET }}
+          S5: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+          for v in S1 S2 S3 S4 S5; do
+            val="${!v}"
+            if [ -n "$val" ] && grep -rqF -- "$val" .vercel/output; then
+              echo "::error::.vercel/output contains the value of a deploy secret ($v) — not uploading"; exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vercel-output-${{ github.sha }}
+          path: .vercel/output
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────────────
+  # deploy-frontend: prebuilt Vercel upload (no double build).
+  # ────────────────────────────────────────────────────────────────────
+  deploy-frontend:
+    # `unit-tests` was an orphan: it ran `npm test`, `npm run lint` and `lint:a11y`
+    # and NOTHING depended on it, so a red suite still shipped to production and the
+    # failure was a report rather than a gate. It gates now — and `lint`, which was split
+    # out of it, must stay listed here for the same reason.
+    needs: [changes, typecheck, unit-tests, lint, a11y, build-frontend]
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # One upload against the Vercel project at a time; newest push wins. A cancelled
+    # upload never gets aliased (--skip-domain), so there is nothing to unwind, and the
+    # `deployed/frontend` marker stays put so the next run rebuilds it.
+    concurrency:
+      group: deploy-frontend-vercel
+      cancel-in-progress: true
+    environment: production
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 🔧 Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: 📥 Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      # The exact bundle build-frontend made while the gates ran; this job only ships it.
+      - name: 📦 Fetch the prebuilt bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: vercel-output-${{ github.sha }}
+          path: .vercel/output
 
       # --skip-domain is what turns fe-smoke from a post-mortem into a gate. It builds and
       # uploads a PRODUCTION deployment (production env vars, production build) but does NOT

@@ -24,7 +24,6 @@ export function anonClient(): SupabaseClient {
   return createClient(SUPABASE_URL, ANON_KEY, noPersist);
 }
 
-// A short, collision-resistant id shared across one test run's fixture names.
 export function runId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -35,15 +34,31 @@ export interface TestUser {
   client: SupabaseClient; // signed in AS this user — queries run under their RLS context
 }
 
+function transientAuthError(message: string | undefined): boolean {
+  return !message || message === '{}' || /rate limit|timed? ?out|fetch failed|network|ECONNRESET|\b50[234]\b/i.test(message);
+}
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export async function createUser(svc: SupabaseClient, label: string, rid: string): Promise<TestUser> {
   const email = `e2e-${label}-${rid}@materialshub.gr`;
   const password = `E2e!${rid}Aa1`;
-  const { data, error } = await svc.auth.admin.createUser({ email, password, email_confirm: true });
-  if (error || !data.user) throw new Error(`createUser(${label}): ${error?.message}`);
+  let userId: string | null = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await pause(500 * 2 ** attempt);
+    const { data, error } = await svc.auth.admin.createUser({ email, password, email_confirm: true });
+    if (data?.user) { userId = data.user.id; break; }
+    // A bodiless failure often DID create the user; the retry then finds it — sign-in below resolves the id.
+    if (attempt > 0 && /already been registered/i.test(error?.message ?? '')) break;
+    if (!transientAuthError(error?.message) || attempt === 3) throw new Error(`createUser(${label}): ${error?.message}`);
+  }
   const client = anonClient();
-  const { error: signErr } = await client.auth.signInWithPassword({ email, password });
-  if (signErr) throw new Error(`signIn(${label}): ${signErr.message}`);
-  return { id: data.user.id, email, client };
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await pause(500 * 2 ** attempt);
+    const { data, error: signErr } = await client.auth.signInWithPassword({ email, password });
+    if (!signErr && data.user) return { id: userId ?? data.user.id, email, client };
+    if (!transientAuthError(signErr?.message) || attempt === 3) throw new Error(`signIn(${label}): ${signErr?.message}`);
+  }
+  throw new Error(`signIn(${label}): no session`);
 }
 
 export async function createWorkspace(svc: SupabaseClient, label: string, rid: string, ownerId: string): Promise<string> {
