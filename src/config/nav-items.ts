@@ -117,6 +117,8 @@ export interface SidebarNavItem {
    *   are unchanged — only the entry point moves.
    */
   surface?: 'top' | 'app';
+  /** An `'app'` item that is ALSO pinned to the top bar; it stays in its launcher hub. */
+  pinTopBar?: boolean;
 }
 
 /**
@@ -140,7 +142,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar,
   //    grouped into Hubs via the `hub` field. ──
   // Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
-  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', hub: 'service', description: 'Shared inbox for customer conversations.' },
+  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', pinTopBar: true, hub: 'service', description: 'Shared inbox for customer conversations.' },
   // WhatsApp + Reviews — agent-driven comms/reputation (Hermes), same launcher pattern; the send /
   // public reply are confirm-gated inside the tools. All-users via agent.use + their module.
   { id: 'messaging', label: 'WhatsApp', path: '/agent-hub?capability=messaging', icon: MessageCircle, requireCapability: 'agent.use', moduleSlug: 'messaging', surface: 'app', hub: 'service', description: 'Message customers on WhatsApp — in the AI studio.' },
@@ -351,12 +353,12 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'dashboard',
   'shared',
   'agent-hub',
-  'discover',
+  'inbox',
   'quotes',
   // Customers & revenue
   'crm',
   'deals',
-  'inbox',
+  'discover',
   'finance',
   'pos',
   'sales',

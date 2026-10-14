@@ -63,7 +63,7 @@ export const Sidebar: React.FC = () => {
 
   const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isGuest, isModuleAvailable, can });
   // Items marked surface:'app' render in the App Launcher, not the top bar / drawer.
-  const topNav = navigationItems.filter((item) => item.surface !== 'app');
+  const topNav = navigationItems.filter((item) => item.surface !== 'app' || item.pinTopBar);
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
