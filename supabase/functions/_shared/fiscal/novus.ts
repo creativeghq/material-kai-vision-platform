@@ -34,6 +34,7 @@ import {
   isReceivingNoteType,
   movementDocTypeLabel,
   mydataClassificationLedger,
+  mydataDocumentTypeName,
   receivingNotePurposeLabel,
   selectableReceivingNotePurposes,
 } from './fiscalVocabulary.generated.ts';
@@ -688,9 +689,10 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             // not receive a second copy from a second sender.
           },
           additionalDetails: {
-            // Greek legal document-type names — correct for a Greek fiscal document, and
-            // overridable per call.
-            documentLabel: input.documentLabel ?? 'Τιμολόγιο Πώλησης',
+            // The provider prints this as the document's title: a fixed 'Τιμολόγιο Πώλησης' titled
+            // every retail receipt and credit note as a sales invoice (Novus certification, 2026-10-14).
+            documentLabel: input.documentLabel
+              ?? mydataDocumentTypeName(header.invoiceType, docLang.toUpperCase() === 'EL' ? 'el' : 'en'),
             documentLanguageCode: docLang,
             documentSizeCode: 0,
             documentComments: input.documentComments ?? '',

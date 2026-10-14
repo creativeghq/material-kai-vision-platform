@@ -345,6 +345,39 @@ export const MYDATA_THIRD_PARTY_COLLECTION_TYPES: readonly string[] = ['8.4', '8
 /** `multipleConnectedMarks` — "δεν είναι αποδεκτό" on these three. */
 export const MYDATA_NO_MULTIPLE_MARKS_TYPES: readonly string[] = ['1.6', '2.4', '5.1'];
 
+export const MYDATA_DOCUMENT_TYPE_NAMES: Readonly<Record<string, { el: string; en: string }>> = {
+  '1.1': { el: 'Τιμολόγιο Πώλησης', en: 'Sales Invoice' },
+  '1.2': { el: 'Τιμολόγιο Πώλησης / Ενδοκοινοτικές Παραδόσεις', en: 'Sales Invoice / Intra-community Supplies' },
+  '1.3': { el: 'Τιμολόγιο Πώλησης / Παραδόσεις Τρίτων Χωρών', en: 'Sales Invoice / Third Country Supplies' },
+  '1.4': { el: 'Τιμολόγιο Πώλησης / Πώληση για Λογαριασμό Τρίτων', en: 'Sales Invoice / Sale on Behalf of Third Parties' },
+  '1.5': { el: 'Τιμολόγιο Πώλησης / Εκκαθάριση Πωλήσεων Τρίτων - Αμοιβή από Πωλήσεις Τρίτων', en: 'Sales Invoice / Clearance of Sales on Behalf of Third Parties' },
+  '1.6': { el: 'Τιμολόγιο Πώλησης / Συμπληρωματικό Παραστατικό', en: 'Sales Invoice / Supplemental Document' },
+  '2.1': { el: 'Τιμολόγιο Παροχής Υπηρεσιών', en: 'Service Rendered Invoice' },
+  '2.2': { el: 'Τιμολόγιο Παροχής / Ενδοκοινοτική Παροχή Υπηρεσιών', en: 'Service Invoice / Intra-community Services' },
+  '2.3': { el: 'Τιμολόγιο Παροχής / Παροχή Υπηρεσιών σε λήπτη Τρίτης Χώρας', en: 'Service Invoice / Services to a Third Country Recipient' },
+  '2.4': { el: 'Τιμολόγιο Παροχής / Συμπληρωματικό Παραστατικό', en: 'Service Invoice / Supplemental Document' },
+  '3.1': { el: 'Τίτλος Κτήσης (μη υπόχρεος Εκδότης)', en: 'Proof of Expenditure (Non-liable Issuer)' },
+  '3.2': { el: 'Τίτλος Κτήσης (άρνηση έκδοσης από υπόχρεο Εκδότη)', en: 'Proof of Expenditure (Denial of Issuance by Liable Issuer)' },
+  '5.1': { el: 'Πιστωτικό Τιμολόγιο / Συσχετιζόμενο', en: 'Credit Invoice / Associated' },
+  '5.2': { el: 'Πιστωτικό Τιμολόγιο / Μη Συσχετιζόμενο', en: 'Credit Invoice / Non-Associated' },
+  '6.1': { el: 'Στοιχείο Αυτοπαράδοσης', en: 'Self-Delivery Record' },
+  '6.2': { el: 'Στοιχείο Ιδιοχρησιμοποίησης', en: 'Self-Supply Record' },
+  '7.1': { el: 'Συμβόλαιο - Έσοδο', en: 'Contract - Income' },
+  '8.1': { el: 'Ενοίκια - Έσοδο', en: 'Rents - Income' },
+  '8.4': { el: 'Απόδειξη Είσπραξης POS', en: 'POS Receipt' },
+  '8.5': { el: 'Απόδειξη Επιστροφής POS', en: 'POS Return Receipt' },
+  '9.3': { el: 'Δελτίο Αποστολής', en: 'Delivery Note' },
+  '11.1': { el: 'Απόδειξη Λιανικής Πώλησης', en: 'Retail Sales Receipt' },
+  '11.2': { el: 'Απόδειξη Παροχής Υπηρεσιών', en: 'Service Rendered Receipt' },
+  '11.3': { el: 'Απλοποιημένο Τιμολόγιο', en: 'Simplified Invoice' },
+  '11.4': { el: 'Πιστωτικό Στοιχείο Λιανικής', en: 'Retail Sales Credit Note' },
+  '11.5': { el: 'Απόδειξη Λιανικής Πώλησης για Λογαριασμό Τρίτων', en: 'Retail Sales Receipt on Behalf of Third Parties' },
+};
+
+export function mydataDocumentTypeName(code: string, lang: 'el' | 'en'): string {
+  return MYDATA_DOCUMENT_TYPE_NAMES[code]?.[lang] ?? (lang === 'el' ? `Παραστατικό ${code}` : `Document ${code}`);
+}
+
 // ─── ΨΔΑ Phase Β1 — the movement LIFECYCLE (#407) ────────────────────────────
 // Source: AADE `DeliveryNote_v2.0.2.pdf` §7.1–7.4 + `TransportTypes-v2.0.2.xsd`.
 // Mandatory 12/10/2026; penalty €5.000/€10.000 ΑΝΑ ΦΟΡΟΛΟΓΙΚΟ ΕΛΕΓΧΟ, not per document.

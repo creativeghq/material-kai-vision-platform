@@ -517,3 +517,24 @@ describe('the filed date and the filed VAT are the ones in our books (#479 F2, F
     expect(assertLineVatAgrees(null, 100, 24, 24, 'x')).toBe(24);
   });
 });
+
+describe('the provider prints the title of the type we send, never a fixed one', () => {
+  const hdr = { series: 'ΑΛΠ', aa: '1', issueDate: '2026-10-14', currency: 'EUR' };
+  const label = (invoiceType: string, lang = 'EL') =>
+    doc(invoice({ header: { ...hdr, invoiceType } as any, documentLanguageCode: lang } as any))
+      .providerAdditionalInvoiceDetails.additionalDetails.documentLabel;
+
+  it('titles a retail receipt as a receipt, not a sales invoice', () => {
+    expect(label('11.1')).toBe('Απόδειξη Λιανικής Πώλησης');
+    expect(label('11.4')).toBe('Πιστωτικό Στοιχείο Λιανικής');
+    expect(label('1.1')).toBe('Τιμολόγιο Πώλησης');
+    expect(label('11.1', 'EN')).toBe('Retail Sales Receipt');
+  });
+
+  it('holds no hard-coded document title in the connector or the builder', () => {
+    for (const f of ['novus.ts', 'invoice-builder.ts']) {
+      const src = stripComments(readFileSync(`supabase/functions/_shared/fiscal/${f}`, 'utf8'));
+      expect(src).not.toMatch(/'Τιμολόγιο Πώλησης'|'Πιστωτικό Τιμολόγιο'|'Πιστωτικό Στοιχείο Λιανικής'/);
+    }
+  });
+});

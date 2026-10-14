@@ -8,6 +8,7 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 import { INVOICE_LABELS, invoiceDocTitle } from '@/modules/finance/invoice-templates/labels';
+import { mydataDocumentTypeName } from '@/services/fiscal/fiscalVocabulary';
 
 const ROOT = join(__dirname, '..', '..');
 const BUILDER = stripComments(
@@ -83,7 +84,8 @@ describe('credit note — the type follows the document being corrected', () => 
   });
 
   it('labels a retail credit note as one', () => {
-    expect(CREDIT_BUILDER).toContain('Πιστωτικό Στοιχείο Λιανικής');
+    expect(mydataDocumentTypeName('11.4', 'el')).toBe('Πιστωτικό Στοιχείο Λιανικής');
+    expect(mydataDocumentTypeName('5.1', 'el')).toBe('Πιστωτικό Τιμολόγιο / Συσχετιζόμενο');
   });
 });
 

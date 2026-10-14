@@ -956,8 +956,7 @@ export async function buildCreditNoteInputFromDb(
           }],
         }
       : {}),
-    documentLabel: overrides.documentLabel
-      ?? (isRetailCredit ? 'Πιστωτικό Στοιχείο Λιανικής' : 'Πιστωτικό Τιμολόγιο'),
+    documentLabel: overrides.documentLabel,
     documentComments: cn.reason ?? undefined,
     // Follows the invoice it corrects — the two are read side by side.
     documentLanguageCode: String(inv.doc_language ?? 'en').toUpperCase(),
