@@ -5127,6 +5127,106 @@ export type Database = {
           },
         ]
       }
+      crm_leads: {
+        Row: {
+          company_name: string | null
+          converted_at: string | null
+          converted_contact_id: string | null
+          converted_deal_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          email: string | null
+          estimated_value: number | null
+          follow_up_on: string | null
+          id: string
+          lost_reason: string | null
+          name: string
+          notes: string | null
+          owner_user_id: string | null
+          phone: string | null
+          request: string | null
+          source: string
+          source_ref: string | null
+          status: string
+          title: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          company_name?: string | null
+          converted_at?: string | null
+          converted_contact_id?: string | null
+          converted_deal_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          email?: string | null
+          estimated_value?: number | null
+          follow_up_on?: string | null
+          id?: string
+          lost_reason?: string | null
+          name: string
+          notes?: string | null
+          owner_user_id?: string | null
+          phone?: string | null
+          request?: string | null
+          source?: string
+          source_ref?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          company_name?: string | null
+          converted_at?: string | null
+          converted_contact_id?: string | null
+          converted_deal_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          email?: string | null
+          estimated_value?: number | null
+          follow_up_on?: string | null
+          id?: string
+          lost_reason?: string | null
+          name?: string
+          notes?: string | null
+          owner_user_id?: string | null
+          phone?: string | null
+          request?: string | null
+          source?: string
+          source_ref?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_leads_converted_contact_id_fkey"
+            columns: ["converted_contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_leads_converted_deal_id_fkey"
+            columns: ["converted_deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_leads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_meetings: {
         Row: {
           attendee_contact_ids: string[]
@@ -35841,6 +35941,10 @@ export type Database = {
       consume_embed_key_quota: {
         Args: { p_key_id: string; p_limit: number }
         Returns: boolean
+      }
+      convert_crm_lead: {
+        Args: { p_create_deal?: boolean; p_lead_id: string }
+        Returns: Json
       }
       convert_to_base_unit: {
         Args: { p_product_id: string; p_qty: number; p_unit: string }

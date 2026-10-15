@@ -4,6 +4,7 @@ export const CRM_BASE = '/crm';
 /** The `?tab=` keys CRMPage renders panes for (`TAB_VALUES` in CRMPage is built from this). */
 export const CRM_TAB = {
   pipeline: 'pipeline',
+  leads: 'leads',
   users: 'users',
   contacts: 'contacts',
   companies: 'companies',

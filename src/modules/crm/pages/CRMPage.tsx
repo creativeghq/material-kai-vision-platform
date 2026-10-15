@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Users, Building2, Trash2, Mail, CreditCard, Key, Tags, Plus, Kanban } from 'lucide-react';
+import { Users, Building2, Trash2, Mail, CreditCard, Key, Tags, Plus, Kanban, UserPlus } from 'lucide-react';
 
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -40,6 +40,7 @@ import { buildCompanyFilters, buildContactFilters, buildUserFilters, categoryFac
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PipelineBoard } from '@/components/business/crm/PipelineBoard';
+import { LeadsPanel } from '../components/LeadsPanel';
 import {
   LIFECYCLE_STAGE_OPTIONS, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
@@ -52,7 +53,7 @@ import {
 // target, and defaulting to a module-gated tab would show an upsell as the front door of a
 // free module. Deep link with ?tab=pipeline.
 const TAB_VALUES = [
-  CRM_TAB.pipeline, CRM_TAB.users, CRM_TAB.contacts, CRM_TAB.companies, CRM_TAB.categories,
+  CRM_TAB.pipeline, CRM_TAB.leads, CRM_TAB.users, CRM_TAB.contacts, CRM_TAB.companies, CRM_TAB.categories,
 ] as const;
 type TabValue = typeof TAB_VALUES[number];
 
@@ -693,6 +694,7 @@ export const CRMManagement: React.FC = () => {
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="pipeline"><Kanban className="h-4 w-4 mr-2" />Pipeline</TabsTrigger>
+            <TabsTrigger value="leads"><UserPlus className="h-4 w-4 mr-2" />Leads</TabsTrigger>
             {canAdminUsers && <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>}
             <TabsTrigger value="contacts"><Building2 className="h-4 w-4 mr-2" />Contacts</TabsTrigger>
             <TabsTrigger value="companies"><Building2 className="h-4 w-4 mr-2" />Companies</TabsTrigger>
@@ -824,6 +826,10 @@ export const CRMManagement: React.FC = () => {
             </Card>
           </TabsContent>
           )}
+
+          <TabsContent value="leads" className="space-y-4 mt-6">
+            <LeadsPanel workspaceId={activeWorkspaceId} />
+          </TabsContent>
 
           {/* Contacts Tab */}
           <TabsContent value="contacts" className="space-y-4 mt-6">

@@ -93,6 +93,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     // (`ModuleTabGate moduleSlug="deals"` on the pane), so the chip carries the same slug rather
     // than being omitted — a workspace that has paid for Deals should get the shortcut.
     { label: 'Pipeline', to: '/crm?tab=pipeline', icon: ClipboardList, moduleSlug: 'deals' },
+    { label: 'Leads', to: '/crm?tab=leads', icon: UserPlus },
     { label: 'Users', to: '/crm?tab=users', icon: Users },
     { label: 'Contacts', to: '/crm?tab=contacts', icon: Contact },
     { label: 'Companies', to: '/crm?tab=companies', icon: Building2 },
