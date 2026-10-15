@@ -7,6 +7,7 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
+import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { faqPairs, jsonLdScript, markdownToHtml } from '../_shared/seo/markdown-html.ts';
 
@@ -89,11 +90,13 @@ const MAX_IMAGE_BYTES = 15_000_000;
 async function uploadImage(creds: WpCreds, ourUrl: string): Promise<string> {
   const own = new URL(Deno.env.get('SUPABASE_URL') ?? '').host;
   if (new URL(ourUrl).host !== own) throw new WpError('Refusing to upload an image that is not ours.', 400);
-  const img = await fetch(ourUrl, { signal: AbortSignal.timeout(20_000) });
-  if (!img.ok) throw new WpError(`Could not read the image ${ourUrl}: HTTP ${img.status}`);
-  const bytes = new Uint8Array(await img.arrayBuffer());
-  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new WpError('An image is larger than 15 MB.', 400);
-  const type = img.headers.get('content-type') || 'image/png';
+  let bytes: Uint8Array;
+  let type: string;
+  try {
+    ({ bytes, mimeType: type } = await fetchImageGuarded(ourUrl, { maxBytes: MAX_IMAGE_BYTES, timeoutMs: 20_000 }));
+  } catch (err) {
+    throw new WpError(`Could not read the image ${ourUrl}: ${(err as Error).message}`);
+  }
   const name = (ourUrl.split('/').pop() || 'image.png').replace(/[^A-Za-z0-9._-]/g, '_');
   const url = await assertSafeUrl(`${creds.site_url.replace(/\/+$/, '')}/wp-json/wp/v2/media`, { allowSchemes: ['https:'] });
   const res = await fetch(url, {
@@ -106,7 +109,7 @@ async function uploadImage(creds: WpCreds, ourUrl: string): Promise<string> {
       'Content-Disposition': `attachment; filename="${name}"`,
       Accept: 'application/json',
     },
-    body: bytes,
+    body: bytes as Uint8Array<ArrayBuffer>,
   });
   const text = await readCapped(res);
   let json: any = null;

@@ -129,7 +129,9 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
   });
   const sourceLabel = sourceFilter ? inboxSourceMeta(sourceFilter as Parameters<typeof inboxSourceMeta>[0]).label : null;
   const [folderView, setFolderView] = React.useState<boolean>(() => {
-    try { return localStorage.getItem(FOLDER_VIEW_KEY) !== 'list'; } catch { return true; }
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(FOLDER_VIEW_KEY); } catch { /* storage blocked: default view */ }
+    return stored !== 'list';
   });
   const chooseFolderView = (on: boolean) => {
     setFolderView(on);
