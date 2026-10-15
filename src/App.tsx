@@ -66,6 +66,7 @@ const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
 const CrmContactDetailPage = lazy(() => import('./modules/crm/pages/ContactDetailPage').then(m => ({ default: m.ContactDetailPage })));
 const PipelineAnalyticsPage = lazy(() => import('./modules/crm/pages/PipelineAnalyticsPage'));
 const DealDetailPage = lazy(() => import('./modules/crm/pages/DealDetailPage').then(m => ({ default: m.DealDetailPage })));
+const LeadDetailPage = lazy(() => import('./modules/crm/pages/LeadDetailPage').then(m => ({ default: m.LeadDetailPage })));
 const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
 const OrderDetailPage = lazy(() => import('./pages/Admin/OrderDetailPage'));
@@ -442,6 +443,18 @@ const App = () => (
                       <CapabilityGuard capability="crm.view">
                         <Layout>
                           <DealDetailPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/crm/leads/:id"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="crm.view">
+                        <Layout>
+                          <LeadDetailPage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>

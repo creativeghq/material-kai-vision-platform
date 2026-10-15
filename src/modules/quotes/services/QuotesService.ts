@@ -44,6 +44,7 @@ export interface Quote {
   customer_company_id?: string | null;
   /** B2C / private customer. XOR with customer_company_id at the DB level. */
   customer_contact_id?: string | null;
+  lead_id?: string | null;
   /** Chosen sub-unit (branch) address of the customer; null = main address. */
   customer_address_unit_id?: string | null;
   /** Public share link. Token is a random uuid surfaced at /q/:token. */
@@ -110,15 +111,18 @@ async function resolveCustomerNames(quotes: Quote[]): Promise<Map<string, string
   const names = new Map<string, string>();
   const companyIds = [...new Set(quotes.map((q) => q.customer_company_id).filter(Boolean))] as string[];
   const contactIds = [...new Set(quotes.map((q) => q.customer_contact_id).filter(Boolean))] as string[];
+  const leadIds = [...new Set(quotes.filter((q) => !q.customer_company_id && !q.customer_contact_id).map((q) => q.lead_id).filter(Boolean))] as string[];
 
-  const [companies, contacts] = await Promise.all([
+  const [companies, contacts, leads] = await Promise.all([
     companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
     contactIds.length ? supabase.from('crm_contacts').select('id, name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+    leadIds.length ? supabase.from('crm_leads').select('id, name').in('id', leadIds) : Promise.resolve({ data: [] as any[] }),
   ]);
 
   // A missing name must not break the list — the filter just won't offer that option.
   for (const row of (companies as any).data ?? []) if (row?.name) names.set(row.id, row.name);
   for (const row of (contacts as any).data ?? []) if (row?.name) names.set(row.id, row.name);
+  for (const row of (leads as any).data ?? []) if (row?.name) names.set(row.id, row.name);
   return names;
 }
 
@@ -257,6 +261,7 @@ export class QuotesService {
     customer_company_id?: string | null;
     /** Source moodboard, when the quote was generated from one (real FK, not a name match). */
     moodboard_id?: string | null;
+    lead_id?: string | null;
   }): Promise<Quote> {
     // user_id is required by the RLS policy on quotes
     const { data: { user } } = await supabase.auth.getUser();
@@ -276,6 +281,7 @@ export class QuotesService {
         customer_contact_id: data?.customer_contact_id ?? null,
         customer_company_id: data?.customer_company_id ?? null,
         moodboard_id: data?.moodboard_id ?? null,
+        lead_id: data?.lead_id ?? null,
         status: 'draft',
       } as any)
       .select()
@@ -406,7 +412,7 @@ export class QuotesService {
     return quotes.map((quote: Quote) => ({
       ...quote,
       items: itemsByQuoteId[quote.id] || [],
-      customer_name: customerNames.get(quote.customer_company_id ?? quote.customer_contact_id ?? '') ?? null,
+      customer_name: customerNames.get(quote.customer_company_id ?? quote.customer_contact_id ?? quote.lead_id ?? '') ?? null,
     }));
   }
 

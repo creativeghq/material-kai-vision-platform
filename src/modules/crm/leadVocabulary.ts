@@ -12,3 +12,7 @@ export const LEAD_SOURCE_LABEL: Record<LeadSource, string> = {
   email: 'Email', phone: 'Phone', website: 'Website', walk_in: 'Walk-in',
   referral: 'Referral', social: 'Social', other: 'Other',
 };
+
+export const LEAD_STATUS_VARIANT: Record<LeadStatus, 'info' | 'warning' | 'success' | 'neutral'> = {
+  new: 'info', contacted: 'warning', quoted: 'warning', converted: 'success', lost: 'neutral',
+};

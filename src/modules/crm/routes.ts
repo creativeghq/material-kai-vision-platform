@@ -27,3 +27,7 @@ export const CRM_KIND = { customer: 'client', supplier: 'supplier', neither: 'ne
 export function crmTabUrl(tab: typeof CRM_TAB[keyof typeof CRM_TAB]): string {
   return `${CRM_BASE}?tab=${tab}`;
 }
+
+export function leadUrl(leadId: string): string {
+  return `${CRM_BASE}/leads/${leadId}`;
+}

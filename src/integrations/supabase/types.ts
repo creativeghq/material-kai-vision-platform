@@ -26497,6 +26497,7 @@ export type Database = {
           id: string
           last_activity_at: string
           margin_pct: number
+          lead_id: string | null
           moodboard_id: string | null
           name: string | null
           notes: string | null
@@ -26542,6 +26543,7 @@ export type Database = {
           id?: string
           last_activity_at?: string
           margin_pct?: number
+          lead_id?: string | null
           moodboard_id?: string | null
           name?: string | null
           notes?: string | null
@@ -26587,6 +26589,7 @@ export type Database = {
           id?: string
           last_activity_at?: string
           margin_pct?: number
+          lead_id?: string | null
           moodboard_id?: string | null
           name?: string | null
           notes?: string | null
@@ -26635,6 +26638,13 @@ export type Database = {
             columns: ["customer_contact_id"]
             isOneToOne: false
             referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "crm_leads"
             referencedColumns: ["id"]
           },
           {
