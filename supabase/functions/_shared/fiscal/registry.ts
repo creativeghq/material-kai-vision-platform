@@ -5,7 +5,8 @@
 // (the issuer identity comes from the submitting workspace's finance_settings, built
 // in invoice-builder.ts).
 
-import { novusConnector, novusBaseUrl } from './novus.ts';
+import { novusConnector } from './novus.ts';
+import { resolveNovusConnection } from './novusConnection.ts';
 import { resolveSecret } from '../secrets.ts';
 import type { FiscalCapability, FiscalConnector, FiscalConnectorContext } from './types.ts';
 
@@ -56,19 +57,13 @@ export async function resolveWorkspaceConnector(
     return { ok: false, error: `Connector "${slug}" is not implemented yet.`, code: 'not_implemented' };
   }
 
-  // MASTER credentials from the standard platform_secrets registry (env-first,
-  // DB-second). One operator key for everyone; the submitting tenant only supplies
-  // its issuer VAT (built in invoice-builder).
-  const [keyRes, sandboxRes, baseRes, b2gRes] = await Promise.all([
-    resolveSecret(supabase, 'NOVUS_API_KEY'),
-    resolveSecret(supabase, 'NOVUS_SANDBOX'),
-    resolveSecret(supabase, 'NOVUS_API_BASE_URL'),
+  const [conn, b2gRes] = await Promise.all([
+    resolveNovusConnection(supabase),
     resolveSecret(supabase, 'NOVUS_B2G_API_KEY'),
   ]);
 
-  const isSandbox = (sandboxRes.value ?? 'true') !== 'false';
-  const apiKey = keyRes.value ?? '';
-  const baseUrl = baseRes.value || (slug === 'novus' ? novusBaseUrl(isSandbox) : '');
+  const { isSandbox, apiKey } = conn;
+  const baseUrl = slug === 'novus' ? conn.baseUrl : '';
 
   const ctx: FiscalConnectorContext = { baseUrl, apiKey, isSandbox, b2gApiKey: b2gRes.value || undefined };
   const isConfigured = !!apiKey && !!baseUrl;

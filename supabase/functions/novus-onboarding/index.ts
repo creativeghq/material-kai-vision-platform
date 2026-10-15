@@ -3,7 +3,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace, isPlatformOperator } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
-import { novusBaseUrl } from '../_shared/fiscal/novus.ts';
+import { resolveNovusConnection } from '../_shared/fiscal/novusConnection.ts';
 import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
@@ -33,17 +33,11 @@ const isEmail = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(v);
 const isPhone = (v: string) => /^(\+\d{8,15}|\d{10})$/.test(v.replace(/[\s.-]/g, ''));
 
 async function novusCtx(supabase: any): Promise<NovusCtx> {
-  const [keyRes, sandboxRes, baseRes] = await Promise.all([
-    resolveSecret(supabase, 'NOVUS_API_KEY'),
-    resolveSecret(supabase, 'NOVUS_SANDBOX'),
-    resolveSecret(supabase, 'NOVUS_API_BASE_URL'),
-  ]);
-  const isSandbox = (sandboxRes.value ?? 'true') !== 'false';
-  const apiKey = keyRes.value ?? '';
-  if (!apiKey) {
+  const conn = await resolveNovusConnection(supabase);
+  if (!conn.apiKey) {
     throw new HttpError(503, 'The Novus master key is not configured — set NOVUS_API_KEY before onboarding anyone.');
   }
-  return { baseUrl: baseRes.value || novusBaseUrl(isSandbox), apiKey, isSandbox };
+  return conn;
 }
 
 async function novusCall(

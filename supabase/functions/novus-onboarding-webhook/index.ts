@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
-import { novusBaseUrl } from '../_shared/fiscal/novus.ts';
+import { resolveNovusConnection } from '../_shared/fiscal/novusConnection.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Novus onboarding events. The payload is a nudge — every event is answered by a re-read.
@@ -78,16 +78,11 @@ Deno.serve(withApiLogging('novus-onboarding-webhook', async (req: Request) => {
     return json({ received: true });
   }
 
-  const [keyRes, sandboxRes, baseRes] = await Promise.all([
-    resolveSecret(supabase, 'NOVUS_API_KEY'),
-    resolveSecret(supabase, 'NOVUS_SANDBOX'),
-    resolveSecret(supabase, 'NOVUS_API_BASE_URL'),
-  ]);
-  const baseUrl = baseRes.value || novusBaseUrl((sandboxRes.value ?? 'true') !== 'false');
+  const { apiKey, baseUrl } = await resolveNovusConnection(supabase);
 
   try {
     const res = await fetch(`${baseUrl}/api/v1/requests/${requestId}`, {
-      headers: { 'API-KEY': keyRes.value ?? '', Accept: 'application/json' },
+      headers: { 'API-KEY': apiKey, Accept: 'application/json' },
       signal: AbortSignal.timeout(20_000),
     });
     const b = await res.json();
