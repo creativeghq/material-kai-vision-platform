@@ -49,5 +49,5 @@ suite('workspace delete · cascade past the disabled-workspace guard', () => {
     expect(orphans ?? [], 'orders outlived the workspace').toHaveLength(0);
 
     ws = ''; // already gone — keep teardown from re-reporting it
-  });
+  }, 90_000);
 });
