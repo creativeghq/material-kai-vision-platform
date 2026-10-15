@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 
-import { answerVerdict, displayHost, modelLabel, VERDICT_BADGE, VERDICT_LABEL } from '@/components/core/Profile/seo/aiCitations';
+import { answerVerdict, describeProbeError, displayHost, modelLabel, VERDICT_BADGE, VERDICT_LABEL } from '@/components/core/Profile/seo/aiCitations';
 import { statusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import { blankedSource } from '../helpers/sourceIndex';
 
@@ -163,5 +163,19 @@ describe('three surfaces, three labels', () => {
       modelLabel('gpt-5-mini'), modelLabel('dfs:chat_gpt'), modelLabel('scrape:chat_gpt'),
     ]);
     expect(surfaces.size).toBe(3);
+  });
+});
+
+describe('describeProbeError', () => {
+  it('reads the cause out of the DataForSEO envelope, not its top-level "Ok."', () => {
+    const nested = '402: {"status_code":20000,"status_message":"Ok.","tasks":[{"status_code":40200,"status_message":"Payment Required."}]}';
+    expect(describeProbeError(nested)).toBe('out of DataForSEO credit (402 Payment Required)');
+    expect(describeProbeError('402: {"status_code":40200,"status_message":"Payment Required.","tasks":null}')).toMatch(/credit/);
+  });
+
+  it('never prints raw JSON', () => {
+    expect(describeProbeError('500: {"status_code":50000,"status_message":"Internal error."}')).toBe('Internal error (HTTP 500)');
+    expect(describeProbeError('503: {"truncated":')).toBe('provider returned HTTP 503');
+    expect(describeProbeError('timeout after 120s')).toBe('timeout after 120s');
   });
 });

@@ -13,6 +13,10 @@ export interface SerpFeatureDescriptor {
   ifPresent: string;
   /** What its ABSENCE means. Empty when absence carries no signal. */
   ifAbsent?: string;
+  /** What gets a site INTO the block. Only for blocks the tracker can attribute. */
+  howToGetIn?: string;
+  /** False when the block is not drawn from the organic ranking (map pack, entity card). */
+  needsRanking?: boolean;
 }
 
 export const SERP_FEATURE_GROUPS: Record<SerpFeatureGroup, string> = {
@@ -33,6 +37,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     ifPresent:
       'Ranking #1 no longer guarantees the click. Being one of the cited sources is the goal — that means clear, extractable answers near the top of the page.',
     ifAbsent: 'Google is not answering this itself yet, so a strong organic position still earns the click.',
+    howToGetIn:
+      'Answer the question in the first 2–3 sentences of a page that already ranks, with headings phrased as the question and facts Google can quote verbatim.',
   },
   {
     key: 'featured_snippet',
@@ -42,6 +48,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     ifPresent: 'Someone owns position zero. Matching the question format they answered is the way to take it.',
     ifAbsent:
       'No snippet is being shown — an unclaimed one is often the cheapest win on the page. A direct, self-contained answer near the top can create it.',
+    howToGetIn:
+      'A 40–60 word direct answer, a list or a table directly under a heading that repeats the query, on a page in the top 10.',
   },
   {
     key: 'people_also_ask',
@@ -50,6 +58,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     what: 'The expanding list of related questions Google shows mid-page.',
     ifPresent: 'These are the real follow-up questions. Answering them on the page earns both the block and the depth.',
     ifAbsent: 'Google sees this as a single-intent query rather than the start of a research journey.',
+    howToGetIn:
+      'Add the listed questions as H2/H3s on the ranking page, each answered in its first sentence.',
   },
   {
     key: 'knowledge_graph',
@@ -58,6 +68,9 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     what: 'The entity card on the right — a brand, product, place or person Google recognises.',
     ifPresent: 'Google treats the subject as a known entity. Whoever owns that panel owns the query.',
     ifAbsent: 'Google does not recognise a definitive entity here, which leaves the framing open.',
+    howToGetIn:
+      'Built from entity signals: Organization schema, a consistent name/address everywhere, and profiles Google trusts (Wikidata, business registries, social).',
+    needsRanking: false,
   },
   {
     key: 'product_considerations',
@@ -76,6 +89,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     ifPresent:
       'The buyer wants to SEE this. Named, compressed, properly alt-texted product photography on an indexable page is the entry ticket.',
     ifAbsent: 'Google is not treating this as a visual query, so imagery will not win extra placement.',
+    howToGetIn:
+      'Original photos on the ranking page with descriptive file names, alt text and ImageObject/Product schema.',
   },
   {
     key: 'video',
@@ -83,6 +98,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     group: 'visual',
     what: 'Individual video results in the organic list.',
     ifPresent: 'Video ranks here. A short demonstration can occupy a slot that text cannot reach.',
+    howToGetIn:
+      'A short video on YouTube (or embedded with VideoObject schema) whose title matches the query.',
   },
   {
     key: 'video_carousel',
@@ -91,6 +108,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     what: 'A scrollable strip of videos, usually YouTube.',
     ifPresent:
       'A whole band of the page is video. Without one you are competing for a smaller share of the remaining space.',
+    howToGetIn:
+      'A short video on YouTube (or embedded with VideoObject schema) whose title matches the query.',
   },
   {
     key: 'google_flights',
@@ -108,6 +127,9 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     ifPresent:
       'Commercial intent is confirmed and competitors are paying for it. Organic sits below the fold for many searchers.',
     ifAbsent: 'No one is bidding shopping here — organic gets the full commercial attention.',
+    howToGetIn:
+      'Paid only — needs a Merchant Center feed and a Shopping campaign.',
+    needsRanking: false,
   },
   {
     key: 'popular_products',
@@ -117,6 +139,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     ifPresent:
       'Product markup and a Merchant Center feed can put your items in this strip without paying for the click.',
     ifAbsent: 'Google is not surfacing a product carousel for this query.',
+    howToGetIn:
+      'Product schema with price and availability, plus a Google Merchant Center feed.',
   },
   {
     key: 'paid',
@@ -134,6 +158,9 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     ifPresent:
       'The buyer wants someone nearby. A national page cannot win this — it needs a Business Profile and local signals.',
     ifAbsent: 'Not a local-intent query, so proximity is not a ranking factor here.',
+    howToGetIn:
+      'Comes from the Google Business Profile, not the website ranking: a verified profile with the right category, address in the target city, photos and reviews.',
+    needsRanking: false,
   },
   {
     key: 'commercial_units',
@@ -158,6 +185,8 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     group: 'social',
     what: 'A news carousel.',
     ifPresent: 'This is a news-sensitive query — coverage and recency outrank evergreen depth.',
+    howToGetIn:
+      'Needs news-style articles: fresh, dated, Article schema, and a site Google treats as a news source.',
   },
   // ── Navigation & refinement ──────────────────────────────────────────────
   {
@@ -180,6 +209,27 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
     group: 'navigational',
     what: 'Links out to marketplaces and large sites.',
     ifPresent: 'Google is routing searchers to marketplaces. Presence on those platforms may matter more than rank.',
+  },
+  {
+    key: 'people_also_search',
+    label: 'People also search for',
+    group: 'navigational',
+    what: 'Alternative searches Google offers after someone returns from a result.',
+    ifPresent: 'Searchers bounce back and try a variant — the variants are queries worth a page of their own.',
+  },
+  {
+    key: 'google_reviews',
+    label: 'Google reviews',
+    group: 'social',
+    what: 'Star ratings and review snippets pulled from Google Business Profiles.',
+    ifPresent: 'Reputation is on the results page itself — the review count and rating are part of the first impression.',
+  },
+  {
+    key: 'short_videos',
+    label: 'Short videos',
+    group: 'visual',
+    what: 'A strip of vertical short-form videos (Shorts, TikTok, Reels).',
+    ifPresent: 'Short-form video earns a slot here that a page cannot.',
   },
   {
     key: 'organic',

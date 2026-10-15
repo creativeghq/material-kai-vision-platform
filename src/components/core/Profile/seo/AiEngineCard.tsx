@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { timeAgo } from '@/utils/datetime';
 import { statusPresentation } from './seoMetrics';
 import {
-  VERDICT_FILL, formatUsd, modelLabel,
+  VERDICT_FILL, describeProbeError, formatUsd, modelLabel,
   type AiEngine, type AiRate, type AiRival,
 } from './aiCitations';
 
@@ -94,14 +94,26 @@ const VerdictBar: React.FC<{ engine: AiEngine }> = ({ engine }) => {
         {engine.cost_usd ? ` · ${formatUsd(engine.cost_usd)}` : ''}
       </p>
       {engine.answered > 0 && engine.failed > 0 && engine.sample_error && (
-        <p className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground" title={engine.sample_error}>
-          <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
-          <span className="line-clamp-2">
-            Last error{engine.last_error_at ? ` ${timeAgo(engine.last_error_at)}` : ''}: {engine.sample_error}
-          </span>
-        </p>
+        <ProbeError engine={engine} sampleError={engine.sample_error} />
       )}
     </div>
+  );
+};
+
+/** Stale once the engine has answered since: the failures stay in the bar, the alarm does not. */
+const ProbeError: React.FC<{ engine: AiEngine; sampleError: string }> = ({ engine, sampleError }) => {
+  const recovered = !!engine.last_error_at && !!engine.last_run_at && engine.last_error_at < engine.last_run_at;
+  const reason = describeProbeError(sampleError);
+  const when = engine.last_error_at ? ` ${timeAgo(engine.last_error_at)}` : '';
+  return (
+    <p className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground" title={sampleError}>
+      {!recovered && <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />}
+      <span className="line-clamp-2">
+        {recovered
+          ? `${engine.failed} earlier ${engine.failed === 1 ? 'call' : 'calls'} failed${when}: ${reason}. Answering normally since.`
+          : `Latest call failed${when}: ${reason}.`}
+      </span>
+    </p>
   );
 };
 

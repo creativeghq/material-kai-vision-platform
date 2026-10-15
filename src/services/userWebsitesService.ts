@@ -470,6 +470,8 @@ export interface SerpFeatureRow {
   present: number | null;
   owned: number | null;
   missing: number | null;
+  missing_ranking?: number | null;
+  missing_unranked?: number | null;
   missing_keywords: SerpFeatureMissingKeyword[];
   series: { date: string; answered: number; unknown: number; present: number; owned: number }[];
 }
@@ -479,11 +481,13 @@ export interface SerpFeaturesReport {
   note: string | null;
   tracked: number;
   answered: number;
+  ranking?: number | null;
   unknown: number;
   never_checked: number;
   unknown_reason: string | null;
   latest_capture: string | null;
   features: SerpFeatureRow[];
+  context_features?: { key: string; present: number }[];
 }
 
 export interface TrackedKeywordRow {

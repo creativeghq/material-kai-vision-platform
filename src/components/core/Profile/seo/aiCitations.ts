@@ -125,6 +125,19 @@ export function answerVerdict(a: {
   return a.mentioned ? 'named' : 'absent';
 }
 
+/** An upstream error as a sentence: DataForSEO wraps the real cause in a JSON envelope whose top level says "Ok.". */
+export function describeProbeError(raw: string): string {
+  const http = raw.match(/^(\d{3})(?!\d)/)?.[1];
+  const messages = [...raw.matchAll(/"status_message":"([^"]*)"/g)].map((m) => m[1]).filter((m) => m && m !== 'Ok.');
+  if (http === '402' || messages.some((m) => /payment required|insufficient/i.test(m))) {
+    return 'out of DataForSEO credit (402 Payment Required)';
+  }
+  if (http === '429') return 'rate-limited by the provider (429)';
+  const msg = messages[0] ?? (raw.trim().startsWith('{') || raw.includes(': {') ? null : raw.trim());
+  if (!msg) return http ? `provider returned HTTP ${http}` : 'provider returned an error';
+  return http ? `${msg.replace(/\.$/, '')} (HTTP ${http})` : msg;
+}
+
 export function displayHost(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
