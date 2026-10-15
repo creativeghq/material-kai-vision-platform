@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
-import { FolderKanban, Loader2, Plus, ExternalLink } from 'lucide-react';
+import { FolderKanban, Plus, ExternalLink } from 'lucide-react';
 import { HubEmptyState } from '@/components/core/hub';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
+import { WorkPanelHeader, WorkPanelLoading } from '@/modules/crm/components/WorkPanelHeader';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { statusTone } from '@/utils/statusTone';
@@ -53,20 +54,19 @@ export const PartyProjectsCard: React.FC<{
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border/60 px-5 py-3">
-        <div className="min-w-0">
-          <CardTitle className="flex items-center gap-2"><FolderKanban className="h-4 w-4" /> Projects</CardTitle>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {companyId ? 'Work booked against this company or its people.' : 'Work booked against this person.'}
-          </p>
-        </div>
-        <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> New project
-        </Button>
-      </CardHeader>
+      <WorkPanelHeader
+        icon={FolderKanban}
+        title="Projects"
+        description={companyId ? 'Work booked against this company or its people.' : 'Work booked against this person.'}
+        action={!loading && rows.length > 0 && (
+          <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> New project
+          </Button>
+        )}
+      />
       <CardContent className="p-0">
         {loading ? (
-          <div className="p-6 text-center"><Loader2 className="inline h-4 w-4 animate-spin" /></div>
+          <WorkPanelLoading />
         ) : rows.length === 0 ? (
           <HubEmptyState
             icon={FolderKanban}

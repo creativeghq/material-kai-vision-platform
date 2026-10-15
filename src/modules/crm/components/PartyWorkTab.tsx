@@ -6,7 +6,8 @@ import {
   Receipt, FileSignature, Wrench, Loader2, Briefcase, Banknote, MessageSquare, type LucideIcon,
 } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
+import { WorkPanelHeader } from './WorkPanelHeader';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState, HubSideNav, type HubNavGroup } from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
@@ -240,22 +241,15 @@ export const PartyWorkTab: React.FC<Props> = ({
 /** One derived section: a flat, scannable list. The detail lives on the record it links to. */
 const KindList: React.FC<{ kind: string; label: string; rows: PartyWorkRow[] }> = ({ kind, label, rows }) => {
   const meta = KINDS[kind] ?? { label: humanizeLabel(kind), icon: FolderKanban, group: GROUP_DELIVERY };
-  const Icon = meta.icon;
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2">
-          <Icon className="h-4 w-4" />
-          {label}
-          <Badge variant="secondary">{rows.length}</Badge>
-        </CardTitle>
-      </CardHeader>
+      <WorkPanelHeader icon={meta.icon} title={label} action={<Badge variant="neutral">{rows.length}</Badge>} />
       <CardContent className="p-0">
         <ul className="divide-y divide-hairline">
           {rows.map((r) => {
             const href = meta.href?.(r) ?? null;
             const body = (
-              <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div className="flex items-center justify-between gap-3 px-5 py-2.5">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium">{r.title || '—'}</span>

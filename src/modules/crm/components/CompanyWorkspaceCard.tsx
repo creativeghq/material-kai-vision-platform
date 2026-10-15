@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, Loader2, Copy, Send, X, ExternalLink } from 'lucide-react';
+import { Building2, Copy, Send, X, ExternalLink, Lock } from 'lucide-react';
 import { InvitePartyDialog } from '@/modules/crm/components/InvitePartyDialog';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
+import { WorkPanelHeader, WorkPanelLoading } from './WorkPanelHeader';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -74,27 +76,26 @@ export const CompanyWorkspaceCard: React.FC<Props> = ({
     } finally { setBusy(false); }
   };
 
-  if (forbidden) return null;
-
   const state = status?.state ?? 'none';
   const tone = STATE_TONE[state];
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-        <div className="min-w-0">
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />Platform access
-          </CardTitle>
-          <CardDescription>
-            Give this business its own workspace on the platform, run by their own people.
-          </CardDescription>
-        </div>
-        <Badge variant={tone.variant}>{tone.label}</Badge>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <WorkPanelHeader
+        icon={Building2}
+        title="Platform access"
+        description="Give this business its own workspace on the platform, run by their own people."
+        action={!loading && !forbidden && <Badge variant={tone.variant}>{tone.label}</Badge>}
+      />
+      <CardContent className={loading || forbidden || state === 'none' || state === 'stalled' ? 'p-0' : 'space-y-4 px-5 py-4'}>
         {loading ? (
-          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          <WorkPanelLoading />
+        ) : forbidden ? (
+          <HubEmptyState
+            icon={Lock}
+            title="Workspace admins only"
+            description="Inviting a business onto the platform is done by an owner or admin of this workspace."
+          />
         ) : state === 'active' ? (
           <div className="space-y-2 text-sm">
             <p className="text-muted-foreground">
@@ -133,21 +134,19 @@ export const CompanyWorkspaceCard: React.FC<Props> = ({
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {state === 'stalled' && (
-              <p className="text-sm text-muted-foreground">
-                Their workspace was created but the invitation lapsed before anyone claimed it.
-              </p>
+          <HubEmptyState
+            icon={Building2}
+            title={state === 'stalled' ? 'The invitation lapsed' : 'Not on the platform yet'}
+            description={state === 'stalled'
+              ? 'Their workspace was created but nobody claimed it before the invitation expired.'
+              : 'They become the owner of a separate business on the platform. You are not added to it — oversight stays on Network, so their customers and prices are theirs alone.'}
+            action={(
+              <Button size="sm" onClick={() => setDialogOpen(true)}>
+                <Send className="mr-1 h-3.5 w-3.5" />
+                {state === 'stalled' ? 'Send a fresh invitation' : 'Send invitation'}
+              </Button>
             )}
-            <p className="text-sm text-muted-foreground">
-              They become the owner of a separate business on the platform. You are not added to
-              it — oversight stays on Network, so their customers and prices are theirs alone.
-            </p>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Send className="h-4 w-4 mr-2" />
-              {state === 'stalled' ? 'Send a fresh invitation' : 'Send invitation'}
-            </Button>
-          </div>
+          />
         )}
       </CardContent>
       <InvitePartyDialog

@@ -6,7 +6,7 @@ import {
   AlarmClock, CheckCircle2, Download, History, Loader2, Paperclip, Plus, ShieldCheck,
   Trash2, Wrench, SkipForward,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -30,6 +30,7 @@ import {
 } from '@/services/customerAssetsService';
 import { todayLocalISO } from '@/utils/datetime';
 import { HubEmptyState } from '@/components/core/hub';
+import { WorkPanelHeader, WorkPanelLoading } from '@/modules/crm/components/WorkPanelHeader';
 
 interface WarrantiesTabProps {
   /** Exactly one of these identifies whose units these are. */
@@ -167,18 +168,16 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
       {/* ── Coming up ─────────────────────────────────────────────────────── */}
       {due.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wrench className="h-4 w-4" />
-              Service coming up
-            </CardTitle>
-            <CardDescription>
+          <WorkPanelHeader
+            icon={Wrench}
+            title="Service coming up"
+            description={<>
               {overdueCount > 0 && <span className="text-red-500 dark:text-red-400">{overdueCount} overdue</span>}
               {overdueCount > 0 && soonCount > 0 && ' · '}
               {soonCount > 0 && <span>{soonCount} inside the reminder window</span>}
               {overdueCount === 0 && soonCount === 0 && 'Nothing needs attention yet.'}
-            </CardDescription>
-          </CardHeader>
+            </>}
+          />
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -228,29 +227,25 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
 
       {/* ── The register ──────────────────────────────────────────────────── */}
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-2 flex-wrap">
-          <div>
-            <CardTitle>Warranties</CardTitle>
-            <CardDescription>
-              Units this customer owns. Anything sold on a delivered order is registered
-              automatically when the product is marked serviceable.
-            </CardDescription>
-          </div>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />Add unit
-          </Button>
-        </CardHeader>
+        <WorkPanelHeader
+          icon={ShieldCheck}
+          title="Equipment & warranties"
+          description="Units this customer owns, with their serial, warranty and service history."
+          action={!loading && assets.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+              <Plus className="mr-1 h-3.5 w-3.5" /> Add unit
+            </Button>
+          )}
+        />
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-10 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />Loading…
-            </div>
+            <WorkPanelLoading />
           ) : assets.length === 0 ? (
             <HubEmptyState
               icon={ShieldCheck}
               title="No units registered yet"
               description="A unit is a specific thing this customer owns — with its serial, its warranty and its service history. Anything sold on a delivered order registers itself once the product is marked serviceable."
-              action={<Button size="sm" onClick={() => setAddOpen(true)}><Plus /> Add unit</Button>}
+              action={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-3.5 w-3.5" /> Add unit</Button>}
             />
           ) : (
             <Table>
@@ -323,16 +318,11 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
       {/* ── What has already been done, across every unit this customer owns ─────── */}
       {history.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Service history
-            </CardTitle>
-            <CardDescription>
-              Every visit logged against this customer's units. Entries survive the removal
-              of the schedule that produced them.
-            </CardDescription>
-          </CardHeader>
+          <WorkPanelHeader
+            icon={History}
+            title="Service history"
+            description="Every visit logged against this customer's units, kept even after the schedule that produced them is removed."
+          />
           <CardContent className="p-0">
             <Table>
               <TableHeader>

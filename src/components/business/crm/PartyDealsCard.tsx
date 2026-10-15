@@ -14,6 +14,8 @@ import { Loader2, Kanban } from 'lucide-react';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { listDealsForParty, type PartyDeal } from '@/services/dealsService';
 
 interface Props {
@@ -41,10 +43,55 @@ export const PartyDealsCard: React.FC<Props> = ({ workspaceId, contactId, compan
     return () => { cancelled = true; };
   }, [workspaceId, contactId, companyId]);
 
-  if (deals === null) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  if (deals === null) {
+    return headless
+      ? <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  }
 
   const open = deals.filter((d) => d.status === 'open');
   const closed = deals.filter((d) => d.status !== 'open');
+
+  if (headless) {
+    if (deals.length === 0) {
+      return (
+        <HubEmptyState
+          icon={Kanban}
+          title="No deals yet"
+          description="Deals are opened on the pipeline board; pick this company as the customer and the deal shows up here."
+          action={<Button size="sm" onClick={() => navigate('/crm?tab=pipeline')}>Open the pipeline</Button>}
+        />
+      );
+    }
+    return (
+      <ul className="divide-y divide-hairline">
+        {[...open, ...closed].map((d) => (
+          <li key={d.id}>
+            <button
+              type="button"
+              onClick={() => navigate(`/crm/deals/${d.id}`)}
+              className="flex w-full items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/40"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                {d.title?.trim() || d.type_label || 'Deal'}
+              </span>
+              {d.expected_close_date && d.status === 'open' && (
+                <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">{formatDate(d.expected_close_date)}</span>
+              )}
+              {d.value != null && (
+                <span className="shrink-0 text-sm tabular-nums">
+                  {formatMoney(d.value, d.currency || 'EUR', { decimals: 0, fallback: '' })}
+                </span>
+              )}
+              <Badge variant={d.status === 'won' ? 'success' : d.status === 'lost' ? 'neutral' : 'info'} className="shrink-0">
+                {d.status === 'open' ? d.stage_label : d.status === 'won' ? 'Won' : 'Lost'}
+              </Badge>
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   return (
     <div className="space-y-2">

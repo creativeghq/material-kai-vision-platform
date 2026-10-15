@@ -7,6 +7,7 @@ import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { SampleLoansCard } from '@/modules/crm/components/SampleLoansCard';
 import { SupplierEprCard } from '@/modules/crm/components/SupplierEprCard';
+import { WorkPanelHeader } from '@/modules/crm/components/WorkPanelHeader';
 import { WarrantyClaimsCard } from '@/modules/crm/components/WarrantyClaimsCard';
 import { TradePortalCard } from '@/modules/crm/components/TradePortalCard';
 import { CompanyWorkspaceCard } from '@/modules/crm/components/CompanyWorkspaceCard';
@@ -1355,11 +1356,8 @@ export const CompanyDetailPage: React.FC = () => {
                     id: 'deals', label: 'Deals', icon: Kanban, group: 'Commercial',
                     node: (
                       <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2"><Kanban className="h-4 w-4 text-muted-foreground"/>Deals</CardTitle>
-                          <CardDescription>Pipeline deals where this company is the customer.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
+                        <WorkPanelHeader icon={Kanban} title="Deals" description="Pipeline deals where this company is the customer." />
+                        <CardContent className="p-0">
                           <PartyDealsCard workspaceId={activeWorkspaceId} companyId={company.id} headless />
                         </CardContent>
                       </Card>

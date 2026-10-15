@@ -6,8 +6,8 @@
  * is then theirs.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, AlertTriangle, Users, Link2, Plus, Copy } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Users, Link2, Plus } from 'lucide-react';
+import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -17,6 +17,7 @@ import {
 } from '@/components/core/ui/select';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
+import { WorkPanelError, WorkPanelForm, WorkPanelHeader, WorkPanelLoading } from './WorkPanelHeader';
 import {
   tradePortalService, ROLE_LABEL, VISIBILITY_LABEL, isUncapped,
   PASSWORDLESS_IS_THE_POINT, DRAFT_UNTIL_WE_CONFIRM, bandsAreEnough,
@@ -35,6 +36,7 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [draft, setDraft] = useState({ email: '', name: '', role: 'buyer' as PortalRole, cap: '' });
 
   const load = useCallback(async () => {
@@ -80,35 +82,34 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
     } finally { setBusy(false); }
   };
 
+  const openForm = () => setFormOpen(true);
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Users className="h-4 w-4 text-primary" /> Trade portal
-        </CardTitle>
-        <CardDescription>
-          Their statement, their prices and their stock. We open the account and set the policy;
-          their own administrator decides who may buy and up to how much.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-3 text-xs">
-        {loading && (
-          <p className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading the account…
-          </p>
+      <WorkPanelHeader
+        icon={Users}
+        title="Trade portal"
+        description="Their statement, prices and stock. We set the policy; their administrator decides who may buy and up to how much."
+        action={!loading && !failed && account && users.length > 0 && !formOpen && (
+          <Button size="sm" variant="outline" onClick={openForm}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add person
+          </Button>
         )}
+      />
+
+      <CardContent className="p-0">
+        {loading && <WorkPanelLoading />}
 
         {!loading && failed && (
-          <p className="flex items-start gap-2 text-destructive">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <WorkPanelError>
             The portal account could not be read just now. That is not a statement that they have
             none.
-          </p>
+          </WorkPanelError>
         )}
 
         {!loading && !failed && !account && (
           <HubEmptyState
+            icon={Users}
             title="No portal account"
             description="A trade customer cannot see their own account until one exists. Opening it costs them nothing and saves the phone call about an invoice."
             action={(
@@ -119,7 +120,7 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
                   'Could not open the account',
                 )}
               >
-                <Plus className="mr-1 h-3 w-3" /> Open the account
+                <Plus className="mr-1 h-3.5 w-3.5" /> Open the account
               </Button>
             )}
           />
@@ -127,7 +128,54 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
 
         {!loading && !failed && account && (
           <>
-            <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
+            {formOpen && (
+              <WorkPanelForm>
+                <div>
+                  <Label htmlFor="tp-email">Email</Label>
+                  <Input id="tp-email" className="mt-1 h-8 w-52 text-xs" value={draft.email}
+                    onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="tp-name">Name</Label>
+                  <Input id="tp-name" className="mt-1 h-8 w-40 text-xs" value={draft.name}
+                    onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="tp-role">Role</Label>
+                  <Select value={draft.role} onValueChange={(v) => setDraft((d) => ({ ...d, role: v as PortalRole }))}>
+                    <SelectTrigger id="tp-role" className="mt-1 h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="tp-cap">Cap per order</Label>
+                  <Input id="tp-cap" type="number" min="0" className="mt-1 h-8 w-28 text-xs"
+                    placeholder="uncapped" value={draft.cap}
+                    onChange={(e) => setDraft((d) => ({ ...d, cap: e.target.value }))} />
+                </div>
+                <Button
+                  size="sm" disabled={busy || !draft.email.trim()}
+                  onClick={() => guard(async () => {
+                    await tradePortalService.addUser({
+                      accountId: account.id,
+                      email: draft.email.trim(),
+                      displayName: draft.name || null,
+                      role: draft.role,
+                      spendLimit: draft.cap === '' ? null : Number(draft.cap),
+                    });
+                    setDraft({ email: '', name: '', role: 'buyer', cap: '' });
+                    setFormOpen(false);
+                  }, 'Could not add the person')}
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" /> Add
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setFormOpen(false)} disabled={busy}>Cancel</Button>
+              </WorkPanelForm>
+            )}
+
+            <div className="flex flex-wrap items-end gap-3 border-b border-hairline px-5 py-3">
               <div>
                 <Label htmlFor="tp-vis" className="text-[11px]">Stock they see</Label>
                 <Select
@@ -162,83 +210,58 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
               <Badge variant={account.is_enabled ? 'success' : 'neutral'}>
                 {account.is_enabled ? 'Open' : 'Closed'}
               </Badge>
+              <div className="basis-full space-y-0.5 text-[11px] text-muted-foreground">
+                <p>{bandsAreEnough}</p>
+                <p>{DRAFT_UNTIL_WE_CONFIRM}</p>
+              </div>
             </div>
 
-            <p className="text-[11px] text-muted-foreground">{bandsAreEnough}</p>
-            <p className="text-[11px] text-muted-foreground">{DRAFT_UNTIL_WE_CONFIRM}</p>
+            {users.length === 0 && !formOpen && (
+              <HubEmptyState
+                icon={Users}
+                title="No one invited yet"
+                description="Add their administrator first — they can then add and cap their own buyers."
+                action={(
+                  <Button size="sm" onClick={openForm}>
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add person
+                  </Button>
+                )}
+              />
+            )}
 
-            {users.map((u) => (
-              <div key={u.id} className="flex flex-wrap items-center gap-2 border-b border-hairline pb-1">
-                <span className="font-medium">{u.display_name || u.email}</span>
-                <span className="text-muted-foreground">{u.email}</span>
-                <Select
-                  value={u.role}
-                  disabled={busy}
-                  onValueChange={(v) => guard(
-                    () => tradePortalService.setUserCap(u.id, v as PortalRole, u.spend_limit_per_order),
-                    'Could not change the role',
-                  )}
-                >
-                  <SelectTrigger className="h-7 w-44 text-[11px]" aria-label={`Role of ${u.email}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <span className="tabular-nums text-muted-foreground">
-                  {isUncapped(u) ? 'uncapped' : `cap ${u.spend_limit_per_order}`}
-                </span>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" disabled={busy}
-                  onClick={() => mint(u.id)}>
-                  <Link2 className="mr-1 h-3 w-3" /> Link
-                  <Copy className="ml-1 h-3 w-3" />
-                </Button>
-              </div>
-            ))}
-
-            <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
-              <div>
-                <Label htmlFor="tp-email" className="text-[11px]">Email</Label>
-                <Input id="tp-email" className="mt-1 h-8 w-52 text-xs" value={draft.email}
-                  onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} />
-              </div>
-              <div>
-                <Label htmlFor="tp-name" className="text-[11px]">Name</Label>
-                <Input id="tp-name" className="mt-1 h-8 w-40 text-xs" value={draft.name}
-                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
-              </div>
-              <div>
-                <Label htmlFor="tp-role" className="text-[11px]">Role</Label>
-                <Select value={draft.role} onValueChange={(v) => setDraft((d) => ({ ...d, role: v as PortalRole }))}>
-                  <SelectTrigger id="tp-role" className="mt-1 h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="tp-cap" className="text-[11px]">Cap per order</Label>
-                <Input id="tp-cap" type="number" min="0" className="mt-1 h-8 w-28 text-xs"
-                  placeholder="uncapped" value={draft.cap}
-                  onChange={(e) => setDraft((d) => ({ ...d, cap: e.target.value }))} />
-              </div>
-              <Button
-                size="sm" disabled={busy || !draft.email.trim()}
-                onClick={() => guard(async () => {
-                  await tradePortalService.addUser({
-                    accountId: account.id,
-                    email: draft.email.trim(),
-                    displayName: draft.name || null,
-                    role: draft.role,
-                    spendLimit: draft.cap === '' ? null : Number(draft.cap),
-                  });
-                  setDraft({ email: '', name: '', role: 'buyer', cap: '' });
-                }, 'Could not add the person')}
-              >
-                <Plus className="mr-1 h-3 w-3" /> Add
-              </Button>
-            </div>
+            {users.length > 0 && (
+              <ul className="divide-y divide-hairline">
+                {users.map((u) => (
+                  <li key={u.id} className="flex flex-wrap items-center gap-3 px-5 py-2.5 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{u.display_name || u.email}</div>
+                      {u.display_name && <div className="truncate text-xs text-muted-foreground">{u.email}</div>}
+                    </div>
+                    <Select
+                      value={u.role}
+                      disabled={busy}
+                      onValueChange={(v) => guard(
+                        () => tradePortalService.setUserCap(u.id, v as PortalRole, u.spend_limit_per_order),
+                        'Could not change the role',
+                      )}
+                    >
+                      <SelectTrigger className="h-8 w-44 text-xs" aria-label={`Role of ${u.email}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <span className="w-24 text-right text-xs tabular-nums text-muted-foreground">
+                      {isUncapped(u) ? 'uncapped' : `cap ${u.spend_limit_per_order}`}
+                    </span>
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => mint(u.id)}>
+                      <Link2 className="mr-1 h-3.5 w-3.5" /> Copy link
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         )}
       </CardContent>
