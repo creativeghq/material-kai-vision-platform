@@ -5,7 +5,8 @@ import { moodStyle } from '@/utils/conversationMood';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/core/ui/avatar';
 import type { InboxSource } from '../inboxSource';
 import { signInboxAttachment, labelChipClass, type InboxThread, type InboxLabel } from '@/services/inboxApi';
-import { avatarTint, castAvatarSrc, initials, labelDot } from '../inboxFormat';
+import { avatarTint, castAvatarSrc, initials, isLogoImage, labelDot } from '../inboxFormat';
+import { safeImageSrc } from '@/utils/safeUrl';
 
 export interface WorkspaceMemberOption { user_id: string; label: string; }
 
@@ -154,7 +155,7 @@ export const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ met
 };
 
 export const ThreadAvatar: React.FC<{
-  thread?: Pick<InboxThread, 'id' | 'metadata' | 'counterparty_participant_id' | 'counterparty_avatar_slot'> | null;
+  thread?: Pick<InboxThread, 'id' | 'metadata' | 'counterparty_participant_id' | 'counterparty_avatar_slot' | 'counterparty_photo_url'> | null;
   name: string;
   className?: string;
   fallbackClassName?: string;
@@ -193,9 +194,15 @@ export const ThreadAvatar: React.FC<{
     : null;
   const style = mood?.mood ? moodStyle(String(mood.mood)) : null;
 
+  const [failed, setFailed] = useState<ReadonlySet<string>>(new Set());
+  const primary = [url, safeImageSrc(thread?.counterparty_photo_url)].find((u): u is string => !!u && !failed.has(u)) ?? null;
   const avatar = (
     <Avatar className={className}>
-      <AvatarImage src={url ?? generated} alt={name} className="object-cover" />
+      <AvatarImage
+        src={primary ?? generated} alt={name}
+        className={primary && isLogoImage(primary) ? 'object-contain bg-white p-1' : 'object-cover'}
+        onLoadingStatusChange={(st) => { if (st === 'error' && primary) setFailed((f) => new Set([...f, primary])); }}
+      />
       {/* Only reached if the image itself fails to load — initials remain the floor. */}
       <AvatarFallback className={fallbackClassName ?? `text-xs ${avatarTint(name)}`}>
         {initials(name)}

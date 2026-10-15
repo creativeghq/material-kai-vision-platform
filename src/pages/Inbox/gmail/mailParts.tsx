@@ -6,15 +6,23 @@ import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { castSlotForName } from '@/utils/characterAvatar';
 import { gmailApi, type GmailAttachment } from '@/services/gmailApi';
-import { avatarTint, castAvatarSrc, initials } from '../inboxFormat';
+import { avatarTint, castAvatarSrc, initials, isLogoImage } from '../inboxFormat';
+import { safeImageSrc } from '@/utils/safeUrl';
 import { AttachmentActionsMenu } from '../components/AttachmentActions';
 
 export const MailAvatar: React.FC<{ name?: string | null; email?: string | null; photoUrl?: string | null; className?: string }> = ({ name, email, photoUrl, className }) => {
   const label = name || email || '?';
   const generated = useMemo(() => castAvatarSrc(email || label, castSlotForName(email || label, name ?? null)), [email, label, name]);
+  const [failed, setFailed] = useState<string | null>(null);
+  const photo = safeImageSrc(photoUrl);
+  const primary = photo && photo !== failed ? photo : null;
   return (
     <Avatar className={className ?? 'h-9 w-9'}>
-      <AvatarImage src={photoUrl || generated} alt={label} className="object-cover" />
+      <AvatarImage
+        src={primary ?? generated} alt={label}
+        className={primary && isLogoImage(primary) ? 'object-contain bg-white p-1' : 'object-cover'}
+        onLoadingStatusChange={(st) => { if (st === 'error' && primary) setFailed(primary); }}
+      />
       <AvatarFallback className={`text-xs ${avatarTint(label)}`}>{initials(label)}</AvatarFallback>
     </Avatar>
   );

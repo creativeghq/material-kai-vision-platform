@@ -147,3 +147,8 @@ export function toLocalInputValue(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     + `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** A company mark (BIMI SVG or site icon) is fitted on white; a person's photo fills the circle. */
+export function isLogoImage(url: string): boolean {
+  return /\/s2\/favicons\?|\.svg(?:[?#]|$)/i.test(url);
+}

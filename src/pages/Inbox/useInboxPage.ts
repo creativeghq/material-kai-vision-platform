@@ -73,6 +73,7 @@ function buildParticipantLabels(
   customerName: string,
   myUserId: string | null,
   channelAvatarUrl: string | null,
+  customerPhotoUrl: string | null = null,
 ): Map<string, ParticipantLabel> {
   const next = new Map<string, ParticipantLabel>();
   for (const p of participants) {
@@ -87,7 +88,7 @@ function buildParticipantLabels(
       });
     } else if (p.participant_type === 'customer') {
       // Server-derived slot — never re-answered from the name, or one person gets two faces.
-      next.set(p.id, { label: customerName, kind: 'customer', userId: p.user_id, avatarSlot: p.avatar_slot ?? null });
+      next.set(p.id, { label: customerName, kind: 'customer', userId: p.user_id, avatarSlot: p.avatar_slot ?? null, avatarUrl: customerPhotoUrl ?? undefined });
     } else {
       next.set(p.id, { label: 'Assistant', kind: 'agent', userId: null });
     }
@@ -606,7 +607,7 @@ export function useInboxPage() {
       setStarredIds(new Set(starred_message_ids || []));
       setMessageOpens(message_opens ?? {});
       setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, unread: false } : t)));
-      const firstLabels = buildParticipantLabels(participants, {}, thread.subject || 'Customer', myUserId, null);
+      const firstLabels = buildParticipantLabels(participants, {}, thread.subject || 'Customer', myUserId, null, thread.counterparty_photo_url ?? null);
       if (!refresh && !threadCache.current.has(id)) setLabels(firstLabels);
       setLoadingThread(false);
 
@@ -655,7 +656,7 @@ export function useInboxPage() {
       for (const prof of profs) {
         profMap[prof.userId] = { full_name: prof.fullName ?? undefined, email: prof.email ?? undefined, avatar_url: prof.avatarUrl ?? undefined };
       }
-      const nextLabels = buildParticipantLabels(participants, profMap, ctx?.contact?.name || thread.subject || 'Customer', myUserId, channelAvatarUrl);
+      const nextLabels = buildParticipantLabels(participants, profMap, ctx?.contact?.name || thread.subject || 'Customer', myUserId, channelAvatarUrl, thread.counterparty_photo_url ?? null);
       setLabels(nextLabels);
       threadCache.current.delete(id);
       threadCache.current.set(id, {

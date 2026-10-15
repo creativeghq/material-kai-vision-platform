@@ -135,6 +135,7 @@ export interface InboxThread {
    * older deploy, in which case the client hashes the seed itself and gets the whole cast.
    */
   counterparty_avatar_slot?: number | null;
+  counterparty_photo_url?: string | null;
   has_attachments?: boolean;
   /**
    * When this conversation comes back to Open by itself. NULL = no follow-up pending.

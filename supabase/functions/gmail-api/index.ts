@@ -1,4 +1,5 @@
 /** gmail-api — a person's own Gmail, live: connect, browse, read, reply, label. Gmail stays the source of truth. */
+import { mailIdentityImages } from '../_shared/mail-identity.ts';
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, isPlatformOperator, isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -107,11 +108,15 @@ async function photosFor(db: Db, account: { email: string; picture_url?: string 
       if (r.email && r.avatar_url && /^https:\/\//.test(r.avatar_url)) map.set(r.email.toLowerCase(), r.avatar_url);
     }
   }
+  const unknown = wanted.filter((e) => !map.has(e));
+  if (unknown.length) {
+    for (const [email, img] of await mailIdentityImages(db, unknown)) map.set(email, img.url);
+  }
   return map;
 }
 
 const withPhoto = (photos: Map<string, string>) => (a: { name: string | null; address: string | null }) =>
-  ({ ...a, photo_url: a.address ? photos.get(a.address) ?? null : null });
+  ({ ...a, photo_url: a.address ? photos.get(a.address.toLowerCase()) ?? null : null });
 
 const SYSTEM_LABELS = ['INBOX', 'STARRED', 'SNOOZED', 'SENT', 'DRAFT', 'IMPORTANT', 'SPAM', 'TRASH'];
 

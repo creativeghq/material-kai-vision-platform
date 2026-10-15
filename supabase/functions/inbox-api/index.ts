@@ -29,6 +29,7 @@ import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { inboxAutopilotSettings } from '../_shared/inbox-autopilot.ts';
 import { runInBackground } from '../_shared/background.ts';
+import { emailAddressOf, mailIdentityImages } from '../_shared/mail-identity.ts';
 import { formatBusinessIdentityForPrompt, resolveBusinessIdentity } from '../_shared/business-identity.ts';
 import {
   sendWhatsAppReply, sendWhatsAppMessage, setMessageReaction,
@@ -104,6 +105,16 @@ const DEFAULT_INBOUND_DOMAIN = 'mail.materialshub.gr';
 const PUBLIC_APP_URL = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
 
 type Json = Record<string, unknown>;
+
+function counterpartyEmail(thread: Record<string, unknown>, inboundDomain: string): string | null {
+  if (thread.channel !== 'email') return null;
+  const meta = (thread.metadata ?? {}) as Json;
+  const ours = (a: string | null) => !!a && (a.endsWith(`@${inboundDomain}`) || a.endsWith(`@${DEFAULT_INBOUND_DOMAIN}`));
+  const from = emailAddressOf(meta.email_from);
+  if (from && !ours(from)) return from;
+  const to = emailAddressOf(meta.email_to);
+  return to && !ours(to) ? to : null;
+}
 
 interface Attachment {
   storage_bucket: string;
@@ -3098,6 +3109,13 @@ async function handleJwtAction(
 
       // Attach labels for the returned threads in one round trip.
       const threadIds = (threads || []).map((t: Record<string, unknown>) => String(t.id));
+      const inboundDomain = (await resolveSecret(db, 'INBOUND_EMAIL_DOMAIN')).value || DEFAULT_INBOUND_DOMAIN;
+      const cpEmailByThread = new Map<string, string>();
+      for (const t of (threads || []) as Array<Record<string, unknown>>) {
+        const e = counterpartyEmail(t, inboundDomain);
+        if (e) cpEmailByThread.set(String(t.id), e);
+      }
+      const photosP = mailIdentityImages(db, [...cpEmailByThread.values()]);
       const labelsByThread = new Map<string, Array<{ id: string; name: string; color: string }>>();
       if (threadIds.length) {
         const { data: tl } = await db.from('inbox_thread_labels')
@@ -3234,6 +3252,7 @@ async function handleJwtAction(
         }
       }
 
+      const photos = await photosP;
       const enriched = (threads || []).map((t: Record<string, unknown>) => {
         const id = String(t.id);
         // Threads visible only via workspace membership (not an explicit participant) start unread.
@@ -3253,6 +3272,7 @@ async function handleJwtAction(
           assignee_name: t.assigned_user_id ? (assigneeNameById.get(String(t.assigned_user_id)) ?? null) : null,
           counterparty_participant_id: counterpartyByThread.get(id) ?? null,
           counterparty_avatar_slot: avatarSlotByThread.get(id) ?? null,
+          counterparty_photo_url: photos.get(cpEmailByThread.get(id) ?? '')?.url ?? null,
           has_attachments: withFiles.has(id),
           outreach: outreachByThread.get(id) ?? [],
         };
@@ -3362,7 +3382,10 @@ async function handleJwtAction(
       // answers the previous question, and a stale draft is a perfectly valid string, so nothing
       // downstream would otherwise notice.
       const messageIds = ((messages || []) as unknown as Array<{ id: string }>).map((m) => m.id);
-      const [draftIsCurrent, wa, starredMessageIds, pinnedMessage, opens] = await Promise.all([
+      const cpEmail = isMember && thread.channel === 'email'
+        ? counterpartyEmail(thread, (await resolveSecret(db, 'INBOUND_EMAIL_DOMAIN')).value || DEFAULT_INBOUND_DOMAIN)
+        : null;
+      const [draftIsCurrent, wa, starredMessageIds, pinnedMessage, opens, cpPhoto] = await Promise.all([
         isMember && thread.agent_draft
           ? db.rpc('inbox_newest_inbound_message_id', { p_thread_id: threadId })
             .then(({ data: newestId }) => !!newestId && newestId === thread.agent_draft_for_message_id)
@@ -3383,6 +3406,7 @@ async function handleJwtAction(
         access.participant && !peek
           ? db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id)
           : Promise.resolve(null),
+        cpEmail ? mailIdentityImages(db, [cpEmail]).then((m) => m.get(cpEmail)?.url ?? null) : Promise.resolve(null),
       ]);
 
       // The provider read receipt is a third-party round trip the operator must not wait on.
@@ -3405,6 +3429,7 @@ async function handleJwtAction(
 
       const threadForCaller = isMember ? {
         ...thread,
+        counterparty_photo_url: cpPhoto,
         agent_draft_is_current: draftIsCurrent,
         counterparty_participant_id: counterpartyId,
         counterparty_avatar_slot: counterpartyId
