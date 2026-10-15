@@ -86,8 +86,12 @@ interface Props {
 function buildPatch(workspaceId: string, data: Record<string, any>): Record<string, any> {
   const patch: Record<string, any> = { workspace_id: workspaceId, updated_at: new Date().toISOString() };
   for (const f of ALL_TEXT_FIELDS) {
-    patch[f.key] = data[f.key] ?? null;
-    if (f.bilingual) patch[`${f.key}_en`] = data[`${f.key}_en`] ?? null;
+    if (!f.bilingual) { patch[f.key] = data[f.key] ?? null; continue; }
+    // The form opens in EN but Novus and every completeness check read the base column.
+    const base = data[f.key] || null;
+    const en = data[`${f.key}_en`] || null;
+    patch[f.key] = base ?? en;
+    patch[`${f.key}_en`] = en ?? base;
   }
   patch.business_company_type = data.business_company_type ?? null;
   patch.business_seasonal = !!data.business_seasonal;

@@ -12,6 +12,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
@@ -65,7 +66,11 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
   const [data, setData] = useState<EInvoiceOnboarding | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const { user } = useAuth();
   const [draft, setDraft] = useState<ApplicationDraft>(EMPTY_DRAFT);
+  const [dirty, setDirty] = useState(false);
+  const edit = (patch: Partial<ApplicationDraft>) => { setDraft((d) => ({ ...d, ...patch })); setDirty(true); };
+  const latest = useRef({ draft, dirty, sent: false });
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -76,8 +81,10 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
       setData(next);
       if (next.application) {
         const a = next.application;
+        const signupName = String(user?.user_metadata?.display_name ?? '');
+        if (!a.administrator_full_name && signupName && !next.request_id) setDirty(true);
         setDraft({
-          administrator_full_name: a.administrator_full_name ?? '',
+          administrator_full_name: a.administrator_full_name || signupName,
           administrator_vat: a.administrator_vat ?? '',
           transaction_types: a.transaction_types?.length ? a.transaction_types : ['B2B'],
           isp_provider_name: a.isp_provider_name ?? '',
@@ -92,9 +99,32 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
       setBusy(null);
       setLoading(false);
     }
-  }, [workspaceId, toast]);
+  }, [workspaceId, toast, user?.user_metadata?.display_name]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const sentNow = !!data?.request_id;
+  latest.current = { draft, dirty, sent: sentNow };
+
+  useEffect(() => {
+    if (!dirty || sentNow || loading) return;
+    const t = window.setTimeout(() => {
+      const snapshot = latest.current.draft;
+      einvoiceOnboardingService.saveApplication(workspaceId, snapshot)
+        .then((next) => {
+          setData(next);
+          if (latest.current.draft === snapshot) setDirty(false);
+          onChanged?.();
+        })
+        .catch((err) => toast({ title: 'Could not save the application', description: (err as Error).message, variant: 'destructive' }));
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [dirty, sentNow, loading, draft, workspaceId, toast, onChanged]);
+
+  useEffect(() => () => {
+    const { draft: d, dirty: unsaved, sent: wasSent } = latest.current;
+    if (unsaved && !wasSent) void einvoiceOnboardingService.saveApplication(workspaceId, d).catch(() => undefined);
+  }, [workspaceId]);
 
   const run = useCallback(async (key: string, fn: () => Promise<EInvoiceOnboarding>, ok?: string) => {
     setBusy(key);
@@ -134,6 +164,8 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
   const sent = !!data.request_id;
   const overall = OVERALL[data.overall];
   const needsIdentity = data.prerequisites_missing.length > 0;
+  const missingHere = new Set(['Administrator name', 'Administrator VAT', 'ISP provider', 'ISP contract number', 'ISP contract date']);
+  const identityGap = data.prerequisites_missing.some((m) => !missingHere.has(m));
 
   return (
     <Card>
@@ -187,7 +219,7 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                 <Label htmlFor="admin-name">Administrator — full name</Label>
                 <Input
                   id="admin-name" value={draft.administrator_full_name}
-                  onChange={(e) => setDraft({ ...draft, administrator_full_name: e.target.value })}
+                  onChange={(e) => edit({ administrator_full_name: e.target.value })}
                   placeholder="The person who signs"
                 />
               </div>
@@ -195,7 +227,7 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                 <Label htmlFor="admin-vat">Administrator — ΑΦΜ</Label>
                 <Input
                   id="admin-vat" value={draft.administrator_vat} inputMode="numeric"
-                  onChange={(e) => setDraft({ ...draft, administrator_vat: e.target.value })}
+                  onChange={(e) => edit({ administrator_vat: e.target.value })}
                   placeholder="Their own, not the company's"
                 />
               </div>
@@ -216,7 +248,7 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                           toast({ title: 'Pick at least one', description: 'Novus needs to know whether this business invoices businesses, consumers, or both.' });
                           return;
                         }
-                        setDraft({ ...draft, transaction_types: next });
+                        edit({ transaction_types: next });
                       }}
                     />
                     {t === 'B2B' ? 'Invoices to businesses (B2B)' : 'Receipts to consumers (B2C)'}
@@ -233,17 +265,17 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                 <div className="space-y-1.5">
                   <Label htmlFor="isp-name">Internet provider</Label>
                   <Input id="isp-name" value={draft.isp_provider_name}
-                    onChange={(e) => setDraft({ ...draft, isp_provider_name: e.target.value })} />
+                    onChange={(e) => edit({ isp_provider_name: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="isp-num">Their contract number</Label>
                   <Input id="isp-num" value={draft.isp_contract_number}
-                    onChange={(e) => setDraft({ ...draft, isp_contract_number: e.target.value })} />
+                    onChange={(e) => edit({ isp_contract_number: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="isp-date">Contract date</Label>
                   <Input id="isp-date" type="date" max={todayLocalISO()} value={draft.isp_contract_date ?? ''}
-                    onChange={(e) => setDraft({ ...draft, isp_contract_date: e.target.value || null })} />
+                    onChange={(e) => edit({ isp_contract_date: e.target.value || null })} />
                 </div>
               </div>
             )}
@@ -269,7 +301,7 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
               {needsIdentity && (
                 <span className="text-xs text-muted-foreground">
                   Still needed: {data.prerequisites_missing.join(', ')}.
-                  {onGoToIdentity && (
+                  {onGoToIdentity && identityGap && (
                     <button type="button" onClick={onGoToIdentity} className="ml-1 font-medium text-primary hover:underline">
                       Business Identity
                     </button>
