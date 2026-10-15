@@ -71,8 +71,9 @@ describe('a draft never answers the wrong message', () => {
 
   it('and says why a stale one is not there', () => {
     // Vanishing without a word reads as the assistant having done nothing.
-    expect(PAGE).toMatch(/agent_draft_is_current === false/);
-    expect(PAGE).toMatch(/agent_draft_error/);
+    expect(PAGE).toMatch(/draftIsCurrent: activeThread\.agent_draft_is_current/);
+    expect(PAGE).toMatch(/agent\.draftIsCurrent === false/);
+    expect(PAGE).toMatch(/draftError: activeThread\.agent_draft_error/);
   });
 });
 

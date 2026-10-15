@@ -36,19 +36,23 @@ describe('gmail-api — a mailbox is its owner\'s alone', () => {
   });
 
   it('sends through Gmail and never trusts a reply target from another thread', () => {
-    expect(action('send')).toContain('sendPreparedGmail(db, account, prepareGmailSend(body), { user_id: userId, workspace_id: account.workspace_id })');
+    expect(action('send')).toContain('const prepared = prepareGmailSend(body);');
+    expect(action('send')).toContain('sendPreparedGmail(db, account, prepared, { user_id: userId, workspace_id: account.workspace_id })');
     expect(client).toContain("'/messages/send'");
     expect(client).toContain('orig.threadId !== p.thread_id');
-    expect(client).toContain('renderEmailMarkup(p.text, escapeHtml)');
+    expect(client).toContain('renderEmailMarkup(t, escapeHtml)');
+    expect(client).toContain('signEmail(p.text, p.signature, render)');
   });
 });
 
 describe('the Gmail view shows received mail only through the sanitising frame', () => {
   const view = stripComments(readFileSync(join(process.cwd(), 'src/pages/Inbox/gmail/GmailThreadView.tsx'), 'utf8'));
   const inbox = stripComments(readFileSync(join(process.cwd(), 'src/pages/Inbox/gmail/GmailInbox.tsx'), 'utf8'));
+  const card = stripComments(readFileSync(join(process.cwd(), 'src/pages/Inbox/components/MailMessageCard.tsx'), 'utf8'));
   it('renders m.html with EmailHtmlView and never injects it', () => {
-    expect(view).toMatch(/<EmailHtmlView html=\{m\.html\}/);
-    expect(view + inbox).not.toContain('dangerouslySetInnerHTML');
+    expect(view).toMatch(/<MailMessageCard[\s\S]*?html=\{m\.html\}/);
+    expect(card).toMatch(/<EmailHtmlView html=\{html\}/);
+    expect(view + inbox + card).not.toContain('dangerouslySetInnerHTML');
   });
 });
 

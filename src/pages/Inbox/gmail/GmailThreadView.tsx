@@ -1,128 +1,116 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Archive, ArrowLeft, Check, Forward, ListTodo, Loader2, Mail, MailOpen, Paperclip, Reply, ReplyAll, Send, Sparkles, Star, Tag, Trash2, X,
-} from 'lucide-react';
+import { Archive, ArrowLeft, Check, ListTodo, Loader2, Mail, MailOpen, Sparkles, Star, Tag, Trash2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
-import { Textarea } from '@/components/core/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { gmailApi, type GmailAddress, type GmailMessage } from '@/services/gmailApi';
-import { EmailHtmlView } from '../components/EmailHtmlView';
 import { normalizeCid, referencedCids } from '@/utils/sanitizeEmailHtml';
 import { useInlineImages } from '../useInlineImages';
-import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
-import { SendLaterMenu } from '../components/SendLater';
-import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
-import { useFileDrop } from '../useFileDrop';
-import { OpenReceipt, TrackOpensToggle, useTrackOpens } from '../components/OpenTracking';
-import { CopilotPanel, RewriteMenu } from '../components/AssistTools';
+import { useTrackOpens } from '../components/OpenTracking';
+import { CopilotPanel } from '../components/AssistTools';
 import type { GmailMailboxState } from './useGmailMailbox';
 import { GmailThreadFacts } from './GmailThreadFacts';
 import { GmailTaskDialog } from './GmailTaskDialog';
-import { AttachmentCards, MailAvatar, PersonChip, RecipientInput, base64ToBlob } from './mailParts';
+import { AttachmentCards, MailAvatar, base64ToBlob } from './mailParts';
 import { AttachmentActionsProvider } from '../components/AttachmentActions';
 import { fileToAttachment } from '../composerAttachments';
-import { FollowUpOnSend, applyGmailPlan, describePlan, type SendFollowUpPlan } from '../components/FollowUpOnSend';
-import { WritingScore } from '../components/WritingScore';
-
+import { applyGmailPlan, describePlan, type SendFollowUpPlan } from '../components/FollowUpOnSend';
+import { MailMessageCard } from '../components/MailMessageCard';
+import { InboxComposer } from '../components/InboxComposer';
+import { useComposerSettings } from '../useComposerSettings';
+import type { ComposeMode, MailComposerModel } from '../composerModel';
 
 const stamp = (iso: string | null) => (iso ? `${formatDate(iso)} ${formatTime(iso)}` : '—');
 const who = (a: GmailAddress) => a.name || a.address || 'Unknown';
+const person = (a: GmailAddress) => ({ address: a.address ?? '', name: a.name, photoUrl: a.photo_url });
 
-const ToolButton: React.FC<{ icon: React.ElementType; label: string; onClick: () => void; disabled?: boolean; active?: boolean }> = ({ icon: Icon, label, onClick, disabled, active }) => (
-  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs gap-1.5" title={label} onClick={onClick} disabled={disabled}>
+const IconAction: React.FC<{ icon: React.ElementType; label: string; onClick: () => void; disabled?: boolean; active?: boolean }> = ({ icon: Icon, label, onClick, disabled, active }) => (
+  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" title={label} aria-label={label} onClick={onClick} disabled={disabled}>
     <Icon className={`w-4 h-4 ${active ? 'fill-current text-amber-700 dark:text-amber-300' : ''}`} />
-    <span className="hidden xl:inline">{label}</span>
   </Button>
 );
 
-const CollapsedMessage: React.FC<{ m: GmailMessage; mine: boolean; onOpen: () => void }> = ({ m, mine, onOpen }) => (
-  <button type="button" onClick={onOpen} className="w-full flex items-center gap-3 py-2.5 border-b border-hairline text-left hover:bg-surface-hover px-1">
-    <MailAvatar name={m.from.name} email={m.from.address} photoUrl={m.from.photo_url} className="h-8 w-8" />
-    <span className="text-sm font-medium shrink-0">{mine ? 'You' : who(m.from)}</span>
-    <span className="text-xs text-muted-foreground truncate flex-1">– {m.snippet}</span>
-    {m.attachments.length > 0 && <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{stamp(m.date)}</span>
-  </button>
-);
-
-const FullMessage: React.FC<{ m: GmailMessage; mine: boolean; accountId: string; onCollapse?: () => void }> = ({ m, mine, accountId, onCollapse }) => {
+const GmailMessageCard: React.FC<{
+  m: GmailMessage; mine: boolean; accountId: string; collapsed: boolean; onToggle?: () => void;
+  onReply: () => void; onForward: () => void;
+}> = ({ m, mine, accountId, collapsed, onToggle, onReply, onForward }) => {
+  const { toast } = useToast();
   const [plain, setPlain] = useState(false);
   const cids = useMemo(() => referencedCids(m.html), [m.html]);
   const parts = m.attachments.filter((a) => a.contentId && cids.has(normalizeCid(a.contentId)));
   const inlineImages = useInlineImages(`${m.id}|${[...cids].join(',')}`, parts.map((a) => ({
     cid: a.contentId!, mime: a.mimeType, size: a.size,
     load: () => gmailApi.attachment(accountId, m.id, a.attachmentId).then((r) => base64ToBlob(r.data_base64, a.mimeType)),
-  })), !!m.html && !plain);
+  })), !collapsed && !!m.html && !plain);
+  const listed = m.attachments.filter((a) => {
+    const cid = a.contentId ? normalizeCid(a.contentId) : null;
+    if (cid && inlineImages?.[cid]) return false;
+    return !(a.inline && cid && !cids.has(cid));
+  });
+  const text = m.text ?? m.snippet;
   return (
-    <article className="py-4 border-b border-hairline last:border-b-0 space-y-3">
-      <header className="flex flex-wrap items-start gap-3">
-        <button type="button" onClick={onCollapse} disabled={!onCollapse} className="flex items-center gap-3 text-left min-w-0">
-          <MailAvatar name={m.from.name} email={m.from.address} photoUrl={m.from.photo_url} className="h-10 w-10" />
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold truncate">{mine ? `You (${m.from.address})` : who(m.from)}</span>
-            <span className="block text-xs text-muted-foreground truncate">{mine ? stamp(m.date) : `${m.from.address} · ${stamp(m.date)}`}</span>
-            {mine && <OpenReceipt opens={m.opens} />}
-          </span>
-        </button>
-        <div className="ml-auto flex flex-col items-end gap-1 min-w-0 max-w-full">
-          {m.to.length > 0 && (
-            <div className="flex flex-wrap items-center justify-end gap-1">
-              <span className="text-xs text-muted-foreground">To:</span>
-              {m.to.slice(0, 4).map((a) => <PersonChip key={a.address} name={a.name} address={a.address ?? ''} photoUrl={a.photo_url} />)}
-              {m.to.length > 4 && <span className="text-xs text-muted-foreground">+{m.to.length - 4}</span>}
-            </div>
-          )}
-          {m.cc.length > 0 && (
-            <div className="flex flex-wrap items-center justify-end gap-1">
-              <span className="text-xs text-muted-foreground">Cc:</span>
-              {m.cc.slice(0, 4).map((a) => <PersonChip key={a.address} name={a.name} address={a.address ?? ''} photoUrl={a.photo_url} />)}
-              {m.cc.length > 4 && <span className="text-xs text-muted-foreground">+{m.cc.length - 4}</span>}
-            </div>
-          )}
-        </div>
-      </header>
-      {m.html && !plain
-        ? <EmailHtmlView html={m.html} sender={m.from.address} onShowText={() => setPlain(true)} inlineImages={inlineImages} />
-        : (
-          <div className="space-y-1">
-            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{m.text ?? m.snippet}</div>
-            {m.html && <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setPlain(false)}>Show formatted</Button>}
-          </div>
-        )}
-      <AttachmentCards accountId={accountId} messageId={m.id}
-        attachments={m.attachments.filter((a) => !a.contentId || !inlineImages?.[normalizeCid(a.contentId)])} />
-    </article>
+    <MailMessageCard
+      name={who(m.from)}
+      address={m.from.address}
+      photoUrl={m.from.photo_url}
+      ours={mine}
+      date={m.date}
+      to={m.to.filter((a) => a.address).map(person)}
+      cc={m.cc.filter((a) => a.address).map(person)}
+      html={m.html}
+      text={text}
+      inlineImages={inlineImages}
+      collapsed={collapsed}
+      onToggle={onToggle}
+      plain={plain}
+      onPlainChange={setPlain}
+      hasAttachments={listed.length > 0}
+      attachments={<AttachmentCards accountId={accountId} messageId={m.id} attachments={listed} />}
+      opens={m.opens}
+      actions={{
+        ours: true,
+        onReply,
+        onCopy: text ? () => { void navigator.clipboard.writeText(text); toast({ title: 'Copied' }); } : undefined,
+        onForward,
+      }}
+    />
   );
 };
 
-type ComposeMode = 'reply' | 'all' | 'forward';
-
 export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const { toast } = useToast();
-  const { account, openId, openMessages, loadingThread, modify, threads, setOpenId, openThread, labels } = g;
+  const isMobile = useIsMobile();
+  const { account, openId, openMessages, loadingThread, modify, threads, setOpenId, openThread, labels, myUserId } = g;
   const [taskOpen, setTaskOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [mode, setMode] = useState<ComposeMode | null>(null);
+  const [summary, setSummary] = useState<{ threadId: string; text: string } | null>(null);
+  const [copilotFor, setCopilotFor] = useState<string | null>(null);
+
+  const [composeMode, setComposeModeState] = useState<ComposeMode>('reply');
+  const [target, setTarget] = useState<GmailMessage | null>(null);
   const [to, setTo] = useState<string[]>([]);
   const [cc, setCc] = useState<string[]>([]);
   const [bcc, setBcc] = useState<string[]>([]);
   const [copiesOpen, setCopiesOpen] = useState(false);
   const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [draft, setDraft] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState(false);
   const [sending, setSending] = useState(false);
   const [preparing, setPreparing] = useState(false);
-  const [assisting, setAssisting] = useState<null | 'summary' | 'draft'>(null);
-  const [summary, setSummary] = useState<{ threadId: string; text: string } | null>(null);
-  const [copilotFor, setCopilotFor] = useState<string | null>(null);
+  const forwardSeq = useRef(0);
+  const [drafting, setDrafting] = useState(false);
+  const [draftShown, setDraftShown] = useState(false);
   const [steer, setSteer] = useState('');
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const [steerOpen, setSteerOpen] = useState(false);
+  const [includeSignature, setIncludeSignature] = useState(true);
+  const [followUp, setFollowUp] = useState<SendFollowUpPlan | null>(null);
   const [trackOpens, setTrackOpens] = useTrackOpens();
-  const { dragging, dropProps } = useFileDrop((dropped) => setFiles((f) => [...f, ...dropped]));
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const sendInFlight = useRef(false);
+  const composerSettings = useComposerSettings(account?.workspace_id, myUserId);
 
   const userLabels = labels.filter((l) => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
   const row = threads.find((t) => t.id === openId);
@@ -130,12 +118,10 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const me = account?.email.toLowerCase() ?? '';
   const threadSubject = row?.subject ?? last?.subject ?? 'Conversation';
   const threadLabels = userLabels.filter((l) => (row?.label_ids ?? []).includes(l.id));
-
   const lastIncoming = useMemo(
     () => [...(openMessages ?? [])].reverse().find((m) => m.from.address !== me) ?? last,
     [openMessages, me, last],
   );
-
   const known = useMemo(() => {
     const map = new Map<string, { name: string | null; photo_url?: string | null }>();
     for (const m of openMessages ?? []) {
@@ -144,81 +130,115 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
     return map;
   }, [openMessages]);
 
-  const reset = () => {
-    setMode(null); setBody(''); setFiles([]); setTo([]); setCc([]); setBcc([]); setCopiesOpen(false); setPreview(false); setSubject(''); setSteer('');
+  const replyBase = target ?? lastIncoming;
+  const replyAllOthers = (m: GmailMessage | null, primary: string) => (m
+    ? [...new Set([...m.to, ...m.cc].map((a) => a.address).filter((a): a is string => !!a && a !== me && a !== primary))]
+    : []);
+
+  const replyPrimary = (m: GmailMessage | null) => {
+    if (!m) return '';
+    if (m.from.address === me) return m.to.map((a) => a.address).find((a): a is string => !!a && a !== me) ?? '';
+    return m.reply_to || m.from.address || '';
   };
 
-  const startReply = (kind: 'reply' | 'all') => {
-    if (!lastIncoming) return;
-    const target = lastIncoming.reply_to || lastIncoming.from.address || '';
-    setTo(target ? [target] : []);
-    const others = kind === 'all'
-      ? [...lastIncoming.to, ...lastIncoming.cc].map((a) => a.address).filter((a): a is string => !!a && a !== me && a !== target)
-      : [];
-    setCc([...new Set(others)]);
+  const startReply = (kind: 'reply' | 'all', m: GmailMessage | null = replyBase, focus = true) => {
+    forwardSeq.current += 1;
+    setPreparing(false);
+    const primary = replyPrimary(m);
+    setTo(primary ? [primary] : []);
+    const others = kind === 'all' ? replyAllOthers(m, primary) : [];
+    setCc(others);
+    setBcc([]);
     setCopiesOpen(others.length > 0);
     setSubject('');
-    setMode(kind);
-    requestAnimationFrame(() => bodyRef.current?.focus());
+    setComposeModeState(kind);
+    if (focus) requestAnimationFrame(() => composerRef.current?.focus());
   };
 
-  const startForward = async () => {
-    if (!account || !last) return;
-    setMode('forward'); setTo([]); setCc([]); setBcc([]); setCopiesOpen(false);
+  const startForward = async (m: GmailMessage | null = target ?? last) => {
+    if (!account || !m) return;
+    const seq = ++forwardSeq.current;
+    setComposeModeState('forward'); setTarget(m); setTo([]); setCc([]); setBcc([]); setCopiesOpen(false);
     setSubject(/^fwd?:/i.test(threadSubject) ? threadSubject : `Fwd: ${threadSubject}`);
-    setBody([
+    setDraft([
       '', '', '---------- Forwarded message ----------',
-      `From: ${who(last.from)}${last.from.name ? ` <${last.from.address}>` : ''}`,
-      `Date: ${stamp(last.date)}`,
-      `Subject: ${last.subject}`,
-      `To: ${last.to.map((a) => a.address).join(', ')}`,
-      '', last.text ?? last.snippet,
+      `From: ${who(m.from)}${m.from.name ? ` <${m.from.address}>` : ''}`,
+      `Date: ${stamp(m.date)}`,
+      `Subject: ${m.subject}`,
+      `To: ${m.to.map((a) => a.address).join(', ')}`,
+      '', m.text ?? m.snippet,
     ].join('\n'));
-    const forwarded = last.attachments.filter((a) => !a.inline);
-    if (!forwarded.length) { setFiles([]); return; }
+    const forwarded = m.attachments.filter((a) => !a.inline);
+    setFiles([]);
+    if (!forwarded.length) return;
     setPreparing(true);
     try {
       const loaded = await Promise.all(forwarded.map(async (a) => {
-        const { data_base64 } = await gmailApi.attachment(account.id, last.id, a.attachmentId);
+        const { data_base64 } = await gmailApi.attachment(account.id, m.id, a.attachmentId);
         return new File([base64ToBlob(data_base64, a.mimeType || 'application/octet-stream')], a.filename, { type: a.mimeType });
       }));
-      setFiles(loaded);
+      if (seq === forwardSeq.current) setFiles(loaded);
     } catch (e) {
-      toast({ title: 'The attachments could not be added', description: (e as Error).message, variant: 'destructive' });
-    } finally { setPreparing(false); }
+      if (seq === forwardSeq.current) toast({ title: 'The attachments could not be added', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      if (seq === forwardSeq.current) setPreparing(false);
+    }
   };
 
-  const assist = async (kind: 'summary' | 'draft') => {
+  const clearComposer = () => {
+    setDraft(''); setFiles([]); setPreview(false); setSteer(''); setDraftShown(false); setTarget(null); setFollowUp(null);
+  };
+  const resetComposer = () => { clearComposer(); startReply('reply', lastIncoming, false); };
+  const leaveForward = () => { if (composeMode === 'forward') { setDraft(''); setFiles([]); setTarget(null); } };
+
+  useEffect(() => {
+    clearComposer();
+    setTo([]); setCc([]); setBcc([]); setCopiesOpen(false); setComposeModeState('reply');
+  }, [openId]);
+  useEffect(() => {
+    if (lastIncoming && composeMode !== 'forward' && !target) startReply(composeMode, lastIncoming, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastIncoming?.id]);
+
+  const suggest = async () => {
     if (!account || !openId) return;
-    setAssisting(kind);
+    setDrafting(true);
+    setSteerOpen(false);
     try {
-      const r = await gmailApi.assist(account.id, openId, kind, kind === 'draft' ? steer : undefined);
-      if (kind === 'summary') setSummary({ threadId: openId, text: r.text });
-      else {
-        if (!mode || mode === 'forward') startReply('reply');
-        setBody(r.text);
-        setSteer('');
-      }
+      const r = await gmailApi.assist(account.id, openId, 'draft', steer);
+      if (composeMode === 'forward') { leaveForward(); startReply('reply', lastIncoming, false); }
+      setDraft(r.text);
+      setDraftShown(true);
+      setSteer('');
     } catch (e) {
-      toast({ title: kind === 'summary' ? 'Could not summarise' : 'Could not draft', description: (e as Error).message, variant: 'destructive' });
-    } finally { setAssisting(null); }
+      toast({ title: 'Could not draft a reply', description: (e as Error).message, variant: 'destructive' });
+    } finally { setDrafting(false); }
   };
 
-  const [followUp, setFollowUp] = useState<SendFollowUpPlan | null>(null);
-  useEffect(() => { setFollowUp(null); }, [openId, mode]);
-  const send = async (sendAt?: Date) => {
-    if (!account || !openId || !lastIncoming || !mode) return;
+  const summarise = async () => {
+    if (!account || !openId) return;
+    try {
+      const r = await gmailApi.assist(account.id, openId, 'summary');
+      setSummary({ threadId: openId, text: r.text });
+    } catch (e) {
+      toast({ title: 'Could not summarise', description: (e as Error).message, variant: 'destructive' });
+    }
+  };
+
+  const send = async (sendAt?: Date): Promise<boolean> => {
+    if (!account || !openId || !replyBase) return false;
     if (sendAt && followUp) {
       toast({ title: 'Send now, or remove the follow-up', description: 'A follow-up starts when the message goes out, so it cannot be set on a message scheduled for later.', variant: 'destructive' });
-      return;
+      return false;
     }
+    if (sendInFlight.current) return false;
+    sendInFlight.current = true;
     setSending(true);
     try {
       const input = {
-        account_id: account.id, to, cc, bcc, body, track_opens: trackOpens,
-        ...(mode === 'forward'
-          ? { subject }
-          : { thread_id: openId, reply_to_message_id: lastIncoming.id }),
+        account_id: account.id, to, cc, bcc, body: draft, track_opens: trackOpens,
+        include_signature: includeSignature,
+        ...(composeMode === 'forward' ? { subject } : { thread_id: openId, reply_to_message_id: replyBase.id }),
         attachments: files.length ? await Promise.all(files.map(fileToAttachment)) : undefined,
       };
       if (sendAt) {
@@ -226,22 +246,76 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
         toast({ title: 'Scheduled', description: `It goes out ${stamp(sendAt.toISOString())}.` });
       } else {
         const sent = await gmailApi.send(input);
-        toast({ title: mode === 'forward' ? 'Forwarded' : 'Reply sent' });
+        toast({ title: composeMode === 'forward' ? 'Forwarded' : 'Reply sent' });
         if (followUp) {
           const plan = followUp;
-          setFollowUp(null);
           await applyGmailPlan(account.id, sent.thread_id, plan, subject || undefined).then(
             () => toast({ title: describePlan(plan) }),
             (e: unknown) => toast({ title: 'Sent, but the follow-up was not set', description: (e as Error).message, variant: 'destructive' }),
           );
         }
       }
-      reset();
-      if (!sendAt && mode !== 'forward') await openThread(openId);
+      const wasForward = composeMode === 'forward';
+      resetComposer();
+      if (!sendAt && !wasForward) await openThread(openId);
+      return true;
     } catch (e) {
       toast({ title: 'Not sent', description: (e as Error).message, variant: 'destructive' });
-    } finally { setSending(false); }
+      return false;
+    } finally { sendInFlight.current = false; setSending(false); }
   };
+
+  const model: MailComposerModel | null = openId && account ? {
+    threadId: openId,
+    workspaceId: account.workspace_id,
+    channel: 'email',
+    threadMeta: null,
+    recipientName: lastIncoming ? who(lastIncoming.from) : threadSubject,
+    agent: { state: null, draft: null, draftIsCurrent: null, draftError: null },
+    waWindow: null,
+    waBlocked: false,
+    isMember: true,
+    isMobile,
+    autocomplete: false,
+    draft,
+    setDraft,
+    composerRef,
+    sending: sending || preparing,
+    isNote: false,
+    attachments: files,
+    setAttachments: setFiles,
+    replyQuote: target && target.id !== lastIncoming?.id && composeMode !== 'forward'
+      ? { label: who(target.from), text: target.snippet || '—' }
+      : null,
+    clearReplyQuote: () => { setTarget(null); startReply(composeMode === 'all' ? 'all' : 'reply', lastIncoming, false); },
+    email: {
+      composeMode,
+      setComposeMode: (mode) => {
+        if (mode === 'forward') { void startForward(); return; }
+        const fromForward = composeMode === 'forward';
+        leaveForward();
+        startReply(mode, fromForward ? lastIncoming : replyBase);
+      },
+      replyAllCount: replyAllOthers(replyBase, replyPrimary(replyBase)).length,
+      to, setTo, from: account.email, cc, setCc, bcc, setBcc, copiesOpen, setCopiesOpen,
+      subject, setSubject, known,
+      trackOpens, setTrackOpens, preview, setPreview, includeSignature, setIncludeSignature,
+    },
+    ai: {
+      drafting, draftShown, setDraftShown, steer, setSteer, steerOpen, setSteerOpen,
+      suggest,
+      rewrite: async (mode, text) => (await gmailApi.assist(account.id, openId, mode, undefined, text)).text,
+    },
+    cards: null,
+    templates: null,
+    composerSettings,
+    followUp: { value: followUp, set: setFollowUp, whatsappThreadId: null },
+    send: () => send(),
+    sendAndClose: async () => { if (await send()) await modify(openId, { remove: ['INBOX'] }, 'Sent and archived'); },
+    schedule: (d) => { void send(d); },
+    discard: resetComposer,
+    refresh: () => { void openThread(openId); },
+  } : null;
 
   if (!openId) {
     return (
@@ -252,42 +326,53 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
     );
   }
 
-  const canSend = to.length > 0 && (body.trim() || files.length > 0) && (mode !== 'forward' || subject.trim()) && !sending && !preparing;
   const earlier = (openMessages ?? []).slice(0, -1);
+  const counterpart = lastIncoming?.from ?? null;
+  const toggleStar = () => modify(openId, row?.starred ? { remove: ['STARRED'] } : { add: ['STARRED'] }, row?.starred ? 'Unstarred' : 'Starred');
+  const card = (m: GmailMessage, collapsed: boolean, onToggle?: () => void) => (
+    <GmailMessageCard key={m.id} m={m} mine={m.from.address === me} accountId={account?.id ?? ''}
+      collapsed={collapsed} onToggle={onToggle}
+      onReply={() => { leaveForward(); setTarget(m); startReply('reply', m); }}
+      onForward={() => { void startForward(m); }} />
+  );
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      <div className="px-2 py-1.5 border-b border-hairline bg-surface-sunken flex items-center gap-0.5 shrink-0 overflow-x-auto">
-        <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={() => setOpenId(null)} title="Back"><ArrowLeft className="w-4 h-4" /></Button>
-        <ToolButton icon={Reply} label="Reply" onClick={() => startReply('reply')} disabled={!lastIncoming} />
-        <ToolButton icon={ReplyAll} label="Reply all" onClick={() => startReply('all')} disabled={!lastIncoming} />
-        <ToolButton icon={Forward} label="Forward" onClick={() => { void startForward(); }} disabled={!last} />
-        <span className="w-px h-5 bg-hairline mx-1" />
-        <ToolButton icon={Star} label="Important" active={row?.starred}
-          onClick={() => modify(openId, row?.starred ? { remove: ['STARRED'] } : { add: ['STARRED'] }, row?.starred ? 'Unstarred' : 'Starred')} />
-        {userLabels.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs gap-1.5" title="Labels"><Tag className="w-4 h-4" /><span className="hidden xl:inline">Label</span></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-              {userLabels.map((l) => {
-                const on = (row?.label_ids ?? []).includes(l.id);
-                return (
-                  <DropdownMenuItem key={l.id} onSelect={() => modify(openId, on ? { remove: [l.id] } : { add: [l.id] }, on ? `Removed ${l.name}` : `Labelled ${l.name}`)}>
-                    <Check className={`w-3.5 h-3.5 mr-2 ${on ? '' : 'opacity-0'}`} />{l.name}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        <ToolButton icon={ListTodo} label="Task" onClick={() => setTaskOpen(true)} disabled={!openMessages} />
-        <ToolButton icon={Sparkles} label="JARVIS" active={false} onClick={() => setCopilotFor(copilotFor === openId ? null : openId)} disabled={!openMessages} />
-        <span className="ml-auto" />
-        <ToolButton icon={MailOpen} label="Unread" onClick={() => modify(openId, { add: ['UNREAD'] }, 'Marked unread')} />
-        <ToolButton icon={Archive} label="Archive" onClick={() => modify(openId, { remove: ['INBOX'] }, 'Archived')} />
-        <ToolButton icon={Trash2} label="Delete" onClick={() => modify(openId, { trash: true }, 'Moved to the Bin')} />
+      <div className="px-1.5 md:px-4 py-2 md:py-3 border-b border-hairline bg-card md:bg-surface-sunken flex items-center gap-2 md:gap-3 shrink-0">
+        <button type="button" onClick={() => setOpenId(null)} aria-label="Back to conversations"
+          className="md:hidden shrink-0 h-11 w-9 flex items-center justify-center rounded-sm text-foreground active:bg-surface-hover">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <MailAvatar name={counterpart?.name} email={counterpart?.address} photoUrl={counterpart?.photo_url} className="h-9 w-9 md:h-10 md:w-10 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-[15px] font-semibold truncate">{counterpart ? who(counterpart) : threadSubject}</div>
+          <div className="text-xs text-muted-foreground truncate">{counterpart?.address ?? account?.email ?? ''} · Gmail</div>
+        </div>
+        <div className="flex items-center gap-0.5 overflow-x-auto max-w-[55%] md:max-w-none">
+          <IconAction icon={Star} label={row?.starred ? 'Unstar' : 'Star'} active={row?.starred} onClick={() => { void toggleStar(); }} />
+          {userLabels.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" title="Labels" aria-label="Labels"><Tag className="w-4 h-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
+                {userLabels.map((l) => {
+                  const on = (row?.label_ids ?? []).includes(l.id);
+                  return (
+                    <DropdownMenuItem key={l.id} onSelect={() => modify(openId, on ? { remove: [l.id] } : { add: [l.id] }, on ? `Removed ${l.name}` : `Labelled ${l.name}`)}>
+                      <Check className={`w-3.5 h-3.5 mr-2 ${on ? '' : 'opacity-0'}`} />{l.name}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <IconAction icon={ListTodo} label="Create a task" onClick={() => setTaskOpen(true)} disabled={!openMessages} />
+          <IconAction icon={Sparkles} label="JARVIS" onClick={() => setCopilotFor(copilotFor === openId ? null : openId)} disabled={!openMessages} />
+          <IconAction icon={MailOpen} label="Mark unread" onClick={() => modify(openId, { add: ['UNREAD'] }, 'Marked unread')} />
+          <IconAction icon={Archive} label="Archive" onClick={() => modify(openId, { remove: ['INBOX'] }, 'Archived')} />
+          <IconAction icon={Trash2} label="Delete" onClick={() => modify(openId, { trash: true }, 'Moved to the Bin')} />
+        </div>
       </div>
 
       {taskOpen && account && (
@@ -303,8 +388,8 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       )}
 
       <AttachmentActionsProvider value={account ? { workspaceId: account.workspace_id, customer: null, subject: threadSubject } : null}>
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="px-3 md:px-5 pt-4 pb-2 space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3 md:p-4">
+        <div className="space-y-3">
           {threadLabels.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {threadLabels.map((l) => (
@@ -316,125 +401,41 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
               ))}
             </div>
           )}
-          {last?.date && <div className="text-xs text-muted-foreground">{stamp(last.date)}</div>}
-          <h1 className="font-sans text-xl sm:text-2xl font-semibold leading-tight break-words">{threadSubject}</h1>
-        </div>
-        {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={threadSubject} sender={lastIncoming?.from ?? null} />}
-
-        <div className="px-3 md:px-5 pb-4">
+          <h1 className="font-sans text-xl sm:text-2xl font-semibold leading-tight break-words pb-1">{threadSubject}</h1>
+          {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={threadSubject} sender={lastIncoming?.from ?? null} />}
           {copilotFor === openId && account && (
-            <div className="mt-3 rounded-sm border border-hairline p-3">
+            <div className="rounded-sm border border-hairline p-3">
               <CopilotPanel run={async (mode, question) => (await gmailApi.assist(account.id, openId, mode, question)).text} />
             </div>
           )}
-          {summary?.threadId === openId && (
-            <div className="mt-3 rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-sm">
+          {summary?.threadId === openId ? (
+            <div className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-sm">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                 <Sparkles className="w-3.5 h-3.5" /> Summary by JARVIS
                 <button type="button" className="ml-auto hover:text-foreground" title="Hide" onClick={() => setSummary(null)}><X className="w-3.5 h-3.5" /></button>
               </div>
               <div className="whitespace-pre-wrap">{summary.text}</div>
             </div>
+          ) : openMessages && openMessages.length > 2 && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => { void summarise(); }}>
+              <Sparkles className="w-3.5 h-3.5 mr-1" /> Summarise this conversation
+            </Button>
           )}
           {loadingThread || !openMessages ? (
             <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
           ) : (
-            <>
+            <div>
               {earlier.map((m) => (expanded.has(m.id)
-                ? <FullMessage key={m.id} m={m} mine={m.from.address === me} accountId={account?.id ?? ''}
-                    onCollapse={() => setExpanded((cur) => { const n = new Set(cur); n.delete(m.id); return n; })} />
-                : <CollapsedMessage key={m.id} m={m} mine={m.from.address === me}
-                    onOpen={() => setExpanded((cur) => new Set(cur).add(m.id))} />))}
-              {last && <FullMessage m={last} mine={last.from.address === me} accountId={account?.id ?? ''} />}
-            </>
+                ? card(m, false, () => setExpanded((cur) => { const n = new Set(cur); n.delete(m.id); return n; }))
+                : card(m, true, () => setExpanded((cur) => new Set(cur).add(m.id)))))}
+              {last && card(last, false)}
+            </div>
           )}
         </div>
       </div>
       </AttachmentActionsProvider>
 
-      <div className="border-t border-hairline bg-surface-sunken p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:p-3 shrink-0">
-        {!mode ? (
-          <div className="grid grid-cols-4 gap-1.5 md:flex md:flex-wrap md:gap-2">
-            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => startReply('reply')} disabled={!lastIncoming}><Reply className="w-4 h-4 mr-1" />Reply</Button>
-            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => startReply('all')} disabled={!lastIncoming}>
-              <ReplyAll className="w-4 h-4 mr-1" /><span className="md:hidden">All</span><span className="hidden md:inline">Reply all</span>
-            </Button>
-            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => { void startForward(); }} disabled={!last}><Forward className="w-4 h-4 mr-1" />Forward</Button>
-            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => { void assist('draft'); }} disabled={!lastIncoming || !!assisting}>
-              {assisting === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}<span className="md:hidden">AI</span><span className="hidden md:inline">Draft with AI</span>
-            </Button>
-          </div>
-        ) : (
-          <div {...dropProps} className={`rounded-sm border border-hairline bg-card${dragging ? ' ring-2 ring-primary/40' : ''}`}>
-            <div className="px-3 pt-1 border-b border-hairline">
-              <div className="flex items-start">
-                <div className="flex-1 min-w-0"><RecipientInput id="g-to" label="To" value={to} onChange={setTo} known={known} autoFocus={mode === 'forward'} /></div>
-                {!copiesOpen && <button type="button" className="text-xs text-muted-foreground hover:text-foreground pt-2.5" onClick={() => setCopiesOpen(true)}>Cc Bcc</button>}
-              </div>
-              {copiesOpen && (
-                <>
-                  <RecipientInput id="g-cc" label="Cc" value={cc} onChange={setCc} known={known} />
-                  <RecipientInput id="g-bcc" label="Bcc" value={bcc} onChange={setBcc} known={known} />
-                </>
-              )}
-              {mode === 'forward' && (
-                <div className="flex items-center gap-2 py-1">
-                  <label htmlFor="g-subject" className="text-xs text-muted-foreground w-8 shrink-0">Subj.</label>
-                  <input id="g-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 bg-transparent text-sm outline-none py-1" />
-                </div>
-              )}
-            </div>
-            {mode !== 'forward' && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-hairline">
-                <Sparkles className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <Input value={steer} onChange={(e) => setSteer(e.target.value)} placeholder="Tell JARVIS what the reply should say, then Draft" className="h-7 text-xs border-0 shadow-none focus-visible:ring-0 px-1" />
-                <Button size="sm" variant="ghost" className="h-7 text-xs shrink-0" disabled={!!assisting} onClick={() => { void assist('draft'); }}>
-                  {assisting === 'draft' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Draft'}
-                </Button>
-              </div>
-            )}
-            <div className="p-2">
-              {preview
-                ? <EmailPreview value={body} onEdit={() => setPreview(false)} />
-                : <Textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your message…" className="min-h-[110px] resize-y border-0 shadow-none focus-visible:ring-0" />}
-            </div>
-            <div className="px-2 pb-2 flex items-center justify-between gap-2">
-              <EmailFormatBar textareaRef={bodyRef} value={body} onChange={setBody} preview={preview} onPreview={setPreview} />
-              <RewriteMenu text={body} onReplace={setBody}
-                run={async (m, text) => (account && openId ? (await gmailApi.assist(account.id, openId, m, undefined, text)).text : text)} />
-              <TrackOpensToggle on={trackOpens} onChange={setTrackOpens} />
-              <ComposerInsertMenu workspaceId={account?.workspace_id ?? null} currentText={body}
-                recipient={{ name: lastIncoming?.from.name ?? null, email: to[0] ?? null }} onInsert={(t) => setBody((d) => (d.trim() ? `${d.trimEnd()}\n\n${t}` : t))} />
-            </div>
-            {(files.length > 0 || preparing) && (
-              <div className="px-3 pb-2 flex flex-wrap gap-1.5 text-xs">
-                {preparing && <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" />Adding the attachments…</span>}
-                {files.map((f, i) => (
-                  <span key={`${f.name}-${i}`} className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-surface-sunken px-1.5 py-0.5">
-                    <Paperclip className="w-3 h-3" />{f.name}
-                    <button type="button" onClick={() => setFiles((c) => c.filter((_, j) => j !== i))} title="Remove"><X className="w-3 h-3" /></button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2 px-3 py-2 border-t border-hairline">
-              <label className="inline-flex items-center gap-1 cursor-pointer text-xs text-muted-foreground hover:text-foreground" title="Attach files">
-                <Paperclip className="w-4 h-4" /><span className="hidden sm:inline">Attach</span>
-                <input type="file" multiple className="hidden" onChange={(e) => { const f = Array.from(e.target.files ?? []); setFiles((c) => [...c, ...f]); e.target.value = ''; }} />
-              </label>
-              <span className="ml-auto flex items-center gap-2">
-                <Button size="sm" variant="ghost" onClick={reset} title="Discard"><Trash2 className="w-4 h-4" /></Button>
-                <WritingScore body={body} subject={mode === 'forward' ? subject : null} />
-                <FollowUpOnSend value={followUp} onChange={setFollowUp} />
-                <SendLaterMenu disabled={!canSend} onPick={(d) => { void send(d); }} />
-                <Button size="sm" onClick={() => { void send(); }} disabled={!canSend}>
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Send<Send className="w-4 h-4 ml-1.5" /></>}
-                </Button>
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
+      {model && <InboxComposer m={model} />}
     </div>
   );
 };

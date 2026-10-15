@@ -5,6 +5,7 @@ import { hasEmailMarkup, renderEmailMarkup } from './emailMarkup.generated.ts';
 import { refreshGoogleToken } from './google-oauth.ts';
 import { base64ToBase64Url, buildMimeMessage, utf8ToBase64, type GmailPart, type MimeAttachment } from './mail-mime.ts';
 import { isTrackId, withTrackingPixel } from './mail-tracking.ts';
+import { signEmail } from './email-signature.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -95,6 +96,7 @@ export interface PreparedGmailSend {
   to: string[]; cc: string[]; bcc: string[]; subject: string; text: string;
   thread_id: string | null; reply_to_message_id: string | null; attachments: MimeAttachment[];
   track_id?: string | null;
+  signature?: { text: string; html: string } | null;
 }
 
 export interface GmailSender { user_id: string; workspace_id: string }
@@ -146,11 +148,14 @@ export async function sendPreparedGmail(
     }, { onConflict: 'id', ignoreDuplicates: true });
     if (error) { console.error('[gmail] open tracking unavailable, sending untracked', error.message); trackId = null; }
   }
-  const markup = hasEmailMarkup(p.text) ? renderEmailMarkup(p.text, escapeHtml) : null;
+  const render = (t: string) => (hasEmailMarkup(t) ? renderEmailMarkup(t, escapeHtml) : null);
+  const signed = p.signature?.text && p.signature.html ? signEmail(p.text, p.signature, render) : null;
+  const markup = signed ? signed.html : render(p.text);
+  const text = signed ? signed.text : p.text;
   const from = account.display_name ? `${account.display_name.replace(/["\\]/g, '')} <${account.email}>` : account.email;
   const raw = buildMimeMessage({
-    from, to: p.to, cc: p.cc, bcc: p.bcc, subject, text: p.text,
-    html: trackId ? withTrackingPixel(markup, p.text, trackId) : markup,
+    from, to: p.to, cc: p.cc, bcc: p.bcc, subject, text,
+    html: trackId ? withTrackingPixel(markup, text, trackId) : markup,
     inReplyTo, references, attachments: p.attachments,
   });
   const sent = await gmailFetch(token, '/messages/send', {

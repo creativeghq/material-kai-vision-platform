@@ -1,5 +1,6 @@
 /** gmail-api — a person's own Gmail, live: connect, browse, read, reply, label. Gmail stays the source of truth. */
 import { mailIdentityImages } from '../_shared/mail-identity.ts';
+import { loadEmailSignature } from '../_shared/email-signature.ts';
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, isPlatformOperator, isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -468,13 +469,16 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
 
     case 'send': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
-      const sent = await sendPreparedGmail(db, account, prepareGmailSend(body), { user_id: userId, workspace_id: account.workspace_id });
+      const prepared = prepareGmailSend(body);
+      if (body.include_signature === true) prepared.signature = await loadEmailSignature(db, userId, account.workspace_id);
+      const sent = await sendPreparedGmail(db, account, prepared, { user_id: userId, workspace_id: account.workspace_id });
       return json({ ok: true, ...sent });
     }
 
     case 'schedule': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''));
       const prepared = prepareGmailSend(body, SCHEDULE_LIMIT_BYTES);
+      if (body.include_signature === true) prepared.signature = await loadEmailSignature(db, userId, account.workspace_id);
       const sendAt = new Date(String(body.send_at ?? ''));
       const now = Date.now();
       if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() < now + 60_000 || sendAt.getTime() > now + 366 * 86_400_000) {

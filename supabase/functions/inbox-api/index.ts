@@ -29,6 +29,7 @@ import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { inboxAutopilotSettings } from '../_shared/inbox-autopilot.ts';
 import { runInBackground } from '../_shared/background.ts';
+import { loadEmailSignature, signEmail } from '../_shared/email-signature.ts';
 import { emailAddressOf, mailIdentityImages } from '../_shared/mail-identity.ts';
 import { formatBusinessIdentityForPrompt, resolveBusinessIdentity } from '../_shared/business-identity.ts';
 import {
@@ -77,7 +78,6 @@ import { handoffSince, stripQuotedEmail, TRANSCRIPT_MESSAGE_MAX } from '../_shar
 import { escapeHtml } from '../_shared/html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
 import { withTrackingPixel } from '../_shared/mail-tracking.ts';
-import { normalizeSignatureCard, renderSignatureHtml, renderSignatureText } from '../_shared/emailSignature.generated.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
@@ -1475,21 +1475,6 @@ async function messageOpens(db: DbClient, messageIds: string[]): Promise<Message
   return out;
 }
 
-async function loadEmailSignature(db: DbClient, userId: string, workspaceId: string): Promise<{ text: string; html: string } | null> {
-  const { data, error } = await db.from('inbox_composer_settings')
-    .select('email_signature, signature_card').eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle();
-  if (error) {
-    console.error('[inbox-api] signature not loaded, sending unsigned', error.message);
-    return null;
-  }
-  const card = normalizeSignatureCard(data?.signature_card);
-  if (card) return { text: renderSignatureText(card), html: renderSignatureHtml(card, escapeHtml) };
-  const plain = String(data?.email_signature ?? '').trim();
-  return plain
-    ? { text: plain, html: `<div style="white-space:pre-wrap;margin-top:18px;color:#555">-- \n${escapeHtml(plain)}</div>` }
-    : null;
-}
-
 async function insertMessageAndNotify(
   db: DbClient,
   opts: {
@@ -1730,7 +1715,13 @@ async function insertMessageAndNotify(
       const unsignedText = cards.length
         ? buildEmailCardsText(cards, body)
         : (body ?? `Attached: ${emailAttachments.map((a) => a.filename).join(', ')}`);
-      const text = signature ? `${unsignedText}\n\n-- \n${signature.text}` : unsignedText;
+      const bodyHtml = cards.length
+        ? buildEmailCardsHtml(cards, body)
+        : hasEmailMarkup(body) ? renderEmailMarkup(String(body), escapeHtml) : null;
+      const signed = signature
+        ? signEmail(unsignedText, signature, (t) => (hasEmailMarkup(t) ? renderEmailMarkup(t, escapeHtml) : null), cards.length ? bodyHtml : null)
+        : null;
+      const text = signed ? signed.text : unsignedText;
 
       let trackId: string | null = null;
       if (opts.trackOpens && opts.senderUserId) {
@@ -1741,12 +1732,7 @@ async function insertMessageAndNotify(
         });
         if (trackErr) { console.error('[inbox-api] open tracking unavailable, sending untracked', trackErr.message); trackId = null; }
       }
-      const bodyHtml = cards.length
-        ? buildEmailCardsHtml(cards, body)
-        : hasEmailMarkup(body) ? renderEmailMarkup(String(body), escapeHtml) : null;
-      const markupHtml = signature
-        ? `${bodyHtml ?? `<div style="white-space:pre-wrap">${escapeHtml(unsignedText)}</div>`}${signature.html}`
-        : bodyHtml;
+      const markupHtml = signed ? signed.html : bodyHtml;
       const html = trackId ? withTrackingPixel(markupHtml, text, trackId) : markupHtml;
 
       let sendErr: string | null = null;

@@ -13,6 +13,7 @@ import { EmailMessageCard } from './EmailMessageCard';
 import { AttachmentActionsProvider } from './AttachmentActions';
 import type { InboxPageState } from '../useInboxPage';
 import { InboxComposer } from './InboxComposer';
+import { useInboxComposerModel } from '../composerModel';
 import { ConversationActions } from './ConversationActions';
 
 export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
@@ -56,6 +57,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     isMobile,
   } = s;
   const fullScreen = isMobile && !!activeId;
+  const composerModel = useInboxComposerModel(s);
   const showMemberControls = isMember && !!activeThread;
   // Only the newest handoff of an unowned thread offers "Assign to me"; older cards are history.
   const lastHandoffId = [...messages].reverse().find((m) => m.message_type === 'system' && (m.metadata as Record<string, unknown> | null)?.agent_handoff)?.id ?? null;
@@ -344,7 +346,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
           </div>
 
           {/* Composer */}
-          <InboxComposer s={s} />
+          {composerModel && <InboxComposer m={composerModel} />}
         </>
       )}
     </MobileFullScreen>

@@ -36,6 +36,7 @@ export type GmailSendInput = {
   thread_id?: string; reply_to_message_id?: string;
   attachments?: Array<{ filename: string; content_type: string; data_base64: string }>;
   track_opens?: boolean;
+  include_signature?: boolean;
 };
 
 async function call<T>(action: string, payload: Record<string, unknown>): Promise<T> {

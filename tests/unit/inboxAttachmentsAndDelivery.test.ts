@@ -231,7 +231,7 @@ describe('one press, one message', () => {
     expect(inboxPage).toMatch(/if \(sendInFlight\.current\) return false;/);
     expect(inboxPage).toMatch(/sendInFlight\.current = false;/);
     // And the keyboard path, which was the one with no guard at all.
-    expect(inboxPage).toMatch(/const canSend = !sending && !waBlocked && !leadBlocked && hasContent;/);
+    expect(inboxPage).toMatch(/const canSend = !sending && !waBlocked && !leadBlocked && hasContent\b/);
     expect(inboxPage).toMatch(/if \(canSend\) void send\(\)/);
   });
 });
