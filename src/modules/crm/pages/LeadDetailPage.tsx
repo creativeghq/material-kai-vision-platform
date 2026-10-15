@@ -1,24 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRightCircle, FileText, Link2, Loader2, Plus, Trash2, Unlink } from 'lucide-react';
+import { ArrowRightCircle, FileText, Link2, Loader2, Mail, Pencil, Phone, Trash2, Unlink, UserPlus } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
-import { HubEmptyState } from '@/components/core/hub';
+import {
+  HubEmptyState, HubPanel, HubPanelAddAction, HubProperty, HubPropertyList, HubRecordIdentity, HubRecordLayout,
+} from '@/components/core/hub';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/utils/decimal';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, fromLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { humanizeLabel } from '@/utils/humanize';
-import { LEAD_STATUS_LABEL, LEAD_STATUS_VARIANT } from '@/modules/crm/leadVocabulary';
-import { crmTabUrl, CRM_TAB } from '@/modules/crm/routes';
+import { LEAD_SOURCE_LABEL, LEAD_STATUS_LABEL, LEAD_STATUS_VARIANT } from '@/modules/crm/leadVocabulary';
+import { CRM_BASE, CRM_TAB, crmTabUrl } from '@/modules/crm/routes';
 import { quoteUrl } from '@/modules/quotes/routes';
 import { crmLeadsService, type Lead, type LeadQuote } from '@/services/crmLeadsService';
-import { LeadFormFields, formToLeadInput, leadToForm, type LeadFormState } from '../components/LeadFormFields';
+import {
+  EDITABLE_LEAD_STATUSES, LeadFormFields, formToLeadInput, leadToForm, type EditableLeadStatus, type LeadFormState,
+} from '../components/LeadFormFields';
 import { ConvertLeadDialog } from '../components/ConvertLeadDialog';
 
 const quoteLabel = (q: LeadQuote) => [q.quote_number, q.name].filter(Boolean).join(' · ') || 'Quote';
@@ -28,8 +34,8 @@ export const LeadDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null | 'missing'>(null);
-  const [form, setForm] = useState<LeadFormState | null>(null);
   const [quotes, setQuotes] = useState<LeadQuote[]>([]);
+  const [editForm, setEditForm] = useState<LeadFormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [converting, setConverting] = useState<Lead | null>(null);
@@ -43,7 +49,6 @@ export const LeadDetailPage: React.FC = () => {
       const [l, q] = await Promise.all([crmLeadsService.get(id), crmLeadsService.quotes(id)]);
       if (!l) { setLead('missing'); return; }
       setLead(l);
-      setForm(leadToForm(l));
       setQuotes(q);
     } catch {
       setLead('missing');
@@ -52,11 +57,6 @@ export const LeadDetailPage: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const dirty = useMemo(
-    () => !!form && lead !== null && lead !== 'missing' && JSON.stringify(form) !== JSON.stringify(leadToForm(lead)),
-    [form, lead],
-  );
-
   const pickable = useMemo(() => {
     const q = pickSearch.trim().toLowerCase();
     return (linkable ?? []).filter((x) => !q || quoteLabel(x).toLowerCase().includes(q));
@@ -64,9 +64,9 @@ export const LeadDetailPage: React.FC = () => {
 
   if (lead === null) return <div className="flex justify-center py-24"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
-  if (lead === 'missing' || !form) {
+  if (lead === 'missing') {
     return (
-      <div className="mx-auto max-w-md py-24 text-center">
+      <div className="mx-auto max-w-md px-4 py-24 text-center">
         <h1 className="font-sans text-lg">Lead not found</h1>
         <p className="mt-1 text-sm text-muted-foreground">It may have been deleted.</p>
         <Button variant="ghost" className="mt-4" onClick={() => navigate(crmTabUrl(CRM_TAB.leads))}>Back to leads</Button>
@@ -75,6 +75,7 @@ export const LeadDetailPage: React.FC = () => {
   }
 
   const converted = lead.status === 'converted';
+  const overdue = !!lead.follow_up_on && !converted && lead.status !== 'lost' && lead.follow_up_on < todayLocalISO();
 
   const run = async (fn: () => Promise<unknown>, failTitle: string) => {
     setBusy(true);
@@ -83,14 +84,12 @@ export const LeadDetailPage: React.FC = () => {
     finally { setBusy(false); }
   };
 
-  const save = async () => {
-    if (!form.name.trim() || saving) return;
+  const saveEdit = async () => {
+    if (!editForm || !editForm.name.trim() || saving) return;
     setSaving(true);
     try {
-      const updated = await crmLeadsService.update(lead.id, formToLeadInput(form));
-      setLead(updated);
-      setForm(leadToForm(updated));
-      toast({ title: 'Lead saved' });
+      setLead(await crmLeadsService.update(lead.id, formToLeadInput(editForm)));
+      setEditForm(null);
     } catch (e) {
       toast({ title: 'Could not save lead', description: (e as Error).message, variant: 'destructive' });
     } finally {
@@ -101,8 +100,7 @@ export const LeadDetailPage: React.FC = () => {
   const createQuote = async () => {
     setBusy(true);
     try {
-      const quoteId = await crmLeadsService.createQuote(lead);
-      navigate(quoteUrl(quoteId));
+      navigate(quoteUrl(await crmLeadsService.createQuote(lead)));
     } catch (e) {
       toast({ title: 'Could not create quote', description: (e as Error).message, variant: 'destructive' });
       setBusy(false);
@@ -132,88 +130,157 @@ export const LeadDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate(crmTabUrl(CRM_TAB.leads))}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" /> Leads
-        </Button>
-        <h1 className="font-sans text-xl">{lead.name}</h1>
-        <Badge variant={LEAD_STATUS_VARIANT[lead.status]}>{LEAD_STATUS_LABEL[lead.status]}</Badge>
-        <span className="text-xs text-muted-foreground">Received {formatDate(lead.created_at)}</span>
-        <div className="ml-auto flex gap-2">
-          {!converted && (
-            <Button size="sm" onClick={() => setConverting(lead)}><ArrowRightCircle className="mr-1 h-4 w-4" />Convert to contact</Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={() => void remove()} aria-label="Delete lead"><Trash2 className="h-4 w-4" /></Button>
-        </div>
-      </div>
-
-      {converted && (
-        <div className="rounded-sm border border-hairline bg-surface-sunken px-4 py-3 text-sm">
-          Converted {formatDate(lead.converted_at)}.{' '}
-          {lead.converted_contact_id && <Link className="text-primary hover:underline" to={`/crm/contacts/${lead.converted_contact_id}`}>Open contact</Link>}
-          {lead.converted_deal_id && <> · <Link className="text-primary hover:underline" to={`/crm/deals/${lead.converted_deal_id}`}>Open deal</Link></>}
-        </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 border-b border-hairline px-5 py-3">
-            <CardTitle className="text-base">Details</CardTitle>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        icon={UserPlus}
+        recordTitle
+        title={lead.name}
+        subtitle={lead.title ?? undefined}
+        breadcrumbs={[{ label: 'CRM', to: CRM_BASE }, { label: 'Leads', to: crmTabUrl(CRM_TAB.leads) }, { label: lead.name }]}
+        actions={
+          <>
             {!converted && (
-              <Button size="sm" variant={dirty ? 'default' : 'outline'} disabled={!dirty || saving || !form.name.trim()} onClick={() => void save()}>
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setEditForm(leadToForm(lead))}><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>
             )}
-          </CardHeader>
-          <CardContent className="p-5">
-            <LeadFormFields form={form} onChange={setForm} disabled={converted} />
-          </CardContent>
-        </Card>
+            {!converted && (
+              <Button size="sm" onClick={() => setConverting(lead)}><ArrowRightCircle className="mr-1.5 h-4 w-4" />Convert to contact</Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => void remove()} aria-label="Delete lead"><Trash2 className="h-4 w-4" /></Button>
+          </>
+        }
+      />
 
-        <Card className="self-start">
-          <CardHeader className="border-b border-hairline px-5 py-3">
-            <CardTitle className="text-base">Quotes</CardTitle>
-            <CardDescription>What this lead has been offered.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 p-4">
+      <HubRecordLayout
+        className="sm:p-6"
+        left={
+          <>
+            <HubRecordIdentity
+              name={lead.name}
+              subtitle={lead.company_name ?? undefined}
+              meta={
+                <>
+                  <Badge variant={LEAD_STATUS_VARIANT[lead.status]}>{LEAD_STATUS_LABEL[lead.status]}</Badge>
+                  <Badge variant="neutral">{LEAD_SOURCE_LABEL[lead.source]}</Badge>
+                </>
+              }
+              actions={
+                <>
+                  {lead.email && (
+                    <Button asChild size="sm" variant="outline"><a href={`mailto:${lead.email}`}><Mail className="mr-1 h-3.5 w-3.5" />Email</a></Button>
+                  )}
+                  {lead.phone && (
+                    <Button asChild size="sm" variant="outline"><a href={`tel:${lead.phone}`}><Phone className="mr-1 h-3.5 w-3.5" />Call</a></Button>
+                  )}
+                </>
+              }
+            />
+            <HubPanel title="Details">
+              <HubPropertyList>
+                <HubProperty label="Status">
+                  {converted ? LEAD_STATUS_LABEL.converted : (
+                    <Select
+                      value={lead.status}
+                      disabled={busy}
+                      onValueChange={(v) => void run(() => crmLeadsService.setStatus(lead.id, v as EditableLeadStatus), 'Could not change status')}
+                    >
+                      <SelectTrigger className="mt-1 h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {EDITABLE_LEAD_STATUSES.map((s) => <SelectItem key={s} value={s}>{LEAD_STATUS_LABEL[s]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </HubProperty>
+                {lead.status === 'lost' && <HubProperty label="Lost reason">{lead.lost_reason}</HubProperty>}
+                <HubProperty label="Email">{lead.email}</HubProperty>
+                <HubProperty label="Phone">{lead.phone}</HubProperty>
+                <HubProperty label="Company">{lead.company_name}</HubProperty>
+                <HubProperty label="Estimated value">
+                  {lead.estimated_value == null ? null : <span className="tabular-nums">{formatMoney(lead.estimated_value, lead.currency)}</span>}
+                </HubProperty>
+                <HubProperty label="Follow-up on">
+                  {lead.follow_up_on
+                    ? <span className={overdue ? 'text-[hsl(var(--error))]' : undefined}>{formatDate(fromLocalISODate(lead.follow_up_on))}{overdue ? ' · overdue' : ''}</span>
+                    : null}
+                </HubProperty>
+                <HubProperty label="Received">{formatDate(lead.created_at)}</HubProperty>
+                <HubProperty label="Reference">{lead.source_ref}</HubProperty>
+              </HubPropertyList>
+            </HubPanel>
+          </>
+        }
+        right={
+          <HubPanel title="Quotes" action={!converted ? <HubPanelAddAction label="Create quote" onClick={() => void createQuote()} /> : undefined}>
             {quotes.length === 0 ? (
-              <HubEmptyState
-                icon={FileText}
-                title="No quote yet"
-                description="Create one for this lead, or link a quote you already made."
-                action={<Button size="sm" onClick={() => void createQuote()} disabled={busy}><Plus className="mr-1 h-4 w-4" />Create quote</Button>}
-              />
+              <p className="py-2 text-sm text-muted-foreground">No quote yet. Create one, or link a quote you already made.</p>
             ) : (
               <ul className="divide-y divide-hairline">
                 {quotes.map((q) => (
                   <li key={q.id} className="flex items-center gap-2 py-2">
                     <Link to={quoteUrl(q.id)} className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium hover:underline">{quoteLabel(q)}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {humanizeLabel(q.status ?? 'draft')} · {formatDate(q.created_at)}
-                      </div>
+                      <div className="text-[11px] text-muted-foreground">{humanizeLabel(q.status ?? 'draft')} · {formatDate(q.created_at)}</div>
                     </Link>
                     <span className="text-sm tabular-nums">{formatMoney(q.grand_total, q.currency ?? 'EUR')}</span>
-                    <Button
-                      size="icon" variant="ghost" aria-label="Unlink quote" disabled={busy}
-                      onClick={() => void run(() => crmLeadsService.linkQuote(q.id, null), 'Could not unlink quote')}
-                    >
-                      <Unlink className="h-4 w-4" />
-                    </Button>
+                    {!converted && (
+                      <Button
+                        size="icon" variant="ghost" className="h-7 w-7" aria-label="Unlink quote" disabled={busy}
+                        onClick={() => void run(() => crmLeadsService.linkQuote(q.id, null), 'Could not unlink quote')}
+                      >
+                        <Unlink className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            <div className="flex flex-wrap gap-2">
-              {quotes.length > 0 && (
-                <Button size="sm" variant="outline" onClick={() => void createQuote()} disabled={busy}><Plus className="mr-1 h-4 w-4" />Create quote</Button>
-              )}
-              <Button size="sm" variant="outline" onClick={() => void openPicker()} disabled={busy}><Link2 className="mr-1 h-4 w-4" />Link existing quote</Button>
-            </div>
+            {!converted && (
+              <Button size="sm" variant="ghost" className="mt-2 w-full" onClick={() => void openPicker()} disabled={busy}>
+                <Link2 className="mr-1.5 h-4 w-4" />Link existing quote
+              </Button>
+            )}
+          </HubPanel>
+        }
+      >
+        {converted && (
+          <div className="rounded-md border border-hairline bg-surface-sunken px-4 py-3 text-sm">
+            Converted {formatDate(lead.converted_at)}.{' '}
+            {lead.converted_contact_id && <Link className="text-primary hover:underline" to={`/crm/contacts/${lead.converted_contact_id}`}>Open contact</Link>}
+            {lead.converted_deal_id && <> · <Link className="text-primary hover:underline" to={`/crm/deals/${lead.converted_deal_id}`}>Open deal</Link></>}
+          </div>
+        )}
+
+        <Card>
+          <CardHeader><CardTitle>Request</CardTitle></CardHeader>
+          <CardContent>
+            {lead.request
+              ? <p className="whitespace-pre-wrap text-sm leading-relaxed">{lead.request}</p>
+              : <HubEmptyState icon={FileText} title="No request recorded" description="Add what they asked for." action={!converted ? <Button size="sm" variant="outline" onClick={() => setEditForm(leadToForm(lead))}>Edit lead</Button> : undefined} />}
           </CardContent>
         </Card>
-      </div>
+
+        <Card>
+          <CardHeader><CardTitle>Notes</CardTitle></CardHeader>
+          <CardContent>
+            {lead.notes
+              ? <p className="whitespace-pre-wrap text-sm leading-relaxed">{lead.notes}</p>
+              : <HubEmptyState icon={FileText} title="No notes yet" description="Keep the conversation history here." action={!converted ? <Button size="sm" variant="outline" onClick={() => setEditForm(leadToForm(lead))}>Edit lead</Button> : undefined} />}
+          </CardContent>
+        </Card>
+      </HubRecordLayout>
+
+      <Dialog open={editForm !== null} onOpenChange={(o) => { if (!o && !saving) setEditForm(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit lead</DialogTitle>
+            <DialogDescription>Changes stay on the lead until you convert it.</DialogDescription>
+          </DialogHeader>
+          {editForm && <LeadFormFields form={editForm} onChange={setEditForm} />}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditForm(null)} disabled={saving}>Cancel</Button>
+            <Button onClick={() => void saveEdit()} disabled={saving || !editForm?.name.trim()}>{saving ? 'Saving…' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={picking} onOpenChange={(o) => { if (!o) setPicking(false); }}>
         <DialogContent className="max-w-lg">
