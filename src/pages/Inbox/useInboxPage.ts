@@ -8,6 +8,7 @@ import { castSlotFor, nameGender } from '@/utils/characterAvatar';
 import { fetchDisplayProfiles } from '@/services/displayProfilesService';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
+import { undoToastAction } from './undoToast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
@@ -92,6 +93,15 @@ function buildParticipantLabels(
     }
   }
   return next;
+}
+
+type RowAction = 'done' | 'open' | 'archive' | 'restore';
+const ROW_ACTION_VERB: Record<RowAction, string> = { done: 'Marked done', open: 'Reopened', archive: 'Deleted', restore: 'Restored' };
+function isRowAction(a: string): a is RowAction { return a in ROW_ACTION_VERB; }
+function runRowAction(id: string, a: RowAction): Promise<unknown> {
+  if (a === 'archive') return inboxApi.archiveThread(id);
+  if (a === 'restore') return inboxApi.restoreThread(id);
+  return inboxApi.setStatus(id, a === 'done' ? 'closed' : 'open');
 }
 
 /** A conversation with automatic outreach waiting: a chain step, or the older single follow-up message. */
@@ -416,14 +426,11 @@ export function useInboxPage() {
       return;
     }
     setBulkBusy(true);
-    const verbs = { read: 'Marked read', done: 'Marked done', open: 'Reopened', archive: 'Deleted', restore: 'Restored', delete_forever: 'Deleted permanently', label: 'Labelled', assign_me: 'Assigned to you', follow_up: 'Follow-up set' } as const;
+    const verbs = { ...ROW_ACTION_VERB, read: 'Marked read', delete_forever: 'Deleted permanently', label: 'Labelled', assign_me: 'Assigned to you', follow_up: 'Follow-up set' } as const;
     try {
       const r = await runBulk(ids, (id) => {
         if (action === 'read') return inboxApi.markRead(id);
-        if (action === 'done') return inboxApi.setStatus(id, 'closed');
-        if (action === 'open') return inboxApi.setStatus(id, 'open');
-        if (action === 'archive') return inboxApi.archiveThread(id);
-        if (action === 'restore') return inboxApi.restoreThread(id);
+        if (isRowAction(action)) return runRowAction(id, action);
         if (action === 'delete_forever') return inboxApi.deleteThreadForever(id);
         if (action === 'follow_up') return plan ? applyPlatformPlan(id, plan) : Promise.reject(new Error('No follow-up chosen'));
         if (action === 'assign_me') return myUserId ? inboxApi.setAssignee(id, myUserId) : Promise.reject(new Error('Not signed in'));
@@ -1090,6 +1097,39 @@ export function useInboxPage() {
     } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
   }, [activeThread, toast, loadThreads]);
 
+  const quickAction = useCallback(async (id: string, action: RowAction) => {
+    const row = threadsRef.current.find((t) => t.id === id);
+    if (!row) return;
+    const at = threadsRef.current.indexOf(row);
+    const leaves = action === 'archive' || action === 'restore';
+    const putBack = () => setThreads((cur) => (leaves
+      ? (cur.some((t) => t.id === id) ? cur : [...cur.slice(0, at), row, ...cur.slice(at)])
+      : cur.map((t) => (t.id === id ? { ...t, status: row.status } : t))));
+    setThreads((cur) => (leaves
+      ? cur.filter((t) => t.id !== id)
+      : cur.map((t) => (t.id === id ? { ...t, status: action === 'done' ? 'closed' : 'open' } : t))));
+    threadCache.current.delete(id);
+    try {
+      await runRowAction(id, action);
+    } catch (e) {
+      putBack();
+      toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' });
+      return;
+    }
+    toast({
+      title: ROW_ACTION_VERB[action],
+      action: undoToastAction(() => {
+        threadCache.current.delete(id);
+        const undo = leaves ? runRowAction(id, action === 'archive' ? 'restore' : 'archive') : inboxApi.setStatus(id, row.status);
+        putBack();
+        undo.catch((e: Error) => {
+          toast({ title: 'Could not undo', description: e.message, variant: 'destructive' });
+          void loadThreads({ silent: true });
+        });
+      }),
+    });
+  }, [toast, loadThreads]);
+
   const deleteForeverActive = useCallback(async () => {
     if (!activeThread) return;
     try {
@@ -1290,6 +1330,7 @@ export function useInboxPage() {
     clearSelection,
     setSelectedIds,
     runBulkAction,
+    quickAction,
     bulkBusy,
     unreadOnly,
     setUnreadOnly,

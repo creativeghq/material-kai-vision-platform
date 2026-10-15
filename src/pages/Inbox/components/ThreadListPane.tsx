@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlarmClock, ChevronRight, Folder as FolderIcon, FolderOpen, Loader2, MessageSquare, Bot, Search, ArchiveRestore, Trash2, Clock, ShoppingCart, Send, Paperclip, Menu, X, PenSquare } from 'lucide-react';
+import { AlarmClock, ChevronRight, Folder as FolderIcon, FolderOpen, Loader2, MessageSquare, Bot, Search, ArchiveRestore, Trash2, Clock, ShoppingCart, Send, Paperclip, Menu, X, PenSquare, Check, CheckCheck, MailOpen, RotateCcw, MoreVertical } from 'lucide-react';
 import { visibleModes } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
@@ -22,6 +22,7 @@ import { LabelChips, SourceWord, ThreadAvatar } from './InboxPrimitives';
 import type { InboxPageState } from '../useInboxPage';
 import { FollowUpStatsLine } from './FollowUpStatsLine';
 import { BulkFollowUp } from './BulkFollowUp';
+import { SwipeRow, type SwipeAction } from './SwipeRow';
 
 
 const FOLDER_VIEW_KEY = 'inbox.whatsapp.layout';
@@ -83,7 +84,24 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     labelIds,
     setShowMailbox,
     inboxUnread,
+    isMobile,
+    quickAction,
+    loadThreads,
   } = s;
+  const selecting = selectedIds.size > 0;
+  const [pull, setPull] = React.useState(0);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const pullStart = React.useRef<{ x: number; y: number; vertical: boolean | null } | null>(null);
+  const PULL_TRIGGER = 64;
+  const swipeFor = (t: InboxThread): { left?: SwipeAction; right?: SwipeAction } => {
+    if (view === 'archived') return { right: { label: 'Restore', Icon: ArchiveRestore, tone: 'info', run: () => { void quickAction(t.id, 'restore'); } } };
+    return {
+      left: { label: 'Delete', Icon: Trash2, tone: 'danger', run: () => { void quickAction(t.id, 'archive'); } },
+      right: t.status === 'closed'
+        ? { label: 'Reopen', Icon: RotateCcw, tone: 'info', run: () => { void quickAction(t.id, 'open'); } }
+        : { label: 'Done', Icon: CheckCheck, tone: 'success', run: () => { void quickAction(t.id, 'done'); } },
+    };
+  };
   const [searchOpen, setSearchOpen] = React.useState(false);
   // Long-press selects, the way a phone list does; the click that ends the press must not also open.
   const press = React.useRef<{ timer: ReturnType<typeof setTimeout> | null; fired: boolean }>({ timer: null, fired: false });
@@ -134,8 +152,9 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                 ?.order_intake?.status === 'pending_review';
               const selected = selectedIds.has(t.id);
               return (
-                <div key={t.id} className="group relative">
-                <span className={`absolute left-1.5 md:left-1 top-1/2 -translate-y-1/2 z-10 ${selectedIds.size > 0 || selected ? 'flex' : 'hidden md:group-hover:flex'}`}>
+                <SwipeRow key={t.id} enabled={isMobile && isMember && !selecting} {...swipeFor(t)}>
+                <div className="group relative">
+                <span className={`absolute left-1 top-1/2 -translate-y-1/2 z-10 hidden ${selecting || selected ? 'md:flex' : 'md:group-hover:flex'}`}>
                   <Checkbox aria-label={`Select ${name}`} checked={selected} onCheckedChange={() => toggleSelected(t.id)} />
                 </span>
                 <button
@@ -144,10 +163,25 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                     if (press.current.fired) { press.current.fired = false; return; }
                     if (selectedIds.size > 0) toggleSelected(t.id); else void openThread(t.id);
                   }}
-                  className={`w-full text-left select-none md:select-auto [-webkit-touch-callout:none] md:[-webkit-touch-callout:default] ${selectedIds.size > 0 ? 'pl-9 md:pl-8 pr-4' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors active:bg-surface-hover ${selected ? 'bg-primary/[0.06]' : ''} ${active ? 'md:bg-surface-hover md:border-l-primary border-l-transparent' : 'border-l-transparent hover:bg-surface-hover'}`}
+                  className={`w-full text-left select-none md:select-auto [-webkit-touch-callout:none] md:[-webkit-touch-callout:default] ${selecting ? 'px-4 md:pl-8' : 'px-4 md:group-hover:pl-8'} py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors active:bg-surface-hover ${selected ? 'bg-primary/[0.06]' : ''} ${active ? 'md:bg-surface-hover md:border-l-primary border-l-transparent' : 'border-l-transparent hover:bg-surface-hover'}`}
                 >
-                  <div className="relative shrink-0 mt-0.5">
-                    <ThreadAvatar thread={t} name={name} className="h-12 w-12 md:h-9 md:w-9" showMood />
+                  {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- touch shortcut; the row and its long-press stay the accessible way in */}
+                  <div
+                    className="relative shrink-0 mt-0.5"
+                    onClick={(e) => {
+                      if (!isMobile || !isMember) return;
+                      e.stopPropagation();
+                      // The click that ends a long-press already selected it.
+                      if (press.current.fired) { press.current.fired = false; return; }
+                      toggleSelected(t.id);
+                      navigator.vibrate?.(10);
+                    }}
+                  >
+                    {isMobile && selected ? (
+                      <span className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                        <Check className="w-6 h-6" />
+                      </span>
+                    ) : <ThreadAvatar thread={t} name={name} className="h-12 w-12 md:h-9 md:w-9" showMood />}
                     {/* Solid, not tinted: at 16px a 15% wash reads as grey in every theme,
                         and the glyph inside it needs a ground to sit on. */}
                     <span
@@ -197,12 +231,6 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                       {t.agent_state === 'active' && (
                         <span className="inline-flex items-center gap-1 text-[11px] leading-none text-primary"><Bot className="w-3 h-3" />AI</span>
                       )}
-                      {/* Same reasoning as the order badge below: "the customer spoke last and
-                          nobody answered" is a JOB, not a description, and it was invisible
-                          from the list — `unread` only says whether anyone LOOKED. That is how
-                          33 conversations reached a week without a reply while the mailbox
-                          showed 67 identically-open threads. The age is measured from the
-                          FIRST unanswered message, so it is how long they have really waited. */}
                       {t.waiting_on === 'us' && (
                         <Badge variant="warning" className="text-[10px] py-0">
                           <Clock className="w-2.5 h-2.5" />
@@ -225,6 +253,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                   </div>
                 </button>
                 </div>
+                </SwipeRow>
               );
   };
 
@@ -233,7 +262,59 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
   return (
     <div className={`md:dashboard-card bg-card md:col-span-4 lg:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
       <div className="md:hidden flex items-center gap-1 h-14 px-1.5 border-b border-hairline bg-card shrink-0">
-        {searchOpen ? (
+        {selecting ? (
+          <>
+            <button type="button" aria-label="Cancel selection" onClick={clearSelection}
+              className="h-11 w-11 flex items-center justify-center rounded-sm text-foreground active:bg-surface-hover">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex-1 min-w-0 px-1 text-lg font-semibold tabular-nums">{selectedIds.size}</div>
+            {bulkBusy && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+            {view === 'archived' ? (
+              <button type="button" aria-label="Restore" disabled={bulkBusy} onClick={() => runBulkAction('restore')}
+                className="h-11 w-11 flex items-center justify-center rounded-sm active:bg-surface-hover disabled:opacity-40">
+                <ArchiveRestore className="w-5 h-5" />
+              </button>
+            ) : (
+              <>
+                <button type="button" aria-label="Mark read" disabled={bulkBusy} onClick={() => runBulkAction('read')}
+                  className="h-11 w-11 flex items-center justify-center rounded-sm active:bg-surface-hover disabled:opacity-40">
+                  <MailOpen className="w-5 h-5" />
+                </button>
+                <button type="button" aria-label={statusTab === 'closed' && view === 'all' ? 'Reopen' : 'Mark done'} disabled={bulkBusy}
+                  onClick={() => runBulkAction(statusTab === 'closed' && view === 'all' ? 'open' : 'done')}
+                  className="h-11 w-11 flex items-center justify-center rounded-sm active:bg-surface-hover disabled:opacity-40">
+                  {statusTab === 'closed' && view === 'all' ? <RotateCcw className="w-5 h-5" /> : <CheckCheck className="w-5 h-5" />}
+                </button>
+                <button type="button" aria-label="Delete" disabled={bulkBusy} onClick={() => runBulkAction('archive')}
+                  className="h-11 w-11 flex items-center justify-center rounded-sm text-destructive active:bg-surface-hover disabled:opacity-40">
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <BulkFollowUp disabled={bulkBusy} onPlan={(plan) => runBulkAction('follow_up', undefined, plan)} />
+              </>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" aria-label="More actions" className="h-11 w-11 flex items-center justify-center rounded-sm active:bg-surface-hover">
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onSelect={() => setSelectedIds(new Set(visibleThreads.map((t) => t.id)))}>
+                  Select all ({visibleThreads.length})
+                </DropdownMenuItem>
+                {view !== 'archived' && (
+                  <DropdownMenuItem onSelect={() => runBulkAction('assign_me')}>Assign to me</DropdownMenuItem>
+                )}
+                {view !== 'archived' && wsLabels.map((l) => (
+                  <DropdownMenuItem key={l.id} onSelect={() => runBulkAction('label', l.id)}>
+                    <span className={`w-2 h-2 rounded-full mr-2 ${labelDot(l.color)}`} />Label: {l.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        ) : searchOpen ? (
           <>
             <button type="button" aria-label="Close search" onClick={() => { setSearchOpen(false); setQuery(''); }}
               className="h-11 w-11 flex items-center justify-center rounded-sm text-muted-foreground active:bg-surface-hover">
@@ -287,7 +368,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             Unread / Archived views, where status is not the axis. The filter bar stays put in
             every view — it is what carries the Unread toggle. */}
         {selectedIds.size > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <div className={`${view === 'archived' ? 'flex' : 'hidden md:flex'} flex-wrap items-center gap-1.5 text-xs`}>
             <Checkbox
               aria-label="Select every conversation shown"
               checked={selectedIds.size === visibleThreads.length ? true : 'indeterminate'}
@@ -400,10 +481,42 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
         </div>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto" onScroll={(e) => {
-        const el = e.currentTarget;
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && nextCursor && !loadingMore) void loadMoreThreads();
-      }}>
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && nextCursor && !loadingMore) void loadMoreThreads();
+        }}
+        onTouchStart={(e) => {
+          pullStart.current = isMobile && e.currentTarget.scrollTop <= 0 && !refreshing
+            ? { x: e.touches[0].clientX, y: e.touches[0].clientY, vertical: null } : null;
+        }}
+        onTouchMove={(e) => {
+          const p = pullStart.current;
+          if (!p) return;
+          const dx = e.touches[0].clientX - p.x;
+          const d = e.touches[0].clientY - p.y;
+          if (p.vertical === null && (Math.abs(dx) > 10 || Math.abs(d) > 10)) p.vertical = Math.abs(d) > Math.abs(dx);
+          if (!p.vertical) return;
+          setPull(d > 0 && e.currentTarget.scrollTop <= 0 ? Math.min(d * 0.5, PULL_TRIGGER * 1.4) : 0);
+        }}
+        onTouchEnd={() => {
+          pullStart.current = null;
+          if (pull >= PULL_TRIGGER) {
+            setRefreshing(true);
+            navigator.vibrate?.(10);
+            void loadThreads({ silent: true }).finally(() => { setRefreshing(false); setPull(0); });
+          } else setPull(0);
+        }}
+      >
+        {(pull > 0 || refreshing) && (
+          <div className="md:hidden flex items-center justify-center text-muted-foreground transition-[height]"
+            style={{ height: refreshing ? 48 : pull }} aria-live="polite">
+            <Loader2 className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`}
+              style={refreshing ? undefined : { transform: `rotate(${pull * 4}deg)`, opacity: Math.min(pull / PULL_TRIGGER, 1) }} />
+            <span className="sr-only">{refreshing ? 'Refreshing' : 'Pull to refresh'}</span>
+          </div>
+        )}
         {loadingThreads ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : visibleThreads.length === 0 ? (
