@@ -7,12 +7,16 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, CircleHelp, Compass, Loader2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CircleHelp, Clock, Compass, Loader2, X } from 'lucide-react';
 
 import { Layout } from '@/components/core/Layout';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/core/ui/alert-dialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
@@ -39,17 +43,21 @@ interface RailProps {
   onPick: (index: number) => void;
 }
 
+type StepMark = 'done' | 'pending' | null;
+
 /** A setup step's tick comes from the DATA; a tour step's from having been read. */
-function stepDone(
+function stepMark(
   step: OnboardingStep,
   seen: string[],
   setupStatus: OnboardingSetupStatus | null,
-): boolean {
-  if (step.id === 'business') return setupStatus?.business === 'ok';
-  if (step.id === 'myaade') return setupStatus?.myaade === 'ok';
-  // The provider's own word only: walking past this step is not the same as being registered.
-  if (step.id === 'einvoicing') return setupStatus?.einvoicing === 'ok';
-  return seen.includes(step.id);
+): StepMark {
+  if (step.id === 'business') return setupStatus?.business === 'ok' ? 'done' : null;
+  if (step.id === 'myaade') return setupStatus?.myaade === 'ok' ? 'done' : null;
+  // The provider's own word only: a sent application is waiting on Novus, not registered.
+  if (step.id === 'einvoicing') {
+    return setupStatus?.einvoicing === 'ok' ? 'done' : setupStatus?.einvoicing === 'pending' ? 'pending' : null;
+  }
+  return seen.includes(step.id) ? 'done' : null;
 }
 
 const StepRail: React.FC<RailProps> = ({ steps, activeIndex, seen, setupStatus, onPick }) => (
@@ -58,7 +66,8 @@ const StepRail: React.FC<RailProps> = ({ steps, activeIndex, seen, setupStatus, 
     <nav aria-label="Setup steps" className="hidden lg:block w-72 shrink-0">
       <ol className="space-y-1">
         {steps.map((step, i) => {
-          const done = stepDone(step, seen, setupStatus);
+          const mark = stepMark(step, seen, setupStatus);
+          const done = mark === 'done';
           const active = i === activeIndex;
           return (
             <li key={step.id}>
@@ -81,14 +90,15 @@ const StepRail: React.FC<RailProps> = ({ steps, activeIndex, seen, setupStatus, 
                         : 'border-hairline text-muted-foreground',
                   )}
                 >
-                  {done ? <Check className="h-3 w-3" /> : i + 1}
+                  {done ? <Check className="h-3 w-3" /> : mark === 'pending' ? <Clock className="h-3 w-3" /> : i + 1}
                 </span>
                 <span className="min-w-0">
                   <span className={cn('block text-sm', active ? 'font-medium' : 'text-foreground/90')}>
                     {step.navLabel}
                   </span>
                   <span className="block text-[11px] text-muted-foreground leading-snug mt-0.5">
-                    {step.kind === 'setup' ? 'Set this up' : 'Have a look'}
+                    {mark === 'pending' ? 'Sent — waiting on Novus'
+                      : step.kind === 'setup' ? 'Set this up' : 'Have a look'}
                   </span>
                 </span>
               </button>
@@ -102,7 +112,8 @@ const StepRail: React.FC<RailProps> = ({ steps, activeIndex, seen, setupStatus, 
     <div className="lg:hidden -mx-4 px-4 overflow-x-auto">
       <ol className="flex gap-2 w-max pb-2">
         {steps.map((step, i) => {
-          const done = stepDone(step, seen, setupStatus);
+          const mark = stepMark(step, seen, setupStatus);
+          const done = mark === 'done';
           const active = i === activeIndex;
           return (
             <li key={step.id}>
@@ -117,7 +128,7 @@ const StepRail: React.FC<RailProps> = ({ steps, activeIndex, seen, setupStatus, 
                     : 'border-hairline text-muted-foreground',
                 )}
               >
-                {done ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>}
+                {done ? <Check className="h-3 w-3" /> : mark === 'pending' ? <Clock className="h-3 w-3" /> : <span>{i + 1}</span>}
                 {step.navLabel}
               </button>
             </li>
@@ -163,18 +174,22 @@ const SetupBody: React.FC<{
   workspaceId: string;
   workspaceName?: string;
   onGoToStep?: (stepId: string) => void;
+  onChanged?: () => void;
 }> = ({
-  stepId, workspaceId, workspaceName, onGoToStep,
+  stepId, workspaceId, workspaceName, onGoToStep, onChanged,
 }) => {
   if (stepId === 'einvoicing') {
     return (
       <EInvoiceOnboardingCard
         workspaceId={workspaceId}
         onGoToIdentity={onGoToStep ? () => onGoToStep('business') : undefined}
+        onChanged={onChanged}
       />
     );
   }
-  if (stepId === 'business') return <BusinessIdentityCard workspaceId={workspaceId} />;
+  if (stepId === 'business') {
+    return <BusinessIdentityCard workspaceId={workspaceId} onboarding onSaved={onChanged} />;
+  }
   if (stepId === 'myaade') {
     return (
       <div className="space-y-4">
@@ -186,7 +201,7 @@ const SetupBody: React.FC<{
   if (stepId === 'workspace') {
     return (
       <div className="space-y-6">
-        <ModulesActivationTab />
+        <ModulesActivationTab collapsible />
         <TeamPanel workspaceId={workspaceId} workspaceName={workspaceName} />
       </div>
     );
@@ -208,6 +223,7 @@ const StartHerePage: React.FC = () => {
   const [seen, setSeen] = useState<string[]>([]);
   const [setupStatus, setSetupStatus] = useState<OnboardingSetupStatus | null>(null);
   const [restored, setRestored] = useState(false);
+  const [confirmFinish, setConfirmFinish] = useState(false);
 
   // Clamp rather than index blindly: switching workspace can SHRINK the list (admin here, plain
   // member there), and `steps[index]` going undefined renders "nothing to walk through" over a
@@ -235,10 +251,12 @@ const StartHerePage: React.FC = () => {
     setRestored(true);
   }, [loading, restored, progress, steps, start, restart]);
 
-  useEffect(() => {
+  const refreshSetup = useCallback(() => {
     if (!activeWorkspaceId) return;
     void onboardingService.setupStatus(activeWorkspaceId).then(setSetupStatus);
-  }, [activeWorkspaceId, safeIndex]);
+  }, [activeWorkspaceId]);
+
+  useEffect(() => { refreshSetup(); }, [refreshSetup, safeIndex]);
 
   const goTo = useCallback((next: number) => {
     if (!step) return;
@@ -253,6 +271,9 @@ const StartHerePage: React.FC = () => {
     const at = steps.findIndex((s) => s.id === stepId);
     if (at >= 0) goTo(at);
   }, [steps, goTo]);
+
+  // Finishing never sends the application (that creates a real contract), so say it was not sent.
+  const unsentEinvoicing = steps.some((s) => s.id === 'einvoicing') && setupStatus?.einvoicing === 'missing';
 
   const complete = useCallback(async () => {
     const nextSeen = step && !seen.includes(step.id) ? [...seen, step.id] : seen;
@@ -355,6 +376,7 @@ const StartHerePage: React.FC = () => {
                 workspaceId={activeWorkspaceId}
                 workspaceName={activeWorkspace?.name}
                 onGoToStep={goToStepId}
+                onChanged={refreshSetup}
               />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -377,7 +399,7 @@ const StartHerePage: React.FC = () => {
                 <ArrowLeft className="h-4 w-4 mr-1" /> Back
               </Button>
               {isLast ? (
-                <Button onClick={complete}>
+                <Button onClick={() => (unsentEinvoicing ? setConfirmFinish(true) : void complete())}>
                   <Check className="h-4 w-4 mr-1" /> Finish
                 </Button>
               ) : (
@@ -391,6 +413,23 @@ const StartHerePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={confirmFinish} onOpenChange={setConfirmFinish}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Your e-invoicing application has not been sent</AlertDialogTitle>
+            <AlertDialogDescription>
+              Novus only starts the registration, and only emails the contract to sign, once you press
+              Send to Novus on the e-Invoicing step. Until it is registered this business cannot issue
+              a legal invoice through us.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => void complete()}>Finish anyway</AlertDialogCancel>
+            <AlertDialogAction onClick={() => goToStepId('einvoicing')}>Open e-Invoicing</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };

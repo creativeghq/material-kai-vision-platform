@@ -13,7 +13,7 @@ import { Label } from '@/components/core/ui/label';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
   einvoiceOnboardingService,
   type ApplicationDraft,
@@ -26,6 +26,7 @@ import {
 interface Props {
   workspaceId: string;
   onGoToIdentity?: () => void;
+  onChanged?: () => void;
 }
 
 const STATE_LOOK: Record<OnboardingStepState, {
@@ -59,7 +60,7 @@ const EMPTY_DRAFT: ApplicationDraft = {
   isp_provider_name: '', isp_contract_number: '', isp_contract_date: null, contact_backup_phone: '',
 };
 
-export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity }) => {
+export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity, onChanged }) => {
   const { toast } = useToast();
   const [data, setData] = useState<EInvoiceOnboarding | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,13 +100,14 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
     setBusy(key);
     try {
       setData(await fn());
+      onChanged?.();
       if (ok) toast({ title: ok });
     } catch (err) {
       toast({ title: 'That did not go through', description: (err as Error).message, variant: 'destructive' });
     } finally {
       setBusy(null);
     }
-  }, [toast]);
+  }, [toast, onChanged]);
 
   const download = useCallback(async () => {
     setBusy('download');
@@ -240,7 +242,7 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="isp-date">Contract date</Label>
-                  <Input id="isp-date" type="date" value={draft.isp_contract_date ?? ''}
+                  <Input id="isp-date" type="date" max={todayLocalISO()} value={draft.isp_contract_date ?? ''}
                     onChange={(e) => setDraft({ ...draft, isp_contract_date: e.target.value || null })} />
                 </div>
               </div>
@@ -255,7 +257,11 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
               </Button>
               <Button
                 size="sm" disabled={busy !== null || needsIdentity}
-                onClick={() => void run('create', () => einvoiceOnboardingService.create(workspaceId), 'Sent to Novus')}
+                // Novus is sent the STORED application.
+                onClick={() => void run('create', async () => {
+                  await einvoiceOnboardingService.saveApplication(workspaceId, draft);
+                  return einvoiceOnboardingService.create(workspaceId);
+                }, 'Sent to Novus — they will email the contract to sign')}
               >
                 {busy === 'create' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
                 Send to Novus

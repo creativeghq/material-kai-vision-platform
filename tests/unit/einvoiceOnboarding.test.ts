@@ -143,11 +143,11 @@ describe('the onboarding step is ticked by the provider, not by the reader', () 
     expect(line).not.toContain('seen');
   });
 
-  it('is the first setup step and is gated to whoever can act on it', () => {
+  it('comes straight after the business details it is built from, gated to whoever can act on it', () => {
     const src = read(STEPS);
     const ids = [...src.matchAll(/^\s{4}id: '([^']+)'/gm)].map((m) => m[1]);
-    expect(ids[0]).toBe('einvoicing');
-    const step = src.slice(src.indexOf("id: 'einvoicing'"), src.indexOf("id: 'business'"));
+    expect(ids.indexOf('einvoicing')).toBe(ids.indexOf('business') + 1);
+    const step = src.slice(src.indexOf("id: 'einvoicing'"), src.indexOf("id: 'myaade'"));
     expect(step).toContain('requireWorkspaceManager: true');
     expect(step).toContain("requireCapability: 'finance.manage'");
   });

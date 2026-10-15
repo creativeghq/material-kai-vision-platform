@@ -6,7 +6,7 @@
  *  4. My company — type / operating mode / main activity.
  *  + Bank & logo.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Save, Upload, Building2, ImageIcon, Copy, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { HubSegmented } from '@/components/core/hub';
@@ -17,6 +17,7 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { aadeService } from '@/modules/myaade';
 import { gemiService } from '@/services/gemiService';
@@ -75,9 +76,34 @@ const MAIN_ACTIVITIES = [
 
 const ALL_TEXT_FIELDS = [...BILLING, ...CUSTOMER_CONTACT, ...PERSONAL];
 
-export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+interface Props {
+  workspaceId: string;
+  /** Start Here: autosave (its Continue writes nothing), signup prefill, operator-funded ΑΑΔΕ lookup. */
+  onboarding?: boolean;
+  onSaved?: () => void;
+}
+
+function buildPatch(workspaceId: string, data: Record<string, any>): Record<string, any> {
+  const patch: Record<string, any> = { workspace_id: workspaceId, updated_at: new Date().toISOString() };
+  for (const f of ALL_TEXT_FIELDS) {
+    patch[f.key] = data[f.key] ?? null;
+    if (f.bilingual) patch[`${f.key}_en`] = data[`${f.key}_en`] ?? null;
+  }
+  patch.business_company_type = data.business_company_type ?? null;
+  patch.business_seasonal = !!data.business_seasonal;
+  patch.main_activity = data.main_activity ?? null;
+  return patch;
+}
+
+export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding = false, onSaved }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [data, setData] = useState<Record<string, any>>({});
+  const [dirty, setDirty] = useState(false);
+  const latest = useRef({ data, dirty });
+  latest.current = { data, dirty };
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
   const [lang, setLang] = useState<Lang>('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,39 +118,59 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
       .then(({ data: row }) => {
         if (cancelled) return;
         const r: Record<string, any> = row ?? { workspace_id: workspaceId };
-        setData(r);
+        const signupVat = String(user?.user_metadata?.vat_number ?? '').replace(/[^0-9]/g, '');
+        const prefill: Record<string, any> = {};
+        if (onboarding && !r.business_email && user?.email) prefill.business_email = user.email;
+        if (onboarding && !r.business_vat && signupVat.length === 9) prefill.business_vat = signupVat;
+        setData({ ...r, ...prefill });
+        if (Object.keys(prefill).length) setDirty(true);
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [workspaceId]);
+  }, [workspaceId, onboarding, user?.email, user?.user_metadata?.vat_number]);
 
-  const set = (k: string, v: any) => setData((d) => ({ ...d, [k]: v }));
+  const set = (k: string, v: any) => { setData((d) => ({ ...d, [k]: v })); setDirty(true); };
+  const setMany = (fn: (d: Record<string, any>) => Record<string, any>) => { setData(fn); setDirty(true); };
+
+  const persist = useCallback(async (snapshot: Record<string, any>) => {
+    // Accounts are managed in Settings → Accounts (single source), not here.
+    const { error } = await supabase.from('finance_settings')
+      .upsert(buildPatch(workspaceId, snapshot), { onConflict: 'workspace_id' });
+    if (!error) onSavedRef.current?.();
+    return error;
+  }, [workspaceId]);
 
   const save = async () => {
     setSaving(true);
     try {
-      const patch: Record<string, any> = { workspace_id: workspaceId, updated_at: new Date().toISOString() };
-      for (const f of ALL_TEXT_FIELDS) {
-        patch[f.key] = data[f.key] ?? null;
-        if (f.bilingual) patch[`${f.key}_en`] = data[`${f.key}_en`] ?? null;
-      }
-      patch.business_company_type = data.business_company_type ?? null;
-      patch.business_seasonal = !!data.business_seasonal;
-      patch.main_activity = data.main_activity ?? null;
-      // Accounts are managed in Settings → Accounts (single source), not here.
-      const { error } = await supabase.from('finance_settings').upsert(patch, { onConflict: 'workspace_id' });
+      const error = await persist(data);
       if (error) throw error;
+      setDirty(false);
       toast({ title: 'Business profile saved' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
-  /** Prefill the issuer fields from ΑΑΔΕ (RgWsPublic2) using the VAT number.
-   *  The bilingual fields (name/activity/tax office/street/city) are filled in BOTH
-   *  languages: the Greek base key from ΑΑΔΕ's registered value, and the `_en` key from
-   *  the server-side English translation (`translate: true`). Review then Save. No companyId
-   *  → this is the workspace's OWN business, so nothing is cached onto a CRM company row. */
+  useEffect(() => {
+    if (!onboarding || !dirty || loading) return;
+    const t = window.setTimeout(() => {
+      const snapshot = latest.current.data;
+      void persist(snapshot).then((error) => {
+        if (error) toast({ title: 'Could not save your business details', description: error.message, variant: 'destructive' });
+        else if (latest.current.data === snapshot) setDirty(false);
+      });
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [onboarding, dirty, loading, data, persist, toast]);
+
+  // Leaving the step inside the debounce window still writes what was typed.
+  useEffect(() => () => {
+    if (onboarding && latest.current.dirty) void persist(latest.current.data);
+  }, [onboarding, persist]);
+
+  /** Prefill from ΑΑΔΕ by VAT: Greek into the base keys, the server translation into `_en`. No
+   *  companyId — this is the workspace's OWN business, so nothing is cached onto a CRM row. */
   const lookupAade = async () => {
     const afm = String(data.business_vat ?? '').replace(/[^0-9]/g, '');
     if (afm.length !== 9) {
@@ -133,7 +179,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
     }
     setAadeLoading(true);
     try {
-      const res = await aadeService.lookup({ afm, reason: 'own_business', workspaceId, translate: true });
+      const res = await aadeService.lookup({ afm, reason: onboarding ? 'onboarding' : 'own_business', workspaceId, translate: true });
       if ('error' in res && res.error) {
         toast({ title: 'ΑΑΔΕ lookup failed', description: res.message || res.error, variant: 'destructive' });
         return;
@@ -144,7 +190,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
         const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
         // `pick(current, greek, english)` — keep the current value if ΑΑΔΕ gave nothing.
         const pick = (cur: any, gr: string | null | undefined) => gr ?? cur;
-        setData((d) => ({
+        setMany((d) => ({
           ...d,
           // Greek (base) slots — the registered ΑΑΔΕ values.
           business_name: pick(d.business_name, r.onomasia),
@@ -179,7 +225,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
         try {
           const g = await gemiService.lookup({ afm, reason: 'own_business', workspaceId });
           if ('ok' in g && g.ok) {
-            setData((d) => ({
+            setMany((d) => ({
               ...d,
               business_gemi: g.gemi.ar_gemi ?? d.business_gemi,
               // ΓΕΜΗ's official Latin name wins over the Haiku transliteration when present.
@@ -194,7 +240,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
     } finally { setAadeLoading(false); }
   };
 
-  const copyBillingToContact = () => setData((d) => ({
+  const copyBillingToContact = () => setMany((d) => ({
     ...d,
     contact_title: d.business_name ?? '', contact_email: d.business_email ?? '',
     contact_phone: d.business_phone ?? '', contact_fax: d.business_fax ?? '',

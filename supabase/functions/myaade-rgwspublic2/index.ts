@@ -37,7 +37,7 @@ interface LookupBody {
   afm: string;
   company_id?: string;
   /** Why this lookup was made — audited because every live call notifies the looked-up ΑΦΜ. */
-  reason?: 'own_business' | 'crm_enrichment' | 'invoice_counterparty' | string;
+  reason?: 'own_business' | 'onboarding' | 'crm_enrichment' | 'invoice_counterparty' | string;
   workspace_id?: string;
   /** 'creds-status' → report the EFFECTIVE codes (workspace row, else operator root default).
    *  'verify-reseller-application' → operator vets a reseller applicant's ΑΦΜ (see below). */
@@ -49,6 +49,22 @@ interface LookupBody {
    *  form can fill BOTH language slots from one lookup. Off by default — only the
    *  own-business prefill opts in, so CRM/reseller lookups stay LLM-free. */
   translate?: boolean;
+}
+
+const ONBOARDING_LOOKUPS_PER_DAY = 5;
+
+/** Start Here lookups spend the OPERATOR's TAXISnet quota: only while the walkthrough is open, capped daily. */
+async function onboardingOperatorGrant(
+  admin: DbClient, userId: string, workspaceId: string,
+): Promise<'ok' | 'quota' | 'denied'> {
+  const { data: walk } = await admin.from('user_onboarding').select('status')
+    .eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle();
+  if ((walk as { status?: string } | null)?.status !== 'active') return 'denied';
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { count, error } = await admin.from('aade_lookup_log').select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId).eq('reason', 'onboarding').eq('source', 'aade').gte('created_at', since);
+  if (error) return 'denied';
+  return (count ?? 0) >= ONBOARDING_LOOKUPS_PER_DAY ? 'quota' : 'ok';
 }
 
 /** English translation of the Greek descriptive fields ΑΑΔΕ returns. */
@@ -300,7 +316,20 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     const admin = createClient(supabaseUrl, supabaseServiceKey);
     // Per-workspace Special Access Codes — only the operator's root workspace falls back
     // to the env / platform_secrets default; every tenant uses its own codes.
-    const creds = await resolveAadeCredentials(admin, body.workspace_id ?? null);
+    let creds = await resolveAadeCredentials(admin, body.workspace_id ?? null);
+    if ((!creds.username || !creds.password) && body.reason === 'onboarding') {
+      const grant = await onboardingOperatorGrant(admin, user.id, body.workspace_id);
+      if (grant === 'quota') {
+        return jsonResponse({
+          error: 'onboarding_quota',
+          message: `The setup lookup runs on our ΑΑΔΕ codes and is limited to ${ONBOARDING_LOOKUPS_PER_DAY} a day. Type the details in, or add your own codes under myDATA & ΑΑΔΕ.`,
+        }, 429);
+      }
+      if (grant === 'ok') {
+        const { data: root } = await admin.from('workspaces').select('id').eq('is_root', true).limit(1).maybeSingle();
+        if (root?.id) creds = await resolveAadeCredentials(admin, root.id);
+      }
+    }
 
     // #356 `RE-4` generalised. `company_id` is a body-supplied FK into crm_companies. Resolved
     // ONCE here, against the workspace this request already proved the caller belongs to, so the
@@ -319,9 +348,6 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       try {
         await admin.from('aade_lookup_log').insert({
           looked_up_afm: rawAfm,
-        // #356 `RE-4` generalised: `company_id` is a body-supplied FK into crm_companies,
-        // stored on an audit row that is later joined for display. The workspace is verified
-        // above; the company was not, so an audit entry could name another tenant's company.
           company_id: safeCompanyId,
           workspace_id: body.workspace_id ?? null,
           requested_by: user.id,

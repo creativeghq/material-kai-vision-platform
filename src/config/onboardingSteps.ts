@@ -69,6 +69,20 @@ export interface OnboardingStep {
 export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   // ───────────────────────────── setup ─────────────────────────────
   {
+    id: 'business',
+    kind: 'setup',
+    navLabel: 'Business Details',
+    title: 'Your business details',
+    lede:
+      'Every invoice, quote and delivery note you issue carries these, and so does the envelope '
+      + 'filed with ΑΑΔΕ. Fill them in once — enter your VAT number and we can fetch the rest. '
+      + 'Everything saves as you type.',
+    icon: Building2,
+    requireWorkspaceManager: true,
+    requireCapability: 'finance.manage',
+    footnote: 'You can change any of this later under Finance → Settings → Business Identity.',
+  },
+  {
     id: 'einvoicing',
     kind: 'setup',
     navLabel: 'e-Invoicing',
@@ -80,23 +94,10 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
     icon: FileSignature,
     requireWorkspaceManager: true,
     requireCapability: 'finance.manage',
-    // First because of the date, and because a signature and Novus's review cannot be hurried.
+    // Straight after the details it is built from: a signature and Novus's review cannot be hurried.
     footnote:
-      'Greek businesses only. It picks up your details from the next step, so fill those in first '
-      + 'if the form asks. Afterwards it lives under Finance → Settings → e-Invoicing.',
-  },
-  {
-    id: 'business',
-    kind: 'setup',
-    navLabel: 'Business Details',
-    title: 'Your business details',
-    lede:
-      'Every invoice, quote and delivery note you issue carries these, and so does the envelope '
-      + 'filed with ΑΑΔΕ. Fill them in once — enter your VAT number and we can fetch the rest.',
-    icon: Building2,
-    requireWorkspaceManager: true,
-    requireCapability: 'finance.manage',
-    footnote: 'You can change any of this later under Finance → Settings → Business Identity.',
+      'Greek businesses only. It uses the business details from the previous step. Afterwards it '
+      + 'lives under Finance → Settings → e-Invoicing.',
   },
   {
     id: 'myaade',

@@ -678,6 +678,11 @@ All colors MUST be HSL.
     scrollbar-gutter: stable;
   }
 
+  /* Native widgets (the date input's calendar icon, its popup) draw for the scheme declared
+     here; undeclared, dark mode painted that icon black on plum-black — invisible. */
+  html.dark { color-scheme: dark; }
+  html.light { color-scheme: light; }
+
   body {
     @apply bg-background text-foreground;
     background-attachment: fixed;

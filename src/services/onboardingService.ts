@@ -43,12 +43,17 @@ const asProgress = (row: OnboardingRow): OnboardingProgress => ({
  * such — a read we could not make must never show as a green tick, and must never show as a red
  * cross either.
  */
-export type SetupVerdict = 'ok' | 'missing' | 'unknown';
+export type SetupVerdict = 'ok' | 'pending' | 'missing' | 'unknown';
 
 export interface OnboardingSetupStatus {
   business: SetupVerdict;
   myaade: SetupVerdict;
   einvoicing: SetupVerdict;
+}
+
+function einvoiceVerdict(d: { can_transmit?: boolean; request_id?: string | null } | null): SetupVerdict {
+  if (d?.can_transmit) return 'ok';
+  return d?.request_id ? 'pending' : 'missing';
 }
 
 export const onboardingService = {
@@ -157,7 +162,7 @@ export const onboardingService = {
       // Novus's own word for it — nothing a member clicks produces this tick.
       einvoicing: einvoice.error
         ? 'unknown'
-        : (einvoice.data as { can_transmit?: boolean } | null)?.can_transmit ? 'ok' : 'missing',
+        : einvoiceVerdict(einvoice.data as { can_transmit?: boolean; request_id?: string | null } | null),
     };
   },
 

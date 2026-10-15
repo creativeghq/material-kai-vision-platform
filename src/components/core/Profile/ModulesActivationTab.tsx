@@ -16,6 +16,7 @@ import { resolveModuleMeta, hubOrder, type ModuleMeta } from '@/config/module-ca
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/core/ui/accordion';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
@@ -79,7 +80,8 @@ interface ModuleGroupEntry {
   children: ModuleTile[];
 }
 
-export const ModulesActivationTab: React.FC = () => {
+/** `collapsible`: each Hub is a closed accordion section — Start Here, where the full grid is a wall. */
+export const ModulesActivationTab: React.FC<{ collapsible?: boolean }> = ({ collapsible = false }) => {
   const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
   const { planLevel, planName, availableSlugs, loading: entLoading } = useEntitlements();
   const { toast } = useToast();
@@ -519,6 +521,31 @@ export const ModulesActivationTab: React.FC = () => {
                 ? 'Nothing left to add — every module available on your plan is already on.'
                 : 'No modules match this filter yet.'}
             </CardContent></Card>
+          ) : collapsible ? (
+            <Accordion type="multiple" className="rounded-sm border border-hairline bg-card">
+              {groups.map((g) => {
+                const HubIcon = g.hub?.icon;
+                const on = g.entries.filter((e) => e.tile.hasIt).length;
+                return (
+                  <AccordionItem key={g.label} value={g.label} className="border-hairline last:border-b-0">
+                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                      <span className="flex min-w-0 items-center gap-2">
+                        {HubIcon ? <HubIcon className="h-4 w-4 shrink-0 text-primary" /> : null}
+                        <span className="text-sm font-semibold">{g.label}</span>
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {g.count} {g.count === 1 ? 'module' : 'modules'}{on ? ` · ${on} on` : ''}
+                        </span>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4">
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {g.entries.map((e) => renderTile(e.tile, e.children))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
           ) : groups.map((g) => {
             const HubIcon = g.hub?.icon;
             return (

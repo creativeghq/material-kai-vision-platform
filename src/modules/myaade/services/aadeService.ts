@@ -71,7 +71,7 @@ export const aadeService = {
   async lookup(args: {
     afm: string;
     companyId?: string;
-    reason?: 'own_business' | 'crm_enrichment' | 'invoice_counterparty';
+    reason?: 'own_business' | 'onboarding' | 'crm_enrichment' | 'invoice_counterparty';
     workspaceId?: string;
     /** Also return `basic_rec_en` (English translation of name/activity/tax office/street/city)
      *  so a bilingual form can fill both language slots. */
