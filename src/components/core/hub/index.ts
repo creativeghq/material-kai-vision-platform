@@ -15,6 +15,7 @@ export {
   HubProperty,
   HubPropertyList,
 } from './HubRecordLayout';
+export { HubRecordPage } from './HubRecordPage';
 
 export { HubTimeline, HubTimelineGroup, HubTimelineItem } from './HubTimeline';
 

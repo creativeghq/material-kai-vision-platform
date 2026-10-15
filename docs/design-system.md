@@ -416,6 +416,9 @@ gives you three white boxes with two gutters of dead space between them.
 
 ### Record screen
 
+Use `<HubRecordPage>` — it IS this tree (PageHeader with `recordTitle` + breadcrumbs, then
+HubRecordLayout), so a record page cannot ship without the header or the gutter.
+
 ```
 PageHeader
 └── HubRecordLayout
@@ -486,7 +489,8 @@ re-implementation of either, not even in a demo page.
 
 ## 10. New page checklist
 
-1. `<PageHeader icon title subtitle breadcrumbs actions />` — one per page.
+1. `<PageHeader icon title subtitle breadcrumbs actions />` — one per page. A record page uses
+   `<HubRecordPage>` instead, which renders it. Enforced by `tests/unit/pageShell.test.ts`.
 2. Pick an archetype from §7 and use its `hub/` components.
 3. Every colour from a token. No `text-white`, no `bg-gray-*`, no hex.
 4. Controls at `h-9`; one solid button.
