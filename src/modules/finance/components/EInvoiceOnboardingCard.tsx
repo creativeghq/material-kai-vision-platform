@@ -1,7 +1,7 @@
 /** e-Invoicing onboarding. "Mark done" records a claim; only Novus turns a rung green. */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
-  AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Download, FileSignature, Hand,
+  AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Download, FileSignature, Hand, Mail,
   History, Loader2, MinusCircle, RefreshCw, Send, Upload, XCircle,
 } from 'lucide-react';
 
@@ -61,7 +61,12 @@ const EMPTY_DRAFT: ApplicationDraft = {
   isp_provider_name: '', isp_contract_number: '', isp_contract_date: null, contact_backup_phone: '',
 };
 
-export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity, onChanged }) => {
+export interface EInvoiceOnboardingHandle {
+  /** Save, validate server-side and send to Novus; true once a request exists. */
+  submit: () => Promise<boolean>;
+}
+
+export const EInvoiceOnboardingCard = forwardRef<EInvoiceOnboardingHandle, Props>(({ workspaceId, onGoToIdentity, onChanged }, ref) => {
   const { toast } = useToast();
   const [data, setData] = useState<EInvoiceOnboarding | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +77,7 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
   const edit = (patch: Partial<ApplicationDraft>) => { setDraft((d) => ({ ...d, ...patch })); setDirty(true); };
   const latest = useRef({ draft, dirty, sent: false });
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -138,6 +144,41 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
       setBusy(null);
     }
   }, [toast, onChanged]);
+
+  const submit = useCallback(async (): Promise<boolean> => {
+    if (latest.current.sent) return true;
+    setBusy('create');
+    setSubmitError(null);
+    try {
+      await einvoiceOnboardingService.saveApplication(workspaceId, latest.current.draft);
+      setDirty(false);
+      setData(await einvoiceOnboardingService.create(workspaceId));
+      onChanged?.();
+      toast({ title: 'Sent to Novus — they will email the contract to sign' });
+      return true;
+    } catch (err) {
+      const message = (err as Error).message;
+      setSubmitError(message);
+      toast({ title: 'Not sent to Novus yet', description: message, variant: 'destructive' });
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }, [workspaceId, onChanged, toast]);
+
+  useImperativeHandle(ref, () => ({ submit }), [submit]);
+
+  const emailContract = useCallback(async () => {
+    setBusy('email');
+    try {
+      const to = await einvoiceOnboardingService.emailContract(workspaceId);
+      toast({ title: 'Contract emailed', description: `Sent to ${to}.` });
+    } catch (err) {
+      toast({ title: 'Could not email the contract', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  }, [workspaceId, toast]);
 
   const download = useCallback(async () => {
     setBusy('download');
@@ -289,11 +330,7 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
               </Button>
               <Button
                 size="sm" disabled={busy !== null || needsIdentity}
-                // Novus is sent the STORED application.
-                onClick={() => void run('create', async () => {
-                  await einvoiceOnboardingService.saveApplication(workspaceId, draft);
-                  return einvoiceOnboardingService.create(workspaceId);
-                }, 'Sent to Novus — they will email the contract to sign')}
+                onClick={() => void submit()}
               >
                 {busy === 'create' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
                 Send to Novus
@@ -309,6 +346,11 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                 </span>
               )}
             </div>
+            {submitError && (
+              <p role="alert" className="rounded-sm border border-[hsl(var(--error)/0.35)] bg-[hsl(var(--error-bg))] px-3 py-2 text-xs text-[hsl(var(--error))]">
+                {submitError}
+              </p>
+            )}
             <p className="text-[11px] text-muted-foreground">
               Sending this creates a real contract at Novus with its own number. Send it once.
             </p>
@@ -330,6 +372,10 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
               onDownload={
                 step.key === 'contract_delivered' && sent && step.state !== 'not_applicable' && step.state !== 'blocked'
                   ? download : undefined
+              }
+              onEmail={
+                step.key === 'contract_delivered' && sent && step.state !== 'not_applicable' && step.state !== 'blocked'
+                  ? emailContract : undefined
               }
               onUpload={step.key === 'contract_signed' && sent ? () => fileInput.current?.click() : undefined}
             />
@@ -394,7 +440,8 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
       </CardContent>
     </Card>
   );
-};
+});
+EInvoiceOnboardingCard.displayName = 'EInvoiceOnboardingCard';
 
 const StepRow: React.FC<{
   step: EInvoiceOnboardingStep;
@@ -402,8 +449,9 @@ const StepRow: React.FC<{
   busy: string | null;
   onAck: (undo: boolean) => void;
   onDownload?: () => void;
+  onEmail?: () => void;
   onUpload?: () => void;
-}> = ({ step, last, busy, onAck, onDownload, onUpload }) => {
+}> = ({ step, last, busy, onAck, onDownload, onEmail, onUpload }) => {
   const look = STATE_LOOK[step.state];
   const Icon = look.icon;
   const acked = !!step.acknowledged_at;
@@ -453,6 +501,12 @@ const StepRow: React.FC<{
           {onDownload && (
             <Button variant="outline" size="sm" onClick={onDownload} disabled={busy !== null}>
               <Download className="h-3.5 w-3.5 mr-1" /> Download the contract
+            </Button>
+          )}
+          {onEmail && (
+            <Button variant="outline" size="sm" onClick={onEmail} disabled={busy !== null}>
+              {busy === 'email' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-1" />}
+              Email it to me
             </Button>
           )}
           {onUpload && step.state !== 'done' && step.state !== 'not_applicable' && (

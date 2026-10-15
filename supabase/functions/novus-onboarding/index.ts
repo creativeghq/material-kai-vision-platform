@@ -5,6 +5,8 @@ import { authenticate, userCanAccessWorkspace, isPlatformOperator } from '../_sh
 import { resolveSecret } from '../_shared/secrets.ts';
 import { resolveNovusConnection } from '../_shared/fiscal/novusConnection.ts';
 import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
+import { escapeHtml } from '../_shared/html.ts';
+import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
 // Novus Onboarding API v1.0. Spec: https://developers.novusconceptus.com/el/
@@ -393,7 +395,7 @@ Deno.serve(withApiLogging('novus-onboarding', async (req: Request) => {
     return json({ success: true, data: await ladder(supabase, workspaceId) });
   }
 
-  if (action === 'contract') {
+  if (action === 'contract' || action === 'email_contract') {
     const r = requireRow(row);
     if (!r.novus_request_id) throw new HttpError(409, 'Nothing has been sent to Novus yet.');
     if (r.request_type === 'LINK_EXISTING') throw new HttpError(409, 'A linked VAT has no contract to sign.');
@@ -416,12 +418,39 @@ Deno.serve(withApiLogging('novus-onboarding', async (req: Request) => {
         `Could not fetch the contract: ${t.slice(0, 300)}`,
       );
     }
+    const filename = `novus-contract-${r.contract_number ?? r.novus_request_id}.pdf`;
+    const pdf = new Uint8Array(await res.arrayBuffer());
+
+    if (action === 'email_contract') {
+      // Only ever to the caller's own sign-in address: a body-supplied recipient would be a relay.
+      const { data: who } = await supabase.auth.admin.getUserById(auth.userId);
+      const to = who?.user?.email;
+      if (!to) throw new HttpError(409, 'Your account has no email address to send the contract to.');
+      const number = escapeHtml(r.contract_number ?? r.novus_request_id);
+      const { data: sent, error: sendErr } = await supabase.functions.invoke('email-api', {
+        body: {
+          action: 'send', to, emailType: 'transactional',
+          subject: `Your Novus e-invoicing contract ${r.contract_number ?? ''}`.trim(),
+          html: `<p>Attached is Novus e-invoicing contract <strong>${number}</strong>.</p>`
+            + '<p>Have it signed by the administrator named on the application, then upload the signed PDF '
+            + 'on the e-Invoicing step, or use the link Novus emailed to the business.</p>',
+          attachments: [{ filename, content: encodeBase64(pdf) }],
+          attribution_workspace_id: workspaceId,
+          tags: { feature: 'novus_contract' },
+        },
+      });
+      if (sendErr || sent?.success === false) {
+        throw new HttpError(502, `The contract could not be emailed: ${sent?.error ?? sendErr?.message ?? 'unknown error'}`);
+      }
+      return json({ success: true, sent_to: to });
+    }
+
     // Proxied, not stored: the download needs our master key, so Novus's own URL is unforwardable.
-    return new Response(await res.arrayBuffer(), {
+    return new Response(pdf, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="novus-contract-${r.contract_number ?? r.novus_request_id}.pdf"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
       },
     });
   }

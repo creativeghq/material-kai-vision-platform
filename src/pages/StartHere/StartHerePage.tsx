@@ -5,7 +5,7 @@
  * under the profile menu. The setup steps mount the platform's REAL settings components, so there
  * is no second form writing the same columns.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, CircleHelp, Clock, Compass, Loader2, X } from 'lucide-react';
 
@@ -27,7 +27,7 @@ import type { OnboardingHighlight, OnboardingStep } from '@/config/onboardingSte
 import { cn } from '@/lib/utils';
 
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
-import { EInvoiceOnboardingCard } from '@/modules/finance/components/EInvoiceOnboardingCard';
+import { EInvoiceOnboardingCard, type EInvoiceOnboardingHandle } from '@/modules/finance/components/EInvoiceOnboardingCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { ModulesActivationTab } from '@/components/core/Profile/ModulesActivationTab';
@@ -175,12 +175,14 @@ const SetupBody: React.FC<{
   workspaceName?: string;
   onGoToStep?: (stepId: string) => void;
   onChanged?: () => void;
+  einvoicingRef?: React.Ref<EInvoiceOnboardingHandle>;
 }> = ({
-  stepId, workspaceId, workspaceName, onGoToStep, onChanged,
+  stepId, workspaceId, workspaceName, onGoToStep, onChanged, einvoicingRef,
 }) => {
   if (stepId === 'einvoicing') {
     return (
       <EInvoiceOnboardingCard
+        ref={einvoicingRef}
         workspaceId={workspaceId}
         onGoToIdentity={onGoToStep ? () => onGoToStep('business') : undefined}
         onChanged={onChanged}
@@ -224,6 +226,8 @@ const StartHerePage: React.FC = () => {
   const [setupStatus, setSetupStatus] = useState<OnboardingSetupStatus | null>(null);
   const [restored, setRestored] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [sending, setSending] = useState(false);
+  const einvoicingRef = useRef<EInvoiceOnboardingHandle>(null);
 
   // Clamp rather than index blindly: switching workspace can SHRINK the list (admin here, plain
   // member there), and `steps[index]` going undefined renders "nothing to walk through" over a
@@ -274,6 +278,18 @@ const StartHerePage: React.FC = () => {
 
   // Finishing never sends the application (that creates a real contract), so say it was not sent.
   const unsentEinvoicing = steps.some((s) => s.id === 'einvoicing') && setupStatus?.einvoicing === 'missing';
+
+  // On e-Invoicing, Continue IS the send: it validates everything server-side and only moves on once Novus has it.
+  const sendsOnContinue = step?.id === 'einvoicing' && setupStatus?.einvoicing === 'missing';
+
+  const next = useCallback(async () => {
+    if (step?.id === 'einvoicing' && einvoicingRef.current) {
+      setSending(true);
+      const ok = await einvoicingRef.current.submit().finally(() => setSending(false));
+      if (!ok) return;
+    }
+    goTo(safeIndex + 1);
+  }, [step, goTo, safeIndex]);
 
   const complete = useCallback(async () => {
     const nextSeen = step && !seen.includes(step.id) ? [...seen, step.id] : seen;
@@ -377,6 +393,7 @@ const StartHerePage: React.FC = () => {
                 workspaceName={activeWorkspace?.name}
                 onGoToStep={goToStepId}
                 onChanged={refreshSetup}
+                einvoicingRef={einvoicingRef}
               />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -403,11 +420,18 @@ const StartHerePage: React.FC = () => {
                   <Check className="h-4 w-4 mr-1" /> Finish
                 </Button>
               ) : (
-                // Each embedded settings card owns its own Save; this button only moves on, and
-                // saying "Save and continue" would claim a write it does not perform.
-                <Button onClick={() => goTo(safeIndex + 1)}>
-                  Continue <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {sendsOnContinue && (
+                    <Button variant="ghost" onClick={() => goTo(safeIndex + 1)} disabled={sending}>
+                      Skip this step
+                    </Button>
+                  )}
+                  <Button onClick={() => void next()} disabled={sending}>
+                    {sending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                    {sendsOnContinue ? 'Send to Novus & continue' : 'Continue'}
+                    {!sending && <ArrowRight className="h-4 w-4 ml-1" />}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

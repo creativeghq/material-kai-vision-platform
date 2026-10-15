@@ -117,6 +117,15 @@ export const einvoiceOnboardingService = {
     throw new Error(typeof data?.error === 'string' ? data.error : 'Novus did not return a PDF.');
   },
 
+  async emailContract(workspaceId: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('novus-onboarding', {
+      body: { action: 'email_contract', workspace_id: workspaceId },
+    });
+    if (error) throw new Error((await parseEdgeError(error)).message);
+    if (!data?.success) throw new Error(data?.error ?? 'The contract could not be emailed.');
+    return String(data.sent_to);
+  },
+
   async uploadSigned(workspaceId: string, file: File): Promise<EInvoiceOnboarding> {
     const form = new FormData();
     form.append('action', 'upload_signed');
