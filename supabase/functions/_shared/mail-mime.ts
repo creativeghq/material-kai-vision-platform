@@ -114,7 +114,7 @@ export interface ParsedGmailMessage {
   headers: Record<string, string>;
   text: string | null;
   html: string | null;
-  attachments: Array<{ attachmentId: string; filename: string; mimeType: string; size: number }>;
+  attachments: Array<{ attachmentId: string; filename: string; mimeType: string; size: number; contentId?: string | null; inline?: boolean }>;
 }
 
 function charsetOf(part: GmailPart): string {
@@ -135,10 +135,17 @@ export function parseGmailPayload(payload: GmailPart): ParsedGmailMessage {
   const headers: Record<string, string> = {};
   for (const h of payload.headers ?? []) headers[h.name.toLowerCase()] = h.value;
   const out: ParsedGmailMessage = { headers, text: null, html: null, attachments: [] };
+  const inlineOnly: ParsedGmailMessage['attachments'] = [];
   const walk = (part: GmailPart) => {
     const type = (part.mimeType ?? '').toLowerCase();
+    const cidHeader = part.headers?.find((h) => h.name.toLowerCase() === 'content-id')?.value ?? '';
+    const contentId = cidHeader.trim().replace(/^<|>$/g, '') || null;
     if (part.filename && part.body?.attachmentId) {
-      out.attachments.push({ attachmentId: part.body.attachmentId, filename: part.filename, mimeType: type, size: part.body.size ?? 0 });
+      out.attachments.push({ attachmentId: part.body.attachmentId, filename: part.filename, mimeType: type, size: part.body.size ?? 0, ...(contentId ? { contentId } : {}) });
+      return;
+    }
+    if (contentId && part.body?.attachmentId) {
+      inlineOnly.push({ attachmentId: part.body.attachmentId, filename: contentId, mimeType: type, size: part.body.size ?? 0, contentId, inline: true });
       return;
     }
     if (type === 'text/plain' && out.text === null && part.body?.data) out.text = decodeBody(part);
@@ -146,6 +153,8 @@ export function parseGmailPayload(payload: GmailPart): ParsedGmailMessage {
     for (const child of part.parts ?? []) walk(child);
   };
   walk(payload);
+  // Last, so the position of every named attachment — what agent refs point at — is unchanged.
+  out.attachments.push(...inlineOnly);
   return out;
 }
 

@@ -436,7 +436,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const messageId = String(body.message_id ?? '');
       if (!/^[0-9a-f]+$/i.test(messageId)) throw new HttpError(400, 'message_id is required');
       const m = await gmail(token, `/messages/${messageId}?format=full`);
-      return json({ attachments: parseGmailPayload(m.payload as GmailPart).attachments });
+      return json({ attachments: parseGmailPayload(m.payload as GmailPart).attachments.filter((a) => !a.inline) });
     }
 
     case 'modify': {

@@ -10,6 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { formatDate, formatTime } from '@/utils/datetime';
 import { gmailApi, type GmailAddress, type GmailMessage } from '@/services/gmailApi';
 import { EmailHtmlView } from '../components/EmailHtmlView';
+import { normalizeCid, referencedCids } from '@/utils/sanitizeEmailHtml';
+import { useInlineImages } from '../useInlineImages';
 import { EmailFormatBar, EmailPreview } from '../components/EmailFormatBar';
 import { SendLaterMenu } from '../components/SendLater';
 import { ComposerInsertMenu } from '../components/ComposerInsertMenu';
@@ -48,6 +50,12 @@ const CollapsedMessage: React.FC<{ m: GmailMessage; mine: boolean; onOpen: () =>
 
 const FullMessage: React.FC<{ m: GmailMessage; mine: boolean; accountId: string; onCollapse?: () => void }> = ({ m, mine, accountId, onCollapse }) => {
   const [plain, setPlain] = useState(false);
+  const cids = useMemo(() => referencedCids(m.html), [m.html]);
+  const parts = m.attachments.filter((a) => a.contentId && cids.has(normalizeCid(a.contentId)));
+  const inlineImages = useInlineImages(`${m.id}|${[...cids].join(',')}`, parts.map((a) => ({
+    cid: a.contentId!, mime: a.mimeType, size: a.size,
+    load: () => gmailApi.attachment(accountId, m.id, a.attachmentId).then((r) => base64ToBlob(r.data_base64, a.mimeType)),
+  })), !!m.html && !plain);
   return (
     <article className="py-4 border-b border-hairline last:border-b-0 space-y-3">
       <header className="flex flex-wrap items-start gap-3">
@@ -77,14 +85,15 @@ const FullMessage: React.FC<{ m: GmailMessage; mine: boolean; accountId: string;
         </div>
       </header>
       {m.html && !plain
-        ? <EmailHtmlView html={m.html} sender={m.from.address} onShowText={() => setPlain(true)} />
+        ? <EmailHtmlView html={m.html} sender={m.from.address} onShowText={() => setPlain(true)} inlineImages={inlineImages} />
         : (
           <div className="space-y-1">
             <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{m.text ?? m.snippet}</div>
             {m.html && <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setPlain(false)}>Show formatted</Button>}
           </div>
         )}
-      <AttachmentCards accountId={accountId} messageId={m.id} attachments={m.attachments} />
+      <AttachmentCards accountId={accountId} messageId={m.id}
+        attachments={m.attachments.filter((a) => !a.contentId || !inlineImages?.[normalizeCid(a.contentId)])} />
     </article>
   );
 };
@@ -165,10 +174,11 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       `To: ${last.to.map((a) => a.address).join(', ')}`,
       '', last.text ?? last.snippet,
     ].join('\n'));
-    if (!last.attachments.length) { setFiles([]); return; }
+    const forwarded = last.attachments.filter((a) => !a.inline);
+    if (!forwarded.length) { setFiles([]); return; }
     setPreparing(true);
     try {
-      const loaded = await Promise.all(last.attachments.map(async (a) => {
+      const loaded = await Promise.all(forwarded.map(async (a) => {
         const { data_base64 } = await gmailApi.attachment(account.id, last.id, a.attachmentId);
         return new File([base64ToBlob(data_base64, a.mimeType || 'application/octet-stream')], a.filename, { type: a.mimeType });
       }));
@@ -294,7 +304,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
 
       <AttachmentActionsProvider value={account ? { workspaceId: account.workspace_id, customer: null, subject: threadSubject } : null}>
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="px-5 pt-4 pb-2 space-y-2">
+        <div className="px-3 md:px-5 pt-4 pb-2 space-y-2">
           {threadLabels.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {threadLabels.map((l) => (
@@ -311,7 +321,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
         </div>
         {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={threadSubject} sender={lastIncoming?.from ?? null} />}
 
-        <div className="px-5 pb-4">
+        <div className="px-3 md:px-5 pb-4">
           {copilotFor === openId && account && (
             <div className="mt-3 rounded-sm border border-hairline p-3">
               <CopilotPanel run={async (mode, question) => (await gmailApi.assist(account.id, openId, mode, question)).text} />
@@ -342,14 +352,16 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       </div>
       </AttachmentActionsProvider>
 
-      <div className="border-t border-hairline bg-surface-sunken p-3 shrink-0">
+      <div className="border-t border-hairline bg-surface-sunken p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:p-3 shrink-0">
         {!mode ? (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => startReply('reply')} disabled={!lastIncoming}><Reply className="w-4 h-4 mr-1" />Reply</Button>
-            <Button size="sm" variant="outline" onClick={() => startReply('all')} disabled={!lastIncoming}><ReplyAll className="w-4 h-4 mr-1" />Reply all</Button>
-            <Button size="sm" variant="outline" onClick={() => { void startForward(); }} disabled={!last}><Forward className="w-4 h-4 mr-1" />Forward</Button>
-            <Button size="sm" variant="outline" onClick={() => { void assist('draft'); }} disabled={!lastIncoming || !!assisting}>
-              {assisting === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}Draft with AI
+          <div className="grid grid-cols-4 gap-1.5 md:flex md:flex-wrap md:gap-2">
+            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => startReply('reply')} disabled={!lastIncoming}><Reply className="w-4 h-4 mr-1" />Reply</Button>
+            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => startReply('all')} disabled={!lastIncoming}>
+              <ReplyAll className="w-4 h-4 mr-1" /><span className="md:hidden">All</span><span className="hidden md:inline">Reply all</span>
+            </Button>
+            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => { void startForward(); }} disabled={!last}><Forward className="w-4 h-4 mr-1" />Forward</Button>
+            <Button size="sm" variant="outline" className="max-md:px-1 max-md:text-xs" onClick={() => { void assist('draft'); }} disabled={!lastIncoming || !!assisting}>
+              {assisting === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}<span className="md:hidden">AI</span><span className="hidden md:inline">Draft with AI</span>
             </Button>
           </div>
         ) : (

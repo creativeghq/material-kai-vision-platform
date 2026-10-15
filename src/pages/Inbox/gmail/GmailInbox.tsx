@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileFullScreen } from '../components/MobileFullScreen';
 import { AlarmClock, AlertTriangle, Archive, BellRing, CalendarClock, Users, FilePen, Inbox as InboxIcon, Loader2, Mail, Paperclip, Plus, Search, Send, ShieldAlert, Star, Tag, Trash2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
@@ -42,6 +44,18 @@ const SYSTEM_ROWS: Array<{ id: string; label: string; icon: React.ElementType }>
   { id: 'SPAM', label: 'Spam', icon: ShieldAlert },
   { id: 'TRASH', label: 'Trash', icon: Trash2 },
 ];
+
+const GmailThreadPane: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
+  const isMobile = useIsMobile();
+  return (
+    <MobileFullScreen
+      active={isMobile && !!g.openId}
+      className={`md:dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 max-md:pt-[env(safe-area-inset-top)] ${g.openId ? 'flex' : 'hidden md:flex'}`}
+    >
+      <GmailThreadView g={g} />
+    </MobileFullScreen>
+  );
+};
 
 const ComposeGmailDialog: React.FC<{ g: GmailMailboxState; onClose: () => void }> = ({ g, onClose }) => {
   const { toast } = useToast();
@@ -381,9 +395,7 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
         </div>
       </div>
 
-      <div className={`dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${g.openId ? 'flex' : 'hidden md:flex'}`}>
-        <GmailThreadView g={g} />
-      </div>
+      <GmailThreadPane g={g} />
       {composing && <ComposeGmailDialog g={g} onClose={() => setComposing(false)} />}
       {showScheduled && <ScheduledDialog onClose={() => setShowScheduled(false)} />}
       {sharing && account && <GmailShareDialog account={account} onClose={() => setSharing(false)} onSaved={() => { setSharing(false); void g.reloadAccounts(); }} />}

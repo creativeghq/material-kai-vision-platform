@@ -421,7 +421,7 @@ export interface ParsedInbound {
   references: string | null;
   text: string | null;
   html: string | null;
-  attachments: Array<{ filename: string; mimeType: string; base64: string; size: number }>;
+  attachments: Array<{ filename: string; mimeType: string; base64: string; size: number; contentId?: string | null }>;
 }
 
 function addressList(list: unknown): string[] {
@@ -442,7 +442,7 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedInbound> {
   }
 
   const attachments = ((email.attachments || []) as Array<{
-    filename?: string; mimeType?: string; content?: string; disposition?: string;
+    filename?: string; mimeType?: string; content?: string; disposition?: string; contentId?: string;
   }>)
     .map((a, i) => {
       const base64 = typeof a.content === 'string' ? a.content : '';
@@ -453,6 +453,7 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedInbound> {
         mimeType: a.mimeType || 'application/octet-stream',
         base64,
         size,
+        contentId: a.contentId ? a.contentId.trim().replace(/^<|>$/g, '') || null : null,
       };
     })
     .filter((a) => a.base64 && a.size <= MAX_ATTACHMENT_BYTES);
@@ -527,6 +528,7 @@ export async function storeAttachments(
       name: att.filename,
       content_type: att.mimeType,
       size: att.size,
+      ...(att.contentId ? { content_id: att.contentId } : {}),
     });
   }
   return out;

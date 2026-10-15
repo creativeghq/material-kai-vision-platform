@@ -52,6 +52,19 @@ describe('Gmail payloads', () => {
     expect(parsed.attachments).toEqual([{ attachmentId: 'att1', filename: 'invoice.pdf', mimeType: 'application/pdf', size: 1234 }]);
   });
 
+  it('lists a nameless cid: part after every named attachment, flagged inline', () => {
+    const parsed = parseGmailPayload({
+      mimeType: 'multipart/related',
+      parts: [
+        { mimeType: 'image/png', headers: [{ name: 'Content-ID', value: '<logo@keros>' }], body: { attachmentId: 'cid1', size: 900 } },
+        { mimeType: 'application/pdf', filename: 'invoice.pdf', body: { attachmentId: 'att1', size: 1234 } },
+      ],
+    });
+    expect(parsed.attachments.map((a) => a.attachmentId)).toEqual(['att1', 'cid1']);
+    expect(parsed.attachments[1]).toMatchObject({ contentId: 'logo@keros', inline: true });
+    expect(parsed.attachments[0]).not.toHaveProperty('inline');
+  });
+
   it('decodes a Greek legacy charset', () => {
     const bytes = new Uint8Array([0xc3, 0xe5, 0xe9, 0xe1]);
     const data = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

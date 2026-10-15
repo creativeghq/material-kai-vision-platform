@@ -251,6 +251,7 @@ export interface InboxAttachment {
   name?: string;
   content_type?: string;
   size?: number;
+  content_id?: string;
   /** Present once the reader has run on an audio attachment. Absent = never read. */
   transcript?: InboxAttachmentTranscript;
   /** Present once the reader has run on a PDF or image. Absent = never read. */

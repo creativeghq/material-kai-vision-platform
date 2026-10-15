@@ -25,7 +25,7 @@ export interface GmailThreadRow {
   outreach?: GmailOutreach[];
 }
 export interface GmailOutreach { id: string; send_at: string; preview: string; sequence_id?: string | null; step?: number | null }
-export interface GmailAttachment { attachmentId: string; filename: string; mimeType: string; size: number }
+export interface GmailAttachment { attachmentId: string; filename: string; mimeType: string; size: number; contentId?: string | null; inline?: boolean }
 export interface GmailMessage {
   id: string; label_ids: string[]; date: string | null; from: GmailAddress; to: GmailAddress[]; cc: GmailAddress[]; reply_to: string | null;
   subject: string; message_id: string | null; text: string | null; html: string | null; attachments: GmailAttachment[]; snippet: string;

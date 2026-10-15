@@ -18,6 +18,32 @@ describe('sanitizeEmailHtml', () => {
     expect(html).toContain('Hi');
   });
 
+  it('shows a cid: image the message carries, and only as an image data URL', () => {
+    const png = 'data:image/png;base64,iVBORw0KGgo=';
+    const { html } = sanitizeEmailHtml(
+      '<img id="a" src="cid:Image001.PNG@01DA"><img id="b" src="cid:missing@x"><img id="c" src="cid:svg@x">',
+      false,
+      { 'image001.png@01da': png, 'svg@x': 'data:image/svg+xml;base64,PHN2Zz4=' },
+    );
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    expect(doc.getElementById('a')?.getAttribute('src')).toBe(png);
+    expect(doc.getElementById('b')?.hasAttribute('src')).toBe(false);
+    // An SVG can carry script; only raster formats are swapped in.
+    expect(doc.getElementById('c')?.hasAttribute('src')).toBe(false);
+  });
+
+  it('accepts a blob: image only from this origin, and matches a percent-encoded cid', () => {
+    const own = `blob:${window.location.origin}/1234`;
+    const { html } = sanitizeEmailHtml(
+      '<img id="a" src="cid:logo%25v2@keros"><img id="b" src="cid:other@x">',
+      false,
+      { 'logo%v2@keros': own, 'other@x': 'blob:https://evil.example/5678' },
+    );
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    expect(doc.getElementById('a')?.getAttribute('src')).toBe(own);
+    expect(doc.getElementById('b')?.hasAttribute('src')).toBe(false);
+  });
+
   it('opens every link in a new tab without an opener', () => {
     const { html } = sanitizeEmailHtml('<a href="https://keros.com">Keros</a>', false);
     expect(html).toContain('target="_blank"');

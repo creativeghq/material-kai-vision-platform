@@ -238,11 +238,6 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                           {(t.unanswered_count ?? 0) > 1 ? ` · ${t.unanswered_count} msgs` : ''}
                         </Badge>
                       )}
-                      {/* #342: an order waiting for approval is the one thing worth seeing
-                          from the list — otherwise it is only discoverable by opening the
-                          thread, which is how an order sits unactioned for a week. It keeps
-                          a tag where the rest of the row went to plain words, because it is
-                          the one item in the row that is a JOB rather than a description. */}
                       {orderPending && (
                         <Badge variant="warning" className="text-[10px] py-0">
                           <ShoppingCart className="w-2.5 h-2.5" />Order

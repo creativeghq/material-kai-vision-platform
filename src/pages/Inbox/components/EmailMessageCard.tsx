@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bot, Forward, Paperclip, Pin, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
@@ -7,6 +7,8 @@ import { castSeedForSender } from '@/utils/characterAvatar';
 import { signInboxAttachment, type InboxMessage } from '@/services/inboxApi';
 import { castAvatarSrc } from '../inboxFormat';
 import { EmailHtmlView } from './EmailHtmlView';
+import { normalizeCid, referencedCids } from '@/utils/sanitizeEmailHtml';
+import { useInlineImages } from '../useInlineImages';
 import { AttachmentView } from './AttachmentView';
 import { MessageActions, MessageBody } from './MessageBubble';
 import { DeliveryState, type ParticipantLabel } from './InboxPrimitives';
@@ -45,7 +47,17 @@ export const EmailMessageCard: React.FC<{
   const [urls, setUrls] = useState<Record<string, string>>({});
   const isPinned = typeof meta.pinned_at === 'string' && !!meta.pinned_at;
   const { to, cc } = emailRecipientsOf(meta);
-  const attachments = m.attachments || [];
+  const inlineCids = useMemo(() => referencedCids(html), [html]);
+  const inlineParts = (m.attachments || []).filter((a) => a.content_id && inlineCids.has(normalizeCid(a.content_id)));
+  const inlineImages = useInlineImages(`${m.id}|${[...inlineCids].join(',')}`, inlineParts.map((a) => ({
+    cid: a.content_id!, mime: a.content_type ?? '', size: a.size ?? 0,
+    load: async () => {
+      const u = await signInboxAttachment(a);
+      if (!u) throw new Error('unsigned');
+      return (await fetch(u)).blob();
+    },
+  })), !collapsed && !!html && !plain);
+  const attachments = (m.attachments || []).filter((a) => !a.content_id || !inlineImages?.[normalizeCid(a.content_id)]);
 
   useEffect(() => {
     if (collapsed) return;
@@ -128,7 +140,7 @@ export const EmailMessageCard: React.FC<{
         </div>
       )}
       {html && !plain
-        ? <EmailHtmlView html={html} sender={fromAddress} onShowText={m.body ? () => setPlain(true) : undefined} />
+        ? <EmailHtmlView html={html} sender={fromAddress} onShowText={m.body ? () => setPlain(true) : undefined} inlineImages={inlineImages} />
         : m.body && (
           <div className="space-y-1">
             {html && <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setPlain(false)}>Show formatted</Button>}

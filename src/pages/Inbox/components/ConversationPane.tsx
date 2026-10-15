@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Loader2, MessageSquare, User as UserIcon, ArrowLeft, Archive, Pin, CalendarClock, AlertTriangle } from 'lucide-react';
-import { useVisualViewport } from '../useVisualViewport';
+import { MobileFullScreen } from './MobileFullScreen';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { inboxThreadSource } from '../inboxSource';
@@ -56,10 +55,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     pinnedMessage,
     isMobile,
   } = s;
-  // Mobile: the conversation is its own full screen over the app chrome, sized to what the
-  // keyboard leaves visible so the composer stays in view while typing.
   const fullScreen = isMobile && !!activeId;
-  const viewport = useVisualViewport(fullScreen);
   const showMemberControls = isMember && !!activeThread;
   // Only the newest handoff of an unowned thread offers "Assign to me"; older cards are history.
   const lastHandoffId = [...messages].reverse().find((m) => m.message_type === 'system' && (m.metadata as Record<string, unknown> | null)?.agent_handoff)?.id ?? null;
@@ -68,13 +64,10 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
   useEffect(() => { setOpenMail(new Set()); }, [activeId]);
   const mailIds = isEmail ? messages.filter((x) => x.message_type === 'text' || x.message_type === 'agent').map((x) => x.id) : [];
   const lastMailId = mailIds[mailIds.length - 1];
-  // Portaled on a phone: <main> is its own stacking context, so nothing inside it can rise above
-  // the app's top bar and tab bar.
-  const pane = (
-    <div
-      className={`md:dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'} ${
-        fullScreen ? 'fixed inset-x-0 top-0 z-50 h-[100dvh] bg-background' : ''}`}
-      style={fullScreen && viewport ? { height: viewport.height, transform: `translateY(${viewport.top}px)` } : undefined}
+  return (
+    <MobileFullScreen
+      active={fullScreen}
+      className={`md:dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}
     >
       {!activeThread ? (
         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
@@ -354,9 +347,8 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
           <InboxComposer s={s} />
         </>
       )}
-    </div>
+    </MobileFullScreen>
   );
-  return fullScreen ? createPortal(pane, document.body) : pane;
 };
 
 const MessageSkeleton: React.FC = () => (

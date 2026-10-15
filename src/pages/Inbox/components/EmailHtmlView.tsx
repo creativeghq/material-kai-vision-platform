@@ -22,18 +22,37 @@ const FRAME_CSS = `
   blockquote{margin:0 0 0 8px;padding-left:10px;border-left:3px solid #d6dbd7;color:#5f6a66;}
 `;
 
-export const EmailHtmlView: React.FC<{ html: string; sender?: string | null; onShowText?: () => void }> = ({ html, sender, onShowText }) => {
+export const EmailHtmlView: React.FC<{
+  html: string; sender?: string | null; onShowText?: () => void;
+  inlineImages?: Readonly<Record<string, string>>;
+}> = ({ html, sender, onShowText, inlineImages }) => {
   const senderKey = (sender ?? '').trim().toLowerCase();
   const [allowOnce, setAllowOnce] = useState(false);
   const [trusted, setTrusted] = useState(() => !!senderKey && readTrusted().includes(senderKey));
   const allow = allowOnce || trusted;
-  const { html: clean, blockedImages } = useMemo(() => sanitizeEmailHtml(html, allow), [html, allow]);
+  const { html: clean, blockedImages } = useMemo(() => sanitizeEmailHtml(html, allow, inlineImages), [html, allow, inlineImages]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(120);
 
   const measure = useCallback(() => {
-    const doc = frameRef.current?.contentDocument;
-    if (doc?.documentElement) setHeight(Math.min(Math.max(doc.documentElement.scrollHeight, 40), 4000));
+    const frame = frameRef.current;
+    const doc = frame?.contentDocument;
+    const body = doc?.body;
+    if (!frame || !doc?.documentElement || !body) return;
+    body.style.transform = '';
+    body.style.width = '';
+    doc.documentElement.style.overflowX = '';
+    const avail = frame.clientWidth;
+    const wide = Math.max(doc.documentElement.scrollWidth, body.scrollWidth);
+    const scale = avail > 0 && wide > avail + 1 ? avail / wide : 1;
+    if (scale < 1) {
+      body.style.boxSizing = 'border-box';
+      body.style.width = `${wide}px`;
+      body.style.transformOrigin = '0 0';
+      body.style.transform = `scale(${scale})`;
+      doc.documentElement.style.overflowX = 'hidden';
+    }
+    setHeight(Math.min(Math.max(Math.ceil(body.scrollHeight * scale), 40), 4000));
   }, []);
 
   useEffect(() => {
@@ -44,8 +63,10 @@ export const EmailHtmlView: React.FC<{ html: string; sender?: string | null; onS
       measure();
       const doc = frame.contentDocument;
       if (!doc?.body) return;
-      observer = new ResizeObserver(measure);
+      let raf = 0;
+      observer = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(measure); });
       observer.observe(doc.body);
+      observer.observe(frame);
       doc.querySelectorAll('img').forEach((img) => img.addEventListener('load', measure));
     };
     frame.addEventListener('load', onLoad);

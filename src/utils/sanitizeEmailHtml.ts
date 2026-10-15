@@ -14,7 +14,26 @@ function blankCssUrls(css: string): { css: string; count: number } {
   return { css: out, count };
 }
 
-export function sanitizeEmailHtml(raw: string, allowRemoteImages: boolean): SanitizedEmail {
+export const INLINE_IMAGE_MAX = 12;
+export const INLINE_IMAGE_BYTES = 3_000_000;
+
+export function normalizeCid(raw: string): string {
+  let s = raw.trim().replace(/^<|>$/g, '');
+  try { s = decodeURIComponent(s); } catch { /* not percent-encoded */ }
+  return s.toLowerCase();
+}
+
+/** Content-IDs an HTML body shows as `cid:` images. */
+export function referencedCids(html: string | null | undefined): Set<string> {
+  return new Set([...(html ?? '').matchAll(/\bcid:([^"'\s)>]+)/gi)].map((m) => normalizeCid(m[1].replace(/&amp;/g, '&'))));
+}
+
+function isInlineImageUrl(u: string): boolean {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  return (!!origin && u.startsWith(`blob:${origin}/`)) || /^data:image\/(png|jpe?g|gif|webp|bmp);base64,/i.test(u);
+}
+
+export function sanitizeEmailHtml(raw: string, allowRemoteImages: boolean, inlineImages?: Readonly<Record<string, string>>): SanitizedEmail {
   let blockedImages = 0;
   const purifier = DOMPurify();
   purifier.addHook('afterSanitizeAttributes', (node) => {
@@ -41,7 +60,12 @@ export function sanitizeEmailHtml(raw: string, allowRemoteImages: boolean): Sani
         if (count) { el.setAttribute('style', css); blockedImages += count; }
       }
     }
-    if (el.tagName === 'IMG' && /^\s*cid:/i.test(el.getAttribute('src') ?? '')) el.removeAttribute('src');
+    const cid = el.tagName === 'IMG' ? /^\s*cid:(.+)$/i.exec(el.getAttribute('src') ?? '') : null;
+    if (cid) {
+      const url = inlineImages?.[normalizeCid(cid[1])];
+      if (url && isInlineImageUrl(url)) el.setAttribute('src', url);
+      else el.removeAttribute('src');
+    }
   });
   purifier.addHook('uponSanitizeElement', (node, data) => {
     if (allowRemoteImages || data.tagName !== 'style' || !node.textContent) return;
