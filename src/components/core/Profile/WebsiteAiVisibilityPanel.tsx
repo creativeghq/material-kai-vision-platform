@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bot, Loader2, MessageSquareQuote, Play, Power, Plus, Quote, Users } from 'lucide-react';
+import { AlertTriangle, Bot, ChevronDown, ChevronRight, Loader2, MessageSquareQuote, Play, Power, Plus, Quote, Users } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -41,7 +41,7 @@ import { CitabilityPanel } from './seo/CitabilityPanel';
 import { LlmMentionsPanel } from './seo/LlmMentionsPanel';
 import { Sparkline } from './seo/Sparkline';
 import {
-  VERDICT_BADGE, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
+  VERDICT_BADGE, VERDICT_FILL, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
   withRosterEngines,
 } from './seo/aiCitations';
 import { compact, statusPresentation } from './seo/seoMetrics';
@@ -168,6 +168,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
 
   const [answers, setAnswers] = useState<AiAnswers | null>(null);
   const [openAnswer, setOpenAnswer] = useState<Record<string, boolean>>({});
+  const [openQuestion, setOpenQuestion] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -742,11 +743,26 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                 are not what your customers ask, nothing above means anything.
               </CardDescription>
             </div>
-            {state?.own_brand_subject_id && (
-              <Button size="sm" variant="outline" className="shrink-0" onClick={() => void openEditor()}>
-                Edit questions
-              </Button>
-            )}
+            <div className="flex shrink-0 gap-2">
+              {(answers?.questions.length ?? 0) > 1 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const all = answers?.questions ?? [];
+                    const anyOpen = all.some((q) => openQuestion[`${q.subject}:${q.template_key}`]);
+                    setOpenQuestion(anyOpen ? {} : Object.fromEntries(all.map((q) => [`${q.subject}:${q.template_key}`, true])));
+                  }}
+                >
+                  {(answers?.questions ?? []).some((q) => openQuestion[`${q.subject}:${q.template_key}`]) ? 'Collapse all' : 'Expand all'}
+                </Button>
+              )}
+              {state?.own_brand_subject_id && (
+                <Button size="sm" variant="outline" onClick={() => void openEditor()}>
+                  Edit questions
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -767,16 +783,55 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             const seenModels = Array.from(new Set(questions.flatMap((q) => q.answers.map((a) => a.model))));
             const allModels = Array.from(new Set([...rosterModels, ...seenModels]));
             return (
-              <ul className="space-y-2.5">
-                {questions.map((q) => (
-                  <li key={`${q.subject}:${q.template_key}`} className="rounded-sm border border-hairline">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2 bg-surface-sunken px-3 py-2">
-                      <p className="min-w-0 flex-1 text-xs font-medium leading-snug text-foreground">{q.prompt_text}</p>
-                      <span className="shrink-0 text-[11px] text-muted-foreground" title={q.template_key}>
-                        {q.subject} · asked {timeAgo(q.asked_at)}
+              <ul className="divide-y divide-hairline rounded-sm border border-hairline">
+                {questions.map((q) => {
+                  const qKey = `${q.subject}:${q.template_key}`;
+                  const qOpen = !!openQuestion[qKey];
+                  const verdicts = allModels.map((model) => ({ model, verdict: answerVerdict(q.answers.find((x) => x.model === model)) }));
+                  const cited = verdicts.filter((v) => v.verdict === 'cited').length;
+                  const named = verdicts.filter((v) => v.verdict === 'named').length;
+                  const answered = verdicts.filter((v) => v.verdict !== 'failed' && v.verdict !== 'not_run').length;
+                  return (
+                  <li key={qKey}>
+                    <button
+                      type="button"
+                      className="flex w-full flex-col gap-1.5 px-3 py-2.5 text-left hover:bg-surface-sunken/60 sm:flex-row sm:items-center sm:gap-3"
+                      onClick={() => setOpenQuestion((s) => ({ ...s, [qKey]: !qOpen }))}
+                      aria-expanded={qOpen}
+                    >
+                      <span className="flex min-w-0 flex-1 items-start gap-1.5">
+                        {qOpen
+                          ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          : <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        <span className={cn('min-w-0 text-xs font-medium leading-snug text-foreground', !qOpen && 'line-clamp-2')}>
+                          {q.prompt_text}
+                        </span>
                       </span>
-                    </div>
-                    <div className="divide-y divide-hairline">
+                      <span className="flex shrink-0 items-center gap-2 pl-5 sm:pl-0">
+                        <span className="flex gap-0.5" role="img" aria-label={verdicts.map((v) => `${modelLabel(v.model)}: ${VERDICT_LABEL[v.verdict]}`).join(', ')}>
+                          {verdicts.map((v) => (
+                            <span
+                              key={v.model}
+                              className={cn('h-2.5 w-2.5 rounded-[2px]', VERDICT_FILL[v.verdict])}
+                              title={`${modelLabel(v.model)}: ${VERDICT_LABEL[v.verdict]}`}
+                            />
+                          ))}
+                        </span>
+                        <span className="w-36 text-[11px] tabular-nums text-muted-foreground sm:text-right">
+                          {answered === 0
+                            ? 'no answer'
+                            : cited > 0
+                              ? <span className="font-semibold text-emerald-700 dark:text-emerald-400">cited by {cited} of {answered}</span>
+                              : named > 0
+                                ? <span className="font-medium text-foreground">named by {named} of {answered}</span>
+                                : `left out by ${answered} of ${answered}`}
+                          {' · '}{timeAgo(q.asked_at)}
+                        </span>
+                      </span>
+                    </button>
+                    {qOpen && (
+                    <div className="divide-y divide-hairline border-t border-hairline bg-surface-sunken/40">
+                      <p className="px-3 py-1.5 text-[11px] text-muted-foreground" title={q.template_key}>{q.subject} · asked {timeAgo(q.asked_at)}</p>
                       {allModels.map((model) => {
                         const a = q.answers.find((x) => x.model === model);
                         const rosterEntry = tierRoster.find((m) => m.model === model);
@@ -838,8 +893,10 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                         );
                       })}
                     </div>
+                    )}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             );
           })()}
