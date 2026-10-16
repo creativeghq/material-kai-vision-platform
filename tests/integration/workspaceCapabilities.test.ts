@@ -28,7 +28,7 @@ suite('workspace capabilities · TS table vs. the live database', () => {
     await teardown(svc, { wsIds: [ws], userIds: [owner?.id, warehouse?.id, client?.id] });
   });
 
-  it('workspace_role_capability_matrix() is exactly src/auth/roleCapabilities.ts — the deploy's sync-capability-matrix job keeps them equal', async () => {
+  it('workspace_role_capability_matrix() is exactly src/auth/roleCapabilities.ts — the sync-capability-matrix deploy job keeps them equal', async () => {
     const { data, error } = await svc.rpc('workspace_role_capability_matrix');
     expect(error).toBeNull();
     const live = new Set((data as Array<{ role: string; capability: string }>).map((r) => `${r.role}:${r.capability}`));
