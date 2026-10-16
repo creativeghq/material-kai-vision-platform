@@ -834,6 +834,24 @@ jobs:
           echo "- **Deployed:** ${{ needs.changes.outputs.changed_functions_count }} function(s)" >> $GITHUB_STEP_SUMMARY
           echo "- **Targets:** \`${{ needs.changes.outputs.changed_functions }}\`" >> $GITHUB_STEP_SUMMARY
 
+  # workspace_role_capability_matrix() is generated from src/auth/roleCapabilities.ts. This applies
+  # it when the live copy has drifted and fails if it still differs, so a role-table edit needs no
+  # manual SQL. Runs on every push: the read is cheap and the write happens only on drift.
+  sync-capability-matrix:
+    needs: [unit-tests, lint]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 🔐 Sync the role → capability matrix
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: npm run capabilities:sync
+
   # ────────────────────────────────────────────────────────────────────────────
   # Post-deploy smoke gate — verify the critical prod flows are actually alive right
   # after a deploy. A FAIL here turns this run red so breakage is caught in seconds,
@@ -942,7 +960,7 @@ jobs:
   # checks below are false — gate on changes.tests as well, or an edited suite would
   # skip silently and report green having never run.
   integration-tests:
-    needs: [changes, deploy-frontend, deploy-functions]
+    needs: [changes, deploy-frontend, deploy-functions, sync-capability-matrix]
     if: ${{ always() && (needs.deploy-frontend.result == 'success' || needs.deploy-functions.result == 'success' || needs.changes.outputs.tests == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 8

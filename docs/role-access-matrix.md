@@ -52,7 +52,7 @@ Resolution (`resolvePersona()`): operator → guest workspace → `TEAM_ROLE_PER
 
 The one table is `WORKSPACE_ROLE_CAPABILITIES` in [`src/auth/roleCapabilities.ts`](../src/auth/roleCapabilities.ts).
 The UI derives personas from it, edge functions read its Deno mirror (`npm run vocab:mirror`), and SQL reads
-`workspace_role_capability_matrix()`, printed from it by `npm run capabilities:sql`. This snapshot is generated
+`workspace_role_capability_matrix()`, which every deploy syncs from it (`npm run capabilities:sync`). This snapshot is generated
 from that file — regenerate rather than edit. The platform operator additionally holds `platform.admin`,
 `catalog.import` and `downstream.view`.
 
