@@ -146,6 +146,10 @@ function failures(calls: CallOut[], names: string[], snap: Snapshot): boolean {
   return false;
 }
 
+/** Answers that NAME the brand. The default scope matches the words anywhere in an answer, so a two-word
+ *  name collected a Bugatti review's sources as "your market". */
+const BRAND_SCOPE = ['brand_entities'];
+
 async function collect(
   db: Loose, site: Site, market: Market, coverage: Coverage[], keyword: string, payer: string | null,
 ): Promise<{ rows: Record<string, unknown>[]; summary: Record<string, unknown>[] }> {
@@ -181,9 +185,9 @@ async function collect(
     const [metrics, series, domains, brands, pages] = await Promise.all([
       call('ai_llm_mentions_aggregated_metrics', { domain, ...p }),
       call('ai_llm_mentions_historical', { domain, ...p }),
-      call('ai_llm_mentions_top_domains', { keyword, ...p, limit: 20 }),
-      call('ai_llm_mentions_top_brands', { keyword, ...p, limit: 20 }),
-      call('ai_llm_mentions_top_pages', { keyword, ...p, limit: 20 }),
+      call('ai_llm_mentions_top_domains', { keyword, keyword_scope: BRAND_SCOPE, ...p, limit: 20 }),
+      call('ai_llm_mentions_top_brands', { keyword, keyword_scope: BRAND_SCOPE, ...p, limit: 20 }),
+      call('ai_llm_mentions_top_pages', { keyword, keyword_scope: BRAND_SCOPE, ...p, limit: 20 }),
     ]);
 
     const ours = blank();
@@ -215,7 +219,7 @@ async function collect(
       mk.top_pages = pages.ok ? parseLeaders(pages.items, 'page') : [];
       if (mk.top_domains.length + mk.top_brands.length + mk.top_pages.length === 0) {
         mk.status = 'no_data';
-        mk.note = mk.note ?? `The ${cov.label} corpus for ${market.country_code} / ${market.language_code} holds no answer matching "${keyword}".`;
+        mk.note = mk.note ?? `The ${cov.label} corpus for ${market.country_code} / ${market.language_code} holds no answer naming "${keyword}" as a brand.`;
       }
     }
     rows.push({

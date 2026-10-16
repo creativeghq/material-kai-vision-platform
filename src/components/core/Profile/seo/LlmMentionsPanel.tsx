@@ -127,7 +127,9 @@ const DomainBlock: React.FC<{ t: LlmMentionTarget }> = ({ t }) => {
 const KeywordBlock: React.FC<{ t: LlmMentionTarget }> = ({ t }) => (
   <div className="space-y-2 border-t border-hairline pt-3">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <p className="text-xs font-medium text-foreground">Your market · <span className="font-normal">answers about “{t.target}”</span></p>
+      <p className="text-xs font-medium text-foreground">
+        AI answers that name “{t.target}” <span className="font-normal text-muted-foreground">· and what they cite</span>
+      </p>
       <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
         <StatusTag status={t.status} /> read {timeAgo(t.captured_at)}
       </span>
