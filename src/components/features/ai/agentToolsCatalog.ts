@@ -1691,7 +1691,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'price-monitoring',
-    capability: 'pricing.manage',
+    capability: ['pricing.manage', 'quotes.use'],
     name: 'Price Monitoring',
     description: 'Track what competitors charge for your products across retailers (Perplexity + DataForSEO + Firecrawl verification).',
     icon: 'Percent',
@@ -2312,8 +2312,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     name: 'HR',
     description: 'Ask about your team and log absences from chat: who\'s on leave, HR overview, record a sick/vacation day, add an employee.',
     icon: 'Users',
-    moduleSlug: 'hr',
-    adminOnly: true, // HR data is owner/admin-only (hr.view); hr-api enforces regardless.
+    moduleSlug: 'hr', // HR data is owner/admin-only (hr.view); hr-api enforces regardless.
     tool_ids: ['manage_hr'],
     quick_starts: [
       {
@@ -2364,8 +2363,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     name: 'Stock',
     description: 'Check inventory and adjust stock from chat: what\'s low, how many of an item you have, receive/issue/set quantities, recent movements.',
     icon: 'Package',
-    moduleSlug: 'stock',
-    adminOnly: true, // writes require finance-manager (owner/admin); stock-api enforces regardless.
+    moduleSlug: 'stock', // writes require finance-manager (owner/admin); stock-api enforces regardless.
     tool_ids: ['manage_stock'],
     quick_starts: [
       {
@@ -2953,6 +2951,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'generation',
+    capability: ['moodboards.use', 'projects.use', 'quotes.use', 'marketing.seo', 'realestate.listings.manage'],
     name: 'Interior Design',
     description: 'Design a room, test a material on your photo, stage, re-light, render a floor plan, build a VR world — each is a guided process, not a blank prompt.',
     icon: 'Sparkles',

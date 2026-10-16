@@ -117,7 +117,7 @@ describe('#395 — the admin axis, offered vs bound', () => {
     // Without it the filter above silently matches nothing — `undefined` is falsy, so every
     // cluster would read as non-admin and the menu would be unfiltered again with the code intact.
     expect(clustersSrc).toMatch(/adminOnly\?: boolean;/);
-    expect((clustersSrc.match(/adminOnly: true/g) || []).length).toBeGreaterThanOrEqual(6);
+    expect((clustersSrc.match(/adminOnly: true/g) || []).length).toBeGreaterThanOrEqual(5);
   });
 
   it('load_toolkit does not take an isAdmin it never reads', () => {

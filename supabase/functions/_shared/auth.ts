@@ -213,9 +213,8 @@ export async function authenticate(
 }
 
 /**
- * True when the user holds one of `allowedRoles` as their account tier OR as an active role in
- * ANY workspace. Never a platform gate: every signup owns a workspace, so 'owner'/'admin' here
- * means "any signed-in user". Use authenticatePlatformOperator for that.
+ * `allowedRoles` held as account tier OR active role in ANY workspace — never a gate on its own:
+ * every signup owns a workspace. Use authenticatePlatformOperator / userHasWorkspaceCapability.
  */
 async function holdsAnyRole(adminClient: DbClient, userId: string, allowedRoles: string[]): Promise<boolean> {
   const [{ data: userProfile }, { data: roles }, { data: memberships }] = await Promise.all([
@@ -512,11 +511,13 @@ export async function listWorkspaceIdsWithCapability(
   capability: Capability | readonly Capability[],
 ): Promise<string[]> {
   if (!userId) return [];
-  const { data } = await adminClient
+  const { data, error } = await adminClient
     .from('workspace_members')
     .select('workspace_id, role')
     .eq('user_id', userId)
     .eq('status', 'active');
+  // Fail closed: an unreadable membership list is not "no workspaces", which reads as nothing to do.
+  if (error) throw new Error(`Could not read workspace memberships: ${error.message}`);
   return ((data ?? []) as Array<{ workspace_id: string; role: string }>)
     .filter((m) => roleHasCapability(m.role, capability))
     .map((m) => m.workspace_id);

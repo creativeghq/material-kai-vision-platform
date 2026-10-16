@@ -307,7 +307,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       // Bind the caller to this invoice explicitly: an active member of its workspace
       // (or global admin), OR the linked customer (crm_contacts.user_id). 404 on
       // mismatch to avoid cross-tenant id enumeration.
-      const isMember = await userHasWorkspaceCapability(supabase, auth.userId, inv.workspace_id, 'finance.manage');
+      const isMember = await userHasWorkspaceCapability(supabase, auth.userId, inv.workspace_id, 'finance.operate');
       let isLinkedCustomer = false;
       if (!isMember && inv.customer_contact_id) {
         const { data: linkedContact } = await supabase

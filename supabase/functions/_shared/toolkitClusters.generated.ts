@@ -53,7 +53,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'],
   },
   'price-monitoring': {
-    capability: ['pricing.manage'],
+    capability: ['pricing.manage', 'quotes.use'],
     tool_ids: ['track_product_prices', 'get_price_summary'],
   },
   'contracts': {
@@ -122,12 +122,10 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['manage_my_hr'],
   },
   'hr': {
-    adminOnly: true,
     capability: ['hr.view'],
     tool_ids: ['manage_hr'],
   },
   'stock': {
-    adminOnly: true,
     capability: ['warehouse.manage'],
     tool_ids: ['manage_stock'],
   },
@@ -181,6 +179,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['generate_presentation_sheet'],
   },
   'generation': {
+    capability: ['moodboards.use', 'projects.use', 'quotes.use', 'marketing.seo', 'realestate.listings.manage'],
     tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video', 'generate_gemini', 'virtual_staging', 'check_generation_status', 'visualize_on_surface'],
   },
   'seo-research': {

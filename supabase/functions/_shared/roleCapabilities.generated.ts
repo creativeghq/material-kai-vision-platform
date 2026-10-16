@@ -72,7 +72,7 @@ export const WORKSPACE_ROLE_CAPABILITIES: Readonly<Record<string, readonly Capab
   admin: BUSINESS_CAPABILITIES,
   member: [
     'workspace.read', 'finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse',
-    'quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use',
+    'quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use', 'marketing.seo',
   ],
   accountant: ['workspace.read', 'finance.manage', 'finance.operate', 'invoice.issue'],
   sales: SALES_CAPABILITIES,

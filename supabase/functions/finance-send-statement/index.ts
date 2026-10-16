@@ -930,7 +930,7 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
       const { data: party, error: pErr } = await supabase.from('vw_finance_parties').select('*')
         .eq('party_type', pt).eq('party_id', body.party_id).maybeSingle();
       if (pErr || !party) return json({ error: 'Party not found' }, 404);
-      if (!(await userHasWorkspaceCapability(supabase, auth.userId, party.workspace_id, ['finance.manage', 'sales.portal']))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, party.workspace_id, ['finance.operate', 'sales.portal']))) {
         return json({ error: 'Not authorized for this party' }, 403);
       }
       const { data: mintSettings } = await supabase.from('finance_settings').select('statements_enabled').eq('workspace_id', party.workspace_id).maybeSingle();
@@ -956,7 +956,7 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
       .eq('party_type', partyType).eq('party_id', body.party_id).maybeSingle();
     if (partyErr || !party) return json({ error: `Party not found: ${partyErr?.message ?? body.party_id}` }, 404);
 
-    if (!(await userHasWorkspaceCapability(supabase, auth.userId, party.workspace_id, ['finance.manage', 'sales.portal']))) {
+    if (!(await userHasWorkspaceCapability(supabase, auth.userId, party.workspace_id, ['finance.operate', 'sales.portal']))) {
       return json({ error: 'Not authorized for this customer' }, 403);
     }
 

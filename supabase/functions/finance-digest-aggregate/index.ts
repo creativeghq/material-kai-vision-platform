@@ -460,7 +460,7 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
 
     // Service role: without this, body.workspace_id + recipients_override mails another tenant's P&L anywhere.
     if (auth.level !== 'secret') {
-      if (!(await userHasWorkspaceCapability(supabase, auth.userId, workspaceId, 'finance.manage'))) return json({ error: 'Not authorized for this workspace' }, 403);
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, workspaceId, 'finance.operate'))) return json({ error: 'Not authorized for this workspace' }, 403);
     }
 
     const { data: settings } = await supabase

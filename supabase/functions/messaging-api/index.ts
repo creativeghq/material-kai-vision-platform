@@ -686,6 +686,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        await requireWorkspaceManager(wsId, 'connect a WhatsApp number');
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
 
         // Zernio: POST /v1/connect/whatsapp/credentials -> { account: { accountId, username, displayName, selectedPhoneNumber } }
@@ -723,6 +724,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        await requireWorkspaceManager(wsId, 'connect a WhatsApp number');
 
         // A WhatsApp number is a connected account on Zernio's bill exactly like an Instagram
         // profile is, so it draws on the same allowance. Checked before the OAuth URL is minted:
@@ -774,6 +776,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        await requireWorkspaceManager(wsId, 'connect a WhatsApp number');
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
 
         // There is NO GET /v1/accounts/{accountId} — the spec exposes only PUT/PATCH/DELETE
@@ -2288,6 +2291,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const syncWsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
         if (!syncWsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(syncWsId); if (gate) return gate; }
+        await requireWorkspaceManager(syncWsId, 'sync WhatsApp channels');
         // includeOverLimit so a plan-limit account still reconciles instead of vanishing
         // from the sync and looking deleted.
         const data = await zernioApi('GET', '/accounts?platform=whatsapp&includeOverLimit=true');

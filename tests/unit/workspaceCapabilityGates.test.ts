@@ -26,7 +26,6 @@ const UNGATED_TOOLKITS: Record<string, string> = {
   'trip-expenses': "the caller's own trip claims",
   'job-research': "the caller's own job search",
   'my-hr': "the caller's own HR record",
-  generation: 'image generation, billed to the caller',
 };
 
 /** Bare membership is the right gate only where ANY member may act. Shrink-only. */

@@ -3817,10 +3817,11 @@ function checkAgentAccess(role: string, agentId: string): { allowed: boolean; ro
   if (!agentConfig) {
     return { allowed: false, role };
   }
-  // An open agent (one listing `member`) is open to every role holding agent.use; its tools are
-  // then narrowed per cluster capability in registerTools.
+  // An open agent is open to STAFF holding agent.use (an employee or client keeps JARVIS only); its
+  // tools are narrowed per cluster capability in registerTools.
   const allowed = agentConfig.allowedRoles.includes(role)
-    || (agentConfig.allowedRoles.includes('member') && roleHasCapability(role, 'agent.use'));
+    || (agentConfig.allowedRoles.includes('member') && roleHasCapability(role, 'agent.use')
+      && roleHasCapability(role, 'workspace.read'));
   return { allowed, role };
 }
 

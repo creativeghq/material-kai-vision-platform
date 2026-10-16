@@ -250,7 +250,7 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
   if (!cronOk) {
     const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) throw new HttpError(401, 'unauthorized');
-    allowedWorkspaceIds = await listWorkspaceIdsWithCapability(supabase, auth.userId, 'finance.manage');
+    allowedWorkspaceIds = await listWorkspaceIdsWithCapability(supabase, auth.userId, 'finance.operate');
     if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_finance_workspaces' });
   }
 

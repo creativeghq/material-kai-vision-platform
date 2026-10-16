@@ -212,7 +212,7 @@ type AnyClient = any;
 const RESEND = 'https://api.resend.com';
 const CONTACT_SYNC_CAP = 150; // Resend writes per run: 150 × ~0.6s fits the 150s edge ceiling
 const CONTACT_WRITE_SPACING_MS = 600;
-/** Roles that send mail to customers in their workspace: everyone but client, employee and hr. */
+/** Roles that send mail to customers in their workspace: all but client, employee and the hr (read-only) role. */
 const EMAIL_SENDER_CAPABILITIES = [
   'crm.view', 'finance.manage', 'invoice.issue', 'quotes.use', 'inbox.use', 'marketing.email',
   'warehouse.manage', 'hr.manage', 'realestate.leads.view',
