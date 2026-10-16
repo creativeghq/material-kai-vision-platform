@@ -1,6 +1,6 @@
 # AI Models Architecture - Complete Overview
 
-**Last Updated**: 2026-06-13
+**Last Updated**: 2026-10-16
 **Status**: Production
 
 > **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **Surya-2 was deleted** (and earlier the same day Surya-2 had replaced **YOLO DocParser + Chandra OCR + `merge_layout`**) — the backbone is now a single **PaddleOCR-VL** two-stage parser (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV3 RT-DETR + 0.9B VLM) that returns layout regions + OCR text + figure boxes in one pass, run **before discovery** (structure-first). It is hosted on **Modal**, NOT HuggingFace. The active endpoints are now **SLIG on Modal + PaddleOCR-VL on Modal** — HuggingFace hosts nothing in this platform anymore. Anywhere below that names YOLO, Chandra, or Surya, read "PaddleOCR-VL structural pass on Modal". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the PaddleOCR section in `CLAUDE.md`.
@@ -12,8 +12,11 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
 | **Anthropic** | Claude Opus 5, Claude Sonnet 5, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
-| **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
-| **Google (Modal)** | SigLIP2 base (768D) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
+| **Voyage AI** | voyage-4-large (index) + voyage-4 (query) | Text, aspect and understanding embeddings (1024D) — one shared 4-series space, sole text embedder |
+| **Voyage AI** | voyage-context-4 | KB sections + PDF chunks (1024D) — each chunk embedded with its document in view; same 4-series space, queried with voyage-4 (KB MRR 0.840 → 0.945, 2026-10-16) |
+| **Voyage AI** | voyage-multimodal-3.5 | Page embeddings (1024D, `page_embeddings`) — a DIFFERENT space; never query it with a voyage-4 vector |
+| **Anthropic / Voyage** | claude-haiku-4-5 (default) / rerank-3-lite (`SEARCH_RERANK_PROVIDER=voyage`) | Search reranking |
+| **Google (Modal)** | SigLIP2 base (768D) (SLIG) | One visual embedding per image (768D), the pre-OCR image filter, and text→visual query vectors |
 | **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV3 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
 | **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |
 
@@ -83,7 +86,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 │ Visual (SLIG SigLIP2 768D) — pixel-similarity:                          │
 │   image_slig_embeddings (key: visual_768)                               │
 │                                                                          │
-│ Aspect (Voyage voyage-4 1024D):                                          │
+│ Aspect (Voyage voyage-4-large 1024D):                                    │
 │   image_color_embeddings    (key: color_aspect_1024)                    │
 │   image_texture_embeddings  (key: texture_aspect_1024)                  │
 │   image_style_embeddings    (key: style_aspect_1024)                    │
@@ -92,7 +95,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 │   string derived from VisionAnalysis fields (colors[], textures[]+      │
 │   finish, style+surface_pattern+applications, material_type+category).  │
 │                                                                          │
-│ Understanding (Voyage voyage-4 1024D):                                  │
+│ Understanding (Voyage voyage-4-large 1024D):                            │
 │   image_understanding_embeddings (key: understanding_1024)              │
 │   ↑ Voyage embedding of the full serialized VisionAnalysis text.        │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -101,14 +104,14 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 │ UNDERSTANDING EMBEDDING (1024D) — runs in parallel with VISUAL          │
 │ Pipeline: VisionAnalysis JSON →                                         │
 │           serialize_vision_analysis_to_text() →                         │
-│           Voyage AI voyage-4 (input_type="document") → 1024D            │
+│           Voyage AI voyage-4-large (input_type="document") → 1024D      │
 │ Provenance persisted: embedding_model, schema_version on every row      │
 │ No fallback embedder at all — Voyage or nothing (deleted 2026-08-08)   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ TEXT EMBEDDINGS                                                         │
-│ Model: Voyage AI voyage-4 (sole text embedder; OpenAI retired 2026-04)  │
+│ Model: voyage-4-large index / voyage-4 query (sole text embedder)       │
 │ Output: 1024D vectors, dict key text_1024                               │
 │ Input types: "document" for indexing, "query" for search                │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -127,8 +130,8 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ SEARCH: 7-vector RAG (Claude Opus 5 + Multi-Vector)                   │
 │ Models:                                                                 │
-│   - Text embeddings: Voyage AI voyage-4 (1024D)                         │
-│   - Visual embeddings: 5× SLIG specialized (768D each)                  │
+│   - Text embeddings: voyage-4-large index / voyage-4 query (1024D)      │
+│   - Visual embedding: 1× SLIG (768D) + 4× Voyage aspect (1024D)         │
 │   - Understanding: Voyage AI 1024D (from VisionAnalysis JSON)           │
 │   - Synthesis LLM: Claude Opus 5 (200K context)                       │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -197,15 +200,15 @@ Chunking is a text task at the quality ceiling — Sonnet matches Opus output qu
 
 ---
 
-### 4. **Voyage AI voyage-4 — Text & Understanding Embeddings** 📝
+### 4. **Voyage AI 4 series — Text, Aspect & Understanding Embeddings** 📝
 
 **File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py`
 
-Voyage `voyage-4` is the sole text embedder. It produces 1024D vectors stored as halfvec in VECS. The dict key is `text_1024` (was `text_1536` under OpenAI text-embedding-3-small, which was retired 2026-04).
+Voyage is the sole text embedder: `voyage-4-large` indexes (`input_type="document"`) and `voyage-4` embeds queries — the 4 series shares one latent space, so the split needs no reindex (#400 W3, 2026-09-12). It produces 1024D vectors stored as halfvec in VECS. The dict key is `text_1024` (was `text_1536` under OpenAI text-embedding-3-small, which was retired 2026-04).
 
 **Two production uses**:
 1. **Chunk + product text embeddings** (`text_embedding_1024`)
-2. **Understanding embeddings**: vision_analysis JSON → `serialize_vision_analysis_to_text()` → voyage-4 with `input_type="document"` → 1024D → `image_understanding_embeddings` collection
+2. **Understanding embeddings**: vision_analysis JSON → `serialize_vision_analysis_to_text()` → voyage-4-large with `input_type="document"` → 1024D → `image_understanding_embeddings` collection
 
 **Provenance** persisted on every row (`embedding_model`, `schema_version`) so the admin UI / backfill cron can detect drift and stale-schema rows. There is **no fallback embedder** — the Voyage→OpenAI fallback was deleted 2026-08-08, so a second provider's vectors cannot co-exist in a VECS collection by construction rather than by per-call discipline.
 
@@ -225,9 +228,9 @@ Voyage `voyage-4` is the sole text embedder. It produces 1024D vectors stored as
 **File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
 **Modal endpoint**: app `slig`, URL `https://basilakis--slig-sligservice-web.modal.run`, serving the custom model `basiliskan/slig` which duplicates **`google/siglip2-base-patch16-512`** — stock SigLIP2 base, **native 768D, no projection head** (`SLIG_EMBEDDING_DIMENSION=768`).
 
-Modal endpoint (app: slig). Modes: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`. For specialized embeddings (color, texture, material, style), the client obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends them with weighted averaging before normalizing to a unit vector.
+Modal endpoint (app: slig, A10G, scale-to-zero). Modes: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`. The color/texture/style/material aspects are NOT SLIG — they are Voyage 1024D vectors of a per-aspect text serialization (§4).
 
-**Output**: 768D specialized embeddings (5 types per image), all halfvec in VECS. The previous-generation 1152D SigLIP-SO400M collections (image_siglip_embeddings + 1152D specialized) were dropped 2026-04 as 100% orphans from the pre-SLIG era.
+**Output**: one 768D visual embedding per image (`image_slig_embeddings`), halfvec in VECS. The previous-generation 1152D SigLIP-SO400M collections (image_siglip_embeddings + 1152D specialized) were dropped 2026-04 as 100% orphans from the pre-SLIG era.
 
 **Hardening (2026-05-01)**:
 - 3-attempt retry on dim-mismatch (was silent abort — single wrong-dim response caused mass data loss)
@@ -299,13 +302,14 @@ The `VisionProvider.vision_provider` still validate. No code path produces new r
 | Vision (primary) | Claude Opus 5 (tool use) | — |
 | Vision (validation, low-confidence) | Claude Opus 5 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
 | Phase 3 OCR (per-image) | PaddleOCR-VL block OCR | — |
-| Visual Embeddings | SLIG (SigLIP2 base 768D, 5×768D) | — |
-| Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
-| Text Embeddings | Voyage AI voyage-4 (1024D) | — |
+| Visual Embeddings | SLIG (SigLIP2 base, 1×768D) | — |
+| Understanding Embedding | Voyage AI voyage-4-large (1024D) | — |
+| Text Embeddings | Voyage AI voyage-context-4 chunks / voyage-4-large other docs / voyage-4 query (1024D) | — |
+| Page Embeddings | Voyage AI voyage-multimodal-3.5 (1024D) | — |
 
 ### Search & Agents
 
-7-vector RAG uses Voyage AI voyage-4 for text + understanding (1024D), 5× SLIG specialized 768D for visual, and Claude Opus 5 for synthesis. The Agent Hub supports Claude Opus 5 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
+RAG uses the Voyage 4 series for text, aspects and understanding (1024D), SLIG 768D for visual, voyage-multimodal-3.5 for pages, and Claude Opus 5 for synthesis. The Agent Hub supports Claude Opus 5 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
 
 ---
 
@@ -322,7 +326,7 @@ These numbers are the source of truth; Doc #4's profile cost lines reference thi
 | **Claude Sonnet 5** | Chunking (~500 chunks) | ~$0.10 |
 | **Claude Opus 5** | Vision analysis (50 images, tool use) | ~$0.13 |
 | **PaddleOCR-VL 1.6** | Phase 3 per-image OCR (text-bearing only) | Modal GPU (scale-to-zero) |
-| **SLIG** | Visual embeddings (250 total, 5× per image) | endpoint |
+| **SLIG** | Visual embeddings (1× per image) | endpoint |
 | **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.05 |
 | **TOTAL** | Per PDF | **~$0.36** |
 
