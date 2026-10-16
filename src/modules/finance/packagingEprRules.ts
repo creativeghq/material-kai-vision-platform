@@ -94,8 +94,42 @@ export interface SupplierEprRow {
   company_id: string;
   name: string;
   country: string;
+  greek?: GreekRegisterState;
   registrations: SupplierRegistration[];
 }
+
+export type GreekRegisterState =
+  | 'listed' | 'not_listed' | 'delisted' | 'no_afm' | 'not_greek' | 'never_read' | 'register_unavailable';
+
+export interface GreekRegisterEntry {
+  amp: string;
+  name: string | null;
+  city: string | null;
+  scheme: string | null;
+  first_seen_at: string;
+}
+
+export interface GreekRegisterResult {
+  state: GreekRegisterState;
+  afm?: string;
+  entries?: GreekRegisterEntry[];
+  last_listed_at?: string | null;
+  checked_at?: string;
+}
+
+export interface CompanyRegisterStatus {
+  company_id: string;
+  name: string;
+  country: string;
+  is_greek: boolean;
+  register: { fresh: boolean; last_ok: string | null; last_attempt: string | null; last_error: string | null };
+  greek: GreekRegisterResult;
+  own: GreekRegisterResult & { recorded_amp: string | null };
+  registrations: SupplierRegistration[];
+}
+
+export const EMPA_PUBLIC_SEARCH_URL =
+  'https://eoan.gr/%CE%B5%CE%BC%CF%80%CE%B1/%CE%B4%CE%B7%CE%BC%CE%BF%CF%83%CE%B9%CE%BF%CF%80%CE%BF%CE%AF%CE%B7%CF%83%CE%B7-%CE%B5%CE%B3%CE%B3%CE%B5%CE%B3%CF%81%CE%B1%CE%BC%CE%BC%CE%AD%CE%BD%CF%89%CE%BD-%CF%80%CE%B1%CF%81%CE%B1%CE%B3%CF%89%CE%B3/';
 
 export interface SupplierEprPosition {
   status: SupplierEprStatus;

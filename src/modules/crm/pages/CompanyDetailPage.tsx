@@ -1385,7 +1385,7 @@ export const CompanyDetailPage: React.FC = () => {
                   }] : []),
                   /* #454 -- PPWR art. 19(2)(a) makes verifying their producer registration a
                      precondition to selling their packaging on, not an audit finding. */
-                  ...(activeWorkspaceId ? [{
+                  ...(activeWorkspaceId && company.is_supplier ? [{
                     id: 'epr', label: 'Packaging EPR', icon: PackageOpen, group: 'After sale',
                     node: <SupplierEprCard workspaceId={activeWorkspaceId} companyId={company.id} />,
                   }] : []),

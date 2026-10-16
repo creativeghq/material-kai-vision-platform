@@ -9,13 +9,14 @@ import { supabase } from '@/integrations/supabase/client';
 
 import type {
   PackagingDeclaration, PackagingComponent, ReusableAsset, MaterialCategory,
-  SupplierEprPosition, EsprPosition, PackagingTier, RecyclabilityGrade,
+  SupplierEprPosition, EsprPosition, PackagingTier, RecyclabilityGrade, CompanyRegisterStatus,
 } from '@/modules/finance/packagingEprRules';
 
 export type {
   PackagingTier, RecyclabilityGrade, DeclarationStatus, SupplierEprStatus, EsprStatus,
   MaterialCategory, DeclarationRow, PackagingDeclaration, PackagingComponent, ReusableAsset,
   SupplierRegistration, SupplierEprRow, SupplierEprPosition, EsprPosition,
+  GreekRegisterState, GreekRegisterEntry, GreekRegisterResult, CompanyRegisterStatus,
 } from '@/modules/finance/packagingEprRules';
 export {
   TIER_LABEL, GRADE_LABEL, ESPR_LABEL, gradeIsAssessed, componentIsIncomplete,
@@ -23,6 +24,7 @@ export {
   declarationNeedsAttention, supplierEprBlocksSale, esprNeedsAnswer,
   PACKAGING_LEGAL_BASIS, AMP_ON_EVERY_DOCUMENT, FOREIGN_EPR_DOES_NOT_EXEMPT,
   CONTAINER_IS_NOT_PACKAGING, REUSE_TARGET_FROM, REUSE_TARGET_PERCENT, WRAPS_STAY_IN_THE_POOL,
+  EMPA_PUBLIC_SEARCH_URL,
 } from '@/modules/finance/packagingEprRules';
 
 export const packagingEprService = {
@@ -128,6 +130,14 @@ export const packagingEprService = {
     } as never);
     if (error) throw error;
     return data as unknown as SupplierEprPosition;
+  },
+
+  async companyRegisterStatus(companyId: string): Promise<CompanyRegisterStatus | null> {
+    const { data, error } = await supabase.rpc('epr_company_register_status' as never, {
+      p_company_id: companyId,
+    } as never);
+    if (error) throw error;
+    return (data ?? null) as unknown as CompanyRegisterStatus | null;
   },
 
   async recordSupplierRegistration(input: {
