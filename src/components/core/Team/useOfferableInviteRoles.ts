@@ -31,8 +31,14 @@ export function useOfferableInviteRoles(): WorkspaceInviteRole[] {
   }, [hrEnabled, stockEnabled, emailMarketingEnabled, realEstateEnabled, quotesEnabled, salesFinanceEnabled]);
 }
 
+/** The viewer's role in `workspaceId`, or null when they are not a member of it. */
+export function useViewerWorkspaceRole(workspaceId: string | null | undefined): string | null {
+  const { memberships } = useWorkspace();
+  return memberships.find((m) => m.workspaceId === workspaceId)?.role ?? null;
+}
+
 /** Whether the viewer may send invitations for `workspaceId` — the same owner/admin test every invite RPC applies. */
 export function useCanInvite(workspaceId: string | null | undefined): boolean {
-  const { memberships } = useWorkspace();
-  return memberships.some((m) => m.workspaceId === workspaceId && (m.role === 'owner' || m.role === 'admin'));
+  const role = useViewerWorkspaceRole(workspaceId);
+  return role === 'owner' || role === 'admin';
 }

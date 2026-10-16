@@ -643,7 +643,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
   const { toast } = useToast();
   // Operator-only branded blocks (e.g. "MH Brand Header") are gated on this.
   // `wsLoading` gates editor init so the flag is settled before blocks register.
-  const { isPlatformOperator, loading: wsLoading } = useWorkspace();
+  const { isPlatformOperator, loading: wsLoading, activeWorkspaceId } = useWorkspace();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef    = useRef<GrapesEditor | null>(null);
@@ -782,7 +782,8 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
           emailType: marketing ? 'marketing' : 'transactional',
           // Marketing test sends use the workspace's own Resend (BYOK), strictly — same path
           // the campaign takes — so the test proves the real sender is configured.
-          ...(marketing ? { workspace_id: workspaceId, requireWorkspaceSender: true } : {}),
+          workspace_id: workspaceId ?? activeWorkspaceId,
+          ...(marketing ? { requireWorkspaceSender: true } : {}),
           tags: { test: 'true', template_id: id },
         },
       });

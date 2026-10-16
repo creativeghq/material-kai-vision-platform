@@ -11,6 +11,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { emailService } from '../services/emailService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface TestEmailDialogProps {
@@ -19,6 +20,7 @@ interface TestEmailDialogProps {
 }
 
 export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenChange }) => {
+  const { activeWorkspaceId } = useWorkspace();
   const [sending, setSending] = useState(false);
   const [formData, setFormData] = useState({
     to: '',
@@ -57,6 +59,7 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
         `,
         text: formData.message,
         emailType: 'transactional',
+        workspaceId: activeWorkspaceId ?? undefined,
         tags: { type: 'test' },
       });
 

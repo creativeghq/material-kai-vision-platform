@@ -15,8 +15,7 @@ import { getErrorMessage } from '@/core/errors/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { fetchDisplayProfiles } from '@/services/displayProfilesService';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useOfferableInviteRoles } from './useOfferableInviteRoles';
+import { useOfferableInviteRoles, useViewerWorkspaceRole } from './useOfferableInviteRoles';
 import { formatDate } from '@/utils/datetime';
 import {
   workspaceManagementService, type WorkspaceInvite,
@@ -42,8 +41,9 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   workspaceId, workspaceName,
 }) => {
   const { toast } = useToast();
-  const { memberships } = useWorkspace();
-  const viewerIsOwner = memberships.some((m) => m.workspaceId === workspaceId && m.role === 'owner');
+  const viewerRole = useViewerWorkspaceRole(workspaceId);
+  const viewerIsOwner = viewerRole === 'owner';
+  const canManage = viewerIsOwner || viewerRole === 'admin';
   const offerableRoles = useOfferableInviteRoles();
 
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -170,7 +170,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   return (
     <div className="space-y-6">
       {/* ── Invite ─────────────────────────────────────────────────────────── */}
-      <Card>
+      {canManage && <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle className="flex items-center gap-2"><Users className="h-4 w-4" /> Invite a Team Member</CardTitle>
           <p className="text-xs text-muted-foreground pt-1">
@@ -234,10 +234,10 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* ── Outstanding invitations ────────────────────────────────────────── */}
-      {invites.length > 0 && (
+      {canManage && invites.length > 0 && (
         <Card>
           <CardHeader className="border-b border-border/60 px-5 py-3">
             <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" /> Awaiting Acceptance ({invites.length})</CardTitle>
@@ -305,7 +305,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
             <div className="divide-y divide-border/40">
               {members.map((m) => {
                 const isOwner = m.role === 'owner';
-                const locked = isOwner || (!viewerIsOwner && OWNER_MANAGED_ROLES.has(m.role));
+                const locked = !canManage || isOwner || (!viewerIsOwner && OWNER_MANAGED_ROLES.has(m.role));
                 return (
                   <div key={m.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="flex min-w-0 items-center gap-3">

@@ -133,6 +133,14 @@ describe('platform work is gated on the operator, never on a workspace role', ()
     expect(fn.slice(0, 600)).toContain(".eq('status', 'active')");
   });
 
+  it('hr-api seats an employee only for an owner/admin, and never revives a non-active membership', () => {
+    const src = read('hr-api/expansion.ts');
+    const body = src.slice(src.indexOf("case 'invite-employee'"), src.indexOf("case 'invite-employee'") + 3000);
+    expect(body).toMatch(/\.in\('role', \['owner', 'admin'\]\)/);
+    expect(body.indexOf("in('role', ['owner', 'admin'])")).toBeLessThan(body.indexOf('inviteUserByEmail'));
+    expect(body).toMatch(/mem && mem\.status !== 'active'/);
+  });
+
   it('trade-portal mint_link needs a selling role in the account workspace', () => {
     const src = read('trade-portal/index.ts');
     expect(src).toMatch(/\.in\('role', \['owner', 'admin', 'member', 'sales', 'sales_manager'\]\)/);

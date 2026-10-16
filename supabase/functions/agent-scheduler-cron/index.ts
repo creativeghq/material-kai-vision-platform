@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders }  from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticatePlatformOperator, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticatePlatformOperator, isCronAuthorized } from '../_shared/auth.ts';
 import { cronMatchesNow } from '../_shared/cron-match.ts';
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ Deno.serve(withApiLogging('agent-scheduler-cron', async (req) => {
   // caller or a platform admin; reject other authenticated users.
   if (!isCronAuthorized(req)) {
     const auth = await authenticatePlatformOperator(req);
-    if (!auth.success && !isAdminAccess(auth)) {
+    if (!auth.success) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

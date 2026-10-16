@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticatePlatformOperator, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticatePlatformOperator, isCronAuthorized } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { escapeHtml } from '../_shared/html.ts';
 
@@ -44,7 +44,7 @@ Deno.serve(withApiLogging('moodboard-dormancy-cron', async (req: Request) => {
   // Cron-only privileged fan-out across ALL tenants (mirrors check-material-alerts).
   if (!isCronAuthorized(req)) {
     const auth = await authenticatePlatformOperator(req);
-    if (!auth.success && !isAdminAccess(auth)) {
+    if (!auth.success) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

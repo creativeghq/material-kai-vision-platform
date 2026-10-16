@@ -11,6 +11,7 @@ import { isEmploymentType, isLocationType, isAbsenceType } from '../_shared/hrVo
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
+import { isPlatformOperator } from '../_shared/auth.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { emitApplicantStage } from '../_shared/hr/applicant-events.ts';
@@ -996,6 +997,12 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     // ─────────────────────────── EMPLOYEE PORTAL INVITE ───────────────────────────
     case 'invite-employee': {
       requireManage();
+      const [{ data: callerMem }, operator] = await Promise.all([
+        supabase.from('workspace_members').select('role').eq('workspace_id', workspaceId).eq('user_id', userId)
+          .eq('status', 'active').in('role', ['owner', 'admin']).maybeSingle(),
+        isPlatformOperator(supabase, userId),
+      ]);
+      if (!callerMem && !operator) throw new HttpError(403, 'Only a workspace owner or admin can give an employee portal access.');
       const id = String(body?.employee_id ?? '');
       const email = String(body?.email ?? '').trim().toLowerCase();
       if (!id || !email) return json({ error: 'employee_id and email are required' }, 400);
@@ -1026,7 +1033,10 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
 
       // Membership: add 'employee' ONLY if they aren't already a member (never demote an existing
       // owner/admin/sales member — their role stays, and the linked record still enables self-service).
-      const { data: mem } = await supabase.from('workspace_members').select('id, role').eq('workspace_id', workspaceId).eq('user_id', newUserId).maybeSingle();
+      const { data: mem } = await supabase.from('workspace_members').select('id, role, status').eq('workspace_id', workspaceId).eq('user_id', newUserId).maybeSingle();
+      if (mem && mem.status !== 'active') {
+        return json({ error: `Their membership here is ${mem.status}; a workspace owner must restore it first.` }, 409);
+      }
       let roleNote: string | null = null;
       if (!mem) await supabase.from('workspace_members').insert({ workspace_id: workspaceId, user_id: newUserId, role: 'employee', status: 'active' });
       else if (mem.role !== 'employee') roleNote = `Existing ${mem.role} member linked; their role was left unchanged.`;
