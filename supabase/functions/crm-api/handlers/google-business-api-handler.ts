@@ -116,7 +116,7 @@ export async function handleGoogleBusiness(req: Request): Promise<Response> {
 
   try {
     const auth = await authenticate(req, {
-      allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'sales', 'factory'],
+      allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'member', 'sales', 'sales_manager', 'realestate_agent', 'factory'],
     });
     if (!auth.success) {
       return new Response(

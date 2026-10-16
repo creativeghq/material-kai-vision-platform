@@ -270,7 +270,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     || (kind === 'invoice' && isServiceRoleRequest(req));
   let authUserId: string | null = null;
   if (!internal) {
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
     authUserId = auth.userId;
   } else {

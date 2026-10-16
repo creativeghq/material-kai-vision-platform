@@ -3772,7 +3772,8 @@ async function getUserWorkspaceMembership(
     const { data, error } = await supabase
       .from('workspace_members')
       .select('role, workspace_id')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('status', 'active');
 
     if (error || !data || data.length === 0) {
       return { role: 'viewer', workspaceId: null };

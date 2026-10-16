@@ -440,6 +440,12 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
+        if (sender.source !== 'workspace' && !isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Email send requires operator privileges' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
         if (body.requireWorkspaceSender && sender.source !== 'workspace') {
           // Reached only by the operator's root workspace now — everything else is already
           // refused above. Kept because "this document must go out on the tenant's OWN domain"

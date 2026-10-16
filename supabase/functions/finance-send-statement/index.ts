@@ -922,7 +922,7 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
     // ---- Single party + share-mint modes (user/role auth) ----
     const auth = await authenticate(req, {
       requireUser: true,
-      allowedRoles: ['admin', 'super_admin', 'owner', 'finance', 'sales'],
+      allowedRoles: ['admin', 'super_admin', 'owner', 'accountant', 'sales', 'sales_manager'],
     });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 

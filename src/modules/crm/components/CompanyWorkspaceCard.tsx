@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Building2, Copy, Send, X, ExternalLink, Lock } from 'lucide-react';
 import { InvitePartyDialog } from '@/modules/crm/components/InvitePartyDialog';
+import { useCanInvite } from '@/components/core/Team/useOfferableInviteRoles';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
 import { WorkPanelHeader, WorkPanelLoading } from './WorkPanelHeader';
@@ -36,6 +37,7 @@ export const CompanyWorkspaceCard: React.FC<Props> = ({
   defaultEmail, defaultContactId, defaultContactName,
 }) => {
   const { toast } = useToast();
+  const canInvite = useCanInvite(workspaceId);
   const [status, setStatus] = useState<CompanyWorkspaceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -124,14 +126,14 @@ export const CompanyWorkspaceCard: React.FC<Props> = ({
                 </Button>
               </div>
             )}
-            <div className="flex flex-wrap gap-2">
+            {canInvite && <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => setDialogOpen(true)}>
                 <Send className="h-3.5 w-3.5 mr-2" />Send again
               </Button>
               <Button size="sm" variant="outline" onClick={revoke} disabled={busy}>
                 <X className="h-3.5 w-3.5 mr-2" />Revoke
               </Button>
-            </div>
+            </div>}
           </div>
         ) : (
           <HubEmptyState
@@ -140,7 +142,7 @@ export const CompanyWorkspaceCard: React.FC<Props> = ({
             description={state === 'stalled'
               ? 'Their workspace was created but nobody claimed it before the invitation expired.'
               : 'They become the owner of a separate business on the platform. You are not added to it — oversight stays on Network, so their customers and prices are theirs alone.'}
-            action={(
+            action={canInvite && (
               <Button size="sm" onClick={() => setDialogOpen(true)}>
                 <Send className="mr-1 h-3.5 w-3.5" />
                 {state === 'stalled' ? 'Send a fresh invitation' : 'Send invitation'}

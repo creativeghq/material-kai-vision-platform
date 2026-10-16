@@ -89,9 +89,8 @@ function pick(body: any, cols: readonly string[]): Record<string, unknown> {
 }
 
 /**
- * HR access for the caller in this workspace. Mirrors the frontend persona model: owner/admin of a
- * business node (→ dealer/architect persona) hold hr.view + hr.manage; plain members (→ staff) hold
- * neither — HR salary/absence data is owner/admin-only. Global operators (admin/super_admin) get all.
+ * HR access for the caller in this workspace, mirroring the frontend personas: owner/admin and
+ * hr_manager hold hr.view + hr.manage, hr holds hr.view, every other role holds neither.
  */
 async function resolveHrAccess(
   supabase: any, userId: string, workspaceId: string,
@@ -105,7 +104,8 @@ async function resolveHrAccess(
   const globalRole = (prof as any)?.roles?.name;
   if (globalRole && ['admin', 'super_admin'].includes(globalRole)) return { canView: true, canManage: true };
   const role = (mem as any)?.role;
-  if (role === 'owner' || role === 'admin') return { canView: true, canManage: true };
+  if (role === 'owner' || role === 'admin' || role === 'hr_manager') return { canView: true, canManage: true };
+  if (role === 'hr') return { canView: true, canManage: false };
   return { canView: false, canManage: false };
 }
 

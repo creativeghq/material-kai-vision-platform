@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, isAdminAccess, isServiceRoleRequest } from '../_shared/auth.ts';
+import { authenticatePlatformOperator, isAdminAccess, isServiceRoleRequest } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 
 // Known pricing sources for major providers (per 1M tokens)
@@ -96,7 +96,7 @@ Deno.serve(withApiLogging('ai-pricing-updater', async (req) => {
     const cronSecret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
     const cronOk = isServiceRoleRequest(req) || (!!cronSecret && req.headers.get('x-cron-secret') === cronSecret);
     if (!cronOk) {
-      const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
+      const auth = await authenticatePlatformOperator(req);
       if (!auth.success && !isAdminAccess(auth)) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

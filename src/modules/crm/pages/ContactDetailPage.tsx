@@ -47,6 +47,7 @@ import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
 import { LeadFieldSelect } from '@/components/business/crm/LeadFieldSelect';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useCanInvite } from '@/components/core/Team/useOfferableInviteRoles';
 import { InvitePartyDialog } from '@/modules/crm/components/InvitePartyDialog';
 import { useModule } from '@/modules/_core';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
@@ -148,6 +149,7 @@ export const ContactDetailPage: React.FC = () => {
   const [openingWhatsApp, setOpeningWhatsApp] = useState(false);
   const { toast } = useToast();
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
+  const canInvite = useCanInvite(activeWorkspaceId);
   const { enabled: realEstateEnabled } = useModule('real-estate'); // Property tab when module on
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
@@ -1051,9 +1053,11 @@ export const ContactDetailPage: React.FC = () => {
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <Button size="sm" onClick={() => setShowInviteDialog(true)} className="shrink-0" disabled={!contact.email && !isNew}>
-                              <UserPlus className="h-3.5 w-3.5 mr-2" /> Invite
-                            </Button>
+                            {canInvite && (
+                              <Button size="sm" onClick={() => setShowInviteDialog(true)} className="shrink-0" disabled={!contact.email && !isNew}>
+                                <UserPlus className="h-3.5 w-3.5 mr-2" /> Invite
+                              </Button>
+                            )}
                             <div className="flex-1 min-w-0">
                               <UserSearchDropdown onSelect={handleLinkUser} placeholder="…or link an existing user" selectedUserId={null} />
                             </div>

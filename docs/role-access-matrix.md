@@ -13,9 +13,9 @@ code as of this writing — where the model is *not* enforced, it says so explic
 ### a) Account role — `roles` table (`user_profiles.role_id`)
 A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `supplier`(2) · `architect`(3) · `admin`(4) — the two tiers `role_upgrade_requests` accepts, the operator flag, and the baseline. **Nothing functional lives here.** A tier is global: true in every workspace the user belongs to. `sales` and `finance` were removed 2026-07-31 (zero users; both are workspace roles — `sales`, `accountant`). `level` is display ordering only, but it is UNIQUE (`roles_level_key`), so a renumber needs a parking pass (`SET level = level + 100`) before landing final values.
 
-This is now the **primary driver of the persona** (see §2) — `resolvePersona()` maps the account role to a persona, falling back to the workspace-derived persona only for `user`/unset. So setting the Role under **Admin → CRM → Users** is what actually grants a user's capabilities.
+The tier only shapes the persona when the user has **no workspace role** (§2) — in practice almost never, because every signup owns a workspace.
 
-Reserved-tier rule: **`admin` is granted operator (see-all) ONLY via root-workspace ownership** (`isPlatformOperator`), never by the account role alone — a tenant can't self-escalate to platform operator. `is_admin_user()` RLS still keys on the `admin` role name.
+**Platform operator.** Frontend: owner/admin of the **root** workspace (`isPlatformOperator` in `WorkspaceContext`) — what `AdminGuard` checks. Edge: account tier `admin`/`super_admin` (`isPlatformOperator` in `_shared/auth.ts`, used by `authenticatePlatformOperator`). SQL: `is_platform_admin()`, same tier test. The operator holds both.
 
 Managed in **Admin → CRM → Users** (inline Role dropdown).
 
@@ -30,21 +30,21 @@ Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 
 | Persona | Account role that grants it | Notes |
 |---|---|---|
-| **operator** | (root-workspace ownership only) | `admin` of the **root** workspace. NOT granted by account role alone. |
-| **dealer** (= Supplier tier) | `supplier` (or legacy `dealer`/`factory`) | Full business node + downstream. |
-| **architect** | `architect` | Sells to end clients; own downstream. |
-| **accountant** (Finance surface) | `finance` | Finance module; the `finance` role keeps **expense-approval** rights (it is NOT the restricted external accountant). |
-| **sales** | `sales` | Sales portal + own customers; sees only their OWN quote book. |
-| **sales_manager** | `sales_manager` | Sales portal across the WHOLE team's book, incl. cost/margin (`sales.team.view`, RLS `is_workspace_sales_manager`). NOT a workspace manager. |
-| **hr_staff** | `hr` | HR module read-only — roster, absences, documents (`hr.view`). |
-| **hr_manager** | `hr_manager` | HR module end to end incl. payroll (`hr.view` + `hr.manage`). Mirrors the Sales staff/manager pair. |
-| **warehouse_staff** | `warehouse` | Warehouse module only (`warehouse.manage`). |
-| **marketing_staff** | `marketing` | Email Marketing module only (`marketing.email`). |
-| **staff** / **end_user** | `user` / unset → workspace fallback | Team member / project client, resolved from the workspace role. |
+| Persona | Granted by | Notes |
+|---|---|---|
+| **operator** | owner/admin of the root workspace | Everything except `sales.portal`. |
+| **dealer** / **architect** | workspace `owner`/`admin` (by the workspace's rank); else account tier `supplier` / `architect` | Full business set. |
+| **staff** | workspace `member` | Finance ops, CRM, quotes, stock, projects; no network/pricing/team. |
+| **accountant** | workspace `accountant` | `finance.manage` only; `isAccountant` restricts it further (no expense approval, no settings). |
+| **sales** / **sales_manager** | `sales` / `sales_manager` | Own quote book / the whole team's (`sales.team.view`, RLS `is_workspace_sales_manager`). |
+| **hr_staff** / **hr_manager** | `hr` / `hr_manager` | `hr.view` / `hr.view` + `hr.manage`. `hr-api` grants the same. |
+| **warehouse_staff** | `warehouse` | `warehouse.manage`. |
+| **marketing_staff** | `marketing` | `marketing.email`. |
+| **employee** | `employee` | `hr.self` — own HR record. |
+| **realestate_agent** | `realestate_agent` | Own listings and leads. |
+| **guest** | `client`, or a guest-kind workspace | Nothing. |
 
-Resolution (`resolvePersona()`): `isPlatformOperator` → operator; then the workspace **team roles** via `TEAM_ROLE_PERSONA` (`sales_manager`, `hr`, `hr_manager`, `warehouse`, `marketing`) — checked **before** the account-tier switch, so a per-workspace team role is never overridden by a broader global tier; else **account role** maps the tenant tier; else the workspace-derived persona (`client`→end_user, `accountant`→accountant, `employee`→employee, `realestate_agent`→realestate_agent, `sales`→sales, owner/admin by rank, member→staff). The sales pair is symmetric — either axis yields the same persona.
-
-The **invited external accountant** (workspace role `accountant`, #202) still resolves to the accountant persona but is flagged `isAccountant` to *restrict* it (no expense approval / no settings) — distinct from the internal `finance` account role.
+Resolution (`resolvePersona()`): operator → guest workspace → `TEAM_ROLE_PERSONA` → owner/admin by rank → member → account tier (only with no workspace role) → staff.
 
 ---
 
@@ -84,11 +84,11 @@ Notes:
 1. **`AuthGuard`** — authenticated or not. Wraps the user-facing app.
 2. **`CapabilityGuard` / `usePermissions().can(cap)`** — per-route/per-feature persona capability check (the table above). e.g. `/finance` needs `finance.manage`, `/network` needs `network.manage`.
 3. **`AdminGuard`** — wraps all `/admin/*`. Passes only for **Platform Operator** (`owner`/`admin`/`super_admin` of the **root** workspace). A dealer/architect who owns their own workspace does **not** pass.
-4. **Edge-function `allowedRoles`** (server, `_shared/auth.ts` — additive: global account role **or** any workspace role):
-   - `admin` / `super_admin` / `owner` → all admin/CRM/email/messaging functions.
-   - `crm-api` also allows `factory`.
-   - Finance functions allow `finance`; issuing also allows `accountant`.
-   - Agents: JARVIS / Interior Designer → `viewer/member/admin/owner`; Demo + `insights`/`seo` aliases → `admin/owner` only.
+4. **Edge functions** (`_shared/auth.ts`):
+   - `authenticate({ allowedRoles })` passes when the caller holds a listed role as account tier **or in ANY workspace** — a partner `kai_` key passes when its owner would. It is never a platform gate: every signup owns a workspace, so `owner`/`admin` there means "any signed-in user". Bind the target workspace with `userCanAccessWorkspace` plus a role read for that workspace.
+   - Platform work (cron fan-outs, integrity runs, billing rates, seats, the platform email sender, MIVAA `/api/admin`) uses `authenticatePlatformOperator(req)`: secret/service-role, or account tier `admin`/`super_admin`. Guarded by `tests/unit/platformScopedAuthGates.test.ts`.
+   - `hr-api` grants view to `hr` and manage to `hr_manager`, as the UI does.
+   - Agents: JARVIS is open to every role; specialist agents allow `member/admin/owner` (+ `viewer` for no membership) only, so team roles are refused them. Widening that needs tools filtered per capability first — agent tools are gated per workspace module, so a `warehouse` user on the `member` list would reach finance tools.
 5. **Postgres RLS** — `is_admin_user()` (account role = **`admin`** only — note: not `super_admin`), `is_workspace_member(workspace_id)` (row belongs to a workspace you're in). Used by CRM/activity/notes/finance tables.
 
 ---
@@ -100,7 +100,7 @@ Notes:
 
 ## 6. Known gaps / notes (be honest)
 - The role set is not a numeric *ladder* — `level` is informational. Access = persona-capability + operator(root) + edge `allowedRoles`.
-- **Account role drives the persona for the frontend** (2026-06 rewire). The marketplace **#227 pyramid still keys on the workspace tree** (a supplier/architect *node* with parent/rank/commission). So the Role grants the *surface*; the workspace node provides the *downstream data* (`/network` shows only the caller's own subtree via `get_manageable_workspaces`). A user tagged `supplier` with no workspace node sees the surface but an empty network until a node exists.
+- The marketplace **#227 pyramid still keys on the workspace tree** (a supplier/architect *node* with parent/rank/commission). So the Role grants the *surface*; the workspace node provides the *downstream data* (`/network` shows only the caller's own subtree via `get_manageable_workspaces`). A user tagged `supplier` with no workspace node sees the surface but an empty network until a node exists.
 - `super_admin` was merged into `admin`; leftover `'super_admin'` strings in edge `allowedRoles` are harmless dead entries.
 - Agent **sub-agent orchestration** is documented as admin/owner-only, but tool-list filtering by role at injection time should be re-verified.
 

@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticatePlatformOperator, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { chargeCronWorkspace, chargeCronUser } from '../_shared/cron-billing.ts';
 
@@ -18,7 +18,7 @@ Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
   // (service-role bearer) or a platform admin; reject everyone else so an
   // anonymous caller can't force a platform-wide notification/cost run.
   if (!isCronAuthorized(req)) {
-    const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
+    const auth = await authenticatePlatformOperator(req);
     if (!auth.success && !isAdminAccess(auth)) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

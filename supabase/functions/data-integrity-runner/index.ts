@@ -9,7 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticatePlatformOperator, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { captureMessage } from '../_shared/sentry.ts';
@@ -109,7 +109,7 @@ Deno.serve(withApiLogging('data-integrity-runner', async (req) => {
     }
 
     // ── Admin path ──────────────────────────────────────────────────────────
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner'] });
+    const auth = await authenticatePlatformOperator(req);
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const supabase = svc();

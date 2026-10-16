@@ -297,7 +297,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       // session — RLS on the user-JWT client is the gate.
       const auth = await authenticate(req, {
         requireUser: true,
-        allowedRoles: wantsLinkOnly ? ['admin', 'super_admin', 'owner', 'finance'] : undefined,
+        allowedRoles: wantsLinkOnly ? ['admin', 'super_admin', 'owner', 'accountant'] : undefined,
       });
       if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 

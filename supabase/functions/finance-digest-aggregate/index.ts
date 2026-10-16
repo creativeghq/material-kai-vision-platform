@@ -444,7 +444,7 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
     // ─── Now (admin-triggered) path ──────────────────────────────────────
     const auth = await authenticate(req, {
       requireUser: true,
-      allowedRoles: ['admin', 'super_admin', 'owner', 'finance'],
+      allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'],
     });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 

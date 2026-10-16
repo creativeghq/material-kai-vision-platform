@@ -19,7 +19,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   // A TRUSTED INTERNAL CALLER IS ALLOWED, because the seeded "Invoice Issued" flow is one.
-  const auth = await authenticate(req, { requireUser: false, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+  const auth = await authenticate(req, { requireUser: false, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
   if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
   const internal = auth.level === 'secret';
   if (!internal && !auth.userId) return json({ error: 'Unauthorized' }, 401);

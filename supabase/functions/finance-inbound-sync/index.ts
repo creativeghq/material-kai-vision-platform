@@ -115,7 +115,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
   // the results of) an inbound myDATA pull for EVERY workspace on the platform.
   let allowedWorkspaceIds: string[] | null = null;
   if (!cronOk) {
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
     if (!auth.success) return json({ error: 'unauthorized' }, 401);
     allowedWorkspaceIds = await listUserWorkspaceIds(supabase, auth.userId);
     if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_member_workspaces' });

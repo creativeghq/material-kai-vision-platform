@@ -1,6 +1,6 @@
 /** embedding-drain — embeds rows whose vector is missing or stale, one backlog per `?task=`. */
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticatePlatformOperator, isCronAuthorized } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { drainKbDocs } from './handlers/kb-docs.ts';
@@ -21,7 +21,7 @@ Deno.serve(withApiLogging(
     if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
     if (!isCronAuthorized(req)) {
-      const auth = await authenticate(req, { allowedRoles: ['admin'] });
+      const auth = await authenticatePlatformOperator(req);
       if (!auth.success) return json({ error: auth.error || 'Unauthorized' }, 401);
     }
 

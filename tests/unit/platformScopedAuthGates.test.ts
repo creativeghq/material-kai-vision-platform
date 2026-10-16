@@ -73,3 +73,68 @@ describe('#294 — platform-scoped gates and body-supplied ids', () => {
     }
   });
 });
+
+describe('platform work is gated on the operator, never on a workspace role', () => {
+  const PLATFORM_FUNCTIONS = [
+    'agent-scheduler-cron/index.ts', 'check-material-alerts/index.ts', 'flow-scheduler-cron/index.ts',
+    'moodboard-dormancy-cron/index.ts', 'embedding-drain/index.ts', 'ai-pricing-updater/index.ts',
+    'data-integrity-runner/index.ts',
+  ];
+
+  it.each(PLATFORM_FUNCTIONS)('%s uses authenticatePlatformOperator and no allowedRoles gate', (file) => {
+    const src = read(file);
+    expect(src).toMatch(/authenticatePlatformOperator\(req\)/);
+    expect(src, 'a workspace-role gate is back on platform-wide work').not.toMatch(/allowedRoles/);
+  });
+
+  it('mivaa-gateway re-checks /api/admin actions with the operator gate', () => {
+    expect(read('mivaa-gateway/index.ts')).toMatch(/const adminAuth = await authenticatePlatformOperator\(req\)/);
+  });
+
+  it('messaging-api keeps platform billing actions behind the operator', () => {
+    const src = read('messaging-api/index.ts');
+    const block = src.slice(src.indexOf('const PLATFORM_ACTIONS'), src.indexOf('const PLATFORM_ACTIONS') + 400);
+    for (const action of ['set-channel-seats', 'set-whatsapp-rate', 'bill-channels-monthly',
+      'reconcile-phone-numbers', 'reconcile-whatsapp-costs']) {
+      expect(block, `${action} left PLATFORM_ACTIONS — any signed-in user can call it`).toContain(`'${action}'`);
+    }
+    expect(src).toMatch(/PLATFORM_ACTIONS\.has\(action\)[^\n]*isPlatformOperator\(/);
+  });
+
+  it('email-api refuses a user send on the platform sender unless they are the operator', () => {
+    const src = read('email-api/index.ts');
+    const resolve = src.indexOf('resolveWorkspaceEmailSender(supabaseClient, body.workspace_id)');
+    const gate = src.search(/sender\.source !== 'workspace' && !isAdminAccess\(auth\) && !\(await isPlatformOperator\(/);
+    expect(resolve).toBeGreaterThan(-1);
+    expect(gate, 'the platform-sender operator check is gone').toBeGreaterThan(resolve);
+  });
+
+  it('a partner kai_ key passes a role gate only when its owner would', () => {
+    const auth = read('_shared/auth.ts');
+    const branch = auth.slice(auth.indexOf("token.startsWith('kai_')"), auth.indexOf("token.startsWith('kai_')") + 700);
+    expect(branch, 'the kai_ branch returns before allowedRoles is checked').toMatch(/holdsAnyRole\(adminClient, partnerAuth\.userId, allowedRoles\)/);
+  });
+
+  it('authenticatePlatformOperator never admits a partner key', () => {
+    const auth = read('_shared/auth.ts');
+    const body = auth.slice(auth.indexOf('export async function authenticatePlatformOperator'));
+    expect(body).toMatch(/auth\.level === 'user' && await isPlatformOperator\(/);
+  });
+
+  it('hr-api grants the HR roles what their personas hold', () => {
+    const src = read('hr-api/index.ts');
+    expect(src).toMatch(/role === 'hr_manager'\) return \{ canView: true, canManage: true \}/);
+    expect(src).toMatch(/role === 'hr'\) return \{ canView: true, canManage: false \}/);
+  });
+
+  it('agent-chat ignores memberships that are not active', () => {
+    const src = read('agent-chat/index.ts');
+    const fn = src.slice(src.indexOf('async function getUserWorkspaceMembership'));
+    expect(fn.slice(0, 600)).toContain(".eq('status', 'active')");
+  });
+
+  it('trade-portal mint_link needs a selling role in the account workspace', () => {
+    const src = read('trade-portal/index.ts');
+    expect(src).toMatch(/\.in\('role', \['owner', 'admin', 'member', 'sales', 'sales_manager'\]\)/);
+  });
+});

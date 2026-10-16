@@ -294,7 +294,7 @@ async function isFinanceManagerForQuote(
   ]);
   const wsManager = !!mem && ['owner', 'admin'].includes((mem as any).role);
   const globalRole = (prof as any)?.roles?.name as string | undefined;
-  const globalManager = !!globalRole && ['admin', 'super_admin', 'finance'].includes(globalRole);
+  const globalManager = !!globalRole && ['admin', 'super_admin'].includes(globalRole);
   return wsManager || globalManager;
 }
 
@@ -462,7 +462,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       // 'accountant' is allowed in so they can SUBMIT/transmit existing documents to myDATA
       // . The privileged CREATE path (issue a new invoice from a quote) is guarded
       // separately below to managers only — an accountant can transmit + pay, never create.
-      allowedRoles: ['admin', 'super_admin', 'owner', 'finance', 'accountant'],
+      allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'],
     });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 

@@ -88,6 +88,10 @@ export async function authenticate(
       // Partner key parse-attempted: return its verdict directly. Don't fall through to JWT validation
       // for kai_* prefixes — the token shape is unambiguous and falling through leaks
       // misleading "Invalid JWT" errors on what is really a missing/disabled api_keys row.
+      if (partnerAuth.success && allowedRoles && allowedRoles.length > 0 &&
+          !(partnerAuth.userId && await holdsAnyRole(adminClient, partnerAuth.userId, allowedRoles))) {
+        return { ...partnerAuth, success: false, level: 'none', error: `Access denied. Required roles: ${allowedRoles.join(', ')}` };
+      }
       return partnerAuth;
     }
 
@@ -208,6 +212,22 @@ export async function authenticate(
 }
 
 /**
+ * True when the user holds one of `allowedRoles` as their account tier OR as an active role in
+ * ANY workspace. Never a platform gate: every signup owns a workspace, so 'owner'/'admin' here
+ * means "any signed-in user". Use authenticatePlatformOperator for that.
+ */
+async function holdsAnyRole(adminClient: DbClient, userId: string, allowedRoles: string[]): Promise<boolean> {
+  const [{ data: userProfile }, { data: roles }, { data: memberships }] = await Promise.all([
+    adminClient.from('user_profiles').select('role_id').eq('user_id', userId).maybeSingle(),
+    adminClient.from('roles').select('id, name').in('name', allowedRoles),
+    adminClient.from('workspace_members').select('role').eq('user_id', userId).eq('status', 'active').in('role', allowedRoles).limit(1),
+  ]);
+  const allowedRoleIds = roles?.map(r => r.id) || [];
+  const globalOk = !!userProfile && allowedRoleIds.includes(userProfile.role_id);
+  return globalOk || (!!memberships && memberships.length > 0);
+}
+
+/**
  * Validate a user JWT token
  */
 async function validateUserToken(
@@ -231,26 +251,8 @@ async function validateUserToken(
       };
     }
 
-    // Check roles if specified.
-    // Reconcile edge auth with the frontend persona model. Authority comes from
-    // TWO sources that must agree: the GLOBAL role (`user_profiles.role_id → roles`) AND
-    // the WORKSPACE role (`workspace_members.role`).
     if (allowedRoles && allowedRoles.length > 0) {
-      const [{ data: userProfile }, { data: roles }, { data: memberships }] = await Promise.all([
-        adminClient.from('user_profiles').select('role_id').eq('user_id', user.id).single(),
-        adminClient.from('roles').select('id, name').in('name', allowedRoles),
-        // `.eq('status', 'active')` (#362): without it a REMOVED admin whose membership row
-        // still exists keeps passing every allowedRoles gate in the platform. The two
-        // sibling helpers in this file (userCanAccessWorkspace, listUserWorkspaceIds) both
-        // already filter on it; this one was the odd one out.
-        adminClient.from('workspace_members').select('role').eq('user_id', user.id).eq('status', 'active').in('role', allowedRoles).limit(1),
-      ]);
-
-      const allowedRoleIds = roles?.map(r => r.id) || [];
-      const globalOk = !!userProfile && allowedRoleIds.includes(userProfile.role_id);
-      const workspaceOk = !!memberships && memberships.length > 0;
-
-      if (!globalOk && !workspaceOk) {
+      if (!(await holdsAnyRole(adminClient, user.id, allowedRoles))) {
         return {
           success: false,
           level: 'none',
@@ -496,6 +498,18 @@ export async function isPlatformOperator(
     .maybeSingle();
   const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
   return !!globalRole && ['admin', 'super_admin'].includes(globalRole);
+}
+
+/**
+ * Authenticate a caller who must operate the PLATFORM. Secret/service-role callers pass; a user
+ * passes only via isPlatformOperator; a partner kai_ key never does. `allowedRoles` cannot express
+ * this gate (see holdsAnyRole).
+ */
+export async function authenticatePlatformOperator(req: Request): Promise<AuthResult> {
+  const auth = await authenticate(req, { requireUser: false });
+  if (!auth.success || auth.level === 'secret') return auth;
+  if (auth.level === 'user' && await isPlatformOperator(auth.supabase, auth.userId)) return auth;
+  return { ...auth, success: false, level: 'none', error: 'Platform operator access required' };
 }
 
 /**

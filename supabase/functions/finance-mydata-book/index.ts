@@ -248,7 +248,7 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
   // finance user triggers (and reads the outcome of) an AADE pull for every workspace.
   let allowedWorkspaceIds: string[] | null = null;
   if (!cronOk) {
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
     if (!auth.success) throw new HttpError(401, 'unauthorized');
     allowedWorkspaceIds = await listUserWorkspaceIds(supabase, auth.userId);
     if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_member_workspaces' });

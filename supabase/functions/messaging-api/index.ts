@@ -15,7 +15,7 @@ import {
 import { CAST } from '../_shared/characterAvatar.generated.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
-import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, isPlatformOperator, listUserWorkspaceIds } from '../_shared/auth.ts';
 import { isWorkspaceEntitled, notEntitledResponse } from '../_shared/entitlement.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
@@ -247,13 +247,18 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
       'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
       'open-whatsapp-thread', 'sync-avatars', 'zernio-probe', 'generate-avatar-cast',
-      // Operator maintenance: both read or repair platform-level billing state.
-      'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
       // 'retry-failed-charges' is deliberately absent for the same reason as release: a
       // workspace put on hold by a failed debit had no way to get itself back other than
       // waiting for the nightly sweep. It is scoped to the caller's own workspace below.
-      'bill-channels-monthly', 'set-channel-read-receipts',
+      'set-channel-read-receipts',
     ]);
+    const PLATFORM_ACTIONS = new Set([
+      'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
+      'bill-channels-monthly', 'set-channel-seats',
+    ]);
+    if (PLATFORM_ACTIONS.has(action) && !isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+      return jsonResponse({ error: 'Platform operator access required' }, 403);
+    }
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
       if (!op.success) return jsonResponse({ error: 'Operator role required for this action' }, 403);

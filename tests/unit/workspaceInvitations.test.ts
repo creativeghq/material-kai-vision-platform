@@ -21,6 +21,7 @@ const CONTACT_PAGE = 'src/modules/crm/pages/ContactDetailPage.tsx';
 const COMPANY_PAGE = 'src/modules/crm/pages/CompanyDetailPage.tsx';
 const COMPANY_CARD = 'src/modules/crm/components/CompanyWorkspaceCard.tsx';
 const DIALOG = 'src/modules/crm/components/InvitePartyDialog.tsx';
+const OFFERABLE_HOOK = 'src/components/core/Team/useOfferableInviteRoles.ts';
 const TEAM_PANEL = 'src/components/core/Team/TeamPanel.tsx';
 const CRM_SERVICE = 'src/services/crm.service.ts';
 
@@ -191,7 +192,9 @@ describe('the role a form offers is a role the RPC accepts', () => {
 
   it('the dialog reads the catalog rather than listing roles by hand', () => {
     const src = read(DIALOG);
-    expect(src).toContain('WORKSPACE_INVITE_ROLES.map');
+    expect(src).toContain('offerableRoles.map');
+    expect(src).toContain('useOfferableInviteRoles()');
+    expect(read(OFFERABLE_HOOK)).toContain('WORKSPACE_INVITE_ROLES.filter');
     for (const r of WORKSPACE_INVITE_ROLES) {
       expect(src).not.toContain(`value="${r}"`);
     }

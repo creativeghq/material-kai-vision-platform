@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, authenticatePlatformOperator, isAdminAccess } from '../_shared/auth.ts';
 import { getMivaaActionCost } from '../_shared/mivaa-pricing.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -627,7 +627,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     // MIVAA identity. Admin-secret (trusted backend) callers are exempt; everyone else
     // is re-checked for the role and 403'd if they lack it.
     if (!isAdmin && isAdminAction(action, finalPath)) {
-      const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
+      const adminAuth = await authenticatePlatformOperator(req);
       if (!adminAuth.success) {
         return new Response(
           JSON.stringify({ error: 'Admin role required for this action', action }),

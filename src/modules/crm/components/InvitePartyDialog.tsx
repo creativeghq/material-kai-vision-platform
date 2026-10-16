@@ -21,9 +21,8 @@ import {
   workspaceManagementService, type CompanyWorkspaceStatus,
   type InvitableRecord, type RecordGrant,
 } from '@/services/workspaceManagementService';
-import {
-  WORKSPACE_INVITE_ROLES, WORKSPACE_ROLE_META, type WorkspaceInviteRole,
-} from '@/auth/workspaceRoles';
+import { WORKSPACE_ROLE_META, type WorkspaceInviteRole } from '@/auth/workspaceRoles';
+import { useOfferableInviteRoles } from '@/components/core/Team/useOfferableInviteRoles';
 
 /** Not interchangeable: `my_workspace` seats them in YOUR tenant and lets them read your CRM and
  *  costs, where `customer` is a login joined to their own CRM record and nothing else. */
@@ -85,6 +84,7 @@ export const InvitePartyDialog: React.FC<Props> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const offerableRoles = useOfferableInviteRoles();
   const hasContact = !!party.contactId;
   const hasCompany = !!party.companyId;
   const available = useMemo(
@@ -267,7 +267,7 @@ export const InvitePartyDialog: React.FC<Props> = ({
               <Select value={role} onValueChange={(v) => setRole(v as WorkspaceInviteRole)}>
                 <SelectTrigger id="ip-role"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {WORKSPACE_INVITE_ROLES.map((r) => (
+                  {offerableRoles.map((r) => (
                     <SelectItem key={r} value={r}>{WORKSPACE_ROLE_META[r].label}</SelectItem>
                   ))}
                 </SelectContent>

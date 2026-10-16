@@ -85,14 +85,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     resellerApplication?: { vatNumber: string; countryCode?: string },
   ) => {
     try {
-      const redirectUrl = `${window.location.origin}/`;
-
       // Invite-first precedence (#211): if this signup came through an invite link
       // (?invite= is stashed by WorkspaceContext before auth), pass the code in signup
       // metadata so handle_new_user_workspace_assignment skips creating a spurious own
       // workspace — the invite is redeemed right after auth and they join the inviter's.
       let pendingInvite: string | null = null;
       try { pendingInvite = localStorage.getItem(INVITE_STORAGE_KEY); } catch { /* private mode */ }
+      // The confirmation link carries the code, so opening it on another device still redeems it.
+      const redirectUrl = `${window.location.origin}/${pendingInvite ? `?invite=${encodeURIComponent(pendingInvite)}` : ''}`;
 
       const { error } = await supabase.auth.signUp({
         email,
@@ -101,7 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           emailRedirectTo: redirectUrl,
           data: {
             display_name: displayName,
-            role: 'member', // Default role for new users
             ...(pendingInvite ? { invite_code: pendingInvite } : {}),
             // Reseller intent captured at signup. The handle_new_user_workspace_assignment
             // trigger reads these to file a pending reseller_applications row; without them

@@ -1008,7 +1008,9 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       let invited = false;
       const { data: inv, error: invErr } = await supabase.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/my-hr` });
       if (inv?.user?.id) { newUserId = inv.user.id; invited = true; }
-      else {
+      else if (!/already.*registered|email_exists/i.test(`${invErr?.message ?? ''} ${(invErr as { code?: string } | null)?.code ?? ''}`)) {
+        return json({ error: invErr?.message || 'Could not invite this email.' }, 400);
+      } else {
         // Likely already registered — find the existing auth user and link them instead. listUsers()
         // is paginated (default ~50), so a naive first-page scan misses anyone further in; page through.
         let found: any = null;

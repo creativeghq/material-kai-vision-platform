@@ -15,14 +15,15 @@ import { getErrorMessage } from '@/core/errors/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { fetchDisplayProfiles } from '@/services/displayProfilesService';
-import { useModule } from '@/modules/_core';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useOfferableInviteRoles } from './useOfferableInviteRoles';
 import { formatDate } from '@/utils/datetime';
 import {
   workspaceManagementService, type WorkspaceInvite,
 } from '@/services/workspaceManagementService';
 import {
-  WORKSPACE_INVITE_ROLES, WORKSPACE_ROLE_META, workspaceRoleLabel,
-  type WorkspaceInviteRole, type WorkspaceMemberRole, type RoleModuleSlug,
+  WORKSPACE_ROLE_META, workspaceRoleLabel,
+  type WorkspaceInviteRole, type WorkspaceMemberRole,
 } from '@/auth/workspaceRoles';
 import { HubEmptyState } from '@/components/core/hub';
 
@@ -34,21 +35,16 @@ interface MemberRow {
   email: string | null;
 }
 
-/** Roles an owner/admin may assign to an EXISTING member — the invitable set plus admin. */
-const ASSIGNABLE_ROLES: WorkspaceMemberRole[] = ['admin', ...WORKSPACE_INVITE_ROLES];
+/** Owners and admins are managed by an owner only — `set_workspace_member_role` refuses an admin. */
+const OWNER_MANAGED_ROLES = new Set(['owner', 'admin']);
 
 export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }> = ({
   workspaceId, workspaceName,
 }) => {
   const { toast } = useToast();
-  // One useModule per slug in ROLE_MODULE_SLUGS — hooks can't be called in a loop, and that list is
-  // what the guard test checks this call site against.
-  const { enabled: hrEnabled } = useModule('hr');
-  const { enabled: stockEnabled } = useModule('stock');
-  const { enabled: emailMarketingEnabled } = useModule('email-marketing');
-  const { enabled: realEstateEnabled } = useModule('real-estate');
-  const { enabled: quotesEnabled } = useModule('quotes');
-  const { enabled: salesFinanceEnabled } = useModule('sales-finance');
+  const { memberships } = useWorkspace();
+  const viewerIsOwner = memberships.some((m) => m.workspaceId === workspaceId && m.role === 'owner');
+  const offerableRoles = useOfferableInviteRoles();
 
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
@@ -59,21 +55,11 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   const [email, setEmail] = useState('');
   const [link, setLink] = useState<string | null>(null);
 
-  /** A role is offerable only if the module behind its portal is actually on — otherwise the
-   *  invitee would land on a surface this workspace has not enabled. */
-  const moduleEnabled = useMemo<Record<RoleModuleSlug, boolean>>(() => ({
-    hr: hrEnabled,
-    stock: stockEnabled,
-    'email-marketing': emailMarketingEnabled,
-    'real-estate': realEstateEnabled,
-    quotes: quotesEnabled,
-    'sales-finance': salesFinanceEnabled,
-  }), [hrEnabled, stockEnabled, emailMarketingEnabled, realEstateEnabled, quotesEnabled, salesFinanceEnabled]);
-
-  const offerableRoles = useMemo(() => WORKSPACE_INVITE_ROLES.filter((r) => {
-    const slug = WORKSPACE_ROLE_META[r].requiresModule as RoleModuleSlug | undefined;
-    return slug ? moduleEnabled[slug] : true;
-  }), [moduleEnabled]);
+  /** Roles this viewer may assign to an EXISTING member: the offerable set, plus admin for an owner. */
+  const assignableRoles = useMemo<WorkspaceMemberRole[]>(
+    () => (viewerIsOwner ? ['admin', ...offerableRoles] : offerableRoles),
+    [viewerIsOwner, offerableRoles],
+  );
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
@@ -319,6 +305,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
             <div className="divide-y divide-border/40">
               {members.map((m) => {
                 const isOwner = m.role === 'owner';
+                const locked = isOwner || (!viewerIsOwner && OWNER_MANAGED_ROLES.has(m.role));
                 return (
                   <div key={m.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="flex min-w-0 items-center gap-3">
@@ -334,13 +321,11 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {isOwner ? (
-                        // The owner's role is not re-assignable from here — transferring ownership is a
-                        // separate, deliberate action, and the RPC refuses to strip the last owner anyway.
-                        <span className="text-xs text-muted-foreground">Owner</span>
+                      {locked ? (
+                        <span className="text-xs text-muted-foreground">{workspaceRoleLabel(m.role)}</span>
                       ) : (
                         <Select
-                          value={ASSIGNABLE_ROLES.includes(m.role as WorkspaceMemberRole) ? m.role : undefined}
+                          value={assignableRoles.includes(m.role as WorkspaceMemberRole) ? m.role : undefined}
                           onValueChange={(v: WorkspaceMemberRole) => changeRole(m, v)}
                           disabled={busy === `role-${m.user_id}`}
                         >
@@ -348,7 +333,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
                             <SelectValue placeholder={workspaceRoleLabel(m.role)} />
                           </SelectTrigger>
                           <SelectContent>
-                            {ASSIGNABLE_ROLES.map((r) => (
+                            {assignableRoles.map((r) => (
                               <SelectItem key={r} value={r} className="text-xs">
                                 {WORKSPACE_ROLE_META[r].label} — {WORKSPACE_ROLE_META[r].portal}
                               </SelectItem>
@@ -359,7 +344,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
                       <Button
                         variant="ghost" size="icon" className="h-8 w-8"
                         title="Remove from workspace" aria-label="Remove from workspace"
-                        onClick={() => remove(m)} disabled={busy === `remove-${m.user_id}` || isOwner}
+                        onClick={() => remove(m)} disabled={busy === `remove-${m.user_id}` || locked}
                       >
                         {busy === `remove-${m.user_id}`
                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
