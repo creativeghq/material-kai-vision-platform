@@ -10,6 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** [source, target] pairs, repo-relative. One line per vocabulary. */
 export const VOCABULARIES = [
+  ['src/auth/roleCapabilities.ts', 'supabase/functions/_shared/roleCapabilities.generated.ts'],
   ['src/modules/messaging/whatsappForms.ts', 'supabase/functions/_shared/whatsappForms.generated.ts'],
   [
     'src/lib/vatCountries.ts',

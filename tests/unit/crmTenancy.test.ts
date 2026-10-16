@@ -58,8 +58,8 @@ describe('#353 CRM-6 — company-enrich cannot write across tenants', () => {
     const anchor = src.indexOf("'id, created_by, workspace_id,");
     expect(anchor, 'the cache-write select no longer names workspace_id').toBeGreaterThan(-1);
     const block = src.slice(anchor, src.indexOf('return jsonResponse({ ok: true', anchor));
-    expect(block).toContain('userCanAccessWorkspace');
-    expect(block).toMatch(/const sameTenant = await userCanAccessWorkspace/);
+    expect(block).toContain('userHasWorkspaceCapability');
+    expect(block).toMatch(/const sameTenant = await userHasWorkspaceCapability/);
     // Membership must GATE the creator/tier test, not sit beside it.
     expect(block).toMatch(/canWrite = sameTenant && company\.created_by === user\.id/);
     expect(block).toMatch(/if \(sameTenant && !canWrite\)/);
@@ -75,7 +75,7 @@ describe('#353 CRM-9 — the billed workspace is verified, not asserted', () => 
 
   it('a body workspace_id is checked against membership before it is used', () => {
     expect(src).toContain('const requestedWorkspaceId = cleanStr(body?.workspace_id)');
-    expect(src).toMatch(/userCanAccessWorkspace\(admin, user\.id, requestedWorkspaceId\)/);
+    expect(src).toMatch(/userHasWorkspaceCapability\(admin, user\.id, requestedWorkspaceId, /);
   });
 
   it('an unverified workspace degrades to personal billing rather than being used', () => {

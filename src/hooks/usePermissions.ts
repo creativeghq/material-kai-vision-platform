@@ -48,11 +48,7 @@ export function usePermissions(): PermissionsApi {
     });
     const can = (capability: Capability) => personaCan(persona, capability);
 
-    // Finer axes are derived from the resolved persona (which the account role
-    // drives), so a Supplier/Architect/Finance/Sales account role grants the right
-    // gates even without a workspace-tree node. operator stays root-only.
-    // `isAccountant` = the INVITED EXTERNAL accountant (workspace role) — a RESTRICT
-    // flag (no expense approval / no settings).
+    // `isAccountant` restricts the invited accountant further: no expense approval, no settings.
     const isAccountant = workspaceRole === 'accountant';
     // Both sales personas get the same focused nav subset; the manager differs only in the SCOPE
     // of ROWS (team-wide rather than own), which is expressed by `sales.team.view`. Margin is not
@@ -80,9 +76,7 @@ export function usePermissions(): PermissionsApi {
       isGuest,
       isWorkspaceManager,
       canSupplyProducts,
-      // Day-to-day finance ops: managers + anyone on the Finance surface (finance role
-      // or invited accountant).
-      canOperateFinance: isWorkspaceManager || persona === 'accountant',
+      canOperateFinance: can('finance.operate'),
       canManageNetwork: isBusinessNode,
     };
   }, [isPlatformOperator, rank, workspaceRole, accountRole, activeWorkspace?.kind, loading]);

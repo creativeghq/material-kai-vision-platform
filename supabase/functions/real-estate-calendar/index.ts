@@ -1,7 +1,7 @@
 /** real-estate-calendar — pushes viewings into the agent's own Google Calendar. */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -127,7 +127,7 @@ Deno.serve(withApiLogging('real-estate-calendar', async (req) => {
   const action = String(body?.action ?? '');
   const workspaceId = String(body?.workspace_id ?? '');
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
-  if (!(await userCanAccessWorkspace(supabase, userId, workspaceId))) return json({ error: 'not found' }, 404);
+  if (!(await userHasWorkspaceCapability(supabase, userId, workspaceId, 'realestate.view'))) return json({ error: 'not found' }, 404);
 
   const { data: conn } = await supabase.from('realestate_calendar_connections')
     .select('*').eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle();

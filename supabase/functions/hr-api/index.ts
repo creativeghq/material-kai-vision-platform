@@ -19,7 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { handleExpansion, handleSelfService } from './expansion.ts';
@@ -164,7 +164,7 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
   // priority order (access 404 → module 404 → entitlement 402) so responses/enumeration-safety are
   // identical to the sequential version. All three helpers resolve (never throw), so no unhandled
   // rejection when we short-circuit before awaiting a later one.
-  const accessP = userCanAccessWorkspace(supabase, userId, workspaceId);
+  const accessP = userHasWorkspaceCapability(supabase, userId, workspaceId, ['hr.view', 'hr.self']);
   const moduleP = isModuleEnabled(supabase, 'hr');
   const entP = assertEntitled(supabase, workspaceId, 'hr');
 

@@ -35,7 +35,7 @@ describe('#377 Phase 2 — a supplier\'s own invoice is read, stored, then match
     expect(SCAN).toMatch(/ingestSupplierDocument\(admin, reader, \{/);
     const ingest = SCAN.slice(SCAN.indexOf('async function ingestInvoice('));
     expect(ingest).toMatch(/reader\.from\('inbound_documents'\)\.select\('id, workspace_id'\)/);
-    expect(ingest).toMatch(/userCanAccessWorkspace\(admin, uid, workspaceId\)/);
+    expect(ingest).toMatch(/userHasWorkspaceCapability\(admin, uid, workspaceId, /);
   });
 
   it('automatic capture is opt-in per workspace, email only, and can never throw into classification', () => {

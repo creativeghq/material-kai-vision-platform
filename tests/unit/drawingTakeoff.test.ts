@@ -127,7 +127,7 @@ describe('the security invariants on this path', () => {
     // Invariant 1. A body-supplied workspace checked against the caller still lets somebody read a
     // drawing they do not own by naming a workspace they do.
     expect(FN).toContain('projects!inner(workspace_id)');
-    expect(FN).toContain('userCanAccessWorkspace(admin, uid, workspaceId)');
+    expect(FN).toContain('userHasWorkspaceCapability(admin, uid, workspaceId, ');
     expect(FN).not.toMatch(/body\.workspace_id|workspace_id\s*\}\s*=\s*body/);
   });
 

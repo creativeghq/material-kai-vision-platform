@@ -38,7 +38,7 @@ describe('#294 — platform-scoped gates and body-supplied ids', () => {
     expect(
       src.match(/allowedRoles: \['admin', 'super_admin', 'owner'\]/g) ?? [],
       "a domain route is back on a workspace-role gate",
-    ).toHaveLength(1); // only the freeform `send` operator check legitimately remains
+    ).toHaveLength(0);
   });
 
   it('email-api gates the email-marketing add-on at the API boundary', () => {
@@ -49,16 +49,16 @@ describe('#294 — platform-scoped gates and body-supplied ids', () => {
     expect(gates, 'one per marketing route: campaign stats + the three contact-sync routes')
       .toHaveLength(4);
     // …and each must sit behind the membership check, never instead of it.
-    expect((src.match(/userCanAccessWorkspace\(/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect((src.match(/userHasWorkspaceCapability\(/g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
   it('catalog-translate-pdf checks ownership before it spends or reads private storage', () => {
     const src = read('catalog-translate-pdf/index.ts');
 
     expect(src, 'both ids come from the request body and the client is service-role')
-      .toMatch(/userCanAccessWorkspace\(/);
+      .toMatch(/userHasWorkspaceCapability\(/);
 
-    const guard = src.indexOf('userCanAccessWorkspace(');
+    const guard = src.indexOf('userHasWorkspaceCapability(');
     const download = src.indexOf('.download(');
     const debit = src.indexOf("'debit_credits'");
     const model = src.indexOf('api.anthropic.com');
@@ -141,8 +141,7 @@ describe('platform work is gated on the operator, never on a workspace role', ()
     expect(body).toMatch(/mem && mem\.status !== 'active'/);
   });
 
-  it('trade-portal mint_link needs a selling role in the account workspace', () => {
-    const src = read('trade-portal/index.ts');
-    expect(src).toMatch(/\.in\('role', \['owner', 'admin', 'member', 'sales', 'sales_manager'\]\)/);
+  it('trade-portal mint_link needs the quoting capability in the account workspace', () => {
+    expect(read('trade-portal/index.ts')).toMatch(/userHasWorkspaceCapability\(service, auth\.userId, workspaceId, 'quotes\.use'\)/);
   });
 });

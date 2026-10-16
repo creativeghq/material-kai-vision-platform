@@ -34,7 +34,7 @@ import {
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
@@ -458,7 +458,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // `debit_credits` already falls back to the personal wallet for a non-member, so this was never
   // credit theft — but the ROWS still landed in the victim's tenant, visible to their admins.
   if (!isServiceCall && body.workspace_id
-    && !(await userCanAccessWorkspace(supabase, resolvedUserId, body.workspace_id))) {
+    && !(await userHasWorkspaceCapability(supabase, resolvedUserId, body.workspace_id, ['agent.use', 'moodboards.use', 'projects.use']))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 

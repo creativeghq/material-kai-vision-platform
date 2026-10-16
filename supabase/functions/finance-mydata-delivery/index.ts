@@ -1,4 +1,4 @@
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -97,7 +97,7 @@ Deno.serve(withApiLogging('finance-mydata-delivery', async (req) => {
   if (!note) throw new HttpError(404, 'not found');
 
   const workspaceId = note.workspace_id;
-  if (!(await userCanAccessWorkspace(service, auth.userId, workspaceId))) throw new HttpError(404, 'not found');
+  if (!(await userHasWorkspaceCapability(service, auth.userId, workspaceId, 'invoice.issue'))) throw new HttpError(404, 'not found');
   const { data: isMgr } = await auth.supabaseAsUser!
     .rpc('is_workspace_finance_manager', { p_workspace_id: workspaceId });
   if (!isMgr) throw new HttpError(404, 'not found');

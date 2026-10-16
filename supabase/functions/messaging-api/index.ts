@@ -15,7 +15,7 @@ import {
 import { CAST } from '../_shared/characterAvatar.generated.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
-import { authenticate, isAdminAccess, isPlatformOperator, listUserWorkspaceIds } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, isPlatformOperator, listWorkspaceIdsWithCapability, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { isWorkspaceEntitled, notEntitledResponse } from '../_shared/entitlement.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
@@ -238,14 +238,12 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     }
     const action = requestBody.action;
 
-    // Messaging is a platform-global feature (channels are not per-workspace) that
-    // spends the platform's WhatsApp credits and edits connection config. Gate the
-    // credit-spending / config-mutating actions to platform operators; reads stay
-    // open to any authenticated user.
+    // Credit-spending / config actions: bound to a workspace where the caller holds inbox.use
+    // (callerWorkspaceIds) and entitled to 'messaging' (requireMessaging).
     const OPERATOR_ACTIONS = new Set([
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
-      'connect-whatsapp-callback', 'sync-channels', 'update-settings',
-      'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
+      'connect-whatsapp-callback', 'sync-channels',
+      'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
       'open-whatsapp-thread', 'sync-avatars', 'zernio-probe', 'generate-avatar-cast',
       // 'retry-failed-charges' is deliberately absent for the same reason as release: a
       // workspace put on hold by a failed debit had no way to get itself back other than
@@ -254,14 +252,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     ]);
     const PLATFORM_ACTIONS = new Set([
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
-      'bill-channels-monthly', 'set-channel-seats',
+      'bill-channels-monthly', 'set-channel-seats', 'update-settings', 'register-webhook',
     ]);
     if (PLATFORM_ACTIONS.has(action) && !isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
       return jsonResponse({ error: 'Platform operator access required' }, 403);
-    }
-    if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
-      const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-      if (!op.success) return jsonResponse({ error: 'Operator role required for this action' }, 403);
     }
 
     // Entitlement: WhatsApp is a paid ('messaging') feature. Gate the credit-spending /
@@ -280,7 +274,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     // reads return empty forever. Derive it from active membership instead.
     let _callerWsIds: string[] | null = null;
     const callerWorkspaceIds = async (): Promise<string[]> => {
-      if (!_callerWsIds) _callerWsIds = await listUserWorkspaceIds(supabaseClient, auth.userId);
+      if (!_callerWsIds) _callerWsIds = await listWorkspaceIdsWithCapability(supabaseClient, auth.userId, 'inbox.use');
       return _callerWsIds;
     };
 
@@ -306,10 +300,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
     const requireWorkspaceManager = async (wsId: string, doing: string): Promise<void> => {
       if (isAdminAccess(auth)) return;
-      const { data: role } = await supabaseClient
-        .from('workspace_members').select('role')
-        .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
-      if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
+      if (!(await userHasWorkspaceCapability(supabaseClient, auth.userId, wsId, 'workspace.manage'))) {
         throw new HttpError(403, `Only a workspace owner or admin can ${doing}`);
       }
     };
@@ -2274,6 +2265,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), from);
         if (!channel?.zernio_account_id) throw new HttpError(400, 'No WhatsApp channel configured');
         { const gate = await requireMessaging(channel.workspace_id); if (gate) return gate; }
+        await requireWorkspaceManager(channel.workspace_id, 'submit a WhatsApp template');
 
         const payload: Record<string, unknown> = {
           accountId: channel.zernio_account_id,

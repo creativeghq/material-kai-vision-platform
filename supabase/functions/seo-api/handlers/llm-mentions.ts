@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, isCronAuthorized, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertEntitled, isWorkspaceEntitled } from '../../_shared/entitlement.ts';
 import { callDataForSEO } from '../../_shared/tools/dataforseo-dispatch.ts';
 import { SEO_MODULE } from './entitlement.ts';
@@ -321,7 +321,7 @@ export async function handleLlmMentions(req: Request, body: Loose): Promise<Resp
     .select('id, workspace_id, user_id, url, display_name')
     .eq('id', websiteId)
     .maybeSingle();
-  if (!site || !(await userCanAccessWorkspace(db, auth.userId, site.workspace_id))) {
+  if (!site || !(await userHasWorkspaceCapability(db, auth.userId, site.workspace_id, 'marketing.seo'))) {
     return json({ success: false, error: 'Not found' }, 404);
   }
   const ent = await assertEntitled(db, site.workspace_id, SEO_MODULE);

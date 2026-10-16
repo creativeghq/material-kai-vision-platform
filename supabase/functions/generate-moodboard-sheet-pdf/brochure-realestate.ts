@@ -9,7 +9,7 @@ import {
   loadFonts, embedImageBytes, wrapText, truncate,
   PAGE_W, PAGE_H, MARGIN, COLOR_DARK, COLOR_GRAY, COLOR_WHITE,
 } from './layout.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 
@@ -79,7 +79,7 @@ export async function buildPropertyBrochurePdf(supabase: any, auth: any, propert
 
   // Gates (mirror real-estate-api): caller ↔ workspace, module publish, entitlement.
   if (!auth?.isService) {
-    if (!auth?.userId || !(await userCanAccessWorkspace(supabase, auth.userId, ws))) return json({ success: false, error: 'not found' }, 404);
+    if (!auth?.userId || !(await userHasWorkspaceCapability(supabase, auth.userId, ws, 'realestate.view'))) return json({ success: false, error: 'not found' }, 404);
   }
   if (!(await isModuleEnabled(supabase, 'real-estate'))) return json({ success: false, error: 'Real Estate module is not available' }, 404);
   const ent = await assertEntitled(supabase, ws, 'real-estate');

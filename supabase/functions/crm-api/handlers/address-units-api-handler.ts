@@ -68,22 +68,14 @@ export async function handleAddressUnits(req: Request): Promise<Response> {
   }
 
   try {
-    // Owner + super_admin included so the primary business persona can manage a party's
-    // address sub-units (was ['admin','factory']). Reads now also go via table RLS on the
-    // client; this gate still covers writes. Tenant isolation enforced by the scope below.
-    const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'member', 'sales', 'sales_manager', 'realestate_agent'] });
+    const auth = await authenticate(req);
     if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
-        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
+        { status: 401, headers: corsHeaders },
       );
     }
-    // `auth.userId`, never `auth.user.id`: authenticate() returns success with `user: null` at
-    // 'secret', 'anon' and 'api_key' level — only 'user' level populates it — and none of those
-    // is gated out here, because `requireUser` defaults to false and `allowedRoles` is applied
-    // only to user tokens. So `user.id` threw a TypeError on every service-role and partner-key
-    // call, 500ing the request. `userId` IS set for 'api_key', so a partner key keeps its real
-    // author, and these columns are nullable, so a backend write records "no human" honestly.
+    // `auth.userId`, never `auth.user.id`: only 'user' level sets `user`, and secret/api_key callers reach here.
     const scope = await getCrmScope(supabase, auth);
 
     const url = new URL(req.url);

@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance PR-A — Supplier Cost List parser
@@ -128,10 +128,7 @@ Deno.serve(withApiLogging('parse-supplier-cost-list', async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
-    const auth = await authenticate(req, {
-      requireUser: true,
-      allowedRoles: ['admin', 'super_admin', 'owner'],
-    });
+    const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
@@ -158,7 +155,7 @@ Deno.serve(withApiLogging('parse-supplier-cost-list', async (req) => {
     // workspace; the service-role load bypasses RLS. Without this, an owner of tenant A
     // could pass tenant B's kb_doc_id and both leak B's SKU→cost table AND overwrite
     // B's products.cost. Bind the caller to the doc's workspace (404 to avoid id enum).
-    if (!(await userCanAccessWorkspace(supabase, auth.userId, doc.workspace_id))) {
+    if (!(await userHasWorkspaceCapability(supabase, auth.userId, doc.workspace_id, 'pricing.manage'))) {
       return json({ error: `KB doc not found: ${body.kb_doc_id}` }, 404);
     }
 

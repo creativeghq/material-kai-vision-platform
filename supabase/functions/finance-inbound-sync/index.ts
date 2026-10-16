@@ -7,7 +7,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
-import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
+import { authenticate, listWorkspaceIdsWithCapability } from '../_shared/auth.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -115,9 +115,9 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
   // the results of) an inbound myDATA pull for EVERY workspace on the platform.
   let allowedWorkspaceIds: string[] | null = null;
   if (!cronOk) {
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
+    const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) return json({ error: 'unauthorized' }, 401);
-    allowedWorkspaceIds = await listUserWorkspaceIds(supabase, auth.userId);
+    allowedWorkspaceIds = await listWorkspaceIdsWithCapability(supabase, auth.userId, 'finance.manage');
     if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_member_workspaces' });
   }
 

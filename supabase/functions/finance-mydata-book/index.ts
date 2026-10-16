@@ -1,7 +1,7 @@
 /** myDATA aggregate book — a READ-ONLY MIRROR of what AADE holds. */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
-import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
+import { authenticate, listWorkspaceIdsWithCapability } from '../_shared/auth.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -248,36 +248,10 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
   // finance user triggers (and reads the outcome of) an AADE pull for every workspace.
   let allowedWorkspaceIds: string[] | null = null;
   if (!cronOk) {
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
+    const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) throw new HttpError(401, 'unauthorized');
-    allowedWorkspaceIds = await listUserWorkspaceIds(supabase, auth.userId);
-    if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_member_workspaces' });
-
-    // `authenticate(allowedRoles)` passes if the caller holds a finance role ANYWHERE, but
-    // membership is not a finance role: a user who is `finance` in workspace A and a plain
-    // `member` in workspace B would otherwise trigger B's AADE pull and read its outcome —
-    // another tenant's tax position, through a service-role query filtered only by membership.
-    // A platform admin legitimately sees everything; everyone else is narrowed to the
-    // workspaces where they actually hold the finance capability.
-    const { data: prof } = await supabase
-      .from('user_profiles')
-      .select('roles!user_profiles_role_id_fkey(name)')
-      .eq('user_id', auth.userId)
-      .maybeSingle();
-    const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
-    if (!globalRole || !['admin', 'super_admin'].includes(globalRole)) {
-      const { data: memberships, error: memErr } = await supabase
-        .from('workspace_members')
-        .select('workspace_id, role')
-        .eq('user_id', auth.userId)
-        .eq('status', 'active')
-        .in('role', ['owner', 'admin', 'accountant'])
-        .in('workspace_id', allowedWorkspaceIds);
-      // Fail closed: an unreadable membership list is not "no restrictions".
-      if (memErr) throw new HttpError(503, 'Could not verify your finance access for these workspaces.');
-      allowedWorkspaceIds = (memberships ?? []).map((m) => m.workspace_id as string);
-      if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_finance_workspaces' });
-    }
+    allowedWorkspaceIds = await listWorkspaceIdsWithCapability(supabase, auth.userId, 'finance.manage');
+    if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_finance_workspaces' });
   }
 
   // Window. The cron refreshes the current year to date; a manual refresh names its own.

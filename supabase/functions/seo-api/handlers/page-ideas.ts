@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
 import { openSpendGate } from '../../_shared/tools/dataforseo-spend-gate.ts';
@@ -47,7 +47,7 @@ export async function handlePageIdeas(req: Request, body: any): Promise<Response
   if (!website) return json({ success: false, error: 'Website not found' }, 404);
   // Invariant 1: the service-role client bypasses RLS, so membership is checked here; 404 on
   // mismatch so ids cannot be enumerated.
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, website.workspace_id))) {
+  if (!(await userHasWorkspaceCapability(supabase, auth.userId, website.workspace_id, 'marketing.seo'))) {
     return json({ success: false, error: 'Website not found' }, 404);
   }
   const ent = await assertEntitled(supabase, website.workspace_id, 'seo-toolkit');

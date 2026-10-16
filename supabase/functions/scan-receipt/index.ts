@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
@@ -157,7 +157,7 @@ async function scan(body: Body, admin: any, uid: string): Promise<Response> {
   if (!data_base64) throw new HttpError(400, 'data_base64 required');
 
   // Invariant 1: the body says which workspace; the database says whether this caller is in it.
-  if (!(await userCanAccessWorkspace(admin, uid, workspace_id))) {
+  if (!(await userHasWorkspaceCapability(admin, uid, workspace_id, 'finance.manage'))) {
     throw new HttpError(404, 'Workspace not found');
   }
 
@@ -320,7 +320,7 @@ async function ingestInvoice(body: Body, reader: any, admin: any, uid: string): 
   } else {
     if (!body.workspace_id) throw new HttpError(400, 'workspace_id required');
     workspaceId = body.workspace_id;
-    if (!(await userCanAccessWorkspace(admin, uid, workspaceId))) throw new HttpError(404, 'Workspace not found');
+    if (!(await userHasWorkspaceCapability(admin, uid, workspaceId, 'finance.manage'))) throw new HttpError(404, 'Workspace not found');
     target = body.inbox_message_id
       ? { kind: 'create', source: 'email', origin: { inbox_message_id: body.inbox_message_id, attachment_index: Number(body.attachment_index ?? 0) } }
       : { kind: 'create', source: 'upload' };

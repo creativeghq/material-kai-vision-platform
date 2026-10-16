@@ -15,7 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { assertSameWorkspace, assertAllSameWorkspace } from '../_shared/same-workspace.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
@@ -219,7 +219,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
 
   // Gates 1–2 concurrent, evaluate access 404 → module 404 → entitlement 402.
-  const accessP = userCanAccessWorkspace(supabase, userId, workspaceId);
+  const accessP = userHasWorkspaceCapability(supabase, userId, workspaceId, 'realestate.view');
   const moduleP = isModuleEnabled(supabase, 'real-estate');
   const entP = assertEntitled(supabase, workspaceId, 'real-estate');
   if (!(await accessP)) return json({ error: 'not found' }, 404);

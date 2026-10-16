@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace, isPlatformOperator } from '../_shared/auth.ts';
+import { authenticate, isPlatformOperator, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { resolveNovusConnection } from '../_shared/fiscal/novusConnection.ts';
 import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
@@ -260,7 +260,7 @@ Deno.serve(withApiLogging('novus-onboarding', async (req: Request) => {
 
   const workspaceId = String(body.workspace_id ?? '');
   if (!workspaceId) throw new HttpError(400, 'workspace_id is required.');
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, workspaceId))) throw new HttpError(404, 'Not found.');
+  if (!(await userHasWorkspaceCapability(supabase, auth.userId, workspaceId, 'workspace.manage'))) throw new HttpError(404, 'Not found.');
 
   const { data: row } = await supabase
     .from('workspace_einvoice_onboarding').select('*').eq('workspace_id', workspaceId).maybeSingle();

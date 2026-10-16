@@ -7,7 +7,7 @@ import { grantBundle, revokeBundle } from '../../_shared/module-bundle.ts';
 import { jsonResponse as json } from '../../_shared/http.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, isAdminAccess, userCanAccessWorkspace, type AuthResult } from '../../_shared/auth.ts';
+import { authenticate, isAdminAccess, type AuthResult, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import {
   getPlatformBillingStripe,
@@ -254,7 +254,7 @@ async function requestModule(auth: AuthResult, body: Record<string, unknown>): P
   if (!workspaceId || !moduleSlug) return json({ error: 'workspace_id and module_slug are required' }, 400);
 
   // Caller must belong to the workspace (bind to caller — never trust the body alone).
-  if (!(await userCanAccessWorkspace(service, userId, workspaceId))) {
+  if (!(await userHasWorkspaceCapability(service, userId, workspaceId, 'workspace.manage'))) {
     return json({ error: 'Not a member of this workspace', code: 'not_member' }, 403);
   }
 

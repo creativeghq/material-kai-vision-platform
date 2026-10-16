@@ -94,8 +94,8 @@ describe('the edge function', () => {
   });
 
   it('verifies workspace membership before reading anything', () => {
-    expect(FN.indexOf('userCanAccessWorkspace(')).toBeGreaterThan(-1);
-    expect(FN.indexOf('userCanAccessWorkspace(')).toBeLessThan(FN.indexOf('await readAll<CompanyRow>'));
+    expect(FN.indexOf('userHasWorkspaceCapability(')).toBeGreaterThan(-1);
+    expect(FN.indexOf('userHasWorkspaceCapability(')).toBeLessThan(FN.indexOf('await readAll<CompanyRow>'));
   });
 
   it('pages past the 1,000-row PostgREST cap rather than trusting a large .limit()', () => {

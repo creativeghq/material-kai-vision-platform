@@ -14,6 +14,7 @@ import {
   type OnboardingStep,
 } from '@/config/onboardingSteps';
 import type { Capability } from '@/auth/capabilities';
+import { CAPABILITIES } from '@/auth/roleCapabilities';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -350,11 +351,7 @@ describe('a member only gets the steps they could act on', () => {
   });
 
   it('every capability a step names is one the app actually defines', () => {
-    const capSrc = read('src/auth/capabilities.ts');
-    const declared = new Set(
-      [...capSrc.slice(capSrc.indexOf('export type Capability')).matchAll(/\| '([a-z.]+)'/g)]
-        .map((m) => m[1]),
-    );
+    const declared = new Set<string>(CAPABILITIES);
     const unknown = ONBOARDING_STEPS
       .map((s) => s.requireCapability)
       .filter((c): c is Capability => !!c)

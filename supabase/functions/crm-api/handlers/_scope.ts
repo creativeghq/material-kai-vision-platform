@@ -1,12 +1,10 @@
-// Shared workspace-scoping for the CRM API handlers.
-// All crm-api handlers run under the SERVICE ROLE (RLS bypassed), and authenticate()
-// only proves the caller holds an admin/factory role in SOME workspace — it is an
-// admission gate, NOT per-row authorization. Without explicit scoping any workspace
-// admin/factory user can list/modify/delete every other tenant's CRM rows (IDOR).
+// Shared workspace-scoping for the CRM API handlers, which run under the SERVICE ROLE (RLS
+// bypassed): the scope is the only boundary — workspaces where the caller's role holds crm.view.
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AuthResult } from '../../_shared/auth.ts';
+import { roleHasCapability } from '../../_shared/roleCapabilities.generated.ts';
 
 export interface CrmScope {
   /** Secret-key or global admin/super_admin — unrestricted across all workspaces. */
@@ -67,7 +65,7 @@ export async function getCrmScope(
       .maybeSingle(),
     adminClient
       .from('workspace_members')
-      .select('workspace_id')
+      .select('workspace_id, role')
       .eq('user_id', userId)
       .eq('status', 'active'),
   ]);
@@ -75,6 +73,7 @@ export async function getCrmScope(
   // filter(Boolean): a NULL/empty workspace_id would poison any `.in('workspace_id', …)`
   // query downstream (Postgres rejects '' as a uuid → 22P02 "invalid input syntax").
   const workspaceIds = (mems ?? [])
+    .filter((m: { role: string }) => roleHasCapability(m.role, 'crm.view'))
     .map((m: { workspace_id: string }) => m.workspace_id)
     .filter(Boolean);
 

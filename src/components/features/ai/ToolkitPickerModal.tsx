@@ -23,6 +23,7 @@ import { HUBS } from '@/config/nav-items';
 import { Play } from 'lucide-react';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { usePermissions } from '@/hooks/usePermissions';
 import { formatNumber } from '@/utils/decimal';
 
 // Every `icon:` referenced by TOOLKITS (cluster + quick_start) must resolve here —
@@ -61,6 +62,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
   currentAgentId, onLaunchQuickStart,
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const { can } = usePermissions();
   // Hand-rolled overlay, not a Radix Dialog: Escape, the Tab trap and focus restore all have
   // to be wired explicitly. Without them focus stayed on the trigger BEHIND this, and Tab
   // walked the page underneath.
@@ -69,7 +71,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
 
   const accessible = useMemo(
     () => {
-      const byRoleAndModule = getAccessibleToolkits(role, enabledModules);
+      const byRoleAndModule = getAccessibleToolkits(role, enabledModules, can);
       if (!currentAgentId) return byRoleAndModule;
       // JARVIS (orchestrator) auto-routes to whichever specialist owns a tool,
       // so it can access EVERY toolkit — show the full accessible set.
@@ -81,7 +83,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
         t.alwaysOn || getToolkitOwnerAgents(t).includes(currentAgentId),
       );
     },
-    [role, enabledModules, currentAgentId],
+    [role, enabledModules, currentAgentId, can],
   );
 
   // Local draft so toggling doesn't immediately churn the parent. Apply on close.

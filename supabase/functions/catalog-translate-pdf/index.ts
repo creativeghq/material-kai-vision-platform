@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
@@ -154,8 +154,8 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
 
     if (auth.level !== 'secret') {
       const [ownsSource, ownsTarget] = await Promise.all([
-        userCanAccessWorkspace(supabase, auth.userId, (pdf as { workspace_id?: string | null }).workspace_id),
-        userCanAccessWorkspace(supabase, auth.userId, targetCatalog.workspace_id),
+        userHasWorkspaceCapability(supabase, auth.userId, (pdf as { workspace_id?: string | null }).workspace_id, 'pricing.manage'),
+        userHasWorkspaceCapability(supabase, auth.userId, targetCatalog.workspace_id, 'pricing.manage'),
       ]);
       if (!ownsSource || !ownsTarget) {
         return jsonResponse({ success: false, error: 'Source PDF not found' }, 404);

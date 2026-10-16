@@ -3,7 +3,7 @@
  * and read its delivery log.
  */
 import { createClient } from '@supabase/supabase-js';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { SUBSCRIBABLE_EVENT_TYPES } from '../_shared/webhook-events.ts';
@@ -70,7 +70,7 @@ Deno.serve(withApiLogging('workspace-webhooks-api', async (req) => {
       .select('id, workspace_id')
       .eq('id', id)
       .maybeSingle();
-    if (!hook || !(await userCanAccessWorkspace(supabase, auth.userId, hook.workspace_id))) {
+    if (!hook || !(await userHasWorkspaceCapability(supabase, auth.userId, hook.workspace_id, 'workspace.manage'))) {
       throw new HttpError(404, 'Webhook not found');
     }
     return hook;
@@ -79,7 +79,7 @@ Deno.serve(withApiLogging('workspace-webhooks-api', async (req) => {
   switch (action) {
     case 'list': {
       const workspaceId = String(body.workspace_id ?? '');
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, workspaceId))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, workspaceId, 'workspace.manage'))) {
         throw new HttpError(404, 'Workspace not found');
       }
       // `secret` is deliberately absent from this projection AND unreadable at the column level.
@@ -93,7 +93,7 @@ Deno.serve(withApiLogging('workspace-webhooks-api', async (req) => {
 
     case 'create': {
       const workspaceId = String(body.workspace_id ?? '');
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, workspaceId))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, workspaceId, 'workspace.manage'))) {
         throw new HttpError(404, 'Workspace not found');
       }
       const { count, error: countErr } = await supabase

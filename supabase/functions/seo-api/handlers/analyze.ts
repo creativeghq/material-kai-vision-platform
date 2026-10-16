@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { missingArticlePlanFields, ANALYZE_PLAN_FIELDS } from './article-plan-guard.ts';
 import { readingEase } from './readability.ts';
@@ -259,7 +259,7 @@ async function resolveContentDate(
       .maybeSingle();
     if (!data) return undefined;
     const owns = data.user_id === userId
-      || (data.workspace_id && await userCanAccessWorkspace(supabase, userId, data.workspace_id));
+      || (data.workspace_id && await userHasWorkspaceCapability(supabase, userId, data.workspace_id, 'marketing.seo'));
     if (!owns) return undefined;
     return data.content_dated_at || undefined;
   } catch (e) {

@@ -243,7 +243,7 @@ describe('applying or reverting a fix refreshes the analysis it invalidated', ()
     expect(reanalyze).toContain('loadOwnedArticle');
     const access = readFileSync(join(HANDLERS, 'article-access.ts'), 'utf-8');
     // 404 on a foreign article, never 403 — invariant 1.
-    expect(access).toContain('userCanAccessWorkspace');
+    expect(access).toContain('userHasWorkspaceCapability');
     expect((access.match(/'Not found'/g) ?? []).length).toBeGreaterThanOrEqual(3);
     // The status literal, not the word: the file explains WHY it never returns 403.
     expect(access, 'a foreign article must 404, never 403 — 403 confirms the id exists').not.toMatch(/,\s*403\)/);

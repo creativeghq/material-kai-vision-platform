@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
@@ -158,7 +158,7 @@ Deno.serve(withApiLogging('seo-reports', async (req: Request) => {
     .select('id, website_id, workspace_id, name, sections, cadence')
     .eq('id', reportId).maybeSingle();
   if (!report) return json({ error: 'Report not found' }, 404);
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, report.workspace_id))) {
+  if (!(await userHasWorkspaceCapability(supabase, auth.userId, report.workspace_id, 'marketing.seo'))) {
     return json({ error: 'Report not found' }, 404); // 404 not 403 — no id enumeration
   }
   const ent = await assertEntitled(supabase, report.workspace_id, 'seo-toolkit');

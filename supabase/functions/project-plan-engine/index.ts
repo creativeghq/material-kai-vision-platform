@@ -7,7 +7,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { evaluateFormula, computeLinePricing, round2 } from '../_shared/blueprint/formula.ts';
 import {
   absorbedGroups,
@@ -359,7 +359,7 @@ async function loadPlanItems(supabase: DbClient, planId: string): Promise<ItemRo
 
 async function requireWorkspace(supabase: DbClient, userId: string | null, workspaceId: string, isService: boolean) {
   if (isService) return;
-  const ok = await userCanAccessWorkspace(supabase, userId, workspaceId);
+  const ok = await userHasWorkspaceCapability(supabase, userId, workspaceId, 'projects.use');
   if (!ok) throw new HttpError(403, 'Not a member of this workspace');
 }
 

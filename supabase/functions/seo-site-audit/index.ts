@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
@@ -345,7 +345,7 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
   if (!websiteId) return json({ error: 'website_id required' }, 400);
   const { data: website } = await supabase.from('user_websites').select('id, workspace_id, url').eq('id', websiteId).maybeSingle();
   if (!website) return json({ error: 'Website not found' }, 404);
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, website.workspace_id))) {
+  if (!(await userHasWorkspaceCapability(supabase, auth.userId, website.workspace_id, 'marketing.seo'))) {
     return json({ error: 'Website not found' }, 404);
   }
   // Paid module — refuse before the MIVAA/Lighthouse audit (#212). Cron branch stays ungated.

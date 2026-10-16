@@ -38,14 +38,14 @@ describe('EX-1 — a body-supplied workspace_id is verified before it is trusted
   it.each(PAID_GENERATORS)('%s checks membership', (rel) => {
     const src = read(rel);
     expect(src, `${rel} debits and writes against body.workspace_id without proving membership`)
-      .toContain('userCanAccessWorkspace');
+      .toContain('userHasWorkspaceCapability');
   });
 
   it.each(PAID_GENERATORS)('%s answers 404, not 403, on a mismatch', (rel) => {
     const src = read(rel);
     // A distinguishable "not yours" turns the endpoint into a workspace-id oracle: 403 confirms
     // the id exists, 404 says nothing. Invariant 1 is explicit about this.
-    const guard = src.slice(src.indexOf('userCanAccessWorkspace'));
+    const guard = src.slice(src.indexOf('userHasWorkspaceCapability'));
     expect(guard, `${rel} distinguishes "exists but not yours" from "not found"`)
       .toMatch(/\b404\b/);
   });
@@ -69,7 +69,7 @@ describe('EX-1 — a body-supplied workspace_id is verified before it is trusted
     expect(
       missed,
       'a new paid generator takes a body workspace_id and is not covered by this guard — ' +
-        'add it to PAID_GENERATORS (and give it a userCanAccessWorkspace check):\n  ' + missed.join('\n  '),
+        'add it to PAID_GENERATORS (and give it a userHasWorkspaceCapability check):\n  ' + missed.join('\n  '),
     ).toEqual([]);
   });
 });

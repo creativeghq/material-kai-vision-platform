@@ -44,7 +44,7 @@ describe('the dictation reader', () => {
 
   it('derives the workspace from the project row, never from the body', () => {
     expect(EDGE).toMatch(/from\('projects'\)[\s\S]{0,120}workspace_id/);
-    expect(EDGE).toContain('userCanAccessWorkspace');
+    expect(EDGE).toContain('userHasWorkspaceCapability');
     expect(EDGE).not.toMatch(/const\s*\{[^}]*workspace_id[^}]*\}\s*=\s*body/);
   });
 

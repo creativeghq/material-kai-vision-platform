@@ -15,7 +15,7 @@ import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { scrapeMarkdown, excerptFromMarkdown } from '../_shared/scrape-markdown.ts';
 import { chargeCronUser, refundCronUser } from '../_shared/cron-billing.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 import { extractContentImages, type PageImage } from '../_shared/page-images.ts';
 import { extractContentLinks, extractSpecs, type PageSpecs } from './spec-extract.ts';
@@ -990,7 +990,7 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
   // Invariant #1 (BOLA): user_websites is workspace-shared. The service-role client
   // above bypasses RLS, so reconcile the caller against the row's workspace by MEMBERSHIP,
   // not the body-supplied id. Return 404 (not 403) on mismatch to avoid id enumeration.
-  if (!isCron && !(await userCanAccessWorkspace(supabase, userId, website.workspace_id))) {
+  if (!isCron && !(await userHasWorkspaceCapability(supabase, userId, website.workspace_id, 'marketing.seo'))) {
     return jsonResponse({ success: false, error: 'Website not found' }, 404);
   }
   if (!website.is_active) return jsonResponse({ success: false, error: 'Website is inactive' }, 400);

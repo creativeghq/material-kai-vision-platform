@@ -90,7 +90,7 @@ describe('the title-block scanner', () => {
     // Invariant 1. A body-supplied workspace_id checked against the caller would still let
     // somebody scan against a project they do not own by naming a workspace they do.
     expect(EDGE).toMatch(/from\('projects'\)[\s\S]{0,120}workspace_id/);
-    expect(EDGE).toContain('userCanAccessWorkspace');
+    expect(EDGE).toContain('userHasWorkspaceCapability');
     expect(EDGE).not.toMatch(/const\s*\{[^}]*workspace_id[^}]*\}\s*=\s*body/);
   });
 

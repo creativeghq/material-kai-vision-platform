@@ -9,7 +9,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -106,7 +106,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
   // stamps the `ai_usage_logs` row this tenant's admins read through
   // `is_workspace_admin(workspace_id)`. 404, not 403 — no workspace-id enumeration.
   if (!isServiceCall && body.workspace_id
-    && !(await userCanAccessWorkspace(supabase, userId, body.workspace_id))) {
+    && !(await userHasWorkspaceCapability(supabase, userId, body.workspace_id, ['agent.use', 'moodboards.use', 'projects.use']))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 

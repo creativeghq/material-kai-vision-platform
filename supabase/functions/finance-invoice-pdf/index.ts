@@ -14,7 +14,7 @@ import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace, isCronAuthorized, isServiceRoleRequest } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability, isCronAuthorized, isServiceRoleRequest } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
@@ -270,7 +270,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     || (kind === 'invoice' && isServiceRoleRequest(req));
   let authUserId: string | null = null;
   if (!internal) {
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
+    const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
     authUserId = auth.userId;
   } else {
@@ -290,7 +290,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   if (!row) return json({ error: `${kind} not found` }, 404);
   // Tenancy: a finance user may only render documents in a workspace they belong to.
   // (Internal receipt calls have no user; their trust comes from the service secret.)
-  if (!internal && !(await userCanAccessWorkspace(supabase, authUserId, row.workspace_id))) {
+  if (!internal && !(await userHasWorkspaceCapability(supabase, authUserId, row.workspace_id,
+    kind === 'delivery_note' ? ['finance.manage', 'sales.portal', 'warehouse.manage'] : ['finance.manage', 'sales.portal']))) {
     return json({ error: 'Not authorized for this document' }, 403);
   }
 

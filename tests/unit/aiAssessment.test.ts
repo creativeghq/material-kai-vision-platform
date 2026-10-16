@@ -327,7 +327,7 @@ describe('every chunk the toolkit emits reaches the screen', () => {
 
 describe('tenancy is bound to the verified identity, never to the request body', () => {
   it('the shared door checks workspace access and 404s on a mismatch', () => {
-    expect(doorSrc).toContain('userCanAccessWorkspace(');
+    expect(doorSrc).toContain('userHasWorkspaceCapability(');
     // 403 confirms the id exists; 404 does not (invariant 1).
     expect(doorSrc).toMatch(/HttpError\(404, 'Not found'\)/);
     expect(doorSrc, 'module entitlement is enforced at the API boundary, not by the nav')

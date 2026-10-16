@@ -197,29 +197,15 @@ export async function handleCompanies(req: Request): Promise<Response> {
 
   try {
     // Authenticate request
-    const auth = await authenticate(req, {
-      // Business-ops gate: a workspace OWNER (the primary business persona, often global
-      // role 'user') and platform super_admin must be allowed — matches finance/messaging/
-      // email/agent handlers. The earlier ['admin','factory'] locked owners out of their
-      // own CRM (list AND write). Tenant isolation is still enforced by getCrmScope below.
-      allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'member', 'sales', 'sales_manager', 'realestate_agent'],
-    });
-
-    // authenticate() already grants success for secret-key (level='secret') access and
-    // enforces the role gate for user tokens, so a failed auth is simply rejected here.
+    const auth = await authenticate(req);
     if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
-        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
+        { status: 401, headers: corsHeaders },
       );
     }
 
-    // `auth.userId`, never `auth.user.id`: authenticate() returns success with `user: null` at
-    // 'secret', 'anon' and 'api_key' level — only 'user' level populates it — and none of those
-    // is gated out here, because `requireUser` defaults to false and `allowedRoles` is applied
-    // only to user tokens. So `user.id` threw a TypeError on every service-role and partner-key
-    // call, 500ing the request. `userId` IS set for 'api_key', so a partner key keeps its real
-    // author, and these columns are nullable, so a backend write records "no human" honestly.
+    // `auth.userId`, never `auth.user.id`: only 'user' level sets `user`, and secret/api_key callers reach here.
     const userId = auth.userId;
 
     // Workspace scoping: the handler runs under the service role (RLS bypassed), so we

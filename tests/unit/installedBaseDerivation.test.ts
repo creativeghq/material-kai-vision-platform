@@ -185,7 +185,7 @@ describe('tenancy', () => {
     const api = stripComments(read(API));
     // Reads and writes run on `db` (the RLS-bound user client). `service` exists only for the
     // membership check and the two definer RPCs that are called AFTER ownership is proven.
-    expect(api).toContain('userCanAccessWorkspace');
+    expect(api).toContain('userHasWorkspaceCapability');
     const serviceUses = api.match(/\bservice\.(from|rpc)\(/g) ?? [];
     expect(
       serviceUses.every((u) => u.startsWith('service.rpc(')),

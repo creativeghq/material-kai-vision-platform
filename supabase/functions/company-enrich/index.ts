@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 // Invariant 1 — tenancy comes from membership, never from the request body.
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
 import { debitExternalServiceCredits, getServicePricing } from '../_shared/credit-utils.ts';
@@ -1106,7 +1106,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     // The workspace billed and audited for every action, membership-checked once (#353 CRM-9).
     const requestedWorkspaceId = cleanStr(body?.workspace_id);
     const workspaceId = requestedWorkspaceId
-      && await userCanAccessWorkspace(admin, user.id, requestedWorkspaceId)
+      && await userHasWorkspaceCapability(admin, user.id, requestedWorkspaceId, 'crm.view')
       ? requestedWorkspaceId
       : undefined;
     if (requestedWorkspaceId && !workspaceId) {
@@ -1169,7 +1169,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
         .eq('id', companyId)
         .maybeSingle();
       if (data) {
-        const sameTenant = await userCanAccessWorkspace(admin, user.id, data.workspace_id);
+        const sameTenant = await userHasWorkspaceCapability(admin, user.id, data.workspace_id, 'crm.view');
         company = sameTenant ? data : null;
         canWrite = sameTenant && company.created_by === user.id;
         if (sameTenant && !canWrite) {

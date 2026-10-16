@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
@@ -201,7 +201,7 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
   const status = body.status === 'publish' ? 'publish' : 'draft';
   const { data: owner } = await supabase.from('seo_articles').select('workspace_id').eq('id', articleId).maybeSingle();
   const workspaceId = (owner as { workspace_id?: string | null } | null)?.workspace_id ?? null;
-  if (!workspaceId || !(await userCanAccessWorkspace(supabase, actingUser, workspaceId))) {
+  if (!workspaceId || !(await userHasWorkspaceCapability(supabase, actingUser, workspaceId, 'marketing.seo'))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
   const ent = await assertEntitled(supabase, workspaceId, SEO_MODULE);

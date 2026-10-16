@@ -19,7 +19,7 @@ import {
   type BasicRec,
 } from '../_shared/aade/rgwspublic2.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
@@ -479,7 +479,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
         // debit above already refuses to touch a stranger's pool; this keeps the usage row honest
         // in the other direction, where the pool silently fell back to personal credits.
         const claimedWs = body.workspace_id ?? null;
-        const billedWs = await userCanAccessWorkspace(admin, user.id, claimedWs)
+        const billedWs = await userHasWorkspaceCapability(admin, user.id, claimedWs, ['crm.view', 'finance.manage'])
           ? claimedWs ?? undefined
           : undefined;
         basicRecEn = await translateBasicRec(admin, basicRec, primaryActDescr, {

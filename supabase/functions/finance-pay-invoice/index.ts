@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isPlatformOperator, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isPlatformOperator, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -292,13 +292,8 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     // ─── Authenticated path (admin OR customer-self) ───────────────────
     if (isAdminMode) {
       const wantsLinkOnly = (body as AdminBody).link_only === true;
-      // link_only requires admin (mints a public pay token). Other authed callers
-      // (e.g. the customer who owns the invoice) can still create a one-shot checkout
-      // session — RLS on the user-JWT client is the gate.
-      const auth = await authenticate(req, {
-        requireUser: true,
-        allowedRoles: wantsLinkOnly ? ['admin', 'super_admin', 'owner', 'accountant'] : undefined,
-      });
+      // link_only mints a public pay token: finance users only. The invoice's own customer may still check out.
+      const auth = await authenticate(req, { requireUser: true });
       if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
       const { data: inv, error: invErr } = await auth.supabase
@@ -312,7 +307,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       // Bind the caller to this invoice explicitly: an active member of its workspace
       // (or global admin), OR the linked customer (crm_contacts.user_id). 404 on
       // mismatch to avoid cross-tenant id enumeration.
-      const isMember = await userCanAccessWorkspace(supabase, auth.userId, inv.workspace_id);
+      const isMember = await userHasWorkspaceCapability(supabase, auth.userId, inv.workspace_id, 'finance.manage');
       let isLinkedCustomer = false;
       if (!isMember && inv.customer_contact_id) {
         const { data: linkedContact } = await supabase
@@ -323,7 +318,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
           .maybeSingle();
         isLinkedCustomer = !!linkedContact;
       }
-      if (!isMember && !isLinkedCustomer) {
+      if ((!isMember && !isLinkedCustomer) || (wantsLinkOnly && !isMember)) {
         return json({ error: 'invoice not found or not accessible' }, 404);
       }
 

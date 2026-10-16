@@ -8,7 +8,7 @@ import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { encodeBase64 as base64Encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -920,10 +920,7 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
     }
 
     // ---- Single party + share-mint modes (user/role auth) ----
-    const auth = await authenticate(req, {
-      requireUser: true,
-      allowedRoles: ['admin', 'super_admin', 'owner', 'accountant', 'sales', 'sales_manager'],
-    });
+    const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     // ---- Mint / rotate a public share link for a party ----
@@ -933,7 +930,7 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
       const { data: party, error: pErr } = await supabase.from('vw_finance_parties').select('*')
         .eq('party_type', pt).eq('party_id', body.party_id).maybeSingle();
       if (pErr || !party) return json({ error: 'Party not found' }, 404);
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, party.workspace_id))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, party.workspace_id, ['finance.manage', 'sales.portal']))) {
         return json({ error: 'Not authorized for this party' }, 403);
       }
       const { data: mintSettings } = await supabase.from('finance_settings').select('statements_enabled').eq('workspace_id', party.workspace_id).maybeSingle();
@@ -959,7 +956,7 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
       .eq('party_type', partyType).eq('party_id', body.party_id).maybeSingle();
     if (partyErr || !party) return json({ error: `Party not found: ${partyErr?.message ?? body.party_id}` }, 404);
 
-    if (!(await userCanAccessWorkspace(supabase, auth.userId, party.workspace_id))) {
+    if (!(await userHasWorkspaceCapability(supabase, auth.userId, party.workspace_id, ['finance.manage', 'sales.portal']))) {
       return json({ error: 'Not authorized for this customer' }, 403);
     }
 

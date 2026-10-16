@@ -1,7 +1,7 @@
 /** ai-rerank — reorder search results by relevance to a query. */
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { rerankResults, RERANK_MODEL, type RerankCandidate } from '../_shared/rerank.ts';
 
 interface SearchResult {
@@ -54,7 +54,7 @@ Deno.serve(withApiLogging('ai-rerank', async (req: Request) => {
   if (results.length > 200) throw new HttpError(400, '`results` is limited to 200 items');
 
   const claimedWorkspaceId = typeof body.workspace_id === 'string' ? body.workspace_id : null;
-  const billedWorkspaceId = await userCanAccessWorkspace(auth.supabase, auth.userId, claimedWorkspaceId)
+  const billedWorkspaceId = await userHasWorkspaceCapability(auth.supabase, auth.userId, claimedWorkspaceId, ['agent.use', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use'])
     ? claimedWorkspaceId ?? undefined
     : undefined;
 

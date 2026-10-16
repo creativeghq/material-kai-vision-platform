@@ -11,7 +11,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, isPlatformOperator, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertAllSameWorkspace } from '../_shared/same-workspace.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -75,14 +75,8 @@ Deno.serve(withApiLogging('trade-portal', async (req: Request) => {
     const workspaceId = (pu as any)?.trade_portal_accounts?.workspace_id as string | undefined;
     // 404 on a mismatch, not 403: a distinguishable refusal is an id oracle.
     if (!pu || !workspaceId) throw new HttpError(404, 'not found');
-    if (!(await userCanAccessWorkspace(service, auth.userId, workspaceId))) {
+    if (!(await userHasWorkspaceCapability(service, auth.userId, workspaceId, 'quotes.use'))) {
       throw new HttpError(404, 'not found');
-    }
-    const { data: seller } = await service.from('workspace_members').select('role')
-      .eq('workspace_id', workspaceId).eq('user_id', auth.userId).eq('status', 'active')
-      .in('role', ['owner', 'admin', 'member', 'sales', 'sales_manager']).maybeSingle();
-    if (!seller && !(await isPlatformOperator(service, auth.userId))) {
-      throw new HttpError(403, 'Only the selling team can issue a trade portal login');
     }
 
     const token = mintToken();

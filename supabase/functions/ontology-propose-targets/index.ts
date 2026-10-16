@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 
@@ -84,7 +84,7 @@ Deno.serve(withApiLogging('ontology-propose-targets', async (req) => {
   try { body = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
   const workspaceId = String(body?.workspace_id ?? '').trim();
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
-  if (!(await userCanAccessWorkspace(supabase, userId, workspaceId))) return json({ error: 'not found' }, 404);
+  if (!(await userHasWorkspaceCapability(supabase, userId, workspaceId, 'pricing.manage'))) return json({ error: 'not found' }, 404);
 
   const limit = Math.min(Math.max(Number(body?.limit ?? MAX_TERMS) || MAX_TERMS, 1), MAX_TERMS);
   const conceptType = ['manufacturer', 'supplier'].includes(String(body?.concept_type ?? ''))

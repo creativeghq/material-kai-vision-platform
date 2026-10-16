@@ -37,7 +37,7 @@ describe('product-cutouts does things in the order that keeps money and tenants 
   const processRow = fn.slice(fn.indexOf('async function processRow('), fn.indexOf('Deno.serve('));
 
   it('the workspace is checked against the caller, and products are read only inside it', () => {
-    expect(fn).toMatch(/userCanAccessWorkspace\(supabase, user\.id, workspaceId\)/);
+    expect(fn).toMatch(/userHasWorkspaceCapability\(supabase, user\.id, workspaceId, /);
     expect(fn).toMatch(/\.from\('products'\)[\s\S]{0,80}\.eq\('workspace_id', workspaceId\)/);
   });
 
@@ -67,7 +67,7 @@ describe('a shop product gets a size and a cut-out without being copied to us', 
   const store = fn.slice(fn.indexOf('async function handleStore('), fn.indexOf('Deno.serve('));
 
   it('store actions run only after the caller is checked against the workspace', () => {
-    expect(fn.indexOf('userCanAccessWorkspace(supabase, user.id, workspaceId)'))
+    expect(fn.indexOf('userHasWorkspaceCapability(supabase, user.id, workspaceId, '))
       .toBeLessThan(fn.indexOf('return await handleStore('));
   });
 

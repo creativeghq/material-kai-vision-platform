@@ -1,6 +1,7 @@
 import type { DbClient } from './supabase-client.ts';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { bootstrapSecretsFromDb } from './secrets-bootstrap.ts';
+import { roleHasCapability, type Capability } from './roleCapabilities.generated.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -478,6 +479,47 @@ export async function userCanAccessWorkspace(
   if (mem) return true;
   const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
   return !!globalRole && ['admin', 'super_admin'].includes(globalRole);
+}
+
+/**
+ * True when the user may do `capability` in `workspaceId`: an ACTIVE member whose role there holds
+ * it (roleCapabilities.generated.ts), or the platform operator. Membership alone is not enough.
+ */
+export async function userHasWorkspaceCapability(
+  adminClient: DbClient,
+  userId: string | null,
+  workspaceId: string | null | undefined,
+  capability: Capability | readonly Capability[],
+): Promise<boolean> {
+  if (!userId || !workspaceId) return false;
+  const [{ data: mem }, operator] = await Promise.all([
+    adminClient
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle(),
+    isPlatformOperator(adminClient, userId),
+  ]);
+  return operator || roleHasCapability((mem as { role?: string } | null)?.role, capability);
+}
+
+/** The workspaces where the user's ACTIVE role holds `capability` — listUserWorkspaceIds, narrowed by role. */
+export async function listWorkspaceIdsWithCapability(
+  adminClient: DbClient,
+  userId: string | null,
+  capability: Capability | readonly Capability[],
+): Promise<string[]> {
+  if (!userId) return [];
+  const { data } = await adminClient
+    .from('workspace_members')
+    .select('workspace_id, role')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+  return ((data ?? []) as Array<{ workspace_id: string; role: string }>)
+    .filter((m) => roleHasCapability(m.role, capability))
+    .map((m) => m.workspace_id);
 }
 
 /**

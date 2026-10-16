@@ -3,7 +3,7 @@ import { mailIdentityImages } from '../_shared/mail-identity.ts';
 import { loadEmailSignature } from '../_shared/email-signature.ts';
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, isPlatformOperator, isServiceRoleRequest, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isPlatformOperator, isServiceRoleRequest, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -283,7 +283,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
   switch (action) {
     case 'status': {
       const workspaceId = String(body.workspace_id ?? '');
-      if (!workspaceId || !(await userCanAccessWorkspace(db, userId, workspaceId))) throw new HttpError(404, 'Workspace not found');
+      if (!workspaceId || !(await userHasWorkspaceCapability(db, userId, workspaceId, 'inbox.use'))) throw new HttpError(404, 'Workspace not found');
       const { data: memberOf, error: memErr } = await db.from('mail_account_members').select('account_id').eq('user_id', userId);
       if (memErr) throw new HttpError(500, memErr.message);
       const sharedIds = (memberOf ?? []).map((m: { account_id: string }) => m.account_id);
@@ -304,7 +304,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
 
     case 'connect': {
       const workspaceId = String(body.workspace_id ?? '');
-      if (!workspaceId || !(await userCanAccessWorkspace(db, userId, workspaceId))) throw new HttpError(404, 'Workspace not found');
+      if (!workspaceId || !(await userHasWorkspaceCapability(db, userId, workspaceId, 'inbox.use'))) throw new HttpError(404, 'Workspace not found');
       if (!googleClientId()) throw new HttpError(503, 'Google is not configured on this platform.');
       const state = await signOAuthState({ user_id: userId, workspace_id: workspaceId });
       const hint = typeof body.login_hint === 'string' ? body.login_hint : undefined;
@@ -670,7 +670,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const email = String(body.email ?? '').trim().toLowerCase();
       const name = String(body.name ?? '').trim().slice(0, 200) || email;
       if (!EMAIL_ADDRESS.test(email)) throw new HttpError(400, 'A valid email is required');
-      if (!(await userCanAccessWorkspace(db, userId, account.workspace_id))) throw new HttpError(404, 'Workspace not found');
+      if (!(await userHasWorkspaceCapability(db, userId, account.workspace_id, 'inbox.use'))) throw new HttpError(404, 'Workspace not found');
       const { data: existing, error: exErr } = await db.from('crm_contacts').select('id')
         .eq('workspace_id', account.workspace_id).ilike('email', email.replace(/[%_\\]/g, '\\$&')).limit(1).maybeSingle();
       if (exErr) throw new HttpError(500, exErr.message);

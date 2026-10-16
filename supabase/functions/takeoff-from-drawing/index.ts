@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitOrRefuse } from '../_shared/credit-utils.ts';
@@ -136,7 +136,7 @@ Deno.serve(withApiLogging('takeoff-from-drawing', async (req: Request) => {
 
   const doc = (rev as any)?.project_documents;
   const workspaceId = doc?.projects?.workspace_id ?? null;
-  if (!rev || !workspaceId || !(await userCanAccessWorkspace(admin, uid, workspaceId))) {
+  if (!rev || !workspaceId || !(await userHasWorkspaceCapability(admin, uid, workspaceId, 'projects.use'))) {
     throw new HttpError(404, 'Drawing not found');
   }
 

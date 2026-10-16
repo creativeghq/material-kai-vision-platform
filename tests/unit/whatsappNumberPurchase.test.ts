@@ -17,7 +17,7 @@ describe('#369 a workspace buys its own WhatsApp number and pays for it in credi
     expect(ops).not.toContain("'purchase-phone-number'");
     expect(purchase).toContain("await requireWorkspaceManager(wsId, 'buy a number')");
     const gate = api.slice(api.indexOf('const requireWorkspaceManager'), api.indexOf('const loadForm'));
-    expect(gate).toMatch(/\['owner', 'admin'\]\.includes/);
+    expect(gate).toMatch(/userHasWorkspaceCapability\(supabaseClient, auth\.userId, wsId, 'workspace\.manage'\)/);
   });
 
   it('debits the quote before buying and refunds when nothing was issued', () => {

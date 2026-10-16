@@ -20,7 +20,7 @@ describe('a recording is transcribed on the server, paid for first, inside the c
 
   it('a dictation with no project checks the workspace against the caller before anything runs', () => {
     const plain = fn.slice(fn.indexOf('if (plainDictation) {'));
-    expect(plain.slice(0, 400)).toMatch(/userCanAccessWorkspace\(admin, uid, workspaceId\)/);
+    expect(plain.slice(0, 400)).toMatch(/userHasWorkspaceCapability\(admin, uid, workspaceId, /);
     expect(fn.indexOf('if (plainDictation) {')).toBeLessThan(fn.indexOf('reserveCredits(admin'));
   });
 

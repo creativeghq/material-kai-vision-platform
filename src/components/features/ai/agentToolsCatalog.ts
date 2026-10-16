@@ -1,5 +1,6 @@
 /** agentToolsCatalog — single source of truth for the agent tool inventory. */
 import type { HubId } from '@/config/nav-items';
+import type { Capability } from '@/auth/roleCapabilities';
 
 export interface AgentToolEntry {
   id: string;
@@ -1363,6 +1364,8 @@ export interface ToolkitDefinition {
   adminOnly?: boolean;
   /** Hidden when the module slug is disabled in public.modules. */
   moduleSlug?: string;
+  /** The caller's workspace role must hold one of these; agent-chat drops the cluster's tools otherwise. */
+  capability?: Capability | readonly Capability[];
   /** When true, this toolkit is always loaded (cannot be disabled by the user). */
   alwaysOn?: boolean;
   /** Which agents' launchers OFFER this toolkit's quick-starts. `alwaysOn` only. */
@@ -1566,6 +1569,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'catalogs',
+    capability: 'pricing.manage',
     name: 'Catalogs',
     description: 'Build email-gated catalog landing pages from manufacturer PDFs. 8-step workflow + optional re-pricing.',
     icon: 'BookOpen',
@@ -1652,6 +1656,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'mentions',
+    capability: 'marketing.seo',
     name: 'Mention Monitoring',
     description: 'Track product / brand / keyword mentions across news, blogs, RSS, YouTube + LLM probes.',
     icon: 'Megaphone',
@@ -1686,6 +1691,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'price-monitoring',
+    capability: 'pricing.manage',
     name: 'Price Monitoring',
     description: 'Track what competitors charge for your products across retailers (Perplexity + DataForSEO + Firecrawl verification).',
     icon: 'Percent',
@@ -1698,6 +1704,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'contracts',
+    capability: ['quotes.use', 'finance.manage'],
     name: 'Contracts',
     description: 'List contracts and send drafts for e-signature (sending asks to Approve first).',
     icon: 'FileText',
@@ -1726,6 +1733,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'inbox',
+    capability: 'inbox.use',
     name: 'Inbox',
     description: 'List customer conversations and reply to one (a customer-facing reply asks to Approve first).',
     icon: 'Inbox',
@@ -1749,6 +1757,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'mail',
+    capability: 'inbox.use',
     name: 'Mail',
     description: 'Work your mail end to end: find an email, read it and its attachments, then act — book the invoice and prepare its payment, build a quote and turn it into an order, add the sender to the CRM, reply or tidy up. Every write asks to Approve first. Gmail is for the platform operator only.',
     icon: 'Mail',
@@ -1776,6 +1785,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'reviews',
+    capability: 'marketing.seo',
     name: 'Reviews',
     description: 'List reviews written about you and post a public reply (a reply asks to Approve first).',
     icon: 'Star',
@@ -1794,6 +1804,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'appointments',
+    capability: 'crm.view',
     name: 'Appointments',
     description: 'List upcoming appointments and schedule new ones with reminders to yourself.',
     icon: 'CalendarClock',
@@ -1824,6 +1835,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'real-estate',
+    capability: 'realestate.view',
     name: 'Real Estate',
     description: 'Manage property listings, valuations, viewings and leads.',
     icon: 'Building2',
@@ -1863,6 +1875,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'sourcing',
+    capability: ['pricing.manage', 'quotes.use'],
     name: 'Sourcing',
     description: 'Find a supplier for a product and draft / send a purchase order.',
     icon: 'ShoppingCart',
@@ -1890,6 +1903,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'expenses',
+    capability: 'finance.manage',
     name: 'Expenses',
     description: 'Record a business operating expense as a categorized supplier bill.',
     icon: 'ReceiptText',
@@ -1938,6 +1952,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'company-assets',
+    capability: 'workspace.read',
     name: 'Company Assets',
     description: 'Track company vehicles, phones, cards, laptops & equipment and who holds each (shared with Finance + HR).',
     icon: 'Package',
@@ -1992,6 +2007,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'docs',
+    capability: 'workspace.read',
     name: 'Workspace Docs',
     description: 'Search, write, and propose edits to your workspace\'s internal documents, and fill in the audit and document templates you keep in the knowledge base.',
     icon: 'FileText',
@@ -2031,6 +2047,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'messaging',
+    capability: 'inbox.use',
     name: 'WhatsApp',
     description: 'Send WhatsApp messages to customers via your connected channels (send asks to Approve first).',
     icon: 'Send',
@@ -2060,6 +2077,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'crm',
+    capability: 'crm.view',
     name: 'CRM',
     description: 'Add companies from a VAT/ΑΦΜ (ΑΑΔΕ/VIES) and refresh existing companies from ΑΑΔΕ.',
     icon: 'Building2',
@@ -2133,6 +2151,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'finance',
+    capability: 'finance.manage',
     name: 'Finance',
     description: 'Ask about invoices and customer balances — "what does ACME owe?", "show unpaid invoices". Read-only.',
     icon: 'Wallet',
@@ -2175,6 +2194,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'email-marketing',
+    capability: 'marketing.email',
     name: 'Email Marketing',
     description: 'Compose draft email campaigns (name + template + audience) the agent drafts and you send from the Email page.',
     icon: 'Mail',
@@ -2288,6 +2308,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'hr',
+    capability: 'hr.view',
     name: 'HR',
     description: 'Ask about your team and log absences from chat: who\'s on leave, HR overview, record a sick/vacation day, add an employee.',
     icon: 'Users',
@@ -2339,6 +2360,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'stock',
+    capability: 'warehouse.manage',
     name: 'Stock',
     description: 'Check inventory and adjust stock from chat: what\'s low, how many of an item you have, receive/issue/set quantities, recent movements.',
     icon: 'Package',
@@ -2388,6 +2410,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'website-embed',
+    capability: 'marketing.seo',
     name: 'Your Website',
     // All users, 0 credits — DB reads over the same derivations the widget itself gates on.
     description: 'Put your products on your own website. Check whether a product is ready for the embed, get the paste-ready snippet, and see what the widget is doing and costing.',
@@ -2418,6 +2441,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'knowledge-graph',
+    capability: 'workspace.read',
     name: 'Product Intelligence',
     // All users, 0 credits — DB-only RPC reads over relationships that already exist.
     // supplier_overview is finance data and is admin/owner-gated at the agent-chat
@@ -2494,6 +2518,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'flows-toolkit',
+    capability: 'workspace.manage',
     name: 'Flows',
     // Module-gated flows-toolkit + per-workspace entitlement enforced inside the tool.
     description: 'Manage workspace automations from chat: list your flows, create a simple trigger → action flow, pause/resume one, or remove it.',
@@ -2540,6 +2565,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'social',
+    capability: 'marketing.seo',
     name: 'Social',
     description: 'Publish and schedule posts to your connected social accounts, find the best time to post, and pull post / account analytics.',
     icon: 'Share2',
@@ -2599,6 +2625,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'tech-radar',
+    capability: 'workspace.manage',
     name: 'Tech Radar',
     // adminOnly mirrors the server: needsTechRadar = isAdmin && (…) in agent-chat/index.ts.
     description: 'Review a proposed solution against the platform stack and keep the findings: browse the radar, track a new entry, update a finding.',
@@ -2651,6 +2678,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'construction',
+    capability: 'projects.use',
     name: 'Construction',
     description: 'The contractor money chain: cost report, payment applications and retention, the variation register, and where each tender package has got to.',
     icon: 'HardHat',
@@ -2702,6 +2730,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'projects',
+    capability: 'projects.use',
     name: 'Projects',
     description: 'Organize work into projects + tasks. Create, browse, add tasks, and spec purchase items (doors/windows) straight from chat.',
     icon: 'FolderKanban',
@@ -2765,6 +2794,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'project-assessment',
+    capability: 'projects.use',
     name: 'AI Assessment',
     description: 'Ask whether a project is on track and what to do first. The signals — budget, margin, overdue tasks, unbilled quotes, open snags, client requests — are derived in SQL; the AI reads them and writes the verdict and the plan. Running one costs credits; reading the last one and turning an action into a task do not.',
     icon: 'Gauge',
@@ -2809,6 +2839,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'finance-assessment',
+    capability: 'finance.manage',
     name: 'AI Assessment — Finance',
     description: 'Ask whether the books are healthy and what to fix first. The signals — margin, what you are owed and owe, unbilled work, fiscal transmissions, unmatched bank lines, debtors — are derived in SQL; the AI reads them and writes the verdict and the plan. Running one costs credits; reading the last one does not.',
     icon: 'Gauge',
@@ -2835,6 +2866,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'real-estate-assessment',
+    capability: 'realestate.view',
     name: 'AI Assessment — Real Estate',
     description: 'Ask why a listing is not moving. The signals — photos, description, energy class, price against its own history, days on market, unanswered enquiries, tenancy and listing expiries, maintenance — are derived in SQL; the AI reads them and writes the verdict and the plan. Running one costs credits; reading the last one does not.',
     icon: 'Gauge',
@@ -2867,6 +2899,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'quotes',
+    capability: 'quotes.use',
     name: 'Quotes',
     description: 'Build client quotes from chat: add catalog or custom products (e.g. 75 sqm at €34/sqm), auto-price + VAT, generate the branded PDF, and open it on the canvas. Saved to the Quotes module. When the catalogue cannot price something, record it as an unpriced request instead of guessing.',
     icon: 'FileText',
@@ -2904,6 +2937,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'presentation-sheets',
+    capability: ['moodboards.use', 'projects.use', 'quotes.use'],
     name: 'Presentation Sheets',
     description: 'A3 client-ready moodboard sheets: material board / color palette / lighting plan / annotated render / FF&E / full deck.',
     icon: 'LayoutTemplate',
@@ -3217,6 +3251,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-research',
+    capability: 'marketing.seo',
     moduleSlug: 'seo-toolkit',
     name: 'SEO Research',
     description: 'Your own rankings (rank tracker + Search Console), keyword research, SERP audit, URL audit, intent classification — read-only.',
@@ -3299,6 +3334,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-domain',
+    capability: 'marketing.seo',
     moduleSlug: 'seo-toolkit',
     name: 'SEO Domain Intel',
     description: 'Domain snapshot, ranked keywords, competitor + keyword gap, traffic estimation.',
@@ -3346,6 +3382,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-backlinks',
+    capability: 'marketing.seo',
     moduleSlug: 'seo-toolkit',
     name: 'SEO Backlinks',
     description: 'Backlinks summary, anchor texts, referring domains.',
@@ -3379,6 +3416,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-content',
+    capability: 'marketing.seo',
     moduleSlug: 'seo-toolkit',
     name: 'SEO Content & Tech',
     description: 'Sentiment, tech stack, WHOIS, OnPage crawl, LLM mentions.',
@@ -3424,6 +3462,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-multi-engine',
+    capability: 'marketing.seo',
     moduleSlug: 'seo-toolkit',
     name: 'SEO Multi-Engine + Niche',
     description: 'YouTube, Local Pack, Google Trends, Amazon, App keywords, Trustpilot, Pinterest, Reddit.',
@@ -3482,6 +3521,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-composite',
+    capability: 'marketing.seo',
     moduleSlug: 'seo-toolkit',
     name: 'SEO Composite Audits',
     description: 'Full site review + brand-search audit (multi-section bundles).',
@@ -3518,6 +3558,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // This cluster is the question, not the department that owns it. The tools stay
     // in their original clusters too; a toolkit is a view, not ownership.
     id: 'ai-visibility',
+    capability: 'marketing.seo',
     name: 'AI Search Visibility',
     description: 'How the brand shows up in AI answers: LLM probes across four models, Google AI Overview presence, what LLMs cite for a keyword, and AI-search keyword volume.',
     icon: 'Bot',
@@ -3560,6 +3601,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'seo-article',
+    capability: 'marketing.seo',
     moduleSlug: 'seo-toolkit',
     name: 'SEO Article Pipeline',
     description: 'Research → read our pages on the topic → plan → write → editor review → analysis report.',
@@ -3600,6 +3642,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'b2b',
+    capability: 'workspace.manage',
     name: 'B2B Research',
     description: 'Manufacturer search, website scrape, official-registry lookup, company enrichment, contact discovery, email validate, save to CRM. Admin-only.',
     icon: 'Building2',
@@ -3678,6 +3721,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'sub-agents',
+    capability: 'workspace.manage',
     name: 'Sub-agents',
     description: 'Deep research / analytics / business / product sub-agents. Admin-only.',
     icon: 'Bot',
@@ -3720,6 +3764,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'admin-misc',
+    capability: 'workspace.manage',
     name: 'Admin Utilities',
     description: 'Background task dispatch, price lookup, DataForSEO escape hatch, and the three ops diagnostics — service health, Sentry errors for a job, and raw job/chunk/product counts.',
     icon: 'Wrench',
@@ -3806,11 +3851,13 @@ export function toolkitTokenEstimate(toolkit: ToolkitDefinition): number {
 export function getAccessibleToolkits(
   role: 'viewer' | 'member' | 'admin' | 'owner',
   enabledModules: string[] = [],
+  can?: (capability: Capability) => boolean,
 ): ToolkitDefinition[] {
   const isAdmin = role === 'admin' || role === 'owner';
   return TOOLKITS.filter((t) => {
     if (t.adminOnly && !isAdmin) return false;
     if (t.moduleSlug && !enabledModules.includes(t.moduleSlug)) return false;
+    if (t.capability && can && !(typeof t.capability === 'string' ? [t.capability] : t.capability).some(can)) return false;
     return true;
   });
 }

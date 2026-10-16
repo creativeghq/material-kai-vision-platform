@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { HttpError } from '../../_shared/api-logger.ts';
 import { jsonResponse as json } from '../../_shared/http.ts';
-import { authenticate, getUserId, userCanAccessWorkspace, isServiceRoleRequest } from '../../_shared/auth.ts';
+import { authenticate, getUserId, isServiceRoleRequest, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../../_shared/ssrf-guard.ts';
 
 type Row = Record<string, unknown>;
@@ -77,7 +77,7 @@ export async function handleDocumentWriteback(req: Request, body: Row): Promise<
   if (!isServiceRoleRequest(req)) {
     const auth = await authenticate(req, { requireUser: true });
     const userId = getUserId(auth);
-    if (!userId || !await userCanAccessWorkspace(admin, userId, inv.workspace_id)) {
+    if (!userId || !await userHasWorkspaceCapability(admin, userId, inv.workspace_id, 'invoice.issue')) {
       throw new HttpError(404, 'Not found');
     }
   }

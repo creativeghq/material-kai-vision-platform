@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../../_shared/ssrf-guard.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { scoreCitability } from '../../_shared/seo/citability.ts';
@@ -79,7 +79,7 @@ export async function handleCitability(req: Request, body: any): Promise<Respons
     .eq('id', websiteId)
     .maybeSingle();
   // 404 on an ownership miss, never 403 — a 403 confirms the id exists (invariant 1).
-  if (!site || !(await userCanAccessWorkspace(db, auth.userId, site.workspace_id))) {
+  if (!site || !(await userHasWorkspaceCapability(db, auth.userId, site.workspace_id, 'marketing.seo'))) {
     return json({ success: false, error: 'Not found' }, 404);
   }
   const ent = await resolveAndAssertSeoEntitled(db, auth.userId);

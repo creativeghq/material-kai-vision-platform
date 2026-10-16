@@ -1,4 +1,7 @@
-/** Capability layer (single source of truth for "what can this user do here?"). */
+/** Capability layer: personas and their capabilities. The per-role table is roleCapabilities.ts. */
+import {
+  BUSINESS_CAPABILITIES, OPERATOR_ONLY_CAPABILITIES, WORKSPACE_ROLE_CAPABILITIES, type Capability,
+} from './roleCapabilities';
 
 /** Who the user effectively is in the active workspace. */
 export type Persona =
@@ -18,114 +21,35 @@ export type Persona =
                        // own leads/viewings (scoped via responsible_sales_user_ids / listing_agent_id)
   | 'guest';     // an outsider: their own account and what was shared, nothing else
 
-/** Every gateable capability on the platform. Keep verbs coarse + surface-oriented. */
-export type Capability =
-  | 'platform.admin'        // /admin shell: modules, secrets, base pricing, user mgmt
-  | 'catalog.import'        // operator-assisted catalog ingestion (operator only)
-  | 'network.manage'        // child workspaces, catalog access, referral links (/network)
-  | 'pricing.manage'        // markup + pricing rules for this node's offerings
-  | 'finance.manage'        // finance module: settings, documents, payments
-  | 'invoice.issue'         // create/transmit invoices, receipts, credit/delivery notes
-  | 'crm.view'              // CRM parties (contacts/companies/suppliers)
-  | 'warehouse.manage'      // inventory / stock
-  | 'downstream.view'       // operator: see procurement quotes escalated from children
-  | 'marketplace.browse'    // browse the upstream catalog to buy/quote
-  | 'quotes.use'            // create + manage quotes
-  | 'sales.portal'          // simplified Sales portal — reps build quotes/orders for customers
-  | 'sales.team.view'       // sales manager: the WHOLE team's quote book, not just own rows.
-                            // Backed server-side by is_workspace_sales_manager(workspace_id) in
-                            // consolidated_quotes_select_public — this flag only unhides the UI.
-                            // SCOPE OF ROWS, NOT OF MARGIN: the cost basis and the applied markup
-                            // are gated separately by user_can_read_quote_costs(), which answers
-                            // only for the quote's CREATOR or a workspace owner/admin.
-  | 'projects.use'          // projects + client views
-  | 'moodboards.use'        // moodboards / design surfaces
-  | 'agent.use'             // KAI agent / chat
-  | 'inbox.use'             // multi-tenant inbox (directional messaging)
-  | 'hr.view'               // HR module: see employees + absences (sensitive PII)
-  | 'hr.manage'             // HR module: create/edit employees, approve/reject absences
-  | 'hr.self'               // HR self-service: an employee sees/acts on ONLY their own record
-  | 'marketing.email'       // Email Marketing module: design templates + send bulk campaigns
-  | 'realestate.view'           // Real Estate: see the module + listings (owner/admin + agent)
-  | 'realestate.listings.manage' // create/edit/publish listings (owner/admin + realestate_agent)
-  | 'realestate.leads.view';     // Property leads/viewings pipeline (owner/admin see all; agent own)
-
-const ALL_BUSINESS: Capability[] = [
-  'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
-  'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use',
-  'inbox.use',
-  // HR data (salary/absence) is owner/admin-only — in ALL_BUSINESS (dealer/architect/operator),
-  // deliberately NOT in the `staff` list below, so plain members don't see HR. Module ENTITLEMENT
-  // (workspace owns 'hr') is enforced separately by EntitlementGuard + assertEntitled.
-  'hr.view', 'hr.manage',
-  // Email Marketing — sending from the company's own verified domain is an owner/admin
-  // function (BYOK config is finance-manager-gated). Module entitlement gates it per-workspace.
-  'marketing.email',
-  // Real Estate — owner/admin (broker) get the full surface: view + manage listings + all leads.
-  // Module entitlement gates it per-workspace; the invited realestate_agent persona gets a scoped subset.
-  'realestate.view', 'realestate.listings.manage', 'realestate.leads.view',
-];
+export type { Capability } from './roleCapabilities';
 
 /**
  * Personas that work with the product catalog — browse it and run material search. Broader than
- * `marketplace.browse`: project clients / end-users don't buy on the marketplace but DO pick
- * materials for moodboards and quotes, so the Products tab + Spotlight product results are gated
- * on ANY of these, not marketplace membership. (Deliberately excludes `agent.use`, which an
- * HR-only employee holds — so a pure employee still gets no catalog access.)
+ * `marketplace.browse` because project clients pick materials too; excludes `agent.use`, which an
+ * HR-only employee holds.
  */
 export const PRODUCT_BROWSE_ANY: Capability[] = [
   'marketplace.browse', 'moodboards.use', 'quotes.use', 'projects.use',
 ];
 
-/** Persona → granted capabilities. The ONE place gating policy lives. */
+const roleCaps = (role: string): Capability[] => [...(WORKSPACE_ROLE_CAPABILITIES[role] ?? [])];
+
+/** Persona → granted capabilities, derived from the per-role table in roleCapabilities.ts. */
 export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
-  operator: [
-    'platform.admin', 'catalog.import', 'downstream.view', ...ALL_BUSINESS,
-  ],
-  dealer: [...ALL_BUSINESS],
-  // Architects sell to end users (they have a downstream network) but never import catalog.
-  architect: [...ALL_BUSINESS],
-  // Team members run day-to-day but don't administer the node (no network/pricing).
-  staff: ['finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
-  // Invited accountant: ONLY the Finance surface (nav + route). Within finance, settings
-  // stay gated on `isWorkspaceManager` and write-ops on `canOperateFinance` (usePermissions),
-  // so they get read + record-payment + myDATA submit but no settings/pricing/CRM.
-  accountant: ['finance.manage'],
-  // Invited sales rep: Sales portal + CRM (manage their customers) + per-customer
-  // account overview (balance owed, total sales/revenue, open orders, last payment, top items
-  // to push, email account info — all read-only via membership-gated RPCs). NO finance module
-  // settings/issuing, pricing, network, or warehouse. Reps see only their OWN quotes (RLS on
-  // user_id); customer financials are workspace-scoped reads.
-  sales: ['sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
-  // Sales manager: the rep surface plus `sales.team.view` — the whole team's quote BOOK. Not its
-  // margins: cost and markup answer only to the quote's creator or a workspace owner/admin
-  // (`user_can_read_quote_costs`), so a manager reviewing a rep's quote sees the lines and the
-  // sell price with the cost column blank. Still NOT a workspace manager: no finance settings,
-  // pricing, network or warehouse.
-  sales_manager: ['sales.portal', 'sales.team.view', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
-  // ── Functional team roles. Deliberately MINIMAL: each holds only its own module's capability
-  //    plus agent.use, so a team member can never reach finance, pricing, the network or the team.
-  //    Widening these is the "access levels" pass — start narrow, because a role that falls through
-  //    to `staff` silently inherits finance/CRM/warehouse, which is the failure this model exists to
-  //    prevent. Module ENTITLEMENT is enforced separately (EntitlementGuard + assertEntitled), so
-  //    holding the capability still gets you nothing until the workspace owns the module.
-  hr_staff: ['hr.view', 'agent.use'],
-  hr_manager: ['hr.view', 'hr.manage', 'agent.use'],
-  warehouse_staff: ['warehouse.manage', 'agent.use'],
-  marketing_staff: ['marketing.email', 'agent.use'],
-  // Invited employee: HR self-service ONLY — their own profile, onboarding, time off and
-  // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
-  // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
-  // hr-api's self- endpoints (the caller's own linked hr_employees row).
-  // `agent.use` is granted so the employee can reach My HR from chat via the self-scoped
-  // `manage_my_hr` tool ("how much leave do I have left?", "request 3 days off").
-  employee: ['hr.self', 'agent.use'],
-  // Invited property agent: the Real Estate surface only. Manages listings (shared team asset,
-  // D1) and works their own leads/viewings (self-scoped via responsible_sales_user_ids / listing_agent_id
-  // in real-estate-api, D7). Gets crm.view (leads ARE crm_contacts, D9) + agent.use (reach listings from
-  // chat), but NO finance/pricing/network/warehouse. Broker (owner/admin) holds the full realestate.* set.
-  realestate_agent: ['realestate.view', 'realestate.listings.manage', 'realestate.leads.view', 'crm.view', 'agent.use'],
-  guest: [],
+  operator: [...OPERATOR_ONLY_CAPABILITIES, ...BUSINESS_CAPABILITIES],
+  dealer: [...BUSINESS_CAPABILITIES],
+  architect: [...BUSINESS_CAPABILITIES],
+  staff: roleCaps('member'),
+  accountant: roleCaps('accountant'),
+  sales: roleCaps('sales'),
+  sales_manager: roleCaps('sales_manager'),
+  hr_staff: roleCaps('hr'),
+  hr_manager: roleCaps('hr_manager'),
+  warehouse_staff: roleCaps('warehouse'),
+  marketing_staff: roleCaps('marketing'),
+  employee: roleCaps('employee'),
+  realestate_agent: roleCaps('realestate_agent'),
+  guest: roleCaps('client'),
 };
 
 export interface PersonaInputs {

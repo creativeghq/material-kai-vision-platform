@@ -5,7 +5,7 @@ import { jsonResponse } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { replicateToken } from '../_shared/replicate-token.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
@@ -171,7 +171,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   // id), plant drafts in B's queue, and overwrite the caption/hashtags/images of any of B's
   // existing posts by id. zernio-api/handlers/publish.ts does this check correctly one
   // directory away.
-  if (workspace_id && !(await userCanAccessWorkspace(supabase, userId, workspace_id))) {
+  if (workspace_id && !(await userHasWorkspaceCapability(supabase, userId, workspace_id, 'marketing.seo'))) {
     // 404, not 403 — do not confirm that a workspace id exists (id enumeration).
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
@@ -188,7 +188,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
       return jsonResponse({ success: false, error: 'Could not verify post' }, 500);
     }
     if (!existingPost
-      || !(await userCanAccessWorkspace(supabase, userId, (existingPost as { workspace_id: string }).workspace_id))) {
+      || !(await userHasWorkspaceCapability(supabase, userId, (existingPost as { workspace_id: string }).workspace_id, 'marketing.seo'))) {
       return jsonResponse({ success: false, error: 'Not found' }, 404);
     }
 

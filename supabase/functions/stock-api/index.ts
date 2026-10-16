@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { assertSameWorkspace } from '../_shared/same-workspace.ts';
@@ -193,7 +193,7 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
 
   // Gate chain (evaluate in strict priority order: access 404 → module 404 → entitlement 402).
-  const accessP = userCanAccessWorkspace(svc, userId, workspaceId);
+  const accessP = userHasWorkspaceCapability(svc, userId, workspaceId, ['warehouse.manage', 'invoice.issue', 'quotes.use']);
   const moduleP = isModuleEnabled(svc, 'stock');
   const entP = assertEntitled(svc, workspaceId, 'stock');
   if (!(await accessP)) return json({ error: 'not found' }, 404); // 404 (not 403) — no ws-id enumeration

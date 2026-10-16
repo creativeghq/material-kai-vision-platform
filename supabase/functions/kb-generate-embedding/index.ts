@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { VOYAGE_DOCUMENT_MODEL } from '../_shared/embedding-utils.ts';
 
@@ -78,7 +78,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
     }
 
     // A user caller may only re-embed docs in their own workspace.
-    if (!isTrustedBackend && !(await userCanAccessWorkspace(supabaseAdmin, callerUserId, doc.workspace_id))) {
+    if (!isTrustedBackend && !(await userHasWorkspaceCapability(supabaseAdmin, callerUserId, doc.workspace_id, 'workspace.manage'))) {
       return new Response(
         JSON.stringify({ error: 'Document not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

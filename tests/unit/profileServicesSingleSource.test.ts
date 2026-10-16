@@ -100,7 +100,7 @@ describe('a draft paid in full online is issued', () => {
 
   it('finance-issue-invoice recognises the trusted server caller and bills the workspace, not nobody', () => {
     const issue = read('supabase/functions/finance-issue-invoice/index.ts');
-    expect(issue).toMatch(/auth\.level !== 'secret' && !\(await userCanAccessWorkspace/);
+    expect(issue).toMatch(/auth\.level !== 'secret' && !\(await userHasWorkspaceCapability/);
     expect(issue).toMatch(/resolveBillingUser\(/);
     // The emitter lives in _shared now; a local copy here would be the second implementation.
     expect(issue).not.toMatch(/^async function emitDocumentIssued/m);

@@ -195,7 +195,7 @@ describe('the enquiry portal', () => {
   });
 
   it('checks the caller workspace on the authenticated half', () => {
-    expect(EDGE).toContain('userCanAccessWorkspace');
+    expect(EDGE).toContain('userHasWorkspaceCapability');
   });
 
   it('escapes everything it interpolates into the invitation HTML', () => {

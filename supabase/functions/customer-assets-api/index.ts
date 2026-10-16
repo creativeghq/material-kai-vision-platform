@@ -6,7 +6,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, getUserId, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, getUserId, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 // Lazy getters — the bootstrap populates env at handler entry, so a module-load capture
@@ -126,7 +126,7 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
   if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
 
   const service = createClient(supabaseUrl(), serviceKey()) as DbClient;
-  if (!(await userCanAccessWorkspace(service, userId, workspaceId))) {
+  if (!(await userHasWorkspaceCapability(service, userId, workspaceId, 'crm.view'))) {
     throw new HttpError(404, 'not found');
   }
 

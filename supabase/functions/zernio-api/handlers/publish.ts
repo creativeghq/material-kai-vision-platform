@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { zernioApi, ensureZernioSecrets } from '../zernio.ts';
 
@@ -55,7 +55,7 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
   if (!post.workspace_id || account.workspace_id !== post.workspace_id) {
     return jsonResponse({ success: false, error: 'Post and social account are not in the same workspace' }, 403);
   }
-  if (!(await userCanAccessWorkspace(supabase, auth.user.id, post.workspace_id))) {
+  if (!(await userHasWorkspaceCapability(supabase, auth.user.id, post.workspace_id, 'marketing.seo'))) {
     return jsonResponse({ success: false, error: 'You are not a member of this workspace' }, 403);
   }
 

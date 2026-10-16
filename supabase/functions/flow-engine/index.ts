@@ -15,7 +15,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
@@ -1882,7 +1882,7 @@ async function handleExecuteFlow(
     const denied = !access.callerUserId
       || (globalFlow
         ? !(await isPlatformAdmin(supabase, access.callerUserId))
-        : !(await userCanAccessWorkspace(supabase, access.callerUserId, flow.workspace_id as string)));
+        : !(await userHasWorkspaceCapability(supabase, access.callerUserId, flow.workspace_id as string, 'workspace.manage')));
     if (denied) return jsonResponse({ success: false, error: 'Flow not found' }, 404);
   }
 

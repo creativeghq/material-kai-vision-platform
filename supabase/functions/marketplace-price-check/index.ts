@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -36,7 +36,7 @@ Deno.serve(withApiLogging('marketplace-price-check', async (req: Request) => {
   if (!productId && !productName) return json({ error: 'product_id or product_name is required' }, 400);
 
   // Caller must belong to the workspace AND the workspace must be an approved+enabled participant.
-  if (!(await userCanAccessWorkspace(svc, auth.userId, workspaceId))) {
+  if (!(await userHasWorkspaceCapability(svc, auth.userId, workspaceId, ['pricing.manage', 'quotes.use']))) {
     return json({ error: 'not a member of this workspace' }, 403);
   }
   const { data: part } = await svc

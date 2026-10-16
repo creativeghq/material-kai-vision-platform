@@ -45,7 +45,7 @@ const BINDS_TENANT = [
  * `pdf.uploaded_by !== userId`; `vies-validate` checks `company.created_by === user.id` and only
  * then writes. Both are correct — in fact catalog-tools.ts:500 is the sibling door that DOES check.
  */
-const VERIFIES_OWNERSHIP = /\.(uploaded_by|created_by|owner_id|user_id|workspace_id)\s*(?:!==|===|!=|==)|userCanAccessWorkspace|assert_workspace_member|assertWorkspace/;
+const VERIFIES_OWNERSHIP = /\.(uploaded_by|created_by|owner_id|user_id|workspace_id)\s*(?:!==|===|!=|==)|userCanAccessWorkspace|userHasWorkspaceCapability|assert_workspace_member|assertWorkspace/;
 
 /** Selecting one specific row by a REQUEST-SUPPLIED id. */
 const REQUEST_SOURCED_ID = String.raw`(?:input|body|args|payload|params|query|req|request)\s*(?:\?)?\s*[.\[]`;

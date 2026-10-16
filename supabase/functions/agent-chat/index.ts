@@ -11,6 +11,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 // Cluster → tool_ids, GENERATED from agentToolsCatalog.TOOLKITS (the picker's own
 // source). Boot-safe: a plain data module with no npm deps and no env reads.
 import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
+import { roleHasCapability, type Capability } from '../_shared/roleCapabilities.generated.ts';
 // What one turn may carry, GENERATED from src/config/agentAttachmentLimits.ts so the composer
 // clamps on the same predicate this function refuses on. Same boot profile: pure data + a pure
 // function, no npm deps, no env reads.
@@ -2061,6 +2062,15 @@ async function executeAgent(
   // Bind tools based on agent configuration with RBAC gating
   const tools: any[] = [];
   const isAdmin = userRole === 'admin' || userRole === 'owner';
+  // A cluster binds only for a role holding its capability; a tool any permitted cluster carries stays.
+  const roleMayUseCluster = (id: string) => {
+    const cap = TOOLKIT_CLUSTERS[id]?.capability;
+    return !cap || roleHasCapability(userRole, cap as Capability[]);
+  };
+  const roleToolIds = new Set(Object.keys(TOOLKIT_CLUSTERS).filter(roleMayUseCluster).flatMap((id) => TOOLKIT_CLUSTERS[id].tool_ids));
+  const deniedByRole = new Set(
+    Object.values(TOOLKIT_CLUSTERS).flatMap((c) => c.tool_ids).filter((t) => !roleToolIds.has(t)),
+  );
   // Full set of tool IDs THIS agent is permitted to use (pre-toolkit-filter).
   // Used to clamp in-run toolkit loads to the agent's own capabilities so the
   // agent can't pull a cluster it doesn't own (e.g. catalogs on interior-designer).
@@ -2083,7 +2093,7 @@ async function executeAgent(
   // `config`/`tools` so the entire existing registration logic below is reused
   // verbatim; the returned array is merged into the live `tools` by the caller.
   async function registerTools(requestedIds: Set<string>): Promise<any[]> {
-    const config = { tools: [...requestedIds] };
+    const config = { tools: [...requestedIds].filter((t) => !deniedByRole.has(t)) };
     const tools: any[] = [];
 
   // Lazy-load ALL tool modules at request time (not boot time).
@@ -3304,6 +3314,7 @@ async function executeAgent(
         // model burns a turn asking for something the menu should not have offered. Six SEO
         // clusters sat in every member's menu.
         .filter((id) => isAdmin || !TOOLKIT_CLUSTERS[id].adminOnly)
+        .filter(roleMayUseCluster)
         .filter((id) => TOOLKIT_CLUSTERS[id].tool_ids.some((t) => agentFullToolIds.has(t)));
       // An agent with nothing left to load gets no escape hatch rather than one advertising an
       // empty list — "Available toolkits: " invites a guess, and every guess is a refusal.
@@ -3806,7 +3817,10 @@ function checkAgentAccess(role: string, agentId: string): { allowed: boolean; ro
   if (!agentConfig) {
     return { allowed: false, role };
   }
-  const allowed = agentConfig.allowedRoles.includes(role);
+  // An open agent (one listing `member`) is open to every role holding agent.use; its tools are
+  // then narrowed per cluster capability in registerTools.
+  const allowed = agentConfig.allowedRoles.includes(role)
+    || (agentConfig.allowedRoles.includes('member') && roleHasCapability(role, 'agent.use'));
   return { allowed, role };
 }
 

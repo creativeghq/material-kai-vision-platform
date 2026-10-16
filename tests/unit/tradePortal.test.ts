@@ -145,7 +145,7 @@ describe('the token is the identity', () => {
 
   it('minting a link needs a real member, not a token', () => {
     expect(fn).toMatch(/action === 'mint_link'[\s\S]{0,400}authenticate\(req/);
-    expect(fn).toMatch(/userCanAccessWorkspace/);
+    expect(fn).toMatch(/userHasWorkspaceCapability/);
     expect(PASSWORDLESS_IS_THE_POINT).toMatch(/WhatsApp/);
   });
 

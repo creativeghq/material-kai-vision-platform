@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled, isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
@@ -544,7 +544,7 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
   const { data: website } = await supabase
     .from('user_websites').select('id, workspace_id, url').eq('id', websiteId).maybeSingle();
   if (!website) return json({ error: 'Website not found' }, 404);
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, website.workspace_id))) {
+  if (!(await userHasWorkspaceCapability(supabase, auth.userId, website.workspace_id, 'marketing.seo'))) {
     return json({ error: 'Website not found' }, 404); // 404 not 403 — no id enumeration
   }
   // Paid module — refuse BEFORE spending a SERP call per keyword (invariant 10).

@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { escapeHtml } from '../_shared/html.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -163,7 +163,7 @@ Deno.serve(withApiLogging('tender-bid-portal', async (req: Request) => {
   if (!bid) throw new HttpError(404, 'Bid not found');
 
   // Invariant 1: the workspace comes from the row, and the caller is checked against it.
-  if (!(await userCanAccessWorkspace(service, uid, bid.workspace_id))) {
+  if (!(await userHasWorkspaceCapability(service, uid, bid.workspace_id, 'projects.use'))) {
     throw new HttpError(404, 'Bid not found');
   }
 

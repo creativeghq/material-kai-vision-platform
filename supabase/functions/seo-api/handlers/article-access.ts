@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
-import { userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import type { ContentAnalysisResult } from '../../_shared/seo-types.ts';
 import { faqPairsPresentIn, type FaqPair } from './faq-insert.ts';
 
@@ -38,7 +38,7 @@ export async function loadOwnedArticle(
 
   const article = data as OwnedArticle;
   if (article.workspace_id) {
-    const ok = await userCanAccessWorkspace(supabase, userId, article.workspace_id);
+    const ok = await userHasWorkspaceCapability(supabase, userId, article.workspace_id, 'marketing.seo');
     if (!ok) return { response: jsonResponse({ success: false, error: 'Not found' }, 404) };
   } else if (article.user_id !== userId) {
     return { response: jsonResponse({ success: false, error: 'Not found' }, 404) };

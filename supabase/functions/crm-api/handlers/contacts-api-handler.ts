@@ -105,19 +105,11 @@ export async function handleContacts(req: Request): Promise<Response> {
     const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/contacts/, '').split('/').filter(Boolean);
 
     // Authenticate request
-    const auth = await authenticate(req, {
-      // Include workspace owner + super_admin so the primary business persona can manage
-      // their own CRM contacts (was ['admin','factory'], which locked owners out). Tenant
-      // isolation stays enforced by the workspace scope below.
-      allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'member', 'sales', 'sales_manager', 'realestate_agent'],
-    });
-
-    // authenticate() already grants success for secret-key (level='secret') access and
-    // enforces the role gate for user tokens, so a failed auth is simply rejected here.
+    const auth = await authenticate(req);
     if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
-        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
+        { status: 401, headers: corsHeaders },
       );
     }
 

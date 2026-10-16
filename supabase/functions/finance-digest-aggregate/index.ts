@@ -4,7 +4,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { formatMoney } from '../_shared/money.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
-import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -442,10 +442,7 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
     }
 
     // ─── Now (admin-triggered) path ──────────────────────────────────────
-    const auth = await authenticate(req, {
-      requireUser: true,
-      allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'],
-    });
+    const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const nb = body as NowBody;
@@ -461,21 +458,9 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
     }
     if (!workspaceId) return json({ error: 'no workspace' }, 400);
 
-    // Tenant boundary: this handler runs under the service role (RLS bypassed) and the
-    // allowedRoles gate only proves the caller is a finance/owner user SOMEWHERE — not that
-    // they belong to the requested workspace. Without this, a finance user in tenant A could
-    // pass body.workspace_id=<tenant B> + recipients_override=[attacker] and exfiltrate tenant
-    // B's AR/AP aging + cash-flow forecast + monthly P&L to an arbitrary address. Require an
-    // active membership of the resolved workspace (internal 'secret' callers bypass).
+    // Service role: without this, body.workspace_id + recipients_override mails another tenant's P&L anywhere.
     if (auth.level !== 'secret') {
-      const { data: mem } = await supabase
-        .from('workspace_members')
-        .select('user_id')
-        .eq('user_id', auth.userId)
-        .eq('workspace_id', workspaceId)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (!mem) return json({ error: 'Not authorized for this workspace' }, 403);
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, workspaceId, 'finance.manage'))) return json({ error: 'Not authorized for this workspace' }, 403);
     }
 
     const { data: settings } = await supabase

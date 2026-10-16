@@ -422,13 +422,18 @@ export function buildToolkitClusters() {
       problems.push('TOOLKITS entry is not an object literal (spread?)');
       continue;
     }
-    let id = null; let alwaysOn = false; let adminOnly = false; let toolIds = null;
+    let id = null; let alwaysOn = false; let adminOnly = false; let toolIds = null; let capability = null;
     for (const p of el.properties) {
       if (!ts.isPropertyAssignment(p)) continue;
       const key = propName(p);
       if (key === 'id') id = lit(p.initializer);
       else if (key === 'alwaysOn') alwaysOn = p.initializer.kind === ts.SyntaxKind.TrueKeyword;
       else if (key === 'adminOnly') adminOnly = p.initializer.kind === ts.SyntaxKind.TrueKeyword;
+      else if (key === 'capability') {
+        const vals = ts.isArrayLiteralExpression(p.initializer) ? p.initializer.elements.map(lit) : [lit(p.initializer)];
+        if (vals.some((v) => v === null)) problems.push(`${id ?? '?'}: non-literal capability`);
+        else capability = vals;
+      }
       else if (key === 'tool_ids') {
         if (!ts.isArrayLiteralExpression(p.initializer)) { problems.push(`${id ?? '?'}: tool_ids is not an array literal`); continue; }
         const vals = p.initializer.elements.map(lit);
@@ -438,7 +443,7 @@ export function buildToolkitClusters() {
     }
     if (!id) { problems.push('TOOLKITS entry with no literal `id`'); continue; }
     if (!toolIds) { problems.push(`${id}: unreadable tool_ids`); continue; }
-    clusters.push({ id, alwaysOn, adminOnly, tool_ids: toolIds });
+    clusters.push({ id, alwaysOn, adminOnly, capability, tool_ids: toolIds });
   }
 
   const dupes = clusters.map((c) => c.id).filter((v, i, a) => a.indexOf(v) !== i);
@@ -454,6 +459,7 @@ export function renderToolkitClusters(clusters) {
       `  ${q(c.id)}: {`,
       ...(c.alwaysOn ? ['    alwaysOn: true,'] : []),
       ...(c.adminOnly ? ['    adminOnly: true,'] : []),
+      ...(c.capability ? [`    capability: [${c.capability.map(q).join(', ')}],`] : []),
       c.tool_ids.length ? `    tool_ids: [${ids}],` : '    tool_ids: [],',
       '  },',
     ].join('\n');
@@ -482,6 +488,8 @@ export interface ToolkitCluster {
    * unfiltered list is a menu handed to the model with entries it can only be refused on.
    */
   adminOnly?: boolean;
+  /** The caller's workspace role must hold one of these, or the binder drops this cluster's tools. */
+  capability?: string[];
   tool_ids: string[];
 }
 

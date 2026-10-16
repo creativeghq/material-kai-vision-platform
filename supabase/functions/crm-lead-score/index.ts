@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 
@@ -64,7 +64,7 @@ Deno.serve(withApiLogging('crm-lead-score', async (req) => {
   const contactId = String(body?.crm_contact_id ?? '').trim();
   if (!workspaceId || !contactId) return json({ error: 'workspace_id and crm_contact_id are required' }, 400);
 
-  if (!(await userCanAccessWorkspace(supabase, userId, workspaceId))) return json({ error: 'not found' }, 404);
+  if (!(await userHasWorkspaceCapability(supabase, userId, workspaceId, 'crm.view'))) return json({ error: 'not found' }, 404);
   const { data: contact } = await supabase.from('crm_contacts')
     .select('name, lead_status, lead_source, contact_type, is_client, is_supplier, created_at')
     .eq('id', contactId).eq('workspace_id', workspaceId).maybeSingle();

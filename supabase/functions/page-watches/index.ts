@@ -1,7 +1,7 @@
 /** Page watches — CRUD over `page_watches`, mirrored to Firecrawl monitors (issue #331). */
 
 import { serviceClient, type DbClient } from '../_shared/supabase-client.ts';
-import { authenticate, getUserId, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, getUserId, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
@@ -153,7 +153,7 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
   // Service role below bypasses RLS, so this check is the only thing standing
   // between a body-supplied id and another tenant's data.
   if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
-  if (!await userCanAccessWorkspace(supabase, userId, workspaceId)) {
+  if (!await userHasWorkspaceCapability(supabase, userId, workspaceId, 'marketing.seo')) {
     // 404 not 403 — a 403 confirms the workspace exists (invariant 1).
     throw new HttpError(404, 'Not found');
   }

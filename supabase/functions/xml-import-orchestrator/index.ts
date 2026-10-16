@@ -4,7 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { captureException } from '../_shared/sentry.ts';
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import {
@@ -597,7 +597,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     // Tenant isolation: the body-supplied workspace_id runs under the service
     // role (RLS-bypassing). Bind the caller to it, or any user could import
     // products into a workspace they don't belong to.
-    if (!isAdminAccess(auth) && !(await userCanAccessWorkspace(supabase, userId, workspace_id))) {
+    if (!isAdminAccess(auth) && !(await userHasWorkspaceCapability(supabase, userId, workspace_id, 'pricing.manage'))) {
       return new Response(JSON.stringify({ error: 'Not authorized for this workspace' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

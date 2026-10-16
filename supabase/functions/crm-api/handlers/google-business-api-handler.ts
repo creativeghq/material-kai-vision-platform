@@ -115,13 +115,11 @@ export async function handleGoogleBusiness(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const auth = await authenticate(req, {
-      allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'member', 'sales', 'sales_manager', 'realestate_agent', 'factory'],
-    });
+    const auth = await authenticate(req);
     if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
-        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
+        { status: 401, headers: corsHeaders },
       );
     }
     const scope = await getCrmScope(supabase, auth);

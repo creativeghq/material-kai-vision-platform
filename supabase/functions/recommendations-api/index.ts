@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -46,7 +46,7 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
     const isAdmin = isAdminAccess(auth);
     const assertWs = async (wsId: string | null | undefined): Promise<Response | null> => {
       if (isAdmin) return null;
-      if (!wsId || !(await userCanAccessWorkspace(supabase, userId, wsId))) {
+      if (!wsId || !(await userHasWorkspaceCapability(supabase, userId, wsId, ['marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use']))) {
         return new Response(
           JSON.stringify({ error: 'Not authorized for this workspace' }),
           { status: 403, headers: corsHeaders },

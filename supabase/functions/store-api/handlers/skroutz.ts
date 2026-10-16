@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { HttpError } from '../../_shared/api-logger.ts';
 import { jsonResponse as json } from '../../_shared/http.ts';
-import { authenticate, getUserId, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, getUserId, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { fromSkroutz, skroutzFetch } from '../../_shared/commerce/skroutz.ts';
 import type { AdapterConnection } from '../../_shared/commerce/adapters.ts';
 
@@ -32,7 +32,7 @@ export async function handleSkroutz(req: Request, body: Row): Promise<Response> 
     .select('id, workspace_id, platform, credentials, enabled')
     .eq('id', connectionId).maybeSingle();
   if (!conn || conn.platform !== 'skroutz') throw new HttpError(404, 'Not found');
-  if (!await userCanAccessWorkspace(admin, userId, conn.workspace_id)) throw new HttpError(404, 'Not found');
+  if (!await userHasWorkspaceCapability(admin, userId, conn.workspace_id, 'finance.manage')) throw new HttpError(404, 'Not found');
 
   const token = ((conn.credentials ?? {}) as Record<string, string>).api_token;
   if (!token) throw new HttpError(400, 'This connection has no Skroutz API token.');

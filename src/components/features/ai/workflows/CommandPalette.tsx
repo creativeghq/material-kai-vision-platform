@@ -12,6 +12,7 @@ import {
   type ToolkitDefinition,
 } from '../agentToolsCatalog';
 import { getWorkflowsForRole } from './workflowRegistry';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { WorkflowDefinition } from './types';
 
 interface Props {
@@ -48,6 +49,7 @@ export const CommandPalette: React.FC<Props> = ({
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { can } = usePermissions();
 
   const entries = useMemo<PaletteEntry[]>(() => {
     const out: PaletteEntry[] = [];
@@ -55,7 +57,7 @@ export const CommandPalette: React.FC<Props> = ({
     // Form-bearing quick-starts first — picking one opens the collect-then-send
     // modal (same flow as the toolkit cards) instead of injecting an editable
     // example. Scoped to toolkits the current agent owns.
-    for (const tk of getAccessibleToolkits(role, enabledModules)) {
+    for (const tk of getAccessibleToolkits(role, enabledModules, can)) {
       if (!(tk.alwaysOn || getToolkitOwnerAgents(tk).includes(agentId))) continue;
       for (const qs of tk.quick_starts || []) {
         if (!qs.form?.length) continue;
@@ -127,7 +129,7 @@ export const CommandPalette: React.FC<Props> = ({
     }
 
     return out;
-  }, [agentId, role, enabledModules]);
+  }, [agentId, role, enabledModules, can]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

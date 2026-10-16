@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { HttpError } from '../../_shared/api-logger.ts';
 import { jsonResponse as json } from '../../_shared/http.ts';
-import { authenticate, getUserId, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, getUserId, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { ADAPTERS, type AdapterConnection } from '../../_shared/commerce/adapters.ts';
 import { assertSafeUrl, SSRFError } from '../../_shared/ssrf-guard.ts';
 
@@ -91,7 +91,7 @@ export async function handleSyncOrders(req: Request, body: Row): Promise<Respons
     .maybeSingle();
   if (!conn) throw new HttpError(404, 'Not found');
 
-  if (!await userCanAccessWorkspace(admin, userId, conn.workspace_id)) {
+  if (!await userHasWorkspaceCapability(admin, userId, conn.workspace_id, 'finance.manage')) {
     throw new HttpError(404, 'Not found');
   }
 

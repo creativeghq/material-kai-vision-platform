@@ -14,7 +14,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -176,7 +176,7 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
 
   // Gate: tenancy → module publish → entitlement (matches hr-api ordering).
-  if (!(await userCanAccessWorkspace(service, userId, workspaceId))) return json({ error: 'not found' }, 404);
+  if (!(await userHasWorkspaceCapability(service, userId, workspaceId, ['quotes.use', 'finance.manage']))) return json({ error: 'not found' }, 404);
   if (!(await isModuleEnabled(service, 'contracts'))) throw new HttpError(404, 'Contracts module is not available');
   const ent = await assertEntitled(service, workspaceId, 'contracts');
   if (!ent.ok) return ent.response;

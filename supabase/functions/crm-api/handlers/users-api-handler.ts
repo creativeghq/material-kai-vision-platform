@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate } from '../../_shared/auth.ts';
+import { authenticatePlatformOperator } from '../../_shared/auth.ts';
 import { getCrmScope } from './_scope.ts';
 import { foldForSearch } from '../../_shared/searchFold.ts';
 
@@ -78,28 +78,18 @@ export async function handleUsers(req: Request): Promise<Response> {
     const method = req.method;
     const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/users/, '').split('/').filter(Boolean);
 
-    // Authenticate request - admin only
-    const auth = await authenticate(req, {
-      allowedRoles: ['admin'],
-    });
-
-    // authenticate() already grants success for secret-key (level='secret') access and
-    // enforces the admin role gate for user tokens, so a failed auth is simply rejected here.
+    const auth = await authenticatePlatformOperator(req);
     if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
-        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
+        { status: auth.level === 'none' && auth.userId ? 403 : 401, headers: corsHeaders },
       );
     }
 
     const user = auth.user;
     const userId = auth.userId;
 
-    // This handler manages PLATFORM auth users (invite, global role_id changes, auth-user
-    // deletion, cross-user AI-usage/credits). That is a platform-operator capability, not a
-    // per-tenant one — authenticate()'s admin/factory gate is satisfied by a WORKSPACE-level
-    // admin, who must NOT be able to enumerate or mutate every platform user (roles, balances).
-    // Restrict to global operators (secret key, or global role admin/super_admin).
+    // PLATFORM users (roles, balances, deletion): the operator only, never a workspace admin.
     const scope = await getCrmScope(supabase, auth);
     if (!scope.isGlobalOperator) {
       return new Response(

@@ -20,7 +20,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
@@ -196,7 +196,7 @@ async function handleRequest(
   // stamps the `ai_usage_logs` row this tenant's admins read through
   // `is_workspace_admin(workspace_id)`. 404, not 403 — no workspace-id enumeration.
   if (!isServiceCall && body.workspace_id
-    && !(await userCanAccessWorkspace(supabase, userId, body.workspace_id))) {
+    && !(await userHasWorkspaceCapability(supabase, userId, body.workspace_id, ['agent.use', 'moodboards.use', 'projects.use', 'realestate.listings.manage']))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 

@@ -20,7 +20,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isCronAuthorized, userCanAccessWorkspace, getUserId } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, getUserId, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
@@ -133,7 +133,7 @@ Deno.serve(withApiLogging('taric-classify', async (req) => {
     // caller cannot reach is dropped rather than reported, so this cannot enumerate ids.
     const owned: any[] = [];
     for (const p of data ?? []) {
-      if (p.workspace_id && await userCanAccessWorkspace(supabase, userId!, p.workspace_id)) {
+      if (p.workspace_id && await userHasWorkspaceCapability(supabase, userId!, p.workspace_id, ['finance.manage', 'pricing.manage'])) {
         owned.push(p);
       }
     }

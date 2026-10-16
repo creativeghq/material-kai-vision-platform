@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 
 function serviceClient() {
   return createClient(
@@ -28,7 +28,7 @@ Deno.serve(withApiLogging('product-market-price', async (req: Request) => {
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
 
   const svc = serviceClient();
-  if (!(await userCanAccessWorkspace(svc, auth.userId, workspaceId))) {
+  if (!(await userHasWorkspaceCapability(svc, auth.userId, workspaceId, ['pricing.manage', 'quotes.use']))) {
     return json({ error: 'not a member of this workspace' }, 403);
   }
 

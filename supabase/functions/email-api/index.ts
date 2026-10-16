@@ -12,7 +12,7 @@ import { renderReactEmailTemplate } from '../_shared/react-email-renderer.ts';
 import { renderTemplateWithVariables } from '../_shared/email-template-vars.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
-import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceIds, isPlatformOperator } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userHasWorkspaceCapability, listWorkspaceIdsWithCapability, isPlatformOperator } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
@@ -212,6 +212,11 @@ type AnyClient = any;
 const RESEND = 'https://api.resend.com';
 const CONTACT_SYNC_CAP = 150; // Resend writes per run: 150 × ~0.6s fits the 150s edge ceiling
 const CONTACT_WRITE_SPACING_MS = 600;
+/** Roles that send mail to customers in their workspace: everyone but client, employee and hr. */
+const EMAIL_SENDER_CAPABILITIES = [
+  'crm.view', 'finance.manage', 'invoice.issue', 'quotes.use', 'inbox.use', 'marketing.email',
+  'warehouse.manage', 'hr.manage', 'realestate.leads.view',
+] as const;
 
 /** Resolve which Resend key to use for CONTACTS ops: the workspace's own BYOK, or — only for the
  *  operator ROOT workspace — the platform key. A non-root workspace without BYOK is NOT allowed
@@ -354,20 +359,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'send': {
         if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
-        // Gate freeform send: a regular authenticated user must NOT be able to send arbitrary
-        // email (any to/subject/html) from the platform's verified domain — that's spam/phishing
-        // + domain-reputation risk. Server-to-server callers (Flows, quote/alert dispatchers) use
-        // the admin secret → isAdminAccess; interactive callers must be an operator.
-        if (!isAdminAccess(auth)) {
-          const opAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-          if (!opAuth.success) {
-            return new Response(
-              JSON.stringify({ success: false, error: 'Email send requires operator privileges' }),
-              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-            );
-          }
-        }
-
         const body: SendEmailRequest = requestBody;
 
         // Reject a malformed recipient BEFORE any provider work. A `to` of the literal string
@@ -389,15 +380,11 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           throw new HttpError(400, `Invalid recipient address: ${JSON.stringify(body.to ?? null)}`);
         }
 
-        // body.workspace_id selects WHOSE Resend key + verified sender
-        // domain is used. Without binding it to the caller, a workspace-A owner could
-        // send from workspace B's verified domain — billed to B's key, counted against
-        // B's quota, stamped to B. Require membership when a workspace_id is supplied
-        // (server-to-server admin-secret callers are exempt — trusted system sends).
-        // Attribution is bound to the caller on exactly the same terms as the sender.
+        // body.workspace_id picks WHOSE sender and quota: the caller must hold a mail-sending role
+        // there. With no workspace the send is on the PLATFORM sender, which is operator-only below.
         const attributionWorkspaceId = body.workspace_id ?? body.attribution_workspace_id ?? null;
         if (!isAdminAccess(auth) && attributionWorkspaceId) {
-          if (!(await userCanAccessWorkspace(supabaseClient, auth.userId, attributionWorkspaceId))) {
+          if (!(await userHasWorkspaceCapability(supabaseClient, auth.userId, attributionWorkspaceId, EMAIL_SENDER_CAPABILITIES))) {
             return new Response(
               JSON.stringify({ success: false, error: 'Not authorized for the requested workspace sender' }),
               { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -889,7 +876,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // Tenancy: caller must belong to the workspace (admin-secret server callers exempt). 404 on
         // mismatch to avoid id enumeration.
         if (!isAdminAccess(auth)) {
-          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) {
+          if (!auth.userId || !(await userHasWorkspaceCapability(supabaseClient, auth.userId, wsId, 'marketing.email'))) {
             throw new HttpError(404, 'not found');
           }
         }
@@ -1001,7 +988,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         const wsId = String(requestBody.workspace_id ?? '');
         if (!wsId) throw new HttpError(400, 'workspace_id is required');
         if (!isAdminAccess(auth)) {
-          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
+          if (!auth.userId || !(await userHasWorkspaceCapability(supabaseClient, auth.userId, wsId, 'marketing.email'))) throw new HttpError(404, 'not found');
         }
         // Paid add-on (email-marketing, EUR 9/mo, its own Stripe product). The nav tile is
         // hidden without it, but this endpoint is reachable directly — nav is UX, the API
@@ -1045,7 +1032,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         const wsId = String(requestBody.workspace_id ?? '');
         if (!wsId) throw new HttpError(400, 'workspace_id is required');
         if (!isAdminAccess(auth)) {
-          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
+          if (!auth.userId || !(await userHasWorkspaceCapability(supabaseClient, auth.userId, wsId, 'marketing.email'))) throw new HttpError(404, 'not found');
         }
         // Paid add-on (email-marketing, EUR 9/mo, its own Stripe product). The nav tile is
         // hidden without it, but this endpoint is reachable directly — nav is UX, the API
@@ -1076,7 +1063,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         if (!wsId) throw new HttpError(400, 'workspace_id is required');
         if (typeof requestBody.auto_sync !== 'boolean') throw new HttpError(400, 'auto_sync (boolean) is required');
         if (!isAdminAccess(auth)) {
-          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
+          if (!auth.userId || !(await userHasWorkspaceCapability(supabaseClient, auth.userId, wsId, 'marketing.email'))) throw new HttpError(404, 'not found');
         }
         // Paid add-on (email-marketing, EUR 9/mo, its own Stripe product). The nav tile is
         // hidden without it, but this endpoint is reachable directly — nav is UX, the API
@@ -1369,7 +1356,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           .from('email_logs')
           .select('created_at, sent_at, delivered_at, opened_at, clicked_at, bounced_at, complained_at');
         if (!isAdminAccess(auth)) {
-          const wsIds = auth.userId ? await listUserWorkspaceIds(supabaseClient, auth.userId) : [];
+          const wsIds = await listWorkspaceIdsWithCapability(supabaseClient, auth.userId, EMAIL_SENDER_CAPABILITIES);
           if (wsIds.length === 0) {
             return new Response(
               JSON.stringify({

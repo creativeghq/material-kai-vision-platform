@@ -211,7 +211,7 @@ describe('the edge function', () => {
   it('derives the workspace from the row and checks access', () => {
     expect(src).toMatch(/const workspaceId = note\.workspace_id;/);
     expect(src).not.toMatch(/body\?\.workspace_id/);
-    expect(src).toMatch(/userCanAccessWorkspace\(service, auth\.userId, workspaceId\)/);
+    expect(src).toMatch(/userHasWorkspaceCapability\(service, auth\.userId, workspaceId, /);
   });
   it('uses only the workspace\'s own credentials', () => {
     expect(src).toMatch(/workspace_inbound_credentials/);

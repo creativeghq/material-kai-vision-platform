@@ -2,7 +2,8 @@
 /** The HTTP door every AI Assessment function stands behind. */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from './cors.ts';
-import { authenticate, getUserId, userCanAccessWorkspace } from './auth.ts';
+import { authenticate, getUserId, userHasWorkspaceCapability } from './auth.ts';
+import type { Capability } from './roleCapabilities.generated.ts';
 import { HttpError } from './api-logger.ts';
 import { assertEntitled } from './entitlement.ts';
 import {
@@ -11,6 +12,12 @@ import {
   runAssessment,
   type AssessmentSubject,
 } from './assessment.ts';
+
+const SUBJECT_CAPABILITY: Record<AssessmentSubject, Capability> = {
+  project: 'projects.use',
+  finance: 'finance.manage',
+  real_estate: 'realestate.view',
+};
 
 export interface AssessmentRequestBody {
   project_id?: string;
@@ -64,7 +71,7 @@ export async function handleAssessmentRequest(
 
   // Tenancy binding (invariant 1). The client above is service-role, so this check is MANDATORY
   // rather than a formality — the subject id arrives in the request body.
-  if (!(await userCanAccessWorkspace(supabase, userId, subject.workspaceId))) {
+  if (!(await userHasWorkspaceCapability(supabase, userId, subject.workspaceId, SUBJECT_CAPABILITY[subjectType]))) {
     throw new HttpError(404, 'Not found');
   }
 

@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
-import { authenticate } from '../../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { zernioApi, ensureZernioSecrets, ZernioApiError } from '../zernio.ts';
 
@@ -54,7 +54,7 @@ export async function handleZernioReviews(req: Request, body: any): Promise<Resp
 
   // Invariant 1: the workspace comes from the BODY, so it is bound to the caller before anything
   // touches Zernio or writes a row. 404 rather than 403 — a 403 confirms the id exists.
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, workspaceId))) {
+  if (!(await userHasWorkspaceCapability(supabase, auth.userId, workspaceId, 'marketing.seo'))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 

@@ -4,7 +4,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
@@ -459,10 +459,6 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
   try {
     const auth = await authenticate(req, {
       requireUser: true,
-      // 'accountant' is allowed in so they can SUBMIT/transmit existing documents to myDATA
-      // . The privileged CREATE path (issue a new invoice from a quote) is guarded
-      // separately below to managers only — an accountant can transmit + pay, never create.
-      allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'],
     });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
@@ -487,7 +483,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       if (!invId) return json({ error: 'emit_issued.invoice_id is required' }, 400);
       const { data: invRow } = await supabase.from('invoices').select('workspace_id').eq('id', invId).maybeSingle();
       if (!invRow) return json({ error: 'Invoice not found' }, 404);
-      if (!(await userCanAccessWorkspace(supabase, auth.user!.id, (invRow as any).workspace_id))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.user!.id, (invRow as any).workspace_id, 'invoice.issue'))) {
         return json({ error: 'Forbidden' }, 404); // 404 (not 403) to avoid id enumeration
       }
       await emitDocumentIssued(supabase, invId);
@@ -501,7 +497,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     if (body.fiscal_status) {
       const wsId = body.fiscal_status.workspace_id;
       if (!wsId) return json({ error: 'fiscal_status.workspace_id is required' }, 400);
-      if (!(await userCanAccessWorkspace(supabase, auth.user!.id, wsId))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.user!.id, wsId, ['finance.manage', 'invoice.issue']))) {
         return json({ error: 'Forbidden' }, 403);
       }
       const r = await resolveWorkspaceConnector(supabase, wsId, 'legal_invoice');
@@ -537,7 +533,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       sigQuery = pc.pos_signature_id ? sigQuery.eq('id', pc.pos_signature_id) : sigQuery.eq('invoice_id', pc.invoice_id!).is('credit_note_id', null);
       const { data: sig } = await sigQuery.order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (!sig) return json({ error: 'No awaiting-payment signature found for this receipt' }, 404);
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, (sig as any).workspace_id))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, (sig as any).workspace_id, 'invoice.issue'))) {
         return json({ error: 'Not authorized for this document' }, 403);
       }
       if ((sig as any).expiry_date && new Date((sig as any).expiry_date).getTime() < Date.now()) {
@@ -672,7 +668,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       }
       const { data: oi } = await supabase.from('invoices')
         .select('id, workspace_id, fiscal_mark, fiscal_uid, amount_due, total').eq('id', po.invoice_id).maybeSingle();
-      if (!oi || !(await userCanAccessWorkspace(supabase, auth.userId, (oi as any).workspace_id))) {
+      if (!oi || !(await userHasWorkspaceCapability(supabase, auth.userId, (oi as any).workspace_id, 'invoice.issue'))) {
         return json({ error: 'invoice not found' }, 404);
       }
       if (!(oi as any).fiscal_mark) {
@@ -722,7 +718,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         .from('credit_notes').select('id, workspace_id, fiscal_status, invoice_id')
         .eq('id', body.credit_note_id).maybeSingle();
       if (!cnRow) return json({ error: 'credit note not found' }, 404);
-      if (auth.level !== 'secret' && !(await userCanAccessWorkspace(supabase, auth.userId, cnRow.workspace_id))) {
+      if (auth.level !== 'secret' && !(await userHasWorkspaceCapability(supabase, auth.userId, cnRow.workspace_id, 'invoice.issue'))) {
         return json({ error: 'Not authorized for this document' }, 403);
       }
 
@@ -888,7 +884,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         .select('id, workspace_id, kind, fiscal_status, fiscal_mark, fiscal_cancellation_mark, delivery_note_number')
         .eq('id', dnId).maybeSingle();
       if (!note) return json({ error: 'delivery note not found' }, 404);
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, (note as any).workspace_id))) {
+      if (!(await userHasWorkspaceCapability(supabase, auth.userId, (note as any).workspace_id, ['invoice.issue', 'warehouse.manage']))) {
         return json({ error: 'Not authorized for this document' }, 404); // 404, not 403 — no id enumeration
       }
       // Writes use the LOADED, authorized row's id, never the caller's (sameWorkspaceFkSweep).
@@ -1035,7 +1031,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         .from('delivery_notes').select('id, workspace_id, fiscal_status')
         .eq('id', body.delivery_note_id).maybeSingle();
       if (!dnRow) return json({ error: 'delivery note not found' }, 404);
-      if (auth.level !== 'secret' && !(await userCanAccessWorkspace(supabase, auth.userId, dnRow.workspace_id))) {
+      if (auth.level !== 'secret' && !(await userHasWorkspaceCapability(supabase, auth.userId, dnRow.workspace_id, ['invoice.issue', 'warehouse.manage']))) {
         return json({ error: 'Not authorized for this document' }, 403);
       }
 
@@ -1150,7 +1146,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       // A 'secret' caller is another edge function (record-payment transmitting a draft it just
       // issued on a full online payment); it has no user to bind, and the service key IS the
       // authorisation. Every other level must be a member of the document's workspace.
-      if (auth.level !== 'secret' && !(await userCanAccessWorkspace(supabase, auth.userId, invWs.workspace_id))) {
+      if (auth.level !== 'secret' && !(await userHasWorkspaceCapability(supabase, auth.userId, invWs.workspace_id, 'invoice.issue'))) {
         return json({ error: 'Not authorized for this document' }, 403);
       }
     } else {

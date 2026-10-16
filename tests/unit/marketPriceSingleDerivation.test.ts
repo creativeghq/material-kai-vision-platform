@@ -65,9 +65,9 @@ describe('market price has exactly one derivation', () => {
   it('every price surface binds tenancy to the verified JWT before it resolves', () => {
     for (const f of [marketplace, catalogue]) {
       const src = strippedSource(f);
-      const gate = src.search(/await\s+userCanAccessWorkspace\s*\(/);
+      const gate = src.search(/await\s+(?:userCanAccessWorkspace|userHasWorkspaceCapability)\s*\(/);
       const resolve = src.search(/rpc\s*\(\s*'resolve_product_market_price'/);
-      expect(gate, `${posix(f)} must CALL userCanAccessWorkspace, not merely import it`).toBeGreaterThan(-1);
+      expect(gate, `${posix(f)} must CALL a workspace access check, not merely import it`).toBeGreaterThan(-1);
       expect(resolve, `${posix(f)} must resolve`).toBeGreaterThan(-1);
       expect(gate, `${posix(f)}: membership check must precede the resolve`).toBeLessThan(resolve);
     }

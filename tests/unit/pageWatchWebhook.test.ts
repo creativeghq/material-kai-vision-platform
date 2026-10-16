@@ -136,9 +136,9 @@ describe('page-watch CRUD — tenancy and spend', () => {
   const src = code(read(CRUD));
 
   it('proves workspace membership before touching anything', () => {
-    expect(src).toMatch(/userCanAccessWorkspace\(/);
+    expect(src).toMatch(/userHasWorkspaceCapability\(/);
     // 404 on mismatch, not 403 — a 403 confirms the id exists (invariant 1).
-    const check = src.indexOf('userCanAccessWorkspace(');
+    const check = src.indexOf('userHasWorkspaceCapability(');
     const firstWrite = Math.min(
       ...['.insert(', '.update(', '.delete('].map((op) => {
         const i = src.indexOf(op);

@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { getToolPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages, transcribeAudioWithGemini } from '../_shared/ai-client.ts';
 import { debitOrRefuse } from '../_shared/credit-utils.ts';
@@ -135,12 +135,12 @@ Deno.serve(withApiLogging('structure-site-note', async (req: Request) => {
   if (plainDictation) {
     workspaceId = typeof body.workspace_id === 'string' ? body.workspace_id : null;
     if (!hasAudio) throw new HttpError(400, 'Send a recording to transcribe.');
-    if (!workspaceId || !(await userCanAccessWorkspace(admin, uid, workspaceId))) throw new HttpError(404, 'Workspace not found');
+    if (!workspaceId || !(await userHasWorkspaceCapability(admin, uid, workspaceId, 'projects.use'))) throw new HttpError(404, 'Workspace not found');
   } else {
     const { data: project } = await admin
       .from('projects').select('workspace_id').eq('id', body.project_id).maybeSingle();
     workspaceId = (project as { workspace_id?: string } | null)?.workspace_id ?? null;
-    if (!workspaceId || !(await userCanAccessWorkspace(admin, uid, workspaceId))) {
+    if (!workspaceId || !(await userHasWorkspaceCapability(admin, uid, workspaceId, 'projects.use'))) {
       throw new HttpError(404, 'Project not found');
     }
   }

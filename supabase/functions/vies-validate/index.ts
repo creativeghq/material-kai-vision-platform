@@ -4,7 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { transliterateToLatin } from '../_shared/transliterate.ts';
 // Invariant 1 — tenancy from membership, never from the request body.
-import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 // Generated mirror of src/services/crm/vatNormalize.ts — the receipt key must match crm_vat_norm.
 // Aliased: this file already has a `normalizeVat` that splits a VAT into country + number.
 // This one produces the CRM dedupe/receipt key, and they must not be confused.
@@ -256,7 +256,7 @@ Deno.serve(withApiLogging('vies-validate', async (req: Request) => {
      * any tenant's company. Membership is the boundary.
      */
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
-    const workspaceId = requestedWs && await userCanAccessWorkspace(admin, user.id, requestedWs)
+    const workspaceId = requestedWs && await userHasWorkspaceCapability(admin, user.id, requestedWs, ['crm.view', 'finance.manage'])
       ? requestedWs
       : null;
     if (requestedWs && !workspaceId) {

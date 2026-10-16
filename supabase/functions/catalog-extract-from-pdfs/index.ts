@@ -8,7 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
@@ -162,7 +162,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     // body-supplied id. (New uploads now stamp workspace_id too; this keeps old rows working.)
     for (const pdf of pdfs) {
       const okByWorkspace = pdf.workspace_id
-        ? await userCanAccessWorkspace(supabase, effectiveUserId, pdf.workspace_id)
+        ? await userHasWorkspaceCapability(supabase, effectiveUserId, pdf.workspace_id, 'pricing.manage')
         : false;
       const okByUploader = !!pdf.uploaded_by && pdf.uploaded_by === effectiveUserId;
       if (!okByWorkspace && !okByUploader) {

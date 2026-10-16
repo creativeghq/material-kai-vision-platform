@@ -7,7 +7,7 @@ import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { resolveDocumentEmailTemplate, withAllVars } from '../_shared/document-email-template.ts';
 
@@ -19,7 +19,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   // A TRUSTED INTERNAL CALLER IS ALLOWED, because the seeded "Invoice Issued" flow is one.
-  const auth = await authenticate(req, { requireUser: false, allowedRoles: ['admin', 'super_admin', 'owner', 'accountant'] });
+  const auth = await authenticate(req, { requireUser: false });
   if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
   const internal = auth.level === 'secret';
   if (!internal && !auth.userId) return json({ error: 'Unauthorized' }, 401);
@@ -33,7 +33,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   if (!inv) return json({ error: 'invoice not found' }, 404);
   // Tenancy: bind to the caller's workspace so one tenant can't email another's invoice
   // (with full PII + myDATA MARK) to an arbitrary address by iterating invoice ids.
-  if (!internal && !(await userCanAccessWorkspace(supabase, auth.userId, inv.workspace_id))) {
+  if (!internal && !(await userHasWorkspaceCapability(supabase, auth.userId, inv.workspace_id, 'finance.manage'))) {
     return json({ error: 'Not authorized for this document' }, 403);
   }
 

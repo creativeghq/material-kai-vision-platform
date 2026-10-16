@@ -10,7 +10,7 @@ import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { contractContentHash } from '../_shared/contract-hash.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -56,7 +56,7 @@ Deno.serve(withApiLogging('generate-contract-pdf', async (req) => {
     const { data: c } = await svc.from('contracts').select('*').eq('id', contractId).maybeSingle();
     if (!c) return json({ error: 'not found' }, 404);
     // Tenancy: the caller must belong to the contract's workspace. 404 (not 403) to avoid id enumeration.
-    if (!(await userCanAccessWorkspace(svc, auth.userId, c.workspace_id))) return json({ error: 'not found' }, 404);
+    if (!(await userHasWorkspaceCapability(svc, auth.userId, c.workspace_id, ['quotes.use', 'finance.manage']))) return json({ error: 'not found' }, 404);
 
     const { data: sigs } = await svc.from('contract_signatures').select('*').eq('contract_id', contractId).order('signed_at', { ascending: true });
 

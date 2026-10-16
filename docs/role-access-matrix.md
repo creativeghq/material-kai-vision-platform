@@ -48,48 +48,70 @@ Resolution (`resolvePersona()`): operator → guest workspace → `TEAM_ROLE_PER
 
 ---
 
-## 3. Capability matrix (persona → what they can do)
+## 3. Capability matrix (workspace role → what they can do)
 
-✓ = granted. From `PERSONA_CAPABILITIES`.
+The one table is `WORKSPACE_ROLE_CAPABILITIES` in [`src/auth/roleCapabilities.ts`](../src/auth/roleCapabilities.ts).
+The UI derives personas from it, edge functions read its Deno mirror (`npm run vocab:mirror`), and SQL reads
+`workspace_role_capability_matrix()`, printed from it by `npm run capabilities:sql`. This snapshot is generated
+from that file — regenerate rather than edit. The platform operator additionally holds `platform.admin`,
+`catalog.import` and `downstream.view`.
 
-| Capability | operator | dealer | architect | staff | accountant | sales | end_user |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| `platform.admin` (/admin shell) | ✓ | | | | | | |
-| `catalog.import` | ✓ | | | | | | |
-| `downstream.view` | ✓ | | | | | | |
-| `network.manage` (/network) | ✓ | ✓ | ✓ | | | | |
-| `pricing.manage` | ✓ | ✓ | ✓ | | | | |
-| `finance.manage` (/finance) | ✓ | ✓ | ✓ | ✓ | ✓ | | |
-| `invoice.issue` (/pos) | ✓ | ✓ | ✓ | ✓ | | | |
-| `crm.view` (/crm) | ✓ | ✓ | ✓ | ✓ | | ✓ | |
-| `warehouse.manage` | ✓ | ✓ | ✓ | ✓ | | | |
-| `marketplace.browse` (/discover) | ✓ | ✓ | ✓ | ✓ | | ✓ | |
-| `quotes.use` | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
-| `sales.portal` (/sales) | | | | | | ✓ | |
-| `projects.use` | ✓ | ✓ | ✓ | ✓ | | | ✓ |
-| `moodboards.use` | ✓ | ✓ | ✓ | ✓ | | | ✓ |
-| `agent.use` | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
-| `inbox.use` | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
+| Capability | owner | admin | member | accountant | sales | sales_manager | hr | hr_manager | warehouse | marketing | employee | realestate_agent | client |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `workspace.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |
+| `workspace.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |
+| `network.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |
+| `pricing.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |
+| `finance.manage` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |
+| `finance.operate` | ✓ | ✓ |  | ✓ |  |  |  |  |  |  |  |  |  |
+| `invoice.issue` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |
+| `crm.view` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  | ✓ |  |
+| `warehouse.manage` | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |  |  |  |  |
+| `marketplace.browse` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `quotes.use` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `sales.portal` |  |  |  |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `sales.team.view` |  |  |  |  |  | ✓ |  |  |  |  |  |  |  |
+| `projects.use` | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |
+| `moodboards.use` | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |
+| `agent.use` | ✓ | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  |
+| `inbox.use` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `hr.view` | ✓ | ✓ |  |  |  |  | ✓ | ✓ |  |  |  |  |  |
+| `hr.manage` | ✓ | ✓ |  |  |  |  |  | ✓ |  |  |  |  |  |
+| `hr.self` |  |  |  |  |  |  |  |  |  |  | ✓ |  |  |
+| `marketing.email` | ✓ | ✓ |  |  |  |  |  |  |  | ✓ |  |  |  |
+| `marketing.seo` | ✓ | ✓ |  |  |  |  |  |  |  | ✓ |  |  |  |
+| `realestate.view` | ✓ | ✓ |  |  |  |  |  |  |  |  |  | ✓ |  |
+| `realestate.listings.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  | ✓ |  |
+| `realestate.leads.view` | ✓ | ✓ |  |  |  |  |  |  |  |  |  | ✓ |  |
 
-Notes:
-- **operator** = everything **except** `sales.portal` (the Sales portal belongs to the two sales personas only — owners/admins work quotes via `/quotes`).
-- **dealer** and **architect** are identical today (full business set); they differ only in marketplace position (dealer sells downstream, architect sells to end users).
-- **accountant** is intentionally narrow — Finance surface only; within Finance, write-ops are further gated by `isWorkspaceManager` / `canOperateFinance`.
-- **sales** sees only their **own** quotes (RLS on `user_id`); customer financials are workspace-scoped reads. **sales_manager** additionally passes `is_workspace_sales_manager(workspace_id)` in `consolidated_quotes_select_public`, so the team-wide read is enforced in the database, not just unhidden in the UI.
+- `workspace.read` — reading the business's own data at all. `client` and `employee` are outsiders: every
+  tenant row policy and every `assert_workspace_member` RPC refuses them.
+- `finance.manage` shows Finance; `finance.operate` writes it (owner, admin, accountant) — the database's
+  `is_workspace_finance_manager`.
+- `marketing.seo` covers SEO, social publishing, site monitoring and reviews.
 
 ---
 
 ## 4. Enforcement layers (where it's actually checked)
 
-1. **`AuthGuard`** — authenticated or not. Wraps the user-facing app.
-2. **`CapabilityGuard` / `usePermissions().can(cap)`** — per-route/per-feature persona capability check (the table above). e.g. `/finance` needs `finance.manage`, `/network` needs `network.manage`.
-3. **`AdminGuard`** — wraps all `/admin/*`. Passes only for **Platform Operator** (`owner`/`admin`/`super_admin` of the **root** workspace). A dealer/architect who owns their own workspace does **not** pass.
-4. **Edge functions** (`_shared/auth.ts`):
-   - `authenticate({ allowedRoles })` passes when the caller holds a listed role as account tier **or in ANY workspace** — a partner `kai_` key passes when its owner would. It is never a platform gate: every signup owns a workspace, so `owner`/`admin` there means "any signed-in user". Bind the target workspace with `userCanAccessWorkspace` plus a role read for that workspace.
-   - Platform work (cron fan-outs, integrity runs, billing rates, seats, the platform email sender, MIVAA `/api/admin`) uses `authenticatePlatformOperator(req)`: secret/service-role, or account tier `admin`/`super_admin`. Guarded by `tests/unit/platformScopedAuthGates.test.ts`.
-   - `hr-api` grants view to `hr` and manage to `hr_manager`, as the UI does.
-   - Agents: JARVIS is open to every role; specialist agents allow `member/admin/owner` (+ `viewer` for no membership) only, so team roles are refused them. Widening that needs tools filtered per capability first — agent tools are gated per workspace module, so a `warehouse` user on the `member` list would reach finance tools.
-5. **Postgres RLS** — `is_admin_user()` (account role = **`admin`** only — note: not `super_admin`), `is_workspace_member(workspace_id)` (row belongs to a workspace you're in). Used by CRM/activity/notes/finance tables.
+1. **UI** — `AuthGuard`, `CapabilityGuard` / `usePermissions().can(cap)`, `AdminGuard` (platform operator:
+   owner/admin of the root workspace), `EntitlementGuard` (module bought). UX only — never the boundary.
+2. **Edge functions** (`_shared/auth.ts`) — `userHasWorkspaceCapability(db, userId, workspaceId, cap)` for
+   one workspace, `listWorkspaceIdsWithCapability` for a fan-out. Platform work uses
+   `authenticatePlatformOperator` (secret/service role, or account tier `admin`). `allowedRoles` is not used
+   for tenant work: it matches a role held in ANY workspace, and every signup owns one.
+3. **Database** — row policies call `has_workspace_capability(workspace_id, cap)` (default `workspace.read`;
+   CRM writes `crm.view`/`finance.operate`, stock writes `warehouse.manage`, pricing writes
+   `pricing.manage`, HR `hr.view`/`hr.manage`); the role helpers (`is_workspace_finance_manager`,
+   `is_workspace_sell_side`, `is_workspace_stock_operator`, `is_workspace_sales_manager`) read the matrix.
+4. **Agent tools** — each toolkit in `agentToolsCatalog.ts` declares a `capability`; agent-chat's
+   `registerTools` drops a cluster's tools for a role that lacks it, and specialist agents open to every
+   role holding `agent.use`.
+
+Guards: [tests/unit/workspaceCapabilityGates.test.ts](../tests/unit/workspaceCapabilityGates.test.ts) (no
+`allowedRoles`, no unlisted membership-only check, every toolkit gated) and
+[tests/integration/workspaceCapabilities.test.ts](../tests/integration/workspaceCapabilities.test.ts) (live
+matrix = TS table; row policies answered as warehouse / client fixtures).
 
 ---
 
@@ -99,9 +121,9 @@ Notes:
 ---
 
 ## 6. Known gaps / notes (be honest)
-- The role set is not a numeric *ladder* — `level` is informational. Access = persona-capability + operator(root) + edge `allowedRoles`.
+- The role set is not a numeric *ladder* — `level` is informational. Access = the capability the role holds in THAT workspace, plus the platform-operator flag.
 - The marketplace **#227 pyramid still keys on the workspace tree** (a supplier/architect *node* with parent/rank/commission). So the Role grants the *surface*; the workspace node provides the *downstream data* (`/network` shows only the caller's own subtree via `get_manageable_workspaces`). A user tagged `supplier` with no workspace node sees the surface but an empty network until a node exists.
-- `super_admin` was merged into `admin`; leftover `'super_admin'` strings in edge `allowedRoles` are harmless dead entries.
+- `super_admin` was merged into `admin`; `isPlatformOperator` still accepts it as a legacy alias.
 - Agent **sub-agent orchestration** is documented as admin/owner-only, but tool-list filtering by role at injection time should be re-verified.
 
 ---

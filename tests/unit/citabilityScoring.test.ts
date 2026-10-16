@@ -64,7 +64,7 @@ describe('a page nobody has read is not a page that failed', () => {
 
   it('tenancy comes from the verified JWT and a miss returns 404, not 403', () => {
     const h = src(HANDLER);
-    expect(h).toContain('userCanAccessWorkspace(db, auth.userId, site.workspace_id)');
+    expect(h).toContain('userHasWorkspaceCapability(db, auth.userId, site.workspace_id, ');
     expect(h).toMatch(/error: 'Not found' \}, 404/);
     expect(h).toContain("authenticate(req, { requireUser: true })");
   });
@@ -156,7 +156,7 @@ describe('the corpus is a separate sample, not a second opinion', () => {
 
   it('the write is checked and tenancy comes from the verified JWT', () => {
     const code = blankComments(src(MENTIONS));
-    expect(code).toContain('userCanAccessWorkspace(db, auth.userId, site.workspace_id)');
+    expect(code).toContain('userHasWorkspaceCapability(db, auth.userId, site.workspace_id, ');
     expect(code).toMatch(/const \{ error \} = await db\.from\('website_llm_mentions'\)\.insert/);
     expect(code).toMatch(/if \(error\) throw new Error/);
     expect(code).toMatch(/error: 'Not found' \}, 404/);

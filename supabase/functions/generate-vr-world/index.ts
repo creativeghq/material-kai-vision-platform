@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -107,7 +107,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
   // back by that tenant's members. 404, not 403: do not confirm a workspace id exists.
   // Service-role callers are exempt; they derive the pair server-side (see the same note in
   // generate-interior-gemini).
-  if (!isServiceCall && wsId && !(await userCanAccessWorkspace(supabase, userId, wsId))) {
+  if (!isServiceCall && wsId && !(await userHasWorkspaceCapability(supabase, userId, wsId, ['agent.use', 'moodboards.use', 'projects.use']))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 
