@@ -13,6 +13,7 @@ import { authenticatePlatformOperator, isCronAuthorized } from '../_shared/auth.
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { captureMessage } from '../_shared/sentry.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 
 interface RequestBody {
   action?:
@@ -91,6 +92,48 @@ async function reportRunToSentry(supabase: ReturnType<typeof svc>, runId: string
   }
 }
 
+/**
+ * Close the Sentry issue of every critical finding that healed in the last two days. Each issue is
+ * found by the exact title `reportRunToSentry` gives it. Needs SENTRY_AUTH_TOKEN (event:write) and
+ * SENTRY_ORG; without them it says so and does nothing, rather than pretending the channel is clean.
+ */
+async function resolveHealedInSentry(supabase: ReturnType<typeof svc>): Promise<void> {
+  const [token, org] = await Promise.all([
+    resolveSecret(supabase, 'SENTRY_AUTH_TOKEN'), resolveSecret(supabase, 'SENTRY_ORG'),
+  ]);
+  if (!token.value || !org.value) {
+    console.warn('[data-integrity-runner] SENTRY_AUTH_TOKEN / SENTRY_ORG unset: healed findings stay open in Sentry');
+    return;
+  }
+  const { data: healed, error } = await supabase.from('data_integrity_findings')
+    .select('check_key, entity_id')
+    .eq('status', 'healed').eq('severity', 'critical')
+    .gt('healed_at', new Date(Date.now() - 2 * 86_400_000).toISOString());
+  if (error) {
+    console.warn('[data-integrity-runner] could not read healed findings:', error.message);
+    return;
+  }
+  const base = `https://sentry.io/api/0/organizations/${encodeURIComponent(org.value)}/issues/`;
+  const headers = { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/json' };
+  for (const f of healed ?? []) {
+    const title = `Data integrity CRITICAL: ${f.check_key} — ${f.entity_id}`;
+    try {
+      const q = new URLSearchParams({ query: `is:unresolved message:"${title.replace(/"/g, '\\"')}"` });
+      const found = await fetch(`${base}?${q}`, { headers, signal: AbortSignal.timeout(10_000) });
+      if (!found.ok) { console.warn(`[data-integrity-runner] Sentry search ${found.status} for ${title}`); continue; }
+      const issues = (await found.json()) as Array<{ id: string; title: string }>;
+      const ids = issues.filter((i) => i.title === title).map((i) => i.id);
+      if (ids.length === 0) continue;
+      const put = await fetch(`${base}?${ids.map((id) => `id=${encodeURIComponent(id)}`).join('&')}`, {
+        method: 'PUT', headers, body: JSON.stringify({ status: 'resolved' }), signal: AbortSignal.timeout(10_000),
+      });
+      if (!put.ok) console.warn(`[data-integrity-runner] Sentry resolve ${put.status} for ${title}`);
+    } catch (e) {
+      console.warn(`[data-integrity-runner] Sentry resolve failed for ${title}:`, e instanceof Error ? e.message : e);
+    }
+  }
+}
+
 Deno.serve(withApiLogging('data-integrity-runner', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -105,6 +148,7 @@ Deno.serve(withApiLogging('data-integrity-runner', async (req) => {
       if (error) return json({ error: error.message }, 500);
       // Only the cron path pages. An admin pressing Run is already looking at the results.
       await reportRunToSentry(supabase, data as string);
+      await resolveHealedInSentry(supabase);
       return json({ ok: true, run_id: data });
     }
 
