@@ -3,6 +3,7 @@ import { API_KEY_ENDPOINTS } from './apiKeyEndpoints.generated.ts';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { bootstrapSecretsFromDb } from './secrets-bootstrap.ts';
 import { roleHasCapability, type Capability } from './roleCapabilities.generated.ts';
+import { secretMatches } from './timing-safe.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -471,7 +472,7 @@ export function isCronAuthorized(req: Request): boolean {
   if (isServiceRoleRequest(req)) return true;
   const provided = req.headers.get('x-cron-secret');
   const expected = Deno.env.get('CRON_SECRET') || '';
-  return !!expected && provided === expected;
+  return secretMatches(provided, expected);
 }
 
 /**
