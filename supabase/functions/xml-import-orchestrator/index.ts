@@ -605,6 +605,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       source_url: sourceUrl,
       row_path: body.row_path ?? null,
       dropped_count: droppedCount,
+      requested_by: auth.level === 'user' ? auth.userId : null,
     });
 
     const pythonAuth = auth.level === 'user'
@@ -658,6 +659,8 @@ interface NewImportJob {
   source_url: string | null;
   row_path: string | null;
   dropped_count: number;
+  /** The signed-in user who started the import; MIVAA bills the job's AI calls to them. */
+  requested_by: string | null;
 }
 
 /** The data_import_jobs row plus its products, chunk-inserted into data_import_job_products. */
@@ -685,11 +688,18 @@ async function createImportJob(supabase: DbClient, job: NewImportJob): Promise<s
         row_path: job.row_path,
       },
     })
-    .select('id')
+    .select('id, background_job_id')
     .single();
   if (jobError) throw new Error(`Failed to create import job: ${jobError.message}`);
 
   const jobId = (jobData as { id: string }).id;
+  const backgroundJobId = (jobData as { background_job_id: string | null }).background_job_id;
+  if (job.requested_by && backgroundJobId) {
+    const { error: payerError } = await supabase.from('background_jobs')
+      .update({ user_id: job.requested_by }).eq('id', backgroundJobId);
+    // Not fatal: the AI calls then log `no_principal`, which keeps the gap countable.
+    if (payerError) console.error(`Import job ${jobId}: payer not recorded: ${payerError.message}`);
+  }
   for (let offset = 0; offset < job.products.length; offset += PRODUCT_INSERT_CHUNK_SIZE) {
     const rows = job.products.slice(offset, offset + PRODUCT_INSERT_CHUNK_SIZE).map((product, i) => ({
       job_id: jobId,

@@ -172,6 +172,17 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
 
       const response = await mivaaApi.uploadPDF(formData);
 
+      const duplicate = response.status === 409 ? (response.detail as { job_id?: string } | undefined) : undefined;
+      if (duplicate?.job_id) {
+        toast({
+          title: 'Already uploaded',
+          description: 'This file is already in this workspace — showing its existing job.',
+        });
+        setFile(null);
+        onUploadComplete(duplicate.job_id, file.name);
+        return;
+      }
+
       if (!response.success) {
         throw new Error(`Processing failed: ${response.error || 'Unknown error'}`);
       }

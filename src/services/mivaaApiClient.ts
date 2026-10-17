@@ -14,6 +14,9 @@ export interface MivaaApiResponse<T = any> {
   error?: string;
   message?: string;
   processing_time?: number;
+  /** HTTP status of a refused call, and the server's structured `detail` when it sent one. */
+  status?: number;
+  detail?: unknown;
 }
 
 /**
@@ -213,7 +216,9 @@ export class MivaaApiClient {
                 ? errorData.detail
                 : Array.isArray(errorData.detail)
                   ? errorData.detail.map((d: any) => d.msg || String(d)).join(', ')
-                  : null;
+                  : typeof errorData.detail?.message === 'string'
+                    ? errorData.detail.message
+                    : null;
             const error = new Error(
               detail ||
                 errorData.error ||
@@ -221,6 +226,7 @@ export class MivaaApiClient {
                 `HTTP ${response.status}: ${response.statusText || response.status}`,
             );
             (error as any).status = response.status;
+            (error as any).detail = errorData.detail;
             throw error;
           }
 
@@ -252,6 +258,8 @@ export class MivaaApiClient {
     ).catch((error) => ({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
+      status: (error as { status?: number })?.status,
+      detail: (error as { detail?: unknown })?.detail,
     }));
   }
 
@@ -285,7 +293,9 @@ export class MivaaApiClient {
                 ? errorData.detail
                 : Array.isArray(errorData.detail)
                   ? errorData.detail.map((d: any) => d.msg || String(d)).join(', ')
-                  : null;
+                  : typeof errorData.detail?.message === 'string'
+                    ? errorData.detail.message
+                    : null;
             const error = new Error(
               detail ||
                 errorData.error ||
@@ -293,6 +303,7 @@ export class MivaaApiClient {
                 `HTTP ${response.status}: ${response.statusText || response.status}`,
             );
             (error as any).status = response.status;
+            (error as any).detail = errorData.detail;
             throw error;
           }
 
@@ -323,6 +334,8 @@ export class MivaaApiClient {
     ).catch((error) => ({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
+      status: (error as { status?: number })?.status,
+      detail: (error as { detail?: unknown })?.detail,
     }));
   }
 
