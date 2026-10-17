@@ -2,12 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { escapeHtml } from '../_shared/html.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -145,12 +144,10 @@ Deno.serve(withApiLogging('tender-bid-portal', async (req: Request) => {
   // ───────────────────────────── AUTHENTICATED (send) ─────────────────────────────
   if (action !== 'send') throw new HttpError(400, 'Unknown action');
 
-  const authHeader = req.headers.get('Authorization') || '';
-  if (!authHeader) throw new HttpError(401, 'Missing Authorization bearer');
-  const reader = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
-  const { data: who } = await reader.auth.getUser();
-  const uid = who?.user?.id;
-  if (!uid) throw new HttpError(401, 'Invalid session');
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) throw new HttpError(401, auth.error || 'Invalid session');
+  const uid = auth.userId;
+  const keyWs = auth.apiKey?.workspace_id;
 
   const bidId = String(body.bid_id ?? '');
   if (!bidId) throw new HttpError(400, 'bid_id required');
@@ -163,7 +160,7 @@ Deno.serve(withApiLogging('tender-bid-portal', async (req: Request) => {
   if (!bid) throw new HttpError(404, 'Bid not found');
 
   // Invariant 1: the workspace comes from the row, and the caller is checked against it.
-  if (!(await userHasWorkspaceCapability(service, uid, bid.workspace_id, 'projects.use'))) {
+  if ((keyWs && bid.workspace_id !== keyWs) || !(await userHasWorkspaceCapability(service, uid, bid.workspace_id, 'projects.use'))) {
     throw new HttpError(404, 'Bid not found');
   }
 

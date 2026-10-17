@@ -34,7 +34,7 @@ import {
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
@@ -433,6 +433,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   let resolvedUserId: string;
+  let keyWorkspaceId: string | null | undefined;
   // Only a server-to-server caller may attribute the spend to something other than "the app" —
   // see ATTRIBUTION_SOURCES. Set here, next to the check that establishes it, rather than
   // re-derived at the log insert where the reason would no longer be visible.
@@ -442,13 +443,12 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // Internal server-to-server call (agent-chat, Python backend, etc.)
     resolvedUserId = body.user_id;
   } else {
-    // User JWT validation
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
-    if (authError || !user) {
-      return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) {
+      return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
     }
-    resolvedUserId = user.id;
+    resolvedUserId = auth.userId;
+    keyWorkspaceId = auth.apiKey ? auth.apiKey.workspace_id : undefined;
   }
 
   // Invariant 1 (#364 EX-1). `body.workspace_id` decides which pool is debited, which workspace
@@ -457,8 +457,9 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // workspace they have never belonged to and write generation history and cost rows into it.
   // `debit_credits` already falls back to the personal wallet for a non-member, so this was never
   // credit theft — but the ROWS still landed in the victim's tenant, visible to their admins.
-  if (!isServiceCall && body.workspace_id
-    && !(await userHasWorkspaceCapability(supabase, resolvedUserId, body.workspace_id, ['agent.use', 'moodboards.use', 'projects.use']))) {
+  if (!isServiceCall && body.workspace_id && (
+    (keyWorkspaceId !== undefined && body.workspace_id !== keyWorkspaceId)
+    || !(await userHasWorkspaceCapability(supabase, resolvedUserId, body.workspace_id, ['agent.use', 'moodboards.use', 'projects.use'])))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 

@@ -1,6 +1,7 @@
 /** seo-toolkit-research — user-driven research wrapper. */
 
 import { createClient } from '@supabase/supabase-js';
+import { authenticate } from '../../_shared/auth.ts';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
@@ -31,18 +32,9 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
   }
 
   try {
-    const authHeader = req.headers.get('authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
-    }
-    const userJwt = authHeader.slice('Bearer '.length);
-
-    const sbUser = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      global: { headers: { Authorization: `Bearer ${userJwt}` } },
-    });
-    const { data: userRes } = await sbUser.auth.getUser();
-    if (!userRes.user) return jsonResponse({ ok: false, error: 'invalid jwt' }, 401);
-    const userId = userRes.user.id;
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ ok: false, error: auth.error || 'unauthorized' }, 401);
+    const userId = auth.userId;
 
     if (!body?.subject || !body?.params) {
       return jsonResponse({ ok: false, error: 'subject and params required' }, 400);
@@ -54,7 +46,7 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
 
     // Paid module — refuse BEFORE firing the MIVAA/DataForSEO engine (#212). Also resolves
     // the workspace the run is filed under (was a late `.maybeSingle()` lookup below).
-    const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(sbAdmin, userId);
+    const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(sbAdmin, userId, auth.apiKey?.workspace_id);
     if (entResponse) return entResponse;
 
     // Meter BEFORE the engine runs (invariant 10, #365 `AD-13`). opportunities-stateless fans out

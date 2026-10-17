@@ -2,14 +2,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitOrRefuse } from '../_shared/credit-utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -111,16 +110,12 @@ Deno.serve(withApiLogging('takeoff-from-drawing', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') throw new HttpError(405, 'POST only');
 
-  const authHeader = req.headers.get('Authorization') || '';
-  if (!authHeader) throw new HttpError(401, 'Missing Authorization bearer');
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) throw new HttpError(401, auth.error || 'Invalid session');
+  const uid = auth.userId;
+  const keyWs = auth.apiKey?.workspace_id;
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  const reader = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: who } = await reader.auth.getUser();
-  const uid = who?.user?.id;
-  if (!uid) throw new HttpError(401, 'Invalid session');
 
   const { revision_id } = (await req.json().catch(() => ({}))) as Body;
   if (!revision_id) throw new HttpError(400, 'revision_id required');
@@ -136,7 +131,7 @@ Deno.serve(withApiLogging('takeoff-from-drawing', async (req: Request) => {
 
   const doc = (rev as any)?.project_documents;
   const workspaceId = doc?.projects?.workspace_id ?? null;
-  if (!rev || !workspaceId || !(await userHasWorkspaceCapability(admin, uid, workspaceId, 'projects.use'))) {
+  if (!rev || !workspaceId || (keyWs && workspaceId !== keyWs) || !(await userHasWorkspaceCapability(admin, uid, workspaceId, 'projects.use'))) {
     throw new HttpError(404, 'Drawing not found');
   }
 

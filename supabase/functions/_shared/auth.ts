@@ -93,6 +93,9 @@ export async function authenticate(
           !(partnerAuth.userId && await holdsAnyRole(adminClient, partnerAuth.userId, allowedRoles))) {
         return { ...partnerAuth, success: false, level: 'none', error: `Access denied. Required roles: ${allowedRoles.join(', ')}` };
       }
+      if (partnerAuth.success && !isEndpointAllowed(partnerAuth.apiKey?.allowed_endpoints ?? null, functionPath(req))) {
+        return { ...partnerAuth, success: false, level: 'none', error: 'This API key does not permit access to this endpoint' };
+      }
       return partnerAuth;
     }
 
@@ -388,6 +391,11 @@ async function validatePartnerApiKey(
       apiKey: null,
     };
   }
+}
+
+/** `/functions/v1/<fn>/…` for the request, whichever form the runtime hands over. */
+function functionPath(req: Request): string {
+  return `/functions/v1${new URL(req.url).pathname.replace(/^\/functions\/v1/, '')}`;
 }
 
 /**

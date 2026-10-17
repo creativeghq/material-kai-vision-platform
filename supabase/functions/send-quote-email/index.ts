@@ -1,6 +1,7 @@
 /** send-quote-email */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { authenticate } from '../_shared/auth.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveDocumentEmailTemplate, withAllVars } from '../_shared/document-email-template.ts';
@@ -27,17 +28,13 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // --- Authenticate (JWT → user) ---
-  const authHeader = req.headers.get('Authorization') || '';
-  const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!jwt) return json({ success: false, error: 'Missing Authorization header' }, 401);
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) return json({ success: false, error: auth.error || 'Invalid session' }, 401);
+  const userId = auth.userId;
+  const keyWs = auth.apiKey?.workspace_id;
 
-  let userId: string | null = null;
   let isAdmin = false;
   try {
-    const { data, error } = await supabase.auth.getUser(jwt);
-    if (error || !data?.user?.id) return json({ success: false, error: 'Invalid session' }, 401);
-    userId = data.user.id;
     const { data: prof } = await supabase
       .from('user_profiles')
       .select('roles!user_profiles_role_id_fkey(name)')
@@ -62,7 +59,7 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
     .select('id, user_id, workspace_id, name, quote_number, status, currency, grand_total, expires_at, public_share_enabled, public_share_token, customer_company_id, customer_contact_id')
     .eq('id', body.quote_id)
     .single();
-  if (qErr || !quote) return json({ success: false, error: 'Quote not found' }, 404);
+  if (qErr || !quote || (keyWs && quote.workspace_id !== keyWs)) return json({ success: false, error: 'Quote not found' }, 404);
   if (!(isAdmin || quote.user_id === userId)) {
     return json({ success: false, error: 'Not authorized for this quote' }, 403);
   }

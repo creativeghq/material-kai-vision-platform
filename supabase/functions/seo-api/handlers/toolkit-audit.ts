@@ -1,6 +1,7 @@
 /** seo-toolkit-audit — composite domain audit for /admin/seo dashboard. */
 
 import { createClient } from '@supabase/supabase-js';
+import { authenticate } from '../../_shared/auth.ts';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { chargeCronWorkspace, chargeCronUser, refundCronWorkspace, refundCronUser } from '../../_shared/cron-billing.ts';
@@ -77,25 +78,16 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
       });
     }
 
-    // ── Branch B: user-driven (Authorization: Bearer <user_jwt>) ──
-    const authHeader = req.headers.get('authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
-    }
-    const userJwt = authHeader.slice('Bearer '.length);
-    // Use a user-scoped client to verify identity + ownership
-    const sbUser = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      global: { headers: { Authorization: `Bearer ${userJwt}` } },
-    });
-    const { data: userRes } = await sbUser.auth.getUser();
-    if (!userRes.user) return jsonResponse({ ok: false, error: 'invalid jwt' }, 401);
-    const userId = userRes.user.id;
+    // ── Branch B: user-driven (a user JWT or a kai_ key) ──
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ ok: false, error: auth.error || 'unauthorized' }, 401);
+    const userId = auth.userId;
 
     const trackedId = body.tracked_domain_id;
     if (!trackedId) return jsonResponse({ ok: false, error: 'tracked_domain_id required' }, 400);
     const source = body.source || 'manual';
 
-    const { data: td, error } = await sbUser
+    const { data: td, error } = await sb
       .from('seo_tracked_domains')
       .select('*')
       .eq('id', trackedId)

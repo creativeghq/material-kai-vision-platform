@@ -17,7 +17,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { fetchBinaryGuarded } from '../_shared/fetch-image.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { captureException } from '../_shared/sentry.ts';
@@ -267,17 +267,17 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
   const body = await req.json();
   let userId: string;
+  let keyWorkspaceId: string | null | undefined;
   const isServiceCall = token === supabaseServiceKey && !!body.user_id;
 
   if (isServiceCall) {
     // Internal server-to-server call (from agent-chat edge function)
     userId = body.user_id;
   } else {
-    // User JWT validation
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
-    if (authError || !user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-    userId = user.id;
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
+    userId = auth.userId;
+    keyWorkspaceId = auth.apiKey ? auth.apiKey.workspace_id : undefined;
   }
 
   const {
@@ -302,8 +302,9 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   // Invariant 1 (#364 EX-1). `workspace_id` comes from the body and then routes the debit,
   // stamps `generation_videos` and stamps the `ai_usage_logs` row that this tenant's admins
   // read through `is_workspace_admin(workspace_id)`. 404, not 403 — no id enumeration.
-  if (!isServiceCall && workspace_id
-    && !(await userHasWorkspaceCapability(supabase, userId, workspace_id, ['agent.use', 'moodboards.use', 'projects.use']))) {
+  if (!isServiceCall && workspace_id && (
+    (keyWorkspaceId !== undefined && workspace_id !== keyWorkspaceId)
+    || !(await userHasWorkspaceCapability(supabase, userId, workspace_id, ['agent.use', 'moodboards.use', 'projects.use'])))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 

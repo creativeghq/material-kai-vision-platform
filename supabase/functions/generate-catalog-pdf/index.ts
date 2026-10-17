@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { fetchCatalog } from './data-fetcher.ts';
 import type { CatalogPDFRequest, CatalogPDFResponse } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { authenticate as authenticateCaller } from '../_shared/auth.ts';
 import { fetchBrandingConfig, fetchTemplateImage, fetchImageBytesFromUrl } from '../_shared/pdf/branding.ts';
 import { renderBrandedDocument, type BrandedDoc, type BrandedDocSection } from '../_shared/pdf/document.ts';
 
@@ -15,7 +16,7 @@ import { round2 } from '../_shared/money.ts';
 const MAX_ITEM_IMAGES = 60;
 // (redeploy nudge — prior deploy hit a transient Supabase 502 during upload)
 
-async function authenticate(req: Request): Promise<{ ok: boolean; userId?: string; isService?: boolean; error?: string }> {
+async function authenticate(req: Request): Promise<{ ok: boolean; userId?: string; isService?: boolean; keyWorkspaceId?: string | null; error?: string }> {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   // Internal server-to-server callers (agent-chat + other edge fns using the service-role
@@ -27,10 +28,9 @@ async function authenticate(req: Request): Promise<{ ok: boolean; userId?: strin
   }
   if (!token) return { ok: false, error: 'Missing Authorization header' };
   try {
-    const admin = createClient(supabaseUrl, supabaseServiceKey);
-    const { data, error } = await admin.auth.getUser(token);
-    if (error || !data?.user?.id) return { ok: false, error: 'Invalid JWT' };
-    return { ok: true, userId: data.user.id };
+    const caller = await authenticateCaller(req, { requireUser: true });
+    if (!caller.success || !caller.userId) return { ok: false, error: caller.error || 'Invalid JWT' };
+    return { ok: true, userId: caller.userId, keyWorkspaceId: caller.apiKey ? caller.apiKey.workspace_id : undefined };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Auth failed' };
   }
@@ -53,6 +53,9 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
 
     const catalog = await fetchCatalog(supabase, catalogId);
 
+    if (auth.keyWorkspaceId !== undefined && catalog.workspace_id !== auth.keyWorkspaceId) {
+      return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
+    }
     if (!auth.isService && auth.userId && catalog.owner_user_id !== auth.userId) {
       return jsonResponse({ success: false, error: 'Not authorized for this catalog' }, 403);
     }

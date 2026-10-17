@@ -20,7 +20,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
@@ -168,19 +168,21 @@ Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
     return await handleRequest(supabase, rawBody, userId, true);
   }
 
-  // User JWT validation
-  const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-  const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
-  if (authError || !user) {
-    return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) {
+    return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
   }
-  userId = user.id;
+  userId = auth.userId;
 
   let body: VirtualStagingRequest;
   try {
     body = await req.json();
   } catch {
     return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
+  }
+  const keyWs = auth.apiKey?.workspace_id;
+  if (keyWs && body.workspace_id && body.workspace_id !== keyWs) {
+    return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
 
   return await handleRequest(supabase, body, userId, false);

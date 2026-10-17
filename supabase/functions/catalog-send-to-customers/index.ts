@@ -5,6 +5,7 @@ import { catalogPublicUrl } from '../_shared/catalogPublicUrl.generated.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { authenticate as authenticateCaller } from '../_shared/auth.ts';
 // One answer to "may this workspace send" (#357 AE-1).
 import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 
@@ -46,24 +47,24 @@ interface SendResponse {
   error?: string;
 }
 
-async function authenticate(req: Request): Promise<{ ok: boolean; userId?: string; error?: string }> {
+async function authenticate(req: Request): Promise<{ ok: boolean; userId?: string; keyWorkspaceId?: string | null; error?: string }> {
   const auth = req.headers.get('Authorization') || '';
   const token = auth.replace(/^Bearer\s+/i, '').trim();
   if (!token) return { ok: false, error: 'Missing Authorization header' };
   if (token === supabaseServiceKey) return { ok: true };
   try {
+    const caller = await authenticateCaller(req, { requireUser: true });
+    if (!caller.success || !caller.userId) return { ok: false, error: caller.error || 'Invalid JWT' };
     const admin = createClient(supabaseUrl, supabaseServiceKey);
-    const { data, error } = await admin.auth.getUser(token);
-    if (error || !data?.user?.id) return { ok: false, error: 'Invalid JWT' };
     // Admin role gate — this is a write-out-to-N-customers operation
     const { data: prof } = await admin
       .from('user_profiles')
       .select('role_id, roles!user_profiles_role_id_fkey(name)')
-      .eq('user_id', data.user.id)
+      .eq('user_id', caller.userId)
       .maybeSingle();
     const roleName = (prof as any)?.roles?.name;
     if (roleName !== 'admin') return { ok: false, error: 'Admin only' };
-    return { ok: true, userId: data.user.id };
+    return { ok: true, userId: caller.userId, keyWorkspaceId: caller.apiKey ? caller.apiKey.workspace_id : undefined };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Auth failed' };
   }
@@ -91,6 +92,9 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
       .eq('id', body.catalog_id)
       .single();
     if (catErr || !catalog) return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
+    if (auth.keyWorkspaceId !== undefined && catalog.workspace_id !== auth.keyWorkspaceId) {
+      return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
+    }
     if (auth.userId && catalog.owner_user_id !== auth.userId) {
       return jsonResponse({ success: false, error: 'Not authorized for this catalog' }, 403);
     }

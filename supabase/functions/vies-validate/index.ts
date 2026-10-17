@@ -4,7 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { transliterateToLatin } from '../_shared/transliterate.ts';
 // Invariant 1 — tenancy from membership, never from the request body.
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 // Generated mirror of src/services/crm/vatNormalize.ts — the receipt key must match crm_vat_norm.
 // Aliased: this file already has a `normalizeVat` that splits a VAT into country + number.
 // This one produces the CRM dedupe/receipt key, and they must not be confused.
@@ -12,7 +12,6 @@ import { normalizeVat as vatReceiptKey } from '../_shared/crm/vatNormalize.gener
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
 const VIES_URL = 'https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number';
 
@@ -160,15 +159,10 @@ Deno.serve(withApiLogging('vies-validate', async (req: Request) => {
 
   try {
     // Authenticate (we don't enforce role here — anyone authed can validate; cache write is gated below)
-    const authHeader = req.headers.get('Authorization') || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '');
-    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401);
-
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return jsonResponse({ error: 'Unauthorized' }, 401);
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ error: auth.error || 'Unauthorized' }, 401);
+    const user = { id: auth.userId };
+    const keyWs = auth.apiKey?.workspace_id;
 
     const body = (await req.json()) as VatRequest;
     const { country, number } = normalizeVat(body.country_code, body.vat_number);
@@ -256,7 +250,8 @@ Deno.serve(withApiLogging('vies-validate', async (req: Request) => {
      * any tenant's company. Membership is the boundary.
      */
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
-    const workspaceId = requestedWs && await userHasWorkspaceCapability(admin, user.id, requestedWs, ['crm.view', 'finance.manage'])
+    const workspaceId = requestedWs && (!keyWs || requestedWs === keyWs)
+      && await userHasWorkspaceCapability(admin, user.id, requestedWs, ['crm.view', 'finance.manage'])
       ? requestedWs
       : null;
     if (requestedWs && !workspaceId) {

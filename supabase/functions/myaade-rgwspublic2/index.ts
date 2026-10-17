@@ -19,7 +19,7 @@ import {
   type BasicRec,
 } from '../_shared/aade/rgwspublic2.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
@@ -177,17 +177,14 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    // Auth (user JWT)
-    const authHeader = req.headers.get('Authorization') || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '');
-    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401);
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return jsonResponse({ error: 'Unauthorized' }, 401);
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ error: auth.error || 'Unauthorized' }, 401);
+    const user = { id: auth.userId };
+    const isFinanceManager = (ws: string) => userHasWorkspaceCapability(auth.supabase, user.id, ws, 'finance.operate');
 
     const body = (await req.json()) as LookupBody;
+    const keyWs = auth.apiKey?.workspace_id;
+    if (keyWs && body.workspace_id && body.workspace_id !== keyWs) return jsonResponse({ error: 'Not found' }, 404);
 
     // ── creds-status: surface the EFFECTIVE ΑΑΔΕ codes for the Keys page ────────────
     // Reports whatever a real lookup would use — the workspace's own row, or (only for the
@@ -195,8 +192,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     // password. Finance-manager gated, same as the get_aade_creds_status RPC.
     if (body.action === 'creds-status') {
       if (!body.workspace_id) return jsonResponse({ error: 'workspace_id required' }, 400);
-      const { data: isMgr } = await userClient.rpc('is_workspace_finance_manager', { p_workspace_id: body.workspace_id });
-      if (!isMgr) return jsonResponse({ error: 'not authorized' }, 403);
+      if (!(await isFinanceManager(body.workspace_id))) return jsonResponse({ error: 'not authorized' }, 403);
       const admin = createClient(supabaseUrl, supabaseServiceKey);
       const creds = await resolveAadeCredentials(admin, body.workspace_id);
       const source = creds.sources.username === 'workspace'
@@ -218,6 +214,10 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     if (body.action === 'verify-reseller-application') {
       const appId = body.application_id;
       if (!appId) return jsonResponse({ error: 'application_id required' }, 400);
+      if (auth.level !== 'user') return jsonResponse({ error: 'not authorized' }, 403);
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: req.headers.get('Authorization') || '' } },
+      });
       const { data: isOp } = await userClient.rpc('is_operator_admin');
       if (!isOp) return jsonResponse({ error: 'not authorized' }, 403);
 
@@ -310,8 +310,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     // resolving its credentials — otherwise a user in workspace A could burn workspace
     // B's quota by passing {afm, workspace_id: B}.
     if (!body.workspace_id) return jsonResponse({ error: 'workspace_id required' }, 400);
-    const { data: isLookupMgr } = await userClient.rpc('is_workspace_finance_manager', { p_workspace_id: body.workspace_id });
-    if (!isLookupMgr) return jsonResponse({ error: 'not authorized' }, 403);
+    if (!(await isFinanceManager(body.workspace_id))) return jsonResponse({ error: 'not authorized' }, 403);
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
     // Per-workspace Special Access Codes — only the operator's root workspace falls back

@@ -9,7 +9,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -97,9 +97,13 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
   if (isServiceCall) {
     userId = body.user_id!;
   } else {
-    const { data: { user }, error: authError } = await createClient(supabaseUrl, supabaseServiceKey).auth.getUser(token);
-    if (authError || !user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-    userId = user.id;
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
+    userId = auth.userId;
+    const keyWs = auth.apiKey?.workspace_id;
+    if (keyWs && body.workspace_id && body.workspace_id !== keyWs) {
+      return jsonResponse({ success: false, error: 'Not found' }, 404);
+    }
   }
 
   // Invariant 1 (#364 EX-1). `workspace_id` arrives in the body and then routes the debit and

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 // Invariant 1 — tenancy comes from membership, never from the request body.
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
 import { debitExternalServiceCredits, getServicePricing } from '../_shared/credit-utils.ts';
@@ -19,7 +19,6 @@ import { verifyWebsite } from '../_shared/crm/verifyWebsite.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 // Lazy getters: the secrets bootstrap populates env at handler entry.
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const APOLLO_API_KEY = () => Deno.env.get('APOLLO_API_KEY') || '';
@@ -1090,21 +1089,19 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '');
-    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401);
-
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return jsonResponse({ error: 'Unauthorized' }, 401);
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ error: auth.error || 'Unauthorized' }, 401);
+    const user = { id: auth.userId };
+    const keyWorkspaceId = auth.apiKey ? auth.apiKey.workspace_id : undefined;
 
     const body = await req.json().catch(() => ({}));
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
     // The workspace billed and audited for every action, membership-checked once (#353 CRM-9).
     const requestedWorkspaceId = cleanStr(body?.workspace_id);
+    if (keyWorkspaceId !== undefined && requestedWorkspaceId && requestedWorkspaceId !== keyWorkspaceId) {
+      return jsonResponse({ error: 'Not found' }, 404);
+    }
     const workspaceId = requestedWorkspaceId
       && await userHasWorkspaceCapability(admin, user.id, requestedWorkspaceId, 'crm.view')
       ? requestedWorkspaceId
@@ -1169,7 +1166,8 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
         .eq('id', companyId)
         .maybeSingle();
       if (data) {
-        const sameTenant = await userHasWorkspaceCapability(admin, user.id, data.workspace_id, 'crm.view');
+        const sameTenant = await userHasWorkspaceCapability(admin, user.id, data.workspace_id, 'crm.view')
+          && (keyWorkspaceId === undefined || data.workspace_id === keyWorkspaceId);
         company = sameTenant ? data : null;
         canWrite = sameTenant && company.created_by === user.id;
         if (sameTenant && !canWrite) {

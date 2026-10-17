@@ -6,7 +6,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { replicateToken } from '../_shared/replicate-token.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { fetchImageGuarded, fetchTextGuarded } from '../_shared/fetch-image.ts';
 import { imagesFromMetadata } from '../_shared/product-media.ts';
@@ -326,14 +326,15 @@ Deno.serve(withApiLogging('product-cutouts', async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const supabase = serviceClient();
-  const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const { data: { user } } = await supabase.auth.getUser(jwt);
-  if (!user) return json({ error: 'Unauthorized' }, 401);
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
+  const user = { id: auth.userId };
 
   let body: { action?: string; workspace_id?: string; product_ids?: unknown } & Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   const workspaceId = String(body.workspace_id ?? '');
-  if (!workspaceId || !(await userHasWorkspaceCapability(supabase, user.id, workspaceId, 'pricing.manage'))) return json({ error: 'Not found' }, 404);
+  const keyWs = auth.apiKey?.workspace_id;
+  if (!workspaceId || (keyWs && workspaceId !== keyWs) || !(await userHasWorkspaceCapability(supabase, user.id, workspaceId, 'pricing.manage'))) return json({ error: 'Not found' }, 404);
   if (typeof body.action === 'string' && body.action.startsWith('store_')) return await handleStore(supabase, body, workspaceId, user.id);
 
   const ids = Array.isArray(body.product_ids)

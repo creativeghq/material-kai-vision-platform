@@ -3,11 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { mergeKad } from '../_shared/kad.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
 const GEMI_BASE = 'https://opendata-api.businessportal.gr/api/opendata/v1';
 const CACHE_FRESH_MS = 90 * 24 * 3600 * 1000;
@@ -130,17 +130,19 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '');
-    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401);
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return jsonResponse({ error: 'Unauthorized' }, 401);
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) return jsonResponse({ error: auth.error || 'Unauthorized' }, 401);
+    const user = { id: auth.userId };
 
     const body = (await req.json()) as LookupBody;
+    const keyWs = auth.apiKey?.workspace_id;
+    if (keyWs && body.workspace_id && body.workspace_id !== keyWs) return jsonResponse({ error: 'Not found' }, 404);
     const admin = createClient(supabaseUrl, supabaseServiceKey);
+    const requestedWs = keyWs ?? body.workspace_id ?? null;
+    if (requestedWs && !(await userHasWorkspaceCapability(admin, user.id, requestedWs, 'crm.view'))) {
+      return jsonResponse({ error: 'Not found' }, 404);
+    }
+    const workspaceId: string | null = requestedWs;
 
     // ── creds-status: is the platform ΓΕΜΗ key configured? (admin-gated) ──────────────
     if (body.action === 'creds-status') {
@@ -171,14 +173,10 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
       }, 503);
     }
 
-    // #356 `RE-4` generalised. `company_id` is a body-supplied FK into crm_companies. Resolved
-    // ONCE here, against the workspace this request already proved the caller belongs to, so the
-    // audit row can never name another tenant's company. A foreign id is dropped rather than
-    // rejected: this is a best-effort audit log and refusing the whole lookup over a bad
-    // provenance field would be the worse trade.
-    const { data: coRow } = body.company_id
+    // `company_id` counts only inside the verified workspace; a foreign id is dropped, not refused.
+    const { data: coRow } = body.company_id && workspaceId
       ? await admin.from('crm_companies').select('id')
-          .eq('id', String(body.company_id)).eq('workspace_id', body.workspace_id ?? '').maybeSingle()
+          .eq('id', String(body.company_id)).eq('workspace_id', workspaceId).maybeSingle()
       : { data: null };
     const safeCompanyId = (coRow as { id?: string } | null)?.id ?? null;
 
@@ -188,11 +186,8 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
         await admin.from('gemi_lookup_log').insert({
           looked_up_afm: afm,
           ar_gemi: arGemi,
-        // #356 `RE-4` generalised: `company_id` is a body-supplied FK into crm_companies,
-        // stored on an audit row that is later joined for display. The workspace is verified
-        // above; the company was not, so an audit entry could name another tenant's company.
           company_id: safeCompanyId,
-          workspace_id: body.workspace_id ?? null,
+          workspace_id: workspaceId,
           requested_by: user.id,
           reason: body.reason ?? null,
           source,
@@ -204,11 +199,11 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
     };
 
     // 90-day cache (only meaningful when a company_id is supplied).
-    if (body.company_id) {
+    if (safeCompanyId) {
       const { data: cached } = await admin
         .from('crm_companies')
         .select('gemi_data, gemi_data_at, vat_number')
-        .eq('id', body.company_id)
+        .eq('id', safeCompanyId)
         .maybeSingle();
       const sameAfm = cached?.vat_number && cached.vat_number.replace(/[^0-9]/g, '').padStart(9, '0') === afm;
       const fresh = cached?.gemi_data_at && (Date.now() - new Date(cached.gemi_data_at).getTime() < CACHE_FRESH_MS);
@@ -247,11 +242,11 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
     await logLookup('gemi', norm.ar_gemi, true);
 
     // Cache onto the CRM company (service role) when caller owns it or is admin — mirrors ΑΑΔΕ.
-    if (body.company_id) {
+    if (safeCompanyId) {
       const { data: company } = await admin
         .from('crm_companies')
         .select('id, created_by, kad_all')
-        .eq('id', body.company_id)
+        .eq('id', safeCompanyId)
         .maybeSingle();
       if (company) {
         let canWrite = company.created_by === user.id;
@@ -281,7 +276,7 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
             kad_all,
             kad_codes,
             updated_at: checkedAt,
-          }).eq('id', body.company_id);
+          }).eq('id', safeCompanyId);
         }
       }
     }

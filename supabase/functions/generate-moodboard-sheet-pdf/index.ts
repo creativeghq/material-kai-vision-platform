@@ -2,6 +2,7 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument } from 'pdf-lib';
+import { authenticate as authenticateCaller } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,12 +24,10 @@ async function authenticate(req: Request): Promise<{ success: boolean; userId?: 
   // Service-role key path (internal callers)
   if (token === supabaseServiceKey) return { success: true, isService: true };
 
-  // User JWT path — validate via the auth API
   try {
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data, error } = await adminClient.auth.getUser(token);
-    if (error || !data?.user?.id) return { success: false, error: 'Invalid JWT' };
-    return { success: true, userId: data.user.id };
+    const caller = await authenticateCaller(req, { requireUser: true });
+    if (!caller.success || !caller.userId) return { success: false, error: caller.error || 'Invalid JWT' };
+    return { success: true, userId: caller.userId };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Auth verification failed' };
   }

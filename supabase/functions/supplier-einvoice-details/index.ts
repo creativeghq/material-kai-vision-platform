@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { extractIbans, findPdfLink, readEinvoiceHtml, type EinvoiceIssuerDetails } from '../_shared/finance/einvoice-issuer-details.ts';
 import { extractText, getDocumentProxy } from 'npm:unpdf@1.4.0';
@@ -271,12 +271,10 @@ Deno.serve(withApiLogging('supplier-einvoice-details', async (req: Request) => {
   if (!workspaceId) throw new HttpError(400, 'workspace_id required');
 
   if (!isCronAuthorized(req)) {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new HttpError(401, 'Missing Authorization bearer');
-    const reader = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
-    const { data: who } = await reader.auth.getUser();
-    if (!who.user) throw new HttpError(401, 'Invalid session');
-    if (!(await userHasWorkspaceCapability(admin, who.user.id, workspaceId, 'finance.manage'))) throw new HttpError(404, 'Workspace not found');
+    const auth = await authenticate(req, { requireUser: true });
+    if (!auth.success || !auth.userId) throw new HttpError(401, auth.error || 'Invalid session');
+    const keyWs = auth.apiKey?.workspace_id;
+    if ((keyWs && workspaceId !== keyWs) || !(await userHasWorkspaceCapability(admin, auth.userId, workspaceId, 'finance.manage'))) throw new HttpError(404, 'Workspace not found');
   }
 
   const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 60);

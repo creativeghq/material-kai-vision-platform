@@ -18,8 +18,9 @@ export async function resolveAndAssertSeoEntitled(
   // deno-lint-ignore no-explicit-any
   supabase: any,
   userId: string,
+  boundWorkspaceId?: string | null,
 ): Promise<{ workspaceId: string | null; response: Response | null }> {
-  const workspaceId = await resolveSeoWorkspace(supabase, userId);
+  const workspaceId = boundWorkspaceId ?? await resolveSeoWorkspace(supabase, userId);
   if (!workspaceId) return { workspaceId: null, response: null };
   const ent = await assertEntitled(supabase, workspaceId, SEO_MODULE);
   return { workspaceId, response: ent.ok ? null : ent.response };

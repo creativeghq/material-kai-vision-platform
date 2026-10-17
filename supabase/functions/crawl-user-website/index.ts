@@ -15,7 +15,7 @@ import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { scrapeMarkdown, excerptFromMarkdown } from '../_shared/scrape-markdown.ts';
 import { chargeCronUser, refundCronUser } from '../_shared/cron-billing.ts';
-import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 import { extractContentImages, type PageImage } from '../_shared/page-images.ts';
 import { extractContentLinks, extractSpecs, type PageSpecs } from './spec-extract.ts';
@@ -87,14 +87,11 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-async function getUserIdFromJwt(req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (!token) return null;
-  const admin = createClient(supabaseUrl, supabaseServiceKey);
-  const { data, error } = await admin.auth.getUser(token);
-  if (error || !data?.user) return null;
-  return data.user.id;
+/** The calling user (JWT or kai_ key); a key is confined to its own workspace (`undefined` = no key). */
+async function getCaller(req: Request): Promise<{ userId: string; keyWorkspaceId: string | null | undefined } | null> {
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) return null;
+  return { userId: auth.userId, keyWorkspaceId: auth.apiKey ? auth.apiKey.workspace_id : undefined };
 }
 
 /** Embed one page, or null if the embedder is unavailable. */
@@ -968,9 +965,12 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
   const isCron = !!cronSecret && cronHeader === cronSecret;
 
   let userId: string | null = null;
+  let keyWorkspaceId: string | null | undefined;
   if (!isCron) {
-    userId = await getUserIdFromJwt(req);
-    if (!userId) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    const caller = await getCaller(req);
+    if (!caller) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    userId = caller.userId;
+    keyWorkspaceId = caller.keyWorkspaceId;
   }
 
   let body: any;
@@ -990,7 +990,10 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
   // Invariant #1 (BOLA): user_websites is workspace-shared. The service-role client
   // above bypasses RLS, so reconcile the caller against the row's workspace by MEMBERSHIP,
   // not the body-supplied id. Return 404 (not 403) on mismatch to avoid id enumeration.
-  if (!isCron && !(await userHasWorkspaceCapability(supabase, userId, website.workspace_id, 'marketing.seo'))) {
+  if (!isCron && (
+    (keyWorkspaceId !== undefined && website.workspace_id !== keyWorkspaceId)
+    || !(await userHasWorkspaceCapability(supabase, userId, website.workspace_id, 'marketing.seo'))
+  )) {
     return jsonResponse({ success: false, error: 'Website not found' }, 404);
   }
   if (!website.is_active) return jsonResponse({ success: false, error: 'Website is inactive' }, 400);
