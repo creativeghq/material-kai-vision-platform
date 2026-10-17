@@ -1,4 +1,3 @@
-/** An edge function identifies its caller through `authenticate()`; a bare `auth.getUser()` refuses every kai_ key. */
 import { describe, expect, it } from 'vitest';
 import { sourceIndex } from '../helpers/sourceIndex';
 

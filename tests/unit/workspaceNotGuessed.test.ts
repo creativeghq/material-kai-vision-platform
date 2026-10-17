@@ -1,4 +1,3 @@
-/** #496: "the user's workspace" is never ONE row picked out of their memberships. */
 import { describe, expect, it } from 'vitest';
 import { blankedSource, posix, sourceIndex } from '../helpers/sourceIndex';
 

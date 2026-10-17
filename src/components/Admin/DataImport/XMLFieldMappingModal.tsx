@@ -37,6 +37,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { XMLProductPreviewModal } from './XMLProductPreviewModal';
 import { formatNumber } from '@/utils/decimal';
@@ -271,7 +272,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   xmlContent,
   onMappingConfirmed,
 }) => {
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>(suggestedMappings);
   const [manualValues, setManualValues] = useState<Record<string, string>>({});
   const [sanitizeNotice, setSanitizeNotice] = useState<{ targets: string[]; sources: string[] }>({ targets: [], sources: [] });
@@ -284,23 +285,6 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   const [previewValueSources, setPreviewValueSources] = useState<Record<string, 'xml' | 'default'>>({});
   const [previewTotal, setPreviewTotal] = useState(0);
   const [xmlBase64, setXmlBase64] = useState<string>('');
-
-  useEffect(() => {
-    const loadWorkspace = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: workspaceData } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .single();
-      if (workspaceData) setWorkspaceId(workspaceData.workspace_id);
-    };
-    loadWorkspace();
-  }, []);
 
   // Sync mappings if the parent re-runs detection (e.g. user re-uploads).
   useEffect(() => {

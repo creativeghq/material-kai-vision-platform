@@ -20,6 +20,7 @@ import {
 } from '@/components/core/ui/select';
 import { Label } from '@/components/core/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
 import { logger } from '@/services/logger.service';
@@ -45,7 +46,7 @@ interface MaterialCategory {
 
 const XMLImportTab: React.FC = () => {
   const navigate = useNavigate();
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string>('');
   const [sourceType, setSourceType] = useState<'file' | 'url'>('file');
@@ -65,22 +66,6 @@ const XMLImportTab: React.FC = () => {
   // the same muscle memory.
   useEffect(() => {
     const loadInitialData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: workspaceData } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .single();
-
-      if (workspaceData) {
-        setWorkspaceId(workspaceData.workspace_id);
-      }
-
       try {
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('material_categories')

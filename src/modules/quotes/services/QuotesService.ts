@@ -1565,19 +1565,11 @@ export class QuotesService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    // Get user's workspace
-    const { data: workspaceData } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('joined_at', { ascending: true })
-      .limit(1)
-      .single();
-
-    if (!workspaceData) {
-      throw new Error('No workspace found for user');
+    const activeWorkspaceId = getActiveWorkspaceId(user.id);
+    if (!activeWorkspaceId) {
+      throw new Error('No active workspace — reload the page and try again');
     }
+    const workspaceData = { workspace_id: activeWorkspaceId };
 
     try {
       // Use MIVAA API for semantic search with multi_vector strategy
