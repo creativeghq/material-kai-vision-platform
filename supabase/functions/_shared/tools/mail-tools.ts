@@ -447,6 +447,11 @@ export const createMailReplyTool = (ctx: Ctx) =>
 
 // ── mail_update ──────────────────────────────────────────────────────────────────────
 
+const MAIL_UPDATE_LABEL = {
+  archive: 'Archive', mark_read: 'Mark as read', star: 'Star', add_label: 'Label', delete: 'Archive',
+  restore: 'Restore', done: 'Mark done', reopen: 'Reopen',
+} as const;
+
 export const createMailUpdateTool = (ctx: Ctx) =>
   tool(async ({ ref, action, label, confirm }: {
     ref: string; action: 'archive' | 'mark_read' | 'star' | 'add_label' | 'delete' | 'restore' | 'done' | 'reopen'; label?: string; confirm?: boolean;
@@ -455,6 +460,13 @@ export const createMailUpdateTool = (ctx: Ctx) =>
     if (!r0) return fail('ref must be a value mail_search returned.');
     const refused = await gate(ctx, r0.source);
     if (refused) return refused;
+
+    const gmailBin = r0.source === 'gmail' && (action === 'delete' || action === 'restore');
+    if (confirm !== true && !gmailBin) {
+      return ask(ctx, 'mail_update', { ref, action, ...(label ? { label } : {}) },
+        `${MAIL_UPDATE_LABEL[action]} this ${r0.source === 'gmail' ? 'Gmail thread' : 'conversation'}?`,
+        label ? `Label: ${label}` : 'Nothing changes until you approve.', false);
+    }
 
     if (r0.source === 'gmail') {
       const base = { account_id: r0.accountId, thread_id: r0.threadId };
@@ -498,7 +510,7 @@ export const createMailUpdateTool = (ctx: Ctx) =>
     }
   }, {
     name: 'mail_update',
-    description: 'Tidy a thread: archive, mark read, star, add a label (Gmail), done / reopen, delete or restore. Gmail delete moves the thread to the Bin, asks to Approve first, and reports success only after Gmail confirms every message is in the Bin. An Inbox conversation is archived, never destroyed.',
+    description: 'Tidy a thread: archive, mark read, star, add a label (Gmail), done / reopen, delete or restore. Asks the user to Approve first. Gmail delete moves the thread to the Bin and reports success only after Gmail confirms every message is in the Bin. An Inbox conversation is archived, never destroyed.',
     schema: z.object({
       ref: z.string().describe('The thread ref.'),
       action: z.enum(['archive', 'mark_read', 'star', 'add_label', 'delete', 'restore', 'done', 'reopen']),
@@ -510,7 +522,7 @@ export const createMailUpdateTool = (ctx: Ctx) =>
 // ── mail_sender_to_crm ───────────────────────────────────────────────────────────────
 
 export const createMailSenderToCrmTool = (ctx: Ctx) =>
-  tool(async ({ ref }: { ref: string }) => {
+  tool(async ({ ref, confirm }: { ref: string; confirm?: boolean }) => {
     const r0 = parseMailRef(ref);
     if (!r0) return fail('ref must be a value mail_search returned.');
     const refused = await gate(ctx, r0.source);
@@ -521,15 +533,27 @@ export const createMailSenderToCrmTool = (ctx: Ctx) =>
       const me = String(t.data?.account_email ?? '').toLowerCase();
       const sender = ((t.data?.messages ?? []) as Array<Record<string, any>>).map((m) => m.from).find((f) => f?.address && String(f.address).toLowerCase() !== me);
       if (!sender) return fail('Every message in that thread is from you.');
+      if (confirm !== true) {
+        return ask(ctx, 'mail_sender_to_crm', { ref },
+          `Add ${sender.name ? `${sender.name} <${sender.address}>` : sender.address} to the CRM?`,
+          'An existing contact with this email is reused; otherwise a new contact is created and the thread linked to it.', false);
+      }
       const r = await callFn('gmail-api', 'create_contact', { account_id: r0.accountId, thread_id: r0.threadId, email: sender.address, name: sender.name ?? undefined }, ctx.jwt);
       return r.ok ? JSON.stringify({ success: true, contact_id: r.data?.contact_id, created: r.data?.created, email: sender.address }) : fail(r.error ?? 'Could not add the contact');
+    }
+    if (confirm !== true) {
+      return ask(ctx, 'mail_sender_to_crm', { ref }, 'Add the person who wrote this conversation to the CRM?',
+        'An existing contact with the same email or phone is reused; otherwise a new contact is created and the conversation linked to it.', false);
     }
     const r = await callFn('inbox-api', 'create_contact_from_thread', { thread_id: r0.threadId }, ctx.jwt);
     return r.ok ? JSON.stringify({ success: true, ...r.data }) : fail(r.error ?? 'Could not add the contact');
   }, {
     name: 'mail_sender_to_crm',
-    description: 'Add the person who wrote a thread to the CRM and link the thread to them. Reuses an existing contact with the same email or phone before creating one. Then use manage_crm to update their details, company or notes.',
-    schema: z.object({ ref: z.string().describe('The thread ref.') }),
+    description: 'Add the person who wrote a thread to the CRM and link the thread to them. Asks the user to Approve first. Reuses an existing contact with the same email or phone before creating one. Then use manage_crm to update their details, company or notes.',
+    schema: z.object({
+      ref: z.string().describe('The thread ref.'),
+      confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
+    }),
   });
 
 export function createMailTools(ctx: Ctx, wanted: string[]): any[] {

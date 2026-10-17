@@ -11,7 +11,7 @@ async function fetchPage(url: string, until: number): Promise<{ html: string; fi
     const left = until - Date.now();
     if (left < 1500) return null;
     try {
-      await assertSafeUrl(current, { allowSchemes: ['https:', 'http:'] });
+      await assertSafeUrl(current, { allowSchemes: ['https:'] });
       const res = await fetch(current, {
         redirect: 'manual',
         signal: AbortSignal.timeout(Math.min(PAGE_TIMEOUT_MS, left)),
@@ -52,7 +52,7 @@ export async function verifyWebsite(candidate: string, keys: IdentityKeys, until
   const requested = domainOf(candidate);
   if (!requested) return null;
   const home = await fetchPage(`https://${requested}/`, until)
-    ?? await fetchPage(`https://www.${requested}/`, until) ?? await fetchPage(`http://${requested}/`, until);
+    ?? await fetchPage(`https://www.${requested}/`, until);
   if (!home) return { requested, domain: requested, alive: false, by: null };
   const domain = domainOf(home.finalUrl) ?? requested;
   let by = pageConfirmsIdentity(htmlToText(home.html), keys);

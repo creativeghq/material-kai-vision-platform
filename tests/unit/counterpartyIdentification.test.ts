@@ -88,9 +88,8 @@ describe('a verdict that drives a CRM write is constrained by the server', () =>
   it('the prompt comes from the database with no fallback', () => {
     const src = stripComments(read(ENRICH));
     expect(src, 'the identification prompt is not loaded from the database')
-      .toContain("loadPrompt(admin, 'research', 'counterparty_identity')");
-    // Where the prompt is USED, not where it is loaded: the fallback that matters is the one
-    // that quietly substitutes a constant when the row is missing, and it lives at the use.
+      .toContain("loadPrompt(admin, 'research', RESEARCH_PROMPTS[k])");
+    expect(src).toContain("identifyInstruction: 'counterparty_identity'");
     const content = identifyResearchCall(src);
     expect(content, 'a hardcoded fallback prompt appeared — a fallback is invisible when it '
       + 'fires, so an admin edit would save and change nothing forever')

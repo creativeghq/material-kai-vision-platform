@@ -18,6 +18,7 @@ import { pickProductSpec } from '../_shared/productSpecKeys.generated.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { grossFromNet } from '../_shared/money.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
+import { findOrCreateParty, normalizeEmail } from '../_shared/crm-party.ts';
 // Shared with public-project-plan so both anonymous surfaces answer identically (#382 Phase 1).
 import { ANON_BLUEPRINT_ITEM_COLUMNS, foldItemPricingForAnon } from '../_shared/blueprint/anon-pricing.ts';
 // ONE answer to "whose workspace is this", for the two paths a stranger can trigger: the AI
@@ -870,11 +871,9 @@ Deno.serve(withApiLogging((req) => {
   // the analytics beacon: a bot gate BEFORE any row exists, and the workspace from the key.
   if (action === 'request_quote') {
     const name = String(params.name ?? '').trim();
-    const email = String(params.email ?? '').trim();
-    if (!name || !email) return embedJson({ error: 'name and email are required' }, 400, cors);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      return embedJson({ error: 'that email address does not look right' }, 400, cors);
-    }
+    if (!name || !String(params.email ?? '').trim()) return embedJson({ error: 'name and email are required' }, 400, cors);
+    const email = normalizeEmail(params.email);
+    if (!email) return embedJson({ error: 'that email address does not look right' }, 400, cors);
 
     // Bot gate before ANY row is created — this endpoint mints a CRM contact and a request from an
     // anonymous caller, which is exactly the shape finance-storefront had to protect.
@@ -888,18 +887,13 @@ Deno.serve(withApiLogging((req) => {
 
     // Find-or-create the contact, the same way guest checkout does. The person asking is a CRM
     // contact, not a platform user.
-    let contactId: string;
-    const { data: existing } = await supabase.from('crm_contacts')
-      .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1);
-    if (existing && existing.length > 0) {
-      contactId = (existing[0] as { id: string }).id;
-    } else {
-      const { data: created, error: cErr } = await supabase.from('crm_contacts')
-        .insert({ workspace_id: workspaceId, name: name.slice(0, 200), email })
-        .select('id').single();
-      if (cErr || !created) return embedJson({ error: 'Could not record your request' }, 500, cors);
-      contactId = (created as { id: string }).id;
+    const party = await findOrCreateParty(
+      supabase, 'crm_contacts', workspaceId, { email }, { name: name.slice(0, 200), email }, { nameFallback: 'never' },
+    );
+    if (party.status === 'unavailable' || party.status === 'failed') {
+      return embedJson({ error: 'Could not record your request' }, 500, cors);
     }
+    const contactId = party.id;
 
     // The AI impression the visitor was looking at when they asked (#341 join 7). Kept because the
     // operator quoting this is otherwise reading a facet list and imagining what the customer had

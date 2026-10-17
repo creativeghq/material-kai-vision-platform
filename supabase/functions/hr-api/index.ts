@@ -28,6 +28,7 @@ import { handleLabour } from './labour.ts';
 import { handleAccounting } from './accounting.ts';
 import { businessDaysInclusive } from './hr-util.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { findOrCreateParty } from '../_shared/crm-party.ts';
 
 
 /** Best-effort employee display name for Flows payloads (never throws). */
@@ -228,12 +229,29 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         } else {
           const contactFields = pick(body?.contact ?? {}, CONTACT_WRITABLE);
           if (!contactFields.name) return json({ error: 'contact.name is required' }, 400);
-          const { data: created, error: cErr } = await supabase
-            .from('crm_contacts')
-            .insert({ ...contactFields, workspace_id: workspaceId, created_by: userId })
-            .select('id').single();
-          if (cErr) throw new HttpError(400, cErr.message);
-          contactId = created.id;
+          const party = await findOrCreateParty(
+            supabase, 'crm_contacts', workspaceId,
+            { name: String(contactFields.name), vat: contactFields.vat_number as string | undefined, email: contactFields.email as string | undefined },
+            { ...contactFields, created_by: userId },
+            { nameFallback: 'never' },
+          );
+          if (party.status === 'unavailable' || party.status === 'failed') throw new HttpError(400, party.message);
+          contactId = party.id;
+          if (party.status === 'found') {
+            const cols = Object.keys(contactFields);
+            const { data: cur, error: curErr } = await supabase
+              .from('crm_contacts').select(cols.join(', ')).eq('id', contactId).single();
+            if (curErr) throw new HttpError(400, curErr.message);
+            const fill: Record<string, unknown> = {};
+            for (const k of cols) {
+              const v = (cur as unknown as Record<string, unknown>)[k];
+              if (v === null || v === undefined || v === '') fill[k] = contactFields[k];
+            }
+            if (Object.keys(fill).length) {
+              const { error: fillErr } = await supabase.from('crm_contacts').update(fill).eq('id', contactId).eq('workspace_id', workspaceId);
+              if (fillErr) throw new HttpError(400, fillErr.message);
+            }
+          }
         }
 
         // Manager (if given) must belong to this workspace.

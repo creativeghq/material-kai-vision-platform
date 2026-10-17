@@ -84,6 +84,49 @@ export function pickContactFields(body: Record<string, unknown>): Record<string,
   return out;
 }
 
+/** Commercial terms on a contact — the same owner/admin rule the companies handler applies (#485 C-2). */
+const CONTACT_COMMERCIAL_TERMS_COLUMNS = [
+  'discount_percent', 'discount_notes', 'credit_limit', 'user_level_key', 'prices_vat_inclusive',
+  'payment_terms_days', 'min_order_value', 'responsible_sales_user_ids',
+] as const;
+
+const CONTACT_COMMERCIAL_TERMS_ROLES = ['owner', 'admin'] as const;
+
+async function callerMayWriteContactTerms(
+  userId: string | null,
+  workspaceId: string | undefined,
+  scope: CrmScope,
+): Promise<boolean> {
+  if (scope.isGlobalOperator) return true;
+  if (!userId || !workspaceId) return false;
+  const { data } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .maybeSingle<{ role: string }>();
+  return !!data && (CONTACT_COMMERCIAL_TERMS_ROLES as readonly string[]).includes(data.role);
+}
+
+export async function stripContactCommercialTerms(
+  fields: Record<string, unknown>,
+  userId: string | null,
+  workspaceId: string | undefined,
+  scope: CrmScope,
+): Promise<Record<string, unknown>> {
+  const out = { ...fields };
+  const attempted = CONTACT_COMMERCIAL_TERMS_COLUMNS.filter((c) => out[c] !== undefined);
+  if (attempted.length > 0 && !(await callerMayWriteContactTerms(userId, workspaceId, scope))) {
+    for (const col of attempted) delete out[col];
+    console.warn(
+      `[crm-contacts-api] dropped commercial terms (${attempted.join(', ')}) — user ${userId} `
+      + `is not an owner/admin of workspace ${workspaceId}`,
+    );
+  }
+  return out;
+}
+
 /**
  * CRM Contacts API
  * Handles CRM contact management: create, list, update, delete
@@ -158,14 +201,15 @@ export async function handleContacts(req: Request): Promise<Response> {
       // that is not a screen (the agent, a partner `kai_` key, the API). One query on the same
       // transliterated key immediately before the insert is the guarantee.
       const contactDuplicate = await guardDuplicateParty(
-        supabase, 'crm_contacts', targetWs, name, body.allow_duplicate === true, corsHeaders,
+        supabase, 'crm_contacts', targetWs, { name, vat: body.vat_number as string | undefined, email: body.email as string | undefined },
+        body.allow_duplicate === true, corsHeaders,
       );
       if (contactDuplicate) return contactDuplicate;
 
       const { data, error } = await supabase
         .from('crm_contacts')
         .insert({
-          ...pickContactFields(body),
+          ...(await stripContactCommercialTerms(pickContactFields(body), userId, targetWs, scope)),
           name,
           workspace_id: targetWs,
           created_by: userId || 'system',
@@ -425,7 +469,13 @@ export async function handleContacts(req: Request): Promise<Response> {
       const contactId = path[0];
       const body = await req.json();
 
-      if (!(await contactInScope(contactId, scope))) {
+      let wsQuery = supabase.from('crm_contacts').select('workspace_id').eq('id', contactId);
+      if (!scope.isGlobalOperator) wsQuery = wsQuery.in('workspace_id', scope.workspaceIds);
+      const { data: wsRow } = scope.isGlobalOperator || scope.workspaceIds.length > 0
+        ? await wsQuery.maybeSingle()
+        : { data: null };
+      const contactWs = (wsRow as { workspace_id?: string } | null)?.workspace_id;
+      if (!contactWs) {
         return new Response(
           JSON.stringify({ error: 'Contact not found' }),
           { status: 404, headers: corsHeaders },
@@ -433,7 +483,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       }
 
       const updates: Record<string, unknown> = {
-        ...pickContactFields(body),
+        ...(await stripContactCommercialTerms(pickContactFields(body), userId, contactWs, scope)),
         updated_at: new Date().toISOString(),
       };
 

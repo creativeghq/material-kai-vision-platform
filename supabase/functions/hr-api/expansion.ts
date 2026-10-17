@@ -11,6 +11,7 @@ import { isEmploymentType, isLocationType, isAbsenceType } from '../_shared/hrVo
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
+import { findOrCreateParty, normalizeEmail } from '../_shared/crm-party.ts';
 import { isPlatformOperator } from '../_shared/auth.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
@@ -497,21 +498,14 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         // Best-effort — never block the application on the link.
         let crmContactId: string | null = null;
         try {
-          const email = String((cf as any).email ?? '').trim().toLowerCase();
-          if (email) {
-            const { data: existing } = await supabase.from('crm_contacts')
-              .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1).maybeSingle();
-            crmContactId = existing?.id ?? null;
-          }
-          if (!crmContactId) {
-            const { data: c2, error: c2Err } = await supabase.from('crm_contacts')
-              .insert({ workspace_id: workspaceId, name: String((cf as any).name), email: email || null, phone: (cf as any).phone ?? null, lead_source: 'application' })
-              .select('id').single();
-            // The application still goes through without the link, but a permanently-null
-            // crm_contact_id on every candidate is a broken spine that nothing would report.
-            if (c2Err) console.error('[hr-api] spine link: crm_contacts insert failed:', c2Err.message);
-            crmContactId = c2?.id ?? null;
-          }
+          const email = normalizeEmail((cf as any).email);
+          const party = await findOrCreateParty(
+            supabase, 'crm_contacts', workspaceId, { email, name: String((cf as any).name) },
+            { name: String((cf as any).name), email, phone: (cf as any).phone ?? null, lead_source: 'application' },
+          );
+          if (party.status === 'unavailable' || party.status === 'failed') {
+            console.error('[hr-api] spine link: contact find-or-create failed:', party.message);
+          } else crmContactId = party.id;
         } catch (e) { console.error('[hr-api] spine link threw — candidate has no crm_contact_id:', e); }
         const { data: created, error: cErr } = await supabase.from('hr_candidates').insert({ ...cf, workspace_id: workspaceId, crm_contact_id: crmContactId }).select('id').single();
         if (cErr) throw new HttpError(400, cErr.message);
@@ -630,26 +624,68 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const id = String(body?.application_id ?? '');
       if (!id) return json({ error: 'application_id is required' }, 400);
       const { data: app } = await supabase.from('hr_applications')
-        .select('*, candidate:hr_candidates!hr_applications_candidate_id_fkey ( name, email, phone )')
+        .select('*, candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, crm_contact_id )')
         .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!app) return json({ error: 'application not found' }, 404);
       if (app.hired_employee_id) return json({ error: 'This application is already hired.' }, 409);
-      // 1) contact
-      const { data: contact, error: cErr } = await supabase.from('crm_contacts')
-        .insert({ name: app.candidate?.name ?? 'New hire', email: app.candidate?.email ?? null, phone: app.candidate?.phone ?? null, workspace_id: workspaceId, created_by: userId })
-        .select('id').single();
-      if (cErr) throw new HttpError(400, cErr.message);
-      // 2) employee
-      const { data: emp, error: eErr } = await supabase.from('hr_employees')
-        .insert({ workspace_id: workspaceId, crm_contact_id: contact.id, status: 'active', start_date: (body?.start_date ?? new Date().toISOString().slice(0, 10)), department_id: body?.department_id ?? null })
-        .select('id').single();
-      if (eErr) throw new HttpError(400, eErr.message);
-      // 3) close application
-      await supabase.from('hr_applications').update({ stage: 'hired', hired_employee_id: emp.id }).eq('id', id).eq('workspace_id', workspaceId);
-      // 4) seed onboarding checklist
-      const tasks = DEFAULT_ONBOARDING.map((title, i) => ({ workspace_id: workspaceId, employee_id: emp.id, title, sort_order: i, status: 'pending' }));
-      await supabase.from('hr_onboarding_tasks').insert(tasks);
-      return json({ employee_id: emp.id, onboarding_seeded: tasks.length }, 201);
+      const startDate = body?.start_date ? String(body.start_date) : null;
+      if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return json({ error: 'start_date must be YYYY-MM-DD' }, 400);
+
+      // Resumable: the candidate's own contact, then an employee already filed for it, so a retry after a
+      // partial failure finishes the hire instead of creating a second person.
+      let contactId: string | null = app.candidate?.crm_contact_id ?? null;
+      if (!contactId) {
+        const name = String(app.candidate?.name ?? '').trim() || 'New hire';
+        const email = normalizeEmail(app.candidate?.email);
+        const party = await findOrCreateParty(
+          supabase, 'crm_contacts', workspaceId, { email, name },
+          { name, email, phone: app.candidate?.phone ?? null, created_by: userId },
+        );
+        if (party.status === 'unavailable' || party.status === 'failed') throw new HttpError(400, party.message);
+        contactId = party.id;
+        if (app.candidate?.id) {
+          const { error: linkErr } = await supabase.from('hr_candidates')
+            .update({ crm_contact_id: contactId }).eq('id', app.candidate.id).eq('workspace_id', workspaceId);
+          if (linkErr) throw new HttpError(400, linkErr.message);
+        }
+      }
+
+      const { data: priorEmp, error: priorErr } = await supabase.from('hr_employees')
+        .select('id').eq('workspace_id', workspaceId).eq('crm_contact_id', contactId).maybeSingle();
+      if (priorErr) throw new HttpError(400, priorErr.message);
+      let employeeId: string | null = priorEmp?.id ?? null;
+      if (!employeeId) {
+        const { data: hrSettings } = await supabase.from('hr_settings').select('timezone').eq('workspace_id', workspaceId).maybeSingle();
+        const tz = hrSettings?.timezone || 'Europe/Athens';
+        const { data: emp, error: eErr } = await supabase.from('hr_employees')
+          .insert({
+            workspace_id: workspaceId, crm_contact_id: contactId, status: 'active',
+            start_date: startDate ?? new Date().toLocaleDateString('sv-SE', { timeZone: tz }),
+            department_id: body?.department_id ?? null,
+          })
+          .select('id').single();
+        if (eErr) throw new HttpError(400, eErr.message);
+        employeeId = emp.id;
+      }
+
+      const { data: claimed, error: hireErr } = await supabase.from('hr_applications')
+        .update({ stage: 'hired', hired_employee_id: employeeId })
+        .eq('id', id).eq('workspace_id', workspaceId).is('hired_employee_id', null)
+        .select('id');
+      if (hireErr) throw new HttpError(400, `The employee was created but the application could not be marked hired: ${hireErr.message}`);
+      if (!claimed?.length) return json({ error: 'This application is already hired.' }, 409);
+
+      const { count: existingTasks, error: tasksReadErr } = await supabase.from('hr_onboarding_tasks')
+        .select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('employee_id', employeeId);
+      if (tasksReadErr) throw new HttpError(400, tasksReadErr.message);
+      let seeded = 0;
+      if (!existingTasks) {
+        const tasks = DEFAULT_ONBOARDING.map((title, i) => ({ workspace_id: workspaceId, employee_id: employeeId, title, sort_order: i, status: 'pending' }));
+        const { error: seedErr } = await supabase.from('hr_onboarding_tasks').insert(tasks);
+        if (seedErr) throw new HttpError(400, `Hired, but the onboarding checklist could not be seeded: ${seedErr.message}`);
+        seeded = tasks.length;
+      }
+      return json({ employee_id: employeeId, onboarding_seeded: seeded }, 201);
     }
 
     // ─────────────────────────── ONBOARDING ───────────────────────────

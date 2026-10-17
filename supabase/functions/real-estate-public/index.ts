@@ -16,6 +16,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { toPublic, matchesCriteria, estimateFromMedianPerSqm, withRentSettlements } from '../_shared/real-estate.ts';
 import { embedText } from '../_shared/real-estate-embedding.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { findOrCreateParty, normalizeEmail } from '../_shared/crm-party.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
 
@@ -365,8 +366,9 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
 
     const name = String(body?.name ?? '').trim();
-    const email = String(body?.email ?? '').trim();
-    if (!name || !email) return json({ error: 'name and email are required' }, 400);
+    if (!name || !String(body?.email ?? '').trim()) return json({ error: 'name and email are required' }, 400);
+    const email = normalizeEmail(body?.email);
+    if (!email) return json({ error: 'a valid email address is required' }, 400);
     if (body?.gdpr_consent !== true) return json({ error: 'gdpr_consent is required' }, 400);
     const rl = await enforceLeadRateLimit(supabase, req, 'request-valuation', workspaceId);
     if (rl) return rl;
@@ -393,28 +395,25 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
 
     // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.
-    // The error MUST be checked. This used to destructure only `data`, so a
-    // failed insert left `contact` null, skipped the property_contacts_ext upsert AND the
-    // crm_contact_created event, and still returned 200 with the estimate — while
-    // ValuationWidget flips to its success screen on any resolved promise.
-    const { data: contact, error: contactErr } = await supabase.from('crm_contacts').insert({
-      workspace_id: workspaceId, name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
+    // An existing contact with this email is reused; an anonymous caller never rewrites its consent or role.
+    const party = await findOrCreateParty(supabase, 'crm_contacts', workspaceId, { email }, {
+      name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
       contact_type: 'seller', lead_source: 'valuation_request', lead_status: 'new',
       // Optional marketing opt-in, captured separately from the required processing consent above.
-      // This is the ONLY moment we can ask — the column is NOT NULL DEFAULT false, so a seller who
-      // opted in here but was written without it stays permanently unmailable by any automation.
       marketing_consent: body?.marketing_consent === true,
-    }).select('id').single();
-    if (contactErr || !contact?.id) {
-      console.error('[real-estate-public] valuation lead capture failed:', contactErr?.message);
+    });
+    if (party.status === 'unavailable' || party.status === 'failed') {
+      console.error('[real-estate-public] valuation lead capture failed:', party.message);
       throw new HttpError(400, 'Could not record your request. Please try again.');
     }
+    const contact = { id: party.id };
     {
-      await supabase.from('property_contacts_ext').upsert({
+      const { error: extErr } = await supabase.from('property_contacts_ext').upsert({
         crm_contact_id: contact.id, workspace_id: workspaceId, contact_role: 'seller',
         owned_property_address: [String(body?.address ?? '').trim(), town].filter(Boolean).join(', ') || null,
         owned_property_value: estimate,
-      }, { onConflict: 'crm_contact_id' });
+      }, { onConflict: 'crm_contact_id', ignoreDuplicates: party.status === 'found' });
+      if (extErr) console.error('[real-estate-public] seller extension write failed:', extErr.message);
       // This is a genuine new-lead moment that writes crm_contacts directly (bypassing crm-api),
       // so it must fire crm_contact_created itself — otherwise the agency's "new lead → notify/assign"
       // automation never runs for its highest-value inbound. Notify workspace owners/admins.

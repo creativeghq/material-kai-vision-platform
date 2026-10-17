@@ -19,6 +19,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { escapeHtml } from '../_shared/html.ts';
+import { findOrCreateParty, normalizeEmail } from '../_shared/crm-party.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
 import { contractContentHash, SIGNED_FIELDS } from '../_shared/contract-hash.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
@@ -203,23 +204,17 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     // creation on the link (matches the degrade-silently pattern used across ingest paths).
     if (!payload.crm_contact_id && (body?.counterparty_email || body?.counterparty_name)) {
       try {
-        const email = String(body?.counterparty_email ?? '').trim().toLowerCase();
-        let contactId: string | null = null;
-        if (email) {
-          const { data: existing } = await asUser.from('crm_contacts')
-            .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1).maybeSingle();
-          contactId = existing?.id ?? null;
+        const email = normalizeEmail(body?.counterparty_email);
+        const name = String(body?.counterparty_name ?? '').trim() || email || 'Contract counterparty';
+        const party = await findOrCreateParty(
+          asUser, 'crm_contacts', workspaceId, { email, name },
+          { name, email, created_by: userId, lead_source: 'contract' },
+        );
+        // `asUser` means an RLS denial resolves rather than throws, so a failed link must be logged.
+        if (party.status === 'unavailable' || party.status === 'failed') {
+          console.error('[contracts-api] spine link: contact find-or-create failed:', party.message);
         }
-        if (!contactId) {
-          const { data: created, error: createError } = await asUser.from('crm_contacts')
-            .insert({ workspace_id: workspaceId, name: String(body?.counterparty_name ?? email ?? 'Contract counterparty'), email: email || null, created_by: userId, lead_source: 'contract' })
-            .select('id').single();
-          // Degrading silently is intended; degrading INVISIBLY is not. `asUser` means an RLS
-          // denial resolves rather than throws, so without this the spine link would just never
-          // form and every contract would quietly carry a null crm_contact_id.
-          if (createError) console.error('[contracts-api] spine link: crm_contacts insert failed:', createError.message);
-          contactId = created?.id ?? null;
-        }
+        const contactId = party.status === 'found' || party.status === 'created' ? party.id : null;
         if (contactId) payload.crm_contact_id = contactId;
       } catch (e) { console.error('[contracts-api] spine link threw — contract has no crm_contact_id:', e); }
     }

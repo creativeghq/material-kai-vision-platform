@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, rowInScope, isUuid, type CrmScope } from './_scope.ts';
-import { pickContactFields, escapeLike, parseIdsParam, quoteOrValue, MAX_FILTER_IDS } from './contacts-api-handler.ts';
+import { pickContactFields, stripContactCommercialTerms, escapeLike, parseIdsParam, quoteOrValue, MAX_FILTER_IDS } from './contacts-api-handler.ts';
 import { noteMatchedTargetIds } from './_noteSearch.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import { foldForSearch } from '../../_shared/searchFold.ts';
@@ -12,6 +12,7 @@ import { normalizeVat } from '../../_shared/crm/vatNormalize.generated.ts';
 import { guardDuplicateParty } from './_partyDedupe.ts';
 import { fetchTextGuarded } from '../../_shared/fetch-image.ts';
 import { toVatPrefix } from '../../_shared/vatCountries.generated.ts';
+import { canReplace, type FieldSource } from '../../_shared/crm/identityCheck.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -271,7 +272,8 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // Greek case and accents: "Καρέλης ΑΕ" finds the stored "ΚΑΡΕΛΗΣ ΑΕ", which plain `ilike`
       // on the raw column never did.
       const companyDuplicate = await guardDuplicateParty(
-        supabase, 'crm_companies', targetWs, body.name, body.allow_duplicate === true, corsHeaders,
+        supabase, 'crm_companies', targetWs, { name: body.name, vat: companyFields.vat_number as string | undefined },
+        body.allow_duplicate === true, corsHeaders,
       );
       if (companyDuplicate) return companyDuplicate;
 
@@ -520,8 +522,15 @@ export async function handleCompanies(req: Request): Promise<Response> {
         const row = (cur ?? {}) as Record<string, unknown> & { field_sources?: Record<string, unknown> | null };
         const sources: Record<string, unknown> = { ...(row.field_sources ?? {}) };
         const at = new Date().toISOString();
-        const changed = touched.filter((f) => (row[f] ?? null) !== (updates[f] ?? null));
         const hinted = (body?._sources ?? {}) as Record<string, unknown>;
+        for (const f of touched) {
+          if (hinted[f] !== 'web_verified') continue;
+          const current = row[f];
+          const blank = current === null || current === undefined || String(current).trim() === '';
+          const prior = (sources[f] as { src?: FieldSource } | undefined)?.src;
+          if (!blank && !canReplace(prior, 'web_verified')) delete updates[f];
+        }
+        const changed = touched.filter((f) => f in updates && (row[f] ?? null) !== (updates[f] ?? null));
         for (const f of changed) {
           sources[f] = hinted[f] === 'web_verified'
             ? { src: 'web_verified', by: 'research', at }
@@ -682,14 +691,15 @@ export async function handleCompanies(req: Request): Promise<Response> {
         // through a search — so the client-side "search before you create" convention does not
         // reach it, and it was the un-gated door into the contact book (#378 F2).
         const contactDuplicate = await guardDuplicateParty(
-          supabase, 'crm_contacts', companyWs, name, body.allow_duplicate === true, corsHeaders,
+          supabase, 'crm_contacts', companyWs, { name, vat: newContact?.vat_number as string | undefined, email: newContact?.email as string | undefined },
+          body.allow_duplicate === true, corsHeaders,
         );
         if (contactDuplicate) return contactDuplicate;
 
         const { data: created, error: createErr } = await supabase
           .from('crm_contacts')
           .insert({
-            ...pickContactFields(newContact ?? {}),
+            ...(await stripContactCommercialTerms(pickContactFields(newContact ?? {}), userId, companyWs, scope)),
             ...(positionGiven ? { position: position || null } : {}),
             name,
             workspace_id: companyWs,

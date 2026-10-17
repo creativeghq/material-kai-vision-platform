@@ -29,6 +29,7 @@ import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 import { refreshListingEmbedding } from '../_shared/real-estate-embedding.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { findOrCreateParty, normalizeEmail } from '../_shared/crm-party.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 /** Member-entered link fields render as hrefs on the ANONYMOUS public page — enforce http(s)
@@ -1358,16 +1359,24 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (!inq) return json({ error: 'not found' }, 404);
         if (inq.crm_contact_id) return json({ crm_contact_id: inq.crm_contact_id, already_linked: true });
 
-        const { data: contact, error: cErr } = await supabase.from('crm_contacts').insert({
-          workspace_id: workspaceId, name: inq.name || inq.email || 'Website lead', email: inq.email, phone: inq.phone,
+        const inqEmail = normalizeEmail(inq.email);
+        const leadName = inq.name || inq.email || 'Website lead';
+        const party = await findOrCreateParty(supabase, 'crm_contacts', workspaceId, { email: inqEmail, name: leadName }, {
+          name: leadName, email: inqEmail ?? inq.email, phone: inq.phone,
           contact_type: 'buyer', lead_source: 'property_portal', lead_status: 'new',
           responsible_sales_user_ids: [userId],
           // Carry the enquiry's marketing opt-in onto the contact. This is the ONLY bridge between the
           // consent the buyer gave on the public page and the flag the direct-to-buyer alert and the
           // digest cron gate on; dropping it here re-opts-out everyone the module converts.
           marketing_consent: inq.marketing_consent === true,
-        }).select('id').single();
-        if (cErr) throw new HttpError(400, cErr.message);
+        });
+        if (party.status === 'unavailable' || party.status === 'failed') throw new HttpError(400, party.message);
+        if (party.status === 'found' && inq.marketing_consent === true) {
+          const { error: consentErr } = await supabase.from('crm_contacts')
+            .update({ marketing_consent: true }).eq('id', party.id).eq('workspace_id', workspaceId);
+          if (consentErr) throw new HttpError(400, consentErr.message);
+        }
+        const contact = { id: party.id };
 
         await supabase.from('property_inquiries').update({ crm_contact_id: contact.id, status: 'contacted' }).eq('id', inqId).eq('workspace_id', workspaceId);
         await supabase.from('property_interests').upsert(
@@ -1434,12 +1443,13 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const phone = body.phone ? String(body.phone).trim() : null;
         const message = String(body.message ?? '').slice(0, 1000) || 'Manually added lead';
 
-        const { data: contact, error: cErr } = await supabase.from('crm_contacts').insert({
-          workspace_id: workspaceId, name, email, phone,
+        const party = await findOrCreateParty(supabase, 'crm_contacts', workspaceId, { email, name }, {
+          name, email: normalizeEmail(email) ?? email, phone,
           contact_type: 'buyer', lead_source: 'manual', lead_status: 'new',
           responsible_sales_user_ids: [userId],
-        }).select('id').single();
-        if (cErr) throw new HttpError(400, cErr.message);
+        });
+        if (party.status === 'unavailable' || party.status === 'failed') throw new HttpError(400, party.message);
+        const contact = { id: party.id };
 
         // A walk-in or phone lead routes like any other. The agent recording it is the natural
         // owner, so they are the fallback when no territory rule matches — that is the one path

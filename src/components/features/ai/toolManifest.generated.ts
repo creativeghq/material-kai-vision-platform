@@ -1095,6 +1095,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Add the person who wrote a thread to the CRM and link the thread to them.',
     params: [
       { name: 'ref', type: 'string', optional: false, description: 'The thread ref.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
     ],
   },
   {

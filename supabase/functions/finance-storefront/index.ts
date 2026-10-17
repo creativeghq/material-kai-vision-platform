@@ -4,6 +4,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { findOrCreateParty, normalizeEmail } from '../_shared/crm-party.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 // Public online storefront (public link / mini-store).
@@ -144,6 +145,8 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         }));
       if (clean.length === 0) return json({ error: 'cart is empty' }, 400);
       if (!customer?.email || !customer?.name) return json({ error: 'name and email are required' }, 400);
+      const custEmail = normalizeEmail(customer.email);
+      if (!custEmail) return json({ error: 'a valid email address is required' }, 400);
 
       // Bot gate BEFORE any work: this mints a document, a CRM contact and a pay token from an
       // ANONYMOUS caller. Above the entitlement check on purpose — a 403/400 difference would
@@ -203,19 +206,15 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       // Guest checkout carries only name+email. The invoices_customer_xor CHECK requires
       // exactly one of customer_company_id / customer_contact_id, so find-or-create a CRM
       // contact by email in this workspace and link it (otherwise every order 500s).
-      const custEmail = String(customer.email).trim();
-      let contactId: string;
-      const { data: existingContacts } = await supabase.from('crm_contacts')
-        .select('id').eq('workspace_id', ws.id).ilike('email', custEmail).limit(1);
-      if (existingContacts && existingContacts.length > 0) {
-        contactId = (existingContacts[0] as any).id;
-      } else {
-        const { data: newContact, error: cErr } = await supabase.from('crm_contacts')
-          .insert({ workspace_id: ws.id, name: String(customer.name).slice(0, 200), email: custEmail })
-          .select('id').single();
-        if (cErr || !newContact) return json({ error: `could not create customer: ${cErr?.message ?? 'no row returned'}` }, 500);
-        contactId = (newContact as any).id;
+      const party = await findOrCreateParty(
+        supabase, 'crm_contacts', ws.id, { email: custEmail },
+        { name: String(customer.name).slice(0, 200), email: custEmail },
+        { nameFallback: 'never' },
+      );
+      if (party.status === 'unavailable' || party.status === 'failed') {
+        return json({ error: `could not create customer: ${party.message}` }, 500);
       }
+      const contactId: string = party.id;
 
       // Draft number (no legal-counter advance — abandoned carts can't gap the series).
       const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: ws.id });
