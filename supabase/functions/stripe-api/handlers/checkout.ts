@@ -46,6 +46,7 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
         .select('role')
         .eq('workspace_id', workspaceId)
         .eq('user_id', userId)
+        .eq('status', 'active')
         .maybeSingle();
       const { data: ws } = await supabase
         .from('workspaces')
@@ -73,7 +74,7 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
       .from('user_profiles')
       .select(customerCol)
       .eq('user_id', userId)
-      .single();
+      .single<Record<string, string | null>>();
 
     if (profile?.[customerCol]) {
       customerId = profile[customerCol];

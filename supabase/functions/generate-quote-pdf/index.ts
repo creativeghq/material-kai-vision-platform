@@ -110,7 +110,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       if (workspaceId && auth.level !== 'secret') {
         const { data: member } = await supabase
           .from('workspace_members').select('user_id')
-          .eq('workspace_id', workspaceId).eq('user_id', auth.userId ?? '').maybeSingle();
+          .eq('workspace_id', workspaceId).eq('user_id', auth.userId ?? '').eq('status', 'active').maybeSingle();
         if (!member) return jsonResponse({ success: false, error: 'Forbidden' }, 403);
       }
       const branding = await fetchBrandingConfig(supabase, workspaceId);
@@ -169,6 +169,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
           .select('user_id')
           .eq('workspace_id', (ownerRow as any).workspace_id)
           .eq('user_id', auth.userId ?? '')
+          .eq('status', 'active')
           .maybeSingle();
         if (!member) {
           return jsonResponse({ success: false, error: 'Forbidden' }, 403);

@@ -55,3 +55,23 @@ describe('a workspace is never guessed from one membership row (#496)', () => {
     expect(stale, 'Remove these NOT_A_GUESS entries — the read they excused is gone').toEqual([]);
   });
 });
+
+describe('a membership test requires an ACTIVE membership', () => {
+  it('every workspace_members read keyed on user AND workspace also filters status', () => {
+    const loose: string[] = [];
+    for (const [abs] of INDEX.blanked()) {
+      const src = blankedSource(abs);
+      const re = /\.from\(\s*['"]workspace_members['"]\s*\)/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(src))) {
+        const ends = [src.indexOf(';', m.index), src.indexOf('.from(', m.index + 1), m.index + 700].filter((i) => i > m!.index);
+        const chain = src.slice(m.index, Math.min(...ends));
+        const keyed = /\.eq\(\s*['"]user_id['"]/.test(chain) && /\.(eq|in)\(\s*['"]workspace_id['"]/.test(chain);
+        if (keyed && !/status/.test(chain) && !/\.(insert|update|upsert|delete)\(/.test(chain)) {
+          loose.push(`${posix(abs)}:${src.slice(0, m.index).split('\n').length}`);
+        }
+      }
+    }
+    expect(loose, 'A suspended or pending member is not a member: add .eq(\'status\', \'active\')').toEqual([]);
+  });
+});

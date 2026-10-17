@@ -521,6 +521,7 @@ export async function handleContacts(req: Request): Promise<Response> {
           .from('workspace_members')
           .select('user_id')
           .eq('user_id', userId)
+          .eq('status', 'active')
           .in('workspace_id', scope.workspaceIds.length ? scope.workspaceIds : ['00000000-0000-0000-0000-000000000000'])
           .limit(1)
           .maybeSingle();
@@ -704,6 +705,7 @@ export async function handleContacts(req: Request): Promise<Response> {
               .from('workspace_members')
               .select('user_id')
               .eq('user_id', userId)
+              .eq('status', 'active')
               .in('workspace_id', scope.workspaceIds.length ? scope.workspaceIds : ['00000000-0000-0000-0000-000000000000'])
               .limit(1)
               .maybeSingle();

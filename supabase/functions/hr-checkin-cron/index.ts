@@ -44,7 +44,9 @@ async function resolveRecipients(supabase: any, s: any): Promise<{ user_id: stri
   const out: { user_id: string | null; email: string | null }[] = [];
   if (userIds.size) {
     const { data: profs } = await supabase.from('user_profiles').select('user_id, email').in('user_id', Array.from(userIds));
-    const emailByUid = new Map((profs ?? []).map((p: any) => [p.user_id, p.email]));
+    const emailByUid = new Map<string, string | null>(
+      (profs ?? []).map((p: { user_id: string; email: string | null }) => [p.user_id, p.email]),
+    );
     for (const uid of userIds) out.push({ user_id: uid, email: emailByUid.get(uid) ?? null });
   }
   for (const email of (s.notify_emails ?? [])) if (email) out.push({ user_id: null, email });
@@ -145,7 +147,7 @@ Deno.serve(withApiLogging('hr-checkin-cron', async (req) => {
       if (recipients === null) recipients = await resolveRecipients(supabase, s);
       if (!recipients.length) { alerted++; continue; }
 
-      const empName = e.contact?.name || 'An employee';
+      const empName = (e.contact as unknown as { name?: string | null } | null)?.name || 'An employee';
       const title = 'Late check-in';
       const bodyText = `${empName} has not clocked in yet${e.work_start_time ? ` (expected ${String(e.work_start_time).slice(0, 5)})` : ''}.`;
       for (const r of recipients) {

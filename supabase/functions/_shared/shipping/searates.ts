@@ -71,7 +71,7 @@ function parseOffers(payload: any, mode: string): NormalizedOffer[] {
       mode,
       raw: o,
     };
-  }).filter((o) => o.amount != null || o.carrier != null);
+  }).filter((o: NormalizedOffer) => o.amount != null || o.carrier != null);
 }
 
 /**

@@ -913,7 +913,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           if (uid) {
             // Paying a user id from another tenant would both leak the sale and misdirect money.
             const { data: member } = await supabase.from('workspace_members')
-              .select('user_id').eq('workspace_id', workspaceId).eq('user_id', uid).maybeSingle();
+              .select('user_id').eq('workspace_id', workspaceId).eq('user_id', uid).eq('status', 'active').maybeSingle();
             if (!member) return json({ error: 'That user is not a member of this workspace.' }, 400);
           }
           payload.user_id = uid;

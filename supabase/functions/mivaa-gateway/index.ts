@@ -276,6 +276,7 @@ async function handleFileUpload(
         .select('workspace_id')
         .eq('user_id', ctx.userId)
         .eq('workspace_id', claimedWorkspace)
+        .eq('status', 'active')
         .maybeSingle();
       if (!wsMember) {
         return new Response(
@@ -589,6 +590,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
         .select('workspace_id')
         .eq('user_id', auth.userId)
         .eq('workspace_id', payload.workspace_id)
+        .eq('status', 'active')
         .maybeSingle();
       if (!wsMember) {
         return new Response(
@@ -600,7 +602,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
 
     // Validate action BEFORE any billing/debit so an unknown-but-priced action
     // can never debit credits and then 400 without a refund.
-    if (!action || !MIVAA_ENDPOINTS[action]) {
+    if (!action || !MIVAA_ENDPOINTS[action as keyof typeof MIVAA_ENDPOINTS]) {
       return new Response(
         JSON.stringify({
           error: 'Invalid action',
@@ -613,7 +615,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       );
     }
 
-    const endpoint = MIVAA_ENDPOINTS[action];
+    const endpoint = MIVAA_ENDPOINTS[action as keyof typeof MIVAA_ENDPOINTS];
 
     // Resolve path parameters BEFORE the authorization gate below. The gate used to test
     // `endpoint.path` — the TEMPLATE — while substitution happened afterwards, unencoded, so

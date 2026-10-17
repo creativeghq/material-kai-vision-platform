@@ -289,7 +289,7 @@ async function isFinanceManagerForQuote(
   const { data: q } = await supabase.from('quotes').select('workspace_id').eq('id', quoteId).maybeSingle();
   if (!q?.workspace_id) return false;
   const [{ data: mem }, { data: prof }] = await Promise.all([
-    supabase.from('workspace_members').select('role').eq('workspace_id', q.workspace_id).eq('user_id', userId).maybeSingle(),
+    supabase.from('workspace_members').select('role').eq('workspace_id', q.workspace_id).eq('user_id', userId).eq('status', 'active').maybeSingle(),
     supabase.from('user_profiles').select('roles!user_profiles_role_id_fkey(name)').eq('user_id', userId).maybeSingle(),
   ]);
   const wsManager = !!mem && ['owner', 'admin'].includes((mem as any).role);

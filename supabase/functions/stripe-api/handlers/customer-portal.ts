@@ -37,7 +37,7 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
       .from('user_profiles')
       .select(customerCol)
       .eq('user_id', userId)
-      .single();
+      .single<Record<string, string | null>>();
 
     if (!profile?.[customerCol]) {
       return new Response(

@@ -577,8 +577,10 @@ async function listStripeProducts(auth: AuthResult): Promise<Response> {
 
   const products = await stripe.products.list({ active: true, limit: 100, expand: ['data.default_price'] });
   return json({
-    products: products.data.map((p) => {
-      const dp = p.default_price;
+    products: products.data.map((p: { id: string; name: string; description: string | null; default_price?: unknown }) => {
+      const dp = p.default_price as
+        | { id: string; unit_amount: number | null; currency: string; recurring?: { interval: string } | null }
+        | string | null | undefined;
       const price = dp && typeof dp === 'object' && dp.recurring
         ? { id: dp.id, unit_amount: dp.unit_amount, currency: dp.currency, interval: dp.recurring.interval }
         : null;

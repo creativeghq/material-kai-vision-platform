@@ -92,12 +92,12 @@ export interface AgentRunContext {
    * Append a structured log entry to agent_run_logs.
    * Fire-and-forget — safe to call without await if you don't need confirmation.
    */
-  log(level: LogLevel, message: string, data?: Record<string, unknown>): Promise<void>;
+  log(level: LogLevel, message: string, data?: Record<string, unknown>): Promise<unknown>;
   /**
    * Update last_heartbeat on the run row so auto-recovery won't kill this run.
    * Call every ~10 s inside long loops.
    */
-  heartbeat(): Promise<void>;
+  heartbeat(): Promise<unknown>;
 }
 
 // ── Result every runner must return ─────────────────────────────────────────
