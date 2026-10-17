@@ -6,6 +6,7 @@ import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { agentReviewLink } from '../_shared/agent-handoff.ts';
 
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -114,7 +115,9 @@ async function maybeAlert(
     user_id: uid, workspace_id: website.workspace_id,
     title: `${Cap} ${verb} for ${domain}`,
     body: `${Cap} ${verb} ${Math.abs(deltaPct ?? 0)}% (${prev.toLocaleString()} → ${cur.toLocaleString()}) week-over-week.`,
-    action_url: '/profile?tab=websites',
+    action_url: agentReviewLink('marketing',
+      `Review what happened to ${domain}: ${metricLabel} ${verb} from ${prev} to ${cur} week-over-week in the domain snapshot `
+      + `(website_id ${website.id}). Work out which keywords or referring domains moved, whether it is real or a data artefact, and what to do.`),
     type: direction === 'down' ? 'warning' : 'success',
     website_id: website.id, domain, metric, direction, previous: prev, current: cur, delta_pct: deltaPct,
   }));

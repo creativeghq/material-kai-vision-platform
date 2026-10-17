@@ -576,7 +576,7 @@ export const createSEOMyRankingsTool = (
   _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
 ) => {
   return tool(
-    async ({ website_id, days }) => {
+    async ({ website_id, days, keywords }) => {
       if (!ctx?.supabase || !ctx?.workspaceId) {
         return JSON.stringify({ success: false, error: 'No workspace context — reading your own rankings needs a signed-in workspace.' });
       }
@@ -589,13 +589,18 @@ export const createSEOMyRankingsTool = (
       const windowDays = Math.min(Math.max(Math.trunc(days ?? 28), 7), 180);
       onChunk?.({ type: 'tool_progress', status: `Reading the rank tracker and Search Console for ${site.domain}…`, timestamp: Date.now() });
 
-      const [rankRes, gscRes, connRes] = await Promise.all([
+      const wanted = (keywords ?? []).map((k) => k.trim()).filter(Boolean).slice(0, 20);
+      const [rankRes, gscRes, connRes, histRes] = await Promise.all([
         ctx.supabase.rpc('get_website_rank_summary', { p_website_id: site.id, p_days: windowDays }),
         ctx.supabase.rpc('get_gsc_summary', { p_website_id: site.id, p_days: windowDays }),
         ctx.supabase.from('website_gsc_connections').select('is_active, last_sync_at, last_sync_error').eq('website_id', site.id).maybeSingle(),
+        wanted.length
+          ? ctx.supabase.rpc('get_keyword_rank_history', { p_website_id: site.id, p_keywords: wanted, p_days: windowDays })
+          : Promise.resolve({ data: null, error: null }),
       ]);
       if (rankRes.error) return JSON.stringify({ success: false, error: `rank tracker: ${rankRes.error.message}` });
       if (gscRes.error) return JSON.stringify({ success: false, error: `search console: ${gscRes.error.message}` });
+      if (histRes.error) return JSON.stringify({ success: false, error: `keyword history: ${histRes.error.message}` });
 
       const rank = rankRes.data || { status: 'not_collected', tracked: 0 };
       const gsc = gscRes.data || { status: 'not_collected', totals: null, top_queries: [] };
@@ -660,6 +665,10 @@ export const createSEOMyRankingsTool = (
           top_queries: queries.slice(0, 25).map((q: any) => ({ query: q.query, position: q.position, impressions: q.impressions, clicks: q.clicks })),
           queries_with_demand_not_tracked: untracked.slice(0, 10).map((q: any) => ({ query: q.query, position: q.position, impressions: q.impressions })),
         },
+        ...(wanted.length ? {
+          keyword_history: histRes.data?.keywords ?? [],
+          keyword_history_guidance: 'One row per day. position is that day\'s FIRST read; null with no error = not in the top 100, an error = unknown. Each daily read is a single sample, and Google can return a different page for the same query seconds later, so a keyword that alternates in and out is volatile, not lost. Treat a drop as real only when it persists over several days, or when rechecked is true and recheck_best_position is also outside the top 10. Compare with search_console.avg_position, which averages every real impression.',
+        } : {}),
         guidance: 'These are measurements, not estimates: the rank tracker is a live Google check of the keywords this workspace chose to track, and Search Console is what Google reports having shown. Answer from them. A third-party index (seo_ranked_keywords, seo_domain_snapshot) is refreshed weeks apart and routinely misses a site\'s own brand rank — never let it override these, and if you cite it, give its SERP date. A status of not_connected / not_collected is a fact to report, not a zero.',
       });
     },
@@ -669,6 +678,7 @@ export const createSEOMyRankingsTool = (
       schema: z.object({
         website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
         days: z.number().int().min(7).max(180).optional().describe('Search Console look-back and rank-history window in days, default 28.'),
+        keywords: z.array(z.string()).max(20).optional().describe('Tracked keywords to return day-by-day position history for (with the page that ranked and Search Console totals). Use when asked why specific keywords moved.'),
       }),
     },
   );

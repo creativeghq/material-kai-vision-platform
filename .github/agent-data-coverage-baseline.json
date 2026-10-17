@@ -1,6 +1,6 @@
 {
-  "_comment": "Derived reads (public RPCs the platform computes in SQL) vs the ones an agent tool reads. `exposed` is scanned from supabase/functions/_shared/tools by scripts/audit-agent-data-coverage.mjs; `known_gaps` must each carry a reason \u2014 \"todo: \u2026\" records an intention, \"unreviewed\" fails the script. Regenerate with: node scripts/audit-agent-data-coverage.mjs --write-baseline",
-  "generated_at": "2026-09-05T16:20:00.000Z",
+  "_comment": "Derived reads (public RPCs the platform computes in SQL) vs the ones an agent tool reads. `exposed` is scanned from supabase/functions/_shared/tools by scripts/audit-agent-data-coverage.mjs; `known_gaps` must each carry a reason — \"todo: …\" records an intention, \"unreviewed\" fails the script. Regenerate with: node scripts/audit-agent-data-coverage.mjs --write-baseline",
+  "generated_at": "2026-10-17T12:16:33.260Z",
   "exposed": [
     "add_configuration_to_quote",
     "apply_assessment_action",
@@ -34,6 +34,7 @@
     "get_gsc_striking_distance",
     "get_gsc_summary",
     "get_invoice_item_costs",
+    "get_keyword_rank_history",
     "get_monthly_pnl",
     "get_order_customs_preview",
     "get_order_item_costs",

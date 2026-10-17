@@ -7,6 +7,7 @@ import { assertEntitled, isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
+import { agentReviewLink } from '../_shared/agent-handoff.ts';
 import { callDataForSEO } from '../_shared/tools/dataforseo-dispatch.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -209,6 +210,28 @@ async function serpWithRetry(kw: SerpTarget, userId: string | null, deadline: nu
   throw last ?? new OutOfTime();
 }
 
+/** Measured 2026-10-17: the same query seconds apart read #3 and "not in top 100", #6 and #16. */
+const DROP_RECHECKS = 2;
+
+/** Re-read a keyword whose reading just left the top 10. Stops at the first re-read back inside it. */
+async function recheckDrop(kw: DueKeyword, userId: string | null, deadline: number): Promise<{ rechecked: boolean; best: number | null }> {
+  let rechecked = false;
+  let best: number | null = null;
+  for (let i = 0; i < DROP_RECHECKS; i++) {
+    if (deadline - Date.now() < MIN_CALL_BUDGET_MS) break;
+    try {
+      const r = await serp(kw, userId, false, 100, deadline);
+      rechecked = true;
+      const p = findPosition(r.items || [], hostOf(kw.url)).position;
+      if (p != null && (best == null || p < best)) best = p;
+      if (best != null && best <= 10) break;
+    } catch {
+      // A failed re-read confirms nothing; an unconfirmed drop is never announced.
+    }
+  }
+  return { rechecked, best };
+}
+
 type SerpLocation = { location_code: number; location_name: string; location_type: string };
 
 /** Location lists change a few times a year; one fetch per country per warm instance. */
@@ -331,7 +354,7 @@ async function trackKeywords(
       captured_at: today,
       position, found: position != null, url,
       serp_features: features, owned_features: ownedFeatures(items, host), error: null,
-      depth_checked: depth,
+      depth_checked: depth, rechecked: false, recheck_best_position: null,
     };
   };
 
@@ -383,8 +406,14 @@ async function trackKeywords(
           captured_at: today, position: null, found: false, url: null,
           serp_features: [], owned_features: [],
           error: String(e instanceof Error ? e.message : e).slice(0, 300),
+          rechecked: false, recheck_best_position: null,
         };
       }
+    }
+    const pos = row.position as number | null;
+    if (row.error == null && kw.last_position != null && kw.last_position <= 10 && (pos == null || pos > 10)) {
+      const rc = await recheckDrop(kw, userId, deadline);
+      row = { ...row, rechecked: rc.rechecked, recheck_best_position: rc.best };
     }
     const { error: upErr } = await supabase
       .from('seo_keyword_positions')
@@ -437,7 +466,7 @@ async function trackKeywords(
  */
 async function alertOnDrops(
   supabase: any,
-  website: { id: string; workspace_id: string },
+  website: { id: string; workspace_id: string; url: string },
   today: string,
   checkedInThisRun: string[],
 ): Promise<void> {
@@ -453,7 +482,19 @@ async function alertOnDrops(
     const inThisRun = new Set(checkedInThisRun);
     const dropped = ((all as any[] | null) || []).filter((d: any) => inThisRun.has(d.tracked_keyword_id));
     if (!dropped.length) return;
-    const names = dropped.slice(0, 5).map((d: any) => d.keyword).join(', ');
+    const pathOf = (u: string | null): string => { try { return u ? new URL(u).pathname : ''; } catch { return ''; } };
+    const lines = dropped.slice(0, 5).map((d: any) => {
+      const now = d.current_position == null ? 'not in the top 100' : `#${d.current_position}`;
+      const page = pathOf(d.previous_url);
+      return `${d.keyword} #${d.previous_position} → ${now}${page ? ` (${page})` : ''}`;
+    });
+    const more = dropped.length > 5 ? ` and ${dropped.length - 5} more` : '';
+    const host = hostOf(website.url);
+    const prompt = `Review what happened to ${host}'s Google rankings. On ${today} the rank tracker confirmed `
+      + `${dropped.length} keyword${dropped.length === 1 ? '' : 's'} left the top 10: ${lines.join('; ')}${more}. `
+      + `Read their day-by-day history and Search Console with seo_my_rankings (website_id ${website.id}, keywords: `
+      + `${JSON.stringify(dropped.slice(0, 5).map((d: any) => d.keyword))}). For each one say whether the drop is real or day-to-day `
+      + `volatility, which page was ranking, and what to do about it.`;
     // `seo.ranking_movement`, not a new `seo.rank_drop`. The trigger already exists,
     // is already in the tenant vocabulary, and already means "your rankings moved" —
     // a second trigger for the same event would be one more copy of a vocabulary that
@@ -463,9 +504,10 @@ async function alertOnDrops(
       website.workspace_id, ['owner', 'admin'], 'seo.ranking_movement', (uid) => ({
         user_id: uid, workspace_id: website.workspace_id,
         title: `${dropped.length} keyword${dropped.length === 1 ? '' : 's'} left the top 10`,
-        body: `${names}${dropped.length > 5 ? ` and ${dropped.length - 5} more` : ''}.`,
-        action_url: '/profile?tab=websites',
+        body: `${host}: ${lines.join('; ')}${more}.`,
+        action_url: agentReviewLink('marketing', prompt),
         type: 'warning',
+        website_id: website.id,
       }),
     );
   } catch (e) {

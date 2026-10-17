@@ -2186,6 +2186,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'website_id', type: 'string', optional: true, description: 'Connected website id. Omit to use the workspace default.' },
       { name: 'days', type: 'number', optional: true, description: 'Search Console look-back and rank-history window in days, default 28.' },
+      { name: 'keywords', type: 'array', optional: true, description: 'Tracked keywords to return day-by-day position history for (with the page that ranked and Search Console totals). Use when asked why specific keywords moved.' },
     ],
   },
   {
