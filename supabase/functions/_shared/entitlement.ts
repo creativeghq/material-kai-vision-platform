@@ -38,6 +38,30 @@ export function notEntitledResponse(moduleSlug: string, extraHeaders: Record<str
   );
 }
 
+/**
+ * The user's most recently joined active workspace that owns `moduleSlug`, else the most recent one
+ * (so the caller's gate still refuses). Never a bare "newest membership": joining a second workspace
+ * would silently move every module call there.
+ */
+export async function resolveEntitledWorkspace(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  userId: string,
+  moduleSlug: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .order('joined_at', { ascending: false });
+  const ids: string[] = (data ?? []).map((m: { workspace_id: string }) => m.workspace_id);
+  for (const id of ids) {
+    if (await isWorkspaceEntitled(supabase, id, moduleSlug)) return id;
+  }
+  return ids[0] ?? null;
+}
+
 /** Convenience: returns `{ ok: true }` or `{ ok: false, response }` ready to return from the handler. */
 export async function assertEntitled(
   // deno-lint-ignore no-explicit-any

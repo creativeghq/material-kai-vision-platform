@@ -5,7 +5,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
-import { SEO_MODULE } from './entitlement.ts';
+import { SEO_MODULE, resolveSeoWorkspace } from './entitlement.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import { findExistingPage } from './existing-page.ts';
@@ -134,20 +134,22 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     }
 
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
-    let memberQuery = supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', userId)
-      .eq('status', 'active');
-    if (requestedWs) memberQuery = memberQuery.eq('workspace_id', requestedWs);
-    // NB: workspace_members has no `created_at` — the timestamp column is `joined_at`.
-    const { data: memberRows, error: memberErr } = await memberQuery
-      .order('joined_at', { ascending: false })
-      .limit(1);
-    if (memberErr) {
-      return jsonResponse({ success: false, error: `Could not resolve workspace: ${memberErr.message}` }, 400);
+    let workspaceId: string | null;
+    if (requestedWs) {
+      const { data: memberRow, error: memberErr } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .eq('workspace_id', requestedWs)
+        .maybeSingle();
+      if (memberErr) {
+        return jsonResponse({ success: false, error: `Could not resolve workspace: ${memberErr.message}` }, 400);
+      }
+      workspaceId = memberRow?.workspace_id ?? null;
+    } else {
+      workspaceId = await resolveSeoWorkspace(supabase, userId);
     }
-    const workspaceId = memberRows?.[0]?.workspace_id ?? null;
     if (requestedWs && !workspaceId) {
       // Asked for a workspace they are not a member of — 404, not 403 (no id enumeration).
       return jsonResponse({ success: false, error: 'Not found' }, 404);

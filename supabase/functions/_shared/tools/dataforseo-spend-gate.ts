@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServicePricing, debitOrRefuseTracked, recordExternalServiceOutcome } from '../credit-utils.ts';
 import { settleCredits } from '../credit-reserve.ts';
+import { resolveEntitledWorkspace } from '../entitlement.ts';
 
 /** `ai_model_pricing.model_key` for DataForSEO spend. One unit = $0.001 of provider cost. */
 export const DATAFORSEO_SERVICE = 'dataforseo-request';
@@ -44,14 +45,7 @@ async function resolveWorkspace(sb: Sb, userId: string): Promise<string | null> 
   if (hit && hit.expiresAt > Date.now()) return hit.workspaceId;
   let workspaceId: string | null = null;
   try {
-    const { data } = await sb
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .order('joined_at', { ascending: false })
-      .limit(1);
-    workspaceId = data?.[0]?.workspace_id ?? null;
+    workspaceId = await resolveEntitledWorkspace(sb, userId, 'seo-toolkit');
   } catch (e) {
     console.warn('[dataforseo-gate] workspace resolve failed:', (e as Error)?.message);
   }
