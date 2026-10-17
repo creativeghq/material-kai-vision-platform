@@ -179,7 +179,7 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   // User-scoped client → auth.uid() resolves inside RLS + the SECURITY DEFINER stock RPCs.
-  const usr = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const usr = auth.supabaseAsUser ?? createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
     auth: { persistSession: false, autoRefreshToken: false },
   });

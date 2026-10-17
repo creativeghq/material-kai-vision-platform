@@ -64,17 +64,65 @@ const KEY_REFUSED: Record<string, string> = {
   'agent-eval': 'The user branch requires auth.level === user.',
 };
 
-describe('the Swagger spec says which functions take a kai_ key', () => {
-  const spec = JSON.parse(readFileSync('scripts/edge-endpoints.json', 'utf8')) as Array<{ name: string; security?: string[] }>;
-  const acceptsKey = (fn: string): boolean => INDEX.stripped()
-    .some(([abs, src]) => INDEX.paths[INDEX.files.indexOf(abs)].startsWith(`supabase/functions/${fn}/`)
-      && /\bauthenticate(Caller)?\(\s*req/.test(src));
+const CALLER_TOKEN_REVIEWED: Record<string, string> = {
+  'finance-send-invoice-email': 'Forwards to finance-invoice-pdf, an edge function that authenticates the key itself.',
+  'xml-import-orchestrator': 'Forwards the caller to MIVAA only when auth.level === user; a key sends the service key.',
+  'myaade-rgwspublic2': 'The caller-scoped client serves verify-reseller-application, which refuses non-user callers.',
+  'mivaa-gateway': 'Job status, uploads and /api/rag refuse a key before the caller header is forwarded.',
+};
 
-  it('a user-callable function declares apiKeyPartner exactly when its code accepts one', () => {
-    const drift = spec
-      .filter((e) => (e.security ?? []).includes('supabaseJwt'))
-      .filter((e) => (acceptsKey(e.name) && !KEY_REFUSED[e.name]) !== (e.security ?? []).includes('apiKeyPartner'))
-      .map((e) => e.name);
-    expect(drift, 'Fix `security` in scripts/edge-endpoints.json, then npm run openapi:edge').toEqual([]);
+const CALLER_TOKEN = [
+  /global:\s*\{\s*headers:\s*\{\s*Authorization/g,
+  /['"]?Authorization['"]?\s*:\s*(callerAuth|forwardedAuth|authHeader|callerAuthHeader|forwardedAuthHeader|req\.headers\.get)/g,
+];
+
+const usesRawCallerToken = (src: string): boolean => CALLER_TOKEN.some((re) => [...src.matchAll(re)]
+  .some((m) => !/supabaseAsUser\s*\?\?[\s\S]{0,260}$/.test(src.slice(Math.max(0, m.index! - 300), m.index!))));
+
+describe('a kai_ key is accepted only where the spec says, and works past the door', () => {
+  const spec = JSON.parse(readFileSync('scripts/edge-endpoints.json', 'utf8')) as Array<{ name: string; security?: string[] }>;
+  const declared = spec.filter((e) => (e.security ?? []).includes('apiKeyPartner')).map((e) => e.name);
+  const sourceOf = (fn: string): string => INDEX.stripped()
+    .filter(([abs]) => INDEX.paths[INDEX.files.indexOf(abs)].startsWith(`supabase/functions/${fn}/`))
+    .map(([, src]) => src).join('\n');
+
+  it('authenticate() refuses a key on any function the generated list does not name', () => {
+    const auth = readFileSync('supabase/functions/_shared/auth.ts', 'utf8');
+    expect(auth).toMatch(/import \{ API_KEY_ENDPOINTS \} from '\.\/apiKeyEndpoints\.generated\.ts'/);
+    expect(auth).toMatch(/!API_KEY_ENDPOINTS\.has\(functionName\(req\)\)/);
+  });
+
+  it('a key caller reads the database as its owner, through actingClient', () => {
+    const auth = readFileSync('supabase/functions/_shared/auth.ts', 'utf8');
+    expect(auth).toMatch(/supabaseAsUser: row\.user_id \? actingClient\(row\.user_id, workspaceId\) : null/);
+    expect(auth).toMatch(/'x-acting-user': userId/);
+  });
+
+  it('the generated list is the spec, freshly projected', async () => {
+    const { keyCapable, render } = await import('../../scripts/gen-api-key-endpoints.mjs');
+    const onDisk = readFileSync('supabase/functions/_shared/apiKeyEndpoints.generated.ts', 'utf8');
+    expect(onDisk, 'run npm run api:keys').toBe(render(keyCapable()));
+  });
+
+  it('every key-capable function authenticates through the shared helper', () => {
+    const lies = declared.filter((fn) => !/\bauthenticate(Caller)?\(\s*req/.test(sourceOf(fn)));
+    expect(lies).toEqual([]);
+  });
+
+  it('a key-capable function never hands the caller token to a hop that cannot read a key, unless reviewed', () => {
+    const unreviewed = declared
+      .filter((fn) => usesRawCallerToken(sourceOf(fn)))
+      .filter((fn) => !CALLER_TOKEN_REVIEWED[fn]);
+    expect(unreviewed, 'Authorize at the door, then use the service client with explicit ownership checks — or drop apiKeyPartner').toEqual([]);
+  });
+
+  it('every reviewed entry is still key-capable and still uses the caller token (shrink-only)', () => {
+    const stale = Object.keys(CALLER_TOKEN_REVIEWED)
+      .filter((fn) => !declared.includes(fn) || !usesRawCallerToken(sourceOf(fn)));
+    expect(stale).toEqual([]);
+  });
+
+  it('operator-only functions never declare apiKeyPartner', () => {
+    expect(declared.filter((fn) => KEY_REFUSED[fn])).toEqual([]);
   });
 });

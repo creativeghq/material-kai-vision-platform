@@ -1559,7 +1559,7 @@ async function executeAgent(
   conversation_id?: string | null, // Supabase conversation ID for background task dispatch
   selectedToolkits?: string[] | null, // Per-turn user-selected toolkit IDs (resolved server-side to tool IDs)
   directTool?: { name: string; input: Record<string, any> } | null, // Deterministic single-tool run — skips the LLM entirely
-  userJwt?: string, // Caller's Supabase user JWT — threaded to user-scoped MIVAA/edge tools (mentions, job-research, seo-article) so they authenticate AS the user, not the opaque service key
+  userJwt?: string, // Caller's Supabase user JWT or kai_ API key — threaded to user-scoped MIVAA/edge tools so they authenticate AS the caller, not the opaque service key
   documents: string[] = [], // User-attached PDFs as data URLs (data:application/pdf;base64,...) — read natively by Opus so the agent can quote/summarize/extract from them
   modelOverride?: string | null, // Internal/eval only: pin the model for this turn instead of letting the router pick
   // Who is on the OTHER end. 'internal' (default) is the operator in their own app. 'customer' is
@@ -2782,7 +2782,7 @@ async function executeAgent(
   if (mailToolIds.length) {
     try {
       const mailMod = await import('../_shared/tools/mail-tools.ts');
-      const isOperator = !!userJwt && await isPlatformOperator(supabase, userId);
+      const isOperator = !!userJwt && !userJwt.startsWith('kai_') && await isPlatformOperator(supabase, userId);
       tools.push(...mailMod.createMailTools({ userId, workspaceId, jwt: userJwt, isOperator, onChunk }, mailToolIds));
     } catch (e) {
       console.error('[agent-chat] mail toolkit failed to load', e);
@@ -4427,7 +4427,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               conversation_id, // Supabase conversation ID for background task dispatch
               selected_toolkits, // Per-turn user-selected toolkit IDs (primary toolkit-level gating)
               isDirectTool ? { name: direct_tool.name, input: direct_tool.input } : null, // Deterministic single-tool run
-              auth.level === 'user' ? (req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim() || undefined) : undefined, // user JWT for user-scoped tools
+              (auth.level === 'user' || auth.level === 'api_key') ? (req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim() || undefined) : undefined, // caller's JWT or kai_ key, forwarded so each hop judges it
               Array.isArray(documents) ? documents : [], // User-attached PDFs as data URLs — read natively by Opus
               modelOverride, // Internal/eval pin; null for every ordinary caller
               audience, // 'customer' clamps the tools, drops memory both ways, and fences the message

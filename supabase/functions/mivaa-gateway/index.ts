@@ -542,6 +542,16 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       );
     }
 
+    // MIVAA reads Supabase JWTs only, and the service key would make it trust the body's workspace.
+    const keyRefusal = () => new Response(
+      JSON.stringify({ error: 'This action is not available with an API key. Sign in to use it.' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+    const viaApiKey = auth.level === 'api_key';
+    if (viaApiKey && (url.pathname.startsWith('/job-status/') || contentType.includes('multipart/form-data'))) {
+      return keyRefusal();
+    }
+
     // Handle job status check via URL path
     // Example: /job-status/abc-123-def
     if (url.pathname.startsWith('/job-status/')) {
@@ -739,6 +749,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     // the upload path's forwarding.
     const callerAuthHeader = req.headers.get('authorization');
     const isRagPath = typeof endpoint.path === 'string' && endpoint.path.startsWith('/api/rag');
+    if (viaApiKey && isRagPath) return keyRefusal();
     const forwardedAuthHeader = (!isAdmin && isRagPath && callerAuthHeader && callerAuthHeader.startsWith('Bearer '))
       ? callerAuthHeader
       : `Bearer ${MIVAA_API_KEY()}`;

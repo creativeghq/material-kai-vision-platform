@@ -26,7 +26,7 @@ describe('Gmail is the platform operator\'s only', () => {
   });
 
   it('the agent binds the mail toolkit with the operator verdict from the server, never from the request', () => {
-    expect(agent).toContain('const isOperator = !!userJwt && await isPlatformOperator(supabase, userId);');
+    expect(agent).toContain("const isOperator = !!userJwt && !userJwt.startsWith('kai_') && await isPlatformOperator(supabase, userId);");
     expect(agent).toContain('mailMod.createMailTools({ userId, workspaceId, jwt: userJwt, isOperator, onChunk }, mailToolIds)');
   });
 

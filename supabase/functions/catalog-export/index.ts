@@ -50,7 +50,7 @@ Deno.serve(withApiLogging('catalog-export', async (req: Request) => {
     return json({ error: `format must be one of ${FORMATS.join(', ')}` }, 400);
   }
 
-  const asUser = createClient(
+  const asUser = auth.supabaseAsUser ?? createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!,
     {

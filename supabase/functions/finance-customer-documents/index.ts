@@ -53,7 +53,7 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   // under service role auth.uid() is NULL and every list would come back empty. Storage signing
   // and the order_detail reads stay on the service-role client above (the customer is not a
   // workspace member, so those tables are not readable under their own RLS).
-  const asUser = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const asUser = auth.supabaseAsUser ?? createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
     auth: { persistSession: false, autoRefreshToken: false },
   });

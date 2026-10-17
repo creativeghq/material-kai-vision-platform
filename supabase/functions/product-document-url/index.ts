@@ -28,7 +28,7 @@ Deno.serve(withApiLogging('product-document-url', async (req: Request) => {
   }
 
   // Under service role auth.uid() is NULL, and the RPC's gate would refuse everyone.
-  const asUser = createClient(
+  const asUser = auth.supabaseAsUser ?? createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!,
     {

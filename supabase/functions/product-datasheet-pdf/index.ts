@@ -94,7 +94,7 @@ Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
   const productId = body.product_id;
   if (!productId) return json({ error: 'product_id is required' }, 400);
 
-  const asUser = createClient(
+  const asUser = auth.supabaseAsUser ?? createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!,
     {

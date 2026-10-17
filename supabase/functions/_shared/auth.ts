@@ -1,4 +1,5 @@
 import type { DbClient } from './supabase-client.ts';
+import { API_KEY_ENDPOINTS } from './apiKeyEndpoints.generated.ts';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { bootstrapSecretsFromDb } from './secrets-bootstrap.ts';
 import { roleHasCapability, type Capability } from './roleCapabilities.generated.ts';
@@ -92,6 +93,9 @@ export async function authenticate(
       if (partnerAuth.success && allowedRoles && allowedRoles.length > 0 &&
           !(partnerAuth.userId && await holdsAnyRole(adminClient, partnerAuth.userId, allowedRoles))) {
         return { ...partnerAuth, success: false, level: 'none', error: `Access denied. Required roles: ${allowedRoles.join(', ')}` };
+      }
+      if (partnerAuth.success && !API_KEY_ENDPOINTS.has(functionName(req))) {
+        return { ...partnerAuth, success: false, level: 'none', error: 'This endpoint does not accept API keys' };
       }
       if (partnerAuth.success && !isEndpointAllowed(partnerAuth.apiKey?.allowed_endpoints ?? null, functionPath(req))) {
         return { ...partnerAuth, success: false, level: 'none', error: 'This API key does not permit access to this endpoint' };
@@ -372,6 +376,7 @@ async function validatePartnerApiKey(
       userId: row.user_id,
       error: null,
       supabase: adminClient,
+      supabaseAsUser: row.user_id ? actingClient(row.user_id, workspaceId) : null,
       apiKey: {
         api_key_id: row.id,
         user_id: row.user_id,
@@ -393,7 +398,23 @@ async function validatePartnerApiKey(
   }
 }
 
+/**
+ * A database client that runs as `userId` for a caller holding no session JWT (a kai_ key). The
+ * service key plus `x-acting-user` makes public.pre_request switch the request to that user, so
+ * RLS and auth.uid() apply exactly as in their own session; `x-workspace-id` names the workspace.
+ */
+export function actingClient(userId: string, workspaceId?: string | null): DbClient {
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { 'x-acting-user': userId, ...(workspaceId ? { 'x-workspace-id': workspaceId } : {}) } },
+  });
+}
+
 /** `/functions/v1/<fn>/…` for the request, whichever form the runtime hands over. */
+function functionName(req: Request): string {
+  return new URL(req.url).pathname.replace(/^\/functions\/v1/, '').split('/').filter(Boolean)[0] ?? '';
+}
+
 function functionPath(req: Request): string {
   return `/functions/v1${new URL(req.url).pathname.replace(/^\/functions\/v1/, '')}`;
 }
