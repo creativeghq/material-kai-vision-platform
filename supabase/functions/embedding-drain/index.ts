@@ -4,10 +4,12 @@ import { authenticatePlatformOperator, isCronAuthorized } from '../_shared/auth.
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { drainKbDocs } from './handlers/kb-docs.ts';
+import { drainKbChunks } from './handlers/kb-chunks.ts';
 import { drainCrmCompanies } from './handlers/crm-companies.ts';
 
 const TASKS: Record<string, (body: Record<string, unknown>) => Promise<Record<string, unknown>>> = {
   'kb-docs': drainKbDocs,
+  'kb-chunks': drainKbChunks,
   'crm-companies': drainCrmCompanies,
 };
 
