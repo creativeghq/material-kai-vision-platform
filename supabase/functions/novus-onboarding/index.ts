@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isPlatformOperator, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, callerIsPlatformOperator, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { resolveNovusConnection } from '../_shared/fiscal/novusConnection.ts';
 import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
@@ -199,7 +199,7 @@ Deno.serve(withApiLogging('novus-onboarding', async (req: Request) => {
   }
 
   if (action.startsWith('webhook_')) {
-    if (!(await isPlatformOperator(supabase, auth.userId))) throw new HttpError(404, 'Not found.');
+    if (!(await callerIsPlatformOperator(auth))) throw new HttpError(404, 'Not found.');
     const ctx = await novusCtx(supabase);
 
     if (action === 'webhook_status') {

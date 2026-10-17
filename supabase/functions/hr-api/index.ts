@@ -434,7 +434,7 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         const acctHandled = await handleAccounting(action, { supabase, workspaceId, userId, body, access });
         if (acctHandled) return acctHandled;
         // Expanded areas (org, recruitment/ATS, onboarding, documents, payroll, analytics).
-        const handled = await handleExpansion(action, { supabase, workspaceId, userId, body, access });
+        const handled = await handleExpansion(action, { supabase, workspaceId, userId, body, access, viaApiKey: auth.level === 'api_key' });
         if (handled) return handled;
         return json({ error: `Unknown action: ${action}` }, 400);
       }

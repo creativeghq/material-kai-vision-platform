@@ -3,7 +3,7 @@ import { mailIdentityImages } from '../_shared/mail-identity.ts';
 import { loadEmailSignature } from '../_shared/email-signature.ts';
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate, isPlatformOperator, isServiceRoleRequest, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, callerIsPlatformOperator, isServiceRoleRequest, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -276,7 +276,7 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
   const auth = await authenticate(req, { requireUser: true });
   if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
   const userId = auth.userId;
-  if (!(await isPlatformOperator(db, userId))) throw new HttpError(403, 'Gmail is available to the platform operator only.');
+  if (!(await callerIsPlatformOperator(auth))) throw new HttpError(403, 'Gmail is available to the platform operator only.');
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
   const action = String(body.action ?? '');
 

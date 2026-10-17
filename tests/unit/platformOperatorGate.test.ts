@@ -31,7 +31,7 @@ describe('#362 — a platform-wide wipe requires a platform operator', () => {
 
   it('reset-platform gates on the global operator role or the service role', () => {
     const src = stripComments(read(RESET));
-    expect(src, 'the platform-operator check is gone from reset-platform').toContain('isPlatformOperator');
+    expect(src, 'the platform-operator check is gone from reset-platform').toContain('callerIsPlatformOperator(auth)');
     expect(src, 'the service-role path is gone from reset-platform').toContain('isServiceRoleRequest');
   });
 

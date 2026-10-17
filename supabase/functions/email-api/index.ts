@@ -12,7 +12,7 @@ import { renderReactEmailTemplate } from '../_shared/react-email-renderer.ts';
 import { renderTemplateWithVariables } from '../_shared/email-template-vars.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
-import { authenticate, isAdminAccess, userHasWorkspaceCapability, listWorkspaceIdsWithCapability, isPlatformOperator } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userHasWorkspaceCapability, listWorkspaceIdsWithCapability, callerIsPlatformOperator } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
@@ -427,7 +427,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
-        if (sender.source !== 'workspace' && !isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+        if (sender.source !== 'workspace' && !isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
           return new Response(
             JSON.stringify({ success: false, error: 'Email send requires operator privileges' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -1083,7 +1083,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
       case 'layout': {
         // The default never ships to the client as a second copy — the UI asks for it here.
-        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+        if (!isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
           throw new HttpError(403, 'Platform operator access required');
         }
 
@@ -1139,7 +1139,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'domain-tracking': {
         // Resend injects the open pixel per DOMAIN and the flag lives only there, so with it
         // off the webhook is wired, subscribed, and simply never called.
-        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+        if (!isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
           throw new HttpError(403, 'Platform operator access required');
         }
         const key = Deno.env.get('RESEND_API_KEY') || '';
@@ -1230,7 +1230,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // workspace_members.role too, so any tenant's workspace owner passed and could add or
         // verify a domain on our own sending account — a domain-reputation and phishing
         // surface, and the same shape that had to be fixed in platform-secrets-admin.
-        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+        if (!isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
           throw new HttpError(403, 'Platform operator access required');
         }
 
@@ -1269,7 +1269,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // workspace_members.role too, so any tenant's workspace owner passed and could add or
         // verify a domain on our own sending account — a domain-reputation and phishing
         // surface, and the same shape that had to be fixed in platform-secrets-admin.
-        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+        if (!isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
           throw new HttpError(403, 'Platform operator access required');
         }
 
@@ -1449,7 +1449,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // workspace_members.role too, so any tenant's workspace owner passed and could add or
         // verify a domain on our own sending account — a domain-reputation and phishing
         // surface, and the same shape that had to be fixed in platform-secrets-admin.
-        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+        if (!isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
           throw new HttpError(403, 'Platform operator access required');
         }
 

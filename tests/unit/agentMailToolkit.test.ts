@@ -20,13 +20,13 @@ function factory(src: string, name: string): string {
 
 describe('Gmail is the platform operator\'s only', () => {
   it('gmail-api refuses every user action unless the caller is a platform operator, before dispatching it', () => {
-    const gateAt = gmailFn.indexOf('if (!(await isPlatformOperator(db, userId)))');
+    const gateAt = gmailFn.indexOf('if (!(await callerIsPlatformOperator(auth)))');
     expect(gateAt).toBeGreaterThan(-1);
     expect(gateAt).toBeLessThan(gmailFn.indexOf('switch (action)'));
   });
 
   it('the agent binds the mail toolkit with the operator verdict from the server, never from the request', () => {
-    expect(agent).toContain('const isOperator = await isPlatformOperator(supabase, userId);');
+    expect(agent).toContain('const isOperator = !!userJwt && await isPlatformOperator(supabase, userId);');
     expect(agent).toContain('mailMod.createMailTools({ userId, workspaceId, jwt: userJwt, isOperator, onChunk }, mailToolIds)');
   });
 

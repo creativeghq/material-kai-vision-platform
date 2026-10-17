@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isPlatformOperator, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, callerIsPlatformOperator, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -159,7 +159,7 @@ async function handleProofAction(req: Request, supabase: any, body: ProofActionB
   // authenticate() hands back the SERVICE-ROLE client, so the manager test is explicit (owner/admin).
   const { data: mem } = await supabase.from('workspace_members').select('role')
     .eq('workspace_id', proof.workspace_id).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
-  const isManager = ['owner', 'admin'].includes(String((mem as any)?.role ?? '')) || await isPlatformOperator(supabase, auth.userId);
+  const isManager = ['owner', 'admin'].includes(String((mem as any)?.role ?? '')) || await callerIsPlatformOperator(auth);
   if (!isManager) return json({ error: 'not found' }, 404);
 
   if (body.recheck_proof) {

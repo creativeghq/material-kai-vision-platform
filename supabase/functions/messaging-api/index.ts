@@ -15,7 +15,7 @@ import {
 import { CAST } from '../_shared/characterAvatar.generated.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
-import { authenticate, isAdminAccess, isPlatformOperator, listWorkspaceIdsWithCapability, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, callerIsPlatformOperator, listWorkspaceIdsWithCapability, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { isWorkspaceEntitled, notEntitledResponse } from '../_shared/entitlement.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
@@ -254,7 +254,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
       'bill-channels-monthly', 'set-channel-seats', 'update-settings', 'register-webhook',
     ]);
-    if (PLATFORM_ACTIONS.has(action) && !isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+    if (PLATFORM_ACTIONS.has(action) && !isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
       return jsonResponse({ error: 'Platform operator access required' }, 403);
     }
 

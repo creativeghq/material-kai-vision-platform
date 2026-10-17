@@ -564,6 +564,11 @@ export async function isPlatformOperator(
   return !!globalRole && ['admin', 'super_admin'].includes(globalRole);
 }
 
+/** The operator question for a REQUEST: a kai_ key never operates the platform, whoever owns it. */
+export async function callerIsPlatformOperator(auth: AuthResult): Promise<boolean> {
+  return auth.level === 'user' && await isPlatformOperator(auth.supabase, auth.userId);
+}
+
 /**
  * Authenticate a caller who must operate the PLATFORM. Secret/service-role callers pass; a user
  * passes only via isPlatformOperator; a partner kai_ key never does. `allowedRoles` cannot express

@@ -56,76 +56,76 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `dashboard-insights` | JWT | Generate cached AI insights for the home dashboard |
-| `generate-interior-gemini` | JWT | Multi-mode interior design image generation (Gemini, FLUX, Grok) |
-| `generate-interior-video-v2` | JWT | Multi-model interior design video generation with async polling fallback |
-| `generate-region-edit` | JWT | Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora |
-| `generate-virtual-staging` | JWT | AI virtual staging of an empty room via Replicate proplabs/virtual-staging |
-| `generate-vr-world` | JWT | Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble |
-| `product-cutouts` | JWT | Make background-removed product cut-outs for the Product in Place embed |
+| `dashboard-insights` | JWT / kai_* | Generate cached AI insights for the home dashboard |
+| `generate-interior-gemini` | JWT / kai_* | Multi-mode interior design image generation (Gemini, FLUX, Grok) |
+| `generate-interior-video-v2` | JWT / kai_* | Multi-model interior design video generation with async polling fallback |
+| `generate-region-edit` | JWT / kai_* | Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora |
+| `generate-virtual-staging` | JWT / kai_* | AI virtual staging of an empty room via Replicate proplabs/virtual-staging |
+| `generate-vr-world` | JWT / kai_* | Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble |
+| `product-cutouts` | JWT / kai_* | Make background-removed product cut-outs for the Product in Place embed |
 
 **Social**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `generate-social-content` | JWT | Generate platform-optimised social media captions and hashtags via Claude |
-| `generate-social-image` | JWT | Generate a social media image via Aurora, Gemini, or FLUX based on content type |
-| `generate-social-video` | JWT | Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable) |
-| `zernio-api` _(GET + POST)_ | JWT | Social media publishing, OAuth account management, and analytics via Zernio. |
+| `generate-social-content` | JWT / kai_* | Generate platform-optimised social media captions and hashtags via Claude |
+| `generate-social-image` | JWT / kai_* | Generate a social media image via Aurora, Gemini, or FLUX based on content type |
+| `generate-social-video` | JWT / kai_* | Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable) |
+| `zernio-api` _(GET + POST)_ | JWT / kai_* | Social media publishing, OAuth account management, and analytics via Zernio. |
 | `zernio-webhook-handler` | sig | Receives Zernio webhooks for social post events and WhatsApp messaging events. |
 
 **Search**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `ai-rerank` | JWT | Reorder search results by relevance to a query |
+| `ai-rerank` | JWT / kai_* | Reorder search results by relevance to a query |
 
 **MIVAA Gateway**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `mivaa-gateway` _(GET + POST)_ | JWT / secret | Authenticated proxy to MIVAA Python backend with per-action credit billing |
+| `mivaa-gateway` _(GET + POST)_ | JWT / kai_* / secret | Authenticated proxy to MIVAA Python backend with per-action credit billing |
 
 **Knowledge Base**
 
 | Function | Auth | Summary |
 |---|---|---|
 | `embedding-drain` | secret / cron / JWT | Embed rows whose Voyage vector is missing or stale — one backlog per task |
-| `kb-generate-embedding` | JWT / secret | Generate or regenerate a Voyage AI 1024D embedding for a kb_docs row |
+| `kb-generate-embedding` | JWT / kai_* / secret | Generate or regenerate a Voyage AI 1024D embedding for a kb_docs row |
 
 **Finance**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `bank-statement-import` | JWT | Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces. |
-| `contracts-api` | JWT / public | Contracts & e-signature - manage contracts and the public signer page |
+| `bank-statement-import` | JWT / kai_* | Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces. |
+| `contracts-api` | JWT / kai_* / public | Contracts & e-signature - manage contracts and the public signer page |
 | `finance-assessment` | JWT | Derive the workspace's finance health signals, and optionally write the AI assessment of them |
-| `finance-categorize-expenses` | JWT | Proposes an expense category per supplier, and applies the ones you confirm |
-| `finance-customer-documents` _(GET + POST)_ | JWT | Customer self-service view of their own invoices, receipts and orders |
-| `finance-digest-aggregate` | JWT | Send finance digest emails and dispatch quote follow-up bell notifications |
+| `finance-categorize-expenses` | JWT / kai_* | Proposes an expense category per supplier, and applies the ones you confirm |
+| `finance-customer-documents` _(GET + POST)_ | JWT / kai_* | Customer self-service view of their own invoices, receipts and orders |
+| `finance-digest-aggregate` | JWT / kai_* | Send finance digest emails and dispatch quote follow-up bell notifications |
 | `finance-document-link` _(GET)_ | token | Redirects a document token to a freshly signed link to the PDF. |
 | `finance-fiscal-offline-recovery` | cron | Re-query connector for pending MARK on offline-accepted fiscal documents |
-| `finance-inbound-sync` | JWT / cron | Pull inbound documents from myDATA (RequestDocs) for configured workspaces |
-| `finance-invoice-pdf` | JWT | Render a legal invoice, credit note, or delivery note as a PDF |
-| `finance-issue-invoice` | JWT | Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note |
-| `finance-mydata-book` | JWT / cron | Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces |
-| `finance-mydata-delivery` | JWT | Files a recorded movement lifecycle leg (ΨΔΑ Phase Β1) with myDATA and reads a movement's AADE status |
-| `finance-mydata-send` | JWT | Transmits an expense document you recorded here straight to myDATA |
-| `finance-pay-invoice` | JWT / token / public | Create a Stripe Checkout session or pay-link for an invoice |
+| `finance-inbound-sync` | JWT / kai_* / cron | Pull inbound documents from myDATA (RequestDocs) for configured workspaces |
+| `finance-invoice-pdf` | JWT / kai_* | Render a legal invoice, credit note, or delivery note as a PDF |
+| `finance-issue-invoice` | JWT / kai_* | Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note |
+| `finance-mydata-book` | JWT / kai_* / cron | Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces |
+| `finance-mydata-delivery` | JWT / kai_* | Files a recorded movement lifecycle leg (ΨΔΑ Phase Β1) with myDATA and reads a movement's AADE status |
+| `finance-mydata-send` | JWT / kai_* | Transmits an expense document you recorded here straight to myDATA |
+| `finance-pay-invoice` | JWT / kai_* / token / public | Create a Stripe Checkout session or pay-link for an invoice |
 | `finance-reminders-cron` | cron | Cron: emit planned-payment and VAT-return-ready flow events. |
-| `finance-send-invoice-email` | JWT | Email an invoice to its customer with optional PDF attachment |
-| `finance-send-payment` | JWT | Instruct a real bank transfer from a workspace account to a counterparty |
-| `finance-send-statement` | JWT / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |
+| `finance-send-invoice-email` | JWT / kai_* | Email an invoice to its customer with optional PDF attachment |
+| `finance-send-payment` | JWT / kai_* | Instruct a real bank transfer from a workspace account to a counterparty |
+| `finance-send-statement` | JWT / kai_* / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |
 | `finance-storefront` | public | Public online storefront: browse products and submit cart checkout |
-| `generate-contract-pdf` | JWT | Render a signed/draft contract to PDF |
+| `generate-contract-pdf` | JWT / kai_* | Render a signed/draft contract to PDF |
 | `generate-purchase-sheet-pdf` | JWT / secret | Render a project purchase sheet (doors/windows + other purchase items) to PDF |
-| `novus-onboarding` | JWT | Register a workspace's VAT with Novus so it can transmit to myDATA |
-| `parse-supplier-cost-list` | JWT | Parse a KB doc supplier cost list and apply costs to matching products |
-| `revolut-api` | JWT | Revolut Business — live accounts & balances, connection, reconciliation, payments, cards |
-| `revolut-sync` | JWT / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
+| `novus-onboarding` | JWT / kai_* | Register a workspace's VAT with Novus so it can transmit to myDATA |
+| `parse-supplier-cost-list` | JWT / kai_* | Parse a KB doc supplier cost list and apply costs to matching products |
+| `revolut-api` | JWT / kai_* | Revolut Business — live accounts & balances, connection, reconciliation, payments, cards |
+| `revolut-sync` | JWT / kai_* / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
 | `revolut-webhooks` | revolutSignature | Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret |
 | `scan-receipt` | JWT | Read a photographed receipt into expense fields, and keep the image on the bill |
-| `supplier-einvoice-details` | JWT | Read suppliers' own e-invoice provider pages for their IBANs and contact details |
+| `supplier-einvoice-details` | JWT / kai_* | Read suppliers' own e-invoice provider pages for their IBANs and contact details |
 | `supplier-orders-api` _(GET + POST)_ | kai_* | Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back |
 | `trip-expense-ops` | JWT | Sales trip-expense receipts: upload, sign, and render the expense PDF |
 
@@ -133,50 +133,50 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `revolut-merchant-webhooks` | JWT / revolutSignature | Revolut Merchant (checkout) webhook receiver + per-workspace webhook setup |
-| `stripe-api` | JWT | Stripe Checkout and Customer Portal session creator |
+| `revolut-merchant-webhooks` | JWT / kai_* / revolutSignature | Revolut Merchant (checkout) webhook receiver + per-workspace webhook setup |
+| `stripe-api` | JWT / kai_* | Stripe Checkout and Customer Portal session creator |
 | `stripe-webhooks` | sig | Stripe webhook receiver for subscription, payment, and invoice events |
-| `viva-config-test` | JWT | Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone |
+| `viva-config-test` | JWT / kai_* | Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone |
 | `viva-webhooks` _(GET + POST)_ | public | Viva.com payment webhook receiver + verification-key handshake (multi-tenant BYOK) |
 
 **Quotes**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `generate-quote-pdf` | JWT | Generate or return cached PDF for a quote |
-| `project-plan-engine` | JWT / secret | Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes) |
+| `generate-quote-pdf` | JWT / kai_* | Generate or return cached PDF for a quote |
+| `project-plan-engine` | JWT / kai_* / secret | Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes) |
 | `public-project-plan` | public | Public lead-gen Blueprint estimator (/tools/project-plan) |
 | `quote-public-share` | token / public | Public token-based quote share lookup (anonymous-friendly) |
-| `quotes-api` _(GET + POST)_ | JWT | REST API for quote requests (customer-facing) |
-| `send-quote-email` | JWT | Email a quote to a recipient with a public share link |
+| `quotes-api` _(GET + POST)_ | JWT / kai_* | REST API for quote requests (customer-facing) |
+| `send-quote-email` | JWT / kai_* | Email a quote to a recipient with a public share link |
 
 **CRM**
 
 | Function | Auth | Summary |
 |---|---|---|
 | `asset-service-reminders-cron` | cron | Cron: emit equipment service-due, service-overdue and warranty-expiring flow events (#343). |
-| `crm-api` _(GET + POST)_ | JWT / secret | REST CRM resource router for companies, contacts, users, and Stripe. |
-| `crm-lead-score` | JWT | AI lead + health scoring for any CRM contact (canonical platform scorer) |
+| `crm-api` _(GET + POST)_ | JWT / kai_* / secret | REST CRM resource router for companies, contacts, users, and Stripe. |
+| `crm-lead-score` | JWT / kai_* | AI lead + health scoring for any CRM contact (canonical platform scorer) |
 | `crm-meeting-reminders` | cron | Cron: send reminders for upcoming CRM meetings whose reminder time has arrived. |
-| `customer-assets-api` | JWT | Installed base: a customer's equipment, its warranties and its recurring service schedules (#343). |
+| `customer-assets-api` | JWT / kai_* | Installed base: a customer's equipment, its warranties and its recurring service schedules (#343). |
 | `seve-directory-sync` | cron | Cron: keep the ΣΕΒΕ exporter directory (seve.gr) copy used as a CRM identity source. |
-| `trade-portal` | public / JWT | A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin |
+| `trade-portal` | public / JWT / kai_* | A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin |
 
 **Business Profile**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `company-enrich` | JWT | Auto-fill soft business identity (website, socials, phone, email, description, industry, employee band, city/state) via web search + Apollo, after a VAT lookup. |
-| `myaade-rgwspublic2` | JWT | Greek business lookup by ΑΦΜ via ΑΑΔΕ RgWsPublic2 SOAP service. |
-| `mygemi-opendata` | JWT | Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API. |
+| `company-enrich` | JWT / kai_* | Auto-fill soft business identity (website, socials, phone, email, description, industry, employee band, city/state) via web search + Apollo, after a VAT lookup. |
+| `myaade-rgwspublic2` | JWT / kai_* | Greek business lookup by ΑΦΜ via ΑΑΔΕ RgWsPublic2 SOAP service. |
+| `mygemi-opendata` | JWT / kai_* | Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API. |
 | `role-upgrade-requests` | JWT | Dealer/factory role promotion workflow — submit, approve, and reject requests. |
-| `vies-validate` | JWT | Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write. |
+| `vies-validate` | JWT / kai_* | Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write. |
 
 **Real Estate**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `real-estate-api` | JWT | Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals |
+| `real-estate-api` | JWT / kai_* | Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals |
 | `real-estate-assessment` | JWT | Derive one property listing's health signals, and optionally write the AI assessment of them |
 | `real-estate-buyer-digests` | cron | Daily cron — emails saved-search digests to buyers with a matching new listing |
 | `real-estate-calendar` _(GET + POST)_ | userJwt | Pushes viewings into the agent's own Google Calendar (per-user OAuth) |
@@ -184,7 +184,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `real-estate-ical` _(GET + POST)_ | icalToken / cron | Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron) |
 | `real-estate-inbound-lead` | inboundLeadToken | Public tokenised endpoint — turns a forwarded portal enquiry email into a CRM lead |
 | `real-estate-listing-social` | cron | Flow action — drafts a social post for a newly published listing, one per connected account |
-| `real-estate-owner` | JWT | A property owner reading their own property |
+| `real-estate-owner` | JWT / kai_* | A property owner reading their own property |
 | `real-estate-public` | token / public | Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture |
 | `real-estate-rent-invoicing` | cron | Daily cron — drafts Finance invoices for rent charges coming due |
 | `real-estate-vendor-reports` | cron | Weekly cron — emails the instructing vendor a performance report on their own listing |
@@ -194,18 +194,18 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `catalog-access` | public | Public gate for shared catalog pages (/c/:handle/:slug) |
-| `catalog-extract-from-pdfs` | JWT | Claude Sonnet vision pass over source PDFs to find materials matching a query |
-| `catalog-image-search` | JWT | Find candidate images for a catalog material via platform DB then web fallback |
+| `catalog-extract-from-pdfs` | JWT / kai_* | Claude Sonnet vision pass over source PDFs to find materials matching a query |
+| `catalog-image-search` | JWT / kai_* | Find candidate images for a catalog material via platform DB then web fallback |
 | `catalog-render-pdf-page` | cron | Proxy to MIVAA rasterize-pdf-page; returns signed URL to a PNG crop of a PDF page |
-| `catalog-send-to-customers` | JWT | Admin sends a published catalog to CRM-category recipients via email |
-| `catalog-translate-pdf` | JWT | Whole-PDF vision pass to populate a catalog's body_data from a source PDF |
-| `generate-catalog-pdf` | JWT | Render a presentation catalog to a PDF and store it in pdf-documents |
+| `catalog-send-to-customers` | JWT / kai_* | Admin sends a published catalog to CRM-category recipients via email |
+| `catalog-translate-pdf` | JWT / kai_* | Whole-PDF vision pass to populate a catalog's body_data from a source PDF |
+| `generate-catalog-pdf` | JWT / kai_* | Render a presentation catalog to a PDF and store it in pdf-documents |
 
 **Moodboard & Sheets**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `generate-moodboard-sheet-pdf` | JWT | Render a moodboard presentation sheet or project client-view to PDF |
+| `generate-moodboard-sheet-pdf` | JWT / kai_* | Render a moodboard presentation sheet or project client-view to PDF |
 | `moodboard-keep-active` _(GET)_ | token / public | Public one-click "keep this moodboard" target for the dormancy warning email |
 | `moodboard-sheet-share` | public | Public token resolver for shared presentation sheets and project client views |
 
@@ -214,19 +214,19 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `scheduled-import-runner` | cron | Cron runner that fetches due scheduled XML imports and re-invokes xml-import-orchestrator. |
-| `xml-import-orchestrator` | JWT | Parse and import supplier XML feeds; supports field detection, preview, and full import modes. |
+| `xml-import-orchestrator` | JWT / kai_* | Parse and import supplier XML feeds; supports field detection, preview, and full import modes. |
 
 **Scraping**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `crawl-user-website` | JWT / cron | Sitemap-driven indexer for SEO inter-linking; preview or full crawl mode |
+| `crawl-user-website` | JWT / kai_* / cron | Sitemap-driven indexer for SEO inter-linking; preview or full crawl mode |
 
 **Email**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `email-api` _(GET + POST)_ | JWT / secret | Action-discriminated email sending, domain management, logs, and analytics via Resend. |
+| `email-api` _(GET + POST)_ | JWT / kai_* / secret | Action-discriminated email sending, domain management, logs, and analytics via Resend. |
 | `email-unsubscribe` _(GET + POST)_ | token | Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe). |
 | `email-webhooks` | sig | Receives Resend delivery event webhooks and updates email_logs. |
 | `mail-track` _(GET)_ | token | Public open-tracking pixel for tracked outgoing email. |
@@ -235,47 +235,47 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `inbox-api` | JWT / token / secret | Multi-tenant unified inbox: threads, participants, messages, agent takeover |
+| `inbox-api` | JWT / kai_* / token / secret | Multi-tenant unified inbox: threads, participants, messages, agent takeover |
 | `inbox-follow-up-cron` | cron | Fire due inbox follow-ups: send the scheduled chase and put the conversation back in Open |
-| `messaging-api` | JWT / secret | WhatsApp messaging via Zernio — send, bulk send, channel management, and analytics. |
+| `messaging-api` | JWT / kai_* / secret | WhatsApp messaging via Zernio — send, bulk send, channel management, and analytics. |
 | `messaging-processor` | cron | Cron-invoked processor that advances scheduled WhatsApp campaigns per-recipient. |
 
 **Pinterest**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `pinterest-api` | JWT | Import Pinterest pins into the catalogue by URL |
+| `pinterest-api` | JWT / kai_* | Import Pinterest pins into the catalogue by URL |
 
 **Notifications**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `notification-dispatcher` | JWT / secret | Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry. |
+| `notification-dispatcher` | JWT / kai_* / secret | Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry. |
 
 **Recommendations**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `recommendations-api` _(GET + POST)_ | JWT / secret | Collaborative filtering interaction tracking, recommendations, and analytics. |
+| `recommendations-api` _(GET + POST)_ | JWT / kai_* / secret | Collaborative filtering interaction tracking, recommendations, and analytics. |
 
 **SEO**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `gsc-api` _(GET + POST)_ | JWT / public | Google Search Console for connected websites (OAuth + performance sync) |
-| `seo-api` | JWT / cron | Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit. |
+| `gsc-api` _(GET + POST)_ | JWT / kai_* / public | Google Search Console for connected websites (OAuth + performance sync) |
+| `seo-api` | JWT / kai_* / cron | Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit. |
 | `seo-content-freshness` | JWT | Content decay — raise generated articles that are past their own refresh cadence |
-| `seo-domain-tracker` | JWT | Weekly Rankings + Backlinks snapshots for a connected website |
-| `seo-publish` | JWT | Publish SEO articles to the workspace's own WordPress site |
-| `seo-rank-tracker` | JWT | Daily positions for the keywords a workspace chose to track |
-| `seo-reports` | JWT | Build a scheduled SEO report and hand it to Flows to deliver |
-| `seo-site-audit` | JWT | Site Health — homepage Lighthouse + on-page audit for a connected website |
+| `seo-domain-tracker` | JWT / kai_* | Weekly Rankings + Backlinks snapshots for a connected website |
+| `seo-publish` | JWT / kai_* | Publish SEO articles to the workspace's own WordPress site |
+| `seo-rank-tracker` | JWT / kai_* | Daily positions for the keywords a workspace chose to track |
+| `seo-reports` | JWT / kai_* | Build a scheduled SEO report and hand it to Flows to deliver |
+| `seo-site-audit` | JWT / kai_* | Site Health — homepage Lighthouse + on-page audit for a connected website |
 
 **Flows**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `flow-engine` | JWT | Execute, test, or event-trigger workflow automations by walking the xyflow graph. |
+| `flow-engine` | JWT / kai_* | Execute, test, or event-trigger workflow automations by walking the xyflow graph. |
 | `flow-scheduler-cron` | cron | Per-minute cron that fires scheduled flows whose cron expression matches current UTC time. |
 | `flow-webhook` | token | Receives external HTTP requests and routes them to the matching webhook-triggered flow. |
 
@@ -290,13 +290,13 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `monitoring-cron` | cron | Unified monitoring dispatcher — one function behind all five price / mention / job cron tasks |
-| `page-watches` | JWT | CRUD for watched pages, mirrored to Firecrawl monitors. |
+| `page-watches` | JWT / kai_* | CRUD for watched pages, mirrored to Firecrawl monitors. |
 
 **Background Agents**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `background-agent-runner` _(GET + POST)_ | JWT / secret | Execute a registered background agent by agent_id |
+| `background-agent-runner` _(GET + POST)_ | JWT / kai_* / secret | Execute a registered background agent by agent_id |
 
 **Crons**
 
@@ -320,7 +320,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `health-check` _(GET + POST)_ | JWT | Check liveness and key validity of all AI providers and external services |
 | `platform-secrets-admin` | JWT | CRUD for the platform_secrets key store (admin/super_admin only) |
 | `reset-platform` | JWT / secret | Destructively clear all user-generated data while preserving system config |
-| `trigger-factory-enrichment` | JWT | Propagate factory fields within a scope and queue a factory-enrichment agent if needed |
+| `trigger-factory-enrichment` | JWT / kai_* | Propagate factory fields within a scope and queue a factory-enrichment agent if needed |
 
 **Internal**
 
@@ -333,21 +333,21 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `product-feed` _(GET)_ | token | Serves a workspace's product catalogue as an XML feed for a marketplace importer. |
-| `store-api` | JWT | Operator actions on a connected sales channel: pull orders, work the Skroutz queue, hand a document back. |
+| `store-api` | JWT / kai_* | Operator actions on a connected sales channel: pull orders, work the Skroutz queue, hand a document back. |
 | `store-orders-webhook` | storeWebhookSignature | Receives orders from a connected sales channel (Shopify, WooCommerce, generic). |
 
 **Customs**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `taric-classify` | JWT / cron | Propose a TARIC commodity code for catalog products |
-| `taric-reference-sync` | JWT / cron | Import the EU TARIC goods nomenclature (Greek extract) into the reference table |
+| `taric-classify` | JWT / kai_* / cron | Propose a TARIC commodity code for catalog products |
+| `taric-reference-sync` | JWT / kai_* / cron | Import the EU TARIC goods nomenclature (Greek extract) into the reference table |
 
 **HR**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `hr-api` | JWT | HR module API — employees, absences, recruitment, onboarding, payroll, attendance, Ergani, accounting |
+| `hr-api` | JWT / kai_* | HR module API — employees, absences, recruitment, onboarding, payroll, attendance, Ergani, accounting |
 | `hr-careers` _(GET + POST)_ | public | Public careers page + job-board API - list a workspace's open postings, read one, accept applications |
 | `hr-checkin-cron` | cron | Cron: fire late check-in alerts for employees who haven't clocked in |
 | `hr-kiosk` | public | Public attendance kiosk — VAT (+ optional PIN) clock in/out |
@@ -363,34 +363,34 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `marketplace-price-check` | JWT | Check a surplus-listing price against the Operator's market cap |
+| `marketplace-price-check` | JWT / kai_* | Check a surplus-listing price against the Operator's market cap |
 
 **Products**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `catalog-export` | JWT | Export the workspace catalogue as CSV, JSON or XML for a distributor or channel |
+| `catalog-export` | JWT / kai_* | Export the workspace catalogue as CSV, JSON or XML for a distributor or channel |
 | `embed-agent` _(GET + POST)_ | public | Public agent surface for the website embed SDK — allowlisted tools, no model turn |
-| `product-datasheet-pdf` | JWT | Branded technical datasheet for one product, as a PDF |
-| `product-document-url` | JWT | Signed, short-lived link to the original file behind a product's knowledge doc or certificate |
-| `product-market-price` | JWT | What a catalogue product is worth on the open market |
+| `product-datasheet-pdf` | JWT / kai_* | Branded technical datasheet for one product, as a PDF |
+| `product-document-url` | JWT / kai_* | Signed, short-lived link to the original file behind a product's knowledge doc or certificate |
+| `product-market-price` | JWT / kai_* | What a catalogue product is worth on the open market |
 | `products-3d-api` _(GET + POST)_ | public | Public product + 3D model read for the website embed SDK |
 
 **Profiles**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `profile-review-summary` | JWT | Regenerates the AI summary printed above a professional's public reviews. |
+| `profile-review-summary` | JWT / kai_* | Regenerates the AI summary printed above a professional's public reviews. |
 
 **Projects**
 
 | Function | Auth | Summary |
 |---|---|---|
 | `project-assessment` | JWT | Derive a project's health signals, and optionally write the AI assessment of them |
-| `scan-drawing-title-block` | JWT | Read a drawing's title block into project drawing-register fields |
-| `structure-site-note` | JWT | Turn a dictated site walk into a diary entry and the defects it described |
-| `takeoff-from-drawing` | JWT | Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines |
-| `tender-bid-portal` | public / JWT | Issue a trade package to a subcontractor and take their priced return |
+| `scan-drawing-title-block` | JWT / kai_* | Read a drawing's title block into project drawing-register fields |
+| `structure-site-note` | JWT / kai_* | Turn a dictated site walk into a diary entry and the defects it described |
+| `takeoff-from-drawing` | JWT / kai_* | Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines |
+| `tender-bid-portal` | public / JWT / kai_* | Issue a trade package to a subcontractor and take their priced return |
 
 **Public**
 
@@ -402,14 +402,14 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `stock-api` | JWT | Stock / warehouse module - inventory, movements, counts, shipments and forecasting |
+| `stock-api` | JWT / kai_* | Stock / warehouse module - inventory, movements, counts, shipments and forecasting |
 
 **Warehouse**
 
 | Function | Auth | Summary |
 |---|---|---|
-| `intake-enrich-products` | JWT | Drain the products intake marked for enrichment, from a URL we already hold |
-| `ontology-propose-targets` | JWT | Propose a target for the invoice terms the ontology cannot resolve |
+| `intake-enrich-products` | JWT / kai_* | Drain the products intake marked for enrichment, from a URL we already hold |
+| `ontology-propose-targets` | JWT / kai_* | Propose a target for the invoice terms the ontology cannot resolve |
 
 **Webhooks**
 
@@ -418,7 +418,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `novus-onboarding-webhook` | novusSignature | Novus onboarding status callbacks |
 | `page-watch-webhook` | sharedSecretHeader | Receives Firecrawl Monitoring callbacks for watched non-price pages and records the diff. |
 | `workspace-webhook-dispatcher` | cron | Deliver queued outbound webhook events to tenant endpoints |
-| `workspace-webhooks-api` | JWT | Manage a workspace's outbound webhook endpoints |
+| `workspace-webhooks-api` | JWT / kai_* | Manage a workspace's outbound webhook endpoints |
 
 <!-- END AUTO-INDEX -->
 

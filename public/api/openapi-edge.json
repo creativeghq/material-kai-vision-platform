@@ -500,6 +500,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -672,6 +675,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "apiKeySecret": []
           }
         ],
@@ -738,6 +744,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -1276,6 +1285,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -1383,6 +1395,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -1588,6 +1603,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -1739,6 +1757,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -1907,6 +1928,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "cronSecret": []
           }
         ],
@@ -2000,6 +2024,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "apiKeySecret": []
           }
         ],
@@ -2066,6 +2093,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -2136,6 +2166,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "apiKeySecret": []
           }
         ],
@@ -2202,6 +2235,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -2272,6 +2308,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -2675,6 +2714,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "apiKeySecret": []
           }
         ],
@@ -2839,6 +2881,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -3009,6 +3054,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "cronSecret": []
           }
         ],
@@ -3099,6 +3147,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "cronSecret": []
           }
         ],
@@ -3187,6 +3238,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -3282,6 +3336,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -3401,6 +3458,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -3492,6 +3552,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -3638,6 +3701,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "queryToken": []
           },
           {}
@@ -3739,6 +3805,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -3829,6 +3898,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -3954,6 +4026,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "cronSecret": []
@@ -4819,6 +4894,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -5129,6 +5207,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -5215,6 +5296,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -5374,6 +5458,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -5522,6 +5609,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -5613,6 +5703,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -5699,6 +5792,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -5795,6 +5891,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -6074,6 +6173,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -6191,6 +6293,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -6338,6 +6443,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -6480,6 +6588,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -6597,6 +6708,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -7105,6 +7219,9 @@
           {
             "supabaseJwt": []
           },
+          {
+            "apiKeyPartner": []
+          },
           {}
         ],
         "responses": {
@@ -7202,6 +7319,9 @@
           {
             "supabaseJwt": []
           },
+          {
+            "apiKeyPartner": []
+          },
           {}
         ],
         "responses": {
@@ -7269,6 +7389,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -7359,6 +7482,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -7465,6 +7591,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -7589,6 +7718,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -7714,6 +7846,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -7841,6 +7976,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -7936,6 +8074,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -8045,6 +8186,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -8358,6 +8502,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "apiKeySecret": []
           }
         ],
@@ -8445,6 +8592,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -9726,6 +9876,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -11550,6 +11703,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "apiKeySecret": []
           }
         ],
@@ -11726,6 +11882,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -11816,6 +11975,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -11896,6 +12058,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -12048,6 +12213,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -12211,6 +12379,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -12301,6 +12472,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -12766,6 +12940,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -12855,6 +13032,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -12920,6 +13100,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -13011,6 +13194,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -13246,6 +13432,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "apiKeySecret": []
           }
         ],
@@ -13312,6 +13501,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -13694,6 +13886,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -13788,6 +13983,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "cronSecret": []
@@ -14756,6 +14954,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -15213,6 +15414,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -15318,6 +15522,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -15413,6 +15620,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -15519,6 +15729,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -15618,6 +15831,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -16233,6 +16449,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -16406,6 +16625,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "queryToken": []
@@ -19110,6 +19332,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -22134,6 +22359,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -22515,6 +22743,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -22610,6 +22841,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -22675,6 +22909,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -22818,6 +23055,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {
             "apiKeySecret": []
@@ -23282,6 +23522,9 @@
           {
             "supabaseJwt": []
           },
+          {
+            "apiKeyPartner": []
+          },
           {}
         ],
         "responses": {
@@ -23513,6 +23756,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -24221,6 +24467,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -24307,6 +24556,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -28108,6 +28360,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -28414,6 +28669,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "cronSecret": []
           }
         ],
@@ -28528,6 +28786,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "cronSecret": []
           }
         ],
@@ -28640,6 +28901,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -28744,6 +29008,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -29753,6 +30020,9 @@
             "supabaseJwt": []
           },
           {
+            "apiKeyPartner": []
+          },
+          {
             "cronSecret": []
           }
         ],
@@ -29883,6 +30153,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -29970,6 +30243,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -30224,6 +30500,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -30378,6 +30657,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -30888,6 +31170,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -31406,6 +31691,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -31502,6 +31790,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -31588,6 +31879,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -31679,6 +31973,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {}
         ],
@@ -31909,6 +32206,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -31995,6 +32295,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           },
           {}
         ],
@@ -32265,6 +32568,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -32359,6 +32665,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -32449,6 +32758,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -32543,6 +32855,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -32637,6 +32952,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -32723,6 +33041,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -32968,6 +33289,9 @@
         "security": [
           {
             "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
           }
         ],
         "responses": {
@@ -36569,7 +36893,7 @@
       "apiKeyPartner": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Partner API key `kai_*` (external integrations) — `Authorization: Bearer kai_…`."
+        "description": "API key `kai_*` — `Authorization: Bearer kai_…`. Acts as the user who created it, in the ONE workspace it is bound to (chosen at creation; a request naming another workspace gets 404). Its endpoint allow-list, when set, is enforced on every function. It never passes a platform-operator gate, whoever owns it. Create one in Profile → API keys."
       },
       "apiKeySecret": {
         "type": "apiKey",

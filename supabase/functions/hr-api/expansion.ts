@@ -30,6 +30,7 @@ export interface Ctx {
   userId: string;
   body: any;
   access: { canView: boolean; canManage: boolean };
+  viaApiKey?: boolean;
 }
 
 
@@ -318,7 +319,7 @@ function anthropicTool(prompt: string, tool: any) {
  * (so index.ts can fall through to its own default 400).
  */
 export async function handleExpansion(action: string, ctx: Ctx): Promise<Response | null> {
-  const { supabase, workspaceId, userId, body, access } = ctx;
+  const { supabase, workspaceId, userId, body, access, viaApiKey } = ctx;
   const requireManage = () => { if (!access.canManage) throw new HttpError(403, 'You need HR manage permission for this action.'); };
 
   switch (action) {
@@ -1000,7 +1001,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const [{ data: callerMem }, operator] = await Promise.all([
         supabase.from('workspace_members').select('role').eq('workspace_id', workspaceId).eq('user_id', userId)
           .eq('status', 'active').in('role', ['owner', 'admin']).maybeSingle(),
-        isPlatformOperator(supabase, userId),
+        viaApiKey ? false : isPlatformOperator(supabase, userId),
       ]);
       if (!callerMem && !operator) throw new HttpError(403, 'Only a workspace owner or admin can give an employee portal access.');
       const id = String(body?.employee_id ?? '');

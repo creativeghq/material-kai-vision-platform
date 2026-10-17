@@ -2782,7 +2782,7 @@ async function executeAgent(
   if (mailToolIds.length) {
     try {
       const mailMod = await import('../_shared/tools/mail-tools.ts');
-      const isOperator = await isPlatformOperator(supabase, userId);
+      const isOperator = !!userJwt && await isPlatformOperator(supabase, userId);
       tools.push(...mailMod.createMailTools({ userId, workspaceId, jwt: userJwt, isOperator, onChunk }, mailToolIds));
     } catch (e) {
       console.error('[agent-chat] mail toolkit failed to load', e);

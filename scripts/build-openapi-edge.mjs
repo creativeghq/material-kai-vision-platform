@@ -18,7 +18,7 @@ const DOCS_BASE = 'https://github.com/creativeghq/material-kai-vision-platform/b
 // ---- security schemes ----
 const securitySchemes = {
   supabaseJwt: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'Supabase user session JWT — `Authorization: Bearer <token>`.' },
-  apiKeyPartner: { type: 'http', scheme: 'bearer', description: 'Partner API key `kai_*` (external integrations) — `Authorization: Bearer kai_…`.' },
+  apiKeyPartner: { type: 'http', scheme: 'bearer', description: 'API key `kai_*` — `Authorization: Bearer kai_…`. Acts as the user who created it, in the ONE workspace it is bound to (chosen at creation; a request naming another workspace gets 404). Its endpoint allow-list, when set, is enforced on every function. It never passes a platform-operator gate, whoever owns it. Create one in Profile → API keys.' },
   apiKeySecret: { type: 'apiKey', in: 'header', name: 'apikey', description: 'Platform admin secret key `sb_secret_*` (full access).' },
   supabaseAnonKey: { type: 'apiKey', in: 'header', name: 'apikey', description: 'The project\'s public (anon / publishable) key. Database (`/rest/v1`) calls need it AND the user JWT — the key alone reads nothing.' },
   cronSecret: { type: 'apiKey', in: 'header', name: 'x-cron-secret', description: 'Shared cron secret (`CRON_SECRET`). pg_cron / scheduled invocations only.' },

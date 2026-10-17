@@ -5,7 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isPlatformOperator } from '../_shared/auth.ts';
+import { authenticate, callerIsPlatformOperator } from '../_shared/auth.ts';
 import {
   resolveSecret,
   maskSecretValue,
@@ -50,7 +50,7 @@ Deno.serve(withApiLogging('platform-secrets-admin', async (req) => {
     // reason; this asks the operator question directly.
     const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
-    if (!(await isPlatformOperator(auth.supabase, auth.userId))) {
+    if (!(await callerIsPlatformOperator(auth))) {
       return json({ error: 'Platform operator access required' }, 403);
     }
 

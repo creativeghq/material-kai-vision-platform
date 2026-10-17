@@ -13,9 +13,9 @@ describe('#294 — platform-scoped gates and body-supplied ids', () => {
   it('platform-secrets-admin asks the operator question, not a workspace role', () => {
     expect(secrets, 'gated on allowedRoles again — `admin` is a workspace role any tenant grants')
       .not.toMatch(/allowedRoles/);
-    expect(secrets).toMatch(/isPlatformOperator\(/);
+    expect(secrets).toMatch(/callerIsPlatformOperator\(/);
     // The gate must actually refuse, not merely compute a boolean.
-    expect(secrets).toMatch(/if\s*\(!\(await isPlatformOperator\([^)]*\)\)\)/);
+    expect(secrets).toMatch(/if\s*\(!\(await callerIsPlatformOperator\([^)]*\)\)\)/);
   });
 
   it('platform_secrets is updated, never upserted', () => {
@@ -34,7 +34,7 @@ describe('#294 — platform-scoped gates and body-supplied ids', () => {
     // `allowedRoles: ['admin','super_admin','owner']`, so any tenant's workspace OWNER could add
     // and verify domains on our sending account: a domain-reputation and phishing surface.
     const src = read('email-api/index.ts');
-    expect(src).toMatch(/isPlatformOperator\(/);
+    expect(src).toMatch(/callerIsPlatformOperator\(/);
     expect(
       src.match(/allowedRoles: \['admin', 'super_admin', 'owner'\]/g) ?? [],
       "a domain route is back on a workspace-role gate",
@@ -98,13 +98,13 @@ describe('platform work is gated on the operator, never on a workspace role', ()
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs']) {
       expect(block, `${action} left PLATFORM_ACTIONS — any signed-in user can call it`).toContain(`'${action}'`);
     }
-    expect(src).toMatch(/PLATFORM_ACTIONS\.has\(action\)[^\n]*isPlatformOperator\(/);
+    expect(src).toMatch(/PLATFORM_ACTIONS\.has\(action\)[^\n]*callerIsPlatformOperator\(/);
   });
 
   it('email-api refuses a user send on the platform sender unless they are the operator', () => {
     const src = read('email-api/index.ts');
     const resolve = src.indexOf('resolveWorkspaceEmailSender(supabaseClient, body.workspace_id)');
-    const gate = src.search(/sender\.source !== 'workspace' && !isAdminAccess\(auth\) && !\(await isPlatformOperator\(/);
+    const gate = src.search(/sender\.source !== 'workspace' && !isAdminAccess\(auth\) && !\(await callerIsPlatformOperator\(/);
     expect(resolve).toBeGreaterThan(-1);
     expect(gate, 'the platform-sender operator check is gone').toBeGreaterThan(resolve);
   });

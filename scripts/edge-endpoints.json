@@ -204,7 +204,8 @@
     "summary": "Reorder search results by relevance to a query",
     "description": "Cross-encoder style reranking over candidates the caller already holds. Fuses the platform's six per-aspect embedding scores (visual/colour/texture/style/material/understanding) into one ordering using claude-haiku-4-5. Degrades to the SOURCE ORDER on every failure path - fewer than 2 candidates, no API key, model error, or a model reply naming ids that were not sent - and reports which happened in `reranked`/`reason`, so a caller never mistakes an unranked list for a ranked one. Ranks by id rather than index, so a shifted candidate list cannot silently reorder the wrong results. The same logic runs in-process for the agent's material_search, visual_search and knowledge_base_search tools; this endpoint is for callers outside the agent runtime. Prompt is editable at /admin/ai-configs (prompts.category='ai_rerank').",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -267,6 +268,7 @@
     "description": "Universal executor for all background agent types. Accepts service-role or user JWT auth. GET ?catalog=1 returns the registered agent type catalog; POST runs or resumes an agent run.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": null,
@@ -641,7 +643,8 @@
     "summary": "Claude Sonnet vision pass over source PDFs to find materials matching a query",
     "description": "Sends one or more admin-uploaded source PDFs to Claude Sonnet 4.6 with tool-use to extract candidate materials matching a free-form query. Returns candidates with name, description, price, specs, bbox, and a rasterized image URL.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -687,7 +690,8 @@
     "summary": "Find candidate images for a catalog material via platform DB then web fallback",
     "description": "Searches the platform product DB (via MIVAA multi-vector search) first, then falls back to DataForSEO Google Images SERP. Returns up to N image candidates tagged with source ('db' or 'web') for admin approval.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -779,7 +783,8 @@
     "summary": "Admin sends a published catalog to CRM-category recipients via email",
     "description": "Resolves recipients from CRM categories, optionally writes catalog_email_grants for each, then dispatches emails via email-api using the catalog_send.recipient template. Preview mode returns recipient list without sending.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -850,7 +855,8 @@
     "summary": "Whole-PDF vision pass to populate a catalog's body_data from a source PDF",
     "description": "Sends an entire source PDF to Claude Sonnet 4.6 via tool-use to produce sections and materials, then merges the result into the target catalog's body_data. Supports layout-preserving (page-per-section) and restructured (category-grouped) modes.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -907,6 +913,7 @@
     "description": "Discovers the sitemap via robots.txt or well-known paths, then either samples 5 URLs (mode=preview) or fully crawls up to max_pages URLs (mode=full), scraping each with Firecrawl and embedding the content via Voyage for SEO inter-linking. Accepts JWT or cron secret.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": null,
@@ -936,6 +943,7 @@
     "description": "Path-routed REST API dispatching to four resource handlers: /companies (GET/POST/PATCH/DELETE for company CRUD, requires admin or factory role), /contacts (contact CRUD), /users (user profile CRUD), /stripe (Stripe customer/subscription operations). Each handler performs its own auth and RLS enforcement.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": null,
@@ -964,6 +972,7 @@
     "description": "Accepts a JSON body with an `action` field (or path suffix) to select the operation. Requires `RESEND_API_KEY`; returns 503 with `provider_not_configured` when absent. Supports optional React Email templates resolved by slug from `email_templates`.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": null,
@@ -1268,7 +1277,8 @@
     "summary": "Send finance digest emails and dispatch quote follow-up bell notifications",
     "description": "Cron mode (invoked by the Finance digest flow): sends scheduled digest emails with AR/AP aging, cash-flow forecast, P&L, and top-party tables to configured recipients, and dispatches bell notifications for idle or due-scheduled quotes. Now mode (admin JWT): sends an on-demand digest for a specific workspace.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -1324,6 +1334,7 @@
     "description": "Polls the AADE myDATA RequestDocs endpoint for each workspace that has configured inbound credentials, upserts received documents into inbound_documents, and advances the per-workspace MARK watermark. The manual 'Sync from myDATA' path may bound the pull to an issue-date window (date_from/date_to) so a sync doesn't drag in years of history. Cron path charges 2 credits per workspace; manual 'Sync now' (JWT) is free. No-ops cleanly when credentials are absent.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": null,
@@ -1353,6 +1364,7 @@
     "description": "Reads the taxpayer's own myDATA book from AADE and stores it in mydata_book_months as a READ-ONLY MIRROR — never merged with, and never written back into, invoices / supplier_bills / inbound_documents. It exists to CONFIRM the platform's own figures against the tax authority's. Combines RequestMyIncome + RequestMyExpenses (the book feed, which omits the counterparty-less 11.x/13.x families) with the 11.x/13.x half of RequestTransmittedDocs, signing credit subtypes 11.4 and 13.31 negative; with that supplement every month and column ties to the myAADE bookAggregate page to the cent. AADE rate-limits these endpoints with a retry-after longer than an edge request may live, so a 429 is recorded as collector_failed with retry_after_s and the last good figures are left untouched rather than zeroed.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": null,
@@ -1381,7 +1393,8 @@
     "summary": "Render a legal invoice, credit note, or delivery note as a PDF",
     "description": "Generates an A4 PDF for an invoice, credit note, or delivery note using pdf-lib with embedded Noto Sans for Greek/Latin rendering. Caches the PDF in pdf-documents storage and returns a 7-day signed URL. Supports GR/EN language selection per-document.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -1421,7 +1434,8 @@
     "summary": "Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note",
     "description": "Creates a draft invoice from a quote (idempotent), optionally issues it, and optionally transmits it to the workspace's legal_invoice connector (Novus → myDATA). Also handles credit-note submission (myDATA 5.1), delivery-note submission (9.3), and POS/IRIS receipt hold + completion (Law 5155). Costs 2 credits per myDATA transmission; root workspace transmits free.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -1497,7 +1511,8 @@
     "summary": "Transmits an expense document you recorded here straight to myDATA",
     "description": "Rent, foreign purchases, contracts and your own payroll/depreciation entries are myDATA types 13.x-17.x, which an e-invoicing provider may not carry — AADE limits providers to 1.1-11.5. This files them directly under the workspace ΑΑΔΕ credentials and stores the MARK. `check-rights` probes whether the subscription can file at all without creating anything.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "methods": [
       "POST"
@@ -1526,7 +1541,8 @@
     "summary": "Files a recorded movement lifecycle leg (ΨΔΑ Phase Β1) with myDATA and reads a movement's AADE status",
     "description": "Each leg of a delivery note's movement (start/tranship, delivery outcome, rejection, return) is its own AADE filing with its own MARK. This sends a leg recorded in delivery_note_events to the matching AADE ERP method (RegisterTransfer, ConfirmDeliveryOutcome, RejectDeliveryNote, ConfirmDeliveryReturn) under the workspace's OWN ΑΑΔΕ credentials, and stamps the MARK. A leg is claimed before the call and never sent twice; a call that dies mid-flight is recorded as indeterminate and resolved by the reconcile action, which matches it against AADE's GetDeliveryNoteStatus history.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -1581,6 +1597,7 @@
     "description": "Two modes: authenticated admin/finance mints a pay_token and/or creates a Stripe Checkout session for an invoice; public/unauthenticated path resolves a pay_token and creates a Checkout session for the buyer. Routes funds to the workspace's connected Stripe account when configured.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "queryToken",
       "public"
     ],
@@ -1628,7 +1645,8 @@
     "summary": "Email an invoice to its customer with optional PDF attachment",
     "description": "Resolves the recipient from the invoice's CRM company/contact, generates or reuses the invoice PDF, and dispatches via the email-api edge function. The 'to' field overrides automatic recipient resolution.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -1656,7 +1674,8 @@
     "summary": "Instruct a real bank transfer from a workspace account to a counterparty",
     "description": "Money OUT, on whichever rail the chosen account sits on. The source is one of the workspace's own `finance_bank_accounts` rows; its mapping decides the provider (Revolut pocket or Viva wallet), and an account mapped to neither is refused rather than silently recorded. Writes an instruction to `payout_instructions` BEFORE calling the provider and never writes a `payments` row — the bank feed records the money when the transfer lands, and settles the bill the instruction names. `request_id` is a required idempotency key minted once per payment attempt: a repeat replays the stored outcome instead of sending a second irreversible transfer. Caller must be a finance manager of the workspace; a mismatch answers 404.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "methods": [
       "POST"
@@ -1754,6 +1773,7 @@
     "description": "Single mode: renders a chronological debit/credit ledger PDF for a CRM company or contact and emails it. Cron-batch mode: iterates all workspaces with auto_statement_enabled and sends each eligible party their statement according to the configured schedule. Customer-side statements include pay-by-card links for open invoices.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": null,
@@ -2206,7 +2226,8 @@
     "summary": "Execute, test, or event-trigger workflow automations by walking the xyflow graph.",
     "description": "Requires Supabase JWT. Routes on body.action to execute-flow (run a saved flow with trigger data), test-flow (dry-run, no side effects), or trigger-event (auto-dispatch from DB triggers or server-to-server).",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/flow-engine.md",
     "methods": [
@@ -2326,7 +2347,8 @@
     "summary": "Render a presentation catalog to a PDF and store it in pdf-documents",
     "description": "Builds a multi-page A3 PDF from the catalog's cover/body/back-cover data and selected template, uploads it to pdf-documents/catalog-output/{id}/, and updates presentation_catalogs with the storage path and a fresh signed URL.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -2348,7 +2370,8 @@
     "summary": "Multi-mode interior design image generation (Gemini, FLUX, Grok)",
     "description": "Generates interior design images across seven modes: text-to-image, image-edit, redesign, copy-style, floor-plan-render, floor-plan-text, and materials-selection-board. Routes to Gemini (flash 6cr / pro 15cr), FLUX Depth Pro (redesign/copy-style 20cr), or Grok Aurora (15cr) based on mode and model_tier. Accepts service-role key for server-to-server calls from agent-chat; otherwise requires user JWT.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/interior-design-models.md",
     "methods": [
@@ -2473,7 +2496,8 @@
     "summary": "Multi-model interior design video generation with async polling fallback",
     "description": "Generates interior design videos via veo-2 (50cr, 8s), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (30/55/110cr, 30s with audio), seedance-2.5-480p/720p (60/125cr, 30s one-pass) h3-max-768p/480p (25/15cr, 15s with stereo audio, rendered in seconds) or ray-3.2-720p/1080p (20/70cr, 5-10s, first-to-last frame interpolation). Model is auto-selected from video_type when not specified; social_reel routes to h3-max-768p. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/interior-video-generation.md",
     "methods": [
@@ -2599,7 +2623,8 @@
     "summary": "Render a moodboard presentation sheet or project client-view to PDF",
     "description": "Accepts either a sheet_id (renders one of the 9 sheet types: material_board, color_palette, concept_board, lighting_plan, annotated_render, elevation_render_pair, ffe_schedule, area_breakdown, full_deck) or a client_view_id (renders a cross-moodboard project deck). Uploads to pdf-documents and returns a 7-day signed URL.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -2633,7 +2658,8 @@
     "summary": "Render a signed/draft contract to PDF",
     "description": "Renders the contract (with any collected signatures) to a PDF, overwrites it at pdf-documents/contract-output/{contract_id}.pdf (private bucket), and returns a 7-day signed URL. Requires a signed-in user; the caller is reconciled against the contract's workspace before rendering (#250 invariant 1).",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -2655,7 +2681,8 @@
     "summary": "Check a surplus-listing price against the Operator's market cap",
     "description": "Resolves the market price for a product (via MIVAA's market-check engine — Perplexity/DataForSEO/Firecrawl) and returns whether a proposed surplus listing price is within the Operator cap (market_median × (1 + cap%), default 20%). Same guard create_marketplace_listing enforces server-side so the client can't forge it. authenticate() + userCanAccessWorkspace(); workspace must be an approved marketplace participant.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -2693,7 +2720,8 @@
     "summary": "What a catalogue product is worth on the open market",
     "description": "Returns the derived market price for a product: the min/max band, the median, and the chosen price (lowest verified in-stock retailer hit) with the basis and confidence stated. Reads resolve_product_market_price, the platform's one price derivation, so a tile and a report cannot disagree. Never triggers a paid scan: the request is recorded as demand, which shortens the refresh cadence for products people actually ask about. Status is 'ok', 'no_data', 'not_collected' or 'collector_failed' - never a bare zero. authenticate() + userCanAccessWorkspace(); the product must belong to that workspace (404 otherwise).",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -2775,7 +2803,8 @@
     "summary": "Weekly Rankings + Backlinks snapshots for a connected website",
     "description": "Snapshots DataForSEO domain rank overview (ranking keywords, organic traffic, position buckets, up/down/new/lost) + backlinks summary (backlinks, referring domains, spam score) + top ranked keywords for the site's MARKET (resolved from its GSC top country, else TLD, else US) into seo_domain_snapshots + seo_domain_keywords. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace().",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/seo-system.md",
     "methods": [
@@ -2808,7 +2837,8 @@
     "summary": "Publish SEO articles to the workspace's own WordPress site",
     "description": "Connects a workspace's WordPress site (application password stored in Vault, verified against /wp/v2/users/me) and publishes an article as a draft or live post. Every site request goes through the SSRF guard, https only, no redirects. A retry updates the post it already created (seo_articles.publish_external_id).",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/seo-system.md",
     "methods": [
@@ -2885,7 +2915,8 @@
     "summary": "Daily positions for the keywords a workspace chose to track",
     "description": "Checks each active row in seo_tracked_keywords against the live Google SERP and writes one seo_keyword_positions row per keyword per day. Distinct from seo-domain-tracker, which DISCOVERS what a domain happens to rank for and replaces that set weekly; this follows a fixed, user-picked set as a time series. Outside the top 100 stores position NULL with found=false — never a sentinel rank, which would be averaged and charted as real. A check that could not run stores `error` and is excluded from every figure: unknown, not unranked. One SERP call per keyword, so both paths are capped at 60 per invocation and ordered oldest-checked-first, turning a large set into a slower rotation rather than a larger bill. verify_jwt disabled so the daily cron-run (x-cron-secret) works; the run action calls authenticate() + userCanAccessWorkspace() and asserts the seo-toolkit entitlement before spending.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/seo-system.md",
     "methods": [
@@ -2936,7 +2967,8 @@
     "summary": "Build a scheduled SEO report and hand it to Flows to deliver",
     "description": "Composes the report from build_website_seo_report, which calls the same derivations the dashboard reads — it computes no figure itself, so a number in the report and the same number on screen cannot drift. Each run is stored as a FROZEN snapshot in seo_report_runs and read back verbatim; re-deriving on open would show today's numbers under an old date. A run that fails to build is still stored, because 'it failed' is a fact the operator needs and deleting the attempt leaves the list reading 'never run'. Delivery is not hardcoded: it emits seo.report_ready and a seeded tenant-configurable flow carries it, so an operator can retarget or silence it without a deploy. verify_jwt disabled so cron-run (x-cron-secret) works; the run action calls authenticate() + userCanAccessWorkspace() and asserts the seo-toolkit entitlement.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -2969,7 +3001,8 @@
     "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",
     "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace(). The full multi-page OnPage crawl stays on-demand via the seo_site_crawl_start agent tool.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/seo-system.md",
     "methods": [
@@ -3197,6 +3230,7 @@
     "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "public"
     ],
     "docs": null,
@@ -3394,7 +3428,8 @@
     "summary": "Generate or return cached PDF for a quote",
     "description": "Builds an A4 branded PDF for a quote using pdf-lib, uploads to pdf-documents storage, and returns a 7-day signed URL. Returns the cached PDF on subsequent calls unless regenerate is requested. Emits a flow event on successful generation.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -3422,7 +3457,8 @@
     "summary": "Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora",
     "description": "Accepts a room image URL, a binary PNG mask data URL (white=regenerate, black=keep), and a prompt. Calls Grok Aurora's /v1/images/edits endpoint with an explicit binary mask. Costs 20 credits. Accepts service-role key for agent-chat internal calls.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/segmentation-inpainting.md",
     "methods": [
@@ -3487,7 +3523,8 @@
     "summary": "Generate platform-optimised social media captions and hashtags via Claude",
     "description": "Uses Claude Haiku to generate 3 caption variants and hashtags tailored to the target platform's character limits and tone conventions. Costs 2 credits (non-refundable). Platforms: instagram, facebook, linkedin, tiktok, pinterest, youtube, twitter, threads.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -3597,7 +3634,8 @@
     "summary": "Generate a social media image via Aurora, Gemini, or FLUX based on content type",
     "description": "Routes to the best image model: lifestyle/people → xAI Aurora (10cr), product/interior → Gemini Imagen (5cr), artistic/textured → FLUX 2 Pro via Replicate (6cr). Model can be overridden explicitly or set to 'auto'. Credits are debited upfront and non-refundable.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -3684,7 +3722,8 @@
     "summary": "Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable)",
     "description": "Generates a short-form social video. DEFAULT h3-max-768p (25cr): 5-15s with stereo audio, rendered in seconds, delegated to generate-interior-video-v2. veo-2 (50cr), wan-3.0-480p/720p/1080p (30/55/110cr) and seedance-2.5-480p/720p (60/125cr) ray-3.2-720p/1080p (20/70cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits debited upfront, non-refundable.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -3782,7 +3821,8 @@
     "summary": "Make background-removed product cut-outs for the Product in Place embed",
     "description": "Product in Place (#474). action=prepare queues one cut-out per product image and works through pending ones at Replicate's pace (one create per ~11 s, ~95 s per call), 1 credit each, debited before the call and refunded on failure; the result must be a PNG with transparency. action=status reports them. The workspace is checked against the caller; products from another workspace are ignored.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "methods": [
       "POST"
@@ -3831,7 +3871,8 @@
     "summary": "AI virtual staging of an empty room via Replicate proplabs/virtual-staging",
     "description": "Takes an empty room image, room type, and optional furniture style/items. Calls proplabs/virtual-staging on Replicate with Prefer: wait polling (~56s, 20 credits). Emits virtual_staging_completed flow event on success. Accepts service-role key for agent-chat internal calls.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/virtual-staging.md",
     "methods": [
@@ -3902,7 +3943,8 @@
     "summary": "Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble",
     "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Model: marble-1.1 (190cr, ~7min); the marble-1.0-draft tier was retired. Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -4029,6 +4071,7 @@
     "description": "Triggered on kb_docs changes (via pg_net) or called directly by the admin UI. Builds text from title + content_markdown, calls MIVAA /api/embeddings/clip-text (voyage-4, 1024D), and writes the vector plus embedding metadata back to kb_docs.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": null,
@@ -4053,6 +4096,7 @@
     "description": "Action-discriminated API for WhatsApp via Zernio (Meta Cloud API). Requires `ZERNIO_API_KEY`; returns 503 with `provider_not_configured` when absent. Channels are `messaging_channels` rows linked to Zernio WhatsApp accounts. Cold/marketing sends require a Meta-approved template; freeform content is only valid inside the 24h customer-care window.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": "docs/inbox-system.md",
@@ -4990,6 +5034,7 @@
     "description": "Action-discriminated reverse proxy to the MIVAA FastAPI backend. Authenticates the caller, checks admin access where required, debits credits per action, then forwards the payload to the corresponding MIVAA endpoint. Also handles multipart/form-data uploads (forwarded to rag_upload) and GET /job-status/{jobId} path requests. Any action whose resolved path is under /api/admin — plus admin_system_health and admin_system_metrics, gated by name because their real routes live at /api/system/* — requires admin access.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": "docs/api-master-reference.md",
@@ -5659,7 +5704,8 @@
     "summary": "Greek business lookup by ΑΦΜ via ΑΑΔΕ RgWsPublic2 SOAP service.",
     "description": "Calls the ΑΑΔΕ RgWsPublic2 SOAP 1.2 endpoint with WS-Security UsernameToken (`AADE_USERNAME`/`AADE_PASSWORD` from env or platform_secrets). Returns basic company record and KAD activity codes. Uses a 90-day cache on `crm_companies.aade_data` to minimize TAXISnet quota consumption. Note: every live SOAP call writes an audit entry to the looked-up ΑΦΜ's TAXISnet inbox.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -5688,7 +5734,8 @@
     "summary": "Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API.",
     "description": "Queries the public ΓΕΜΗ OpenData API (GET /companies?afm=…) for the Greek Commercial Registry record — GEMI number, legal form, status, incorporation date, activities. Unlike the ΑΑΔΕ RgWsPublic2 service, ΓΕΜΗ OpenData is public open data behind a single operator-issued application key (env GEMI_API_KEY → platform_secrets), so ONE platform key serves every workspace with no per-tenant quota or audit notification. 90-day cache on crm_companies; writing the cache back onto a CRM company requires ownership/admin.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -5730,6 +5777,7 @@
     "description": "Action-discriminated handler for two notification channels. `send-push`: sends Web Push notifications to browser subscriptions using VAPID keys (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`). `send-webhook`: delivers a JSON payload to configured webhook endpoints with optional HMAC-SHA256 signing, up to 3 retries with configurable delay, and updates `webhook_endpoints` success/failure timestamps. `get-vapid-key`: returns the public VAPID key for service-worker subscription registration.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": null,
@@ -5798,7 +5846,8 @@
     "summary": "Register a workspace's VAT with Novus so it can transmit to myDATA",
     "description": "Novus Onboarding API v1.0 under the platform's software-house key. Creates the onboarding application, downloads the generated contract PDF, uploads the signed copy, records acknowledgements for the manual steps, and syncs the provider's own status back. Approval triggers Novus provisioning and the Δήλωση Παρόχου filing with ΑΑΔΕ. Operator-only webhook_* actions register the signed callback endpoint.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "methods": [
       "POST"
@@ -5885,7 +5934,8 @@
     "summary": "Parse a KB doc supplier cost list and apply costs to matching products",
     "description": "Reads a kb_docs row with price_doc_type='supplier_cost_list', parses its Markdown table for SKU/cost rows, bulk-matches against products by sku or external_sku within the workspace, and updates products.cost. Supports dry_run mode to preview matches without writing.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -5913,7 +5963,8 @@
     "summary": "Import Pinterest pins into the catalogue by URL",
     "description": "Pinterest pin IMPORT only. The OAuth half (get_auth_url / callback / get_boards / get_board_pins / disconnect) was removed — board browsing needed a connected account and nothing used it. Extract a pin's image + metadata by URL, then import one or many into the catalogue.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -6159,7 +6210,8 @@
     "summary": "REST API for quote requests (customer-facing)",
     "description": "Path-routed REST handler for customer quote requests: create one from a quote, list/get the caller’s own, and update its status. All operations scoped to the authenticated user. The /proposals routes were removed with the `proposals` table on 2026-08-30 (#378 N9) — it was an abandoned second quoting system that never held a row. Live quotes are `quotes` / `quote_items`.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -6247,6 +6299,7 @@
     "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and cached recommendation distribution. DELETE /cache clears the user's recommendation_scores rows.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": null,
@@ -6544,7 +6597,8 @@
     "summary": "Email a quote to a recipient with a public share link",
     "description": "Sends a quote summary email to the customer (or an explicit address). Ensures a public share token exists (mints one if needed), composes inline HTML with a view-quote link and optional free-text message, and dispatches via email-api. Authorized for the quote owner or an admin.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -6579,6 +6633,7 @@
     "description": "Single POST endpoint routing on body.action to one of eight handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research, page_ideas. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": "docs/seo-system.md",
@@ -7201,7 +7256,8 @@
     "summary": "Stripe Checkout and Customer Portal session creator",
     "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured. 'connect-onboard' / 'connect-status' manage the workspace's Stripe Express account for per-workspace payouts (destination charges).",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -7468,7 +7524,8 @@
     "summary": "Propagate factory fields within a scope and queue a factory-enrichment agent if needed",
     "description": "Called by PDF, XML, and scraping import pipelines after products are inserted. Runs propagateFactoryFieldsInScope to share the best factory object across all products in the same document/session scope, then queues a background agent_run (agent_type='factory-enrichment') when average completeness score is below 0.9.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -7515,7 +7572,8 @@
     "summary": "Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write.",
     "description": "Accepts a JWT-authenticated POST with `country_code` and `vat_number`. Non-EU codes are skipped with `skipped_reason='non_eu'`; VIES outages return 503 with `skipped_reason='vies_unreachable'`. If `company_id` is supplied and the caller owns the company (or is admin), the validated result is cached on `crm_companies` VIES columns.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -7550,7 +7608,8 @@
     "summary": "Auto-fill soft business identity (website, socials, phone, email, description, industry, employee band, city/state) via web search + Apollo, after a VAT lookup.",
     "description": "JWT-authenticated POST. Runs Anthropic web_search (always) merged with Apollo.io (only when APOLLO_API_KEY is set) to fill fields a VAT registry never carries. Credit-metered per invariant #10 (reserve ceiling then per-provider debit). If company_id is supplied and the caller owns the row (or is admin), only currently-empty columns are cached back onto crm_companies.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -7603,7 +7662,8 @@
     "summary": "Parse and import supplier XML feeds; supports field detection, preview, and full import modes.",
     "description": "Requires Supabase JWT. Accepts base64-encoded XML and routes behavior via preview_only and generate_preview flags: analyze mode returns detected fields with coverage stats (dictionary-first, AI-residual), preview mode applies mappings to a sample product, import mode creates a data_import_job and batch-inserts products for MIVAA processing.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/xml-import-orchestrator.md",
     "methods": [
@@ -7768,7 +7828,8 @@
     "summary": "Social media publishing, OAuth account management, and analytics via Zernio.",
     "description": "Action-discriminated API routing POST requests to three handlers: analytics (get_best_time, get_post_analytics, get_account_insights), OAuth (connect, callback, disconnect; GET returns account list), and publish (publish_now, schedule). All actions require supabase JWT auth.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/social-media-system.md",
     "methods": [
@@ -8268,6 +8329,7 @@
     "description": "Action-based handler for the multi-tenant Inbox (#209). Three auth surfaces: JWT actions (authenticated member/operator/customer-account flows), token actions (token_*, service-role + scoped customer share token), and internal_agent_reply (service-role, called by the agent runtime). Threads are workspace-scoped with directional ACLs (internal/customer/upstream); the AI agent can auto-respond and be assigned per-thread.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "queryToken",
       "apiKeySecret"
     ],
@@ -10201,7 +10263,8 @@
     "summary": "HR module API — employees, absences, recruitment, onboarding, payroll, attendance, Ergani, accounting",
     "description": "Action-based HR backbone (#252). Session JWT; authenticate() yields a service-role client, so every action re-derives the workspace from body.workspace_id and calls userCanAccessWorkspace, plus isModuleEnabled('hr') and per-workspace assertEntitled('hr') (402 upsell). RBAC: reads need hr.view, writes/approvals need hr.manage (owner/admin/global-admin only); self-* actions are open to a linked employee (workspace role 'employee') and hard-scoped to their own record. NOTE: the client reads the list tabs (employees, departments, absences, job postings, applications, onboarding, documents, payroll runs) DIRECTLY from the DB (RLS-gated), not through this function — the edge function serves writes + computed/credit-metered/external actions. Every action requires action and workspace_id in the POST body.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/hr-system.md",
     "methods": [
@@ -12332,7 +12395,8 @@
     "summary": "Generate cached AI insights for the home dashboard",
     "description": "User JWT; caller must be an active member of workspace_id. Gathers a live workspace snapshot (projects, AR/finance, tasks, inbox, quotes) and asks Claude Haiku for 2-5 friendly insights, cached 15 days per (user, workspace) in dashboard_insights_cache. Never errors: on LLM failure it returns a deterministic numbers-driven fallback cached with a short TTL.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -12491,7 +12555,8 @@
     "summary": "Proposes an expense category per supplier, and applies the ones you confirm",
     "description": "Received myDATA documents arrive under one category named after the inlet they came through, which tells you nothing about what the money bought. This proposes a category from a closed chart for each SUPPLIER — the durable unit, since a decision about a supplier also files everything that arrives from them afterwards. `suggest` writes nothing and returns proposals with a confidence and a reason; `apply` writes only the rules it is handed, and re-files just the documents still sitting in the inlet. A supplier the classifier could not read comes back undecided rather than filed somewhere plausible.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "methods": [
       "POST"
@@ -12524,7 +12589,8 @@
     "summary": "Customer self-service view of their own invoices, receipts and orders",
     "description": "Any authenticated user (customer-facing, not admin-gated). Resolves the caller's linked crm_contacts (and their businesses via crm_company_contacts), then returns strictly the documents whose counterparty is one of those — issued invoices/retail receipts, payment receipts, and sales orders — with fresh 7-day signed PDF URLs. Runs under service role because customers are not workspace members.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -12594,6 +12660,7 @@
     "description": "The only writer of persisted plan-line prices, plan versions, and plan->quote items (#242). User JWT or service-role secret; every write re-binds to the plan/project workspace via userCanAccessWorkspace. Resolves quantities from formulas + rates from product_prices, expands sub-blueprints, and syncs to quotes / purchase items.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "apiKeySecret"
     ],
     "docs": "docs/blueprint-estimating.md",
@@ -12884,6 +12951,7 @@
     "description": "Contracts & e-signature. One entity, three contexts (hr | finance | project). verify_jwt is disabled so the PUBLIC token sign path works; management actions call authenticate() plus the module/entitlement gates and then write through a USER-context client, so the context-branched RLS (hr->admin, finance->finance-manager, project->member) is the real enforcement - no service-role body-trust (#250 invariant 1). status/token/workspace/created_by are server-set, never caller-writable.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "public"
     ],
     "docs": "docs/contracts-system.md",
@@ -12978,7 +13046,8 @@
     "summary": "Stock / warehouse module - inventory, movements, counts, shipments and forecasting",
     "description": "Stock Management API. Promotes the warehouse/inventory feature (previously a Finance tab) into a first-class PAID ADD-ON, mirroring hr-api (#252). Gate order: authenticate -> userCanAccessWorkspace -> isModuleEnabled('stock') -> assertEntitled(ws,'stock'), then finance-manager RBAC on writes.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/warehouse-and-billing.md",
     "methods": [
@@ -13266,7 +13335,8 @@
     "summary": "Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone",
     "description": "Runs a workspace's saved Viva credentials against Viva for real and returns a per-step verdict: the Smart Checkout OAuth pair, the Merchant pair (the same call the webhook verification handshake makes), creating a payment order on the configured source, and reading that order back.\n\nWHY IT EXISTS: every field on the Viva setup card is silently wrong until a customer pays. A mistyped payment source code — Viva issues a 4-DIGIT code per source — authenticates, saves, and is accepted by every layer right up until the first real sale. The order read-back is the only check that proves it, because Viva echoes SourceCode back.\n\nNo money moves: the test order is 0.30, nobody is redirected to checkout, and paymentTimeout expires it in five minutes. The webhook leg is NOT testable here (Viva offers no way to trigger a delivery) — `workspace_viva_config.webhook_event_types` records what actually arrives instead.\n\nTENANCY: caller must be a finance manager of the target workspace, checked under their own RLS via supabaseAsUser; mismatch returns 404, not 403.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -13288,7 +13358,8 @@
     "summary": "Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals",
     "description": "Single action router for the Real Estate module (#249/#281). Gate order per request: `authenticate` → `userCanAccessWorkspace` (404 on mismatch) → `isModuleEnabled('real-estate')` (404) → `assertEntitled(ws, 'real-estate')` (402) → Real-Estate RBAC (`canView` / `canManage`).\n\n**Agent scoping.** A broker sees every listing in the workspace. A `realestate_agent` sees a listing only when they are its `listing_agent_id`, they created it, or it is flagged `open_for_all` (view-only). Ownership failures return **404**, not 403, so listing ids cannot be enumerated.\n\n**Sub-module add-ons.** Tenancy / rent / maintenance / landlord-statement actions additionally require the `real-estate-management` entitlement; investment actions require `real-estate-investments`. Either returns **402** when the workspace has not purchased the add-on.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/real-estate-system.md",
     "methods": [
@@ -15864,7 +15935,8 @@
     "summary": "AI lead + health scoring for any CRM contact (canonical platform scorer)",
     "description": "Scores **any** `crm_contacts` lead from generic CRM signals (activity recency, engagement, company fit, pipeline position), enriched with property signals when the Real Estate module is enabled. Writes the shared `crm_contacts.lead_score` (0-100, likelihood to transact soon) and `health_score` (0-100, engagement/fit) so CRM, Sales and Real Estate all render the SAME number rather than three private scores.\n\nNot module-gated — lead scoring is a CRM-wide capability. Uses Anthropic tool-use (`emit_lead_score`) so the verdict is schema-locked, never a parsed blob. Credit-metered reserve→settle at a 3-credit ceiling, with an automatic refund when the model returns no usable output.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/crm-system.md",
     "methods": [
@@ -15959,6 +16031,7 @@
     "description": "Loads a CSV/TSV export of the TARIC goods nomenclature into public.taric_codes, which backs the commodity-code picker, code validation and the classifier shortlist. Column headers are matched against an alias table so the EU export, the Greek national export and an admin re-export all load unconfigured. Admin JWT for the import; the monthly refresh cron authenticates with x-cron-secret and fetches TARIC_REFERENCE_URL.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": "docs/taric-customs-classification.md",
@@ -15985,6 +16058,7 @@
     "description": "Three stages, cheapest first: a supplier-declared HS/CN/TARIC code found in the product attributes is validated and applied directly; otherwise search_taric_codes shortlists candidates and Claude picks one through a forced tool call. The model result is NEVER written to products.taric_code — it lands in taric_code_suggested with a confidence for a human to confirm, because a tariff misclassification is a customs liability. Stage C debits one credit per product before the upstream call; the hourly backfill cron runs with llm=false so it only applies free supplier-declared codes.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": "docs/taric-customs-classification.md",
@@ -16030,7 +16104,8 @@
     "name": "bank-statement-import",
     "tag": "Finance",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "methods": [
       "POST"
@@ -16077,7 +16152,8 @@
     "summary": "Revolut Business — live accounts & balances, connection, reconciliation, payments, cards",
     "description": "One POST surface; the body's `action` picks the operation. Every call needs `workspace_id`; the caller must be a finance manager of that workspace (404 otherwise, never 403) and the workspace must be entitled to the banking-revolut module (402). Actions that reach Revolut need a completed connection (init → authorize-url → oauth-complete); without one they answer 400 \"Revolut is not set up\". Every money-out instruction is recorded in payout_instructions with an idempotent request_id before Revolut is called. For the platform's own derived balances use GET /rest/v1/vw_bank_account_balances (Banking (database) section).",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/banking-revolut.md",
     "methods": [
@@ -16642,6 +16718,7 @@
     "description": "#315. Pulls transactions since each workspace's watermark (first run: 365 days) and upserts statement lines into revolut_bank_transactions, deduped on workspace + '<txid>:<legid>'. Dual auth like finance-inbound-sync: x-cron-secret/service-role for the cron path; a JWT user path restricted to the caller's own workspaces. Skips workspaces whose banking-revolut entitlement lapsed. Failures land in workspace_revolut_config.last_sync_error (explicit failure marker, never a silent zero). The sweep also pulls Stripe balance transactions (Connect workspaces) into the unified feed as informational rows.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "cronSecret"
     ],
     "docs": null,
@@ -16680,6 +16757,7 @@
     "description": "#315 payments-revolut. Two surfaces: POST ?setup=1 (user JWT, finance manager, module entitlement) registers the merchant webhook with the tenant's own secret key and stores the signing secret; POST ?ws=<workspace_id> receives signed deliveries (HMAC v1.<timestamp>.<body>, 5-min window, fail-closed 503 without a stored secret). On ORDER_COMPLETED the order is re-read from the Merchant API with the tenant's key (webhook-as-trigger doctrine) and settled through record-payment; intent status paid, duplicate-safe, cross-tenant guarded.",
     "security": [
       "supabaseJwt",
+      "apiKeyPartner",
       "revolutSignature"
     ],
     "docs": null,
@@ -16708,7 +16786,8 @@
     "summary": "Manage a workspace's outbound webhook endpoints",
     "description": "Tenant-facing CRUD for outbound webhook subscriptions (#330). Actions: list, create, update, rotate_secret, delete, deliveries. The HMAC signing secret is generated server-side and returned exactly once (on create and rotate_secret) - the column is revoked from the authenticated role and cannot be read back. Endpoint URLs are https-only and pass the shared SSRF guard before they are stored. Event types are validated against SUBSCRIBABLE_EVENT_TYPES. workspace_id is always reconciled against the caller's JWT; an endpoint belonging to another workspace returns 404, not 403.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/outbound-webhooks.md",
     "methods": [
@@ -16834,7 +16913,8 @@
     "summary": "CRUD for watched pages, mirrored to Firecrawl monitors.",
     "description": "Action-dispatched endpoint backing the Page Monitoring UI. Creates, updates and deletes a Firecrawl monitor alongside each `page_watches` row so the two never drift — a row deleted without its monitor would keep billing on its schedule. Requires a user JWT; the supplied workspace_id is verified against the caller's membership before any read or write. `run` debits a Firecrawl credit before starting the check and refuses with 402 if the debit fails. Gated on the `page-monitoring` module.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "methods": [
       "POST"
@@ -16943,7 +17023,8 @@
     "summary": "Installed base: a customer's equipment, its warranties and its recurring service schedules (#343).",
     "description": "Action-discriminated JWT endpoint over customer_assets, customer_asset_warranties, customer_asset_service_plans and customer_asset_service_events, plus the per-product defaults in product_service_defaults. Reads and writes run through the caller's own RLS context; registration and service completion go through SECURITY DEFINER RPCs that call assert_workspace_member. There is no next_due_on field anywhere: the next due date IS the plan's single open service event, served by the customer_asset_service_due view. Ownership mismatches return 404, never 403. Warranty certificates upload through this function (service-role write to the private pdf-documents bucket under warranties/, after ownership is proven on the RLS-bound client) and are read via a short-lived signed URL; the row stores bucket + path and never a URL. Deleting an asset that has logged service returns 409 - the DB refuses it so the history cannot be erased.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17214,7 +17295,8 @@
     "summary": "Read suppliers' own e-invoice provider pages for their IBANs and contact details",
     "description": "For each CRM supplier with a myDATA document that links to its e-invoicing provider (download_url), fetches that page (or the PDF it serves or links to on the same site) through the SSRF guard and reads it deterministically: checksum-valid IBANs are filed as crm_bank_account_suggestions (source einvoice_provider) for review on the party card, never written to crm_bank_accounts; the HTML issuer block's phones, fax and email (never a PDF's, whose text mixes in our own block) fill BLANK company fields or are added as crm_phones; a blank address is filled from the myDATA issuer address. Each read stamps crm_companies.einvoice_read_at / einvoice_read_outcome. Pages are fetched sequentially with a per-host gap; a run stops at its time budget and reports remaining.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17540,7 +17622,8 @@
     "summary": "Read a drawing's title block into project drawing-register fields",
     "description": "Turns a PDF or image of a drawing sheet into the fields a register entry needs: drawing number, title, revision, discipline, scale, sheet size, issue date and the purpose it was issued for. The reader is a forced Anthropic tool call over the sheet; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. The workspace is derived from the PROJECT row rather than the body, so naming a workspace you belong to does not grant a scan against a project you do not own. It deliberately writes nothing: a scanner that also created register entries would file a whole drawing set off a model's reading, and a wrong drawing number stays invisible until somebody builds from the wrong sheet. discipline and purpose are snapped onto the controlled vocabularies the register offers, and anything that could not be placed is returned under unmapped rather than dropped. An unreadable issue date comes back null, never defaulted to today, because a drawing stamped with today shows as issued on time.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17575,7 +17658,8 @@
     "summary": "Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines",
     "description": "Reads the tabular schedules a design team PRINTED on a drawing sheet — door, window, room, finishes — and returns them as proposed schedule-of-works lines. It transcribes; it never measures. A quantity worked out from the geometry of a plan is a guess indistinguishable from a fact, and somebody orders materials against it, so the tool schema offers no area or length field and every returned row must carry the schedule and row it was read from. A row that printed no quantity comes back null, never zero. The reader is a forced Anthropic tool call; credits are debited BEFORE the model runs and the prompt is a database row with no code fallback. Only a revision id is accepted — the file is fetched server-side from that row's own bucket and object path, so no URL in a request body can redirect it. The workspace comes from the project that owns the revision; a drawing in another workspace reports as not found. It writes nothing: the caller confirms the rows and adds them by the normal path.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17598,7 +17682,8 @@
     "summary": "Turn a dictated site walk into a diary entry and the defects it described",
     "description": "One site walk normally produces two kinds of record at once — a diary entry about the day and several distinct defects — so this returns both, with each defect as its own record because they get assigned and closed separately. The reader is a forced Anthropic tool call over the transcript; credits are debited BEFORE the model runs and the prompt is loaded from the database with no code fallback. The workspace is derived from the PROJECT row rather than the body. Rooms are read server-side and a returned room_id is validated against them, because a room list supplied by the caller could name another project's rooms and the id is written onto a defect. It writes NOTHING: a transcription mishears, and a defect filed straight off a mishearing is a job somebody gets sent to do, so the caller confirms and siteService does the writes. Everything heard but not placed comes back under `unclear`, `dropped` or `room_unmatched` rather than being discarded.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17628,7 +17713,8 @@
     "description": "Makes a tender sendable. `send` (authenticated) mints a private link for one bid, emails it to the subcontractor's CRM address and returns the link either way, since a company with no email on file is ordinary. `resolve_token` and `submit` are PUBLIC and token-authenticated: the subcontractor never needs an account. THE TOKEN IS PER BID, which is the security model — it resolves to one subcontractor's own lines, so a forwarded link cannot reveal what a competitor quoted. Re-sending keeps the same token so somebody part-way through pricing does not lose their link. `submit` never spreads the request body into a write: each rate is matched against a line that token owns and anything else is discarded, and a blank rate is stored as NULL rather than 0, because 'not priced' and 'free' are different answers. An expired or withdrawn link is indistinguishable from a wrong one.",
     "security": [
       "public",
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17763,7 +17849,8 @@
     "summary": "Regenerates the AI summary printed above a professional's public reviews.",
     "description": "Reads the non-hidden reviews written about user_id, and when at least three carry written comments and the stored summary is stale, asks Claude for a 2-3 sentence summary and stores it in review_summaries.summary_text. Every gate runs before the model call, so a fresh summary costs nothing. Review text is fenced as data, not instructions. Not credit-metered: the summary is a marketplace surface the operator owns, and neither the reviewer nor the professional asked for it. Records summary_status (ok / not_enough_reviews / generation_failed) so an empty summary can say which it is.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17789,7 +17876,8 @@
     "description": "THE TOKEN IS THE IDENTITY. Every read and write is scoped by what the link resolves to, and a company id in the request body is never trusted. The access pattern is a link unique to the recipient with no account for them to create and forget — which is what pastes into a WhatsApp thread.\n\nThe piece bespoke portals miss is DELEGATED ADMINISTRATION: `admin` on a portal account is the customer's own person, and only they decide a colleague's over-cap order. Over a cap is a REQUEST, not a refusal — the draft order is created either way, so nobody loses a basket to a limit their own office set, and the cap AS IT WAS is recorded so raising it later cannot rewrite why the request existed.\n\nThe statement reads `get_customer_open_balance` and nothing here re-totals it. Stock is shown as BANDS PER POOL unless the account's policy says otherwise: “40 m² available” is a lie if it is three tones. An invalid link gets one refusal shape, because a distinguishable refusal tells a guesser they are close.",
     "security": [
       "public",
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17938,7 +18026,8 @@
     "summary": "Propose a target for the invoice terms the ontology cannot resolve",
     "description": "Every unresolved binding carried `proposed_by = NULL`, so the work list was every unmatched invoice term waiting to be paired by hand. This reads a batch, asks a model and writes back CANDIDATES — a human still confirms, because confirming changes what products get classified as and therefore what they cost.\n\nThe rubric is a DB row (`prompt_type='tool'`, `category='ontology_propose'`), so what counts as a match is retunable without a deploy, and the terms are fenced as untrusted DATA. The model may not name a binding it was not given or a company that does not exist. Its most important rule is in the rubric verbatim: NEVER match a brand to its distributor — doing that once brands every one of that maker's products with the distributor's name, permanently. A term that is plainly a brand with no CRM row is proposed as a NEW manufacturer and left `unresolved`, since a candidate with no target reads as a decision waiting for a click when it is a company waiting to be created.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -17973,7 +18062,8 @@
     "summary": "Drain the products intake marked for enrichment, from a URL we already hold",
     "description": "Approving a queued supplier line never crawls: it stamps `metadata.enrichment = {status:'pending'}` and returns, so a slow or failed crawl cannot hold up a receipt. This is the drain, and it CLAIMS its batch — the stamp is the claim, so two runs cannot enrich one product twice.\n\nIt reads only a URL WE ALREADY HOLD: the product's own link, or its brand's site. Searching the open web for a spec sheet by name is a guessed match, and a wrong specification on the right-looking product is a valid-looking value nothing downstream can catch. A product with nowhere to look is recorded as `no_source`; a page that is not confidently about the product writes NOTHING.\n\nFindings are CLAIMS: they land in `attributes_raw` under `web_enrichment` with their source and confidence, and the existing nightly canonicalization pass is what promotes them into `attributes` — never into `metadata`, where the supplier's own invoice facts live.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -18002,7 +18092,8 @@
     "summary": "A property owner reading their own property",
     "description": "What a vendor or landlord sees of a property they own: the listing, viewing and enquiry activity, offers in AGGREGATE, the viewing feedback an agent has not hidden, price history, and - where the Property Management add-on is entitled - the tenancy, rent received and outstanding, work done and inspections.\n\nThe caller is NOT a workspace member. Access is a `record_guests` row with `role='owner'` for this user and this property, and the workspace is read off that grant rather than the request, so no `workspace_id` is accepted. An unknown or revoked property is 404, never 403.\n\nMoney reaches an owner as a DOCUMENT (quote, invoice, landlord statement), so this surface says what happened rather than what it cost: maintenance carries no cost and no contractor, and offers carry no buyer, terms or agent note. Output is the `toOwner()` projection - cost basis, minimum offer, commission and the valuation estimate never leave.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": "docs/real-estate-system.md",
     "methods": [
@@ -18034,7 +18125,8 @@
     "summary": "Signed, short-lived link to the original file behind a product's knowledge doc or certificate",
     "description": "Any authenticated member of the product's workspace. Resolves the source document of a kb_doc attached to the product, or a document named by one of the product's certificates, and returns a 5-minute signed download URL. pdf-documents is a private bucket, so the URL is minted per read and never stored. Authorization is decided by get_product_document_path, which runs AS THE CALLER. A catalogue reader outside the workspace is refused: a kb_doc is one page, the file behind it is the whole supplier catalogue. Refusals answer 404, not 403, so the id space cannot be walked.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -18066,7 +18158,8 @@
     "summary": "Branded technical datasheet for one product, as a PDF",
     "description": "Any authenticated member of the product's workspace. Renders through the shared branded-document renderer, so the datasheet carries the same cover, background and company identity as that workspace's quotes and catalogues rather than a second idea of the brand. Specifications, attributes and properties are printed once each, in that order, with certificates as their own block. Internal fields are filtered by the pattern FETCHED from internal_product_field_pattern(), and an unreadable pattern withholds everything rather than printing a cost on a customer's copy. Authorization is get_product_detail's, running as the caller; the catalogue tier is refused with 404 because a datasheet publishes the supplier's letterhead. Re-rendered per request, never cached: a stale datasheet is the thing this replaces.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -18090,7 +18183,8 @@
     "summary": "Export the workspace catalogue as CSV, JSON or XML for a distributor or channel",
     "description": "Any authenticated member of the workspace. Returns the active catalogue as a downloadable file. A saved xml_mapping_template can be applied in REVERSE, renaming our columns to the partner's vocabulary the importer already learned, so the same pairs are not taught twice. Cost, margin and supplier links are absent by construction: a partner price list is a separate decision with its own audience, not a side effect of exporting everything. CSV quoting is RFC 4180 and neutralises leading =, +, - and @ so a cell is never read as a spreadsheet formula; XML escapes the five predefined entities and drops characters XML 1.0 cannot carry. Membership is proved by the read (export_catalogue_rows runs as the caller), not asserted in the function.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [
@@ -18218,7 +18312,8 @@
     "summary": "Operator actions on a connected sales channel: pull orders, work the Skroutz queue, hand a document back.",
     "description": "`sync_orders` — A webhook that never arrived leaves no trace, and 'no orders today' reads exactly like a quiet market, so this is the only thing that makes a lapsed subscription visible. Pulls the last N days from Shopify (Admin REST) or WooCommerce (wc/v3) and ingests everything through the SAME upsert_inbound_order the webhook uses, so the two cannot disagree about what an order is; anything already held returns skipped_dupe. The store URL is operator-supplied, so the fetch goes through the shared SSRF guard: https only, DNS-resolved, private and link-local ranges refused. With discover_only it ingests nothing and instead returns the note_attribute / meta_data keys that actually appear on recent orders, counted, so the VAT-number and invoice-request keys are picked from what the shop really sends rather than guessed.\n\n`skroutz_*` — Skroutz is not a passive feed like a webshop — it pushes an order and starts a clock. An order must be accepted or rejected, and since 30/03/2026 dispatch needs an explicit set_as_ready; an order left open expires, and an expired order is a lost sale. `skroutz_pull` fetches the open queue and ingests through the same upsert_inbound_order every other channel uses. `skroutz_upload_document` re-uploads the RENDERED PDF as a file, because Skroutz takes the file itself rather than a link, capped at 7MB on their side. All calls carry the Bearer token and the vnd.skroutz version header; note Skroutz allows ONE active API key per shop, so generating a new one expires the old and is a breaking event.\n\n`document_writeback` — Writes a stable document link and the document number onto the upstream order: a Shopify metafield under the materialkai namespace, or WooCommerce order meta plus a customer-visible order note. The link points at finance-document-link rather than at storage, so it keeps working after any signature would have expired. The store URL is operator-supplied, so the call goes through the shared SSRF guard, https only. A draft is refused. Every attempt, successful or not, lands in store_order_sync_log. Also called by store-orders-webhook with the service role when a connection auto-sends documents back.\n\nThe inbound order webhook (store-orders-webhook) stays a separate function: its URL is registered with each store.",
     "security": [
-      "supabaseJwt"
+      "supabaseJwt",
+      "apiKeyPartner"
     ],
     "docs": null,
     "methods": [

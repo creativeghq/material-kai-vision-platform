@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isPlatformOperator, isServiceRoleRequest } from '../_shared/auth.ts';
+import { authenticate, callerIsPlatformOperator, isServiceRoleRequest } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 
@@ -385,7 +385,7 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
-      if (!(await isPlatformOperator(auth.supabase, auth.userId))) {
+      if (!(await callerIsPlatformOperator(auth))) {
         // 403, not 404: there is no object being enumerated here, so the id-enumeration
         // argument for masking does not apply — and an operator hitting a genuine
         // misconfiguration needs to be able to tell it apart from a wrong URL.
