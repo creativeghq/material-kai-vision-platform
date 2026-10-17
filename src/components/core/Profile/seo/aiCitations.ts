@@ -175,6 +175,33 @@ export interface LostQuestion {
   status: SeoMetricStatus | string;
 }
 
+/** GA4 sessions an AI assistant referred. Derived by `get_website_ai_referrals`. */
+export interface AiReferrals {
+  status: string;
+  note: string | null;
+  window_days: number | null;
+  period_start: string | null;
+  period_end: string | null;
+  captured_at: string | null;
+  site_sessions: number;
+  ai_sessions: number;
+  ai_share: number | null;
+  ai_engaged_rate: number | null;
+  site_engaged_rate: number | null;
+  ai_conversions: number;
+  ai_revenue: number;
+  platforms: {
+    platform: string;
+    label: string;
+    sessions: number;
+    engaged_rate: number | null;
+    conversions: number;
+    revenue: number;
+    sources: { source: string; medium: string | null; sessions: number }[];
+  }[];
+  series: { date: string; v: number }[];
+}
+
 export interface CitabilityDimensionScore {
   key: string;
   score: number | null;

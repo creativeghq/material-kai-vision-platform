@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, CitabilityReport, CitedPageComparison, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
+import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, AiReferrals, CitabilityReport, CitedPageComparison, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -1773,6 +1773,13 @@ export const userWebsitesService = {
     });
     if (error) throw new Error(await edgeErrorMessage(error, 'Could not analyse the page'));
     return data;
+  },
+
+  /** GA4 sessions an AI assistant referred to this site. */
+  async aiReferrals(websiteId: string): Promise<AiReferrals | null> {
+    const { data, error } = await supabase.rpc('get_website_ai_referrals' as any, { p_website_id: websiteId } as any);
+    if (error) throw error;
+    return (data as AiReferrals) ?? null;
   },
 
   /** Score the page an assistant cited instead of us, beside our own score for the question. */
