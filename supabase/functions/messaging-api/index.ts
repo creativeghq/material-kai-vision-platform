@@ -2292,9 +2292,22 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (!syncWsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(syncWsId); if (gate) return gate; }
         await requireWorkspaceManager(syncWsId, 'sync WhatsApp channels');
+        // Only accounts on this workspace's OWN Zernio profile are its to bind. Every account on
+        // the platform key is listable, so "not yet in messaging_channels" would hand tenant A's
+        // half-finished signup to whoever pressed Sync (#495). A shared (ceiling) profile cannot
+        // say whose an account is, so it is refused.
+        const syncProfileId = await resolveWorkspaceProfile(supabaseClient, syncWsId);
+        try {
+          await assertOwnProfile(supabaseClient, syncWsId, syncProfileId);
+        } catch (e) {
+          throw new HttpError(409, e instanceof Error ? e.message : String(e));
+        }
         // includeOverLimit so a plan-limit account still reconciles instead of vanishing
         // from the sync and looking deleted.
-        const data = await zernioApi('GET', '/accounts?platform=whatsapp&includeOverLimit=true');
+        const data = await zernioApi(
+          'GET',
+          `/accounts?platform=whatsapp&includeOverLimit=true&profileId=${encodeURIComponent(syncProfileId)}`,
+        );
         const accounts = (data.accounts || data.data || []) as any[];
         const synced: any[] = [];
 
@@ -2302,10 +2315,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           const accountId = acc._id || acc.accountId || acc.id;
           const senderId = acc.selectedPhoneNumber || acc.username || acc.platformIdentifier;
           if (!accountId || !senderId) continue;
+          const accProfileId = typeof acc.profileId === 'object' ? acc.profileId?._id : acc.profileId;
+          if (accProfileId !== syncProfileId) continue;
 
           const { data: existing } = await supabaseClient
-            .from('messaging_channels').select('id, config')
+            .from('messaging_channels').select('id, config, workspace_id')
             .eq('zernio_account_id', accountId).maybeSingle();
+          if (existing && existing.workspace_id !== syncWsId) continue;
 
           // The number's OWN WhatsApp Business profile — including the photo customers actually
           // see beside our messages. `GET /whatsapp/business-profile` returns it; nothing had ever
