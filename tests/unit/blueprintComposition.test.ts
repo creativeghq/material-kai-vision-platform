@@ -23,6 +23,8 @@ import { computeBlueprint } from '../../supabase/functions/_shared/blueprint/com
 import { compositionRows } from '../../supabase/functions/_shared/blueprint/plan-rows';
 import { expectedMirror, SOURCE, TARGET } from '../../scripts/gen-blueprint-mirror.mjs';
 import { ANON_BLUEPRINT_ITEM_COLUMNS } from '../../supabase/functions/_shared/blueprint/anon-pricing.ts';
+import { composeEstimate, repriceItems, seedPlanItems, subtotalOf } from '../../src/utils/blueprintCompute';
+import { computeConfiguratorEstimate } from '../../src/embed/configuratorPricing';
 
 // A miniature kitchen carrying every shape that matters: a per-metre rate table two zones share,
 // a per-piece module, a module option, an optional zone, and a surface that follows another zone.
@@ -437,12 +439,9 @@ describe('a schedule line is a count, not a price', () => {
 });
 
 describe('the anonymous starters payload carries every column the client reads', () => {
-  // WHY: `public-project-plan → starters` selects an EXPLICIT column list, and the client's
-  // seedPlanItems reads `bi.<column>` off what comes back. A column added to the table and to the
-  // client but not to that list fails in total silence — which is exactly what happened when
-  // is_schedule and option_key shipped: hardware counts rendered as on/off switches, and
-  // `opt_gola` was never published, so every gola line's formula failed and fell back to its
-  // default quantity of 0.
+  // `public-project-plan → starters` selects an EXPLICIT column list and seedPlanItems reads
+  // `bi.<column>` off it, so a column missing from that list fails in silence (is_schedule once
+  // rendered hardware counts as switches). Publishing `opt_*` is a separate fact, pinned above.
   const CLIENT = readFileSync('src/utils/blueprintCompute.ts', 'utf8');
 
   const columnsClientReads = Array.from(new Set(
@@ -1011,5 +1010,57 @@ describe('edge ⇄ frontend mirror parity', () => {
     // Swap that one line back and the mirror IS the edge copy behind its banner. Nothing else
     // may differ: the two files are one derivation living in two module systems.
     expect(mirror.replace(WEB_IMPORT, EDGE_IMPORT).endsWith(edge)).toBe(true);
+  });
+});
+
+describe('the anonymous client prices a kitchen the way the engine records it', () => {
+  const rows = [
+    ...items,
+    { id: 'hsec', parent_id: null, sort_order: 1, kind: 'section', label: 'Hardware' },
+    { id: 'h-std', parent_id: 'hsec', sort_order: 0, kind: 'task', label: 'Handles', option_group: 'Handle system', option_key: 'handles', tier: 'good', is_allowance: true, allowance_amount: 0, margin_pct: 0 },
+    { id: 'h-gola', parent_id: 'hsec', sort_order: 1, kind: 'task', label: 'Gola profile', unit: 'm', option_group: 'Handle system', option_key: 'gola', quantity_formula: '= total_run_length', material_cost: 25, margin_pct: 0 },
+    { id: 'h-vert', parent_id: 'hsec', sort_order: 2, kind: 'task', label: 'Gola verticals', unit: 'pcs', quantity_formula: '= opt_gola * total_units', is_schedule: true, default_selected: true, margin_pct: 0 },
+    { id: 'hinges', parent_id: 'hsec', sort_order: 3, kind: 'task', label: 'Hinges', unit: 'pcs', quantity_formula: '= total_hinges', is_schedule: true, default_selected: true, material_cost: 4, margin_pct: 0 },
+  ];
+
+  const client = (pickGola: boolean) => {
+    const seedDims = deriveComposition(schema, cfg(), rows as any[]).vars;
+    let flat = seedPlanItems(rows, seedDims, new Set(absorbedGroups(schema)));
+    if (pickGola) {
+      const dims = composeEstimate(schema, cfg(), rows as any[], {}, flat)!.dims;
+      flat = repriceItems(flat.map((it) => (it.option_group === 'Handle system' ? { ...it, is_selected: it.id === 'h-gola' } : it)), dims);
+    }
+    return { flat, subtotal: composeEstimate(schema, cfg(), rows as any[], {}, flat)!.subtotal };
+  };
+  const selectedIds = (pickGola: boolean) =>
+    new Set(client(pickGola).flat.filter((it) => it.is_selected).map((it) => it.id));
+  const edge = (pickGola: boolean) =>
+    computeBlueprint(rows, {}, selectedIds(pickGola), { schema, config: cfg() });
+  const edgeQty = (c: ReturnType<typeof edge>, id: string) =>
+    c.sections.flatMap((s) => s.tasks).find((t) => t.id === id)!.quantity;
+
+  it.each([false, true])('agrees on every quantity and the subtotal (gola picked: %s)', (pickGola) => {
+    const e = edge(pickGola);
+    const c = client(pickGola);
+    for (const id of ['h-vert', 'hinges', 'fit', 'h-gola']) {
+      expect(c.flat.find((it) => it.id === id)!.quantity).toBe(edgeQty(e, id));
+    }
+    expect(c.subtotal).toBe(e.subtotal);
+  });
+
+  it('prices the tenant configurator embed the same way', () => {
+    expect(computeConfiguratorEstimate(schema, cfg(), rows as any[], {})!.subtotal).toBe(edge(false).subtotal);
+  });
+
+  it('publishes opt_gola, so the verticals count is not silently 0', () => {
+    expect(client(true).flat.find((it) => it.id === 'h-vert')!.quantity).toBeGreaterThan(0);
+  });
+
+  it('keeps a priced schedule line out of both totals', () => {
+    const c = client(false);
+    const hinges = c.flat.find((it) => it.id === 'hinges')!;
+    expect(hinges.unit_price).toBe(4);
+    expect(hinges.line_total).toBe(0);
+    expect(subtotalOf(c.flat)).toBe(subtotalOf(c.flat.filter((it) => !it.is_schedule)));
   });
 });

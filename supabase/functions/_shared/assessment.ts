@@ -11,8 +11,9 @@ import {
   ASSESSMENT_SUBJECT_PROMPT,
   type AssessmentSubject,
 } from './assessmentVocabulary.generated.ts';
+import { userIsProjectTeam } from './project-team.ts';
 
-export { ASSESSMENT_SUBJECT_MODULE };
+export { ASSESSMENT_SUBJECT_MODULE, userIsProjectTeam };
 export type { AssessmentSubject };
 
 /**
@@ -90,14 +91,9 @@ export interface AssessmentRunResult {
 }
 
 /**
- * Resolve a project from an id or a fuzzy name, WITHIN THIS WORKSPACE (#395).
- *
- * `project_id` is a model-supplied argument and the client is service-role, so without the
- * workspace filter the only thing between a turn and another tenant's project is `user_id` — a
- * user identity, not a tenancy binding. Someone who belongs to two workspaces reached, from a
- * workspace-A session, every project they own in workspace B. When both are given, the id wins.
- *
- * Shared with `tools/project-tools.ts`, which used to carry its own copy.
+ * Resolve a project from an id or a fuzzy name, WITHIN THIS WORKSPACE (#395), and only one the
+ * caller is on the team of. The id is model-supplied and the client is service-role, so both
+ * filters are the boundary. When both are given, the id wins.
  */
 export async function resolveProjectId(
   supabase: DbClient,
@@ -107,19 +103,27 @@ export async function resolveProjectId(
   projectName?: string,
 ): Promise<string | null> {
   if (projectId) {
-    let q = supabase.from('projects').select('id').eq('id', projectId).eq('user_id', userId);
+    let q = supabase.from('projects').select('id').eq('id', projectId);
     if (workspaceId) q = q.eq('workspace_id', workspaceId);
     const { data } = await q.maybeSingle();
-    return (data as any)?.id || null;
+    const id = (data as any)?.id as string | undefined;
+    return id && (await userIsProjectTeam(supabase, userId, id)) ? id : null;
   }
   if (projectName) {
-    let q = supabase.from('projects').select('id').eq('user_id', userId);
+    const { data: memberOf } = await supabase
+      .from('project_members').select('project_id').eq('user_id', userId);
+    const teamIds = ((memberOf ?? []) as Array<{ project_id: string }>).map((r) => r.project_id);
+    let q = supabase.from('projects').select('id')
+      .or(teamIds.length ? `user_id.eq.${userId},id.in.(${teamIds.join(',')})` : `user_id.eq.${userId}`);
     if (workspaceId) q = q.eq('workspace_id', workspaceId);
     const { data } = await q
       .ilike('name', `%${projectName}%`)
       .order('last_activity_at', { ascending: false })
-      .limit(1);
-    return (data && (data as any[])[0]?.id) || null;
+      .limit(10);
+    for (const row of (data ?? []) as Array<{ id: string }>) {
+      if (await userIsProjectTeam(supabase, userId, row.id)) return row.id;
+    }
+    return null;
   }
   return null;
 }

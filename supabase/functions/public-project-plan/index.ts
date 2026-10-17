@@ -167,7 +167,8 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
   if (action === 'kitchen_lead') {
     const { blueprint_id, dimensions, composition, selected_item_ids, contact, turnstile_token } = body ?? {};
     const name = String(contact?.name ?? '').trim().slice(0, 120);
-    const email = String(contact?.email ?? '').trim().slice(0, 200);
+    const typedEmail = String(contact?.email ?? '').trim().slice(0, 200);
+    const email = typedEmail.toLowerCase();
     const phone = String(contact?.phone ?? '').trim().slice(0, 40);
     const shape = String(contact?.shape ?? '').trim().slice(0, 160);
     const notes = String(contact?.notes ?? '').trim().slice(0, 2000);
@@ -175,6 +176,9 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     if (!blueprint_id) throw new HttpError(400, 'blueprint_id required');
     if (!name || (!email && !phone)) {
       throw new HttpError(400, 'A name and either an email or a phone number are required');
+    }
+    if (email && !/^[^\s@,;:<>()[\]"'*%\\]+@[^\s@,;:<>()[\]"'*%\\]+\.[a-z]{2,}$/.test(email)) {
+      throw new HttpError(400, 'That email address does not look valid');
     }
 
     const ip = clientIp(req);
@@ -253,7 +257,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     let contactId: string | null = null;
     if (email) {
       const { data } = await supabase.from('crm_contacts')
-        .select('id').eq('workspace_id', workspace.id).ilike('email', email).limit(1);
+        .select('id').eq('workspace_id', workspace.id).in('email', [...new Set([email, typedEmail])]).limit(1);
       contactId = (data ?? [])[0]?.id ?? null;
     }
     if (!contactId && phone) {

@@ -5,7 +5,7 @@
 // only for the unsaved public preview.
 
 import { evaluateFormula, computeLinePricing, round2 } from './blueprintFormula';
-import { deriveComposition, hasComposition } from './blueprintComposition';
+import { deriveComposition, hasComposition, optionFlags } from './blueprintComposition';
 import type { Composition, DerivedComposition, RateItemLike, ZoneDef } from './blueprintComposition';
 import type { ProjectPlanItem } from '@/services/projectPlansService';
 
@@ -22,7 +22,8 @@ export function applyOptionDefaults(items: ProjectPlanItem[]) {
 }
 
 /** Recompute quantity (from formula) + unit_price + line_total for every task. */
-export function repriceItems(items: ProjectPlanItem[], dims: Record<string, number>): ProjectPlanItem[] {
+export function repriceItems(items: ProjectPlanItem[], baseDims: Record<string, number>): ProjectPlanItem[] {
+  const dims = withOptionFlags(items, baseDims);
   return items.map((it) => {
     if (it.kind === 'section') return { ...it, unit_price: 0, line_total: 0 };
     let qty: number;
@@ -36,12 +37,21 @@ export function repriceItems(items: ProjectPlanItem[], dims: Record<string, numb
       material_cost: it.material_cost, labor_rate: it.labor_rate, margin_pct: it.margin_pct,
       quantity: qty, is_selected: it.is_selected,
     });
+    if (it.is_schedule) return { ...it, quantity: qty, unit_price: it.material_cost != null ? unit_price : 0, line_total: 0 };
     return { ...it, quantity: qty, unit_price, line_total };
   });
 }
 
+/** `opt_<key>` flags from the current selection, layered over the dims every formula reads. */
+export function withOptionFlags(items: ProjectPlanItem[], dims: Record<string, number>): Record<string, number> {
+  return { ...dims, ...optionFlags(items.filter((i) => i.kind === 'task')) };
+}
+
+/** A schedule line is a count, priced on the quote — it never adds to a total here. */
 export function subtotalOf(items: ProjectPlanItem[]): number {
-  return round2(items.filter((i) => i.kind === 'task' && i.is_selected).reduce((a, i) => a + Number(i.line_total || 0), 0));
+  return round2(items
+    .filter((i) => i.kind === 'task' && i.is_selected && !i.is_schedule)
+    .reduce((a, i) => a + Number(i.line_total || 0), 0));
 }
 
 /**
@@ -72,7 +82,7 @@ export function composeEstimate(
   const derived = deriveComposition(schema as ZoneDef[], config, rawItems);
   return {
     derived,
-    dims: { ...baseDims, ...derived.vars },
+    dims: withOptionFlags(flatItems, { ...baseDims, ...derived.vars }),
     absorbed: new Set(derived.absorbed_groups),
     subtotal: round2(subtotalOf(flatItems) + derived.total),
   };

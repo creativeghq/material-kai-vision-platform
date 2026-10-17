@@ -13,6 +13,8 @@ const { z } = await import('npm:zod@3.25.76');
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { moduleGate } from './module-gate.ts';
+import { userHasWorkspaceCapability } from '../auth.ts';
+import { userSeesProjectMoney } from '../project-team.ts';
 import {
   ASSESSMENT_CREDIT_CEILING,
   ASSESSMENT_SUBJECT_MODULE,
@@ -129,13 +131,14 @@ async function resolveSubject(
 ): Promise<{ id: string; name: string } | null> {
   const sb = svcClient();
   if (subject === 'finance') {
+    if (!(await userHasWorkspaceCapability(sb, userId, workspaceId, 'finance.operate'))) return null;
     const { data } = await sb.from('workspaces').select('id, name').eq('id', workspaceId).maybeSingle();
     // deno-lint-ignore no-explicit-any
     return data ? { id: workspaceId, name: (data as any).name || 'this workspace' } : null;
   }
   if (subject === 'project') {
     const pid = await resolveProjectId(sb, userId, workspaceId, id, query);
-    if (!pid) return null;
+    if (!pid || !(await userSeesProjectMoney(sb, userId, pid))) return null;
     const { data } = await sb.from('projects').select('name').eq('id', pid).maybeSingle();
     // deno-lint-ignore no-explicit-any
     return { id: pid, name: (data as any)?.name || 'the project' };

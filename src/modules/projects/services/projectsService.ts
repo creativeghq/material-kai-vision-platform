@@ -613,7 +613,7 @@ export interface MyTask {
 /** Raise a project lifecycle flow event (#378 Phase 4). */
 export async function emitProjectLifecycle(
   projectId: string | null | undefined,
-  type: 'project_created' | 'project_task_completed' | 'project_milestone_reached'
+  type: 'project_created'
       | 'project_snag_raised' | 'project_expense_approved' | 'project_delivery_issued'
       | 'project_asset_registered',
   say: (projectName: string) => { title: string; body: string },
@@ -1108,11 +1108,12 @@ class ProjectsService {
     // Subtasks inherit room from parent
     let room_id = input.room_id ?? null;
     if (input.parent_task_id) {
-      const { data: parent } = await (supabase as any)
+      const { data: parent, error: parentError } = await (supabase as any)
         .from('project_tasks')
         .select('room_id')
         .eq('id', input.parent_task_id)
         .single();
+      if (parentError) throw parentError;
       room_id = parent?.room_id ?? null;
     }
 
@@ -1128,6 +1129,10 @@ class ProjectsService {
         assignee_id: input.assignee_id ?? null,
         assignee_employee_id: input.assignee_employee_id ?? null,
         due_date: input.due_date ?? null,
+        start_date: input.start_date ?? null,
+        end_date: input.end_date ?? null,
+        progress_pct: input.progress_pct ?? 0,
+        is_milestone: input.is_milestone ?? false,
         priority: input.priority ?? null,
         visibility: input.visibility ?? 'internal',
         sort_order: input.sort_order ?? 0,
@@ -1139,14 +1144,8 @@ class ProjectsService {
     return data as ProjectTask;
   }
 
+  /** Completion flow events are raised by the `project_task_completed_flow_events` trigger, from every door. */
   async updateTask(id: string, input: UpdateTaskInput): Promise<ProjectTask> {
-    // The status BEFORE the write, so completion fires on a real transition. Re-saving a task that
-    // was already done is not a completion, and every flow run is metered.
-    const previousStatus = input.status !== undefined
-      ? ((await (supabase as any).from('project_tasks').select('status').eq('id', id).maybeSingle())
-          .data as { status: string | null } | null)?.status ?? null
-      : null;
-
     const { data, error } = await (supabase as any)
       .from('project_tasks')
       .update(input)
@@ -1154,31 +1153,7 @@ class ProjectsService {
       .select()
       .single();
     if (error) throw error;
-
-    const task = data as ProjectTask & { is_milestone?: boolean | null };
-
-    if (input.status !== undefined && task.status === 'done' && previousStatus !== 'done') {
-      const label = task.title || 'A task';
-      void emitProjectLifecycle(task.project_id, 'project_task_completed',
-        (name) => ({ title: `Task done: ${label}`, body: `${label} was completed on ${name}.` }),
-        { task_id: task.id, task_title: task.title });
-
-      /**
-       * A MILESTONE is a separate event, not a flag on the task one.
-       *
-       * They are different questions with different audiences: "a task finished" is for the team
-       * and fires constantly; "we hit the milestone" is for the client and fires rarely. Folding
-       * the second into the first as a config filter would make every milestone automation pay for
-       * a run on every task — and flow runs are metered.
-       */
-      if (task.is_milestone) {
-        void emitProjectLifecycle(task.project_id, 'project_milestone_reached',
-          (name) => ({ title: `Milestone reached: ${label}`, body: `${name} reached the milestone "${label}".` }),
-          { task_id: task.id, task_title: task.title });
-      }
-    }
-
-    return task as ProjectTask;
+    return data as ProjectTask;
   }
 
   // ---------- TASK DEPENDENCIES (WS3 #285) ----------

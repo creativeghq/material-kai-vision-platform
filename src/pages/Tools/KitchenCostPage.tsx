@@ -19,7 +19,7 @@ import { QuantityStepper } from '@/components/features/blueprint/QuantityStepper
 import { ZoneConfigurator } from '@/components/features/blueprint/ZoneConfigurator';
 import type { DimensionDef } from '@/services/blueprintsService';
 import type { ProjectPlanItem } from '@/services/projectPlansService';
-import { composeEstimate, repriceItems, seedPlanItems, subtotalOf } from '@/utils/blueprintCompute';
+import { composeEstimate, repriceItems, seedPlanItems, subtotalOf, withOptionFlags } from '@/utils/blueprintCompute';
 import { absorbedGroups, defaultComposition, deriveComposition, hasComposition } from '@/utils/blueprintComposition';
 import { evaluateFormula } from '@/utils/blueprintFormula';
 import type { Composition, ZoneDef } from '@/utils/blueprintComposition';
@@ -94,7 +94,7 @@ export default function KitchenCostPage() {
     () => (starter ? composeEstimate(zones, composition, starter.items, dims, items) : null),
     [starter, zones, composition, dims, items],
   );
-  const effectiveDims = composed?.dims ?? dims;
+  const effectiveDims = composed?.dims ?? withOptionFlags(items, dims);
   const derived = composed?.derived ?? null;
   const subtotal = composed ? composed.subtotal : subtotalOf(items);
 
@@ -224,7 +224,7 @@ export default function KitchenCostPage() {
           // visitor to turn off the hinges their kitchen needs.
           extras: tasks.filter((t) => !t.option_group && !t.is_schedule),
           schedule: tasks.filter((t) => t.is_schedule && t.is_selected && Number(t.quantity ?? 0) > 0),
-          total: tasks.filter((t) => t.is_selected).reduce((a, t) => a + Number(t.line_total || 0), 0),
+          total: subtotalOf(tasks),
         };
       })
       .filter((s) => s.groups.length > 0 || s.extras.length > 0 || s.schedule.length > 0);

@@ -10,7 +10,6 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { evaluateFormula, computeLinePricing, round2 } from '../_shared/blueprint/formula.ts';
 import {
-  absorbedGroups,
   defaultComposition,
   derivePlanComposition,
   hasComposition,
@@ -19,6 +18,7 @@ import {
 } from '../_shared/blueprint/composition.ts';
 import type { Composition, DerivedComposition, PlanComposition, ZoneDef } from '../_shared/blueprint/composition.ts';
 import { compositionRows } from '../_shared/blueprint/plan-rows.ts';
+import { applyOptionDefaults, importSelection, prepareSectionImport, stripAbsorbed } from '../_shared/blueprint/section-import.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface ItemRow {
@@ -70,11 +70,12 @@ async function buildRateMap(supabase: DbClient, items: ItemRow[]) {
   for (const it of items) { if (it.service_id) ids.add(it.service_id); if (it.product_id) ids.add(it.product_id); }
   const map: Record<string, number> = {};
   if (ids.size === 0) return map;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('product_prices')
     .select('product_id, list_price, confirmed_at')
     .in('product_id', Array.from(ids))
     .order('confirmed_at', { ascending: false });
+  if (error) throw new HttpError(502, `Failed to read linked prices: ${error.message}`);
   for (const row of (data ?? []) as { product_id: string; list_price: number | null }[]) {
     if (map[row.product_id] === undefined && row.list_price != null) map[row.product_id] = Number(row.list_price);
   }
@@ -110,6 +111,16 @@ function resolveItem(it: ItemRow, dims: Record<string, number>, rates: Record<st
   return { quantity: qty, unit_price, line_total };
 }
 
+/** A blueprint the target workspace may read: a platform starter or its own. 404 otherwise. */
+async function loadVisibleBlueprint(supabase: DbClient, blueprintId: string, workspaceId: string | null) {
+  const { data, error } = await supabase.from('blueprints').select('*').eq('id', blueprintId).maybeSingle();
+  if (error) throw new HttpError(400, error.message);
+  if (!data || !(data.is_platform_starter === true || (workspaceId && data.workspace_id === workspaceId))) {
+    throw new HttpError(404, 'Blueprint not found');
+  }
+  return data;
+}
+
 // Load a blueprint's items, expanding sub_blueprint_id nodes into nested sections.
 // Depth-guarded + cycle-guarded. Returns a flat list with remapped parent ids.
 async function loadBlueprintTree(
@@ -119,9 +130,11 @@ async function loadBlueprintTree(
   depth: number,
   visited: Set<string>,
   out: ItemRow[],
+  workspaceId: string,
 ): Promise<void> {
   if (depth > 3 || visited.has(blueprintId)) return;
   visited.add(blueprintId);
+  if (depth > 0) await loadVisibleBlueprint(supabase, blueprintId, workspaceId);
   const { data, error } = await supabase
     .from('blueprint_items')
     .select('*')
@@ -140,48 +153,13 @@ async function loadBlueprintTree(
       id: newId,
       parent_id: newParent,
       source_item_id: r.id,
-      // A non-option line imports with the blueprint's own default, so optional extras
-      // (accessories, add-on mechanisms) land in the plan switched OFF rather than silently
-      // inflating the first estimate. Option members stay undefined so applyOptionDefaults
-      // below still resolves the group by tier:'good'.
-      is_selected: r.option_group ? undefined : (r.default_selected !== false),
+      is_selected: importSelection(r),
     });
     if (r.sub_blueprint_id) {
-      // expand the referenced blueprint as children of this node
-      await loadBlueprintTree(supabase, r.sub_blueprint_id, newId, depth + 1, new Set(visited), out);
+      await loadBlueprintTree(supabase, r.sub_blueprint_id, newId, depth + 1, new Set(visited), out, workspaceId);
     }
   }
   visited.delete(blueprintId);
-}
-
-// Within each option_group, ensure exactly one member is selected by default
-// (prefer tier 'good', else the lowest sort_order). Mutates is_selected in place.
-// Used on import; manual edits thereafter manage selection via is_selected directly.
-function applyOptionDefaults(items: ItemRow[]) {
-  const groups: Record<string, ItemRow[]> = {};
-  for (const it of items) {
-    if (it.option_group) (groups[it.option_group] ||= []).push(it);
-  }
-  for (const members of Object.values(groups)) {
-    const already = members.find((m) => m.is_selected === true);
-    const pick = already
-      ?? members.find((m) => m.tier === 'good')
-      ?? [...members].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0];
-    for (const m of members) m.is_selected = m.id === pick?.id;
-  }
-}
-
-/**
- * Zone-driven blueprints carry their cabinet fronts on an option_group that a zone global owns.
- * Those rows are a RATE TABLE, not lines — the zone prices them through its own derived lines — so
- * they must not be imported into the plan at all. Their prices are frozen into the plan's
- * composition (snapshotRateTables) before this runs, which is what keeps the plan self-contained.
- */
-function stripAbsorbed(items: ItemRow[], schema: ZoneDef[]): ItemRow[] {
-  if (!hasComposition(schema)) return items;
-  const absorbed = new Set(absorbedGroups(schema));
-  if (!absorbed.size) return items;
-  return items.filter((it) => !(it.option_group && absorbed.has(it.option_group)));
 }
 
 
@@ -291,13 +269,10 @@ function buildQuoteItems(quoteId: string, items: ItemRow[]) {
   const sectionLabel: Record<string, string> = {};
   for (const it of items) if (it.kind === 'section') sectionLabel[it.id] = it.label;
   const leaf = items.filter((it) => it.kind !== 'section' && it.is_selected !== false);
-  let subtotal = 0;
-  const rows = leaf.map((it) => {
+  return leaf.map((it) => {
     const qty = Number(it.quantity ?? 1);
     if (it.is_schedule) {
       const rate = it.material_cost != null ? Number(it.material_cost) : null;
-      const lineTotal = round2(qty * Number(rate ?? 0));
-      subtotal += lineTotal;
       return {
         quote_id: quoteId,
         product_id: null,
@@ -315,7 +290,6 @@ function buildQuoteItems(quoteId: string, items: ItemRow[]) {
       };
     }
     const lineTotal = Number(it.line_total ?? 0);
-    subtotal += lineTotal;
     const dimsText = it.is_allowance ? 'Allowance' : `${qty}${it.unit ? ` ${it.unit}` : ''} × ${Number(it.unit_price ?? 0).toFixed(2)}`;
     return {
       quote_id: quoteId,
@@ -330,7 +304,6 @@ function buildQuoteItems(quoteId: string, items: ItemRow[]) {
       added_from: 'manual',
     };
   });
-  return { rows, subtotal: round2(subtotal) };
 }
 
 async function loadPlan(supabase: DbClient, planId: string) {
@@ -357,10 +330,91 @@ async function loadPlanItems(supabase: DbClient, planId: string): Promise<ItemRo
   return (data ?? []) as ItemRow[];
 }
 
-async function requireWorkspace(supabase: DbClient, userId: string | null, workspaceId: string, isService: boolean) {
+/** Same predicate as SQL `_user_is_project_team`: the owner, or a listed member who is active in the workspace. */
+async function userIsProjectTeam(supabase: DbClient, userId: string, projectId: string): Promise<boolean> {
+  const { data: proj, error } = await supabase.from('projects').select('user_id, workspace_id').eq('id', projectId).maybeSingle();
+  if (error) throw new HttpError(400, error.message);
+  if (!proj) return false;
+  if (proj.user_id === userId) return true;
+  const { data: pm, error: pmErr } = await supabase
+    .from('project_members').select('user_id').eq('project_id', projectId).eq('user_id', userId).maybeSingle();
+  if (pmErr) throw new HttpError(400, pmErr.message);
+  if (!pm) return false;
+  const { data: wm, error: wmErr } = await supabase
+    .from('workspace_members').select('user_id')
+    .eq('workspace_id', proj.workspace_id).eq('user_id', userId).eq('status', 'active').maybeSingle();
+  if (wmErr) throw new HttpError(400, wmErr.message);
+  return !!wm;
+}
+
+async function requireWorkspace(
+  supabase: DbClient,
+  userId: string | null,
+  workspaceId: string,
+  isService: boolean,
+  projectId?: string | null,
+) {
   if (isService) return;
   const ok = await userHasWorkspaceCapability(supabase, userId, workspaceId, 'projects.use');
-  if (!ok) throw new HttpError(403, 'Not a member of this workspace');
+  if (!ok || !userId) throw new HttpError(404, 'Not found');
+  if (projectId && !(await userIsProjectTeam(supabase, userId, projectId))) throw new HttpError(404, 'Not found');
+}
+
+async function storeSubtotal(supabase: DbClient, planId: string, patch: Record<string, unknown>) {
+  const { error } = await supabase.from('project_plans').update(patch).eq('id', planId);
+  if (error) throw new HttpError(400, `Failed to store plan totals: ${error.message}`);
+}
+
+/** Rebuild a DRAFT quote's lines from the plan. quotes.subtotal / total_items are trigger-derived. */
+async function writeQuoteItems(supabase: DbClient, quoteId: string, items: ItemRow[], replace: boolean) {
+  if (replace) {
+    const { error } = await supabase.from('quote_items').delete().eq('quote_id', quoteId);
+    if (error) throw new HttpError(400, `Failed to clear quote items: ${error.message}`);
+  }
+  const rows = buildQuoteItems(quoteId, items);
+  if (rows.length) {
+    const { error } = await supabase.from('quote_items').insert(rows);
+    if (error) throw new HttpError(400, `Failed to add quote items: ${error.message}`);
+  }
+}
+
+/**
+ * Point the plan at `quoteId` only if it still points at `expected`. False = another press won;
+ * the caller drops the quote it minted and answers with the winner's.
+ */
+async function claimPlanQuote(supabase: DbClient, planId: string, expected: string | null, quoteId: string): Promise<boolean> {
+  let q = supabase.from('project_plans').update({ quote_id: quoteId, status: 'quoted' }).eq('id', planId);
+  q = expected ? q.eq('quote_id', expected) : q.is('quote_id', null);
+  const { data, error } = await q.select('id');
+  if (error) throw new HttpError(400, `Failed to link the quote to the plan: ${error.message}`);
+  return (data ?? []).length === 1;
+}
+
+async function dropUnclaimedQuote(supabase: DbClient, quoteId: string, planId: string): Promise<string> {
+  const { error } = await supabase.from('quotes').delete().eq('id', quoteId);
+  if (error) throw new HttpError(409, `Another request linked a quote first; could not discard ${quoteId}: ${error.message}`);
+  const winner = await loadPlan(supabase, planId);
+  return winner.quote_id;
+}
+
+/**
+ * Merge `patch` into the thread's kitchen_estimate (read-modify-write: metadata also carries the
+ * channel binding). `claim` writes only while no plan_id is stamped; false = another press won.
+ */
+async function stampKitchenEstimate(
+  supabase: DbClient, threadId: string, patch: Record<string, unknown>, claim: boolean,
+): Promise<boolean> {
+  const { data: fresh, error: readErr } = await supabase.from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle();
+  if (readErr) throw new HttpError(400, readErr.message);
+  const current = (fresh?.metadata ?? {}) as Record<string, unknown>;
+  const currentEst = (current.kitchen_estimate ?? {}) as Record<string, unknown>;
+  let q = supabase.from('inbox_threads')
+    .update({ metadata: { ...current, kitchen_estimate: { ...currentEst, ...patch } } })
+    .eq('id', threadId);
+  if (claim) q = q.is('metadata->kitchen_estimate->>plan_id', null);
+  const { data, error } = await q.select('id');
+  if (error) throw new HttpError(400, `Failed to stamp the estimate: ${error.message}`);
+  return (data ?? []).length === 1;
 }
 
 const handler = withApiLogging('project-plan-engine', async (req: Request): Promise<Response> => {
@@ -383,10 +437,6 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       if (!blueprint_id) throw new HttpError(400, 'blueprint_id required');
       // WHO THE PLAN BELONGS TO, when nobody is signed in (#382 Phase 4).
       const bodyUserId = isService && typeof body?.user_id === 'string' ? body.user_id : null;
-      const { data: bp, error: bpErr } = await supabase.from('blueprints').select('*').eq('id', blueprint_id).maybeSingle();
-      if (bpErr) throw new HttpError(400, bpErr.message);
-      if (!bp) throw new HttpError(404, 'Blueprint not found');
-
       // Resolve the target workspace + user. project_id (when given) determines workspace.
       let workspaceId: string;
       let planUserId = userId ?? bodyUserId;
@@ -396,12 +446,15 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         if (!proj) throw new HttpError(404, 'Project not found');
         workspaceId = proj.workspace_id;
         planUserId = planUserId ?? proj.user_id;
-      } else if (bp.workspace_id) {
-        workspaceId = bp.workspace_id;
       } else {
-        throw new HttpError(400, 'project_id required when importing a platform-starter blueprint');
+        const { data: own, error: oErr } = await supabase.from('blueprints').select('workspace_id').eq('id', blueprint_id).maybeSingle();
+        if (oErr) throw new HttpError(400, oErr.message);
+        if (!own) throw new HttpError(404, 'Blueprint not found');
+        if (!own.workspace_id) throw new HttpError(400, 'project_id required when importing a platform-starter blueprint');
+        workspaceId = own.workspace_id;
       }
-      await requireWorkspace(supabase, userId, workspaceId, isService);
+      await requireWorkspace(supabase, userId, workspaceId, isService, project_id ?? null);
+      const bp = await loadVisibleBlueprint(supabase, blueprint_id, workspaceId);
 
       // default dimensions from the blueprint schema
       const dims: Record<string, number> = {};
@@ -412,7 +465,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
 
       // build plan item tree from the blueprint (with sub-blueprint expansion)
       const tree: ItemRow[] = [];
-      await loadBlueprintTree(supabase, blueprint_id, null, 0, new Set(), tree);
+      await loadBlueprintTree(supabase, blueprint_id, null, 0, new Set(), tree, workspaceId);
       applyOptionDefaults(tree); // one tier per option_group selected by default
 
       // Zone-driven blueprint: snapshot the schema + the absorbed rate tables onto the plan, seed a
@@ -443,7 +496,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       if (planErr) throw new HttpError(400, `Failed to create plan: ${planErr.message}`);
 
       const { subtotal } = await writePlanItems(supabase, plan.id, scoped, dims, derived);
-      await supabase.from('project_plans').update({ subtotal }).eq('id', plan.id);
+      await storeSubtotal(supabase, plan.id, { subtotal });
       const items = await loadPlanItems(supabase, plan.id);
       return json({ plan: { ...plan, subtotal }, items });
     }
@@ -469,18 +522,16 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const metadata = (thread.metadata ?? {}) as Record<string, unknown>;
       const est = metadata.kitchen_estimate as {
         blueprint_id?: string; reference?: string; dimensions?: Record<string, number>;
-        selected_item_ids?: string[]; plan_id?: string; project_id?: string;
+        selected_item_ids?: string[]; plan_id?: string; project_id?: string; approved_at?: string;
         composition?: Composition;
         contact?: { name?: string };
       } | undefined;
       if (!est?.blueprint_id) throw new HttpError(404, 'No kitchen estimate on this thread');
-      // Idempotent — a second Approve returns the plan the first one made.
-      if (est.plan_id) return json({ plan_id: est.plan_id, project_id: est.project_id ?? null, already_exists: true });
+      if (est.plan_id && (est.approved_at || !est.project_id)) {
+        return json({ plan_id: est.plan_id, project_id: est.project_id ?? null, already_exists: true });
+      }
 
-      const { data: bp, error: bpErr } = await supabase
-        .from('blueprints').select('*').eq('id', est.blueprint_id).maybeSingle();
-      if (bpErr) throw new HttpError(400, bpErr.message);
-      if (!bp) throw new HttpError(404, 'Blueprint not found');
+      const bp = await loadVisibleBlueprint(supabase, est.blueprint_id, thread.workspace_id);
 
       const schema = (bp.dimensions_schema ?? []) as { key: string; default?: number }[];
       const dims: Record<string, number> = {};
@@ -491,7 +542,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       }
 
       const tree: ItemRow[] = [];
-      await loadBlueprintTree(supabase, est.blueprint_id, null, 0, new Set(), tree);
+      await loadBlueprintTree(supabase, est.blueprint_id, null, 0, new Set(), tree, thread.workspace_id);
       applyOptionDefaults(tree);
 
       // The visitor's zone configuration is a PROPOSAL like the rest of the estimate: it says how
@@ -523,18 +574,36 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         }
       }
 
+      // The ids are claimed on the thread BEFORE anything is created, so a retry after a partial
+      // failure resumes onto the same project and plan instead of minting a second pair.
+      let projectId = est.project_id ?? null;
+      let planId = est.plan_id ?? null;
+      if (!planId || !projectId) {
+        projectId = crypto.randomUUID();
+        planId = crypto.randomUUID();
+        const claimed = await stampKitchenEstimate(supabase, thread_id, { plan_id: planId, project_id: projectId }, true);
+        if (!claimed) {
+          const { data: won, error: wonErr } = await supabase.from('inbox_threads').select('metadata').eq('id', thread_id).maybeSingle();
+          if (wonErr) throw new HttpError(400, wonErr.message);
+          const wonEst = (((won?.metadata ?? {}) as Record<string, unknown>).kitchen_estimate ?? {}) as { plan_id?: string; project_id?: string };
+          return json({ plan_id: wonEst.plan_id ?? null, project_id: wonEst.project_id ?? null, already_exists: true });
+        }
+      }
+
       const projectName = `Kitchen — ${est.contact?.name || est.reference || 'website enquiry'}`;
-      const { data: project, error: projErr } = await supabase.from('projects').insert({
+      const { error: projErr } = await supabase.from('projects').upsert({
+        id: projectId,
         workspace_id: thread.workspace_id,
         user_id: userId,
         name: projectName,
         status: 'planning',
         budget_currency: bp.source_currency || 'EUR',
-      }).select('id').single();
+      }, { onConflict: 'id', ignoreDuplicates: true });
       if (projErr) throw new HttpError(400, `Failed to create project: ${projErr.message}`);
 
-      const { data: plan, error: planErr } = await supabase.from('project_plans').insert({
-        project_id: project.id,
+      const { error: planErr } = await supabase.from('project_plans').upsert({
+        id: planId,
+        project_id: projectId,
         workspace_id: thread.workspace_id,
         user_id: userId,
         blueprint_id: est.blueprint_id,
@@ -544,34 +613,18 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         source_currency: bp.source_currency || 'EUR',
         status: 'draft',
         created_by: userId,
-      }).select().single();
+      }, { onConflict: 'id', ignoreDuplicates: true });
       if (planErr) throw new HttpError(400, `Failed to create plan: ${planErr.message}`);
+      const plan = await loadPlan(supabase, planId);
+      if (plan.workspace_id !== thread.workspace_id || plan.project_id !== projectId) throw new HttpError(409, 'Claimed plan id belongs to another record');
 
       const { subtotal } = await writePlanItems(
         supabase, plan.id, stripAbsorbed(tree, compSchema), dims, derivePlanComposition(planComp),
       );
-      await supabase.from('project_plans').update({ subtotal }).eq('id', plan.id);
+      await storeSubtotal(supabase, plan.id, { subtotal });
+      await stampKitchenEstimate(supabase, thread_id, { approved_by: userId, approved_at: new Date().toISOString() }, false);
 
-      // Read-modify-write: metadata also carries the channel binding, and clobbering the column
-      // would drop it (inbox-system.md §2).
-      const { data: fresh } = await supabase
-        .from('inbox_threads').select('metadata').eq('id', thread_id).maybeSingle();
-      const current = (fresh?.metadata ?? metadata) as Record<string, unknown>;
-      const currentEst = (current.kitchen_estimate ?? est) as Record<string, unknown>;
-      await supabase.from('inbox_threads').update({
-        metadata: {
-          ...current,
-          kitchen_estimate: {
-            ...currentEst,
-            plan_id: plan.id,
-            project_id: project.id,
-            approved_by: userId,
-            approved_at: new Date().toISOString(),
-          },
-        },
-      }).eq('id', thread_id);
-
-      return json({ plan_id: plan.id, project_id: project.id, subtotal });
+      return json({ plan_id: planId, project_id: projectId, subtotal });
     }
 
     case 'rescale':
@@ -579,7 +632,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { plan_id } = body;
       if (!plan_id) throw new HttpError(400, 'plan_id required');
       const plan = await loadPlan(supabase, plan_id);
-      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService, plan.project_id);
       const dims: Record<string, number> = action === 'rescale'
         ? { ...(plan.dimensions ?? {}), ...(body.dimensions ?? {}) }
         : (plan.dimensions ?? {});
@@ -594,9 +647,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       // a second copy of every cabinet on each reprice.
       const items = (await loadPlanItems(supabase, plan_id)).filter((it) => it.source !== 'composition');
       const { subtotal } = await writePlanItems(supabase, plan_id, items, dims, derived);
-      await supabase.from('project_plans')
-        .update({ dimensions: dims, subtotal, ...(planComp ? { composition: planComp } : {}) })
-        .eq('id', plan_id);
+      await storeSubtotal(supabase, plan_id, { dimensions: dims, subtotal, ...(planComp ? { composition: planComp } : {}) });
       const fresh = await loadPlanItems(supabase, plan_id);
       return json({ plan: { ...plan, dimensions: dims, subtotal, ...(planComp ? { composition: planComp } : {}) }, items: fresh });
     }
@@ -605,7 +656,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { plan_id, note } = body;
       if (!plan_id) throw new HttpError(400, 'plan_id required');
       const plan = await loadPlan(supabase, plan_id);
-      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService, plan.project_id);
       const items = await loadPlanItems(supabase, plan_id);
       const { data: maxV } = await supabase.from('project_plan_versions').select('version').eq('plan_id', plan_id).order('version', { ascending: false }).limit(1).maybeSingle();
       const nextV = (maxV?.version ?? 0) + 1;
@@ -624,7 +675,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { plan_id, version } = body;
       if (!plan_id || version == null) throw new HttpError(400, 'plan_id and version required');
       const plan = await loadPlan(supabase, plan_id);
-      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService, plan.project_id);
       const { data: ver, error } = await supabase.from('project_plan_versions').select('*').eq('plan_id', plan_id).eq('version', version).maybeSingle();
       if (error) throw new HttpError(400, error.message);
       if (!ver) throw new HttpError(404, 'Version not found');
@@ -639,7 +690,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const planComp = (snap.composition ?? plan.composition ?? {}) as PlanComposition;
       const derived = derivePlanComposition(planComp);
       const { subtotal } = await writePlanItems(supabase, plan_id, reIded, dims, derived);
-      await supabase.from('project_plans').update({ dimensions: dims, composition: planComp, subtotal }).eq('id', plan_id);
+      await storeSubtotal(supabase, plan_id, { dimensions: dims, composition: planComp, subtotal });
       const items = await loadPlanItems(supabase, plan_id);
       return json({ plan: { ...plan, dimensions: dims, composition: planComp, subtotal }, items });
     }
@@ -648,45 +699,39 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { plan_id } = body;
       if (!plan_id) throw new HttpError(400, 'plan_id required');
       const plan = await loadPlan(supabase, plan_id);
-      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService, plan.project_id);
       const items = await loadPlanItems(supabase, plan_id);
 
-      // Reuse the plan's existing DRAFT quote if it has one (idempotent regenerate —
-      // avoids piling up duplicate drafts on repeated clicks / re-quotes). Once the
-      // quote has been sent/accepted we leave it alone and create a fresh one.
-      let quote: { id: string } | null = null;
+      // A plan's DRAFT quote is rebuilt in place; a sent/accepted one is left alone and a fresh draft
+      // minted. The plan is claimed before the lines are written, so a retry reuses the quote.
       if (plan.quote_id) {
-        const { data: existing } = await supabase.from('quotes').select('id, status').eq('id', plan.quote_id).maybeSingle();
+        const { data: existing, error: exErr } = await supabase.from('quotes').select('id, status').eq('id', plan.quote_id).maybeSingle();
+        if (exErr) throw new HttpError(400, exErr.message);
         if (existing && existing.status === 'draft') {
-          quote = { id: existing.id };
-          await supabase.from('quote_items').delete().eq('quote_id', existing.id); // rebuild from the current plan
-          await supabase.from('quotes').update({ name: plan.title }).eq('id', existing.id);
+          const { error: nErr } = await supabase.from('quotes').update({ name: plan.title }).eq('id', existing.id);
+          if (nErr) throw new HttpError(400, `Failed to update quote: ${nErr.message}`);
+          await writeQuoteItems(supabase, existing.id, items, true);
+          if (plan.status !== 'quoted') await storeSubtotal(supabase, plan_id, { status: 'quoted' });
+          return json({ quote_id: existing.id });
         }
       }
-      if (!quote) {
-        const cust = await projectCustomer(supabase, plan.project_id);
-        const { data: created, error: qErr } = await supabase.from('quotes').insert({
-          user_id: plan.user_id,
-          workspace_id: plan.workspace_id,
-          project_id: plan.project_id,
-          ...cust,
-          name: plan.title,
-          status: 'draft',
-          currency: plan.source_currency || 'EUR',
-          notes: `Created from project plan${plan.brief ? `: ${plan.brief}` : ''}`,
-        }).select().single();
-        if (qErr) throw new HttpError(400, `Failed to create quote: ${qErr.message}`);
-        quote = { id: created.id };
+      const cust = await projectCustomer(supabase, plan.project_id);
+      const { data: created, error: qErr } = await supabase.from('quotes').insert({
+        user_id: plan.user_id,
+        workspace_id: plan.workspace_id,
+        project_id: plan.project_id,
+        ...cust,
+        name: plan.title,
+        status: 'draft',
+        currency: plan.source_currency || 'EUR',
+        notes: `Created from project plan${plan.brief ? `: ${plan.brief}` : ''}`,
+      }).select('id').single();
+      if (qErr) throw new HttpError(400, `Failed to create quote: ${qErr.message}`);
+      if (!(await claimPlanQuote(supabase, plan_id, plan.quote_id ?? null, created.id))) {
+        return json({ quote_id: await dropUnclaimedQuote(supabase, created.id, plan_id) });
       }
-
-      const { rows: quoteItems, subtotal } = buildQuoteItems(quote.id, items);
-      if (quoteItems.length) {
-        const { error: qiErr } = await supabase.from('quote_items').insert(quoteItems);
-        if (qiErr) throw new HttpError(400, `Failed to add quote items: ${qiErr.message}`);
-      }
-      await supabase.from('quotes').update({ total_items: quoteItems.length, subtotal }).eq('id', quote.id);
-      await supabase.from('project_plans').update({ quote_id: quote.id, status: 'quoted' }).eq('id', plan_id);
-      return json({ quote_id: quote.id });
+      await writeQuoteItems(supabase, created.id, items, false);
+      return json({ quote_id: created.id });
     }
 
     case 'add-section-from-blueprint': {
@@ -696,20 +741,17 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { plan_id, source_blueprint_id, section_id } = body;
       if (!plan_id || !source_blueprint_id || !section_id) throw new HttpError(400, 'plan_id, source_blueprint_id, section_id required');
       const plan = await loadPlan(supabase, plan_id);
-      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService, plan.project_id);
 
+      await loadVisibleBlueprint(supabase, source_blueprint_id, plan.workspace_id);
       const { data: srcItems, error } = await supabase.from('blueprint_items').select('*').eq('blueprint_id', source_blueprint_id);
       if (error) throw new HttpError(400, error.message);
-      const rows = (srcItems ?? []) as ItemRow[];
-      const section = rows.find((i) => i.id === section_id && i.kind === 'section');
-      if (!section) throw new HttpError(404, 'Section not found');
-      const tasks = rows.filter((i) => i.parent_id === section_id);
-
       const existing = await loadPlanItems(supabase, plan_id);
       const maxSort = existing.filter((i) => i.kind === 'section').reduce((m, i) => Math.max(m, i.sort_order ?? 0), -1);
-      const newSecId = crypto.randomUUID();
-      const appended: ItemRow[] = [{ ...section, id: newSecId, parent_id: null, sort_order: maxSort + 1 }];
-      tasks.forEach((t, idx) => appended.push({ ...t, id: crypto.randomUUID(), parent_id: newSecId, sort_order: idx }));
+      const appended = prepareSectionImport(
+        (srcItems ?? []) as ItemRow[], section_id, ((plan.composition ?? {}) as PlanComposition).schema, maxSort + 1,
+      );
+      if (!appended) throw new HttpError(404, 'Section not found');
 
       const dims = plan.dimensions ?? {};
       // Composition lines are regenerated, never carried: keeping the old ones and adding a fresh
@@ -717,7 +759,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const kept = existing.filter((i) => i.source !== 'composition');
       const derived = derivePlanComposition((plan.composition ?? {}) as PlanComposition);
       const { subtotal } = await writePlanItems(supabase, plan_id, [...kept, ...appended], dims, derived);
-      await supabase.from('project_plans').update({ subtotal }).eq('id', plan_id);
+      await storeSubtotal(supabase, plan_id, { subtotal });
       const items = await loadPlanItems(supabase, plan_id);
       return json({ plan: { ...plan, subtotal }, items });
     }
@@ -729,7 +771,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       if (!plan_id) throw new HttpError(400, 'plan_id required');
       const plan = await loadPlan(supabase, plan_id);
       if (!plan.project_id) throw new HttpError(400, 'Plan is not attached to a project');
-      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService, plan.project_id);
       const items = await loadPlanItems(supabase, plan_id);
       const sectionLabel: Record<string, string> = {};
       for (const it of items) if (it.kind === 'section') sectionLabel[it.id] = it.label;
@@ -762,11 +804,11 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
           sort_order: idx,
         };
       });
-      if (purchaseItems.length) {
-        const { error: piErr } = await supabase.from('project_purchase_items').insert(purchaseItems);
-        if (piErr) throw new HttpError(400, `Failed to write material list: ${piErr.message}`);
-      }
-      return json({ count: purchaseItems.length });
+      const { data: count, error: piErr } = await supabase.rpc('replace_plan_purchase_items', {
+        p_plan_id: plan_id, p_rows: purchaseItems,
+      });
+      if (piErr) throw new HttpError(piErr.code === 'PT409' ? 409 : 400, `Failed to write material list: ${piErr.message}`);
+      return json({ count: Number(count ?? purchaseItems.length) });
     }
 
     case 'create-change-order': {
@@ -775,10 +817,19 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { plan_id } = body;
       if (!plan_id) throw new HttpError(400, 'plan_id required');
       const plan = await loadPlan(supabase, plan_id);
-      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService, plan.project_id);
       if (!plan.quote_id) throw new HttpError(400, 'Plan has no quote to revise');
-      const { data: prevQuote } = await supabase.from('quotes').select('revision_number').eq('id', plan.quote_id).maybeSingle();
+      const { data: prevQuote, error: pqErr } = await supabase.from('quotes')
+        .select('id, status, revision_number, parent_quote_id').eq('id', plan.quote_id).maybeSingle();
+      if (pqErr) throw new HttpError(400, pqErr.message);
+      if (!prevQuote) throw new HttpError(404, 'Quote not found');
       const items = await loadPlanItems(supabase, plan_id);
+
+      // A revision still in draft IS the pending change order: rebuild it, never stack another.
+      if (prevQuote.status === 'draft' && prevQuote.parent_quote_id) {
+        await writeQuoteItems(supabase, prevQuote.id, items, true);
+        return json({ quote_id: prevQuote.id });
+      }
 
       const coCust = await projectCustomer(supabase, plan.project_id);
       const { data: quote, error: qErr } = await supabase.from('quotes').insert({
@@ -790,18 +841,14 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         status: 'draft',
         currency: plan.source_currency || 'EUR',
         parent_quote_id: plan.quote_id,
-        revision_number: (prevQuote?.revision_number ?? 1) + 1,
+        revision_number: (prevQuote.revision_number ?? 1) + 1,
         notes: 'Change order generated from updated project plan',
-      }).select().single();
+      }).select('id').single();
       if (qErr) throw new HttpError(400, `Failed to create change order: ${qErr.message}`);
-
-      const { rows: quoteItems, subtotal } = buildQuoteItems(quote.id, items);
-      if (quoteItems.length) {
-        const { error: qiErr } = await supabase.from('quote_items').insert(quoteItems);
-        if (qiErr) throw new HttpError(400, `Failed to add quote items: ${qiErr.message}`);
+      if (!(await claimPlanQuote(supabase, plan_id, plan.quote_id, quote.id))) {
+        return json({ quote_id: await dropUnclaimedQuote(supabase, quote.id, plan_id) });
       }
-      await supabase.from('quotes').update({ total_items: quoteItems.length, subtotal }).eq('id', quote.id);
-      await supabase.from('project_plans').update({ quote_id: quote.id, status: 'quoted' }).eq('id', plan_id);
+      await writeQuoteItems(supabase, quote.id, items, false);
       return json({ quote_id: quote.id });
     }
 

@@ -85,6 +85,18 @@ export const TaskDrawer: React.FC<{
     if (!title.trim() && task) editTitle(draft.current?.savedTitle ?? task.title);
     flush();
   };
+  const saveDates = (patch: { start_date?: string | null; end_date?: string | null }): boolean => {
+    if (!task) return false;
+    if (task.is_milestone && 'start_date' in patch) patch = { ...patch, end_date: patch.start_date ?? null };
+    const start = 'start_date' in patch ? patch.start_date : task.start_date?.slice(0, 10) ?? null;
+    const end = 'end_date' in patch ? patch.end_date : task.end_date?.slice(0, 10) ?? null;
+    if (start && end && end < start) {
+      toast({ title: 'End date is before the start date', variant: 'destructive' });
+      return false;
+    }
+    void update(task.id, patch);
+    return true;
+  };
   const addSubtask = async () => {
     if (!task || !newSubtask.trim()) return;
     try {
@@ -155,10 +167,15 @@ export const TaskDrawer: React.FC<{
                   </Select>
                 </Prop>
                 <Prop label="Start">
-                  <DateField value={task.start_date} readOnly={readOnly} onChange={(v) => void update(task.id, { start_date: v })} />
+                  <DateField value={task.start_date} readOnly={readOnly} onCommit={(v) => saveDates({ start_date: v })} />
                 </Prop>
+                {!task.is_milestone && (
+                  <Prop label="End">
+                    <DateField value={task.end_date} readOnly={readOnly} onCommit={(v) => saveDates({ end_date: v })} />
+                  </Prop>
+                )}
                 <Prop label="Due">
-                  <DateField value={task.due_date} readOnly={readOnly} onChange={(v) => void update(task.id, { due_date: v })} />
+                  <DateField value={task.due_date} readOnly={readOnly} onCommit={(v) => { void update(task.id, { due_date: v }); return true; }} />
                 </Prop>
                 {rooms.length > 0 && !task.parent_task_id && (
                   <Prop label="Room">
@@ -285,14 +302,33 @@ const Prop: React.FC<{ label: string; children: React.ReactNode }> = ({ label, c
   </>
 );
 
-const DateField: React.FC<{ value: string | null; readOnly: boolean; onChange: (v: string | null) => void }> = ({ value, readOnly, onChange }) => {
+const COMPLETE_DATE = /^(\d{4})-\d{2}-\d{2}$/;
+
+/** Writes only a finished date: a native date input reports every keystroke of the year (0002, 0020, 0202…). */
+const DateField: React.FC<{ value: string | null; readOnly: boolean; onCommit: (v: string | null) => boolean }> = ({ value, readOnly, onCommit }) => {
+  const saved = value?.slice(0, 10) ?? '';
+  const [draft, setDraft] = useState(saved);
+  const sent = useRef(saved);
+  useEffect(() => { setDraft(saved); sent.current = saved; }, [saved]);
   if (readOnly) return <span>{value ? formatDate(value) : '—'}</span>;
+  const commit = (v: string) => {
+    if (v === sent.current) return;
+    if ((v && !COMPLETE_DATE.test(v)) || !onCommit(v || null)) { setDraft(sent.current); return; }
+    sent.current = v;
+  };
   return (
     <Input
       type="date"
       className="h-8 w-44"
-      value={value?.slice(0, 10) ?? ''}
-      onChange={(e) => onChange(e.target.value || null)}
+      value={draft}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        const year = COMPLETE_DATE.exec(v)?.[1];
+        if (year && Number(year) >= 1900) commit(v);
+      }}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
     />
   );
 };

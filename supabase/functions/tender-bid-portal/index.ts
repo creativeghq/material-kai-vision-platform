@@ -4,6 +4,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { escapeHtml } from '../_shared/html.ts';
+import { userIsProjectTeam } from '../_shared/project-team.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -17,6 +18,12 @@ const corsHeaders = {
 /** Long enough that guessing is not a strategy, matching how contracts mint a signing token. */
 const mintToken = () => crypto.randomUUID() + crypto.randomUUID().replace(/-/g, '');
 const TOKEN_TTL_DAYS = 30;
+
+/** A bid is editable only while its package is issued and, when it has one, its due date has not passed. */
+function packageOpenForPricing(pkg: { status: string; due_at: string | null }): boolean {
+  if (pkg.status !== 'issued') return false;
+  return !pkg.due_at || Date.now() <= new Date(`${pkg.due_at}T23:59:59.999Z`).getTime();
+}
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -67,9 +74,9 @@ Deno.serve(withApiLogging('tender-bid-portal', async (req: Request) => {
       .maybeSingle();
     if (!pkg) return json({ not_found: true });
 
-    // An awarded or cancelled package is closed to further pricing. Said plainly, because the
-    // subcontractor is entitled to know the enquiry is over rather than type a price into nothing.
-    if (pkg.status === 'awarded' || pkg.status === 'cancelled') {
+    // Said plainly, because the subcontractor is entitled to know the enquiry is over rather than
+    // type a price into nothing.
+    if (!packageOpenForPricing(pkg)) {
       return json({ closed: true, package: { name: pkg.name, reference: pkg.reference } });
     }
 
@@ -159,15 +166,39 @@ Deno.serve(withApiLogging('tender-bid-portal', async (req: Request) => {
     .maybeSingle();
   if (!bid) throw new HttpError(404, 'Bid not found');
 
-  // Invariant 1: the workspace comes from the row, and the caller is checked against it.
-  if ((keyWs && bid.workspace_id !== keyWs) || !(await userHasWorkspaceCapability(service, uid, bid.workspace_id, 'projects.use'))) {
+  const [{ data: pkg }, { data: company }] = await Promise.all([
+    service.from('tender_packages').select('id, reference, name, scope, status, due_at, currency, project_id, workspace_id')
+      .eq('id', bid.package_id).maybeSingle(),
+    service.from('crm_companies').select('name, email')
+      .eq('id', bid.company_id).eq('workspace_id', bid.workspace_id).maybeSingle(),
+  ]);
+
+  // Invariant 1: the workspace comes from the row, and the caller must be on the project's team.
+  const projectId = (pkg as { project_id?: string; workspace_id?: string } | null)?.project_id;
+  if (
+    !pkg || !projectId || (pkg as { workspace_id: string }).workspace_id !== bid.workspace_id
+    || (keyWs && bid.workspace_id !== keyWs)
+    || !(await userHasWorkspaceCapability(service, uid, bid.workspace_id, 'projects.use'))
+    || !(await userIsProjectTeam(service, uid, projectId))
+  ) {
     throw new HttpError(404, 'Bid not found');
   }
 
-  const [{ data: pkg }, { data: company }] = await Promise.all([
-    service.from('tender_packages').select('reference, name, scope, due_at, currency').eq('id', bid.package_id).maybeSingle(),
-    service.from('crm_companies').select('name, email').eq('id', bid.company_id).maybeSingle(),
-  ]);
+  // Sending is what issues a draft package; the portal prices only an issued, in-date one, so a
+  // link sent for anything else would open onto "closed".
+  const pk = pkg as { id: string; status: string; due_at: string | null };
+  if (pk.status === 'draft') {
+    const { error: issueErr } = await service.from('tender_packages')
+      .update({ status: 'issued', issued_at: new Date().toISOString() })
+      .eq('id', pk.id).eq('status', 'draft');
+    if (issueErr) throw new HttpError(500, issueErr.message);
+    pk.status = 'issued';
+  }
+  if (!packageOpenForPricing(pk)) {
+    throw new HttpError(409, pk.status === 'issued'
+      ? 'The due date for prices has passed. Move it before sending the enquiry.'
+      : `This package is ${pk.status} and no longer takes prices.`);
+  }
 
   // Re-issuing keeps the SAME token: a subcontractor who already has the link and starts pricing
   // must not have it invalidated because somebody pressed send twice.

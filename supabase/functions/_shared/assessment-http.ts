@@ -12,10 +12,11 @@ import {
   runAssessment,
   type AssessmentSubject,
 } from './assessment.ts';
+import { userSeesProjectMoney } from './project-team.ts';
 
 const SUBJECT_CAPABILITY: Record<AssessmentSubject, Capability> = {
   project: 'projects.use',
-  finance: 'finance.manage',
+  finance: 'finance.operate',
   real_estate: 'realestate.view',
 };
 
@@ -72,6 +73,10 @@ export async function handleAssessmentRequest(
   // Tenancy binding (invariant 1). The client above is service-role, so this check is MANDATORY
   // rather than a formality — the subject id arrives in the request body.
   if (!(await userHasWorkspaceCapability(supabase, userId, subject.workspaceId, SUBJECT_CAPABILITY[subjectType]))) {
+    throw new HttpError(404, 'Not found');
+  }
+  // The subject gate SQL `_assessment_subject_visible` applies: a project assessment states margin.
+  if (subjectType === 'project' && !(await userSeesProjectMoney(supabase, userId, subject.subjectId))) {
     throw new HttpError(404, 'Not found');
   }
 

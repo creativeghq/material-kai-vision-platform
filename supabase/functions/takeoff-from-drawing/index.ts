@@ -6,6 +6,7 @@ import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitOrRefuse } from '../_shared/credit-utils.ts';
+import { userIsProjectTeam } from '../_shared/project-team.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -105,6 +106,8 @@ function base64FromBytes(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+const DRAWING_BUCKET = 'pdf-documents';
+
 Deno.serve(withApiLogging('takeoff-from-drawing', async (req: Request) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -131,13 +134,26 @@ Deno.serve(withApiLogging('takeoff-from-drawing', async (req: Request) => {
 
   const doc = (rev as any)?.project_documents;
   const workspaceId = doc?.projects?.workspace_id ?? null;
-  if (!rev || !workspaceId || (keyWs && workspaceId !== keyWs) || !(await userHasWorkspaceCapability(admin, uid, workspaceId, 'projects.use'))) {
+  if (
+    !rev || !workspaceId || !doc?.project_id || (keyWs && workspaceId !== keyWs)
+    || !(await userHasWorkspaceCapability(admin, uid, workspaceId, 'projects.use'))
+    || !(await userIsProjectTeam(admin, uid, doc.project_id))
+  ) {
     throw new HttpError(404, 'Drawing not found');
   }
 
-  const bucket = (rev as any).storage_bucket as string;
-  const path = (rev as any).storage_object_path as string;
-  if (!bucket || !path) throw new HttpError(409, 'That revision has no file attached.');
+  const storedBucket = (rev as any).storage_bucket as string | null;
+  const path = (rev as any).storage_object_path as string | null;
+  if (!storedBucket || !path) throw new HttpError(409, 'That revision has no file attached.');
+  // The row is client-writable, so the bytes the service role reads are pinned to where the
+  // upload path puts THIS document's files (invariant 7) — never wherever the row points.
+  const bucket = DRAWING_BUCKET;
+  if (
+    storedBucket !== DRAWING_BUCKET || path.includes('..')
+    || !path.startsWith(`project-docs/${doc.project_id}/${doc.id}/`)
+  ) {
+    throw new HttpError(404, 'Drawing not found');
+  }
 
   const { data: file, error: dlError } = await admin.storage.from(bucket).download(path);
   if (dlError || !file) throw new HttpError(404, 'The drawing file could not be read.');

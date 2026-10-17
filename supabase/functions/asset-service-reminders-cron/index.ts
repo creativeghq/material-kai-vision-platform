@@ -10,6 +10,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 const BATCH = 200;
 /** Look no further ahead than this for warranties; the longest sane reminder offset. */
 const WARRANTY_HORIZON_DAYS = 400;
+const WARRANTY_MAX_PAGES = 25;
 
 interface DueRow {
   event_id: string;
@@ -67,11 +68,23 @@ function assetActionUrl(companyId: string | null, contactId: string | null): str
   return '/crm';
 }
 
+/** The subset of `userIds` that are ACTIVE members of `workspaceId`. */
+async function activeMembers(db: DbClient, workspaceId: string, userIds: string[]): Promise<string[]> {
+  if (userIds.length === 0) return [];
+  const { data, error } = await db.from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .in('user_id', [...new Set(userIds)]);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((m: { user_id: string }) => m.user_id))];
+}
+
 /**
  * Who hears about this? The plan's assignee if it has one, else whoever is marked responsible
- * for the customer in CRM, else the workspace's owners/admins. An empty list would mean the
- * reminder fires into nothing, which is the exact failure this feature exists to prevent — so
- * the owner/admin fallback is unconditional.
+ * for the customer in CRM, else the workspace's owners/admins — each only while an ACTIVE member
+ * of the row's own workspace. The owner/admin fallback is unconditional so a reminder never
+ * fires into nothing.
  */
 async function resolveRecipients(
   db: DbClient,
@@ -80,23 +93,30 @@ async function resolveRecipients(
   companyId: string | null,
   contactId: string | null,
 ): Promise<string[]> {
-  if (assigneeUserId) return [assigneeUserId];
+  if (assigneeUserId) {
+    const ids = await activeMembers(db, workspaceId, [assigneeUserId]);
+    if (ids.length > 0) return ids;
+  }
 
   if (companyId || contactId) {
     const table = companyId ? 'crm_companies' : 'crm_contacts';
-    const { data } = await db.from(table)
+    const { data, error } = await db.from(table)
       .select('responsible_sales_user_ids')
       .eq('id', companyId || contactId)
+      .eq('workspace_id', workspaceId)
       .maybeSingle();
-    const ids = (data as { responsible_sales_user_ids?: string[] } | null)?.responsible_sales_user_ids ?? [];
-    if (ids.length > 0) return [...new Set(ids)];
+    if (error) throw error;
+    const ids = await activeMembers(
+      db, workspaceId, (data as { responsible_sales_user_ids?: string[] } | null)?.responsible_sales_user_ids ?? []);
+    if (ids.length > 0) return ids;
   }
 
-  const { data: members } = await db.from('workspace_members')
+  const { data: members, error } = await db.from('workspace_members')
     .select('user_id')
     .eq('workspace_id', workspaceId)
     .eq('status', 'active')
     .in('role', ['owner', 'admin']);
+  if (error) throw error;
   return [...new Set((members ?? []).map((m: { user_id: string }) => m.user_id))];
 }
 
@@ -122,6 +142,7 @@ Deno.serve(withApiLogging('asset-service-reminders-cron', async (req: Request) =
     .from('customer_asset_service_due')
     .select('*')
     .eq('is_within_lead_time', true)
+    .or('and(is_overdue.eq.true,overdue_reminded_at.is.null),and(is_overdue.eq.false,reminded_at.is.null)')
     .order('due_on', { ascending: true })
     .limit(BATCH);
   if (dueErr) {
@@ -200,11 +221,12 @@ Deno.serve(withApiLogging('asset-service-reminders-cron', async (req: Request) =
       // `reminded_at` would stay null forever — and ops.asset_reminders_silent_zero looks for
       // exactly that, so every such row would raise a false alarm about a cron that in fact did
       // its job. Stamp both on the overdue path, keeping the original timestamp when there is one.
-      await db.from('customer_asset_service_events')
+      const { error: stampErr } = await db.from('customer_asset_service_events')
         .update(overdue
           ? { overdue_reminded_at: nowIso, reminded_at: row.reminded_at ?? nowIso }
           : { reminded_at: nowIso })
         .eq('id', row.event_id);
+      if (stampErr) throw stampErr;
       if (overdue) serviceOverdue++; else serviceDue++;
     } catch (_err) {
       failed++;
@@ -212,15 +234,28 @@ Deno.serve(withApiLogging('asset-service-reminders-cron', async (req: Request) =
   }
 
   // ── Warranties ────────────────────────────────────────────────────────────
-  const { data: warranties } = await db
-    .from('customer_asset_warranties')
-    .select('id, workspace_id, asset_id, kind, policy_number, ends_on, remind_days_before, reminded_at')
-    .gte('ends_on', day)
-    .lte('ends_on', addDays(day, WARRANTY_HORIZON_DAYS))
-    .order('ends_on', { ascending: true })
-    .limit(BATCH);
+  // Paged, not a single first page: rows whose every window is already stamped sort first and
+  // would otherwise starve the ones still owed a reminder.
+  const warranties: WarrantyRow[] = [];
+  for (let page = 0; page < WARRANTY_MAX_PAGES; page++) {
+    const { data, error } = await db
+      .from('customer_asset_warranties')
+      .select('id, workspace_id, asset_id, kind, policy_number, ends_on, remind_days_before, reminded_at')
+      .gte('ends_on', day)
+      .lte('ends_on', addDays(day, WARRANTY_HORIZON_DAYS))
+      .order('ends_on', { ascending: true })
+      .order('id', { ascending: true })
+      .range(page * BATCH, page * BATCH + BATCH - 1);
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    warranties.push(...((data ?? []) as WarrantyRow[]));
+    if ((data ?? []).length < BATCH) break;
+  }
 
-  for (const w of (warranties ?? []) as WarrantyRow[]) {
+  for (const w of warranties) {
     const offsets = (w.remind_days_before ?? []).filter((n) => Number.isFinite(n) && n >= 0);
     const sent = w.reminded_at ?? {};
     // Largest offset first: if several windows opened at once (a warranty added late, say),
@@ -233,7 +268,7 @@ Deno.serve(withApiLogging('asset-service-reminders-cron', async (req: Request) =
     try {
       const { data: asset } = await db.from('customer_assets')
         .select('id, name, customer_company_id, customer_contact_id, project_id, status')
-        .eq('id', w.asset_id).maybeSingle();
+        .eq('id', w.asset_id).eq('workspace_id', w.workspace_id).maybeSingle();
       const a = asset as {
         name?: string; customer_company_id?: string | null; customer_contact_id?: string | null;
         project_id?: string | null; status?: string;
@@ -294,7 +329,7 @@ Deno.serve(withApiLogging('asset-service-reminders-cron', async (req: Request) =
     JSON.stringify({
       success: true,
       scanned_due: (dueRows ?? []).length,
-      scanned_warranties: (warranties ?? []).length,
+      scanned_warranties: warranties.length,
       serviceDue, serviceOverdue, warrantyExpiring, failed,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },

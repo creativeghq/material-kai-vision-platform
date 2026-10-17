@@ -112,6 +112,63 @@ function rpcError(err: { code?: string; message?: string }): never {
   throw new HttpError(400, err.message || 'request failed');
 }
 
+/** Every id an update can point a row at must live in the row's own workspace — what `register_customer_asset` checks. */
+async function assertRefsInWorkspace(
+  db: DbClient,
+  workspaceId: string,
+  patch: Record<string, unknown>,
+  currentProjectId: string | null = null,
+): Promise<void> {
+  const id = (k: string) => (patch[k] == null || patch[k] === '' ? null : String(patch[k]));
+  const exists = async (table: string, rowId: string) => {
+    const { data, error } = await db.from(table).select('id')
+      .eq('id', rowId).eq('workspace_id', workspaceId).maybeSingle();
+    if (error) throw new HttpError(400, error.message);
+    return !!data;
+  };
+  for (const [key, table, label] of [
+    ['customer_company_id', 'crm_companies', 'company'],
+    ['supplier_company_id', 'crm_companies', 'supplier'],
+    ['provider_company_id', 'crm_companies', 'provider'],
+    ['project_id', 'projects', 'project'],
+  ] as const) {
+    const v = id(key);
+    if (v && !(await exists(table, v))) throw new HttpError(404, `${label} not found`);
+  }
+  const roomId = id('room_id');
+  if (roomId) {
+    const { data: room, error } = await db.from('project_rooms')
+      .select('project_id, projects!inner(workspace_id)').eq('id', roomId).maybeSingle();
+    if (error) throw new HttpError(400, error.message);
+    const r = room as { project_id: string; projects: { workspace_id: string } } | null;
+    const projectId = 'project_id' in patch ? id('project_id') : currentProjectId;
+    if (!r || r.projects.workspace_id !== workspaceId || (projectId && r.project_id !== projectId)) {
+      throw new HttpError(404, 'room not found');
+    }
+  }
+  const assignee = id('assignee_user_id');
+  if (assignee) {
+    const { data, error } = await db.from('workspace_members').select('user_id')
+      .eq('workspace_id', workspaceId).eq('user_id', assignee).eq('status', 'active').maybeSingle();
+    if (error) throw new HttpError(400, error.message);
+    if (!data) throw new HttpError(404, 'assignee not found');
+  }
+}
+
+/** Opens the plan's next occurrence; a failure names the half that did not happen, never a silent 200. */
+async function openNextOccurrence(service: DbClient, planId: string, anchor: string): Promise<void> {
+  const { error } = await service.rpc('open_next_service_event', { p_plan_id: planId, p_from: anchor });
+  if (error) {
+    throw new HttpError(
+      502,
+      `The service plan was saved, but its next occurrence could not be opened (${error.message}). ` +
+        'Save the plan again to retry.',
+    );
+  }
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   await bootstrapForFunction();
@@ -239,6 +296,11 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
       if (!assetId) throw new HttpError(400, 'asset_id is required');
       const patch = pick(body, ASSET_WRITABLE);
       if (Object.keys(patch).length === 0) throw new HttpError(400, 'nothing to update');
+      const { data: current } = await db.from('customer_assets').select('project_id')
+        .eq('id', assetId).eq('workspace_id', workspaceId).maybeSingle();
+      if (!current) throw new HttpError(404, 'not found');
+      await assertRefsInWorkspace(
+        db, workspaceId, patch, (current as { project_id: string | null }).project_id);
       const { data, error } = await db.from('customer_assets').update(patch)
         .eq('id', assetId).eq('workspace_id', workspaceId).select(ASSET_SELECT).maybeSingle();
       if (error) throw new HttpError(400, error.message);
@@ -278,6 +340,7 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
     case 'warranty.save': {
       const warrantyId = body.warranty_id ? String(body.warranty_id) : '';
       const patch = pick(body, WARRANTY_WRITABLE);
+      await assertRefsInWorkspace(db, workspaceId, patch);
 
       if (warrantyId) {
         const { data, error } = await db.from('customer_asset_warranties').update(patch)
@@ -408,12 +471,28 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
     case 'plan.save': {
       const planId = body.plan_id ? String(body.plan_id) : '';
       const patch = pick(body, PLAN_WRITABLE);
+      const askedAnchor = String(body.anchor_date ?? '');
+      if (askedAnchor && !ISO_DATE.test(askedAnchor)) throw new HttpError(400, 'anchor_date must be YYYY-MM-DD');
+      await assertRefsInWorkspace(db, workspaceId, patch);
 
       if (planId) {
         const { data, error } = await db.from('customer_asset_service_plans').update(patch)
           .eq('id', planId).eq('workspace_id', workspaceId).select('*').maybeSingle();
         if (error) throw new HttpError(400, error.message);
         if (!data) throw new HttpError(404, 'not found');
+        const plan = data as { id: string; asset_id: string; is_active: boolean };
+        if (plan.is_active) {
+          const [{ data: last }, { data: owner }] = await Promise.all([
+            db.from('customer_asset_service_events').select('completed_on, due_on')
+              .eq('plan_id', plan.id).neq('status', 'due')
+              .order('due_on', { ascending: false }).limit(1).maybeSingle(),
+            db.from('customer_assets').select('installed_on, purchased_on').eq('id', plan.asset_id).maybeSingle(),
+          ]);
+          const l = last as { completed_on: string | null; due_on: string } | null;
+          const a = owner as { installed_on: string | null; purchased_on: string | null } | null;
+          const anchor = askedAnchor || l?.completed_on || l?.due_on || a?.installed_on || a?.purchased_on;
+          if (anchor) await openNextOccurrence(service, plan.id, anchor);
+        }
         return json({ plan: data });
       }
 
@@ -436,14 +515,11 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
       // Open the first occurrence so a brand-new plan shows on the worklist immediately —
       // a plan with no open event would sit at "never due" and remind nobody, forever.
       const dates = asset as { installed_on?: string | null; purchased_on?: string | null };
-      const anchor = String(body.anchor_date ?? '')
+      const anchor = askedAnchor
         || dates.installed_on
         || dates.purchased_on
         || new Date().toISOString().slice(0, 10);
-      await service.rpc('open_next_service_event', {
-        p_plan_id: (data as { id: string }).id,
-        p_from: anchor,
-      });
+      await openNextOccurrence(service, (data as { id: string }).id, anchor);
       return json({ plan: data });
     }
 

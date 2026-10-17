@@ -35,8 +35,8 @@ const LIFECYCLE_TRIGGERS = [
 const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string | null> = {
   project_status_changed: 'src/modules/projects/services/projectsService.ts',
   project_created: 'src/modules/projects/services/projectsService.ts',
-  project_task_completed: 'src/modules/projects/services/projectsService.ts',
-  project_milestone_reached: 'src/modules/projects/services/projectsService.ts',
+  project_task_completed: null,
+  project_milestone_reached: null,
   project_snag_raised: 'src/modules/projects/services/siteService.ts',
   project_expense_approved: 'src/modules/finance/services/tripExpenseService.ts',
   project_delivery_issued: 'src/modules/finance/services/deliveryNotesService.ts',
@@ -123,7 +123,8 @@ describe('the emitter is the part nothing else substitutes for', () => {
   it('status and completion fire only on a REAL transition', () => {
     // Re-saving a task that was already done is not a completion, and every flow run is metered.
     expect(svc).toMatch(/project\.status !== previousStatus/);
-    expect(svc).toMatch(/task\.status === 'done' && previousStatus !== 'done'/);
+    expect(svc, 'completion is emitted by the project_task_completed_flow_events trigger; a client emit doubles it')
+      .not.toMatch(/emitProjectLifecycle\([^)]*'project_task_completed'/);
   });
 
   it('a milestone is its own event, not a flag on the task one', () => {
@@ -133,8 +134,7 @@ describe('the emitter is the part nothing else substitutes for', () => {
      * second into the first as a config filter makes every milestone automation pay for a run on
      * every task.
      */
-    expect(svc).toMatch(/'project_milestone_reached'/);
-    expect(svc).toMatch(/task\.is_milestone/);
+    expect(svc).not.toMatch(/emitProjectLifecycle\([^)]*'project_milestone_reached'/);
   });
 
   it('an expense announces per LINE, because one card spans several jobs', () => {
