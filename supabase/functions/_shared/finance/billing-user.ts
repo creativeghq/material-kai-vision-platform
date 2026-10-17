@@ -13,7 +13,7 @@ export async function resolveBillingUser(
     .eq('workspace_id', workspaceId)
     .eq('status', 'active')
     .eq('role', 'owner')
-    .order('created_at', { ascending: true })
+    .order('joined_at', { ascending: true })
     .limit(1)
     .maybeSingle();
   if (!owner?.user_id) console.warn('[billing-user] no billing user for workspace', workspaceId);
