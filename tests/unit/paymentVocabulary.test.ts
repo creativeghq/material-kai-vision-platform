@@ -273,6 +273,7 @@ describe("myDATA payment methods are AADE table 8.12, in AADE's order", () => {
       'src/modules/finance/pages/PosPage.tsx',
       'supabase/functions/finance-invoice-pdf/index.ts',
       'supabase/functions/finance-storefront/index.ts',
+      'supabase/functions/finance-issue-invoice/index.ts',
     ];
     for (const f of FILES) {
       const src = stripComments(readFileSync(join(ROOT, f), 'utf8'));
@@ -281,6 +282,8 @@ describe("myDATA payment methods are AADE table 8.12, in AADE's order", () => {
       expect(src, `${f} spells out the table again`).not.toMatch(/7:\s*'Domestic/);
       expect(src, `${f} writes a bare payment_method_code integer`)
         .not.toMatch(/payment_method_code:\s*\d/);
+      expect(src, `${f} defaults a payment type to a bare integer`)
+        .not.toMatch(/payment_type\s*\?\?\s*\d/);
     }
   });
 });

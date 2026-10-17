@@ -158,10 +158,35 @@ Deno.serve(withApiLogging('finance-mydata-send', async (req) => {
       if (problems.length) throw new HttpError(400, problems.join(' '));
 
       const creds = await credentialsFor(service, workspaceId);
-      const res = await post(creds, 'SendInvoices', buildExpenseEnvelope(input));
+
+      // Rule 4: claim before filing. A filing in flight, or one whose outcome is unknown, blocks a
+      // re-send until a person has checked myDATA; a failed one may be retried.
+      const staleIso = new Date(Date.now() - 10 * 60_000).toISOString();
+      const { data: claimed, error: claimErr } = await service.from('inbound_documents')
+        .update({ transmit_attempted_at: new Date().toISOString(), transmit_error: 'transmitting' })
+        .eq('id', docId).eq('workspace_id', workspaceId)
+        .is('mydata_mark', null)
+        .or(`transmit_attempted_at.is.null,and(transmit_error.not.is.null,transmit_error.neq.transmitting,transmit_error.not.like.indeterminate*),and(transmit_error.eq.transmitting,transmit_attempted_at.lt.${staleIso})`)
+        .select('id');
+      if (claimErr) throw new HttpError(500, claimErr.message);
+      if (!claimed?.length) {
+        throw new HttpError(409, 'This document is already being filed, has been filed, or its last filing has an unknown outcome. Check myDATA before sending again.');
+      }
+
+      let res: Response;
+      try {
+        res = await post(creds, 'SendInvoices', buildExpenseEnvelope(input));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await service.from('inbound_documents').update({
+          transmit_error: `indeterminate: ${msg.slice(0, 200)} — ΑΑΔΕ may have accepted it; check myDATA before re-sending`,
+          updated_at: new Date().toISOString(),
+        }).eq('id', docId).eq('workspace_id', workspaceId);
+        throw new HttpError(502, 'The filing did not get an answer from ΑΑΔΕ. It may have been accepted — check myDATA before sending again.');
+      }
       const outcome = parseSendResponse(res.status, await res.text().catch(() => ''));
 
-      await service.from('inbound_documents').update({
+      const { error: stampErr } = await service.from('inbound_documents').update({
         transmit_attempted_at: new Date().toISOString(),
         transmit_error: outcome.ok ? null : outcome.errors.join(' · '),
         ...(outcome.ok
@@ -177,6 +202,12 @@ Deno.serve(withApiLogging('finance-mydata-send', async (req) => {
           : {}),
         updated_at: new Date().toISOString(),
       }).eq('id', docId).eq('workspace_id', workspaceId);
+      if (stampErr) {
+        if (outcome.ok) {
+          throw new HttpError(500, `Filed with ΑΑΔΕ (MARK ${outcome.mark}) but the MARK could not be saved here: ${stampErr.message}. Do not send again.`);
+        }
+        throw new HttpError(500, stampErr.message);
+      }
 
       if (!outcome.ok) {
         return jsonResponse({ ok: false, errors: outcome.errors, status: outcome.status }, 200);

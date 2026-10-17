@@ -13,6 +13,7 @@ import { emitDocumentIssued } from '../_shared/fiscal/document-issued.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { fiscalDate, type FiscalConnector, type FiscalConnectorContext, type FiscalInvoiceInput, type FiscalSubmissionResult } from '../_shared/fiscal/types.ts';
 import { resolveBillingUser } from '../_shared/finance/billing-user.ts';
+import { MYDATA_PAYMENT_CODE } from '../_shared/paymentVocabulary.generated.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 // Flow:
@@ -694,7 +695,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         invoice_id: (oi as any).id,
         terminal_id: po.terminal_id,
         pos_nsp_id: po.pos_nsp_id,
-        payment_type: po.payment_type ?? 7,
+        payment_type: po.payment_type ?? MYDATA_PAYMENT_CODE.pos,
         signature_token: sig.token,
         signature_data: sig.data ?? null,
         invoice_uid: sig.invoiceUid || (oi as any).fiscal_uid || null,
@@ -767,7 +768,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           const { data: tok } = await supabase.from('pos_ecr_tokens').select('tid_nsp')
             .eq('invoice_id', cnRow.invoice_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
           cnOverrides.posPayment = {
-            type: body.pos_payment.payment_type ?? 7,
+            type: body.pos_payment.payment_type ?? MYDATA_PAYMENT_CODE.pos,
             terminalId: body.pos_payment.terminal_id,
             posNspId: body.pos_payment.pos_nsp_id,
             ...(tok?.tid_nsp ? { tid: tok.tid_nsp } : {}),
@@ -825,7 +826,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             credit_note_id: cnRow.id,
             terminal_id: body.pos_payment?.terminal_id ?? null,
             pos_nsp_id: body.pos_payment?.pos_nsp_id ?? null,
-            payment_type: body.pos_payment?.payment_type ?? 7,
+            payment_type: body.pos_payment?.payment_type ?? MYDATA_PAYMENT_CODE.pos,
             signature_token: firstSig?.token ?? '',
             signature_data: firstSig?.data ?? null,
             invoice_uid: firstSig?.invoiceUid ?? result.uid ?? null,
@@ -1297,7 +1298,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                 .limit(1)
                 .maybeSingle();
               effOverrides.posPayment = {
-                type: body.pos_payment.payment_type ?? 7,
+                type: body.pos_payment.payment_type ?? MYDATA_PAYMENT_CODE.pos,
                 terminalId: body.pos_payment.terminal_id,
                 posNspId: body.pos_payment.pos_nsp_id,
                 ...(tok?.tid_nsp ? { tid: tok.tid_nsp } : {}),
@@ -1350,7 +1351,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                 invoice_id: invoiceId,
                 terminal_id: body.pos_payment?.terminal_id ?? null,
                 pos_nsp_id: body.pos_payment?.pos_nsp_id ?? null,
-                payment_type: body.pos_payment?.payment_type ?? 7,
+                payment_type: body.pos_payment?.payment_type ?? MYDATA_PAYMENT_CODE.pos,
                 signature_token: firstSig?.token ?? '',
                 signature_data: firstSig?.data ?? null,
                 invoice_uid: firstSig?.invoiceUid ?? result.uid ?? null,
