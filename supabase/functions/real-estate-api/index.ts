@@ -197,6 +197,14 @@ function newToken(): string {
   return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
 }
 
+/** #483 M13: a stored media path is one this function minted for that property, never a client's choice. */
+const UUID_FILE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[.][a-z0-9]{1,5}';
+function mintedMediaPath(path: string, workspaceId: string, propertyId: string, documents: boolean): boolean {
+  return new RegExp(`^${workspaceId}/${propertyId}/${documents ? 'documents/' : ''}${UUID_FILE}$`, 'i').test(path);
+}
+const inPropertyFolder = (path: string | null | undefined, workspaceId: string, propertyId: string): boolean =>
+  !!path && path.startsWith(`${workspaceId}/${propertyId}/`) && !path.includes('..');
+
 Deno.serve(withApiLogging('real-estate-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -514,6 +522,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const storagePath = String(body.storage_path ?? '');
         if (!id || !storagePath) return json({ error: 'property_id and storage_path are required' }, 400);
         await loadEditable(id);
+        if (!mintedMediaPath(storagePath, workspaceId, id, false)) return json({ error: 'storage_path was not issued for this property' }, 400);
         const kind = ['photo', 'floor_plan', 'render'].includes(body.kind) ? body.kind : 'photo';
         const { count } = await supabase.from('property_photos').select('id', { count: 'exact', head: true }).eq('property_id', id);
         const { data, error } = await supabase.from('property_photos').insert({
@@ -1173,6 +1182,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const storagePath = String(body.storage_path ?? '');
         if (!id || !storagePath) return json({ error: 'property_id and storage_path are required' }, 400);
         await loadEditable(id);
+        if (!mintedMediaPath(storagePath, workspaceId, id, true)) return json({ error: 'storage_path was not issued for this property' }, 400);
         const docType = DOC_TYPES.includes(String(body.doc_type)) ? String(body.doc_type) : 'other';
         const { data, error } = await supabase.from('property_documents').insert({
           workspace_id: workspaceId, property_id: id, storage_path: storagePath,
@@ -1190,7 +1200,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           .select('*').eq('property_id', id).eq('workspace_id', workspaceId).order('created_at', { ascending: false });
         if (error) throw new HttpError(400, error.message);
         const docs = await Promise.all((data ?? []).map(async (d: any) => {
-          const { data: s } = await supabase.storage.from(d.storage_bucket || 'property-media').createSignedUrl(d.storage_path, 3600);
+          if ((d.storage_bucket && d.storage_bucket !== 'property-media') || !inPropertyFolder(d.storage_path, workspaceId, id)) {
+            return { ...d, url: null };
+          }
+          const { data: s } = await supabase.storage.from('property-media').createSignedUrl(d.storage_path, 3600);
           return { ...d, url: s?.signedUrl ?? null };
         }));
         return json({ documents: docs });
@@ -1206,7 +1219,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           .select('storage_path, storage_bucket, property_id').eq('id', docId).eq('workspace_id', workspaceId).maybeSingle();
         if (!doc) return json({ error: 'not found' }, 404);
         await loadEditable(String((doc as any).property_id));
-        if (doc.storage_path) await supabase.storage.from(doc.storage_bucket || 'property-media').remove([doc.storage_path]);
+        if ((!doc.storage_bucket || doc.storage_bucket === 'property-media')
+          && inPropertyFolder(doc.storage_path, workspaceId, String((doc as any).property_id))) {
+          await supabase.storage.from('property-media').remove([doc.storage_path]);
+        }
         const { error } = await supabase.from('property_documents').delete().eq('id', docId).eq('workspace_id', workspaceId);
         if (error) throw new HttpError(400, error.message);
         return json({ ok: true });
@@ -1281,7 +1297,9 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const { data: photo } = await supabase.from('property_photos').select('storage_path, property_id').eq('id', photoId).eq('workspace_id', workspaceId).maybeSingle();
         if (!photo) return json({ error: 'not found' }, 404);
         await loadEditable(String((photo as any).property_id));
-        if (photo?.storage_path) await supabase.storage.from('property-media').remove([photo.storage_path]);
+        if (inPropertyFolder(photo?.storage_path, workspaceId, String((photo as any).property_id))) {
+          await supabase.storage.from('property-media').remove([photo.storage_path]);
+        }
         const { error } = await supabase.from('property_photos').delete().eq('id', photoId).eq('workspace_id', workspaceId);
         if (error) throw new HttpError(400, error.message);
         return json({ ok: true });

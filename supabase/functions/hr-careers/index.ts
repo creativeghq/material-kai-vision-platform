@@ -251,23 +251,13 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
       location: String(body?.location ?? '').trim().slice(0, 200) || null,
       links: String(body?.links ?? '').trim().slice(0, 1000) || null,
     };
-    let candidateId = '';
-    if (email) {
-      const { data: existing } = await supabase.from('hr_candidates').select('id').eq('workspace_id', ws.id).eq('email', email).maybeSingle();
-      if (existing) {
-        candidateId = existing.id;
-        // Refresh the profile from this (newer) application, but never blank out what we already had.
-        const patch = Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null));
-        if (Object.keys(patch).length) await supabase.from('hr_candidates').update(patch).eq('id', candidateId).eq('workspace_id', ws.id);
-      }
-    }
-    if (!candidateId) {
-      const { data: c, error: cErr } = await supabase.from('hr_candidates').insert({
-        workspace_id: ws.id, name, email: email || null, source: 'careers_page', ...profile,
-      }).select('id').single();
-      if (cErr) return json({ error: 'Could not submit application.' }, 400);
-      candidateId = c.id;
-    }
+    // An anonymous form proves nobody's identity, so it never edits an existing candidate (#483 M17):
+    // knowing someone's email must not let a stranger replace their phone, links or résumé.
+    const { data: c, error: cErr } = await supabase.from('hr_candidates').insert({
+      workspace_id: ws.id, name, email: email || null, source: 'careers_page', ...profile,
+    }).select('id').single();
+    if (cErr) return json({ error: 'Could not submit application.' }, 400);
+    const candidateId: string = c.id;
 
     // Store the résumé under this workspace's own hr/ prefix so the admin CV viewer
     // (`assertHrObjectPath`) can sign it, and no other tenant's path is reachable.
