@@ -4,7 +4,7 @@ import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
 import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
 // One dispatcher, shared with the CRM's Google Business lookup — a second copy of the
 // reserve → call → settle chain is a second place for invariant 10 to be got wrong.
-import { callDataForSEO, meteredAttribution } from './dataforseo-dispatch.ts';
+import { callDataForSEO, callSEOAgentRoute } from './dataforseo-dispatch.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
 // Invariant 7 — a model-supplied URL that OUR infrastructure will fetch (#352 A19).
 import { assertSafeUrl } from '../ssrf-guard.ts';
@@ -52,48 +52,6 @@ export interface SeoWebsiteCtx {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-type SeoAttribution = { user_id?: string; workspace_id?: string };
-
-/** Composite-audit dispatcher (site-review, brand-search, keyword-gap, quick-page). */
-async function callSEOAgentRoute(
-  path: string,
-  body: Record<string, any>,
-): Promise<{ ok: boolean; data?: any; error?: string }> {
-  const secret = await cronSecret();
-  if (!secret) return { ok: false, error: 'CRON_SECRET not configured' };
-  const attribution = body?.attribution as SeoAttribution | undefined;
-  const gate = await openSpendGate(`composite_${path}`, attribution?.user_id, body, attribution?.workspace_id);
-  if (!gate.ok) return { ok: false, error: gate.message };
-  try {
-    const resp = await fetch(
-      `${MIVAA_GATEWAY_URL}/api/v1/seo-agent/${path}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
-        // A composite fans out to several DataForSEO calls under ONE reservation, so the flag
-        // has to reach every one of them — MIVAA charged its unit on each leg.
-        body: JSON.stringify(attribution ? { ...body, attribution: meteredAttribution(gate, attribution) } : body),
-      },
-    );
-    const text = await resp.text();
-    let parsed: any = null;
-    try { parsed = JSON.parse(text); } catch { parsed = text; }
-    if (!resp.ok) {
-      await gate.settle(0);
-      return { ok: false, error: describeUpstreamError(resp.status, parsed) };
-    }
-    const data = parsed?.data;
-    // Composite routes report cost per section; the call's cost is their sum.
-    await gate.settle(sumSectionCost(data));
-    const taskError = dataForSeoTaskError(data);
-    if (taskError) return { ok: false, error: taskError };
-    return { ok: true, data };
-  } catch (e) {
-    await gate.settle(0);
-    return { ok: false, error: e instanceof Error ? e.message : 'network error' };
-  }
-}
-
 /** Say "the index has no record of this" in words the model cannot round to zero. */
 function emptyResult(
   subject: Record<string, unknown>,
@@ -108,24 +66,6 @@ function emptyResult(
     answer: `The provider returned no ${what} for this target. That means it is not in the index — NOT that the value is zero. Do not report it as 0.`,
     hint,
   });
-}
-
-/**
- * Total upstream cost of a composite response. Returns undefined — never 0 — when no section
- * reports one, so the gate keeps its reserve rather than settling a paid call to free.
- */
-function sumSectionCost(data: any): number | undefined {
-  if (!data || typeof data !== 'object') return undefined;
-  if (typeof data.cost_usd === 'number') return data.cost_usd;
-  const sections = data.sections;
-  if (!sections || typeof sections !== 'object') return undefined;
-  let total = 0;
-  let seen = false;
-  for (const section of Object.values(sections as Record<string, any>)) {
-    const c = Number(section?.cost_usd);
-    if (Number.isFinite(c)) { total += c; seen = true; }
-  }
-  return seen ? total : undefined;
 }
 
 async function callOpportunitiesStateless(

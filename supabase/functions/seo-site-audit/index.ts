@@ -7,6 +7,8 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { callSEOAgentRoute } from '../_shared/tools/dataforseo-dispatch.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -394,6 +396,41 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
         .eq('id', row.id);
       return json({ ok: false, error: msg }, 502);
     }
+  }
+
+  // ── Audit ONE page of this site, metered through the shared DataForSEO dispatcher ──
+  if (action === 'page') {
+    let url: string;
+    try {
+      url = await assertSafeUrl(String(body?.url || ''), { allowSchemes: ['https:'] });
+    } catch (e) {
+      return json({ ok: false, error: `That URL cannot be audited: ${e instanceof Error ? e.message : 'invalid address'}` }, 400);
+    }
+    const bare = (h: string) => h.toLowerCase().replace(/^www\./, '');
+    const siteHost = bare(new URL(/^https?:\/\//i.test(website.url) ? website.url : `https://${website.url}`).hostname);
+    const pageHost = bare(new URL(url).hostname);
+    if (pageHost !== siteHost && !pageHost.endsWith(`.${siteHost}`)) {
+      return json({ ok: false, error: `Only pages on ${siteHost} can be audited for this website.` }, 400);
+    }
+    const r = await callSEOAgentRoute('onpage/quick-page', {
+      url, for_mobile: body?.for_mobile === true,
+      attribution: { user_id: auth.userId, workspace_id: website.workspace_id },
+    });
+    if (!r.ok) return json({ ok: false, error: r.error }, 502);
+    const sections = r.data?.sections || {};
+    const ip = sections?.instant_page?.items?.[0] || {};
+    const cats = sections?.lighthouse?.items?.[0]?.categories || {};
+    const checks = ip?.checks || {};
+    const issues = Object.entries(BAD_CHECKS)
+      .filter(([k]) => checks[k] === true || ip[k] === true)
+      .map(([, title]) => title);
+    return json({
+      ok: true, url,
+      seo_score: pct(cats.seo?.score) ?? (typeof ip.onpage_score === 'number' ? Math.round(ip.onpage_score) : null),
+      perf_score: pct(cats.performance?.score), a11y_score: pct(cats.accessibility?.score),
+      bp_score: pct(cats['best-practices']?.score),
+      issues, sections, errors: r.data?.errors || {},
+    });
   }
 
   // ── Poll the newest crawl for this site ──

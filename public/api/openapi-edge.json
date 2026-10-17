@@ -6704,7 +6704,7 @@
         ],
         "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",
         "operationId": "post_seo_site_audit",
-        "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace(). The full multi-page OnPage crawl stays on-demand via the seo_site_crawl_start agent tool.\n\n**Actions** (`action` in the body):\n- `run` — Audit one website's homepage now and store the result. → `{ ok, perf_score, a11y_score, bp_score, seo_score, issues }`\n- `cron-run` — x-cron-secret only — weekly audit of every active connected website + 180-day retention prune. → `{ ok, audited, failed }`\n- `crawl-start` — Start a multi-page crawl of a connected site (10–1000 pages, default 100). One crawl at a time per site — a second concurrent crawl doubles the bill and produces two partial reports that disagree, so it returns 409. → `{ok:boolean, crawl_id?:string, error?:string} — 409 when one is already running`\n- `crawl-sync` — Poll the newest crawl for a site and fold whatever has finished into the audit. Returns the terminal status unchanged when the crawl is no longer running. → `{ok:boolean, status?:string, ...} — 404 when there is no crawl to sync`\n- `cron-sync-crawls` — x-cron-secret only — advance every running crawl. A crawl left un-polled never finishes, and a `running` row nothing ever moves is indistinguishable from one still working. A crawl still running after 24h is treated as STUCK, not slow, so the panel never keeps a permanent spinner with nothing saying it died. → `{ok:true, advanced:number, finished:number}`\n\n📖 [docs/seo-system.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/seo-system.md)",
+        "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works. User actions take a session JWT or a kai_ key and require marketing.seo on the website's workspace plus the seo-toolkit module. `page` audits any single page of the website's own domain, metered through the shared DataForSEO dispatcher (credits reserved before the call, settled on the provider's cost).\n\n**Actions** (`action` in the body):\n- `run` — Audit one website's homepage now and store the result. → `{ ok, perf_score, a11y_score, bp_score, seo_score, issues }`\n- `cron-run` — x-cron-secret only — weekly audit of every active connected website + 180-day retention prune. → `{ ok, audited, failed }`\n- `crawl-start` — Start a multi-page crawl of a connected site (10–1000 pages, default 100). One crawl at a time per site — a second concurrent crawl doubles the bill and produces two partial reports that disagree, so it returns 409. → `{ok:boolean, crawl_id?:string, error?:string} — 409 when one is already running`\n- `crawl-sync` — Poll the newest crawl for a site and fold whatever has finished into the audit. Returns the terminal status unchanged when the crawl is no longer running. → `{ok:boolean, status?:string, ...} — 404 when there is no crawl to sync`\n- `page` — Audit ONE page of the website (DataForSEO instant on-page + Lighthouse + content parsing). The URL must be https and on the website's own domain (subdomains included); internal addresses are refused. Not stored — the homepage audit owns the health history. → `{ok:boolean, url, seo_score, perf_score, a11y_score, bp_score, issues:string[], sections, errors} — 400 off-domain or unsafe URL; 502 when the credit check or the provider refuses (error says which)`\n- `cron-sync-crawls` — x-cron-secret only — advance every running crawl. A crawl left un-polled never finishes, and a `running` row nothing ever moves is indistinguishable from one still working. A crawl still running after 24h is treated as STUCK, not slow, so the panel never keeps a permanent spinner with nothing saying it died. → `{ok:true, advanced:number, finished:number}`\n\n📖 [docs/seo-system.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/seo-system.md)",
         "security": [
           {
             "supabaseJwt": []
@@ -6852,6 +6852,34 @@
                       }
                     },
                     "description": "Returns: {ok:boolean, status?:string, ...} — 404 when there is no crawl to sync"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "website_id",
+                      "action",
+                      "url"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "description": "\"page\""
+                      },
+                      "website_id": {
+                        "type": "string",
+                        "description": "Connected website (string (uuid))"
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "https URL on the website's domain"
+                      },
+                      "for_mobile": {
+                        "type": "boolean",
+                        "description": "Lighthouse mobile profile"
+                      }
+                    },
+                    "description": "Returns: {ok:boolean, url, seo_score, perf_score, a11y_score, bp_score, issues:string[], sections, errors} — 400 off-domain or unsafe URL; 502 when the credit check or the provider refuses (error says which)"
                   },
                   {
                     "type": "object",

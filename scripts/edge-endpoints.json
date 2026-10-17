@@ -2999,7 +2999,7 @@
     "name": "seo-site-audit",
     "tag": "SEO",
     "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",
-    "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace(). The full multi-page OnPage crawl stays on-demand via the seo_site_crawl_start agent tool.",
+    "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works. User actions take a session JWT or a kai_ key and require marketing.seo on the website's workspace plus the seo-toolkit module. `page` audits any single page of the website's own domain, metered through the shared DataForSEO dispatcher (credits reserved before the call, settled on the provider's cost).",
     "security": [
       "supabaseJwt",
       "apiKeyPartner"
@@ -3058,6 +3058,37 @@
           }
         ],
         "response": "{ok:boolean, status?:string, ...} — 404 when there is no crawl to sync"
+      },
+      {
+        "name": "page",
+        "summary": "Audit ONE page of the website (DataForSEO instant on-page + Lighthouse + content parsing). The URL must be https and on the website's own domain (subdomains included); internal addresses are refused. Not stored — the homepage audit owns the health history.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Connected website"
+          },
+          {
+            "name": "action",
+            "type": "string",
+            "required": true,
+            "desc": "\"page\""
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "required": true,
+            "desc": "https URL on the website's domain"
+          },
+          {
+            "name": "for_mobile",
+            "type": "boolean",
+            "required": false,
+            "desc": "Lighthouse mobile profile"
+          }
+        ],
+        "response": "{ok:boolean, url, seo_score, perf_score, a11y_score, bp_score, issues:string[], sections, errors} — 400 off-domain or unsafe URL; 502 when the credit check or the provider refuses (error says which)"
       },
       {
         "name": "cron-sync-crawls",
