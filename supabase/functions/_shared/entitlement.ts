@@ -2,6 +2,7 @@
 // guards are UX only). A paid-module edge function calls assertEntitled() after it resolves the
 // target workspace and refuses with a 402 when the workspace doesn't own the module.
 import { corsHeaders } from './cors.ts';
+import { keyWorkspaceFence } from './request-context.ts';
 
 export async function isWorkspaceEntitled(
   // deno-lint-ignore no-explicit-any
@@ -39,7 +40,7 @@ export function notEntitledResponse(moduleSlug: string, extraHeaders: Record<str
 }
 
 /**
- * The user's most recently joined active workspace that owns `moduleSlug`, else the most recent one
+ * A kai_ key's bound workspace; otherwise the user's most recently joined active workspace that owns `moduleSlug`, else the most recent one
  * (so the caller's gate still refuses). Never a bare "newest membership": joining a second workspace
  * would silently move every module call there.
  */
@@ -49,6 +50,8 @@ export async function resolveEntitledWorkspace(
   userId: string,
   moduleSlug: string,
 ): Promise<string | null> {
+  const fenced = keyWorkspaceFence();
+  if (fenced) return fenced;
   const { data } = await supabase
     .from('workspace_members')
     .select('workspace_id')
