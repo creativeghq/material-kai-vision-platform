@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { productDetailService, type ProductDetail } from '@/services/productDetailService';
+import { loadFieldRegistry, type FieldRegistrySnapshot } from '@/services/fieldRegistryService';
+import { describeVariant, isPriceOnRequest } from '../quoteVariantLabels';
 
 export interface QuoteDocumentItem {
   id: string;
@@ -13,6 +16,9 @@ export interface QuoteDocumentItem {
   line_total: number;
   selected_size: string | null;
   selected_color: string | null;
+  variant: string | null;
+  /** No price was resolved for this line; it prints "Price on request", never 0. */
+  price_on_request: boolean;
   // FF&E fields
   room: string | null;
   dimensions: string | null;
@@ -60,6 +66,7 @@ export interface QuoteDocumentData {
   grand_total: number;
   cash_discount_pct: number;
   currency: string;
+  total_incomplete: boolean;
   items: QuoteDocumentItem[];
   client: QuoteDocumentClient;
   template: QuoteTemplateConfig;
@@ -89,7 +96,6 @@ export function useQuoteDocument(quoteId: string) {
         setLoading(true);
         setError(null);
 
-        // Fetch quote
         const { data: quote, error: qErr } = await supabase
           .from('quotes')
           .select('*')
@@ -98,40 +104,52 @@ export function useQuoteDocument(quoteId: string) {
 
         if (qErr || !quote) throw new Error(qErr?.message || 'Quote not found');
 
-        // Fetch items with product info
         const { data: rawItems, error: iErr } = await supabase
           .from('quote_items')
           .select(`
-            id, quantity, notes, selected_size, selected_color, unit_price, discounted_price, line_total,
+            id, product_id, quantity, notes, selected_size, selected_color, selected_attributes,
+            unit_price, discounted_price, line_total, pricing_status,
             custom_product_name, custom_product_description, custom_sku, custom_unit,
-            room, dimensions, installation_requirements, delivery_date,
-            products ( id, name, metadata )
+            room, dimensions, installation_requirements, delivery_date
           `)
           .eq('quote_id', quoteId)
           .order('added_at', { ascending: true });
 
         if (iErr) throw new Error(iErr.message);
 
+        // get_product_detail, not an embed: workspace RLS hid other catalogues' products.
+        const productIds = [...new Set((rawItems || []).map((i: any) => i.product_id).filter(Boolean))] as string[];
+        const [details, registry] = await Promise.all([
+          Promise.all(productIds.map((id) => productDetailService.fetch(id).catch(() => null))),
+          loadFieldRegistry().catch(() => null as FieldRegistrySnapshot | null),
+        ]);
+        const productById = new Map<string, ProductDetail>();
+        details.forEach((d) => { if (d) productById.set(d.id, d); });
+
         const items: QuoteDocumentItem[] = (rawItems || []).map((item: any) => {
-          const product = item.products;
-          const meta = product?.metadata || {};
-          const isCustom = !product;
+          const product = item.product_id ? productById.get(item.product_id) ?? null : null;
+          const meta = (product?.metadata || {}) as Record<string, any>;
+          const isCustom = !item.product_id;
+          const categoryKey = ((product as any)?.category as string | undefined) ?? (meta.material_category as string | undefined) ?? null;
+          const priceOnRequest = isPriceOnRequest(item.pricing_status, item.unit_price);
           return {
             id: item.id,
             product_name: isCustom
               ? (item.custom_product_name || 'Custom Item')
-              : (product?.name || 'Unknown Product'),
+              : (product?.name || item.custom_product_name || 'Unknown Product'),
             description: isCustom
               ? (item.custom_product_description || null)
               : (meta.description || null),
-            sku: isCustom ? (item.custom_sku || null) : (meta.sku || null),
-            quantity: item.quantity,
+            sku: isCustom ? (item.custom_sku || null) : ((product as any)?.sku || meta.sku || null),
+            quantity: Number(item.quantity),
             unit: isCustom ? (item.custom_unit || 'pcs') : (meta.unit || 'pcs'),
             unit_price: parseFloat(item.unit_price) || 0,
             discounted_price: item.discounted_price != null ? parseFloat(item.discounted_price) : null,
             line_total: parseFloat(item.line_total) || 0,
             selected_size: item.selected_size || null,
             selected_color: item.selected_color || null,
+            variant: describeVariant(item.selected_attributes, categoryKey, registry),
+            price_on_request: priceOnRequest,
             room: item.room || null,
             dimensions: item.dimensions || null,
             installation_requirements: item.installation_requirements || null,
@@ -139,7 +157,6 @@ export function useQuoteDocument(quoteId: string) {
           };
         });
 
-        // Fetch client (CRM chain → profile fallback)
         const client = await resolveClient(quote.user_id);
 
         // Fetch template config — non-fatal, defaults to empty if not configured
@@ -155,7 +172,6 @@ export function useQuoteDocument(quoteId: string) {
           // No template configured yet — continue with empty config
         }
 
-        // Resolve signed URLs for template images
         const [firstUrl, introUrl, detailsUrl, contentUrl, lastUrl] = await Promise.all([
           getSignedUrl('quote-templates', cfg.first_page_path || cfg.cover_image_path || null),
           getSignedUrl('quote-templates', cfg.intro_page_path || null),
@@ -192,6 +208,7 @@ export function useQuoteDocument(quoteId: string) {
           grand_total: parseFloat(quote.grand_total) || 0,
           cash_discount_pct: parseFloat(quote.cash_discount_pct) || 0,
           currency: quote.currency || 'EUR',
+          total_incomplete: items.some((i) => i.price_on_request),
           items,
           client,
           template,

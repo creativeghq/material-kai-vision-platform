@@ -30,7 +30,7 @@ Asked "roughly what would that cost", you will want to produce a plausible figur
 `match_kind: none` means *"let me get that quoted for you"* — not *"we don't do that"*. The catalogue is small; most real requests will miss. A miss that ends in a recorded request is a lead. A miss that ends in an apology is a lost customer and no record that they ever asked.
 
 **3. Retry once with the returned vocabulary before concluding anything.**
-Facet keys are per-tenant and you cannot guess them. Asked for a navy armchair you will send `{"color": "navy"}` when this workspace's key is `available_colors`, get nothing back, and confidently report that we do not stock navy. On a miss `price_my_spec` returns `available_vocabulary` — the keys and in-stock values this catalogue actually uses. Re-send with those before you believe the miss. Only the **second** miss is trustworthy.
+Facet keys are per-tenant and you cannot guess them. Asked for a navy armchair you will send `{"colour": "navy"}` when this workspace's key is `color`, get nothing back, and confidently report that we do not stock navy. On a miss `price_my_spec` returns `available_vocabulary` — the keys and in-stock values this catalogue actually uses. Re-send with those before you believe the miss. Only the **second** miss is trustworthy.
 
 ## The walk
 

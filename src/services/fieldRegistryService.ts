@@ -14,6 +14,8 @@ export interface RegistryField {
   sortOrder: number;
   sensitivity: FieldSensitivity;
   role: 'identity' | 'descriptive';
+  /** {category_key: role} overriding `role` in that category. */
+  roleByCategory?: Record<string, 'identity' | 'descriptive'> | null;
   /** {category_key: label} — a per-category name for the same field. */
   labelByCategory: Record<string, string> | null;
   descriptionByCategory: Record<string, string> | null;
@@ -75,7 +77,7 @@ async function fetchSnapshot(): Promise<FieldRegistrySnapshot> {
     supabase
       .from('material_metadata_fields')
       .select('field_name, display_name, section, applies_to_categories, is_global, sort_order, '
-            + 'sensitivity, label_by_category, description, description_by_category, role')
+            + 'sensitivity, label_by_category, description, description_by_category, role, role_by_category')
       .eq('status', 'active'),
     supabase.rpc('internal_product_field_pattern' as never),
   ]);
@@ -97,6 +99,7 @@ async function fetchSnapshot(): Promise<FieldRegistrySnapshot> {
     categories: r.is_global === true ? null : ((r.applies_to_categories as string[]) ?? []),
     sortOrder: typeof r.sort_order === 'number' ? r.sort_order : 0,
     role: r.role === 'identity' ? 'identity' : 'descriptive',
+    roleByCategory: (r.role_by_category as Record<string, 'identity' | 'descriptive'> | null) ?? null,
     sensitivity: r.sensitivity === 'internal' ? 'internal' : 'public',
     labelByCategory: (r.label_by_category as Record<string, string> | null) ?? null,
     descriptionByCategory: (r.description_by_category as Record<string, string> | null) ?? null,
@@ -174,6 +177,11 @@ export function sectionsForCategory(
     }));
 }
 
+/** The field's role in THIS category: `width_mm` is a variant axis for tiles and a fact for HVAC. */
+export function roleForField(field: RegistryField, categoryKey: string): 'identity' | 'descriptive' {
+  return field.roleByCategory?.[categoryKey] ?? field.role;
+}
+
 export function identityFieldsForCategory(
   snapshot: FieldRegistrySnapshot,
   categoryKey: string,
@@ -183,7 +191,7 @@ export function identityFieldsForCategory(
   // it sorts LAST — ascending would rank Finish above U-value and the card would never show it.
   const ordered = (f: RegistryField) => (f.sortOrder > 0 ? 0 : 1);
   return snapshot.fields
-    .filter((f) => f.role === 'identity' && f.categories !== null
+    .filter((f) => roleForField(f, categoryKey) === 'identity' && f.categories !== null
       && fieldAppliesTo(f, categoryKey) && f.sensitivity !== 'internal')
     .sort((a, b) => ordered(a) - ordered(b)
       || a.sortOrder - b.sortOrder
@@ -211,21 +219,18 @@ export function categoryHasField(
 }
 
 /**
- * Mirrors `public.is_internal_product_field(text)`: the registry answers for a field it knows,
- * the pattern is the floor for one it does not.
- *
- * Returns `null` when it cannot judge — the registry loaded but the pattern did not, and the
- * key is unknown. Callers must withhold on `null`. Collapsing that to `false` is the shape
- * where a fetch failure quietly turns the filter off and nothing anywhere reports it.
+ * Mirrors `public.is_internal_product_field(text)`: a key matching the internal name pattern is
+ * internal whatever its registry row says; otherwise the registry decides, and an unknown key is
+ * public. Returns `null` only when the pattern has not loaded — callers must withhold on `null`.
  */
 export function isInternalFieldKey(
   snapshot: FieldRegistrySnapshot,
   key: string,
 ): boolean | null {
   if (!key) return false;
-  const canonical = normalizeFieldKey(key);
-  const known = snapshot.byName.get(key.toLowerCase()) ?? snapshot.byName.get(canonical);
-  if (known) return known.sensitivity === 'internal';
   if (!snapshot.internalPattern) return null;
-  return snapshot.internalPattern.test(canonical);
+  const canonical = normalizeFieldKey(key);
+  if (snapshot.internalPattern.test(canonical) || snapshot.internalPattern.test(key.toLowerCase())) return true;
+  const known = snapshot.byName.get(key.toLowerCase()) ?? snapshot.byName.get(canonical);
+  return known ? known.sensitivity === 'internal' : false;
 }

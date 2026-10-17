@@ -63,6 +63,7 @@ import { LiveTimer } from './components/LiveTimer';
 import { getStatusBadge } from './components/StatusBadge';
 import { PipelineErrorsPanel } from './components/PipelineErrorsPanel';
 import { buildJobQueueFilters } from './jobQueueFilters';
+import { latestStageStatuses, completedStages, failedStages, jobOutcome, describeFailures } from './jobOutcome';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { statusTone } from '@/utils/statusTone';
 
@@ -329,6 +330,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               prev.progress === jobData.progress &&
               prev.last_heartbeat === (jobData as BackgroundJob).last_heartbeat &&
               prev.updated_at === (jobData as BackgroundJob).updated_at &&
+              JSON.stringify(prev.current_slow_operation ?? null) === JSON.stringify((jobData as BackgroundJob).current_slow_operation ?? null) &&
+              JSON.stringify(prev.failure_summary ?? null) === JSON.stringify((jobData as BackgroundJob).failure_summary ?? null) &&
               JSON.stringify(prev.metadata) === JSON.stringify(jobData.metadata)) {
             return prev; // No change, keep same reference to prevent modal blink
           }
@@ -884,51 +887,26 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   /** Delete a job and EVERYTHING tied to it via the backend cleanup service. */
   const deleteJobWithAllData = async (jobId: string): Promise<{ success: boolean; stats: Record<string, number> }> => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${MIVAA_API_URL}/api/v1/rag/documents/jobs/${jobId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-      const body = await res.json();
-      const stats: Record<string, number> = {};
-      if (body && typeof body.stats === 'object' && body.stats !== null) {
-        for (const [k, v] of Object.entries(body.stats)) {
-          if (typeof v === 'number') stats[k] = v;
-        }
-      }
-      return { success: !!body?.success, stats };
-    } catch (error) {
-      console.error('Error in deleteJobWithAllData:', error);
-      throw error;
+    const res = await mivaaApi.deleteJob(jobId);
+    const body = res.data as { success?: boolean; stats?: Record<string, unknown> } | undefined;
+    if (!res.success || !body?.success) {
+      throw new Error(res.error || 'MIVAA did not confirm the deletion');
     }
+    const stats: Record<string, number> = {};
+    if (body.stats && typeof body.stats === 'object') {
+      for (const [k, v] of Object.entries(body.stats)) {
+        if (typeof v === 'number') stats[k] = v;
+      }
+    }
+    return { success: true, stats };
   };
 
-  /**
-   * Continue an interrupted job - marks it for resumption
-   */
+  /** Continue an interrupted job: MIVAA resumes it from its last checkpoint. */
   const handleContinueJob = async (jobId: string) => {
     try {
-      // Mark the job as pending so the processor can pick it up again
-      const { error } = await supabase
-        .from('background_jobs')
-        .update({
-          status: 'pending',
-          error: null,
-          interrupted_at: null,
-          // Keep the progress and metadata so it can resume
-        })
-        .eq('id', jobId);
-
-      if (error) {
-        throw new Error(error.message);
+      const res = await mivaaApi.resumeJob(jobId);
+      if (!res.success) {
+        throw new Error(res.error || 'MIVAA refused the resume');
       }
 
       await fetchQueueData();
@@ -937,7 +915,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         setSelectedJob(null);
       }
 
-      toast.success('Job marked for continuation. It will resume processing shortly.');
+      toast.success('Job resumed from its last checkpoint.');
     } catch (error) {
       console.error('Error continuing job:', error);
       toast.error(`Failed to continue job: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1027,7 +1005,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       const { stats } = await deleteJobWithAllData(jobId);
 
 
-      // Refresh the job list
       await fetchQueueData();
 
       // Close the dialog if this was the selected job
@@ -1141,7 +1118,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     };
 
     const statusMessage = [
-      statusCounts.processing > 0 && `${statusCounts.processing} processing (will be interrupted)`,
+      statusCounts.processing > 0 && `${statusCounts.processing} processing (will be cancelled)`,
       statusCounts.pending > 0 && `${statusCounts.pending} pending`,
       statusCounts.failed > 0 && `${statusCounts.failed} failed`,
       statusCounts.interrupted > 0 && `${statusCounts.interrupted} interrupted`,
@@ -1158,42 +1135,29 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     setClearingQueue(true);
     let successCount = 0;
     let failCount = 0;
-    let interruptedCount = 0;
+    let cancelledCount = 0;
 
     try {
-      // First, interrupt any processing jobs by marking them as interrupted in the database
-      const processingJobs = jobsToClear.filter(j => j.status === 'processing' || j.status === 'retrying');
-      if (processingJobs.length > 0) {
-        toast.info(`Interrupting ${processingJobs.length} processing job(s)...`);
-
-        for (const job of processingJobs) {
-          try {
-            // Mark as interrupted in the database so the worker stops
-            const { error } = await supabase
-              .from('background_jobs')
-              .update({
-                status: 'interrupted',
-                interrupted_at: new Date().toISOString(),
-                error: 'Job interrupted by user via Clear Queue',
-              })
-              .eq('id', job.id);
-
-            if (!error) {
-              interruptedCount++;
-            }
-          } catch (error) {
-            console.error(`Failed to interrupt job ${job.id}:`, error);
-          }
+      // Workers stop on 'cancelled'; 'interrupted' is a resumable state they ignore.
+      const activeJobs = jobsToClear.filter(j => j.status === 'processing' || j.status === 'retrying' || j.status === 'pending');
+      if (activeJobs.length > 0) {
+        toast.info(`Cancelling ${activeJobs.length} active job(s)...`);
+        const { data: cancelled, error: cancelError } = await supabase
+          .from('background_jobs')
+          .update({ status: 'cancelled', error: 'Job cancelled by user via Clear Queue' })
+          .in('id', activeJobs.map(j => j.id))
+          .in('status', ['pending', 'processing', 'retrying'])
+          .select('id');
+        if (cancelError) {
+          console.error('Failed to cancel active jobs:', cancelError);
         }
+        cancelledCount = cancelled?.length ?? 0;
 
-        // Wait a moment for workers to acknowledge the interruption
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
-      // Now delete all jobs (including the newly interrupted ones) using Supabase directly
       for (const job of jobsToClear) {
         try {
-          // Use comprehensive cleanup function
           await deleteJobWithAllData(job.id);
           successCount++;
         } catch (error) {
@@ -1207,7 +1171,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       await fetchQueueData();
 
       const resultMessage = [
-        interruptedCount > 0 && `${interruptedCount} interrupted`,
+        cancelledCount > 0 && `${cancelledCount} cancelled`,
         successCount > 0 && `${successCount} deleted`,
         failCount > 0 && `${failCount} failed`,
       ].filter(Boolean).join(', ');
@@ -2759,6 +2723,17 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 }
 
                 if (selectedJob.status === 'completed') {
+                  const bannerOutcome = jobOutcome(selectedJob, jobCheckpoints);
+                  if (bannerOutcome.completedWithFailures) {
+                    return (
+                      <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-300 shrink-0" />
+                        <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                          {describeFailures(bannerOutcome)} — {productsDiscovered} products discovered, {chunksCreated} chunks created
+                        </p>
+                      </div>
+                    );
+                  }
                   return (
                     <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
                       <CheckCircle className="h-4 w-4 text-green-400 shrink-0" />
@@ -3292,15 +3267,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   // which emits an in_progress event before completed) renders as
                   // done and the "current stage" indicator jumps ahead to the
                   // next stage.
-                  const latestStatusByStage: Record<string, string> = {};
-                  jobCheckpoints.forEach(cp => {
-                    if (cp.stage) {
-                      latestStatusByStage[cp.stage as string] = (cp.status as string) || 'completed';
-                    }
-                  });
-                  const completedCheckpoints = Object.entries(latestStatusByStage)
-                    .filter(([, status]) => status !== 'in_progress')
-                    .map(([stage]) => stage);
+                  const latestStatusByStage = latestStageStatuses(jobCheckpoints);
+                  const completedCheckpoints = completedStages(latestStatusByStage);
+                  const failedCheckpoints = failedStages(latestStatusByStage);
+                  const outcome = jobOutcome(selectedJob, jobCheckpoints);
 
                   // Determine current stage by finding the NEXT pipeline stage that hasn't been checkpointed yet
                   const getCurrentStage = () => {
@@ -3361,11 +3331,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     productProgress.filter(p => p.status === 'completed').length || 0;
 
                   return (
-                    <Card className={`border-2 ${isJobCompleted ? 'border-green-500/30 bg-green-500/5' : isJobFailed ? 'border-red-500/30 bg-red-500/5' : 'border-primary/20 bg-primary/5'}`}>
+                    <Card className={`border-2 ${isJobCompleted && outcome.completedWithFailures ? 'border-amber-500/30 bg-amber-500/5' : isJobCompleted ? 'border-green-500/30 bg-green-500/5' : isJobFailed ? 'border-red-500/30 bg-red-500/5' : 'border-primary/20 bg-primary/5'}`}>
                       <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
                           <CardTitle className="flex items-center gap-2">
-                            {isJobCompleted ? (
+                            {isJobCompleted && outcome.completedWithFailures ? (
+                              <>
+                                <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-300" />
+                                Completed with failures
+                              </>
+                            ) : isJobCompleted ? (
                               <>
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                                 Pipeline Complete
@@ -3387,7 +3362,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           </Badge>
                         </div>
                         <CardDescription>
-                          {isJobCompleted
+                          {isJobCompleted && outcome.completedWithFailures
+                            ? describeFailures(outcome)
+                            : isJobCompleted
                             ? 'All extraction stages completed successfully'
                             : isJobFailed
                             ? selectedJob?.error || 'An error occurred during processing'
@@ -3410,12 +3387,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           {/* Pipeline Stage Flow */}
                           <div className="flex items-center justify-between gap-2">
                             {pipelineStages.map((stage, index) => {
-                              const isComplete =
+                              const recordedFailure = !!stage.checkpoint && failedCheckpoints.includes(stage.checkpoint);
+                              const isComplete = !recordedFailure && (
                                 (stage.checkpoint && completedCheckpoints.includes(stage.checkpoint)) ||
-                                (stage.id === 'completed' && isJobCompleted);
+                                (stage.id === 'completed' && isJobCompleted));
                               const isCurrent = currentStage === stage.id && !isJobCompleted && !isJobFailed;
                               // When job failed, mark the stage where it failed
-                              const isFailedStage = isJobFailed && !isComplete && !isCurrent && (() => {
+                              const isFailedStage = recordedFailure || (isJobFailed && !isComplete && !isCurrent && (() => {
                                 // The failed stage is the first non-completed stage (where it stopped)
                                 const failedStageFromMeta = selectedJob?.metadata?.stage;
                                 if (failedStageFromMeta) {
@@ -3426,7 +3404,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 const prevComplete = index === 0 ||
                                   (pipelineStages[prevStageIndex].checkpoint && completedCheckpoints.includes(pipelineStages[prevStageIndex].checkpoint));
                                 return prevComplete && !isComplete;
-                              })();
+                              })());
                               const isPending = !isComplete && !isCurrent && !isFailedStage;
 
                               return (

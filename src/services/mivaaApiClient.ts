@@ -3,6 +3,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { RetryHelper } from '@/utils/retryHelper';
 import { MIVAA_API_URL } from '@/config/mivaa';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 
 /**
  * MIVAA API Response Types
@@ -163,10 +164,8 @@ export class MivaaApiClient {
     this.baseUrl = baseUrl;
   }
 
-  /**
-   * Get Supabase auth token for MIVAA authentication
-   */
-  private async getAuthToken(): Promise<string> {
+  /** Bearer token plus the ACTIVE workspace as `X-Workspace-Id`; MIVAA validates membership. */
+  private async getAuthHeaders(): Promise<Record<string, string>> {
     const {
       data: { session },
       error,
@@ -176,7 +175,10 @@ export class MivaaApiClient {
       throw new Error('Not authenticated. Please sign in.');
     }
 
-    return session.access_token;
+    const headers: Record<string, string> = { Authorization: `Bearer ${session.access_token}` };
+    const workspaceId = getActiveWorkspaceId(session.user?.id);
+    if (workspaceId) headers['X-Workspace-Id'] = workspaceId;
+    return headers;
   }
 
   /**
@@ -191,13 +193,13 @@ export class MivaaApiClient {
     return RetryHelper.withRetry(
       async () => {
         try {
-          const token = await this.getAuthToken();
+          const authHeaders = await this.getAuthHeaders();
           const url = `${this.baseUrl}${endpoint}`;
 
           const response = await fetch(url, {
             ...options,
             headers: {
-              Authorization: `Bearer ${token}`,
+              ...authHeaders,
               'Content-Type': 'application/json',
               ...options.headers,
             },
@@ -263,13 +265,13 @@ export class MivaaApiClient {
     return RetryHelper.withRetry(
       async () => {
         try {
-          const token = await this.getAuthToken();
+          const authHeaders = await this.getAuthHeaders();
           const url = `${this.baseUrl}${endpoint}`;
 
           const response = await fetch(url, {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${token}`,
+              ...authHeaders,
               // Don't set Content-Type for FormData - browser sets it with boundary
             },
             body: formData,
@@ -589,6 +591,18 @@ export class MivaaApiClient {
     });
   }
 
+  async resumeJob(jobId: string): Promise<MivaaApiResponse> {
+    return this.request(`/api/rag/documents/job/${encodeURIComponent(jobId)}/resume`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteJob(jobId: string): Promise<MivaaApiResponse> {
+    return this.request(`/api/rag/documents/jobs/${encodeURIComponent(jobId)}`, {
+      method: 'DELETE',
+    });
+  }
+
   /**
    * Get job result
    * @returns PDFExtractionResult with document content and metrics
@@ -707,11 +721,11 @@ export class MivaaApiClient {
     let sawDone = false;
 
     try {
-      const token = await this.getAuthToken();
+      const authHeaders = await this.getAuthHeaders();
       const response = await fetch(`${this.baseUrl}/api/images/segment/stream`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),

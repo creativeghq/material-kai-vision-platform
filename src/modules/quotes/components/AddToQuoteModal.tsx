@@ -14,6 +14,8 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, Quote } from '../services/QuotesService';
+import { QuantityInput } from './QuantityInput';
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 
 interface AddToQuoteModalProps {
   productId: string;
@@ -38,6 +40,16 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string>('');
   const [quantity, setQuantity] = useState(defaultQuantity);
+  const [identity, setIdentity] = useState<{
+    selected_attributes: Record<string, string>;
+    selected_size: string | null;
+    selected_color: string | null;
+  }>({ selected_attributes: {}, selected_size: null, selected_color: null });
+  const identityFields = {
+    ...(Object.keys(identity.selected_attributes).length > 0 && { selected_attributes: identity.selected_attributes }),
+    ...(identity.selected_size && { selected_size: identity.selected_size }),
+    ...(identity.selected_color && { selected_color: identity.selected_color }),
+  };
   // Inline quote creation
   const [showCreate, setShowCreate] = useState(false);
   const [newQuoteName, setNewQuoteName] = useState('');
@@ -83,6 +95,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         quantity,
         notes,
         added_from: '3d_generation',
+        ...identityFields,
         ...(room && { room }),
         ...(dimensions && { dimensions }),
         ...(installationRequirements && { installation_requirements: installationRequirements }),
@@ -118,6 +131,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         quantity,
         notes,
         added_from: 'manual',
+        ...identityFields,
         ...(room && { room }),
         ...(dimensions && { dimensions }),
         ...(installationRequirements && { installation_requirements: installationRequirements }),
@@ -167,13 +181,21 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
 
           {/* Quantity */}
           <div>
-            <Label>Quantity</Label>
-            <Input
-              type="number"
-              min="1"
+            <Label htmlFor="add-to-quote-qty">Quantity</Label>
+            <QuantityInput
+              id="add-to-quote-qty"
               value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+              onCommit={setQuantity}
               className="mt-1"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Variant</Label>
+            <LineIdentityPicker
+              productId={productId}
+              value={identity.selected_attributes}
+              onChange={setIdentity}
             />
           </div>
 

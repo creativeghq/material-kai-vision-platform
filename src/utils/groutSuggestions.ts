@@ -65,9 +65,7 @@ function extractDominantColor(metadata: Record<string, any>): string | null {
   const colorFields = [
     'color',
     'color_name',
-    'colors',
     'dominant_color',
-    'primary_color',
   ];
 
   for (const field of colorFields) {

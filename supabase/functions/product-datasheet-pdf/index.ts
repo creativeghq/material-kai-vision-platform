@@ -28,25 +28,58 @@ function plain(v: unknown): string | null {
   return s === '' ? null : s;
 }
 
-function specRowsFrom(
-  bag: unknown,
-  seen: Set<string>,
-  isInternal: (key: string) => boolean,
-): Array<{ label: string; value: string }> {
-  if (!bag || typeof bag !== 'object' || Array.isArray(bag)) return [];
-  const out: Array<{ label: string; value: string }> = [];
-  for (const [key, raw] of Object.entries(bag as Json)) {
-    if (seen.has(key) || isInternal(key)) continue;
-    const value = plain(raw);
-    if (!value) continue;
-    seen.add(key);
-    out.push({
-      label: key.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-      value: value.slice(0, 200),
-    });
-    if (out.length >= MAX_SPEC_ROWS) break;
+interface RegistryField {
+  field_name: string;
+  display_name: string | null;
+  label_by_category: Record<string, string> | null;
+  section: string | null;
+  sort_order: number | null;
+  aliases: string[] | null;
+}
+
+interface SpecValue { field: RegistryField; value: string }
+
+/** Exact field name first, then aliases — the registry is the only source of what a key means. */
+function registryResolver(fields: RegistryField[]): (key: string) => RegistryField | null {
+  const byName = new Map<string, RegistryField>();
+  const byAlias = new Map<string, RegistryField>();
+  for (const f of fields) byName.set(f.field_name.toLowerCase(), f);
+  for (const f of fields) {
+    for (const a of f.aliases ?? []) {
+      const k = String(a).toLowerCase();
+      if (!byName.has(k) && !byAlias.has(k)) byAlias.set(k, f);
+    }
   }
-  return out;
+  return (key) => {
+    const lower = key.toLowerCase();
+    const folded = normalizeFieldKey(key);
+    return byName.get(lower) ?? byName.get(folded) ?? byAlias.get(lower) ?? byAlias.get(folded) ?? null;
+  };
+}
+
+function collectSpecValues(
+  bags: unknown[],
+  resolve: (key: string) => RegistryField | null,
+  isInternal: (key: string) => boolean,
+): SpecValue[] {
+  const out = new Map<string, SpecValue>();
+  for (const bag of bags) {
+    if (!bag || typeof bag !== 'object' || Array.isArray(bag)) continue;
+    for (const [key, raw] of Object.entries(bag as Json)) {
+      if (isInternal(key)) continue;
+      const field = resolve(key);
+      if (!field || out.has(field.field_name)) continue;
+      const value = plain(raw);
+      if (!value) continue;
+      out.set(field.field_name, { field, value: value.slice(0, 200) });
+    }
+  }
+  return [...out.values()];
+}
+
+function humanise(key: string): string {
+  const s = key.replace(/[_-]+/g, ' ').trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
@@ -119,17 +152,52 @@ Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
   }
   if (!patternText) isInternal = () => true;
 
-  const seen = new Set<string>();
-  const specTables: BrandedSpecTable[] = [];
-  const blocks: Array<[string, unknown]> = [
-    ['Specifications', product.specifications],
-    ['Attributes', product.attributes],
-    ['Properties', product.properties],
-  ];
-  for (const [title, bag] of blocks) {
-    const rows = specRowsFrom(bag, seen, isInternal);
-    if (rows.length) specTables.push({ title, rows });
+  const [registryRes, sectionsRes, categoryRes] = await Promise.all([
+    service.from('material_metadata_fields')
+      .select('field_name, display_name, label_by_category, section, sort_order, aliases')
+      .eq('status', 'active'),
+    service.from('material_field_sections').select('section_key, display_order'),
+    product.category_id
+      ? service.from('material_categories').select('category_key').eq('id', String(product.category_id)).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (registryRes.error || sectionsRes.error || categoryRes.error) {
+    return json({ error: 'Could not load the field registry' }, 500);
   }
+  const categoryKey = String((categoryRes.data as Json | null)?.category_key ?? product.category ?? '');
+
+  // PDF ingest writes `metadata`; every bag is read, and the first registered value wins.
+  const values = collectSpecValues(
+    [product.attributes, product.specifications, product.metadata, product.properties],
+    registryResolver((registryRes.data ?? []) as RegistryField[]),
+    isInternal,
+  );
+
+  // Per-key sensitivity from the SQL verdict in one call; a key it does not return is withheld.
+  const { data: kept, error: redactErr } = await service.rpc('redact_internal_product_fields', {
+    p_data: Object.fromEntries(values.map((v) => [v.field.field_name, true])),
+  });
+  const publicKeys = new Set(!redactErr && kept && typeof kept === 'object' ? Object.keys(kept as Json) : []);
+  const publishable = values.filter((v) => publicKeys.has(v.field.field_name));
+
+  const sectionOrder = new Map(((sectionsRes.data ?? []) as Json[])
+    .map((r) => [String(r.section_key), Number(r.display_order ?? 0)]));
+  const bySection = new Map<string, SpecValue[]>();
+  for (const v of publishable.slice(0, MAX_SPEC_ROWS)) {
+    const key = v.field.section ?? 'other';
+    bySection.set(key, [...(bySection.get(key) ?? []), v]);
+  }
+  const specTables: BrandedSpecTable[] = [...bySection.entries()]
+    .sort(([a], [b]) => (sectionOrder.get(a) ?? 9999) - (sectionOrder.get(b) ?? 9999))
+    .map(([section, rows]) => ({
+      title: humanise(section),
+      rows: rows
+        .sort((x, y) => (x.field.sort_order ?? 9999) - (y.field.sort_order ?? 9999))
+        .map((v) => ({
+          label: v.field.label_by_category?.[categoryKey] ?? v.field.display_name ?? humanise(v.field.field_name),
+          value: v.value,
+        })),
+    }));
 
   const certRows = (Array.isArray(certs) ? certs : []).map((c) => {
     const cert = c as Json;

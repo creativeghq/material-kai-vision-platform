@@ -124,7 +124,15 @@ export const servicesService = {
       .single();
     if (error) throw error;
     const productId = (prod as any).id;
-    await this._writePrice(workspaceId, productId, input);
+    try {
+      await this._writePrice(workspaceId, productId, input);
+    } catch (priceError) {
+      const { error: rollbackError } = await supabase.from('products').delete().eq('id', productId);
+      if (rollbackError) {
+        throw new Error(`Service saved without its price, and removing it failed: ${rollbackError.message}`);
+      }
+      throw priceError;
+    }
     return productId;
   },
 
@@ -198,7 +206,18 @@ export const servicesService = {
   },
 
   async _writePrice(workspaceId: string, productId: string, input: ServiceInput): Promise<void> {
-    if (input.price == null) return;
+    if (input.price === undefined) return;
+    if (input.price === null) {
+      // An explicit null CLEARS the price ("on request"); it is not "leave it as it was".
+      const { error } = await supabase
+        .from('product_prices')
+        .update({ list_price: null })
+        .eq('workspace_id', workspaceId)
+        .eq('product_id', productId)
+        .is('variant_key', null);
+      if (error) throw error;
+      return;
+    }
     // supabase-js resolves on an RLS denial rather than throwing, so an unbound write is
     // silent (#389). This is a PRICE: a silently-dropped upsert leaves the service
     // quotable at whatever the previous number was, and a wrong price is a valid number.

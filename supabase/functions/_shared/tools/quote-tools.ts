@@ -757,7 +757,7 @@ export const createRaiseQuoteRequestTool = (
         + 'matched exactly — quote that price and use create_quote.',
       schema: z.object({
         spec: z.record(z.string()).optional().describe(
-          'What they asked for, as key/value — the same spec you sent to price_my_spec, e.g. {"fabric":"linen","available_colors":"sunset"}',
+          'What they asked for, as key/value — the same spec you sent to price_my_spec, e.g. {"fabric":"linen","color":"sunset"}',
         ),
         product_type: z.string().optional().describe('What the thing IS, e.g. "lounge armchair", "floor tile"'),
         contact_id: z.string().uuid().optional().describe('Existing CRM contact id, when the customer is already known.'),

@@ -62,11 +62,14 @@ describe('field sensitivity — the registry answers, the pattern is the floor',
     expect(isInternalFieldKey(snap, 'landed_cost_note')).toBe(true);
   });
 
-  it('an explicitly public registry row overrides the pattern', () => {
-    // Without this escape hatch a legitimately public field whose name reads like money would
-    // be unrenderable and there would be no way to say so.
+  it('a public registry row decides only for a key the pattern does not match', () => {
     expect(new RegExp(DB_PATTERN).test('price_range')).toBe(false);
     expect(isInternalFieldKey(snap, 'price_range')).toBe(false);
+  });
+
+  it('the pattern is a floor: a matching key is internal even when its registry row says public', () => {
+    const mislabelled = snapshot([field({ name: 'wholesale_price', sensitivity: 'public' })]);
+    expect(isInternalFieldKey(mislabelled, 'wholesale_price')).toBe(true);
   });
 
   it('the floor catches the keys a supplier feed actually carries', () => {
@@ -117,11 +120,10 @@ describe('field sensitivity — the registry answers, the pattern is the floor',
     }
   });
 
-  it('an unknown key with no pattern is UNRESOLVED, not public', () => {
-    // The failure this shape is built to survive: the registry loaded, the pattern did not.
-    // Answering `false` there turns the filter off in exactly the situation nobody notices.
+  it('with no pattern loaded every key is UNRESOLVED, not public', () => {
+    // The registry loaded, the pattern did not: the floor cannot be applied, so nothing is vouched for.
     const noPattern = snapshot([field({ name: 'finish' })], null);
-    expect(isInternalFieldKey(noPattern, 'finish')).toBe(false);
+    expect(isInternalFieldKey(noPattern, 'finish')).toBeNull();
     expect(isInternalFieldKey(noPattern, 'some_key_nobody_registered')).toBeNull();
   });
 });

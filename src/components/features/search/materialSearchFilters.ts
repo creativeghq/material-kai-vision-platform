@@ -1,6 +1,7 @@
 /** Filter definitions for the material search surface (/search). */
-import { Building2, FileText, Hash, Layers } from 'lucide-react';
+import { FileText, Hash, Layers } from 'lucide-react';
 import { optionsFromRows, type FilterField, type FilterGroupDef } from '@/components/core/filters';
+import { isInternalFieldKey, type FieldRegistrySnapshot } from '@/services/fieldRegistryService';
 
 export interface EntityRef {
   type: 'MATERIAL' | 'ORG' | 'LOCATION' | 'PERSON' | 'DATE';
@@ -12,41 +13,53 @@ export interface MaterialSearchRow {
   title?: string;
   content?: string;
   source?: string;
+  metadata?: Record<string, unknown>;
   extracted_entities?: EntityRef[];
 }
 
-const MATERIAL_TYPES = [
-  'Ceramic', 'Porcelain', 'Marble', 'Granite', 'Wood', 'Metal',
-  'Fabric', 'Leather', 'Glass', 'Concrete', 'Stone', 'Composite',
-];
+/** A facet with more distinct values than this is a free-text field, not a filter. */
+const MAX_FACET_OPTIONS = 30;
 
-const COLORS = [
-  'White', 'Black', 'Gray', 'Beige', 'Brown', 'Blue',
-  'Green', 'Red', 'Yellow', 'Orange', 'Pink', 'Purple',
-];
+function facetValues(v: unknown): string[] {
+  const one = (x: unknown): string | null => {
+    if (x && typeof x === 'object' && !Array.isArray(x) && 'value' in (x as Record<string, unknown>)) {
+      return one((x as Record<string, unknown>).value);
+    }
+    if (typeof x === 'string') return x.trim() || null;
+    if (typeof x === 'number' || typeof x === 'boolean') return String(x);
+    return null;
+  };
+  if (Array.isArray(v)) return v.map(one).filter((x): x is string => x !== null);
+  const single = one(v);
+  return single === null ? [] : [single];
+}
 
-const TEXTURES = ['Smooth', 'Rough', 'Matte', 'Glossy', 'Textured', 'Patterned', 'Polished', 'Honed'];
-
-const APPLICATIONS = [
-  'Flooring', 'Wall Covering', 'Upholstery', 'Countertop', 'Backsplash',
-  'Exterior', 'Interior', 'Commercial', 'Residential',
-];
-
-const AVAILABILITY_STATUS = ['In Stock', 'Pre-Order', 'Discontinued', 'Limited'];
-
-const blob = (r: MaterialSearchRow) => `${r.title ?? ''} ${r.content ?? ''}`.toLowerCase();
-
-/** Which of `terms` the row mentions — turns free text into an exact-set facet. */
-const mentioned = (terms: string[]) => (r: MaterialSearchRow) => {
-  const text = blob(r);
-  return terms.filter((t) => text.includes(t.toLowerCase()));
-};
-
-function termField(key: string, label: string, terms: string[], rows: MaterialSearchRow[]): FilterField | null {
-  const accessor = mentioned(terms);
-  const options = optionsFromRows(rows, accessor);
-  if (options.length === 0) return null;
-  return { key, label, type: 'multi', options, accessor };
+/**
+ * Attribute facets come from the field registry: a key is offered only when the registry knows
+ * it and the sensitivity gate says it is public. With no registry loaded, no attribute facet is
+ * offered (an unjudged key is withheld, never shown).
+ */
+function registryFacets(rows: MaterialSearchRow[], registry: FieldRegistrySnapshot | null): FilterGroupDef[] {
+  if (!registry) return [];
+  const keys = new Set<string>();
+  for (const r of rows) for (const k of Object.keys(r.metadata ?? {})) keys.add(k);
+  const bySection = new Map<string, FilterField[]>();
+  for (const key of [...keys].sort()) {
+    const field = registry.byName.get(key);
+    if (!field || isInternalFieldKey(registry, key) !== false) continue;
+    const accessor = (r: MaterialSearchRow) => facetValues(r.metadata?.[key]);
+    const options = optionsFromRows(rows, accessor);
+    if (options.length < 2 || options.length > MAX_FACET_OPTIONS) continue;
+    const list = bySection.get(field.section) ?? [];
+    list.push({ key: `attr_${key}`, label: field.label, type: 'multi', options, accessor });
+    bySection.set(field.section, list);
+  }
+  return [...bySection.entries()].map(([section, fields]) => ({
+    key: `attr_${section}`,
+    label: section.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+    icon: Layers,
+    fields,
+  }));
 }
 
 function entityField(key: string, label: string, type: EntityRef['type'], rows: MaterialSearchRow[]): FilterField | null {
@@ -59,21 +72,11 @@ function entityField(key: string, label: string, type: EntityRef['type'], rows: 
 
 const compact = (fields: (FilterField | null)[]) => fields.filter((f): f is FilterField => f !== null);
 
-export function buildMaterialSearchFilters(rows: MaterialSearchRow[]): FilterGroupDef[] {
-  const groups: FilterGroupDef[] = [];
-
-  const properties = compact([
-    termField('material_type', 'Material type', MATERIAL_TYPES, rows),
-    termField('color', 'Color', COLORS, rows),
-    termField('texture', 'Texture', TEXTURES, rows),
-  ]);
-  if (properties.length) groups.push({ key: 'properties', label: 'Material', icon: Layers, fields: properties });
-
-  const use = compact([
-    termField('application', 'Application', APPLICATIONS, rows),
-    termField('availability', 'Availability', AVAILABILITY_STATUS, rows),
-  ]);
-  if (use.length) groups.push({ key: 'use', label: 'Use', icon: Building2, fields: use });
+export function buildMaterialSearchFilters(
+  rows: MaterialSearchRow[],
+  registry: FieldRegistrySnapshot | null = null,
+): FilterGroupDef[] {
+  const groups: FilterGroupDef[] = [...registryFacets(rows, registry)];
 
   const sources = optionsFromRows(rows, (r) => r.source);
   if (sources.length) {

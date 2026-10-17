@@ -27,10 +27,36 @@ import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { rerankResults, type RerankCandidate } from '../rerank.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 // One wording for every untrusted block (security invariant 9).
-import { wrapUntrusted } from '../untrusted.ts';
+import { wrapUntrusted, UNTRUSTED_FIELDS_NOTE } from '../untrusted.ts';
 
 /** Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place. */
 const RERANKABLE_KEYS = ['results', 'chunks', 'products'] as const;
+
+/**
+ * Catalogue text is supplier/PDF content (invariant 9). The payload stays JSON because agent-chat
+ * parses it into product cards, so product rows carry the structured-result note and raw chunk
+ * text — which no card renders — is fenced in full.
+ */
+// deno-lint-ignore no-explicit-any
+export function fenceSearchPayload(data: any): any {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  for (const key of RERANKABLE_KEYS) {
+    const arr = data[key];
+    if (!Array.isArray(arr)) continue;
+    data[key] = arr.map((r) => {
+      if (!r || typeof r !== 'object') return r;
+      const isProduct = key === 'products' || r.product_id || r.product_name || r.name;
+      if (isProduct) return r;
+      const out = { ...r };
+      for (const f of ['content', 'text', 'chunk_text']) {
+        if (typeof out[f] === 'string' && out[f]) out[f] = wrapUntrusted('catalogue excerpt', out[f]);
+      }
+      return out;
+    });
+  }
+  data._untrusted = UNTRUSTED_FIELDS_NOTE;
+  return data;
+}
 
 // deno-lint-ignore no-explicit-any
 const toCandidate = (r: any, i: number): RerankCandidate => ({
@@ -286,7 +312,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
           if (hitCount === 0) {
             Object.assign(ranked ?? {}, await describeEmptyResult('products', workspaceId));
           }
-          return JSON.stringify(ranked);
+          return JSON.stringify(fenceSearchPayload(ranked));
         } catch (fetchError) {
           clearTimeout(timeoutId);
 
@@ -448,12 +474,12 @@ export const createVisualSearchTool = (workspaceId: string, images: string[], us
             // texture" would discard the bias a vision call was just spent computing.
             // `query_summary` carries the exact text the server embedded, so the agent can
             // tell the user what it actually matched on.
-            return JSON.stringify(data);
+            return JSON.stringify(fenceSearchPayload(data));
           }
           // The text query is optional here, so this reranks only when the user gave one to
           // rank against; pure image-similarity results keep MIVAA's visual ordering, which is
           // the right answer when there is no stated intent to weigh them against.
-          return JSON.stringify(await rerankMivaaPayload(data, query || '', 'visual_search_rerank'));
+          return JSON.stringify(fenceSearchPayload(await rerankMivaaPayload(data, query || '', 'visual_search_rerank')));
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (fetchError instanceof Error && fetchError.name === 'AbortError') {

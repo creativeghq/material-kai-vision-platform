@@ -1,8 +1,4 @@
-/**
- * Schedule Import Modal
- *
- * Configure cron schedules for recurring XML imports
- */
+/** Schedule Import Modal — the next run is computed and validated by the server, never here. */
 
 import React, { useState } from 'react';
 import {
@@ -25,6 +21,8 @@ import {
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Calendar, Loader2, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 
@@ -35,6 +33,7 @@ interface ImportJob {
   cron_schedule: string | null;
   source_url: string | null;
   next_run_at: string | null;
+  metadata?: { schedule_last_attempt?: { at?: string; status?: string; error?: string } } | null;
 }
 
 interface ScheduleImportModalProps {
@@ -61,6 +60,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
   onScheduled,
 }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [selectedPreset, setSelectedPreset] = useState<string>(
     job.cron_schedule || '0 */6 * * *',
   );
@@ -69,6 +69,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastAttempt = job.metadata?.schedule_last_attempt;
 
   const handleSave = async () => {
     if (!sourceUrl) {
@@ -87,25 +88,10 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
     setError(null);
 
     try {
-      // Calculate next run time
-      const nextRunAt = calculateNextRun(cronSchedule);
-
-      // Update job with schedule
-      const { error: updateError } = await supabase
-        .from('data_import_jobs')
-        .update({
-          is_scheduled: true,
-          cron_schedule: cronSchedule,
-          source_url: sourceUrl,
-          next_run_at: nextRunAt,
-        })
-        .eq('id', job.id);
-
-      if (updateError) throw updateError;
-
+      const data = await saveSchedule(cronSchedule);
       toast({
         title: 'Schedule Saved',
-        description: `Import will run ${getScheduleDescription(cronSchedule)}`,
+        description: `Import will run ${getScheduleDescription(cronSchedule)} — next run ${formatDate(data.next_run_at, { withTime: true })}`,
       });
 
       onScheduled();
@@ -123,16 +109,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
     setError(null);
 
     try {
-      const { error: updateError } = await supabase
-        .from('data_import_jobs')
-        .update({
-          is_scheduled: false,
-          cron_schedule: null,
-          next_run_at: null,
-        })
-        .eq('id', job.id);
-
-      if (updateError) throw updateError;
+      await saveSchedule(null);
 
       toast({
         title: 'Schedule Removed',
@@ -149,30 +126,20 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
     }
   };
 
-  const calculateNextRun = (cronSchedule: string): string => {
-    const now = new Date();
-
-    if (cronSchedule === '0 * * * *') {
-      now.setHours(now.getHours() + 1, 0, 0, 0);
-    } else if (cronSchedule === '0 */6 * * *') {
-      now.setHours(now.getHours() + 6, 0, 0, 0);
-    } else if (cronSchedule === '0 */12 * * *') {
-      now.setHours(now.getHours() + 12, 0, 0, 0);
-    } else if (cronSchedule === '0 0 * * *') {
-      now.setDate(now.getDate() + 1);
-      now.setHours(0, 0, 0, 0);
-    } else if (cronSchedule === '0 0 * * 0') {
-      const daysUntilSunday = (7 - now.getDay()) % 7 || 7;
-      now.setDate(now.getDate() + daysUntilSunday);
-      now.setHours(0, 0, 0, 0);
-    } else if (cronSchedule === '0 0 1 * *') {
-      now.setMonth(now.getMonth() + 1, 1);
-      now.setHours(0, 0, 0, 0);
-    } else {
-      now.setHours(now.getHours() + 1);
-    }
-
-    return now.toISOString();
+  const saveSchedule = async (cronSchedule: string | null): Promise<{ next_run_at: string }> => {
+    if (!activeWorkspaceId) throw new Error('No active workspace');
+    const { data, error: fnError } = await supabase.functions.invoke('xml-import-orchestrator', {
+      body: {
+        action: 'schedule',
+        workspace_id: activeWorkspaceId,
+        job_id: job.id,
+        cron_schedule: cronSchedule,
+        source_url: sourceUrl,
+      },
+    });
+    if (fnError) throw new Error(await edgeErrorMessage(fnError, 'Failed to save schedule'));
+    if (!data?.success) throw new Error(data?.error || 'Failed to save schedule');
+    return data;
   };
 
   const getScheduleDescription = (cronSchedule: string): string => {
@@ -264,7 +231,14 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
             <div className="p-3 bg-purple-900/20 border border-purple-700 rounded text-sm">
               <strong>Current Schedule:</strong> {job.cron_schedule}
               <br />
-              <strong>Next Run:</strong> {formatDate(job.next_run_at, { withTime: true })}
+              <strong>Next Run:</strong> {formatDate(job.next_run_at, { withTime: true })} (UTC schedule)
+            </div>
+          )}
+          {lastAttempt && (
+            <div className={`p-3 rounded text-sm border ${lastAttempt.status === 'dispatched' ? 'border-border' : 'border-destructive/40 bg-destructive/5'}`}>
+              <strong>Last scheduled run:</strong> {lastAttempt.status}
+              {lastAttempt.at && <> · {formatDate(lastAttempt.at, { withTime: true })}</>}
+              {lastAttempt.error && <p className="text-xs text-muted-foreground mt-1 break-words">{lastAttempt.error}</p>}
             </div>
           )}
         </div>

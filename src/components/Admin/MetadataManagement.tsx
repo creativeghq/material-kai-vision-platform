@@ -55,6 +55,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import {
+  valueKind,
+  toEditorText,
+  displayValue,
+  parseEditorText,
+  patchProductField,
+  type MetadataValueKind,
+} from './metadataFieldEditor';
 
 // ── Batch Categorization types ──────────────────────────────────────────────
 interface CategorizeResult {
@@ -92,8 +100,10 @@ interface MetadataItem {
   productId: string;
   field_name: string;
   field_value: string;
-  // Per-field confidence from _extraction_metadata, fallback to product-level confidence
-  confidence: number;
+  raw_value: unknown;
+  value_kind: MetadataValueKind;
+  // Per-field confidence from _extraction_metadata, then product-level; null = never recorded
+  confidence: number | null;
   product_name: string;
   document_name: string;
   created_at: string;
@@ -215,7 +225,7 @@ export const MetadataManagement: React.FC = () => {
         const extractionMeta = meta._extraction_metadata || {};
         // Product-level confidence is the fallback when per-field data is absent
         const productConfidence =
-          typeof meta.confidence === 'number' ? meta.confidence : 1.0;
+          typeof meta.confidence === 'number' ? meta.confidence : null;
 
         Object.entries(meta).forEach(([key, value]) => {
           // Skip internal/system fields (prefixed with _)
@@ -234,11 +244,7 @@ export const MetadataManagement: React.FC = () => {
               ? fieldMeta.confidence
               : productConfidence;
 
-          const fieldValue = Array.isArray(value)
-            ? value.join(', ')
-            : typeof value === 'object'
-              ? JSON.stringify(value)
-              : String(value);
+          const fieldValue = displayValue(value);
 
           fieldCounts[key] = (fieldCounts[key] || 0) + 1;
 
@@ -248,6 +254,8 @@ export const MetadataManagement: React.FC = () => {
             productId: product.id,
             field_name: key,
             field_value: fieldValue,
+            raw_value: value,
+            value_kind: valueKind(value),
             confidence: fieldConfidence,
             product_name: product.name,
             document_name:
@@ -292,7 +300,10 @@ export const MetadataManagement: React.FC = () => {
     setCurrentPage((p) => clampPage(p, filteredMetadata.length));
   }, [filteredMetadata.length]);
 
-  const getConfidenceBadge = (confidence: number) => {
+  const getConfidenceBadge = (confidence: number | null) => {
+    if (confidence === null) {
+      return <span className="text-xs text-muted-foreground">Unknown</span>;
+    }
     if (confidence >= 0.9) {
       return (
         <span className="text-xs text-emerald-600 dark:text-emerald-400">
@@ -316,34 +327,20 @@ export const MetadataManagement: React.FC = () => {
 
   const handleEdit = (item: MetadataItem) => {
     setSelectedItem(item);
-    setEditValue(item.field_value);
+    setEditValue(toEditorText(item.raw_value, item.value_kind));
     setIsEditDialogOpen(true);
   };
 
   const handleSaveEdit = async () => {
     if (!selectedItem) return;
+    const parsed = parseEditorText(editValue, selectedItem.value_kind);
+    if ('error' in parsed) {
+      toast({ title: 'Invalid value', description: parsed.error, variant: 'destructive' });
+      return;
+    }
     setIsSaving(true);
     try {
-      const { data: product, error: fetchError } = await supabase
-        .from('products')
-        .select('metadata')
-        .eq('id', selectedItem.productId)
-        .single();
-
-      if (fetchError) throw fetchError;
-      if (!product) throw new Error('Product not found');
-
-      const updatedMetadata = {
-        ...product.metadata,
-        [selectedItem.field_name]: editValue,
-      };
-
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ metadata: updatedMetadata })
-        .eq('id', selectedItem.productId);
-
-      if (updateError) throw updateError;
+      await patchProductField(selectedItem.productId, selectedItem.field_name, parsed.value);
 
       toast({
         title: 'Success',
@@ -373,24 +370,7 @@ export const MetadataManagement: React.FC = () => {
     }
 
     try {
-      const { data: product, error: fetchError } = await supabase
-        .from('products')
-        .select('metadata')
-        .eq('id', item.productId)
-        .single();
-
-      if (fetchError) throw fetchError;
-      if (!product) throw new Error('Product not found');
-
-      const updatedMetadata = { ...product.metadata };
-      delete updatedMetadata[item.field_name];
-
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ metadata: updatedMetadata })
-        .eq('id', item.productId);
-
-      if (updateError) throw updateError;
+      await patchProductField(item.productId, item.field_name, null);
 
       // Removing the last product that carries a field does NOT remove the canonical values
       // derived from it — `facet_canonical_values` is gold, rebuilt from silver, and rows there
@@ -444,7 +424,7 @@ export const MetadataManagement: React.FC = () => {
     const load = async () => {
       const { count } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('workspace_id', batchWorkspaceId)
         .or('metadata->material_category.is.null,metadata->>material_category.eq.');
       setUncategorizedCount(count ?? 0);
@@ -473,7 +453,7 @@ export const MetadataManagement: React.FC = () => {
       setLastRun(data);
       const { count } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('workspace_id', batchWorkspaceId)
         .or('metadata->material_category.is.null,metadata->>material_category.eq.');
       setUncategorizedCount(count ?? 0);
@@ -781,13 +761,30 @@ export const MetadataManagement: React.FC = () => {
                 <Input value={selectedItem.product_name} disabled className="bg-muted" />
               </div>
               <div>
-                <Label>Value</Label>
-                <Textarea
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  rows={4}
-                  placeholder="Enter new value..."
-                />
+                <Label>Value ({selectedItem.value_kind === 'array' || selectedItem.value_kind === 'object' ? 'JSON' : selectedItem.value_kind})</Label>
+                {selectedItem.value_kind === 'boolean' ? (
+                  <div className="mt-1 flex items-center gap-2">
+                    <Switch
+                      checked={editValue.trim().toLowerCase() === 'true'}
+                      onCheckedChange={(v) => setEditValue(v ? 'true' : 'false')}
+                    />
+                    <span className="text-sm">{editValue.trim().toLowerCase() === 'true' ? 'Yes' : 'No'}</span>
+                  </div>
+                ) : selectedItem.value_kind === 'number' ? (
+                  <Input
+                    inputMode="decimal"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                  />
+                ) : (
+                  <Textarea
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    rows={selectedItem.value_kind === 'string' ? 4 : 8}
+                    className={selectedItem.value_kind === 'string' ? undefined : 'font-mono text-xs'}
+                    placeholder="Enter new value..."
+                  />
+                )}
               </div>
               <div>
                 <Label>Confidence</Label>

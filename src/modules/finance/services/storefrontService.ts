@@ -41,6 +41,26 @@ export interface StorefrontProductSafety {
   reason?: string;
 }
 
+export interface StorefrontVariant {
+  variant_key: string;
+  label: string;
+  unit: string | null;
+  price: number;
+  currency: string;
+  image_url: string | null;
+}
+
+export function cartKey(productId: string, variantKey: string | null | undefined): string {
+  return `${productId}::${variantKey ?? ''}`;
+}
+
+export function parseCartKey(key: string): { product_id: string; variant_key: string | null } {
+  const i = key.indexOf('::');
+  if (i < 0) return { product_id: key, variant_key: null };
+  const v = key.slice(i + 2);
+  return { product_id: key.slice(0, i), variant_key: v === '' ? null : v };
+}
+
 export interface StorefrontProduct {
   product_id: string;
   name: string;
@@ -50,6 +70,9 @@ export interface StorefrontProduct {
   price: number;
   currency: string;
   image_url: string | null;
+  vat_percent?: number | null;
+  /** Priced variants; when present the visitor must pick one. */
+  variants?: StorefrontVariant[];
   safety?: StorefrontProductSafety | null;
 }
 
@@ -82,7 +105,7 @@ export const storefrontService = {
   getProducts(slug: string) { return callFn<{ ok: boolean; products: StorefrontProduct[] }>({ action: 'products', slug }); },
   checkout(
     slug: string,
-    items: { product_id: string; qty: number }[],
+    items: { product_id: string; variant_key: string | null; qty: number }[],
     customer: { name: string; email: string; note?: string },
     turnstileToken?: string | null,
   ) {

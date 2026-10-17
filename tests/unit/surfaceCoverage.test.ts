@@ -139,11 +139,10 @@ describe('coverage', () => {
 });
 
 describe('pack size is read, never guessed', () => {
-  it('prefers a recorded coverage, then converts sqft, then multiplies a piece count', () => {
+  it('prefers a recorded coverage, then multiplies a piece count', () => {
     expect(packCoverageM2({ metadata: { m2_per_box: '1.44' } }, 0.36)).toBeCloseTo(1.44, 4);
-    expect(packCoverageM2({ metadata: { sqft_per_box: '15.5' } }, 0.36)).toBeCloseTo(1.44, 2);
     expect(packCoverageM2({ attributes: { pieces_per_box: 4 } }, 0.36)).toBeCloseTo(1.44, 4);
-    expect(packCoverageM2({ metadata: { planks_per_box: 8 } }, 0.24)).toBeCloseTo(1.92, 4);
+    expect(packCoverageM2({ metadata: { pieces_per_box: 8 } }, 0.24)).toBeCloseTo(1.92, 4);
     expect(packCoverageM2({ metadata: { coverage_per_roll_m2: 5.3 } }, null)).toBeCloseTo(5.3, 4);
   });
 

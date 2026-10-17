@@ -208,7 +208,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-muted-foreground">Efficiency</span>
                     <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-                      {model.energy_efficiency}
+                      {model.energy_class}
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">

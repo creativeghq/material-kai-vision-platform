@@ -40,8 +40,24 @@ interface PreviewProduct {
   factory_group_name?: string;
   material_category: string;
   images: string[];
+  external_sku?: string;
+  price?: string;
+  supplier_cost?: string;
+  currency?: string;
+  unit?: string;
+  attributes?: Record<string, string | string[]>;
   metadata: Record<string, any>;
 }
+
+const COMMERCIAL_FIELDS: Array<[keyof PreviewProduct, string]> = [
+  ['external_sku', 'SKU'],
+  ['price', 'List price'],
+  ['supplier_cost', 'Supplier cost'],
+  ['currency', 'Currency'],
+  ['unit', 'Unit'],
+];
+
+const show = (v: unknown) => (Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 interface XMLProductPreviewModalProps {
   isOpen: boolean;
@@ -52,6 +68,8 @@ interface XMLProductPreviewModalProps {
   // Fill-the-Gaps panel. Used to render the "from default" badge so the
   // operator sees exactly what their fallback covered.
   valueSources?: Record<string, 'xml' | 'default'>;
+  targetLabel?: (fieldName: string) => string;
+  isImporting?: boolean;
   onConfirm: () => void;
   onEdit: () => void;
   totalProducts: number;
@@ -80,6 +98,8 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
   onClose,
   product,
   valueSources = {},
+  targetLabel = (f) => formatLabel(f),
+  isImporting = false,
   onConfirm,
   onEdit,
   totalProducts,
@@ -265,27 +285,74 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
             </div>
           </div>
 
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Commercial
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {COMMERCIAL_FIELDS.map(([key, label]) => (
+                  <div key={key} className="bg-muted/50 rounded-lg p-2 border">
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                      <SourceBadge source={valueSources[key]} />
+                    </div>
+                    <p className="text-sm font-semibold truncate">{product[key] ? show(product[key]) : '—'}</p>
+                  </div>
+                ))}
+              </div>
+              {product.price && !product.currency && (
+                <p className="text-xs text-warning mt-2">
+                  No currency mapped or set — rows whose price carries no currency symbol will be refused.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {product.attributes && Object.keys(product.attributes).length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Category fields
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {Object.entries(product.attributes).map(([key, value]) => (
+                    <div key={key} className="bg-muted/50 rounded-lg p-2 border">
+                      <p className="text-xs font-medium text-muted-foreground">{targetLabel(key)}</p>
+                      <p className="text-sm font-semibold truncate" title={show(value)}>{show(value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Additional Metadata */}
           {product.metadata && Object.keys(product.metadata).length > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Additional Fields
+                  Extra data
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {Object.entries(product.metadata)
-                    .filter(([key]) => !['source_type', 'extraction_date', 'extraction_method'].includes(key))
                     .slice(0, 9)
                     .map(([key, value]) => (
                       <div key={key} className="bg-muted/50 rounded-lg p-2 border">
                         <p className="text-xs font-medium text-muted-foreground">
                           {formatLabel(key)}
                         </p>
-                        <p className="text-sm font-semibold truncate" title={String(value)}>
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        <p className="text-sm font-semibold truncate" title={show(value)}>
+                          {show(value)}
                         </p>
                       </div>
                     ))}
@@ -319,9 +386,9 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
               <Edit className="h-4 w-4 mr-2" />
               Edit mappings
             </Button>
-            <Button onClick={onConfirm} disabled={!hasAllRequiredFields}>
+            <Button onClick={onConfirm} disabled={!hasAllRequiredFields || isImporting}>
               <Upload className="h-4 w-4 mr-2" />
-              Start import
+              {isImporting ? 'Starting…' : 'Start import'}
             </Button>
           </div>
         </div>

@@ -39,6 +39,19 @@ export const productDetailService = {
     return data as unknown as ProductDetail;
   },
 
+  async fetchMany(productIds: Array<string | null | undefined>): Promise<Map<string, ProductDetail>> {
+    const ids = [...new Set(productIds.filter(Boolean))] as string[];
+    const out = new Map<string, ProductDetail>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data, error } = await supabase.rpc('get_product_details' as never, {
+        p_ids: ids.slice(i, i + 200),
+      } as never);
+      if (error) throw error;
+      for (const d of (data ?? []) as unknown as ProductDetail[]) if (d?.id) out.set(d.id, d);
+    }
+    return out;
+  },
+
   /**
    * The cost basis for a set of products, keyed by product id.
    *

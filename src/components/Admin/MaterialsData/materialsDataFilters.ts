@@ -49,8 +49,19 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
     case 'products':
       return [
         {
-          // Values come from the products_item_type_check constraint. `status` is
-          // deliberately absent — it carries no CHECK, so there is no vocabulary to offer.
+          // Ingest writes `draft`; publish_products moves a draft to `active`.
+          key: 'status',
+          type: 'multi',
+          label: 'Status',
+          description: 'Drafts are invisible on every public surface until published.',
+          column: 'status',
+          options: [
+            { value: 'draft', label: 'Draft' },
+            { value: 'active', label: 'Active' },
+          ],
+        },
+        {
+          // Values come from the products_item_type_check constraint.
           key: 'item_type',
           type: 'multi',
           label: 'Item type',

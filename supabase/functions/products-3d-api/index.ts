@@ -8,7 +8,10 @@ import {
   authenticateEmbedKey, embedJson, intersectIdFilters, type EmbedKeyContext,
 } from '../_shared/embed-key.ts';
 import { embedCorsHeaders } from '../_shared/cors.ts';
-import { imagesFromMetadata } from '../_shared/product-media.ts';
+import { associatedImagesByProduct, productImages } from '../_shared/product-media.ts';
+import {
+  PUBLIC_PRODUCT_STATUS, loadDefaultVatRate, normaliseVariantKey, productVatPct,
+} from '../_shared/commerce/public-catalogue.ts';
 // #447 — the embed runs the app's own format/pack parsers, so a product is PROJECTED to the keys
 // they read rather than answered with a second derivation of the format.
 import { pickProductSpec } from '../_shared/productSpecKeys.generated.ts';
@@ -80,7 +83,7 @@ async function loadOptions(
   supabase: ReturnType<typeof serviceClient>,
   workspaceId: string,
   productId: string,
-  vatRate: number,
+  vatPct: number,
 ) {
   const { data: groups } = await supabase
     .from('product_option_groups')
@@ -107,7 +110,7 @@ async function loadOptions(
       .map((v: any) => ({
         id: v.id,
         label: v.label,
-        price_delta: grossFromNet(v.price_delta, vatRate),
+        price_delta: grossFromNet(v.price_delta, vatPct),
         base_color_hex: v.base_color_hex,
         roughness: v.roughness,
         metalness: v.metalness,
@@ -312,20 +315,25 @@ Deno.serve(withApiLogging((req) => {
 
   // The published set, always scoped to the key's workspace. `storefront_published` lives on
   // product_prices, so this join IS the publication gate — a product with no published price row
-  // is not reachable through this endpoint at all.
-  const publishedQuery = () => supabase
+  // is not reachable through this endpoint at all. Only an `active` product is public.
+  const anyPublished = () => supabase
     .from('product_prices')
-    .select('product_id, list_price, currency, unit, product:products(id, name, description, metadata, item_type)')
+    .select('product_id, variant_key, list_price, currency, unit, '
+      + 'product:products!inner(id, name, description, metadata, item_type, status, mydata_vat_category)')
     .eq('workspace_id', workspaceId)
     .eq('storefront_published', true)
-    .not('list_price', 'is', null);
+    .not('list_price', 'is', null)
+    .eq('product.status', PUBLIC_PRODUCT_STATUS);
+  // One price row per product: the base row unless a variant is named. Unique per
+  // (workspace, product, variant_key), so `.maybeSingle()` over this cannot see two rows.
+  const publishedQuery = (variantKey: string | null = null) =>
+    variantKey ? anyPublished().eq('variant_key', variantKey) : anyPublished().is('variant_key', null);
+  const isPublished = async (productId: string) => {
+    const { data } = await anyPublished().eq('product_id', productId).limit(1);
+    return (data ?? []).length > 0;
+  };
 
-  const { data: vatRow } = await supabase
-    .from('finance_settings')
-    .select('default_vat_rate')
-    .eq('workspace_id', workspaceId)
-    .maybeSingle();
-  const vatRate = Number(vatRow?.default_vat_rate ?? 24);
+  const vatRate = await loadDefaultVatRate(supabase, workspaceId);
 
   if (action === 'list') {
     const limit = Math.min(Math.max(Number(params.limit) || 24, 1), MAX_LIMIT);
@@ -388,6 +396,13 @@ Deno.serve(withApiLogging((req) => {
 
     const priced = (rows ?? []).filter((r: any) => r.product);
     const ids = priced.map((r: any) => r.product_id);
+    let images: Awaited<ReturnType<typeof associatedImagesByProduct>>;
+    try {
+      images = await associatedImagesByProduct(supabase, ids);
+    } catch (e) {
+      captureException(e as Error);
+      return embedJson({ error: 'Could not load products' }, 500, cors);
+    }
 
     // Which of these have a ready model, in one query rather than N — AND how big it is.
     const formatsByProduct = new Map<string, string[]>();
@@ -450,9 +465,9 @@ Deno.serve(withApiLogging((req) => {
       description: r.product.description ?? null,
       unit: r.unit ?? null,
       item_type: r.product.item_type ?? 'good',
-      price: grossFromNet(r.list_price, vatRate),
+      price: grossFromNet(r.list_price, productVatPct(r.product.mydata_vat_category, vatRate)),
       currency: r.currency ?? 'EUR',
-      images: imagesFromMetadata(r.product.metadata),
+      images: productImages(images.get(r.product_id), r.product.metadata),
       cutout_url: cutoutByProduct.get(r.product_id) ?? null,
       buy: buyByProduct.get(r.product_id) ?? {},
       model_formats: formatsByProduct.get(r.product_id) ?? [],
@@ -478,7 +493,9 @@ Deno.serve(withApiLogging((req) => {
       return embedJson({ error: 'Product not found' }, 404, cors);
     }
 
-    const { data: row } = await publishedQuery().eq('product_id', productId).maybeSingle();
+    const variantKey = normaliseVariantKey(params.variant_key);
+    const { data: row, error: rowErr } = await publishedQuery(variantKey).eq('product_id', productId).maybeSingle();
+    if (rowErr) return embedJson({ error: 'Could not load the product' }, 500, cors);
     // 404 rather than 403 when the product belongs to another tenant or is unpublished — the two
     // must be indistinguishable, or the endpoint becomes a product-id oracle (invariant 1).
     if (!row || !(row as any).product) return embedJson({ error: 'Product not found' }, 404, cors);
@@ -493,7 +510,14 @@ Deno.serve(withApiLogging((req) => {
     // Configurator options (#258 Phase 2). Sent with the product so the widget can render the
     // picker on first paint rather than after a second round trip — the swatches ARE the product
     // on a configurable item, and revealing them late reads as a broken page.
-    const options = await loadOptions(supabase, workspaceId, productId, vatRate);
+    const product = (row as any).product;
+    const vatPct = productVatPct(product.mydata_vat_category, vatRate);
+    const options = await loadOptions(supabase, workspaceId, productId, vatPct);
+    const [{ data: variantRows, error: variantErr }, images] = await Promise.all([
+      anyPublished().eq('product_id', productId).not('variant_key', 'is', null),
+      associatedImagesByProduct(supabase, [productId]).catch(() => null),
+    ]);
+    if (variantErr || !images) return embedJson({ error: 'Could not load the product' }, 500, cors);
 
     // HOW THIS TENANT WANTS THEIR PRODUCTS LIT (#335, wired to the embed in #382).
     const { data: scene } = await supabase.rpc('resolve_scene_settings', {
@@ -502,18 +526,24 @@ Deno.serve(withApiLogging((req) => {
       p_embed_key_id: auth.ctx.keyId,
     });
 
-    const product = (row as any).product;
     return embedJson({
       ok: true,
       product: {
         product_id: (row as any).product_id,
+        variant_key: (row as any).variant_key ?? null,
         name: product.name,
         description: product.description ?? null,
         unit: (row as any).unit ?? null,
         item_type: product.item_type ?? 'good',
-        price: grossFromNet((row as any).list_price, vatRate),
+        price: grossFromNet((row as any).list_price, vatPct),
         currency: (row as any).currency ?? 'EUR',
-        images: imagesFromMetadata(product.metadata),
+        images: productImages(images.get(productId), product.metadata, variantKey),
+        variants: ((variantRows ?? []) as any[]).map((v) => ({
+          variant_key: v.variant_key,
+          unit: v.unit ?? null,
+          price: grossFromNet(v.list_price, vatPct),
+          currency: v.currency ?? 'EUR',
+        })),
         models: serializeModels(supabaseUrl, (models ?? []) as ModelRow[]),
         options,
         scene: scene ?? null,
@@ -532,8 +562,9 @@ Deno.serve(withApiLogging((req) => {
     if (!(await isProductInScope(supabase, auth.ctx, productId))) {
       return embedJson({ error: 'Product not found' }, 404, cors);
     }
-    const { data: published } = await publishedQuery().eq('product_id', productId).maybeSingle();
-    if (!published) return embedJson({ error: 'Product not found' }, 404, cors);
+    const { data: published } = await anyPublished().eq('product_id', productId).limit(1);
+    if (!published?.length) return embedJson({ error: 'Product not found' }, 404, cors);
+    const vatPct = productVatPct((published[0] as any).product?.mydata_vat_category, vatRate);
 
     const raw = params.option_value_ids;
     const optionIds = (Array.isArray(raw) ? raw : String(raw ?? '').split(','))
@@ -557,7 +588,7 @@ Deno.serve(withApiLogging((req) => {
       ok: true,
       // Gross, matching the `price` every other action returns — a configurator that quotes ex-VAT
       // next to a VAT-inclusive list price is a support ticket.
-      configured_price: net == null ? null : grossFromNet(net, vatRate),
+      configured_price: net == null ? null : grossFromNet(net, vatPct),
       currency: (p?.currency as string) ?? 'EUR',
       options_applied: p?.options_applied ?? 0,
       options_requested: p?.options_requested ?? 0,
@@ -804,7 +835,9 @@ Deno.serve(withApiLogging((req) => {
     let priced: unknown = null;
     if (res?.match_kind === 'exact' && matches[0]) {
       // Scope still applies: an exact match the key may not serve is not a match for this caller.
-      if (await isProductInScope(supabase, auth.ctx, matches[0].product_id)) {
+      const { data: pub } = await anyPublished().eq('product_id', matches[0].product_id).limit(1);
+      const vatPct = productVatPct((pub?.[0] as any)?.product?.mydata_vat_category, vatRate);
+      if ((pub ?? []).length > 0 && await isProductInScope(supabase, auth.ctx, matches[0].product_id)) {
         const { data: p } = await supabase.rpc('get_configured_product_price', {
           p_workspace_id: workspaceId,
           p_product_id: matches[0].product_id,
@@ -815,7 +848,7 @@ Deno.serve(withApiLogging((req) => {
         priced = {
           product_id: matches[0].product_id,
           name: matches[0].name,
-          price: net == null ? null : grossFromNet(net, vatRate),
+          price: net == null ? null : grossFromNet(net, vatPct),
           currency: (p as Record<string, unknown>)?.currency ?? 'EUR',
         };
       }
@@ -988,8 +1021,7 @@ Deno.serve(withApiLogging((req) => {
     if (!(await isProductInScope(supabase, auth.ctx, productId))) {
       return embedJson({ error: 'Product not found' }, 404, cors);
     }
-    const { data: published } = await publishedQuery().eq('product_id', productId).maybeSingle();
-    if (!published) return embedJson({ error: 'Product not found' }, 404, cors);
+    if (!(await isPublished(productId))) return embedJson({ error: 'Product not found' }, 404, cors);
 
     // The merchant previewing in the app is not a visitor; counting it would report a widget live
     // on no website.
@@ -1285,9 +1317,9 @@ Deno.serve(withApiLogging((req) => {
     const askFor = intersectIdFilters(await scopeRestriction(supabase, auth.ctx), wanted) ?? [];
     if (askFor.length === 0) return embedJson({ ok: true, faces: [] }, 200, cors);
 
-    const { data: pubRows, error: pubErr } = await publishedQuery().in('product_id', askFor);
+    const { data: pubRows, error: pubErr } = await anyPublished().in('product_id', askFor);
     if (pubErr) return embedJson({ error: 'Could not load products' }, 500, cors);
-    const publishedIds = ((pubRows ?? []) as any[]).map((r) => r.product_id);
+    const publishedIds = [...new Set(((pubRows ?? []) as any[]).map((r) => r.product_id as string))];
     if (publishedIds.length === 0) return embedJson({ ok: true, faces: [] }, 200, cors);
 
     const [productsRes, mapsRes] = await Promise.all([
@@ -1304,6 +1336,13 @@ Deno.serve(withApiLogging((req) => {
     if (productsRes.error || mapsRes.error) return embedJson({ error: 'Could not load products' }, 500, cors);
     const productRows = productsRes.data;
     const mapRows = mapsRes.data;
+    let images: Awaited<ReturnType<typeof associatedImagesByProduct>>;
+    try {
+      images = await associatedImagesByProduct(supabase, publishedIds);
+    } catch (e) {
+      captureException(e as Error);
+      return embedJson({ error: 'Could not load products' }, 500, cors);
+    }
 
     const albedo = new Map<string, string>();
     for (const m of (mapRows ?? []) as any[]) {
@@ -1316,7 +1355,7 @@ Deno.serve(withApiLogging((req) => {
       ok: true,
       faces: ((productRows ?? []) as any[]).map((p) => {
         const tile = albedo.get(p.id) ?? null;
-        const photo = tile ? null : (imagesFromMetadata(p.metadata)[0] ?? null);
+        const photo = tile ? null : (productImages(images.get(p.id), p.metadata)[0] ?? null);
         return {
           product_id: p.id,
           url: tile ?? photo,

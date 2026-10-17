@@ -846,6 +846,7 @@ export const createFindImageForMaterialTool = (userId: string, workspaceId: stri
               max_candidates: maxCandidates,
               search_db_first: searchDbFirst,
               caller_user_id: userId,
+              workspace_id: catalog.workspace_id ?? workspaceId,
             },
           },
         );

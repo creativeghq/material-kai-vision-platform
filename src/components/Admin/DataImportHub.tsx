@@ -22,10 +22,12 @@ import MaterialCategoriesTab from './DataImport/MaterialCategoriesTab';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 
 const DataImportHub: React.FC = () => {
   const navigate = useNavigate();
+  const { activeWorkspaceId } = useWorkspace();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam || 'pdf');
@@ -39,15 +41,17 @@ const DataImportHub: React.FC = () => {
     if (tabParam && ['pdf', 'xml', 'history', 'categories', 'csv', 'export'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
-  }, [tabParam]);
+  }, [tabParam, activeWorkspaceId]);
 
   const checkActiveJobs = async () => {
+    if (!activeWorkspaceId) return;
     try {
       setCheckingJobs(true);
       const { data, error } = await supabase
         .from('background_jobs')
         .select('*')
-        .eq('job_type', 'pdf_processing')
+        .eq('workspace_id', activeWorkspaceId)
+        .in('job_type', ['pdf_processing', 'product_discovery_upload'])
         .in('status', ['pending', 'processing'])
         .order('created_at', { ascending: false });
 

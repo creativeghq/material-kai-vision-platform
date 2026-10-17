@@ -45,13 +45,12 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
 
-  // Upload metadata
   const [manufacturer, setManufacturer] = useState('');
 
-  // Extraction
   const [extractQuery, setExtractQuery] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [candidates, setCandidates] = useState<ExtractCandidate[]>([]);
+  const [partialErrors, setPartialErrors] = useState<string[]>([]);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
   const [sectionTitle, setSectionTitle] = useState('');
 
@@ -125,14 +124,24 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
     if (!extractQuery.trim()) return;
     setExtracting(true);
     setCandidates([]);
+    setPartialErrors([]);
     setSelected({});
     try {
       const res = await catalogsService.extractFromPdfs({ catalogId: catalog.id, query: extractQuery.trim() });
       const cands = (res.candidates || []) as ExtractCandidate[];
+      const failures = Array.isArray(res.partial_errors) ? res.partial_errors : [];
+      setPartialErrors(failures);
+      if (failures.length > 0) {
+        toast({
+          title: `${failures.length} source PDF(s) could not be read`,
+          description: 'The results below cover only the PDFs that were read.',
+          variant: 'destructive',
+        });
+      }
       setCandidates(cands);
       setSelected(Object.fromEntries(cands.map((_, i) => [i, true])));
       setSectionTitle(`Extracted: ${extractQuery.trim().slice(0, 60)}`);
-      if (cands.length === 0) toast({ title: 'No matches', description: 'The Vision pass found no products for that query.' });
+      if (cands.length === 0 && failures.length === 0) toast({ title: 'No matches', description: 'The Vision pass found no products for that query.' });
     } catch (err) {
       toast({ title: 'Extract failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setExtracting(false); }
@@ -265,6 +274,17 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
                 Extract
               </Button>
             </div>
+
+            {partialErrors.length > 0 && (
+              <div role="alert" className="rounded-sm border border-hairline bg-surface-sunken p-2 text-xs">
+                <p className="font-semibold text-red-700 dark:text-red-300">
+                  {partialErrors.length} source PDF(s) failed; these results are incomplete.
+                </p>
+                <ul className="mt-1 list-disc pl-4 text-muted-foreground">
+                  {partialErrors.map((e) => <li key={e}>{e}</li>)}
+                </ul>
+              </div>
+            )}
 
             {candidates.length > 0 && (
               <div className="space-y-2">

@@ -19,12 +19,19 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
-import { scrapeToMarkdown, analysePage } from '../_shared/tools/material-scrape-tools.ts';
+import { scrapeToMarkdown } from '../_shared/tools/material-scrape-tools.ts';
+import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
+import { wrapUntrusted } from '../_shared/untrusted.ts';
+import { reserveCredits, refundCredits, settleCredits } from '../_shared/credit-reserve.ts';
+import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 
 const OP = 'intake_enrichment';
 const MAX_BATCH = 10;
 /** Below this the page is not confidently about this product, so nothing is written. */
 const MIN_CONFIDENCE = 0.5;
+const EXTRACTION_MODEL = 'claude-opus-5';
+const EXTRACTION_CEILING = 20;
+const MAX_PAGE_CHARS = 60_000;
 
 interface Claimed {
   product_id: string;
@@ -41,15 +48,34 @@ interface Claimed {
 /** The only source we will read: one we already hold. */
 const sourceFor = (p: Claimed): string | null => p.product_url ?? p.brand_website ?? null;
 
-function parseReply(raw: string): Record<string, unknown> | null {
-  const trimmed = raw.trim();
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start < 0 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(trimmed.slice(start, end + 1));
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
-  } catch { return null; }
+/** The reply shape is enforced by the server: field keys are the registry's, never the model's. */
+export function extractionSchema(fieldKeys: string[]) {
+  const base = {
+    source_confidence: z.number(),
+    image_urls: z.array(z.string()),
+  };
+  if (fieldKeys.length === 0) return z.object(base);
+  return z.object({
+    ...base,
+    values: z.array(z.object({
+      key: z.enum(fieldKeys as [string, ...string[]]),
+      value: z.union([z.string(), z.number(), z.boolean()]),
+    })),
+  });
+}
+
+/** Registry fields for a category: those scoped to it plus the globals (`applies_to_categories` null). */
+async function registryFieldKeys(supabase: any, categoryKey: string | null): Promise<string[]> {
+  let q = supabase
+    .from('material_metadata_fields')
+    .select('field_name')
+    .eq('status', 'active');
+  q = categoryKey
+    ? q.or(`applies_to_categories.is.null,applies_to_categories.cs.{${categoryKey}}`)
+    : q.is('applies_to_categories', null);
+  const { data, error } = await q;
+  if (error) throw new Error(`field registry unreadable: ${error.message}`);
+  return [...new Set((data ?? []).map((f: any) => f.field_name).filter(Boolean))] as string[];
 }
 
 Deno.serve(withApiLogging('intake-enrich-products', async (req) => {
@@ -74,8 +100,7 @@ Deno.serve(withApiLogging('intake-enrich-products', async (req) => {
   const limit = Math.min(Math.max(Number(body?.limit ?? MAX_BATCH) || MAX_BATCH, 1), MAX_BATCH);
 
   // The task prompt is a DB row; the FIELDS come from the registry, not from either.
-  const taskPrompt = await loadPrompt(supabase, 'tool', 'intake_enrichment');
-  const systemPrompt = 'You read a product page and return only what it states.';
+  const systemPrompt = await loadPrompt(supabase, 'tool', 'intake_enrichment');
 
   const { data: claimed, error: claimErr } = await supabase.rpc('claim_products_for_enrichment', {
     p_workspace: workspaceId, p_limit: limit,
@@ -89,105 +114,124 @@ Deno.serve(withApiLogging('intake-enrich-products', async (req) => {
   const results: any[] = [];
   let enriched = 0, noSource = 0, lowConfidence = 0, failed = 0;
 
-  for (const p of batch) {
+  /** Every outcome is recorded; a recording that did not persist is a failure, never a count. */
+  const record = async (productId: string, status: string, reason: string, findings: unknown): Promise<string | null> => {
+    const { error } = await supabase.rpc('record_product_enrichment', {
+      p_product: productId, p_status: status, p_reason: reason, p_findings: findings,
+    });
+    return error ? error.message : null;
+  };
+  const fail = async (p: Claimed, reason: string) => {
+    failed++;
+    const recErr = await record(p.product_id, 'failed', reason, null);
+    results.push({ product_id: p.product_id, status: 'failed', reason, ...(recErr ? { record_error: recErr } : {}) });
+  };
+
+  for (const [idx, p] of batch.entries()) {
     const url = sourceFor(p);
     if (!url) {
-      noSource++;
-      await supabase.rpc('record_product_enrichment', {
-        p_product: p.product_id, p_status: 'no_source',
-        p_reason: 'No product link and no website on its brand. Searching the web by name would be '
+      const recErr = await record(p.product_id, 'no_source',
+        'No product link and no website on its brand. Searching the web by name would be '
           + 'a guess, and a wrong specification on the right-looking product cannot be caught later.',
-        p_findings: null,
-      });
+        null);
+      if (recErr) { failed++; results.push({ product_id: p.product_id, status: 'failed', record_error: recErr }); continue; }
+      noSource++;
       results.push({ product_id: p.product_id, status: 'no_source' });
       continue;
     }
 
-    // Which fields this product's category actually has. `applies_to_categories` holds category
-    // KEYS, so a product with no material category asks for nothing in particular.
-    let fieldKeys: string[] = [];
-    if (p.category_key) {
-      const { data: fields } = await supabase
-        .from('material_metadata_fields')
-        .select('field_name, applies_to_categories')
-        .contains('applies_to_categories', [p.category_key])
-        .limit(60);
-      fieldKeys = (fields ?? []).map((f: any) => f.field_name).filter(Boolean);
+    let fieldKeys: string[];
+    try {
+      fieldKeys = await registryFieldKeys(supabase, p.category_key);
+    } catch (e) {
+      await fail(p, e instanceof Error ? e.message : String(e));
+      continue;
     }
 
     const scraped = await scrapeToMarkdown(url, userId, workspaceId, OP);
     if ('error' in scraped) {
-      failed++;
-      await supabase.rpc('record_product_enrichment', {
-        p_product: p.product_id, p_status: 'failed',
-        p_reason: `Could not read ${url}: ${String(scraped.error).slice(0, 300)}`,
-        p_findings: null,
-      });
-      results.push({ product_id: p.product_id, status: 'failed' });
+      await fail(p, `Could not read ${url}: ${String(scraped.error).slice(0, 300)}`);
       continue;
     }
 
-    const task = `${taskPrompt}\n\nPRODUCT: ${p.product_name}`
-      + (p.manufacturer ? `\nMAKER: ${p.manufacturer}` : '')
-      + (p.external_sku ? `\nSUPPLIER ARTICLE CODE: ${p.external_sku}` : '')
-      + (p.sku ? `\nOUR CODE: ${p.sku}` : '')
-      + `\n\nFIELD KEYS: ${fieldKeys.length ? fieldKeys.join(', ') : '(none declared for this category)'}`;
+    const identity = JSON.stringify({
+      product: p.product_name,
+      maker: p.manufacturer,
+      supplier_article_code: p.external_sku,
+      our_code: p.sku,
+      field_keys: fieldKeys,
+    });
+    const userMessage = `${wrapUntrusted('product record', identity)}\n\n${wrapUntrusted('product page', scraped.markdown, MAX_PAGE_CHARS)}`;
 
-    const analysed = await analysePage(systemPrompt, task, scraped.markdown, userId, workspaceId, OP);
-    if ('error' in analysed) {
-      failed++;
-      await supabase.rpc('record_product_enrichment', {
-        p_product: p.product_id, p_status: 'failed',
-        p_reason: `Extraction failed for ${url}: ${String(analysed.error).slice(0, 300)}`,
-        p_findings: null,
+    const reserve = await reserveCredits(supabase, userId, workspaceId, EXTRACTION_CEILING, OP);
+    if (!reserve.ok) {
+      const reason = reserve.message || 'Insufficient credits for the extraction pass.';
+      for (const rest of batch.slice(idx)) await fail(rest, reason);
+      break;
+    }
+
+    let reply: { source_confidence: number; image_urls: string[]; values?: Array<{ key: string; value: unknown }> };
+    try {
+      const res = await generateStructuredWithClaude(userMessage, extractionSchema(fieldKeys), {
+        model: EXTRACTION_MODEL,
+        systemPrompt,
+        temperature: 0,
+        task: OP,
+        userId,
+        workspaceId,
       });
-      results.push({ product_id: p.product_id, status: 'failed' });
+      if (!res.output) throw new Error('model returned no structured reply');
+      reply = res.output as typeof reply;
+      const price = await resolveTokenPrice(supabase, EXTRACTION_MODEL);
+      const actual = price
+        ? Math.round(((res.usage.inputTokens / 1e6) * price.input + (res.usage.outputTokens / 1e6) * price.output) * price.markup * 100 * 100) / 100
+        : 0;
+      await settleCredits(supabase, userId, workspaceId, EXTRACTION_CEILING, actual, OP, { product_id: p.product_id });
+    } catch (e) {
+      // A refusal or an off-schema reply is a FAILED extraction, never a parse target.
+      await refundCredits(supabase, userId, workspaceId, EXTRACTION_CEILING, OP, { reason: 'extraction_failed' });
+      await fail(p, `Extraction failed for ${url}: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}`);
       continue;
     }
 
-    const parsed = parseReply(analysed.text);
-    const confidence = Number(parsed?.source_confidence ?? 0);
-    if (!parsed || confidence < MIN_CONFIDENCE) {
-      lowConfidence++;
-      await supabase.rpc('record_product_enrichment', {
-        p_product: p.product_id, p_status: 'low_confidence',
-        p_reason: `The page at ${url} was not confidently about this product (${confidence.toFixed(2)}). `
+    const confidence = Number(reply.source_confidence ?? 0);
+    if (!(confidence >= MIN_CONFIDENCE)) {
+      const recErr = await record(p.product_id, 'low_confidence',
+        `The page at ${url} was not confidently about this product (${confidence.toFixed(2)}). `
           + 'Nothing was written: a thin product is a deliberate outcome, a wrong spec is not.',
-        p_findings: null,
-      });
+        null);
+      if (recErr) { failed++; results.push({ product_id: p.product_id, status: 'failed', record_error: recErr }); continue; }
+      lowConfidence++;
       results.push({ product_id: p.product_id, status: 'low_confidence', confidence });
       continue;
     }
 
-    // Only the keys the registry declares for this category. A field nobody has classified is not
-    // a field, and letting the model name its own would make `attributes_raw` a second registry.
+    const allowed = new Set(fieldKeys);
     const values: Record<string, unknown> = {};
-    for (const k of fieldKeys) {
-      if (parsed[k] !== undefined && parsed[k] !== null && parsed[k] !== '') values[k] = parsed[k];
+    for (const { key, value } of reply.values ?? []) {
+      if (allowed.has(key) && value !== null && value !== '') values[key] = value;
     }
-    const images = Array.isArray(parsed.image_urls)
-      ? (parsed.image_urls as unknown[]).filter((u) => typeof u === 'string').slice(0, 10)
-      : [];
+    const images = (reply.image_urls ?? []).filter((u) => typeof u === 'string' && /^https?:\/\//.test(u)).slice(0, 10);
 
-    await supabase.rpc('record_product_enrichment', {
-      p_product: p.product_id,
-      p_status: 'done',
-      p_reason: Object.keys(values).length
+    const recErr = await record(p.product_id, 'done',
+      Object.keys(values).length
         ? `Read ${Object.keys(values).length} field(s) from ${url}.`
         : `${url} described this product and stated none of its registry fields. That is a finding, `
           + 'not a failure.',
-      p_findings: {
+      {
         source_url: url,
         source: 'web_enrichment',
         confidence,
         read_at: new Date().toISOString(),
         values,
-        // Candidates, not associations: an image becomes searchable through `document_images` and
-        // `image_product_associations`, which belong to the catalogue ingestion path. Recording the
-        // URL here keeps the finding rather than dropping it on the floor.
+        // Candidates, not associations: images become searchable only through the ingestion path.
         image_candidates: images,
-      },
-    });
+      });
+    if (recErr) {
+      failed++;
+      results.push({ product_id: p.product_id, status: 'failed', record_error: recErr });
+      continue;
+    }
     enriched++;
     results.push({
       product_id: p.product_id, status: 'done',
@@ -196,7 +240,7 @@ Deno.serve(withApiLogging('intake-enrich-products', async (req) => {
   }
 
   return json({
-    ok: true,
+    ok: failed === 0,
     claimed: batch.length,
     enriched,
     no_source: noSource,

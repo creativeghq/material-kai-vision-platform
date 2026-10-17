@@ -51,11 +51,10 @@ export function parseFormatText(text: unknown): TileFormat | null {
 }
 
 /**
- * One piece's format in metres, read where the pipeline writes it: the registry's tile fields in
- * `attributes` or the `metadata.dimensions` section (with the registry's unit dropdown, cm when
- * absent), the roll and plank fields whose unit is in their name, then the structured sizes and
- * the "60x60" strings the extractors emit. The registry carries no unit column, so the units
- * here are the convention the seeds use — a bare 60x60 is centimetres.
+ * One piece's format in metres, read where the pipeline writes it: the registry's `width_mm` /
+ * `length_mm` in `attributes`, the `metadata.dimensions` section or metadata, then the roll and
+ * plank fields, then the structured sizes and the "60x60" strings the extractors emit. Every
+ * registry key carries its unit in its name; a bare 60x60 string is centimetres.
  */
 export function tileFormatM(row: { attributes?: unknown; metadata?: unknown }): TileFormat {
   const attributes = obj(row.attributes);
@@ -63,13 +62,13 @@ export function tileFormatM(row: { attributes?: unknown; metadata?: unknown }): 
   const dims = obj(metadata.dimensions);
 
   for (const src of [attributes, dims, metadata]) {
-    const f = pair(positive(src.width), positive(src.length), unitFactor(src.dimension_unit ?? src.unit, 'cm'));
+    const f = pair(positive(src.width_mm), positive(src.length_mm), 0.001);
     if (f) return f;
   }
 
-  const rollW = positive(attributes.roll_width_cm ?? metadata.roll_width_cm);
+  const rollW = positive(attributes.roll_width_mm ?? metadata.roll_width_mm);
   const rollL = positive(attributes.roll_length_m ?? metadata.roll_length_m);
-  if (rollW && rollL) return { tileWidthM: rollW / 100, tileLengthM: rollL, formatSource: 'recorded' };
+  if (rollW && rollL) return { tileWidthM: rollW / 1000, tileLengthM: rollL, formatSource: 'recorded' };
 
   const plank = pair(
     positive(attributes.plank_width_mm ?? metadata.plank_width_mm),
@@ -108,10 +107,7 @@ export function packCoverageM2(
   const direct = read('m2_per_box') ?? read('coverage_per_roll_m2');
   if (direct) return direct;
 
-  const sqft = read('sqft_per_box');
-  if (sqft) return metres(sqft, 0.09290304);
-
-  const pieces = read('pieces_per_box') ?? read('planks_per_box');
+  const pieces = read('pieces_per_box');
   if (pieces && pieceAreaM2 && pieceAreaM2 > 0) return Math.round(pieces * pieceAreaM2 * 1e6) / 1e6;
 
   return null;

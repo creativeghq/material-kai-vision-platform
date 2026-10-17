@@ -400,20 +400,22 @@ export const createFindProductsBySpecTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ ip_min, ip_max, pei_min, thickness_min, thickness_max, wattage_min, wattage_max, limit }: {
-      ip_min?: number; ip_max?: number; pei_min?: number;
+    async ({ category, ip_min, ip_max, pei_min, pei_max, thickness_min, thickness_max, wattage_min, wattage_max, limit }: {
+      category?: string; ip_min?: number; ip_max?: number; pei_min?: number; pei_max?: number;
       thickness_min?: number; thickness_max?: number; wattage_min?: number; wattage_max?: number; limit?: number;
     }) => {
       const sb = svcClient();
-      const filters: Record<string, number> = {};
+      const filters: Record<string, number | string> = {};
       if (ip_min != null) filters.ip_min = ip_min;
       if (ip_max != null) filters.ip_max = ip_max;
       if (pei_min != null) filters.pei_min = pei_min;
+      if (pei_max != null) filters.pei_max = pei_max;
       if (thickness_min != null) filters.thickness_min = thickness_min;
       if (thickness_max != null) filters.thickness_max = thickness_max;
       if (wattage_min != null) filters.wattage_min = wattage_min;
       if (wattage_max != null) filters.wattage_max = wattage_max;
       if (Object.keys(filters).length === 0) return JSON.stringify({ success: false, error: 'Provide at least one numeric spec filter (ip/pei/thickness/wattage).' });
+      if (category) filters.category = category;
       const { data, error } = await sb.rpc('search_products_by_specs', { p_workspace_id: workspaceId, p_filters: filters, p_limit: limit ?? 50 });
       if (error) return JSON.stringify({ success: false, error: error.message });
       onChunk?.({ type: 'find_products_by_spec_result', workspace_id: workspaceId, filters, products: data, timestamp: Date.now() });
@@ -424,11 +426,14 @@ export const createFindProductsBySpecTool = (
       description:
         'Filter products by NUMERIC spec ranges — IP rating, PEI class, thickness (mm), wattage (W) — ' +
         'parsed from product specs into queryable numbers. Use for "tiles with IP rating 65 or higher", ' +
-        '"PEI IV and above", "panels 6–10mm thick", "fixtures 50–100W". Pass any combination of min/max bounds.',
+        '"PEI IV and above", "panels 6–10mm thick", "fixtures 50–100W". Pass any combination of min/max bounds. ' +
+        'Thickness is the product\'s single thickness_mm value, never a format like 60x60.',
       schema: z.object({
+        category: z.string().optional().describe('Category key to restrict to, e.g. tiles, lighting, sanitary'),
         ip_min: z.number().optional().describe('Minimum IP rating, e.g. 65'),
         ip_max: z.number().optional().describe('Maximum IP rating'),
         pei_min: z.number().optional().describe('Minimum PEI class (1–5; III = 3)'),
+        pei_max: z.number().optional().describe('Maximum PEI class (1–5)'),
         thickness_min: z.number().optional().describe('Minimum thickness in mm'),
         thickness_max: z.number().optional().describe('Maximum thickness in mm'),
         wattage_min: z.number().optional().describe('Minimum wattage in W'),
@@ -548,7 +553,7 @@ export const createPriceMySpecTool = (
             + 'the offer rather than linking to an empty planner. Then quote this price.'
           : 'No match for the keys you used. FIRST check `available_vocabulary` above — it lists the '
             + 'facet keys and in-stock values this catalogue actually uses, and your key names may '
-            + 'simply differ (e.g. "color" vs "available_colors"). Retry once with the real keys. '
+            + 'simply differ (e.g. "colour" vs "color"). Retry once with the real keys. '
             + 'If it still misses, the catalogue genuinely does not have it: do NOT estimate a price '
             + '— offer to raise a quote request. Near matches are suggestions and carry no price on purpose.',
       });
@@ -564,7 +569,7 @@ export const createPriceMySpecTool = (
       schema: z.object({
         product_type: z.string().optional().describe('What the thing IS, e.g. "lounge armchair", "floor tile"'),
         spec: z.record(z.string()).optional().describe(
-          'Attributes as key/value, e.g. {"fabric":"linen","available_colors":"sunset"}',
+          'Attributes as key/value, e.g. {"fabric":"linen","color":"sunset"}',
         ),
         limit: z.number().optional().describe('Max matches and near matches (default 5)'),
       }),

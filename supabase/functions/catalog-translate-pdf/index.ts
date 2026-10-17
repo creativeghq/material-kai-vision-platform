@@ -336,8 +336,10 @@ async function rasterizeAllMaterials(supabase: any, sections: any[]): Promise<vo
             dpi: 200,
           },
         });
-        if (!error && data?.success && data.image_url) {
-          m.image_url = data.image_url;
+        // pdf-tiles is public-read: persist the path and its permanent URL, never the expiring signed one.
+        if (!error && data?.success && typeof data.storage_path === 'string' && data.storage_path) {
+          m.image_storage_path = data.storage_path;
+          m.image_url = supabase.storage.from('pdf-tiles').getPublicUrl(data.storage_path).data.publicUrl;
           m.image_source = 'extracted_from_pdf';
           m.image_source_ref = `${provenance.source_pdf_id}#${provenance.page_no}`;
         }

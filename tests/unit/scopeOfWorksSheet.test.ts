@@ -59,7 +59,7 @@ describe('a client never sees internal work', () => {
   });
 
   it('a failure is loud, because an empty scope on a sent document is worse than no document', () => {
-    expect(fetcher).toMatch(/console\.error/);
+    expect(fetcher).toMatch(/if \(error\) throw new Error\(`Scope of works unreadable/);
   });
 });
 

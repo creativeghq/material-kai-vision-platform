@@ -5,7 +5,7 @@
  * allowance and the box rounding come from the SQL derivation, so what is shown here is what the
  * order will carry — and the uplift is shown AS an uplift, never folded into the quantity.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Ruler, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -36,26 +36,39 @@ export const TileQuantityDialog: React.FC<{
   const [quantity, setQuantity] = useState<TileQuantity | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [computedFor, setComputedFor] = useState<string | null>(null);
+  const seq = useRef(0);
 
   const measured = totalArea(rooms);
+  const inputKey = `${measured.area}|${wastage.trim()}`;
 
-  const derive = useCallback(async (area: number, pct: number | null) => {
-    if (area <= 0) { setQuantity(null); return; }
+  const derive = useCallback(async (area: number, pct: number | null, key: string) => {
+    const mine = ++seq.current;
+    setComputedFor(null);
+    if (area <= 0) { setQuantity(null); setLoading(false); return; }
     setLoading(true);
     try {
-      setQuantity(await tileQuantityService.forLine({
+      const result = await tileQuantityService.forLine({
         productId, requested: area, wastagePercent: pct,
-      }));
+      });
+      if (mine !== seq.current) return;
+      setQuantity(result);
       setFailed(false);
+      setComputedFor(key);
     } catch {
+      if (mine !== seq.current) return;
       setQuantity(null); setFailed(true);
-    } finally { setLoading(false); }
+    } finally {
+      if (mine === seq.current) setLoading(false);
+    }
   }, [productId]);
+
+  const canApply = !loading && !failed && quantity?.supplied != null && computedFor === inputKey;
 
   useEffect(() => {
     if (!open) return;
     const pct = wastage.trim() === '' ? null : Number(wastage);
-    void derive(measured.area, Number.isFinite(pct as number) ? pct : null);
+    void derive(measured.area, Number.isFinite(pct as number) ? pct : null, inputKey);
     // `measured.area` is the only input that matters; recomputing on every keystroke of an
     // unfinished dimension would fire a query per digit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,9 +78,10 @@ export const TileQuantityDialog: React.FC<{
     setRooms((rs) => rs.map((r, n) => (n === i ? { ...r, ...patch } : r)));
 
   const apply = () => {
+    if (!canApply || quantity?.supplied == null) return;
     const pct = wastage.trim() === '' ? null : Number(wastage);
     onApply({
-      quantity: quantity?.supplied ?? measured.area,
+      quantity: quantity.supplied,
       wastagePercent: Number.isFinite(pct as number) ? (pct as number) : null,
       note: describeRooms(rooms),
     });
@@ -201,7 +215,7 @@ export const TileQuantityDialog: React.FC<{
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={apply} disabled={measured.area <= 0}>Use this quantity</Button>
+          <Button onClick={apply} disabled={!canApply}>Use this quantity</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

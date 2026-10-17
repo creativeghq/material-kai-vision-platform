@@ -126,13 +126,13 @@ describe('the spec projection', () => {
     // and a 60×120 slab rendered as the assumed 60×60 with nobody able to tell.
     const kept = pickProductSpec({
       available_sizes: [{ width: 60, length: 120, unit: 'cm' }],
-      dimensions: { width: 30, length: 60, dimension_unit: 'cm' },
+      dimensions: { width: 30, length: 60, unit: 'cm' },
       m2_per_box: '1.44',
       cost: 999,
       supplier_company_id: 'leak',
     }) as Record<string, unknown>;
     expect((kept.available_sizes as Array<Record<string, unknown>>)[0]).toEqual({ width: 60, length: 120, unit: 'cm' });
-    expect(kept.dimensions).toEqual({ width: 30, length: 60, dimension_unit: 'cm' });
+    expect(kept.dimensions).toEqual({ width: 30, length: 60, unit: 'cm' });
     expect(kept.m2_per_box).toBe('1.44');
     // And it is still an allowlist: nothing unclassified rides along.
     expect(kept.cost).toBeUndefined();

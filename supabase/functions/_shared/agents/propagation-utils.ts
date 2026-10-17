@@ -1,16 +1,10 @@
 /**
- * Factory Propagation Utilities
- *
- * Shared helpers for propagating factory metadata across products
- * that share the same scope (source_document_id, scrape_session_id, etc.).
- *
- * The canonical factory data lives in two places (always kept in sync):
- *   - products.metadata['factory']  — full nested object (canonical)
- *   - products.metadata['factory_name'] / ['factory_group_name'] — backward-compat flat fields
+ * Factory propagation: share the most complete `metadata.factory` object between products of
+ * the SAME manufacturer inside one workspace-bound scope. `metadata.factory` is canonical;
+ * `factory_name` / `factory_group_name` are flat mirrors kept in sync.
  */
 
 import type { DbClient } from '../supabase-client.ts';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ── Factory object shape ──────────────────────────────────────────────────────
 
@@ -61,113 +55,133 @@ export function mergeFactory(
   return result;
 }
 
-// ── Scope helpers ─────────────────────────────────────────────────────────────
+function isFilled(v: unknown): boolean {
+  return v !== undefined && v !== null && String(v).trim() !== '';
+}
 
-type ScopeColumn = 'source_document_id' | 'scrape_session_id' | 'workspace_id';
-
-/**
- * Find the most complete `metadata.factory` object across all products
- * in a given scope (e.g. all products from the same PDF document).
- */
-async function findBestFactoryInScope(
-  supabase: DbClient,
-  scopeColumn: ScopeColumn,
-  scopeValue: string,
-): Promise<FactoryObject | null> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('id, metadata')
-    .eq(scopeColumn, scopeValue)
-    .not('metadata', 'is', null);
-
-  if (error || !data || data.length === 0) return null;
-
-  let best: FactoryObject | null = null;
-  let bestScore = 0;
-
-  for (const row of data) {
-    const factory = (row.metadata as any)?.factory as FactoryObject | undefined;
-    if (!factory) continue;
-    const score = factoryCompletenessScore(factory);
-    if (score > bestScore) {
-      bestScore = score;
-      best = factory;
+/** Copy `source` values only into fields `target` leaves empty — never overwrites. */
+export function fillEmptyFactoryFields(target: FactoryObject, source: FactoryObject): FactoryObject {
+  const result: FactoryObject = { ...target };
+  for (const [k, v] of Object.entries(source)) {
+    if (isFilled(v) && !isFilled((result as Record<string, unknown>)[k])) {
+      (result as Record<string, unknown>)[k] = v;
     }
   }
+  return result;
+}
 
-  return best;
+// ── Scope helpers ─────────────────────────────────────────────────────────────
+
+export const FACTORY_SCOPE_COLUMNS = ['source_document_id'] as const;
+export type FactoryScopeColumn = typeof FACTORY_SCOPE_COLUMNS[number];
+
+export function isFactoryScopeColumn(v: unknown): v is FactoryScopeColumn {
+  return typeof v === 'string' && (FACTORY_SCOPE_COLUMNS as readonly string[]).includes(v);
+}
+
+export function factoryNameKey(meta: Record<string, unknown>): string {
+  const factory = (meta.factory ?? {}) as FactoryObject;
+  const name = factory.factory_name ?? meta.factory_name;
+  return typeof name === 'string' ? name.trim().toLowerCase().replace(/\s+/g, ' ') : '';
+}
+
+interface ScopedProduct { id: string; metadata: Record<string, unknown> }
+
+/**
+ * Pure planner: for each manufacturer in the scope pick its most complete factory object and
+ * fill only the EMPTY fields of that manufacturer's other products. A product with no
+ * manufacturer name inherits only when the scope holds exactly one manufacturer.
+ */
+export function planFactoryPropagation(products: ScopedProduct[]): Array<{ id: string; metadata: Record<string, unknown> }> {
+  const best = new Map<string, { factory: FactoryObject; score: number }>();
+  for (const p of products) {
+    const key = factoryNameKey(p.metadata);
+    if (!key) continue;
+    const factory = (p.metadata.factory ?? {}) as FactoryObject;
+    const score = factoryCompletenessScore(factory);
+    const cur = best.get(key);
+    if (!cur || score > cur.score) best.set(key, { factory, score });
+  }
+  const soleKey = best.size === 1 ? [...best.keys()][0] : null;
+
+  const updates: Array<{ id: string; metadata: Record<string, unknown> }> = [];
+  for (const p of products) {
+    const key = factoryNameKey(p.metadata) || soleKey;
+    if (!key) continue;
+    const source = best.get(key);
+    if (!source || source.score === 0) continue;
+    const existing = (p.metadata.factory ?? {}) as FactoryObject;
+    if (factoryCompletenessScore(existing) >= 0.9) continue;
+    const merged = fillEmptyFactoryFields(existing, source.factory);
+    if (JSON.stringify(merged) === JSON.stringify(existing)) continue;
+    updates.push({
+      id: p.id,
+      metadata: {
+        ...p.metadata,
+        factory: merged,
+        factory_name: merged.factory_name ?? p.metadata.factory_name,
+        factory_group_name: merged.factory_group_name ?? p.metadata.factory_group_name,
+      },
+    });
+  }
+  return updates;
 }
 
 /**
- * Propagate factory data to all products in a scope that are missing it.
- * Merges rather than overwrites — existing partial data is preserved.
- *
- * @returns number of products updated
+ * Propagate factory data within `scopeColumn = scopeValue`, bounded to `workspaceId`.
+ * Throws on an unknown scope column or a failed read; returns the number of rows updated.
  */
 export async function propagateFactoryFieldsInScope(
   supabase: DbClient,
-  scopeColumn: ScopeColumn,
+  workspaceId: string,
+  scopeColumn: FactoryScopeColumn,
   scopeValue: string,
 ): Promise<number> {
-  const best = await findBestFactoryInScope(supabase, scopeColumn, scopeValue);
-  if (!best || factoryCompletenessScore(best) === 0) return 0;
+  if (!workspaceId) throw new Error('propagateFactoryFieldsInScope: workspaceId is required');
+  if (!isFactoryScopeColumn(scopeColumn)) throw new Error(`Unsupported scope column: ${String(scopeColumn)}`);
 
-  const { data: products, error } = await supabase
+  const { data, error } = await supabase
     .from('products')
     .select('id, metadata')
+    .eq('workspace_id', workspaceId)
     .eq(scopeColumn, scopeValue)
     .not('metadata', 'is', null);
+  if (error) throw new Error(`Factory propagation read failed: ${error.message}`);
 
-  if (error || !products) return 0;
+  const products = (data ?? []).map((r: { id: string; metadata: unknown }) => ({
+    id: r.id,
+    metadata: ((r.metadata ?? {}) as Record<string, unknown>),
+  }));
 
   let updated = 0;
-
-  for (const product of products) {
-    const meta     = ((product.metadata as any) ?? {}) as Record<string, unknown>;
-    const existing = (meta.factory ?? {}) as FactoryObject;
-
-    // Skip if already complete
-    if (factoryCompletenessScore(existing) >= 0.9) continue;
-
-    const merged = mergeFactory(existing, best);
-
-    // Write back: nested factory object + flat backward-compat fields
-    const newMeta = {
-      ...meta,
-      factory:             merged,
-      factory_name:        merged.factory_name        ?? meta.factory_name,
-      factory_group_name:  merged.factory_group_name  ?? meta.factory_group_name,
-    };
-
+  for (const u of planFactoryPropagation(products)) {
     const { error: updateErr } = await supabase
       .from('products')
-      .update({ metadata: newMeta })
-      .eq('id', product.id);
-
+      .update({ metadata: u.metadata })
+      .eq('id', u.id)
+      .eq('workspace_id', workspaceId);
     if (!updateErr) updated++;
   }
-
   return updated;
 }
 
-/**
- * Write a factory object onto a single product, syncing flat fields too.
- * Safe to call with a partial object — only non-empty values are written.
- */
+/** Write a factory object onto one product of `workspaceId`, syncing the flat fields. */
 export async function writeFactoryToProduct(
   supabase: DbClient,
+  workspaceId: string,
   productId: string,
   factory: FactoryObject,
-): Promise<void> {
+): Promise<boolean> {
   const { data, error: fetchErr } = await supabase
     .from('products')
     .select('metadata')
     .eq('id', productId)
-    .single();
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
 
-  if (fetchErr || !data) return;
+  if (fetchErr || !data) return false;
 
-  const meta     = ((data.metadata as any) ?? {}) as Record<string, unknown>;
+  const meta     = ((data.metadata as Record<string, unknown> | null) ?? {});
   const existing = (meta.factory ?? {}) as FactoryObject;
   const merged   = mergeFactory(existing, factory);
 
@@ -178,5 +192,10 @@ export async function writeFactoryToProduct(
     factory_group_name:  merged.factory_group_name  ?? meta.factory_group_name,
   };
 
-  await supabase.from('products').update({ metadata: newMeta }).eq('id', productId);
+  const { error } = await supabase
+    .from('products')
+    .update({ metadata: newMeta })
+    .eq('id', productId)
+    .eq('workspace_id', workspaceId);
+  return !error;
 }

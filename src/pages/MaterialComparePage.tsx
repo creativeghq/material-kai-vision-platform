@@ -4,8 +4,7 @@
  * URL: /compare?ids=id1,id2,...
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { formatLabel } from '@/lib/labelUtils';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/core/ui/button';
@@ -16,6 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import { getManufacturer } from '@/utils/productMetadata';
 import { resolveUploadCategory } from '@/lib/categoryFieldRegistry';
 import { trackProductCompare } from '@/services/manufacturerAnalyticsService';
+import { productDetailService } from '@/services/productDetailService';
+import { useFieldRegistry } from '@/hooks/useFieldRegistry';
+import { buildCompareSections, valuesDiffer } from '@/pages/compareRows';
 import {
   X,
   Plus,
@@ -43,11 +45,13 @@ interface Product {
   name: string;
   description: string;
   category_id: string | null;
+  category?: string | null;
   status: string | null;
   quality_score: number | null;
   confidence_score: number | null;
   properties: Record<string, unknown> | null;
   specifications: Record<string, unknown> | null;
+  attributes?: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   image_url?: string;
 }
@@ -60,22 +64,6 @@ interface SearchResult {
 
 const MAX_COMPARE = 4;
 const MIN_COMPARE = 2;
-
-function flattenObject(obj: Record<string, unknown> | null, prefix = ''): Record<string, string> {
-  if (!obj) return {};
-  const result: Record<string, string> = {};
-  for (const [key, val] of Object.entries(obj)) {
-    const fullKey = prefix ? `${prefix}.${key}` : key;
-    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
-      Object.assign(result, flattenObject(val as Record<string, unknown>, fullKey));
-    } else {
-      result[fullKey] = val === null ? '—' : String(val);
-    }
-  }
-  return result;
-}
-
-// formatLabel is imported from @/lib/labelUtils — handles snake_case, camelCase, acronyms
 
 function ScoreBar({ value, label, note }: { value: number | null; label: string; note?: string }) {
   if (value === null) return <span className="text-muted-foreground text-sm">—</span>;
@@ -98,6 +86,7 @@ export default function MaterialComparePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const registry = useFieldRegistry();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [completeness, setCompleteness] = useState<Record<string, { score: number | null; reason: string | null }>>({});
@@ -129,10 +118,24 @@ export default function MaterialComparePage() {
         pairs.filter(([, c]) => c).map(([id, c]) => [id, { score: c!.score, reason: c!.reason }]),
       ));
     });
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, description, category_id, status, quality_score, confidence_score, properties, specifications, metadata')
-      .in('id', productIds);
+    let data: Product[] | null = null;
+    let error: Error | null = null;
+    try {
+      const details = await Promise.all(productIds.map((id) => productDetailService.fetch(id)));
+      data = details.filter(Boolean).map((d) => ({
+        quality_score: null,
+        confidence_score: null,
+        category_id: null,
+        status: null,
+        properties: null,
+        specifications: null,
+        metadata: null,
+        description: '',
+        ...(d as unknown as Partial<Product>),
+      })) as Product[];
+    } catch (e) {
+      error = e instanceof Error ? e : new Error(String(e));
+    }
 
     if (error) {
       toast({ title: 'Error loading products', description: error.message, variant: 'destructive' });
@@ -171,13 +174,12 @@ export default function MaterialComparePage() {
   const searchProducts = useCallback(async (query: string) => {
     if (!query.trim()) { setSearchResults([]); return; }
     setSearching(true);
-    const { data } = await supabase
-      .from('products')
-      .select('id, name, description')
-      .ilike('name', `%${query}%`)
-      .not('id', 'in', `(${ids.join(',') || '00000000-0000-0000-0000-000000000000'})`)
-      .limit(8);
-    setSearchResults(data ?? []);
+    const { data } = await supabase.rpc('search_catalogue', { p_query: query, p_limit: 12 });
+    const taken = new Set(ids);
+    setSearchResults(((data ?? []) as Array<{ id: string; name: string; description: string | null }>)
+      .filter((r) => !taken.has(r.id))
+      .slice(0, 8)
+      .map((r) => ({ id: r.id, name: r.name, description: r.description ?? '' })));
     setSearching(false);
   }, [ids]);
 
@@ -202,18 +204,10 @@ export default function MaterialComparePage() {
     setSearchParams(newIds.length ? { ids: newIds.join(',') } : {});
   };
 
-  // Collect all property + spec keys across all products
-  const allPropKeys = Array.from(
-    new Set(products.flatMap((p) => Object.keys(flattenObject(p.properties as Record<string, unknown>)))),
+  const sections = useMemo(
+    () => (registry.snapshot ? buildCompareSections(products, registry.snapshot) : []),
+    [products, registry.snapshot],
   );
-  const allSpecKeys = Array.from(
-    new Set(products.flatMap((p) => Object.keys(flattenObject(p.specifications as Record<string, unknown>)))),
-  );
-
-  const getValues = (products: Product[], key: string, section: 'properties' | 'specifications') =>
-    products.map((p) => flattenObject(p[section] as Record<string, unknown>)[key] ?? '—');
-
-  const isDifferent = (values: string[]) => new Set(values.filter((v) => v !== '—')).size > 1;
 
   if (loading) {
     return (
@@ -381,92 +375,53 @@ export default function MaterialComparePage() {
             </thead>
 
             <tbody>
-              {/* Properties section */}
-              {allPropKeys.length > 0 && (
-                <>
-                  <tr>
-                    <td colSpan={products.length + 1} className="px-3 pt-6 pb-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Properties
-                      </p>
-                    </td>
-                  </tr>
-                  {allPropKeys.map((key) => {
-                    const values = getValues(products, key, 'properties');
-                    const diff = isDifferent(values);
-                    return (
-                      <tr key={`prop-${key}`} className={diff ? 'bg-accent/30' : ''}>
-                        <td className="sticky left-0 z-10 bg-background p-3 text-sm text-muted-foreground align-top">
-                          <div className="flex items-center gap-1.5">
-                            {diff ? (
-                              <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-                            ) : (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                            )}
-                            {formatLabel(key)}
-                          </div>
-                        </td>
-                        {values.map((v, i) => (
-                          <td
-                            key={i}
-                            className={`p-3 text-sm align-top border-l border-border/40 ${
-                              diff ? 'font-medium' : ''
-                            }`}
-                          >
-                            {v}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </>
-              )}
-
-              {/* Specifications section */}
-              {allSpecKeys.length > 0 && (
-                <>
-                  <tr>
-                    <td colSpan={products.length + 1} className="px-3 pt-6 pb-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Specifications
-                      </p>
-                    </td>
-                  </tr>
-                  {allSpecKeys.map((key) => {
-                    const values = getValues(products, key, 'specifications');
-                    const diff = isDifferent(values);
-                    return (
-                      <tr key={`spec-${key}`} className={diff ? 'bg-accent/30' : ''}>
-                        <td className="sticky left-0 z-10 bg-background p-3 text-sm text-muted-foreground align-top">
-                          <div className="flex items-center gap-1.5">
-                            {diff ? (
-                              <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-                            ) : (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                            )}
-                            {formatLabel(key)}
-                          </div>
-                        </td>
-                        {values.map((v, i) => (
-                          <td
-                            key={i}
-                            className={`p-3 text-sm align-top border-l border-border/40 ${
-                              diff ? 'font-medium' : ''
-                            }`}
-                          >
-                            {v}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </>
-              )}
-
-              {allPropKeys.length === 0 && allSpecKeys.length === 0 && (
+              {!registry.ready && (
                 <tr>
                   <td colSpan={products.length + 1} className="p-6 text-center text-muted-foreground text-sm">
-                    No properties or specifications available for these materials.
+                    {registry.error ? 'The field registry could not be loaded, so no specifications are shown.' : 'Loading specifications…'}
+                  </td>
+                </tr>
+              )}
+
+              {sections.map((section) => (
+                <React.Fragment key={section.key}>
+                  <tr>
+                    <td colSpan={products.length + 1} className="px-3 pt-6 pb-2">
+                      <p className="text-xs font-semibold text-muted-foreground">{section.label}</p>
+                    </td>
+                  </tr>
+                  {section.rows.map((row) => {
+                    const diff = valuesDiffer(row.values);
+                    return (
+                      <tr key={`${section.key}-${row.key}`} className={diff ? 'bg-accent/30' : ''}>
+                        <td className="sticky left-0 z-10 bg-background p-3 text-sm text-muted-foreground align-top">
+                          <div className="flex items-center gap-1.5">
+                            {diff ? (
+                              <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                            )}
+                            {row.label}
+                          </div>
+                        </td>
+                        {row.values.map((v, i) => (
+                          <td
+                            key={i}
+                            className={`p-3 text-sm align-top border-l border-border/40 ${diff ? 'font-medium' : ''}`}
+                          >
+                            {v}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+
+              {registry.ready && sections.length === 0 && (
+                <tr>
+                  <td colSpan={products.length + 1} className="p-6 text-center text-muted-foreground text-sm">
+                    No specifications recorded for these materials.
                   </td>
                 </tr>
               )}

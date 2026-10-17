@@ -570,12 +570,12 @@ function createAgentGraph(
                 name: productName,
                 description: r.description || r.content || '',
                 category: r.category || r.metadata?.category || 'materials',
-                type: r.type || r.metadata?.material_type || 'general',
+                type: r.type || r.metadata?.material || 'general',
                 status: 'active',
                 images: imageUrl ? [{ url: imageUrl, alt: productName, isPrimary: true }] : [],
                 metadata: {
                   ...r.metadata,
-                  factory_name: r.factory || r.metadata?.factory || r.manufacturer,
+                  factory_name: r.factory || r.metadata?.factory_name || r.manufacturer,
                   score: r.score || r.similarity_score,
                 },
                 pricing: {

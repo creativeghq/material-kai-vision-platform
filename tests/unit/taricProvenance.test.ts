@@ -26,7 +26,7 @@ describe('#360 CB-17 — approving is not authoring', () => {
   it('a code typed by a person is still manual', () => {
     // The distinction only means something if both halves exist.
     const card = read('src/components/business/marketplace/ProductFiscalCard.tsx');
-    expect(card).toMatch(/taric_status: 'confirmed', taric_source: 'manual'/);
+    expect(card).toMatch(/taric_status: form\.taric \? 'confirmed' : 'pending',\s*taric_source: form\.taric \? 'manual' : null/);
   });
 
   it('rejecting clears back to pending rather than inventing a state', () => {

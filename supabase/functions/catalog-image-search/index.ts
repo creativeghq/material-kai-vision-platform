@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -15,6 +15,7 @@ const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 interface SearchRequest {
   query: string;
+  workspace_id?: string;
   max_candidates?: number;
   search_db_first?: boolean;
   caller_user_id?: string;
@@ -58,6 +59,13 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
     // a direct user call binds to its verified JWT. Null (pure service) → run unbilled.
     const effectiveUserId = auth.level === 'secret' && body.caller_user_id ? body.caller_user_id : auth.userId;
 
+    // MIVAA searches one workspace's catalogue; the acting user must be able to read it.
+    const workspaceId = typeof body.workspace_id === 'string' ? body.workspace_id : '';
+    if (!workspaceId) return jsonResponse({ success: false, error: 'workspace_id is required' }, 400);
+    if (effectiveUserId && !(await userHasWorkspaceCapability(supabase, effectiveUserId, workspaceId, 'workspace.read'))) {
+      return jsonResponse({ success: false, error: 'Workspace not found' }, 404);
+    }
+
     const maxCandidates = Math.min(12, Math.max(1, body.max_candidates || 6));
     const searchDbFirst = body.search_db_first !== false;
 
@@ -66,7 +74,13 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
     let webHits = 0;
 
     if (searchDbFirst) {
-      const dbResults = await searchPlatformDb(supabase, body.query, maxCandidates);
+      let dbResults: ImageCandidate[];
+      try {
+        dbResults = await searchPlatformDb(supabase, workspaceId, body.query, maxCandidates);
+      } catch (e) {
+        // A failed catalogue search is not "no catalogue images" — never fall through to the paid web search.
+        return jsonResponse({ success: false, error: e instanceof Error ? e.message : 'Catalogue image search failed' }, 502);
+      }
       dbHits = dbResults.length;
       candidates.push(...dbResults);
     }
@@ -82,7 +96,7 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
           p_operation_type: 'catalog_image_search_web',
           p_description: `Catalog image web search: ${body.query.slice(0, 60)}`,
           p_metadata: { query: body.query },
-          p_workspace_id: null,
+          p_workspace_id: workspaceId,
         });
         const drow = Array.isArray(dd) ? dd[0] : dd;
         if (de || !drow?.success) {
@@ -103,7 +117,7 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
             p_operation_type: 'catalog_image_search_web_refund',
             p_description: 'Catalog image web search refund (no results)',
             p_metadata: { query: body.query },
-            p_workspace_id: null,
+            p_workspace_id: workspaceId,
           });
         } catch (e) { console.warn('[catalog-image-search] refund failed:', e instanceof Error ? e.message : e); }
       }
@@ -121,66 +135,54 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
   }
 }));
 
-async function searchPlatformDb(supabase: any, query: string, limit: number): Promise<ImageCandidate[]> {
-  try {
-    const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
-    url.searchParams.set('strategy', 'multi_vector');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const cronSecret = CRON_SECRET();
-    if (cronSecret) headers['x-cron-secret'] = cronSecret;
-    // MIVAA /api/rag/search now requires auth — authenticate as the
-    // platform service so this internal call isn't rejected with 401.
-    const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
-    if (mivaaKey) headers['Authorization'] = `Bearer ${mivaaKey}`;
+/** Throws on any upstream or lookup failure; an empty array means the catalogue genuinely had nothing. */
+async function searchPlatformDb(supabase: any, workspaceId: string, query: string, limit: number): Promise<ImageCandidate[]> {
+  const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
+  url.searchParams.set('strategy', 'multi_vector');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const cronSecret = CRON_SECRET();
+  if (cronSecret) headers['x-cron-secret'] = cronSecret;
+  // MIVAA /api/rag/search now requires auth — authenticate as the
+  // platform service so this internal call isn't rejected with 401.
+  const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
+  if (mivaaKey) headers['Authorization'] = `Bearer ${mivaaKey}`;
 
-    const res = await fetch(url.toString(), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ query, top_k: limit }),
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ query, workspace_id: workspaceId, top_k: limit }),
+  });
+  if (!res.ok) throw new Error(`Catalogue search failed: MIVAA ${res.status}`);
+  const data = await res.json();
+  const products: any[] = data?.results || data?.products || [];
+  const out: ImageCandidate[] = [];
+
+  for (const p of products) {
+    const productId = p.id || p.product_id;
+    if (!productId) continue;
+
+    // The product→image link is `image_product_associations`; pdf-tiles image_url is public-read.
+    const { data: assoc, error: assocErr } = await supabase
+      .from('image_product_associations')
+      .select('overall_score, document_images!inner(image_url)')
+      .eq('product_id', productId)
+      .order('overall_score', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (assocErr) throw new Error(`product image lookup failed: ${assocErr.message}`);
+    const imageUrl = (assoc as { document_images?: { image_url?: string } } | null)?.document_images?.image_url;
+    if (!imageUrl) continue;
+
+    out.push({
+      source: 'db',
+      thumb_url: imageUrl,
+      full_url: imageUrl,
+      title: p.product_name || p.name || p.title || null,
+      source_metadata: { product_id: productId, score: p.score ?? null },
     });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const products: any[] = data?.results || data?.products || [];
-    const out: ImageCandidate[] = [];
-
-    for (const p of products) {
-      const productId = p.id || p.product_id;
-      if (!productId) continue;
-
-      // `document_images` has NEITHER `product_id` NOR `storage_path`. The product→image
-      // link is the `image_product_associations` join table, and the image already carries
-      // a usable `image_url` (pdf-tiles is a public-read bucket — no signing needed).
-      // The previous query named BOTH missing columns, so PostgREST rejected it outright
-      // and this internal path returned nothing 100% of the time — meaning every image
-      // search silently escalated to the billed provider.
-      const { data: assoc, error: assocErr } = await supabase
-        .from('image_product_associations')
-        .select('overall_score, document_images!inner(image_url)')
-        .eq('product_id', productId)
-        .order('overall_score', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (assocErr) {
-        console.error('[catalog-image-search] product→image lookup failed:', assocErr.message);
-        continue;
-      }
-      const imageUrl = (assoc as { document_images?: { image_url?: string } } | null)?.document_images?.image_url;
-      if (!imageUrl) continue;
-
-      out.push({
-        source: 'db',
-        thumb_url: imageUrl,
-        full_url: imageUrl,
-        title: p.name || p.title || null,
-        source_metadata: { product_id: productId, score: p.score ?? null },
-      });
-      if (out.length >= limit) break;
-    }
-    return out;
-  } catch (err) {
-    console.warn('[catalog-image-search] DB search failed:', err);
-    return [];
+    if (out.length >= limit) break;
   }
+  return out;
 }
 
 /**

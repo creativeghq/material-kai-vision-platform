@@ -82,11 +82,9 @@ describe('size and colour are projected from the map, never written beside it', 
       .toEqual({ selected_size: null, selected_color: null });
   });
 
-  it('prefers the primary key when a product carries several colour-ish fields', () => {
-    // Six colour-ish fields are classified identity for tiles today (phase 4 has not run).
-    // Whichever wins, it must be deterministic — not "whichever key enumerated first".
-    const attrs = { available_colors: 'beige', color: 'sand', primary_color: 'ivory' };
-    expect(projectIdentity(attrs).selected_color).toBe('sand');
+  it('reads colour from the one registry key; a retired spelling is not a second source', () => {
+    expect(projectIdentity({ colors: 'beige', color: 'sand' }).selected_color).toBe('sand');
+    expect(projectIdentity({ colors: 'beige' }).selected_color).toBeNull();
   });
 
   it('ranks stocked values first without dropping any', () => {

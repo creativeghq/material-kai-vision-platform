@@ -38,6 +38,7 @@ import { ProductStockPanel } from '@/components/business/marketplace/ProductStoc
 import { ProductServiceDefaultsPanel } from '@/components/features/products/ProductServiceDefaultsPanel';
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
+import { toMillimetres, formatDimensionsMm, pickPackagingValue } from './productDisplayUnits';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
 import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
 import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
@@ -57,7 +58,7 @@ import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { SupplierPricingSection } from './SupplierPricingSection';
 import { ProductPriceLine } from './ProductPriceLine';
 import { supabase } from '@/integrations/supabase/client';
-import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
+import { generateGroutRecommendations, formatGroutSuggestion, type GroutSuggestion } from '@/utils/groutSuggestions';
 import {
   categoryDisplayName,
   resolveProductCategory,
@@ -158,6 +159,8 @@ const isLowConfidence = (val: unknown): boolean => {
 // ("matte" vs "Matte") and size formatting ("11,8X11,8" vs "11,8x11,8 cm").
 // Source data is left intact; we normalize at the render boundary.
 const DISPLAY_SENTINEL = '—';
+const GROUT_BRANDS = ['mapei', 'kerakoll', 'isomat', 'technica'] as const;
+const GROUT_CODE_META_KEYS = new Set<string>([...GROUT_BRANDS, 'suppliers', 'details']);
 const titleCaseDisplay = (s: string): string =>
   s.toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
 const isSentinel = (s: string | undefined): boolean =>
@@ -641,7 +644,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       })();
   // Smart thickness extraction — returns ONLY this product's thickness, or undefined
   const thickness = (() => {
-    const thData = materialPropsData?.thickness;
+    const thData = materialPropsData?.thickness_mm;
     if (!thData) return undefined;
     // Unwrap {value, confidence} wrapper
     const thVal = (typeof thData === 'object' && !Array.isArray(thData) && 'value' in (thData as Record<string, unknown>))
@@ -651,7 +654,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     // Simple string — belongs to this product
     if (typeof thVal === 'string') return thVal || undefined;
     if (typeof thVal === 'number') return String(thVal);
-    // Array of per-product-line objects: [{product, thickness_mm, thickness_inch}, ...]
+    // Array of per-product-line objects: [{product, thickness_mm}, ...]
     if (Array.isArray(thVal)) {
       const arr = thVal as Array<Record<string, string>>;
       const match = arr.find(t =>
@@ -660,23 +663,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           normalizeMatch(t.product).includes(productNameNorm)
         ),
       );
-      if (match) {
-        const inch = match.thickness_inch && match.thickness_inch !== 'Not specified' ? ` (${match.thickness_inch}")` : '';
-        return `${match.thickness_mm}mm${inch}`;
-      }
-      // No match for this product — leave empty
-      return undefined;
+      return match ? `${match.thickness_mm}mm` : undefined;
     }
-    // Plain object: try common patterns like {mm: "10", inch: "0.4"} or {thickness_mm: "10"}
     if (typeof thVal === 'object' && thVal !== null) {
       const obj = thVal as Record<string, unknown>;
       const mm = obj.mm || obj.thickness_mm;
-      if (mm) {
-        const inch = (obj.inch || obj.thickness_inch) && String(obj.inch || obj.thickness_inch) !== 'Not specified'
-          ? ` (${obj.inch || obj.thickness_inch}")` : '';
-        return `${mm}mm${inch}`;
-      }
-      return undefined; // Unknown object shape — leave empty
+      return mm ? `${mm}mm` : undefined;
     }
     return undefined;
   })();
@@ -704,7 +696,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
 
 
-  // Smart color extraction — prefers product-specific available_colors, then tries to match by name.
+  // Smart color extraction — a per-product `color` list, else a name-keyed `color` map.
   // Output is title-cased and deduped (case-insensitive) so "warm white" / "Warm White" /
   // duplicates from upstream sources collapse to one entry.
   const formatColorList = (raw: unknown): string | undefined => {
@@ -726,12 +718,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return out.length ? out.join(', ') : undefined;
   };
   const extractProductColors = (): string | undefined => {
-    // available_colors is a simple per-product array (most reliable for individual product rows)
-    const avColors = allData?.available_colors;
+    const avColors = allData?.color;
     if (Array.isArray(avColors) && avColors.length > 0) {
       return formatColorList(avColors);
     }
-    const colData = appearanceData?.colors;
+    const colData = appearanceData?.color;
     const colVal = (colData && typeof colData === 'object' && 'value' in (colData as Record<string, unknown>))
       ? (colData as Record<string, unknown>).value
       : colData;
@@ -754,12 +745,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return formatColorList(String(colVal));
   };
 
-  // Appearance colors: prefer the explicit `available_colors` (per-product
-  // primary colors from the AI extractor), then fall back to the vision-rollup
-  // color list (20 perceptual shades across the images). Show both if they
-  // differ meaningfully so users see both the "official" and the "observed"
-  // palette.
-  const primaryColors = extractProductColors() || formatColorList(extractValue(allData?.colors));
+  // The extracted `color` first, the vision-rollup shades beside it when they differ.
+  const primaryColors = extractProductColors() || formatColorList(extractValue(allData?.color));
   const visionColorsRaw = appearanceData?.colors_from_vision;
   const visionColors = (() => {
     if (!Array.isArray(visionColorsRaw)) return undefined;
@@ -852,7 +839,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Pattern': patternsList.length === 0 ? normFinish(extractValue(appearanceData?.pattern)) : undefined,
     'Texture': visionTexturesList.length === 0 ? normFinish(extractValue(appearanceData?.texture)) : undefined,
     'Textures': visionTexturesList.length > 0 ? visionTexturesList.join(', ') : undefined,
-    'Shade Variation': extractValue(appearanceData?.shade_variation),
+    'Shade Variation': extractValue(appearanceData?.v_rating ?? appearanceData?.color_variation),
     'Visual Effect': extractValue(appearanceData?.visual_effect),
     'Visual Description': extractValue(appearanceData?.vision_description),
   };
@@ -936,19 +923,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return filtered.map(([k, v]) => `${k}: ${v}`).join(', ');
   };
 
+  // `grout_color_codes` holds one entry per grout brand (mapei, kerakoll, …) plus `suppliers` /
+  // `details`, and colour-keyed codes; the brand entries are read here, the rest below.
+  const groutCodesRaw = (() => {
+    const g = commercialData?.grout_color_codes;
+    const inner = g && typeof g === 'object' && 'value' in (g as Record<string, unknown>)
+      ? (g as Record<string, unknown>).value : g;
+    return inner && typeof inner === 'object' && !Array.isArray(inner) ? inner as Record<string, unknown> : {};
+  })();
+  const groutBrand = (brand: GroutSuggestion['brand']): string | undefined =>
+    extractValue(groutCodesRaw[brand]) ||
+    (groutRecommendations[brand] ? `${formatGroutSuggestion(groutRecommendations[brand])} (AI Suggested)` : undefined);
+  const groutColorCodes = Object.fromEntries(
+    Object.entries(groutCodesRaw).filter(([k]) => !GROUT_CODE_META_KEYS.has(k)),
+  );
   const commercial = {
     'Product Codes': extractFilteredCodes(commercialData?.product_codes),
     'SKU Codes': extractFilteredCodes(commercialData?.sku_codes),
-    'Grout Suppliers': extractValue(commercialData?.grout_suppliers),
-    'Grout Mapei': extractValue(commercialData?.grout_mapei) ||
-      (groutRecommendations.mapei ? `${formatGroutSuggestion(groutRecommendations.mapei)} (AI Suggested)` : undefined),
-    'Grout Kerakoll': extractValue(commercialData?.grout_kerakoll) ||
-      (groutRecommendations.kerakoll ? `${formatGroutSuggestion(groutRecommendations.kerakoll)} (AI Suggested)` : undefined),
-    'Grout Isomat': extractValue(commercialData?.grout_isomat) ||
-      (groutRecommendations.isomat ? `${formatGroutSuggestion(groutRecommendations.isomat)} (AI Suggested)` : undefined),
-    'Grout Technica': extractValue(commercialData?.grout_technica) ||
-      (groutRecommendations.technica ? `${formatGroutSuggestion(groutRecommendations.technica)} (AI Suggested)` : undefined),
-    'Grout Color Codes': extractProductValue(commercialData?.grout_color_codes),
+    'Grout Suppliers': extractValue(groutCodesRaw.suppliers),
+    'Grout Mapei': groutBrand('mapei'),
+    'Grout Kerakoll': groutBrand('kerakoll'),
+    'Grout Isomat': groutBrand('isomat'),
+    'Grout Technica': groutBrand('technica'),
+    'Grout Color Codes': extractProductValue(Object.keys(groutColorCodes).length ? groutColorCodes : undefined),
   };
 
 
@@ -982,8 +979,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     // Build once per product: variantKey (lowercased) → {supplier: code}
     const groutByVariant: Record<string, Record<string, string>> = {};
 
-    // grout_details: structured array from vision extractor
-    const groutDetails = unwrap(commercialData?.grout_details);
+    // `details`: structured array from the vision extractor
+    const groutDetails = unwrap(groutCodesRaw.details);
     if (Array.isArray(groutDetails)) {
       groutDetails.forEach((g: any) => {
         const supplier = String(g?.supplier || '').toLowerCase().trim();
@@ -995,28 +992,25 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       });
     }
 
-    // grout_color_codes: dict {variantName: code} or {variantName: {supplier: code}}
-    const groutColorCodes = unwrap(commercialData?.grout_color_codes);
-    if (groutColorCodes && typeof groutColorCodes === 'object' && !Array.isArray(groutColorCodes)) {
-      Object.entries(groutColorCodes as Record<string, unknown>).forEach(([variantKey, code]) => {
-        const key = variantKey.toLowerCase().trim();
-        if (!groutByVariant[key]) groutByVariant[key] = {};
-        if (typeof code === 'string' || typeof code === 'number') {
-          // Single code — assume Mapei unless key says otherwise
-          groutByVariant[key].mapei = String(code);
-        } else if (code && typeof code === 'object') {
-          Object.entries(code as Record<string, unknown>).forEach(([sup, c]) => {
-            if (c !== null && c !== undefined) {
-              groutByVariant[key][sup.toLowerCase()] = String(c);
-            }
-          });
-        }
-      });
-    }
+    // colour-keyed codes: {variantName: code} or {variantName: {supplier: code}}
+    Object.entries(groutColorCodes).forEach(([variantKey, code]) => {
+      const key = variantKey.toLowerCase().trim();
+      if (!groutByVariant[key]) groutByVariant[key] = {};
+      if (typeof code === 'string' || typeof code === 'number') {
+        // Single code — assume Mapei unless key says otherwise
+        groutByVariant[key].mapei = String(code);
+      } else if (code && typeof code === 'object') {
+        Object.entries(code as Record<string, unknown>).forEach(([sup, c]) => {
+          if (c !== null && c !== undefined) {
+            groutByVariant[key][sup.toLowerCase()] = String(c);
+          }
+        });
+      }
+    });
 
-    // Legacy per-supplier dicts: commercial.grout_mapei = {color: code}, etc.
-    (['mapei', 'kerakoll', 'isomat', 'technica'] as const).forEach(sup => {
-      const supData = unwrap(commercialData?.[`grout_${sup}`]);
+    // Per-brand dicts: grout_color_codes.mapei = {color: code}, etc.
+    GROUT_BRANDS.forEach(sup => {
+      const supData = unwrap(groutCodesRaw[sup]);
       if (supData && typeof supData === 'object' && !Array.isArray(supData)) {
         Object.entries(supData as Record<string, unknown>).forEach(([vkey, code]) => {
           const key = vkey.toLowerCase().trim();
@@ -1363,8 +1357,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Helper function to render product variants table.
   // Columns are: SKU, Variant, Color, Pattern, Size, then ONE column per
   // grout supplier that actually has data for at least one variant.
-  // Grout suppliers come from the new schema (commercial.grout_details +
-  // commercial.grout_color_codes) via extractVariants().
+  // Grout suppliers come from commercial.grout_color_codes via extractVariants().
   const renderVariantsTable = () => {
     if (productVariants.length === 0) return null;
 
@@ -1461,23 +1454,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     // Key Specs sidebar (summary) + packaging block
     'factory_name', 'factory_group_name', 'brand', 'origin', 'country_of_origin',
     'collection', 'material_category', 'zone_intent', 'body_type', 'finish',
-    'material_subtype', 'available_sizes', 'dimensions', 'size', 'thickness',
-    'rectified', 'pieces_per_box', 'planks_per_box', 'patterns_count',
-    'm2_per_box', 'sqft_per_box', 'm2_per_pallet', 'sqft_per_pallet',
-    'weight_per_box_kg', 'weight_per_box_lb', 'weight_kg', 'weight_lb',
-    'coverage_m2', 'coverage_sqft', 'boxes_per_pallet', 'weight_per_pallet_kg',
-    'weight_per_pallet_lb', 'pallet_dimensions_cm', 'per_variant',
+    'material_subtype', 'available_sizes', 'dimensions', 'size', 'thickness_mm', 'edge_type',
+    'pieces_per_box', 'patterns_count',
+    'm2_per_box', 'm2_per_pallet',
+    'weight_per_box_kg', 'weight_kg',
+    'boxes_per_pallet', 'weight_per_pallet_kg',
+    'pallet_dimensions_cm', 'per_variant',
     // Appearance card
-    'colors', 'available_colors', 'colors_from_vision', 'primary_color_hex',
-    'patterns', 'pattern', 'texture', 'textures', 'category', 'subcategory',
-    'shade_variation', 'visual_effect', 'vision_description', 'detected_text',
+    'color', 'colors_from_vision', 'primary_color_hex',
+    'pattern', 'texture', 'textures', 'category', 'subcategory',
+    'v_rating', 'color_variation', 'visual_effect', 'vision_description', 'detected_text',
     // Certifications card
     'certifications', 'standards', 'certifications_source', 'eco_friendly',
     'sustainability_rating', 'fire_rating',
     // Commercial card + Variants table
-    'product_codes', 'sku_codes', 'grout_suppliers', 'grout_mapei',
-    'grout_kerakoll', 'grout_isomat', 'grout_technica', 'grout_color_codes',
-    'vision_variants', 'grout_details', 'product_table',
+    'product_codes', 'sku_codes', 'grout_color_codes',
+    'vision_variants', 'product_table',
     // Internal / non-display / blobs
     'extraction_timestamp', 'extraction_method', 'confidence_scores',
     'source_page', 'chunk_index', 'product_name', 'name', 'description',
@@ -1952,10 +1944,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 if (ipRating) categorySpecRows.push({ label: 'IP Rating', value: ipRating });
                 categorySpecRows.push({ label: 'Finish', value: finish });
               } else if (uploadCat === 'heating') {
-                const heatOutput = tryExtract(allData?.heat_output_watts);
+                const heatOutput = tryExtract(allData?.heat_output_w);
                 if (heatOutput) categorySpecRows.push({ label: 'Heat Output', value: `${heatOutput}W` });
-                const btu = tryExtract(allData?.heat_output_btu);
-                if (btu) categorySpecRows.push({ label: 'BTU', value: `${btu} BTU/h` });
                 const panelType = tryExtract(allData?.panel_type);
                 if (panelType) categorySpecRows.push({ label: 'Panel Type', value: panelType });
                 const energyClass = tryExtract(allData?.energy_class);
@@ -1966,7 +1956,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               } else if (uploadCat === 'sanitary') {
                 const productType = tryExtract(allData?.product_type);
                 if (productType) categorySpecRows.push({ label: 'Product Type', value: productType });
-                const bodyMat = tryExtract(allData?.body_material);
+                const bodyMat = tryExtract(allData?.material);
                 if (bodyMat) categorySpecRows.push({ label: 'Material', value: bodyMat });
                 categorySpecRows.push({ label: 'Finish', value: finish });
                 const flowRate = tryExtract(allData?.flow_rate_l_min);
@@ -1978,7 +1968,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               } else if (uploadCat === 'kitchen') {
                 const productType = tryExtract(allData?.product_type);
                 if (productType) categorySpecRows.push({ label: 'Product Type', value: productType });
-                const bodyMat = tryExtract(allData?.body_material);
+                const bodyMat = tryExtract(allData?.material);
                 if (bodyMat) categorySpecRows.push({ label: 'Body Material', value: bodyMat });
                 const doorMat = tryExtract(allData?.door_material);
                 if (doorMat) categorySpecRows.push({ label: 'Door Material', value: doorMat });
@@ -1988,13 +1978,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               } else if (uploadCat === 'furniture') {
                 const frameMat = tryExtract(allData?.frame_material);
                 if (frameMat) categorySpecRows.push({ label: 'Frame', value: frameMat });
-                const upholstery = tryExtract(allData?.upholstery_material);
+                const upholstery = tryExtract(allData?.upholstery);
                 if (upholstery) categorySpecRows.push({ label: 'Upholstery', value: upholstery });
                 const topMat = tryExtract(allData?.top_material);
                 if (topMat) categorySpecRows.push({ label: 'Top Surface', value: topMat });
                 categorySpecRows.push({ label: 'Finish', value: finish });
-                const seatH = tryExtract(allData?.seat_height_cm);
-                if (seatH) categorySpecRows.push({ label: 'Seat Height', value: `${seatH} cm` });
+                const seatH = tryExtract(allData?.seat_height_mm);
+                if (seatH) categorySpecRows.push({ label: 'Seat Height', value: `${seatH} mm` });
                 const weightCap = tryExtract(allData?.weight_capacity_kg);
                 if (weightCap) categorySpecRows.push({ label: 'Weight Capacity', value: `${weightCap} kg` });
               } else if (uploadCat === 'paint_wall_decor') {
@@ -2002,7 +1992,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 if (productType) categorySpecRows.push({ label: 'Product Type', value: productType });
                 const baseType = tryExtract(allData?.base_type);
                 if (baseType) categorySpecRows.push({ label: 'Base Type', value: baseType });
-                const sheen = tryExtract(allData?.finish_sheen, allData?.finish);
+                const sheen = tryExtract(allData?.finish);
                 if (sheen) categorySpecRows.push({ label: 'Finish / Sheen', value: sheen });
                 const coverage = tryExtract(allData?.coverage_per_litre_m2);
                 if (coverage) categorySpecRows.push({ label: 'Coverage', value: `${coverage} m²/L` });
@@ -2011,7 +2001,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 const coats = tryExtract(allData?.coats_recommended);
                 if (coats) categorySpecRows.push({ label: 'Coats', value: coats });
               } else if (uploadCat === 'decor') {
-                const primaryMat = tryExtract(allData?.primary_material);
+                const primaryMat = tryExtract(allData?.material);
                 if (primaryMat) categorySpecRows.push({ label: 'Material', value: primaryMat });
                 categorySpecRows.push({ label: 'Finish', value: finish });
                 const style = tryExtract(allData?.style, designData?.design_style);
@@ -2041,14 +2031,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               // Dimensions — shown for non-tile categories that have W/H/D
               if (uploadCat !== 'tiles' && uploadCat !== 'wood') {
-                const w = tryExtract(allData?.width_mm, allData?.width_cm);
-                const h = tryExtract(allData?.height_mm, allData?.height_cm);
-                const d = tryExtract(allData?.depth_mm, allData?.depth_cm);
-                const diamVal = tryExtract(allData?.diameter_mm, allData?.diameter_cm);
+                const dims = formatDimensionsMm({
+                  w: toMillimetres(allData?.width_mm),
+                  h: toMillimetres(allData?.height_mm),
+                  d: toMillimetres(allData?.depth_mm),
+                });
+                const diamMm = toMillimetres(allData?.diameter_mm);
                 const weightVal = tryExtract(allData?.weight_kg);
-                const dims = [w && `W: ${w}`, h && `H: ${h}`, d && `D: ${d}`].filter(Boolean);
-                if (dims.length > 0) categorySpecRows.push({ label: 'Dimensions', value: dims.join(' × ') });
-                if (diamVal) categorySpecRows.push({ label: 'Diameter', value: diamVal });
+                if (dims) categorySpecRows.push({ label: 'Dimensions', value: dims });
+                if (diamMm !== null) categorySpecRows.push({ label: 'Diameter', value: `${diamMm} mm` });
                 if (weightVal) categorySpecRows.push({ label: 'Weight', value: `${weightVal} kg` });
               }
 
@@ -2063,71 +2054,39 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               // The hand-kept one said tiles/wood/general_materials; the registry says tiles
               // and wood, and general_materials has no packaging field at all.
               const pkg = (allData?.packaging || {}) as Record<string, unknown>;
-              const pickPkg = (k: string): string | null => {
-                const v = pkg[k];
-                if (v === null || v === undefined || v === '') return null;
-                if (typeof v === 'number') return String(v);
-                if (typeof v === 'string') return v;
-                if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
-                  const inner = (v as Record<string, unknown>).value;
-                  return inner != null ? String(inner) : null;
-                }
-                return null;
-              };
+              // Ingest writes packaging flat OR nested; both resolve, so a flat key is never
+              // marked consumed and then rendered nowhere.
+              const pickPkg = (k: string): string | null =>
+                pickPackagingValue(pkg, allData as Record<string, unknown>, k);
 
               let packagingRows: Array<{ label: string; value: string }> = [];
               if (fieldRegistry.hasSection(uploadCat, 'packaging')) {
                 const pieces = pickPkg('pieces_per_box');
                 const patternsCount = pickPkg('patterns_count');
                 const boxes = pickPkg('boxes_per_pallet');
-                const coverageM2 = pickPkg('m2_per_box') ?? pickPkg('coverage_m2');
-                const coverageSqft = pickPkg('sqft_per_box') ?? pickPkg('coverage_sqft');
-                const weightKg = pickPkg('weight_per_box_kg') ?? pickPkg('weight_kg');
-                const weightLb = pickPkg('weight_per_box_lb') ?? pickPkg('weight_lb');
+                const coverageM2 = pickPkg('m2_per_box');
+                const weightKg = pickPkg('weight_per_box_kg');
                 const palletKg = pickPkg('weight_per_pallet_kg');
-                const palletLb = pickPkg('weight_per_pallet_lb');
                 const palletM2 = pickPkg('m2_per_pallet');
-                const palletSqft = pickPkg('sqft_per_pallet');
                 const palletDims = pickPkg('pallet_dimensions_cm');
 
                 packagingRows = [
                   pieces && { label: uploadCat === 'wood' ? 'Planks / Pack' : 'Pieces / Box', value: pieces },
                   patternsCount && { label: 'Patterns', value: patternsCount },
-                  coverageM2 && {
-                    label: 'Coverage / Box',
-                    value: coverageSqft ? `${coverageM2} m² (${coverageSqft} sqft)` : `${coverageM2} m²`,
-                  },
-                  weightKg && {
-                    label: 'Weight / Box',
-                    value: weightLb ? `${weightKg} kg (${weightLb} lb)` : `${weightKg} kg`,
-                  },
+                  coverageM2 && { label: 'Coverage / Box', value: `${coverageM2} m²` },
+                  weightKg && { label: 'Weight / Box', value: `${weightKg} kg` },
                   boxes && { label: 'Boxes / Pallet', value: boxes },
-                  palletM2 && {
-                    label: 'Coverage / Pallet',
-                    value: palletSqft ? `${palletM2} m² (${palletSqft} sqft)` : `${palletM2} m²`,
-                  },
-                  palletKg && {
-                    label: 'Pallet Weight',
-                    value: palletLb ? `${palletKg} kg (${palletLb} lb)` : `${palletKg} kg`,
-                  },
+                  palletM2 && { label: 'Coverage / Pallet', value: `${palletM2} m²` },
+                  palletKg && { label: 'Pallet Weight', value: `${palletKg} kg` },
                   palletDims && { label: 'Pallet Dimensions', value: `${palletDims} cm` },
                 ].filter(Boolean) as Array<{ label: string; value: string }>;
               }
 
               // ── Warranty ──
-              // The `products.warranty` COLUMN (set on warehouse intake) is free text and
-              // authoritative when present; the extracted `warranty_years` from ingestion is
-              // the fallback and only shown for categories that typically carry one.
+              // `products.warranty` is the registry's `warranty` field: ingest routes it to the column.
               const warrantyCol = (product as any)?.warranty as string | null | undefined;
               if (warrantyCol) {
                 categorySpecRows.push({ label: 'Warranty', value: String(warrantyCol) });
-              } else {
-                // Same reasoning as packaging: whether a category carries `warranty_years` is
-                // what `applies_to_categories` on that field says, not a second list here.
-                if (fieldRegistry.hasField(uploadCat, 'warranty_years')) {
-                  const warranty = tryExtract(allData?.warranty_years, commercialData?.warranty_years);
-                  if (warranty) categorySpecRows.push({ label: 'Warranty', value: `${warranty} years` });
-                }
               }
 
               // Reference fields captured at intake. Shown here so they are not write-only.
@@ -2462,6 +2421,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               const data: Record<string, unknown> = {};
               const lowConf = new Set<string>();
               for (const field of section.fields) {
+                // Per-key sensitivity gate; an unresolved verdict (null) withholds.
+                if (fieldRegistry.isInternalField(field.key) !== false) {
+                  consumedKeys.add(field.key);
+                  continue;
+                }
                 const hit = lookupRegistryField(field.key);
                 if (!hit) continue;
                 consumedKeys.add(field.key);

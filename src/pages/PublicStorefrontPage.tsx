@@ -14,7 +14,8 @@ import { Label } from '@/components/core/ui/label';
 import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
 import {
   storefrontService,
-  type StorefrontMeta, type StorefrontProduct, type StorefrontProductSafety,
+  cartKey, parseCartKey,
+  type StorefrontMeta, type StorefrontProduct, type StorefrontProductSafety, type StorefrontVariant,
 } from '@/modules/finance/services/storefrontService';
 
 const money = (n: number, ccy: string) => formatMoney(n, ccy || 'EUR');
@@ -30,6 +31,7 @@ const PublicStorefrontPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [picked, setPicked] = useState<Record<string, string>>({});
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
@@ -65,14 +67,27 @@ const PublicStorefrontPage: React.FC = () => {
 
   const addOnArrival = searchParams.get('add') === '1';
   useEffect(() => {
-    if (!addOnArrival || !highlightId || !products.some((p) => p.product_id === highlightId)) return;
-    setCart((c) => (c[highlightId] ? c : { ...c, [highlightId]: 1 }));
+    const target = products.find((p) => p.product_id === highlightId);
+    if (!addOnArrival || !highlightId || !target || (target.variants?.length ?? 0) > 0) return;
+    const key = cartKey(highlightId, null);
+    setCart((c) => (c[key] ? c : { ...c, [key]: 1 }));
   }, [addOnArrival, highlightId, products]);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.product_id, p])), [products]);
   const currency = products[0]?.currency ?? 'EUR';
   const cartLines = Object.entries(cart).filter(([, q]) => q > 0);
-  const total = cartLines.reduce((s, [id, q]) => s + (byId.get(id)?.price ?? 0) * q, 0);
+  const lineOf = (key: string): { p: StorefrontProduct; v: StorefrontVariant | null } | null => {
+    const { product_id, variant_key } = parseCartKey(key);
+    const p = byId.get(product_id);
+    if (!p) return null;
+    const v = variant_key ? p.variants?.find((x) => x.variant_key === variant_key) ?? null : null;
+    if (variant_key && !v) return null;
+    return { p, v };
+  };
+  const total = cartLines.reduce((s, [key, q]) => {
+    const line = lineOf(key);
+    return s + (line ? (line.v?.price ?? line.p.price) * q : 0);
+  }, 0);
 
   const setQty = (id: string, delta: number) => setCart((c) => {
     const next = Math.max(0, (c[id] ?? 0) + delta);
@@ -87,7 +102,7 @@ const PublicStorefrontPage: React.FC = () => {
     try {
       const res = await storefrontService.checkout(
         slug,
-        cartLines.map(([product_id, qty]) => ({ product_id, qty })),
+        cartLines.map(([key, qty]) => ({ ...parseCartKey(key), qty })),
         { name: name.trim(), email: email.trim(), note: note.trim() || undefined },
         turnstileToken,
       );
@@ -135,33 +150,58 @@ const PublicStorefrontPage: React.FC = () => {
             <Card><CardContent className="p-10 text-center text-sm text-muted-foreground">No products available right now.</CardContent></Card>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {products.map((p) => (
+              {products.map((p) => {
+                const variants = p.variants ?? [];
+                const chosen = variants.find((v) => v.variant_key === picked[p.product_id]) ?? null;
+                const shownPrice = chosen?.price ?? p.price;
+                const shownImage = chosen?.image_url ?? p.image_url;
+                const needsPick = variants.length > 0 && !chosen;
+                return (
                 <Card
                   key={p.product_id}
                   id={`product-${p.product_id}`}
                   className={`overflow-hidden ${p.product_id === highlightId ? 'ring-2 ring-primary' : ''}`}
                 >
                   <div className="aspect-square bg-muted/40">
-                    {p.image_url
-                      ? <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
+                    {shownImage
+                      ? <img src={shownImage} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
                       : <div className="flex h-full items-center justify-center text-muted-foreground">{p.item_type === 'service' ? <Wrench className="h-8 w-8" /> : <Package className="h-8 w-8" />}</div>}
                   </div>
                   <CardContent className="p-3">
                     <div className="line-clamp-2 text-sm font-medium">{p.name}</div>
-                    <div className="mt-1 text-sm text-primary">{money(p.price, p.currency)}{p.unit ? <span className="text-muted-foreground">/{p.unit}</span> : ''}</div>
+                    <div className="mt-1 text-sm text-primary">{money(shownPrice, chosen?.currency ?? p.currency)}{(chosen?.unit ?? p.unit) ? <span className="text-muted-foreground">/{chosen?.unit ?? p.unit}</span> : ''}</div>
+                    {variants.length > 0 && (
+                      <div className="mt-2">
+                        <Label htmlFor={`variant-${p.product_id}`} className="sr-only">Choose a variant of {p.name}</Label>
+                        <select
+                          id={`variant-${p.product_id}`}
+                          className="h-8 w-full rounded-sm border border-hairline bg-background px-2 text-xs"
+                          value={picked[p.product_id] ?? ''}
+                          onChange={(e) => setPicked((s) => ({ ...s, [p.product_id]: e.target.value }))}
+                        >
+                          <option value="">Choose…</option>
+                          {variants.map((v) => (
+                            <option key={v.variant_key} value={v.variant_key}>{v.label} · {money(v.price, v.currency)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     {/* The visible label is short because the card is; the accessible name is not,
                         because "Add" repeated twenty times down a list says nothing. */}
                     <Button
                       size="sm" variant="outline" className="mt-2 w-full"
-                      aria-label={`Add ${p.name} to the cart`}
-                      onClick={() => setQty(p.product_id, 1)}
+                      aria-label={`Add ${p.name}${chosen ? ` (${chosen.label})` : ''} to the cart`}
+                      disabled={needsPick}
+                      title={needsPick ? 'Choose a variant first' : undefined}
+                      onClick={() => setQty(cartKey(p.product_id, chosen?.variant_key ?? null), 1)}
                     >
                       <Plus className="mr-1 h-3.5 w-3.5" /> Add
                     </Button>
                     <SafetyDisclosure safety={p.safety ?? null} />
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -176,12 +216,13 @@ const PublicStorefrontPage: React.FC = () => {
               <>
                 <div className="space-y-2">
                   {cartLines.map(([id, qty]) => {
-                    const p = byId.get(id); if (!p) return null;
+                    const line = lineOf(id); if (!line) return null;
+                    const { p, v } = line;
                     return (
                       <div key={id} className="flex items-center gap-2 text-sm">
                         <div className="min-w-0 flex-1">
-                          <div className="truncate">{p.name}</div>
-                          <div className="text-xs text-muted-foreground">{money(p.price, p.currency)} × {qty}</div>
+                          <div className="truncate">{p.name}{v ? ` · ${v.label}` : ''}</div>
+                          <div className="text-xs text-muted-foreground">{money(v?.price ?? p.price, v?.currency ?? p.currency)} × {qty}</div>
                         </div>
                         <div className="flex items-center gap-1">
                           {/* An icon-only control has no accessible name, so a screen reader

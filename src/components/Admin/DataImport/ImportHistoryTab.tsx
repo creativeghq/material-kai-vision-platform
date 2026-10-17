@@ -25,8 +25,10 @@ interface ImportJob {
   created_at: string;
   completed_at: string | null;
   error_message: string | null;
-  original_xml_content: string | null;
   field_mappings: Record<string, string> | null;
+  manual_values?: Record<string, string> | null;
+  metadata?: Record<string, any> | null;
+  workspace_id?: string;
   mapping_template_id: string | null;
   category: string;
   is_scheduled: boolean;
@@ -75,7 +77,7 @@ const ImportHistoryTab: React.FC = () => {
             event: '*',
             schema: 'public',
             table: 'background_jobs',
-            filter: 'job_type=eq.pdf_processing',
+            filter: `workspace_id=eq.${workspaceId}`,
           },
           () => {
             console.log('background_jobs (PDF) changed - refreshing data');
@@ -102,19 +104,22 @@ const ImportHistoryTab: React.FC = () => {
       const [xmlJobsResult, pdfJobsResult] = await Promise.all([
         supabase
           .from('data_import_jobs')
-          .select('*')
+          .select('id, workspace_id, import_type, source_name, status, total_products, processed_products, failed_products, created_at, completed_at, error_message, field_mappings, manual_values, metadata, mapping_template_id, category, is_scheduled, cron_schedule, last_run_at, next_run_at, source_url')
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .limit(25),
         supabase
           .from('background_jobs')
           .select('*')
-          .eq('job_type', 'pdf_processing')
+          .eq('workspace_id', workspaceId)
+          .in('job_type', ['pdf_processing', 'product_discovery_upload'])
           .order('created_at', { ascending: false })
           .limit(25),
       ]);
 
-      const xmlJobs = xmlJobsResult.data || [];
+      if (xmlJobsResult.error) throw xmlJobsResult.error;
+      if (pdfJobsResult.error) throw pdfJobsResult.error;
+      const xmlJobs = (xmlJobsResult.data || []) as unknown as ImportJob[];
       const pdfJobs = (pdfJobsResult.data || []).map((job: any) => ({
         id: job.id,
         import_type: 'pdf',
@@ -126,7 +131,6 @@ const ImportHistoryTab: React.FC = () => {
         created_at: job.created_at,
         completed_at: job.completed_at,
         error_message: job.error_message,
-        original_xml_content: null,
         field_mappings: null,
         mapping_template_id: null,
         category: job.metadata?.category || 'products',
@@ -153,8 +157,15 @@ const ImportHistoryTab: React.FC = () => {
 
   const handleManualRerun = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
-    if (!job) return;
-    if (!workspaceId || !job.original_xml_content) {
+    if (!job || !workspaceId) return;
+    const { data: stored } = await supabase
+      .from('data_import_jobs')
+      .select('original_xml_content')
+      .eq('id', job.id)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    const originalXml = (stored as { original_xml_content?: string | null } | null)?.original_xml_content;
+    if (!originalXml) {
       toast({
         title: 'Cannot Re-run',
         description: 'Original XML content not available for this import',
@@ -170,9 +181,12 @@ const ImportHistoryTab: React.FC = () => {
         body: {
           workspace_id: workspaceId,
           category: job.category,
-          xml_content: job.original_xml_content,
+          xml_content: originalXml,
           source_name: `${job.source_name} (Re-run)`,
+          source_url: job.source_url ?? undefined,
           field_mappings: job.field_mappings,
+          manual_values: job.manual_values ?? undefined,
+          row_path: job.metadata?.row_path ?? undefined,
           mapping_template_id: job.mapping_template_id,
           parent_job_id: job.id,
         },
@@ -232,6 +246,7 @@ const ImportHistoryTab: React.FC = () => {
           onViewDetails={(jobId) => {
             navigate(`/admin/async-queue-monitor?jobId=${jobId}`);
           }}
+          onSchedule={job.import_type === 'xml' ? () => setSelectedJobForSchedule(job) : undefined}
         />
       ))}
 

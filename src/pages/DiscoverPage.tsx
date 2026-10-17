@@ -29,6 +29,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
+import { productDetailService } from '@/services/productDetailService';
 import { Product } from '@/components/features/products/types';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import { MarketplaceTab } from '@/components/features/discover/MarketplaceTab';
@@ -481,8 +482,31 @@ export const DiscoverPage: React.FC = () => {
     setProducts(data.map(toRawProduct));
   }
 
+  const openSeq = React.useRef(0);
   function openProduct(p: RawProduct) {
-    setModalProduct(toProduct(p));
+    const base = toProduct(p);
+    setModalProduct(base);
+    const mine = ++openSeq.current;
+    productDetailService.fetch(p.id)
+      .then((detail) => {
+        if (!detail || mine !== openSeq.current) return;
+        setModalProduct({
+          ...base,
+          ...(detail as unknown as Partial<Product>),
+          name: detail.name || base.name,
+          category: base.category,
+          images: base.images,
+          metadata: ((detail as { metadata?: Product['metadata'] }).metadata ?? base.metadata),
+        } as Product);
+      })
+      .catch((e: unknown) => {
+        if (mine !== openSeq.current) return;
+        toast({
+          title: 'Showing a summary of this product',
+          description: e instanceof Error ? e.message : 'The full product record could not be read.',
+          variant: 'destructive',
+        });
+      });
   }
 
   /**

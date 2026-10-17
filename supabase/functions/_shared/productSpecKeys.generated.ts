@@ -13,10 +13,10 @@
  */
 
 export const PRODUCT_SPEC_KEYS = [
-  'width', 'length', 'height', 'unit', 'dimension_unit',
+  'width_mm', 'length_mm', 'height_mm', 'width', 'length', 'height', 'unit',
   'dimensions', 'dimensions_cm_from_vision', 'available_sizes', 'slab_size',
-  'roll_width_cm', 'roll_length_m', 'plank_width_mm', 'plank_length_mm',
-  'm2_per_box', 'sqft_per_box', 'pieces_per_box', 'planks_per_box', 'coverage_per_roll_m2',
+  'roll_width_mm', 'roll_length_m', 'plank_width_mm', 'plank_length_mm',
+  'm2_per_box', 'pieces_per_box', 'coverage_per_roll_m2',
 ] as const;
 
 export type ProductSpecKey = (typeof PRODUCT_SPEC_KEYS)[number];

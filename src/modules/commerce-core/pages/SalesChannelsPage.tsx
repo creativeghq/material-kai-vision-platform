@@ -522,10 +522,10 @@ export default function SalesChannelsPage() {
                     <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       <span>
-                        {f.last_gap_count} of {f.last_item_count ?? 0} will be dropped on arrival for a missing
-                        attribute — {Object.entries(f.last_gaps ?? {}).sort((a, b) => b[1] - a[1])
-                          .map(([k, n]) => `${k} (${n})`).join(', ')}. The feed still returns 200, so the
-                        listing is simply short.
+                        {f.last_gap_count} of {f.last_item_count ?? 0} are missing from the listing —{' '}
+                        {Object.entries(f.last_gaps ?? {}).sort((a, b) => b[1] - a[1])
+                          .map(([k, n]) => (k === 'price' ? `withheld: no price (${n})` : `${k} (${n})`)).join(', ')}.
+                        The feed still returns 200, so the listing is simply short.
                       </span>
                     </p>
                   )}

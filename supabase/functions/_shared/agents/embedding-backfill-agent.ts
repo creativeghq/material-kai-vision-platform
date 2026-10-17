@@ -33,6 +33,12 @@ export class EmbeddingBackfillAgent implements AgentRunner {
     const { supabase, agentConfig, input, log, heartbeat, mivaaGatewayUrl, mivaaApiKey } = ctx;
     const cfg = { ...agentConfig.config } as Record<string, any>;
 
+    // A platform-wide repair: only the operator's unscoped agent may run it, never a tenant-owned copy.
+    if (agentConfig.workspace_id !== null || ctx.workspaceId !== null) {
+      await log('error', 'Embedding backfill refused: a workspace-owned agent cannot repair every tenant');
+      return { success: false, output: { error: 'platform_agent_only' }, inputTokens: 0, outputTokens: 0, creditsDebited: 0 };
+    }
+
     if (!mivaaApiKey) {
       await log('error', 'MIVAA_API_KEY not configured — cannot reach backfill endpoints');
       return { success: false, output: { error: 'mivaa_api_key_missing' }, inputTokens: 0, outputTokens: 0, creditsDebited: 0 };

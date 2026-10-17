@@ -20,7 +20,7 @@ import { warehouseService, type OperatorCatalogMatch } from '@/services/warehous
 import { catalogGrantsService } from '@/services/catalogGrantsService';
 import { UPLOAD_CATEGORIES } from '@/lib/categoryFieldRegistry';
 import {
-  dealerProductsService, type CategoryField, type ManualImageRef,
+  dealerProductsService, routeByDestination, type CategoryField, type ManualImageRef,
 } from '@/services/dealerProductsService';
 
 const CATEGORY_SUGGESTIONS = UPLOAD_CATEGORIES;
@@ -145,16 +145,17 @@ export const AddDealerProductDialog: React.FC<{
         images.push(await dealerProductsService.uploadImage(activeWorkspaceId, files[i], i));
       }
 
-      // Build dynamic metadata from the attribute rows (skip empties). available_colors
-      // accepts a comma list → array (matches the catalog metadata shape).
-      const metadata: Record<string, any> = {};
+      // Build dynamic metadata from the attribute rows (skip empties). `color` and sizes
+      // accept a comma list → array (matches the catalog metadata shape).
+      const values: Record<string, any> = {};
       for (const [k, v] of Object.entries(attrs)) {
         const val = (v ?? '').trim();
         if (!val) continue;
-        metadata[k] = (k === 'available_colors' || k === 'colors' || k === 'available_sizes')
+        values[k] = (k === 'color' || k === 'available_sizes')
           ? val.split(',').map((s) => s.trim()).filter(Boolean)
           : val;
       }
+      const { metadata, column_fields } = routeByDestination(values, categoryFields);
 
       const productId = await dealerProductsService.createManualProduct(activeWorkspaceId, {
         name: name.trim(),
@@ -167,6 +168,7 @@ export const AddDealerProductDialog: React.FC<{
         dimensions: dimensions || undefined,
         external_sku: sku || undefined,
         metadata,
+        ...(Object.keys(column_fields).length > 0 ? { column_fields } : {}),
         images,
       });
 
@@ -300,7 +302,7 @@ export const AddDealerProductDialog: React.FC<{
                     list={facetOptions[k] ? `facet-${k}` : undefined}
                     value={attrs[k] ?? ''}
                     onChange={(e) => setAttr(k, e.target.value)}
-                    placeholder={k === 'available_colors' ? 'comma,separated' : ''}
+                    placeholder={k === 'color' ? 'comma,separated' : ''}
                   />
                   {facetOptions[k] && (
                     <datalist id={`facet-${k}`}>

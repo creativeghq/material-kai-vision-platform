@@ -1,9 +1,20 @@
 /** Background Agent: Product Enrichment */
 
 import { loadPrompt } from '../prompt-utils.ts';
-import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
+import { generateStructuredWithClaude, z } from '../ai-client.ts';
+import { wrapUntrusted } from '../untrusted.ts';
+import { loadMaterialCategoryVocab, resolveMaterialCategory } from './material-category-vocab.ts';
 import { DelegateToMivaaError } from './types.ts';
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
+
+/** material_category is constrained to the registry vocabulary by the server, not by the prompt. */
+function enrichmentSchema(vocab: Set<string>) {
+  return z.object({
+    description:       z.string(),
+    keywords:          z.array(z.string()),
+    material_category: z.enum([...vocab] as [string, ...string[]]).nullable(),
+  });
+}
 
 export class ProductEnrichmentAgent implements AgentRunner {
   readonly agentType    = 'product-enrichment';
@@ -18,26 +29,33 @@ export class ProductEnrichmentAgent implements AgentRunner {
   readonly defaultModel = 'claude-haiku-4-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
-    const { supabase, agentConfig, run, input, log, heartbeat } = ctx;
+    const { supabase, agentConfig, input, log, heartbeat } = ctx;
+
+    // Runs as the service role: the run's authorized workspace bounds every product read/write.
+    const workspaceId = ctx.workspaceId;
+    if (!workspaceId) {
+      await log('error', 'Product enrichment refused: run has no authorized workspace');
+      return { success: false, output: { error: 'workspace_required' }, inputTokens: 0, outputTokens: 0, creditsDebited: 0 };
+    }
 
     const cfg           = { ...agentConfig.config, ...input } as Record<string, unknown>;
     const batchSize     = Math.min(Number(cfg.batch_size     ?? 10), 50);
     const categoryFilter = (cfg.category_filter as string | undefined) || null;
     const forceRewrite  = Boolean(cfg.force_rewrite ?? false);
 
-    // Delegate large batches to Python
     if (batchSize > 20) {
       throw new DelegateToMivaaError('Batch too large for edge function', {
         batch_size: batchSize, category_filter: categoryFilter, force_rewrite: forceRewrite,
+        workspace_id: workspaceId,
       });
     }
 
     await log('info', `Starting product enrichment`, { batchSize, categoryFilter, forceRewrite });
 
-    // Fetch products that need enrichment
     let query = supabase
       .from('products')
-      .select('id, name, description, metadata')
+      .select('id, name, description, metadata, attributes, attributes_raw')
+      .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true })
       .limit(batchSize);
 
@@ -61,11 +79,10 @@ export class ProductEnrichmentAgent implements AgentRunner {
 
     await log('info', `Found ${products.length} products to enrich`);
 
-    // The default lives in `prompts` (prompt_type='agent', category='product-enrichment').
-    // It used to be a hardcoded literal here: the override path existed, so an admin could
-    // change this — but only by overriding a default nobody could see (#347 phase 3P).
     const systemPrompt = agentConfig.system_prompt_override
       || await loadPrompt(supabase, 'agent', 'product-enrichment');
+    const vocab = await loadMaterialCategoryVocab(supabase);
+    const schema = enrichmentSchema(vocab);
 
     let totalInputTokens  = 0;
     let totalOutputTokens = 0;
@@ -76,77 +93,75 @@ export class ProductEnrichmentAgent implements AgentRunner {
       await heartbeat();
 
       const productMeta = (product.metadata || {}) as Record<string, unknown>;
-      const userMessage = `Enrich this product:
-Name: ${product.name}
-Material category: ${productMeta.material_category || 'unknown'}
-Current description: ${product.description || '(none)'}
-Factory: ${productMeta.factory_name || 'unknown'}
-
-Return JSON: { "description": "...", "keywords": ["..."], "material_category": "..." }`;
+      const userMessage = wrapUntrusted('product record', JSON.stringify({
+        name: product.name,
+        material_category: productMeta.material_category ?? null,
+        description: product.description ?? null,
+        factory: productMeta.factory_name ?? null,
+      }), 8000);
 
       try {
-        const result = await runLangGraphAgent({
-          anthropicApiKey: ctx.anthropicApiKey,
-          model:           agentConfig.model,
+        const result = await generateStructuredWithClaude(userMessage, schema, {
+          model:        agentConfig.model,
           systemPrompt,
-          tools:           [],   // no tools needed for simple enrichment
-          userMessage,
-          maxIterations:   1,
-          onLog:           (level, msg, data) => log(level, msg, data),
+          temperature:  0,
+          task:         'background_agent_product_enrichment',
+          userId:       agentConfig.created_by ?? undefined,
+          workspaceId,
         });
 
-        totalInputTokens  += result.inputTokens;
-        totalOutputTokens += result.outputTokens;
+        totalInputTokens  += result.usage.inputTokens;
+        totalOutputTokens += result.usage.outputTokens;
 
-        // Parse JSON response
-        let enriched: Record<string, unknown>;
-        try {
-          const clean = result.finalResponse.replace(/```json\n?|\n?```/g, '').trim();
-          enriched = JSON.parse(clean);
-        } catch {
-          await log('warn', `Could not parse JSON for product ${product.id}`, { raw: result.finalResponse.slice(0, 200) });
-          errors.push(`parse_error:${product.id}`);
+        const enriched = result.output;
+        if (!enriched) {
+          errors.push(`no_output:${product.id}`);
           continue;
         }
+        const category = resolveMaterialCategory(enriched.material_category, vocab);
+        if (enriched.material_category && !category) {
+          await log('warn', `Rejected material_category outside the registry for ${product.id}`, { value: enriched.material_category });
+        }
 
-        // Update product — material_category lives inside metadata (JSONB), not a top-level column
         const updateData: Record<string, unknown> = {};
-        if (enriched.description) updateData.description = enriched.description;
-        if (enriched.keywords || enriched.material_category) {
+        if (enriched.description?.trim()) updateData.description = enriched.description.trim();
+        const keywords = (enriched.keywords ?? []).map((k) => k.trim()).filter(Boolean);
+        if (keywords.length > 0 || category) {
           const metaUpdate = { ...productMeta };
-          if (enriched.keywords) metaUpdate.search_keywords = enriched.keywords;
-          if (enriched.material_category) metaUpdate.material_category = enriched.material_category;
+          if (keywords.length > 0) metaUpdate.search_keywords = keywords;
+          if (category) metaUpdate.material_category = category;
           updateData.metadata = metaUpdate;
         }
 
-        // ── Auto-canonicalize material_category through the facet pipeline ──
-        // material_category is whitelisted, so the canonicalizer's L0.5+L1+L2
-        // collapse "Πορσελάνη" / "Porcelain" / "Porzellan" → canonical "porcelain".
-        // The enrichment agent's other outputs (description, keywords) are NOT
-        // canonicalizable facets so they pass through unchanged.
-        try {
+        if (category) {
           const canonResp = await supabase.functions.invoke('canonicalize-attributes', {
             body: {
               product_id: product.id,
-              raw_attributes: enriched.material_category ? { material_category: enriched.material_category } : {},
+              workspace_id: workspaceId,
+              raw_attributes: { material_category: category },
               source: 'agent_product_enrichment',
             },
           });
           if (canonResp.error) {
             await log('warn', `canonicalize-attributes failed for ${product.id}`, { error: canonResp.error.message });
           } else if (canonResp.data && Object.keys(canonResp.data.attributes || {}).length > 0) {
-            updateData.attributes     = canonResp.data.attributes;
-            updateData.attributes_raw = canonResp.data.attributes_raw;
+            updateData.attributes = {
+              ...((product.attributes ?? {}) as Record<string, unknown>),
+              ...(canonResp.data.attributes as Record<string, unknown>),
+            };
+            updateData.attributes_raw = {
+              ...((product.attributes_raw ?? {}) as Record<string, unknown>),
+              ...((canonResp.data.attributes_raw ?? {}) as Record<string, unknown>),
+            };
           }
-        } catch (canonErr: any) {
-          await log('warn', `canonicalize-attributes threw for ${product.id}`, { error: canonErr?.message });
         }
 
         if (Object.keys(updateData).length > 0) {
           const { error: updateErr } = await supabase
             .from('products')
             .update(updateData)
-            .eq('id', product.id);
+            .eq('id', product.id)
+            .eq('workspace_id', workspaceId);
 
           if (updateErr) {
             await log('warn', `Failed to update product ${product.id}`, { error: updateErr.message });
@@ -156,32 +171,16 @@ Return JSON: { "description": "...", "keywords": ["..."], "material_category": "
             await log('debug', `Enriched product ${product.id} (${product.name})`);
           }
         }
-      } catch (err: any) {
-        await log('warn', `Failed to enrich product ${product.id}`, { error: err.message });
+      } catch (err) {
+        await log('warn', `Failed to enrich product ${product.id}`, { error: err instanceof Error ? err.message : String(err) });
         errors.push(`ai_error:${product.id}`);
       }
     }
 
     await log('info', `Enrichment complete`, { enriched: enrichedCount, errors: errors.length, total: products.length });
 
-    // Cost attribution — historically zero ai_usage_logs writes from any
-    // background agent, so the Operations dashboard underreported spend.
-    if (totalInputTokens > 0 || totalOutputTokens > 0) {
-      logAgentAiUsage(supabase, {
-        runId:        run.id,
-        agentId:      agentConfig.id,
-        agentType:    this.agentType,
-        userId:       agentConfig.created_by,
-        workspaceId:  agentConfig.workspace_id,
-        model:        agentConfig.model,
-        inputTokens:  totalInputTokens,
-        outputTokens: totalOutputTokens,
-        metadata:     { enriched: enrichedCount, total: products.length },
-      });
-    }
-
     return {
-      success:        enrichedCount > 0 || errors.length < products.length,
+      success:        errors.length === 0,
       output:         { enriched: enrichedCount, errors: errors.length, total: products.length, error_ids: errors },
       inputTokens:    totalInputTokens,
       outputTokens:   totalOutputTokens,

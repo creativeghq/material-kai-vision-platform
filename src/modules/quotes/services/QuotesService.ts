@@ -2,8 +2,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { ADMIN_ROLES, isAdmin as isAdminRole } from '@/auth/roles';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
-import { productDetailService } from '@/services/productDetailService';
+import { productDetailService, type ProductDetail } from '@/services/productDetailService';
 import { variantKey } from '@/services/lineIdentityRules';
+import { UnifiedSearchService } from '@/services/unifiedSearchService';
 
 // INTERFACES
 
@@ -244,7 +245,31 @@ export interface QuoteTimeline {
  * over-share. The seller's cost arrives through `productDetailService.costs()`, which gates on
  * `is_workspace_sell_side` — the same treatment the per-line `cost_snapshot` got.
  */
-const QUOTE_PRODUCT_SELECT = 'id, name, sku, description, metadata';
+/** The product fields a quote line shows, read through get_product_detail (an embed is workspace-RLS-limited). */
+async function quoteLineProducts(
+  productIds: Array<string | null | undefined>,
+): Promise<Map<string, { id: string; name: string; sku: string | null; description: string | null; metadata: Record<string, any> }>> {
+  const details = await productDetailService.fetchMany(productIds).catch((e) => {
+    console.error('[QuotesService] get_product_details failed - line products unknown:', e);
+    return new Map<string, ProductDetail>();
+  });
+  const out = new Map<string, { id: string; name: string; sku: string | null; description: string | null; metadata: Record<string, any> }>();
+  for (const d of details.values()) {
+    out.set(d.id, {
+      id: d.id,
+      name: d.name,
+      sku: (d as any).sku ?? null,
+      description: (d as any).description ?? null,
+      metadata: ((d as any).metadata ?? {}) as Record<string, any>,
+    });
+  }
+  return out;
+}
+
+async function withLineProducts<T extends { product_id?: string | null }>(items: T[]): Promise<Array<T & { product: any }>> {
+  const products = await quoteLineProducts(items.map((it) => it.product_id));
+  return items.map((it) => ({ ...it, product: it.product_id ? products.get(it.product_id) ?? null : null }));
+}
 
 export class QuotesService {
   /**
@@ -426,13 +451,14 @@ export class QuotesService {
 
     if (quoteError) throw quoteError;
 
-    const { data: items, error: itemsError } = await supabase
+    const { data: rawItems, error: itemsError } = await supabase
       .from('quote_items')
-      .select(`*, product:products(${QUOTE_PRODUCT_SELECT})`)
+      .select('*')
       .eq('quote_id', quoteId)
       .order('added_at', { ascending: true });
 
     if (itemsError) throw itemsError;
+    const items = await withLineProducts((rawItems ?? []) as any[]);
 
     // Two cost basifications, both sell-side-gated at the database: what this LINE was quoted at
     // (frozen on acceptance) and what the product costs TODAY. The seller view needs the second
@@ -465,8 +491,9 @@ export class QuotesService {
               variant_key: variantKey(it.selected_attributes as Record<string, string> | null),
             })),
         });
-        for (const r of (imageRows ?? []) as Array<{ product_id: string; image_url: string | null }>) {
-          if (r.image_url && !productImageMap[r.product_id]) productImageMap[r.product_id] = r.image_url;
+        for (const r of (imageRows ?? []) as Array<{ product_id: string; variant_key: string | null; image_url: string | null }>) {
+          const k = `${r.product_id}|${r.variant_key ?? ''}`;
+          if (r.image_url && !productImageMap[k]) productImageMap[k] = r.image_url;
         }
       } catch { /* a thumbnail is an aid; the quote still opens without it */ }
     }
@@ -477,7 +504,7 @@ export class QuotesService {
       cost_snapshot: costByItemId.get(item.id) ?? null,
       product: item.product ? {
         ...item.product,
-        image_url: productImageMap[item.product.id] || item.product.image_url,
+        image_url: productImageMap[`${item.product.id}|${variantKey(item.selected_attributes as Record<string, string> | null) ?? ''}`] || item.product.image_url,
         cost: productCosts.get(item.product.id)?.cost ?? null,
         cost_currency: productCosts.get(item.product.id)?.cost_currency ?? null,
       } : item.product,
@@ -1032,9 +1059,9 @@ export class QuotesService {
       quotes.map(async (quote) => {
         // No cost here at all: the requests inbox reads only name and sku, and
         // `/quotes/requests` is a customer-facing route (#368 follow-up).
-        const { data: items, error: itemsError } = await supabase
+        const { data: rawItems, error: itemsError } = await supabase
           .from('quote_items')
-          .select(`*, product:products(${QUOTE_PRODUCT_SELECT})`)
+          .select('*')
           .eq('quote_id', quote.id)
           .order('added_at', { ascending: true });
 
@@ -1042,7 +1069,7 @@ export class QuotesService {
 
         return {
           ...quote,
-          items: items || [],
+          items: await withLineProducts((rawItems ?? []) as any[]),
         };
       }),
     );
@@ -1557,121 +1584,63 @@ export class QuotesService {
   // PRODUCT SEARCH FOR QUOTES
 
   /**
-   * Search products with their primary images for the add products sheet
-   * Uses MIVAA API's powerful /api/rag/search endpoint for semantic + text search
+   * Search products with their primary images for the add-products sheet. Scoped to the QUOTE's
+   * workspace (else the active one), through the typed unified-search contract: results carry `id`.
    */
-  async searchProductsWithImages(query: string, limit: number = 20): Promise<(Product & { image_url?: string })[]> {
-    // Get the current user to find their workspace
+  async searchProductsWithImages(
+    query: string,
+    limit: number = 20,
+    opts: { quoteId?: string | null; workspaceId?: string | null } = {},
+  ): Promise<(Product & { image_url?: string })[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const activeWorkspaceId = getActiveWorkspaceId(user.id);
-    if (!activeWorkspaceId) {
-      throw new Error('No active workspace — reload the page and try again');
+    let workspaceId = opts.workspaceId ?? null;
+    if (!workspaceId && opts.quoteId) {
+      const { data: q } = await supabase.from('quotes').select('workspace_id').eq('id', opts.quoteId).maybeSingle();
+      workspaceId = (q as { workspace_id?: string | null } | null)?.workspace_id ?? null;
     }
-    const workspaceData = { workspace_id: activeWorkspaceId };
+    if (!workspaceId) workspaceId = getActiveWorkspaceId(user.id);
+    if (!workspaceId) throw new Error('No active workspace');
 
-    try {
-      // Use MIVAA API for semantic search with multi_vector strategy
-      const MIVAA_API_URL = 'https://v1api.materialshub.gr';
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || '';
-
-      const response = await fetch(`${MIVAA_API_URL}/api/rag/search?strategy=multi_vector`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          query,
-          workspace_id: workspaceData.workspace_id,
-          top_k: limit,
-          similarity_threshold: 0.3, // Lower threshold for broader results
-        }),
-      });
-
-      if (!response.ok) {
-        console.warn('MIVAA search failed, falling back to direct DB search');
-        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
-      }
-
-      const result = await response.json();
-
-      if (!result.success || !result.results || result.results.length === 0) {
-        // Fallback to direct DB search if MIVAA returns no results
-        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
-      }
-
-      // Extract unique product IDs from search results
-      const productIds = new Set<string>();
-      const productDataMap: Record<string, { image_url?: string; score?: number }> = {};
-
-      for (const item of result.results) {
-        // MIVAA search returns products in various formats
-        const productId = item.product_id || item.metadata?.product_id;
-        const imageUrl = item.image_url || item.metadata?.image_url;
-
-        if (productId && !productIds.has(productId)) {
-          productIds.add(productId);
-          productDataMap[productId] = {
-            image_url: imageUrl,
-            score: item.score || item.similarity_score,
-          };
-        }
-      }
-
-      if (productIds.size === 0) {
-        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
-      }
-
-      // Fetch full product details
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('id, name, description, metadata')
-        .in('id', Array.from(productIds));
-
-      if (error) throw error;
-      if (!products || products.length === 0) {
-        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
-      }
-
-      // Get images for products that don't have them from search results
-      const productsNeedingImages = products.filter(p => !productDataMap[p.id]?.image_url).map(p => p.id);
-
-      if (productsNeedingImages.length > 0) {
-          const { data: relationships } = await supabase
-          .from('image_product_associations')
-          .select('product_id, image:document_images(image_url)')
-          .in('product_id', productsNeedingImages)
-          .order('overall_score', { ascending: false });
-
-        if (relationships) {
-          for (const rel of relationships) {
-            if (!productDataMap[rel.product_id]?.image_url && rel.image?.image_url) {
-              productDataMap[rel.product_id] = {
-                ...productDataMap[rel.product_id],
-                image_url: rel.image.image_url,
-              };
-            }
-          }
-        }
-      }
-
-      // Combine and return sorted by relevance
-      return products.map(product => ({
-        ...product,
-        image_url: productDataMap[product.id]?.image_url || undefined,
-      })).sort((a, b) => {
-        const scoreA = productDataMap[a.id]?.score || 0;
-        const scoreB = productDataMap[b.id]?.score || 0;
-        return scoreB - scoreA;
-      });
-    } catch (error) {
-      console.error('MIVAA search error:', error);
-      // Fallback to direct DB search
-      return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
+    const result = await UnifiedSearchService.searchMultiVector({ query, workspace_id: workspaceId, limit });
+    if (!result.success) {
+      console.warn('[QuotesService] product search failed, using name search:', result.error);
+      return this.searchProductsDirectDB(query, workspaceId, limit);
     }
+
+    const seen = new Set<string>();
+    const hits = (result.results ?? []).filter((r) => {
+      if (!r.id || seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    if (hits.length === 0) return this.searchProductsDirectDB(query, workspaceId, limit);
+
+    const imageById: Record<string, string> = {};
+    for (const r of hits) {
+      const url = r.related_images?.find((i) => i.url)?.url;
+      if (url) imageById[r.id] = url;
+    }
+    const needingImages = hits.filter((r) => !imageById[r.id]).map((r) => r.id);
+    if (needingImages.length > 0) {
+      const { data: relationships } = await supabase
+        .from('image_product_associations')
+        .select('product_id, image:document_images(image_url)')
+        .in('product_id', needingImages)
+        .order('overall_score', { ascending: false });
+      for (const rel of (relationships ?? []) as Array<{ product_id: string; image?: { image_url?: string | null } | null }>) {
+        if (!imageById[rel.product_id] && rel.image?.image_url) imageById[rel.product_id] = rel.image.image_url;
+      }
+    }
+
+    return hits.map((r) => ({
+      id: r.id,
+      name: r.name ?? r.product_name ?? '',
+      description: r.description ?? null,
+      metadata: r.metadata ?? {},
+      image_url: imageById[r.id] || undefined,
+    })) as unknown as (Product & { image_url?: string })[];
   }
 
   /**

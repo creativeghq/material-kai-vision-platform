@@ -73,7 +73,7 @@ describe('visual_search routes an aspect to an endpoint that honors it', () => {
     // Reranking sorts by text relevance to the user's phrasing. On the aspect path that
     // would discard the exact bias a vision call was just spent computing, which is the
     // silent-no-op this whole guard is about — arriving one layer later.
-    expect(visualSearch).toMatch(/if \(aspect\)[\s\S]{0,600}return JSON\.stringify\(data\)/);
+    expect(visualSearch).toMatch(/if \(aspect\)[\s\S]{0,600}return JSON\.stringify\(fenceSearchPayload\(data\)\)/);
   });
 });
 

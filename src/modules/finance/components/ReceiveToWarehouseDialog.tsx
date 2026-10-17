@@ -431,7 +431,20 @@ export const ReceiveToWarehouseDialog: React.FC<{
     }
   };
 
+  const submittingRef = useRef(false);
   const submit = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setBusy(true);
+    try {
+      await runSubmit();
+    } finally {
+      submittingRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const runSubmit = async () => {
     const active = receivable
       .map(({ i }) => ({ i, r: rows[i] }))
       .filter(({ r }) => r && r.include && r.mode !== 'skip' && parseDecimalOr(r.qty, 0) > 0);
@@ -454,6 +467,51 @@ export const ReceiveToWarehouseDialog: React.FC<{
      */
     const createdNames: string[] = [];
 
+    // Every line is validated BEFORE the first product is created, so a refusal on line 5 cannot
+    // leave lines 1-4 as catalogue products that a retry then creates a second time.
+    const baseQtyByLine = new Map<number, { quantity: number; note: string | null }>();
+    for (const { i, r } of active) {
+      const qty = parseDecimalOr(r.qty, 0);
+      if (r.mode !== '__create') {
+        const target = items.find((it) => it.id === r.mode);
+        const targetUnit = normalizeUnit(target?.unit);
+        const lineUnit = normalizeUnit(r.unit);
+        if (target?.product_id && targetUnit && lineUnit && targetUnit !== lineUnit) {
+          const uom = await productUomService.getUom(target.product_id).catch(() => null);
+          const base = uom ? productUomService.convertToBase(uom, qty, lineUnit) : null;
+          if (base == null || normalizeUnit(uom?.base_unit) !== targetUnit) {
+            toast({
+              title: `Cannot receive "${r.name || 'this line'}"`,
+              description:
+                `The document bills in ${lineUnit} but "${target.name}" is counted in ${targetUnit}, ` +
+                'and this product has no conversion between them. Set the packaging on the product ' +
+                '(Fiscal & Customs → Packaging & units), or receive it into a matching stock item.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          baseQtyByLine.set(i, { quantity: base, note: `${qty} ${lineUnit} → ${base} ${targetUnit} (${r.name || 'line'})` });
+        } else {
+          baseQtyByLine.set(i, { quantity: qty, note: null });
+        }
+        continue;
+      }
+      const typed = parseDecimalOr(r.salePrice, NaN);
+      const check = netListPrice({
+        typed: Number.isFinite(typed) ? typed : null,
+        vatCategory: r.vatCategory,
+        pricesIncludeVat: r.pricesIncludeVat,
+      });
+      if (!check.ok) {
+        toast({
+          title: `Cannot price "${r.name || 'this line'}"`,
+          description: 'The typed price is marked as VAT-inclusive but no sale VAT category is set, so there is no rate to net it by. Set the VAT category on the line, or untick "includes VAT". Nothing was created.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     /**
      * One token per CLICK, reused across a retry of that same click. A useRef latch closes the
      * double-tap and cannot close the dropped connection — the case where the receipt committed
@@ -461,7 +519,6 @@ export const ReceiveToWarehouseDialog: React.FC<{
      */
     if (!clickTokenRef.current) clickTokenRef.current = crypto.randomUUID();
 
-    setBusy(true);
     try {
       const mappings: { item_id: string; quantity: number; line_number: number | null }[] = [];
       let created = 0;
@@ -470,34 +527,11 @@ export const ReceiveToWarehouseDialog: React.FC<{
       for (const { i, r } of active) {
         const qty = parseDecimalOr(r.qty, 0);
         if (r.mode !== '__create') {
-          // Receiving into an EXISTING stock row: the document states one unit, the row counts
-          // in another, and `inbound_doc_receive_to_warehouse` takes a bare number. Left alone,
-          // a supplier line of 288 m² adds 288 PIECES to a row of gypsum boards — a valid
-          // number, off by the area of a board, that nothing downstream can detect.
-          const target = items.find((it) => it.id === r.mode);
-          const targetUnit = normalizeUnit(target?.unit);
-          const lineUnit = normalizeUnit(r.unit);
-          if (target?.product_id && targetUnit && lineUnit && targetUnit !== lineUnit) {
-            const uom = await productUomService.getUom(target.product_id).catch(() => null);
-            const base = uom ? productUomService.convertToBase(uom, qty, lineUnit) : null;
-            // A conversion we cannot make is a hard stop, never a 1:1 fallback.
-            if (base == null || normalizeUnit(uom?.base_unit) !== targetUnit) {
-              toast({
-                title: `Cannot receive "${r.name || 'this line'}"`,
-                description:
-                  `The document bills in ${lineUnit} but "${target.name}" is counted in ${targetUnit}, ` +
-                  'and this product has no conversion between them. Set the packaging on the product ' +
-                  '(Fiscal & Customs → Packaging & units), or receive it into a matching stock item.',
-                variant: 'destructive',
-              });
-              setBusy(false);
-              return;
-            }
-            converted.push(`${qty} ${lineUnit} → ${base} ${targetUnit} (${r.name || 'line'})`);
-            mappings.push({ item_id: r.mode, quantity: base, line_number: lineNumberAt(i) });
-            continue;
-          }
-          mappings.push({ item_id: r.mode, quantity: qty, line_number: lineNumberAt(i) });
+          // Receiving into an EXISTING stock row: the quantity is the one converted to the row's
+          // unit in the validation pass above (a missing conversion was a hard stop there).
+          const pre = baseQtyByLine.get(i) ?? { quantity: qty, note: null };
+          if (pre.note) converted.push(pre.note);
+          mappings.push({ item_id: r.mode, quantity: pre.quantity, line_number: lineNumberAt(i) });
           continue;
         }
 
@@ -566,17 +600,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
           vatCategory: r.vatCategory,
           pricesIncludeVat: r.pricesIncludeVat,
         });
-        if (!netted.ok) {
-          // Storing the gross figure unchanged is the one answer that is definitely wrong, and
-          // it is what both copies of this arithmetic used to do when the category was blank.
-          toast({
-            title: `Cannot price "${r.name || 'this line'}"`,
-            description: 'The typed price is marked as VAT-inclusive but no sale VAT category is set, so there is no rate to net it by. Set the VAT category on the line, or untick "includes VAT".',
-            variant: 'destructive',
-          });
-          setBusy(false);
-          return;
-        }
+        if (!netted.ok) throw new Error(`"${r.name || 'this line'}" has a VAT-inclusive price with no sale VAT category`);
         const price = netted.net ?? NaN;
         const discount = num(r.defaultDiscount);
         if (productId && (Number.isFinite(price) && price > 0 || discount != null)) {
@@ -631,7 +655,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
       onDone();
     } catch (e: any) {
       // A plan-quota refusal gets the dedicated "Upgrade" toast instead of the failure blob.
-      if (handleQuota(e)) return; // finally below still clears busy
+      if (handleQuota(e)) return; // submit's finally still clears busy
       // Name what survived. The receipt RPC runs last and is all-or-nothing, and the retry now
       // carries the same token — so if it DID commit before the connection dropped, pressing
       // Receive again replays it rather than receiving the goods a second time.
@@ -646,7 +670,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
         description: `${e?.message ?? 'Unknown error'}.${leftBehind}`,
         variant: 'destructive',
       });
-    } finally { setBusy(false); }
+    }
   };
 
   const issuer = doc.issuer_name ?? doc.issuer_vat ?? doc.mark;

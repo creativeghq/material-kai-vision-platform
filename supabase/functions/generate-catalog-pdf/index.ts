@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { fetchCatalog } from './data-fetcher.ts';
 import type { CatalogPDFRequest, CatalogPDFResponse } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { authenticate as authenticateCaller } from '../_shared/auth.ts';
 import { fetchBrandingConfig, fetchTemplateImage, fetchImageBytesFromUrl } from '../_shared/pdf/branding.ts';
 import { renderBrandedDocument, type BrandedDoc, type BrandedDocSection } from '../_shared/pdf/document.ts';
@@ -52,12 +53,17 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     if (!catalogId) return jsonResponse({ success: false, error: 'Missing catalog_id' }, 400);
 
     const catalog = await fetchCatalog(supabase, catalogId);
-
     if (auth.keyWorkspaceId !== undefined && catalog.workspace_id !== auth.keyWorkspaceId) {
       return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
     }
-    if (!auth.isService && auth.userId && catalog.owner_user_id !== auth.userId) {
-      return jsonResponse({ success: false, error: 'Not authorized for this catalog' }, 403);
+
+    // Owning the row is not enough: an owner who has since left the workspace keeps owner_user_id.
+    if (!auth.isService) {
+      const allowed = !!auth.userId && catalog.owner_user_id === auth.userId && (
+        !catalog.workspace_id
+        || await userHasWorkspaceCapability(supabase, auth.userId, catalog.workspace_id, 'workspace.read')
+      );
+      if (!allowed) return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
     }
 
     const sections = (catalog.body_data?.sections || []) as Array<{ title?: string; intro?: string | null; materials?: any[] }>;

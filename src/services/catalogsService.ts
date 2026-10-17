@@ -415,7 +415,7 @@ class CatalogsService {
     query: string;
     maxResults?: number;
     autoAdd?: boolean;
-  }): Promise<{ success: boolean; candidates: any[]; error?: string }> {
+  }): Promise<{ success: boolean; candidates: any[]; error?: string; partial_errors?: string[] }> {
     const cat = await this.get(input.catalogId);
     if (!cat) throw new Error('Catalog not found');
     if (!cat.source_pdf_ids || cat.source_pdf_ids.length === 0) {
@@ -431,7 +431,7 @@ class CatalogsService {
     });
     if (error) throw error;
     if (!data?.success) throw new Error(data?.error || 'Extraction failed');
-    return data as { success: boolean; candidates: any[] };
+    return data as { success: boolean; candidates: any[]; partial_errors?: string[] };
   }
 
   /** Whole-PDF → catalog body translation. Mirrors the agent's translate_pdf_to_catalog tool. */

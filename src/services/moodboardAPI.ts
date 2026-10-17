@@ -5,6 +5,27 @@ import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { getProductName } from '@/utils/productMetadata';
 import { moodboardPath, generationPathFromUrl } from '@/utils/storagePaths';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { productDetailService, type ProductDetail } from '@/services/productDetailService';
+
+type MoodboardMaterial = { id: string; name?: string; category_id?: string; properties?: any; metadata?: any };
+
+async function loadMaterials(ids: Array<string | null | undefined>): Promise<Map<string, MoodboardMaterial>> {
+  const details = await productDetailService.fetchMany(ids).catch((e) => {
+    console.error('[moodboardAPI] get_product_details failed - materials unknown:', e);
+    return new Map<string, ProductDetail>();
+  });
+  const out = new Map<string, MoodboardMaterial>();
+  for (const d of details.values()) {
+    out.set(d.id, {
+      id: d.id,
+      name: d.name,
+      category_id: (d as any).category_id ?? undefined,
+      properties: (d as any).properties ?? {},
+      metadata: (d as any).metadata ?? {},
+    });
+  }
+  return out;
+}
 
 export interface CreateMoodBoardData {
   title: string;
@@ -47,14 +68,22 @@ class MoodBoardAPI {
           material_id,
           position,
           notes,
-          added_at,
-          material:products(id, name, category_id, properties, metadata)
+          added_at
         )
       `)
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
+
+    const materials = await loadMaterials(
+      (data || []).flatMap((b: any) => (b.moodboard_items || []).map((i: any) => i.material_id)),
+    );
+    for (const board of (data || []) as any[]) {
+      for (const item of board.moodboard_items || []) {
+        item.material = item.material_id ? materials.get(item.material_id) ?? null : null;
+      }
+    }
 
     // Batch fetch preview images for the first 4 items of each moodboard
     const allProductIds = new Set<string>();
@@ -330,24 +359,19 @@ class MoodBoardAPI {
 
   // Get items in a moodboard
   async getMoodBoardItems(moodboardId: string): Promise<MoodBoardItem[]> {
-    const { data, error } = await supabase
+    const { data: rawItems, error } = await supabase
       .from('moodboard_items')
-      .select(
-        `
-        *,
-        material:products(
-          id,
-          name,
-          category_id,
-          properties,
-          metadata
-        )
-      `,
-      )
+      .select('*')
       .eq('moodboard_id', moodboardId)
       .order('position', { ascending: true });
 
     if (error) throw error;
+    const data = (rawItems || []) as any[];
+
+    const materials = await loadMaterials(data.map((i: any) => i.material_id));
+    for (const item of data) {
+      item.material = item.material_id ? materials.get(item.material_id) ?? null : null;
+    }
 
     // Get product IDs to fetch images
     const productIds = (data || [])
@@ -402,7 +426,7 @@ class MoodBoardAPI {
     const nextPosition =
       itemData.position ?? (existingItems?.[0]?.position ?? -1) + 1;
 
-    const { data: result, error } = await supabase
+    const { data: rawResult, error } = await supabase
       .from('moodboard_items')
       .insert({
         moodboard_id: itemData.moodboard_id,
@@ -413,21 +437,14 @@ class MoodBoardAPI {
         ...(itemData.media_type ? { media_type: itemData.media_type } : {}),
         ...(itemData.media_title ? { media_title: itemData.media_title } : {}),
       })
-      .select(
-        `
-        *,
-        material:products(
-          id,
-          name,
-          category_id,
-          properties,
-          metadata
-        )
-      `,
-      )
+      .select('*')
       .single();
 
     if (error) throw error;
+    const result = rawResult as any;
+    result.material = result.material_id
+      ? (await loadMaterials([result.material_id])).get(result.material_id) ?? null
+      : null;
 
     // Fetch best image for the product via image_product_associations
     let thumbnail_url: string | null = null;

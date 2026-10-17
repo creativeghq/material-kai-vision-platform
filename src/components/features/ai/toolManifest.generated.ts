@@ -679,9 +679,11 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createFindProductsBySpecTool',
     description: 'Filter products by NUMERIC spec ranges — IP rating, PEI class, thickness (mm), wattage (W) — parsed from product specs into queryable numbers.',
     params: [
+      { name: 'category', type: 'string', optional: true, description: 'Category key to restrict to, e.g. tiles, lighting, sanitary' },
       { name: 'ip_min', type: 'number', optional: true, description: 'Minimum IP rating, e.g. 65' },
       { name: 'ip_max', type: 'number', optional: true, description: 'Maximum IP rating' },
       { name: 'pei_min', type: 'number', optional: true, description: 'Minimum PEI class (1–5; III = 3)' },
+      { name: 'pei_max', type: 'number', optional: true, description: 'Maximum PEI class (1–5)' },
       { name: 'thickness_min', type: 'number', optional: true, description: 'Minimum thickness in mm' },
       { name: 'thickness_max', type: 'number', optional: true, description: 'Maximum thickness in mm' },
       { name: 'wattage_min', type: 'number', optional: true, description: 'Minimum wattage in W' },
@@ -1527,7 +1529,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Price a described specification against the published catalogue — "a lounge armchair in linen, sunset", "velvet dining chair".',
     params: [
       { name: 'product_type', type: 'string', optional: true, description: 'What the thing IS, e.g. "lounge armchair", "floor tile"' },
-      { name: 'spec', type: 'object', optional: true, description: 'Attributes as key/value, e.g. {"fabric":"linen","available_colors":"sunset"}' },
+      { name: 'spec', type: 'object', optional: true, description: 'Attributes as key/value, e.g. {"fabric":"linen","color":"sunset"}' },
       { name: 'limit', type: 'number', optional: true, description: 'Max matches and near matches (default 5)' },
     ],
   },
@@ -1651,7 +1653,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createRaiseQuoteRequestTool',
     description: 'Record an unpriced customer request as a real lead, for when the catalogue cannot satisfy a specification — the follow-up to a `price_my_spec` verdict of "near" or "none".',
     params: [
-      { name: 'spec', type: 'object', optional: true, description: 'What they asked for, as key/value — the same spec you sent to price_my_spec, e.g. {"fabric":"linen","available_colors":"sunset"}' },
+      { name: 'spec', type: 'object', optional: true, description: 'What they asked for, as key/value — the same spec you sent to price_my_spec, e.g. {"fabric":"linen","color":"sunset"}' },
       { name: 'product_type', type: 'string', optional: true, description: 'What the thing IS, e.g. "lounge armchair", "floor tile"' },
       { name: 'contact_id', type: 'string', optional: true, description: 'Existing CRM contact id, when the customer is already known.' },
       { name: 'contact_name', type: 'string', optional: true, description: 'The customer\'s name, when they are not already a CRM contact.' },

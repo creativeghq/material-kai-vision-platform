@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Button } from '@/components/core/ui/button';
 import { RefreshCw, CheckCircle2, AlertTriangle, Package, Award, FileText, Eye } from 'lucide-react';
 import { mivaaApi } from '@/services/mivaaApiClient';
+import { toast } from 'sonner';
 
 interface ProductCoverage {
   id: string;
@@ -82,7 +83,15 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
   const rerunCatalogKnowledge = async () => {
     setRerunning(true);
     try {
-      await mivaaApi.runCatalogKnowledge(documentId, true);
+      const res = await mivaaApi.runCatalogKnowledge(documentId, true);
+      const body = res.data as { success?: boolean; error?: string; message?: string } | undefined;
+      if (!res.success || body?.success === false) {
+        const reason = res.error || body?.error || body?.message || 'MIVAA reported the re-run as failed';
+        toast.error(`Catalog knowledge re-run failed: ${reason}`);
+        setError(reason);
+        return;
+      }
+      toast.success('Catalog knowledge re-run finished');
       await load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Re-run failed');

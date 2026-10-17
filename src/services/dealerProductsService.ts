@@ -15,6 +15,22 @@ export interface CategoryField {
   field_type: string; // 'text' | 'number' | 'boolean' | 'select' | ...
   /** Registry's `canonicalize` — this facet has canonical values worth autocompleting. */
   canonicalize: boolean;
+  destination: 'column' | 'metadata';
+}
+
+/** Splits form values by registry destination; a key the registry does not know is metadata. */
+export function routeByDestination(
+  values: Record<string, unknown>,
+  fields: CategoryField[],
+): { metadata: Record<string, unknown>; column_fields: Record<string, unknown> } {
+  const dest = new Map(fields.map((f) => [f.field_name, f.destination]));
+  const metadata: Record<string, unknown> = {};
+  const column_fields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(values)) {
+    if (dest.get(k) === 'column') column_fields[k] = v;
+    else metadata[k] = v;
+  }
+  return { metadata, column_fields };
 }
 
 export interface ManualImageRef {
@@ -35,6 +51,7 @@ export interface ManualProductPayload {
   dimensions?: string;
   external_sku?: string;
   metadata?: Record<string, any>;
+  column_fields?: Record<string, any>;
   images?: ManualImageRef[];
   // First-class product fields the admin product modal carries. The MIVAA core
   // doesn't model these; the create-manual endpoint applies them as a post-create
@@ -57,7 +74,7 @@ export const dealerProductsService = {
     try {
       const { data } = await supabase
         .from('material_metadata_fields')
-        .select('field_name, display_name, field_type, applies_to_categories, is_global, canonicalize, status')
+        .select('field_name, display_name, field_type, applies_to_categories, is_global, canonicalize, status, destination')
         .eq('status', 'active');
       const rows = (data ?? []) as any[];
       return rows
@@ -77,6 +94,7 @@ export const dealerProductsService = {
           label: r.display_name || r.field_name,
           field_type: r.field_type || 'text',
           canonicalize: r.canonicalize === true,
+          destination: r.destination === 'column' ? 'column' as const : 'metadata' as const,
         }));
     } catch {
       return [];

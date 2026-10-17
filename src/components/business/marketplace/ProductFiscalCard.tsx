@@ -12,6 +12,7 @@ import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupSer
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { warehouseService, type ProductFiscalFields } from '@/services/warehouseService';
 import { taricService, formatTaricCode } from '@/services/taricService';
+import { productDetailService } from '@/services/productDetailService';
 import { TaricCombobox } from '@/components/core/TaricCombobox';
 import { OriginCountryCombobox } from '@/components/core/OriginCountryCombobox';
 import { RegulatoryRoleNotice } from '@/components/business/marketplace/RegulatoryRoleNotice';
@@ -29,7 +30,7 @@ const SELECT_COLUMNS = [
   'mydata_vat_category',
   'mydata_income_classification_type', 'mydata_income_classification_category',
   'mydata_income_classification_type_retail', 'mydata_income_classification_category_retail',
-  'prices_include_vat', 'markup_percent', 'warranty', 'product_url', 'notes',
+  'prices_include_vat', 'warranty', 'product_url', 'notes',
   'taric_code', 'country_of_origin', 'is_own_brand', 'dopc_product_type_code', 'workspace_id',
   'wood_species_common', 'wood_species_scientific', 'first_placed_on_eu_market_at',
   'discontinued_by_supplier_on',
@@ -77,6 +78,10 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
   const [incCats, setIncCats] = useState<RefRow[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // markup_percent is a cost fact read through get_product_costs; unknown = never written back.
+  const [markupKnown, setMarkupKnown] = useState(false);
+  const [loadedTaric, setLoadedTaric] = useState('');
   const [saving, setSaving] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [suggestion, setSuggestion] = useState<{
@@ -100,15 +105,20 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [{ data: p }, types, cats, matCats] = await Promise.all([
+      const [{ data: p, error: readError }, types, cats, matCats, costs] = await Promise.all([
         supabase.from('products').select(SELECT_COLUMNS).eq('id', productId).maybeSingle(),
         invoicingSetupService.listReference('income_classification_type').catch(() => [] as RefRow[]),
         invoicingSetupService.listReference('income_classification_category').catch(() => [] as RefRow[]),
         supabase.from('material_categories').select('id, name').order('name').limit(200)
           .then((r) => (r.data ?? []) as { id: string; name: string }[], () => []),
+        productDetailService.costs([productId]),
       ]);
       if (cancelled) return;
+      setLoadError(readError ? readError.message : !p ? 'Product not found' : null);
       const row = p as any;
+      const cost = costs.get(productId);
+      setMarkupKnown(!!cost);
+      setLoadedTaric((row?.taric_code ?? '').replace(/[^0-9]/g, ''));
       setForm({
         barcode: row?.barcode ?? '',
         cpv: row?.cpv_code ?? '',
@@ -121,7 +131,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         incTypeRetail: row?.mydata_income_classification_type_retail ?? '',
         incCatRetail: row?.mydata_income_classification_category_retail ?? '',
         pricesIncludeVat: row?.prices_include_vat ?? false,
-        markup: row?.markup_percent != null ? String(row.markup_percent) : '',
+        markup: cost?.markup_percent != null ? String(cost.markup_percent) : '',
         warranty: row?.warranty ?? '',
         productUrl: row?.product_url ?? '',
         notes: row?.notes ?? '',
@@ -159,6 +169,10 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
   const num = (v: string): number | null => (v.trim() === '' ? null : Number(v));
 
   const save = async () => {
+    if (loadError) {
+      toast({ title: 'Not saved', description: `The product could not be read (${loadError}); saving would overwrite it with blanks.`, variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
       const fiscal: ProductFiscalFields = {
@@ -173,12 +187,12 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         mydata_income_classification_type_retail: form.incTypeRetail || null,
         mydata_income_classification_category_retail: form.incCatRetail || null,
         prices_include_vat: form.pricesIncludeVat,
-        markup_percent: num(form.markup),
+        markup_percent: markupKnown ? num(form.markup) : undefined,
         warranty: form.warranty.trim() || null,
         product_url: form.productUrl.trim() || null,
         notes: form.notes.trim() || null,
-        taric_code: form.taric || null,
       };
+      const taricChanged = form.taric !== loadedTaric;
       await warehouseService.updateProductFiscal(productId, fiscal);
       // Origin and the classification audit trail are not part of FISCAL_KEYS — they belong to
       // customs, and a code chosen by hand here is a confirmed one whatever the classifier said.
@@ -189,13 +203,23 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         wood_species_common: form.speciesCommon.trim() || null,
         wood_species_scientific: form.speciesScientific.trim() || null,
         first_placed_on_eu_market_at: form.firstPlacedOn || null,
-        ...(form.taric ? { taric_status: 'confirmed', taric_source: 'manual', taric_code_suggested: null } : {}),
+        ...(taricChanged
+          ? {
+              taric_code: form.taric || null,
+              taric_status: form.taric ? 'confirmed' : 'pending',
+              taric_source: form.taric ? 'manual' : null,
+              taric_code_suggested: null,
+              taric_confidence: null,
+              taric_reasoning: null,
+            }
+          : {}),
       }).eq('id', productId);
       if (error) throw error;
+      setLoadedTaric(form.taric);
       // #438 -- the factory dropping a range is the EARLIEST signal that stock is becoming a
       // write-down. Everything else only tells you once it has already sat.
       await ageingService.markDiscontinued(productId, form.discontinuedOn || null);
-      if (form.taric) { setSuggestion(null); setProvenance({ source: 'manual', reasoning: null }); }
+      if (taricChanged) { setSuggestion(null); setProvenance(form.taric ? { source: 'manual', reasoning: null } : null); }
       setSavedAt((n) => n + 1);
       toast({ title: 'Product data saved' });
     } catch (err: any) {
@@ -211,6 +235,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
       if (first?.code && first.status === 'confirmed') {
         // The supplier had already declared a valid code — applied directly, nothing to confirm.
         set({ taric: first.code });
+        setLoadedTaric(first.code);
         setSuggestion(null);
         toast({ title: 'TARIC code taken from the supplier data', description: formatTaricCode(first.code) });
       } else if (first?.code) {
@@ -238,6 +263,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
     try {
       await taricService.confirmSuggestion(productId, suggestion.code);
       set({ taric: suggestion.code });
+      setLoadedTaric(suggestion.code);
       setSuggestion(null);
       toast({ title: 'TARIC code confirmed' });
     } catch (err: any) {
@@ -333,7 +359,8 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
           </FieldBox>
           <FieldBox label="Default markup %">
             <Input className="h-8 text-xs" inputMode="decimal" value={form.markup}
-              onChange={(e) => set({ markup: e.target.value })} placeholder="0" />
+              disabled={!markupKnown} title={markupKnown ? undefined : 'Markup is a cost fact you cannot read here'}
+              onChange={(e) => set({ markup: e.target.value })} placeholder={markupKnown ? '0' : '—'} />
           </FieldBox>
           <div className="flex items-end pb-1">
             {/* htmlFor rather than nesting: Radix renders a button[role=checkbox], not a native
@@ -515,7 +542,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
       </Section>
 
       <div className="flex justify-end">
-        <Button size="sm" variant="outline" onClick={save} disabled={saving}>
+        <Button size="sm" variant="outline" onClick={save} disabled={saving || !!loadError}>
           {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
           Save product data
         </Button>

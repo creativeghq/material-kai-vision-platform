@@ -1,8 +1,19 @@
 /** Background Agent: Material Tagger */
 
 import { loadPrompt } from '../prompt-utils.ts';
-import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
+import { generateStructuredWithClaude, z } from '../ai-client.ts';
+import { wrapUntrusted } from '../untrusted.ts';
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
+
+const META_FACET_KEYS = ['material_category', 'color', 'finish', 'style', 'application', 'room', 'lamp_type', 'color_temperature_k', 'mounting_type'];
+
+const TAG_SCHEMA = z.object({
+  material:      z.string().nullable(),
+  color:         z.string().nullable(),
+  finish:        z.string().nullable(),
+  application:   z.string().nullable(),
+  tags:          z.array(z.string()),
+});
 
 export class MaterialTaggerAgent implements AgentRunner {
   readonly agentType    = 'material-tagger';
@@ -12,7 +23,14 @@ export class MaterialTaggerAgent implements AgentRunner {
   readonly defaultModel = 'claude-haiku-4-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
-    const { supabase, agentConfig, run, input, log, heartbeat } = ctx;
+    const { supabase, agentConfig, input, log, heartbeat } = ctx;
+
+    // Runs as the service role: the run's authorized workspace bounds every product read/write.
+    const workspaceId = ctx.workspaceId;
+    if (!workspaceId) {
+      await log('error', 'Material tagging refused: run has no authorized workspace');
+      return { success: false, output: { error: 'workspace_required' }, inputTokens: 0, outputTokens: 0, creditsDebited: 0 };
+    }
 
     const cfg            = { ...agentConfig.config, ...input } as Record<string, unknown>;
     const batchSize      = Math.min(Number(cfg.batch_size ?? 10), 20);
@@ -20,11 +38,10 @@ export class MaterialTaggerAgent implements AgentRunner {
 
     await log('info', `Starting material tagging`, { batchSize, recanonicalize });
 
-    // Find products that need canonical attributes filled in.
-    // `attributes` is jsonb NOT NULL DEFAULT '{}', so "needs work" = attributes='{}'.
     let query = supabase
       .from('products')
-      .select('id, name, description, metadata')
+      .select('id, name, description, metadata, attributes, attributes_raw')
+      .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true })
       .limit(batchSize);
 
@@ -45,9 +62,6 @@ export class MaterialTaggerAgent implements AgentRunner {
 
     await log('info', `Found ${products.length} products to tag`);
 
-    // The default lives in `prompts` (prompt_type='agent', category='material-tagger').
-    // It used to be a hardcoded literal here: the override path existed, so an admin could
-    // change this — but only by overriding a default nobody could see (#347 phase 3P).
     const systemPrompt = agentConfig.system_prompt_override
       || await loadPrompt(supabase, 'agent', 'material-tagger');
 
@@ -59,62 +73,46 @@ export class MaterialTaggerAgent implements AgentRunner {
     for (const product of products) {
       await heartbeat();
 
-      // Build a text-only context. Vision input would be ideal but the
-      // product-level image URL doesn't live on this row (images are in
-      // document_images linked via image_product_associations). For now
-      // we extract attributes from the available text — name + description
-      // + any pre-extracted facets already in metadata.
-      const metaSnippet = (() => {
-        const m = (product.metadata || {}) as Record<string, unknown>;
-        const keep = ['material_category', 'available_colors', 'finish', 'style', 'application', 'room', 'socket', 'light_color', 'mounting_type'];
-        const out: Record<string, unknown> = {};
-        for (const k of keep) {
-          if (m[k] !== undefined && m[k] !== null && m[k] !== '') out[k] = m[k];
-        }
-        return Object.keys(out).length > 0 ? JSON.stringify(out) : '(no metadata facets)';
-      })();
-
-      const userMessage = `Tag this product:
-Name: ${product.name}
-Description: ${product.description || '(none)'}
-Existing metadata facets: ${metaSnippet}
-
-Return JSON with applicable fields from: material_type, color, finish, application, tags[]`;
+      const m = (product.metadata || {}) as Record<string, unknown>;
+      const facets: Record<string, unknown> = {};
+      for (const k of META_FACET_KEYS) {
+        if (m[k] !== undefined && m[k] !== null && m[k] !== '') facets[k] = m[k];
+      }
+      const userMessage = wrapUntrusted('product record', JSON.stringify({
+        name: product.name,
+        description: product.description ?? null,
+        metadata_facets: facets,
+      }), 8000);
 
       try {
-        const result = await runLangGraphAgent({
-          anthropicApiKey: ctx.anthropicApiKey,
-          model:           agentConfig.model,
+        const result = await generateStructuredWithClaude(userMessage, TAG_SCHEMA, {
+          model:        agentConfig.model,
           systemPrompt,
-          tools:           [],
-          userMessage,
-          maxIterations:   1,
-          onLog:           (level, msg, data) => log(level, msg, data),
+          temperature:  0,
+          task:         'background_agent_material_tagger',
+          userId:       agentConfig.created_by ?? undefined,
+          workspaceId,
         });
 
-        totalInputTokens  += result.inputTokens;
-        totalOutputTokens += result.outputTokens;
+        totalInputTokens  += result.usage.inputTokens;
+        totalOutputTokens += result.usage.outputTokens;
 
-        let tagData: Record<string, unknown>;
-        try {
-          const clean = result.finalResponse.replace(/```json\n?|\n?```/g, '').trim();
-          tagData = JSON.parse(clean);
-        } catch {
-          await log('warn', `Could not parse tags for product ${product.id}`, { raw: result.finalResponse.slice(0, 200) });
-          errors.push(`parse_error:${product.id}`);
+        const tagData: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(result.output ?? {})) {
+          if (Array.isArray(v) ? v.length > 0 : typeof v === 'string' && v.trim() !== '') tagData[k] = v;
+        }
+        if (Object.keys(tagData).length === 0) {
+          await log('debug', `Model returned no tags for ${product.id}`);
           continue;
         }
 
-        // ── Auto-canonicalize via the canonicalize-attributes edge function ──
-        // Sole write path: the canonicalizer normalizes Haiku's raw output
-        // (any language) and writes products.attributes + products.attributes_raw.
-        // No dead writes to non-existent top-level columns. Diff-before-canonicalize
-        // means re-runs on stable products skip already-seen values.
-        const updateData: Record<string, unknown> = {};
+        let canonAttrs: Record<string, unknown> = {};
+        let canonRaw: Record<string, unknown> = {};
         try {
           const canonResp = await supabase.functions.invoke('canonicalize-attributes', {
             body: {
               product_id: product.id,
+              workspace_id: workspaceId,
               raw_attributes: tagData,
               source: 'agent_material_tagger',
             },
@@ -124,63 +122,46 @@ Return JSON with applicable fields from: material_type, color, finish, applicati
             errors.push(`canon_error:${product.id}`);
             continue;
           }
-          if (canonResp.data) {
-            updateData.attributes      = canonResp.data.attributes      || {};
-            updateData.attributes_raw  = canonResp.data.attributes_raw  || {};
-          }
-        } catch (canonErr: any) {
-          await log('warn', `canonicalize-attributes threw for ${product.id}`, { error: canonErr?.message });
+          canonAttrs = (canonResp.data?.attributes ?? {}) as Record<string, unknown>;
+          canonRaw   = (canonResp.data?.attributes_raw ?? {}) as Record<string, unknown>;
+        } catch (canonErr) {
+          await log('warn', `canonicalize-attributes threw for ${product.id}`, { error: canonErr instanceof Error ? canonErr.message : String(canonErr) });
           errors.push(`canon_throw:${product.id}`);
           continue;
         }
 
-        // Only update if we got at least one canonical attribute back.
-        // Empty canonical result usually means Haiku produced unusable output
-        // (e.g. all values rejected by the non-ASCII guard) — log and skip
-        // rather than overwrite with empty attributes.
-        const attrs = updateData.attributes as Record<string, unknown> | undefined;
-        if (!attrs || Object.keys(attrs).length === 0) {
+        if (Object.keys(canonAttrs).length === 0) {
           await log('debug', `Canonicalizer returned no attributes for ${product.id} — leaving as-is`, tagData);
           continue;
         }
 
         const { error: updateErr } = await supabase
           .from('products')
-          .update(updateData)
-          .eq('id', product.id);
+          .update({
+            attributes:     { ...((product.attributes ?? {}) as Record<string, unknown>), ...canonAttrs },
+            attributes_raw: { ...((product.attributes_raw ?? {}) as Record<string, unknown>), ...canonRaw },
+          })
+          .eq('id', product.id)
+          .eq('workspace_id', workspaceId);
 
         if (updateErr) {
           await log('warn', `Failed to update tags for product ${product.id}`, { error: updateErr.message });
           errors.push(`update_error:${product.id}`);
         } else {
           taggedCount++;
-          await log('debug', `Tagged product ${product.id} (${product.name})`, attrs);
+          await log('debug', `Tagged product ${product.id} (${product.name})`, canonAttrs);
         }
-      } catch (err: any) {
-        await log('warn', `Failed to tag product ${product.id}`, { error: err.message });
+      } catch (err) {
+        await log('warn', `Failed to tag product ${product.id}`, { error: err instanceof Error ? err.message : String(err) });
         errors.push(`ai_error:${product.id}`);
       }
     }
 
     await log('info', `Tagging complete`, { tagged: taggedCount, errors: errors.length });
 
-    if (totalInputTokens > 0 || totalOutputTokens > 0) {
-      logAgentAiUsage(supabase, {
-        runId:        run.id,
-        agentId:      agentConfig.id,
-        agentType:    this.agentType,
-        userId:       agentConfig.created_by,
-        workspaceId:  agentConfig.workspace_id,
-        model:        agentConfig.model,
-        inputTokens:  totalInputTokens,
-        outputTokens: totalOutputTokens,
-        metadata:     { tagged: taggedCount, total: products.length },
-      });
-    }
-
     return {
-      success:        taggedCount > 0 || errors.length < products.length,
-      output:         { tagged: taggedCount, errors: errors.length, total: products.length },
+      success:        errors.length === 0,
+      output:         { tagged: taggedCount, errors: errors.length, total: products.length, error_ids: errors },
       inputTokens:    totalInputTokens,
       outputTokens:   totalOutputTokens,
       creditsDebited: 0,

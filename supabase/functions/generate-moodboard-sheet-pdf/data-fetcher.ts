@@ -186,25 +186,25 @@ export async function fetchProductChips(
 ): Promise<ProductChip[]> {
   if (productIds.length === 0) return [];
 
-  // When a caller scope is supplied (non-service path), only include
-  // products in the caller's own workspaces — an embedded foreign product_id can't leak.
+  // A sheet may show the creator's own products or any published one; another tenant's draft never.
   let productQuery = supabase
     .from('products')
     .select('id, name, description, category_id, metadata')
     .in('id', productIds);
   if (scopeWorkspaceIds) {
-    productQuery = productQuery.in(
-      'workspace_id',
-      scopeWorkspaceIds.length ? scopeWorkspaceIds : ['00000000-0000-0000-0000-000000000000'],
-    );
+    productQuery = scopeWorkspaceIds.length
+      ? productQuery.or(`workspace_id.in.(${scopeWorkspaceIds.join(',')}),status.eq.active`)
+      : productQuery.eq('status', 'active');
   }
-  const { data: products } = await productQuery;
+  const { data: products, error: productsErr } = await productQuery;
+  if (productsErr) throw new Error(`Product lookup failed: ${productsErr.message}`);
 
-  const { data: rels } = await supabase
+  const { data: rels, error: relsErr } = await supabase
     .from('image_product_associations')
     .select('product_id, overall_score, image:document_images(image_url)')
     .in('product_id', productIds)
     .order('overall_score', { ascending: false });
+  if (relsErr) throw new Error(`Product image lookup failed: ${relsErr.message}`);
 
   const imageByProduct: Record<string, string> = {};
   for (const rel of rels || []) {
@@ -220,7 +220,7 @@ export async function fetchProductChips(
     description: p.description || null,
     image_url: imageByProduct[p.id] || null,
     hex: p.metadata?.hex_codes?.[0] || p.metadata?.color_hex || null,
-    category: p.metadata?.material_type || p.metadata?.category || null,
+    category: p.metadata?.material || p.metadata?.category || null,
   }));
 }
 
@@ -232,11 +232,12 @@ export async function fetchQuoteFfeItems(
 ): Promise<FfeItem[]> {
   // Verify the caller owns the quote before reading its items,
   // else an embedded foreign quote_id would leak that tenant's FF&E pricing.
-  const { data: quoteRow } = await supabase
+  const { data: quoteRow, error: quoteErr } = await supabase
     .from('quotes')
     .select('user_id, workspace_id, currency')
     .eq('id', quoteId)
     .maybeSingle();
+  if (quoteErr) throw new Error(`Quote lookup failed: ${quoteErr.message}`);
   if (scope) {
     const q = quoteRow;
     const ownsQuote = !!q && (
@@ -256,11 +257,8 @@ export async function fetchQuoteFfeItems(
     .eq('quote_id', quoteId)
     .order('added_at', { ascending: true });
 
-  if (error) {
-    // Loud: an empty schedule on a document handed to a client is worse than no document.
-    console.error('fetchQuoteFfeItems failed — FF&E schedule will print empty:', error.message);
-    return [];
-  }
+  // An empty schedule on a document handed to a client is worse than no document: fail the render.
+  if (error) throw new Error(`FF&E schedule unreadable: ${error.message}`);
   return (data || []).map((row: any) => ({
     room: row.room ?? null,
     // Prefer the free-text override, fall back to the catalog product's name.
@@ -281,11 +279,12 @@ export async function fetchProjectScopePhases(
   scope?: { userId: string; workspaceIds: string[] } | null,
   opts?: { showOwners?: boolean },
 ): Promise<ScopePhase[]> {
-  const { data: projectRow } = await supabase
+  const { data: projectRow, error: projectErr } = await supabase
     .from('projects')
     .select('user_id, workspace_id')
     .eq('id', projectId)
     .maybeSingle();
+  if (projectErr) throw new Error(`Project lookup failed: ${projectErr.message}`);
   if (scope) {
     const p = projectRow as { user_id?: string; workspace_id?: string } | null;
     const owns = !!p && (
@@ -303,12 +302,7 @@ export async function fetchProjectScopePhases(
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
 
-  if (error) {
-    // Loud, for the same reason the FF&E fetcher is: an empty scope on a document already sent to
-    // a client is worse than no document, and a console.warn is how that ships unnoticed.
-    console.error('fetchProjectScopePhases failed — scope sheet will print empty:', error.message);
-    return [];
-  }
+  if (error) throw new Error(`Scope of works unreadable: ${error.message}`);
 
   const rows = (data || []) as Array<Record<string, any>>;
   if (rows.length === 0) return [];
@@ -319,10 +313,11 @@ export async function fetchProjectScopePhases(
   if (opts?.showOwners) {
     const employeeIds = [...new Set(rows.map((r) => r.assignee_employee_id).filter(Boolean))] as string[];
     if (employeeIds.length) {
-      const { data: emps } = await supabase
+      const { data: emps, error: empErr } = await supabase
         .from('hr_employees')
         .select('id, crm_contacts(name)')
         .in('id', employeeIds);
+      if (empErr) throw new Error(`Task owners unreadable: ${empErr.message}`);
       for (const e of (emps || []) as Array<Record<string, any>>) {
         const n = e.crm_contacts?.name;
         if (n) nameById.set(e.id, n);

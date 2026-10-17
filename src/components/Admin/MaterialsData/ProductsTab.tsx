@@ -9,7 +9,11 @@ import {
 } from '@/components/core/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Eye, Loader2, Trash2, FileText, Code, Globe, Package, RefreshCw } from 'lucide-react';
+import { Eye, Loader2, Trash2, FileText, Code, Globe, Package, RefreshCw, Send, Layers } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Badge } from '@/components/core/ui/badge';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { publishProducts, publishCatalogue, productStatusBadge } from '@/services/productPublishService';
 import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/core/filters';
 import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +41,7 @@ interface Product {
   // wrapper used to drop it, so from THIS list — the catalogue management surface — none of those
   // rendered and nobody was ever asked for a model (#341).
   workspace_id?: string | null;
+  status?: string | null;
   metadata: any;
   created_at: string;
   source_document_id: string;
@@ -56,7 +61,7 @@ interface Product {
  * wrong; they were still delivered over the wire and held in this component's state.
  */
 const PRODUCTS_TAB_SELECT =
-  'id, name, workspace_id, metadata, created_at, source_document_id, source_type, '
+  'id, name, workspace_id, status, metadata, created_at, source_document_id, source_type, '
   + 'source_job_id, text_embedding_1024';
 
 interface ProductsTabProps {
@@ -74,6 +79,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [reembeddingId, setReembeddingId] = useState<string | null>(null);
+  const [publishingKey, setPublishingKey] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<Map<string, ProductEmbedReadiness>>(new Map());
   const { toast } = useToast();
 
@@ -187,6 +193,45 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
     }
   };
 
+  const runPublish = async (key: string, work: () => Promise<{ requested: number; published: number }>) => {
+    setPublishingKey(key);
+    try {
+      const { requested, published } = await work();
+      if (requested === 0) {
+        toast({ title: 'Nothing to publish', description: 'There are no drafts left to publish here.' });
+      } else if (published < requested) {
+        toast({
+          title: 'Partly published',
+          description: `${published} of ${requested} draft(s) were published. The rest were no longer drafts or are outside your catalogue rights.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Published', description: `${published} product(s) are now active.` });
+      }
+      await loadProducts(currentPage);
+      onStatsUpdate();
+    } catch (error) {
+      toast({
+        title: 'Publish failed',
+        description: error instanceof Error ? error.message : 'publish_products failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setPublishingKey(null);
+    }
+  };
+
+  const handlePublishOne = (productId: string) =>
+    runPublish(productId, async () => ({ requested: 1, published: await publishProducts([productId]) }));
+
+  const handlePublishCatalogue = (sourceDocumentId: string) => {
+    if (!confirm('Publish every draft product from this catalogue? They become visible on public surfaces.')) return;
+    void runPublish(`doc:${sourceDocumentId}`, () => publishCatalogue(workspaceId, sourceDocumentId));
+  };
+
+  const hasActiveFilters = Object.values(filterValues).some((v) =>
+    v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
+
   const handleReembed = async (productId: string) => {
     setReembeddingId(productId);
     try {
@@ -276,14 +321,28 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : products.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No products found
-            </div>
+            hasActiveFilters ? (
+              <HubEmptyState
+                variant="filtered"
+                icon={Package}
+                title="No products match these filters"
+                description="Widen or clear the filters to see the rest of the catalogue."
+                action={<Button variant="outline" onClick={() => setFilterValues({})}>Clear filters</Button>}
+              />
+            ) : (
+              <HubEmptyState
+                icon={Package}
+                title="No products yet"
+                description="Import a PDF catalogue or an XML feed; its products land here as drafts for review."
+                action={<Button asChild><Link to="/admin/data-import">Import products</Link></Button>}
+              />
+            )
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Product Name</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Manufacturer</TableHead>
@@ -317,6 +376,12 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                   return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{getProductName(product)}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const b = productStatusBadge(product.status);
+                        return <Badge variant={b.variant}>{b.label}</Badge>;
+                      })()}
+                    </TableCell>
                     <TableCell>{getSourceBadge(product.source_type)}</TableCell>
                     <TableCell>
                       <span className="text-xs text-muted-foreground capitalize">
@@ -371,6 +436,30 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {product.status === 'draft' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title="Publish this product"
+                            disabled={publishingKey !== null}
+                            onClick={() => { void handlePublishOne(product.id); }}
+                          >
+                            {publishingKey === product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            <span className="ml-1">Publish</span>
+                          </Button>
+                        )}
+                        {product.status === 'draft' && product.source_document_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Publish all from this catalogue"
+                            aria-label="Publish all from this catalogue"
+                            disabled={publishingKey !== null}
+                            onClick={() => handlePublishCatalogue(product.source_document_id)}
+                          >
+                            {publishingKey === `doc:${product.source_document_id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"

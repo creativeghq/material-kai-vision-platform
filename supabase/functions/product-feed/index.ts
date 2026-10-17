@@ -1,14 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { grossFromNet } from '../_shared/money.ts';
-import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
-import { imageFromMetadata } from '../_shared/product-media.ts';
+import { associatedImagesByProduct, productImages } from '../_shared/product-media.ts';
+import {
+  PUBLIC_PRODUCT_STATUS, loadDefaultVatRate, productVatPct, variantAttrsFromKey,
+} from '../_shared/commerce/public-catalogue.ts';
 import {
   renderGoogleFeed, renderSkroutzFeed, renderBestPriceFeed, gapSummary, stockState, escapeXml,
   type FeedProduct,
 } from '../_shared/commerce/feed-render.ts';
 
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
+
+const PAGE_SIZE = 1000;
 
 function xml(body: string, gzip: boolean): Response {
   const headers: Record<string, string> = {
@@ -53,27 +57,42 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
   }
 
   const { data: ws } = await supabase.from('workspaces').select('slug, name').eq('id', feed.workspace_id).maybeSingle();
-  const { data: fs } = await supabase.from('finance_settings')
-    .select('default_vat_rate').eq('workspace_id', feed.workspace_id).maybeSingle();
-  const fallbackVat = Number(fs?.default_vat_rate ?? 24);
-
-  let q = supabase.from('product_prices')
-    .select('product_id, list_price, currency, product:products(id, name, description, sku, external_sku, barcode, '
-      + 'metadata, category_id, brand_company_id, mydata_vat_category, net_mass_kg, mpn, status)')
-    .eq('workspace_id', feed.workspace_id);
-  if (feed.only_storefront_published) q = q.eq('storefront_published', true);
-  const { data: priceRows } = await q.limit(5000);
+  const fallbackVat = await loadDefaultVatRate(supabase, feed.workspace_id);
 
   const sel = (feed.selection ?? {}) as { mode?: string; ids?: string[] };
-  const wanted = new Set((sel.ids ?? []).map(String));
+  const wanted = [...new Set((sel.ids ?? []).map(String).filter(Boolean))];
+  const narrowed = sel.mode === 'products' || sel.mode === 'category';
 
-  const rows = (priceRows ?? []).filter((r: Record<string, any>) => {
-    const p = r.product;
-    if (!p || p.status === 'archived') return false;
-    if (sel.mode === 'products') return wanted.has(String(p.id));
-    if (sel.mode === 'category') return wanted.has(String(p.category_id ?? ''));
-    return true;
-  });
+  // Selection, status and publication are all in the query; a JS filter after a page cap would
+  // silently drop whatever sat past the cap.
+  const scoped = () => {
+    let q = supabase.from('product_prices')
+      .select('id, product_id, variant_key, list_price, currency, product:products!inner(id, name, description, sku, '
+        + 'external_sku, barcode, metadata, category_id, brand_company_id, mydata_vat_category, net_mass_kg, mpn, status)')
+      .eq('workspace_id', feed.workspace_id)
+      .eq('product.status', PUBLIC_PRODUCT_STATUS);
+    if (feed.only_storefront_published) q = q.eq('storefront_published', true);
+    if (sel.mode === 'products') q = q.in('product_id', wanted);
+    if (sel.mode === 'category') q = q.in('product.category_id', wanted);
+    return q;
+  };
+
+  const rows: Record<string, any>[] = [];
+  let unpriced = 0;
+  if (!narrowed || wanted.length > 0) {
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await scoped().order('id', { ascending: true }).range(from, from + PAGE_SIZE - 1);
+      if (error) throw new HttpError(500, `product feed price read failed: ${error.message}`, error);
+      const page = (data ?? []) as Record<string, any>[];
+      for (const r of page) {
+        if (!r.product) continue;
+        // A missing price is WITHHELD and counted, never published as 0.
+        if (r.list_price == null) unpriced += 1;
+        else rows.push(r);
+      }
+      if (page.length < PAGE_SIZE) break;
+    }
+  }
 
   const categoryIds = [...new Set(rows.map((r: Record<string, any>) => r.product?.category_id).filter(Boolean))];
   const brandIds = [...new Set(rows.map((r: Record<string, any>) => r.product?.brand_company_id).filter(Boolean))];
@@ -89,13 +108,28 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
   const brandName = new Map((brands.data ?? []).map((b: any) => [b.id, b.name]));
 
   const productIds = rows.map((r: Record<string, any>) => r.product?.id).filter(Boolean);
+  const images = await associatedImagesByProduct(supabase, productIds);
+  const variantLabels = new Map<string, string>();
+  const variantRows = rows.filter((r) => r.variant_key != null);
+  for (let i = 0; i < variantRows.length; i += 500) {
+    const { data } = await supabase.rpc('get_variant_labels', {
+      p_rows: variantRows.slice(i, i + 500).map((r) => ({
+        key: r.id, product_id: r.product_id, attributes: variantAttrsFromKey(String(r.variant_key)),
+      })),
+    });
+    for (const l of (data ?? []) as Array<{ row_key: string; label: string | null }>) {
+      if (l.label) variantLabels.set(l.row_key, l.label);
+    }
+  }
   const onHand = new Map<string, number>();
   const known = new Set<string>();
-  if (productIds.length) {
-    const { data: stock } = await supabase.from('warehouse_items')
+  const distinctIds = [...new Set(productIds.map(String))];
+  for (let i = 0; i < distinctIds.length; i += 200) {
+    const { data: stock, error: stockErr } = await supabase.from('warehouse_items')
       .select('product_id, qty_on_hand, qty_reserved, is_active')
       .eq('workspace_id', feed.workspace_id)
-      .in('product_id', productIds);
+      .in('product_id', distinctIds.slice(i, i + 200));
+    if (stockErr) throw new HttpError(500, `product feed stock read failed: ${stockErr.message}`, stockErr);
     for (const w of stock ?? []) {
       const row = w as Record<string, any>;
       if (row.is_active === false) continue;
@@ -110,15 +144,18 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
 
   const products: FeedProduct[] = rows.map((r: Record<string, any>) => {
     const p = r.product;
-    const pct = p.mydata_vat_category != null ? vatPctForCat(p.mydata_vat_category, fallbackVat) : fallbackVat;
-    const net = Number(r.list_price ?? 0);
+    const variantKey: string | null = r.variant_key ?? null;
+    const pct = productVatPct(p.mydata_vat_category, fallbackVat);
+    const net = Number(r.list_price);
+    const link = `${storeUrl}?product=${encodeURIComponent(p.id)}`
+      + (variantKey ? `&variant=${encodeURIComponent(variantKey)}` : '');
     return {
-      id: String(p.id),
+      id: variantKey ? String(r.id) : String(p.id),
       sku: p.external_sku ?? p.sku ?? null,
-      name: String(p.name ?? ''),
+      name: String(p.name ?? '') + (variantLabels.has(r.id) ? ` — ${variantLabels.get(r.id)}` : ''),
       description: p.description ?? null,
-      link: `${storeUrl}?product=${encodeURIComponent(p.id)}`,
-      image: imageFromMetadata(p.metadata),
+      link,
+      image: productImages(images.get(String(p.id)), p.metadata, variantKey)[0] ?? null,
       category: catName.get(p.category_id) ?? null,
       brand: brandName.get(p.brand_company_id) ?? null,
       mpn: p.mpn ?? null,
@@ -149,10 +186,11 @@ Deno.serve(withApiLogging('product-feed', async (req) => {
     && new Blob([body]).size > 512 * 1024;
 
   const gaps = gapSummary(feed.format, listed);
+  if (unpriced > 0) gaps.byAttribute.price = (gaps.byAttribute.price ?? 0) + unpriced;
   await supabase.rpc('bump_product_feed_fetch', {
     p_feed_id: feed.id,
     p_item_count: listed.length,
-    p_gap_count: gaps.count,
+    p_gap_count: gaps.count + unpriced,
     p_gaps: gaps.byAttribute,
   });
 

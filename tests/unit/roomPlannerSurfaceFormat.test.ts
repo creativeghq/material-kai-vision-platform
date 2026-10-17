@@ -17,28 +17,25 @@ const recorded = (w: number, l: number) => ({ tileWidthM: w, tileLengthM: l, for
 const assumed = { tileWidthM: DEFAULT_TILE_M, tileLengthM: DEFAULT_TILE_M, formatSource: 'default' };
 
 describe('one piece of a surface product, in metres', () => {
-  it('reads the registry tile fields as centimetres unless the registry unit says otherwise', () => {
-    expect(tileFormatM({ attributes: { width: 60, length: 60 } })).toEqual(recorded(0.6, 0.6));
-    expect(tileFormatM({ attributes: { width: '120', length: '60' } })).toEqual(recorded(1.2, 0.6));
-    expect(tileFormatM({ attributes: { width: 600, length: 600, dimension_unit: 'mm' } })).toEqual(recorded(0.6, 0.6));
-    const inch = tileFormatM({ attributes: { width: 12, length: 24, dimension_unit: 'inch' } });
-    expect(inch.tileWidthM).toBeCloseTo(0.3048, 6);
-    expect(inch.tileLengthM).toBeCloseTo(0.6096, 6);
+  it('reads the registry tile fields in millimetres, the unit their names carry', () => {
+    expect(tileFormatM({ attributes: { width_mm: 600, length_mm: 600 } })).toEqual(recorded(0.6, 0.6));
+    expect(tileFormatM({ attributes: { width_mm: '1200', length_mm: '600' } })).toEqual(recorded(1.2, 0.6));
+    // The retired unitless keys are no longer a format source.
+    expect(tileFormatM({ attributes: { width: 60, length: 60, dimension_unit: 'cm' } })).toEqual(assumed);
   });
 
   it('reads a comma decimal the way the supplier wrote it', () => {
-    expect(tileFormatM({ attributes: { width: '60,5', length: '120' } })).toEqual(recorded(0.605, 1.2));
+    expect(tileFormatM({ attributes: { width_mm: '605,5', length_mm: '1200' } })).toEqual(recorded(0.6055, 1.2));
   });
 
   it('reads the metadata dimensions section the extractors write, and the flat metadata keys', () => {
-    expect(tileFormatM({ metadata: { dimensions: { width: 30, length: 60, unit: 'cm' } } })).toEqual(recorded(0.3, 0.6));
-    expect(tileFormatM({ metadata: { width: 45, length: 90 } })).toEqual(recorded(0.45, 0.9));
-    // attributes win over metadata when both carry a format.
-    expect(tileFormatM({ attributes: { width: 60, length: 60 }, metadata: { width: 30, length: 30 } })).toEqual(recorded(0.6, 0.6));
+    expect(tileFormatM({ metadata: { dimensions: { width_mm: 300, length_mm: 600 } } })).toEqual(recorded(0.3, 0.6));
+    expect(tileFormatM({ metadata: { width_mm: 450, length_mm: 900 } })).toEqual(recorded(0.45, 0.9));
+    expect(tileFormatM({ attributes: { width_mm: 600, length_mm: 600 }, metadata: { width_mm: 300, length_mm: 300 } })).toEqual(recorded(0.6, 0.6));
   });
 
   it('reads wallpaper rolls and wood planks, whose unit is in the field name', () => {
-    expect(tileFormatM({ attributes: { roll_width_cm: 53, roll_length_m: 10.05 } })).toEqual(recorded(0.53, 10.05));
+    expect(tileFormatM({ attributes: { roll_width_mm: 530, roll_length_m: 10.05 } })).toEqual(recorded(0.53, 10.05));
     expect(tileFormatM({ metadata: { plank_width_mm: 190, plank_length_mm: 1900 } })).toEqual(recorded(0.19, 1.9));
   });
 
@@ -54,9 +51,9 @@ describe('one piece of a surface product, in metres', () => {
 
   it('assumes, and SAYS it assumed, when the product carries no format', () => {
     for (const row of [
-      {}, { attributes: null }, { attributes: { width: 60 } }, { attributes: { width: 0, length: 60 } },
-      { attributes: { width: 'big', length: 'huge' } }, { attributes: 'not-an-object' },
-      { attributes: { width: 60, length: 60, dimension_unit: 'parsecs' } }, { metadata: { dimensions: [] } },
+      {}, { attributes: null }, { attributes: { width_mm: 600 } }, { attributes: { width_mm: 0, length_mm: 600 } },
+      { attributes: { width_mm: 'big', length_mm: 'huge' } }, { attributes: 'not-an-object' },
+      { metadata: { dimensions: [] } },
     ]) {
       expect(tileFormatM(row as { attributes?: unknown; metadata?: unknown })).toEqual(assumed);
     }

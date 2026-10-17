@@ -179,12 +179,12 @@ describe('the enrichment drain reads only what we already hold', () => {
     // Hunting the open web by name is the guessed match: a wrong specification on the
     // right-looking product is a valid-looking value nothing downstream catches.
     expect(drain).toMatch(/sourceFor[\s\S]{0,120}product_url[\s\S]{0,80}brand_website/);
-    expect(drain).toMatch(/p_status: 'no_source'/);
+    expect(drain).toMatch(/record\(p\.product_id, 'no_source'/);
   });
 
   it('a low-confidence page writes nothing', () => {
-    expect(drain).toMatch(/confidence < MIN_CONFIDENCE/);
-    expect(drain).toMatch(/p_status: 'low_confidence'[\s\S]{0,400}p_findings: null/);
+    expect(drain).toMatch(/!\(confidence >= MIN_CONFIDENCE\)/);
+    expect(drain).toMatch(/record\(p\.product_id, 'low_confidence'[\s\S]{0,400}null\)/);
   });
 
   it('findings are claims in attributes_raw, never in metadata or attributes', () => {

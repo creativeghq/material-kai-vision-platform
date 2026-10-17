@@ -57,6 +57,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { ordersService } from '@/modules/finance/services/ordersService';
+import { QuantityInput } from './QuantityInput';
 import { quotesService } from '../services/QuotesService';
 import { projectIdentity, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
 import {
@@ -197,7 +198,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     const debounceTimer = setTimeout(async () => {
       try {
         setSearchLoading(true);
-        const results = await quotesService.searchProductsWithImages(searchQuery, 15);
+        const results = await quotesService.searchProductsWithImages(searchQuery, 15, { quoteId });
         const selectedIds = selectedProducts.map(p => p.id);
         setSearchResults(
           results.filter(p => !existingProductIds.includes(p.id) && !selectedIds.includes(p.id)),
@@ -210,7 +211,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [searchQuery, existingProductIds, selectedProducts]);
+  }, [searchQuery, existingProductIds, selectedProducts, quoteId]);
 
   // Warehouse on-hand for the current results, so we can flag low/out-of-stock before adding.
   useEffect(() => {
@@ -719,7 +720,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                       <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0" onClick={() => setCustomField('quantity', Math.max(1, customForm.quantity - 1))}>
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <Input id="cp-qty" type="number" min="1" value={customForm.quantity} onChange={e => setCustomField('quantity', parseInt(e.target.value) || 1)} className="text-center" />
+                      <QuantityInput id="cp-qty" value={customForm.quantity} onCommit={q => setCustomField('quantity', q)} className="text-center" />
                       <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0" onClick={() => setCustomField('quantity', customForm.quantity + 1)}>
                         <Plus className="h-3 w-3" />
                       </Button>

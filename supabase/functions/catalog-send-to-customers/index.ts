@@ -5,9 +5,10 @@ import { catalogPublicUrl } from '../_shared/catalogPublicUrl.generated.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { authenticate as authenticateCaller } from '../_shared/auth.ts';
 // One answer to "may this workspace send" (#357 AE-1).
 import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
+import { userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate as authenticateCaller } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -55,15 +56,6 @@ async function authenticate(req: Request): Promise<{ ok: boolean; userId?: strin
   try {
     const caller = await authenticateCaller(req, { requireUser: true });
     if (!caller.success || !caller.userId) return { ok: false, error: caller.error || 'Invalid JWT' };
-    const admin = createClient(supabaseUrl, supabaseServiceKey);
-    // Admin role gate — this is a write-out-to-N-customers operation
-    const { data: prof } = await admin
-      .from('user_profiles')
-      .select('role_id, roles!user_profiles_role_id_fkey(name)')
-      .eq('user_id', caller.userId)
-      .maybeSingle();
-    const roleName = (prof as any)?.roles?.name;
-    if (roleName !== 'admin') return { ok: false, error: 'Admin only' };
     return { ok: true, userId: caller.userId, keyWorkspaceId: caller.apiKey ? caller.apiKey.workspace_id : undefined };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Auth failed' };
@@ -95,8 +87,11 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
     if (auth.keyWorkspaceId !== undefined && catalog.workspace_id !== auth.keyWorkspaceId) {
       return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
     }
-    if (auth.userId && catalog.owner_user_id !== auth.userId) {
-      return jsonResponse({ success: false, error: 'Not authorized for this catalog' }, 403);
+    // Mailing N customers is checked against the CATALOG's workspace, never a global account tier.
+    if (auth.userId && !(await userHasWorkspaceCapability(
+      supabase, auth.userId, catalog.workspace_id, ['marketing.email', 'workspace.manage'],
+    ))) {
+      return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
     }
     if (catalog.status !== 'published') {
       return jsonResponse({

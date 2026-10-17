@@ -24,18 +24,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
 import { logger } from '@/services/logger.service';
-
-interface DetectedField {
-  xml_field: string;
-  sample_values: string[];
-  suggested_mapping: string;
-  confidence: number;
-  data_type: string;
-  total_rows?: number;
-  present_count?: number;
-  coverage_pct?: number;
-  distinct_values?: number;
-}
+import { bytesToBase64, type AttributeTarget, type DetectedField } from './xmlFeedEncoding';
 
 interface MaterialCategory {
   id: string;
@@ -56,14 +45,13 @@ const XMLImportTab: React.FC = () => {
   const [totalRows, setTotalRows] = useState<number>(0);
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [xmlContentCache, setXmlContentCache] = useState<string>(''); // Cache XML content for URL sources
+  const [xmlBase64, setXmlBase64] = useState<string>('');
+  const [attributeTargets, setAttributeTargets] = useState<AttributeTarget[]>([]);
+  const [rowPath, setRowPath] = useState<string>('');
   const [category, setCategory] = useState<string>('');
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
 
-  // Load workspace ID + material categories on mount. Category is the
-  // job-level material_category that every product in this XML inherits.
-  // Mirrors the PDF upload flow ([PDFUploadSection.tsx]) so operators have
-  // the same muscle memory.
+  // The upload category is the fallback material_category for every row the feed does not classify.
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -130,27 +118,19 @@ const XMLImportTab: React.FC = () => {
     setError(null);
 
     try {
-      let xmlText: string;
-
-      // Fetch XML content based on source type
+      let raw: ArrayBuffer;
       if (sourceType === 'file' && selectedFile) {
-        xmlText = await selectedFile.text();
+        raw = await selectedFile.arrayBuffer();
       } else if (sourceType === 'url' && remoteUrl) {
         const response = await fetch(remoteUrl);
         if (!response.ok) {
           throw new Error(`Failed to fetch URL: ${response.statusText}`);
         }
-        xmlText = await response.text();
+        raw = await response.arrayBuffer();
       } else {
         throw new Error('Invalid source configuration');
       }
-
-      // Encode to base64 (UTF-8 safe)
-      // btoa() only supports Latin1, so we need to use TextEncoder for UTF-8
-      const encoder = new TextEncoder();
-      const uint8Array = encoder.encode(xmlText);
-      const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
-      const xmlBase64 = btoa(binaryString);
+      const encoded = bytesToBase64(raw);
 
       // Call Edge Function in preview mode
       const { data, error: functionError } = await supabase.functions.invoke(
@@ -158,10 +138,10 @@ const XMLImportTab: React.FC = () => {
         {
           body: {
             workspace_id: workspaceId,
-            xml_content: xmlBase64,
-            category, // Sent up-front so the orchestrator knows it for import-mode
-            source_url: sourceType === 'url' ? remoteUrl : undefined,
-            preview_only: true, // Trigger field detection mode
+            xml_content: encoded,
+            category,
+            row_path: rowPath.trim() || undefined,
+            preview_only: true,
           },
         },
       );
@@ -177,7 +157,8 @@ const XMLImportTab: React.FC = () => {
       setDetectedFields(data.detected_fields || []);
       setSuggestedMappings(data.suggested_mappings || {});
       setTotalRows(data.total_rows || 0);
-      setXmlContentCache(xmlText); // Cache the XML content for later use
+      setAttributeTargets(data.attribute_targets || []);
+      setXmlBase64(encoded);
       setShowMappingModal(true);
     } catch (err: any) {
       console.error('Error detecting fields:', err);
@@ -237,7 +218,21 @@ const XMLImportTab: React.FC = () => {
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Every product imported from this XML will be tagged with this category.
+          The category for every row the feed does not classify itself, and the source of the
+          fields you can map.
+        </p>
+        <Label htmlFor="xml-import-row-path" className="text-sm font-medium pt-2 block">
+          Row path <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Input
+          id="xml-import-row-path"
+          className="w-full md:max-w-xs font-mono"
+          placeholder="catalog.products.product"
+          value={rowPath}
+          onChange={(e) => setRowPath(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Leave empty to import every product, item or material element in the file.
         </p>
       </div>
 
@@ -295,7 +290,7 @@ const XMLImportTab: React.FC = () => {
               <div className="flex justify-end">
                 <Button
                   onClick={handleDetectFields}
-                  disabled={isDetecting || !category}
+                  disabled={isDetecting || !category || !workspaceId}
                 >
                   {isDetecting ? (
                     <>
@@ -339,7 +334,7 @@ const XMLImportTab: React.FC = () => {
                   <div className="flex justify-end">
                     <Button
                       onClick={handleDetectFields}
-                      disabled={isDetecting}
+                      disabled={isDetecting || !category || !workspaceId}
                     >
                       {isDetecting ? (
                         <>
@@ -411,8 +406,11 @@ const XMLImportTab: React.FC = () => {
           suggestedMappings={suggestedMappings}
           totalRows={totalRows}
           category={category}
-          xmlFile={selectedFile}
-          xmlContent={xmlContentCache}
+          attributeTargets={attributeTargets}
+          xmlBase64={xmlBase64}
+          sourceName={selectedFile?.name || 'xml_url_import'}
+          sourceUrl={sourceType === 'url' ? remoteUrl : undefined}
+          rowPath={rowPath.trim() || undefined}
           onMappingConfirmed={handleMappingConfirmed}
         />
       )}

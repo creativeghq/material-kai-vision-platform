@@ -3,6 +3,7 @@ import { UNITS } from '@/lib/units';
 import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp, DollarSign, Send, Calculator } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { QuantityInput } from './QuantityInput';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { QuoteItemWithProduct } from '../services/QuotesService';
@@ -285,7 +286,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   };
 
   const handleQuantityChange = async (itemId: string, newQuantity: number) => {
-    if (!onUpdateQuantity || newQuantity < 1) return;
+    if (!onUpdateQuantity || !(newQuantity > 0)) return;
     try {
       setUpdatingItemId(itemId);
       await onUpdateQuantity(itemId, newQuantity);
@@ -628,10 +629,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                               >
                                 {isUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Minus className="h-3 w-3" />}
                               </Button>
-                              <Input
-                                type="number" min={1} value={item.quantity}
-                                onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
-                                className="w-12 h-6 text-center text-xs px-1"
+                              <QuantityInput
+                                value={Number(item.quantity)}
+                                onCommit={q => { void handleQuantityChange(item.id, q); }}
+                                aria-label="Quantity"
+                                className="w-14 h-6 text-center text-xs px-1"
                                 disabled={isUpdating}
                               />
                               <Button

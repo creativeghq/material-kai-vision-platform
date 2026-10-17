@@ -87,15 +87,15 @@ export const MAPPING_RULES: Record<string, MappingSuggestion> = {
 
   // ---------- Price ----------
   'price': { mapping: 'price', confidence: 1.0 },
-  'cost': { mapping: 'price', confidence: 0.85 },
+  'cost': { mapping: 'supplier_cost', confidence: 0.85 },
   'precio': { mapping: 'price', confidence: 0.95 },
   'prix': { mapping: 'price', confidence: 0.95 },
   'preis': { mapping: 'price', confidence: 0.95 },
-  'pricew': { mapping: 'price', confidence: 0.85 },        // ERP wholesale price (Panagoulas-style)
+  'pricew': { mapping: 'supplier_cost', confidence: 0.85 }, // ERP wholesale price (Panagoulas-style)
   'priceretail': { mapping: 'price', confidence: 0.85 },    // ERP retail price (Panagoulas-style)
-  'price_w': { mapping: 'price', confidence: 0.85 },
+  'price_w': { mapping: 'supplier_cost', confidence: 0.85 },
   'price_retail': { mapping: 'price', confidence: 0.85 },
-  'wholesale_price': { mapping: 'price', confidence: 0.9 },
+  'wholesale_price': { mapping: 'supplier_cost', confidence: 0.9 },
   'retail_price': { mapping: 'price', confidence: 0.9 },
 
   // ---------- SKU / external id ----------
@@ -119,9 +119,9 @@ export const MAPPING_RULES: Record<string, MappingSuggestion> = {
 
   // ---------- Color ----------
   'color': { mapping: 'color', confidence: 1.0 },
-  'colors': { mapping: 'colors', confidence: 1.0 },
+  'colors': { mapping: 'color', confidence: 1.0 },
   'colour': { mapping: 'color', confidence: 1.0 },
-  'colours': { mapping: 'colors', confidence: 1.0 },
+  'colours': { mapping: 'color', confidence: 1.0 },
 
   // ---------- Dimensions / size ----------
   'dimensions': { mapping: 'dimensions', confidence: 1.0 },
@@ -188,14 +188,14 @@ export const MAPPING_RULES: Record<string, MappingSuggestion> = {
   // Price
   'τιμή': { mapping: 'price', confidence: 0.95 },
   'τιμη': { mapping: 'price', confidence: 0.9 },
-  'κόστος': { mapping: 'price', confidence: 0.85 },
-  'τιμή_χονδρικής': { mapping: 'price', confidence: 0.85 },
+  'κόστος': { mapping: 'supplier_cost', confidence: 0.85 },
+  'τιμή_χονδρικής': { mapping: 'supplier_cost', confidence: 0.85 },
   'τιμή_λιανικής': { mapping: 'price', confidence: 0.85 },
 
   // Color
   'χρώμα': { mapping: 'color', confidence: 0.95 },
   'χρωμα': { mapping: 'color', confidence: 0.9 },
-  'χρώματα': { mapping: 'colors', confidence: 0.95 },
+  'χρώματα': { mapping: 'color', confidence: 0.95 },
 
   // Dimensions / size
   'διαστάσεις': { mapping: 'dimensions', confidence: 0.95 },

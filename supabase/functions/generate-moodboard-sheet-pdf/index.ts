@@ -221,21 +221,12 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       return jsonResponse({ success: false, error: 'Sheet not found' }, 404);
     }
 
-    // sheet.data can embed quote_id / product_ids / included_sheet_ids
-    // that point at OTHER users' entities. The created_by check only proves the top-level
-    // sheet belongs to the caller — bind every embedded fetch below to the caller too.
-    // Service-role calls (the upstream tool already verified ownership) bypass, mirroring
-    // the ownership check above.
-    const scopeUserId = auth.isService ? null : (auth.userId ?? null);
-    let scopeWorkspaceIds: string[] | null = null;
-    if (scopeUserId) {
-      const { data: mems } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', scopeUserId);
-      scopeWorkspaceIds = (mems || []).map((m: { workspace_id: string }) => m.workspace_id);
-    }
-    const quoteScope = scopeUserId ? { userId: scopeUserId, workspaceIds: scopeWorkspaceIds ?? [] } : null;
+    // sheet.data can embed quote_id / product_ids / included_sheet_ids pointing at OTHER tenants.
+    // Every embedded fetch is bound to a user: the caller, or for a service-role render (the public
+    // share regenerates as the service role) the sheet's creator. No creator → nothing embeds.
+    const scopeUserId = (auth.isService ? sheet.created_by : auth.userId) ?? NIL_UUID;
+    const scopeWorkspaceIds = await activeWorkspaceIds(supabase, scopeUserId);
+    const quoteScope = { userId: scopeUserId, workspaceIds: scopeWorkspaceIds };
 
     await supabase
       .from('moodboard_presentation_sheets')
@@ -512,6 +503,20 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
   }
 }));
 
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
+/** The user's ACTIVE memberships; an unreadable list throws rather than reading as "none". */
+async function activeWorkspaceIds(supabase: DbClient, userId: string): Promise<string[]> {
+  if (userId === NIL_UUID) return [];
+  const { data, error } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+  if (error) throw new Error(`Could not resolve workspace scope: ${error.message}`);
+  return (data || []).map((m: { workspace_id: string }) => m.workspace_id);
+}
+
 function jsonResponse(body: SheetPdfResponse, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -564,17 +569,9 @@ async function buildClientViewPdf(
 
     // ── Tenancy binding for everything the deck embeds (#361 `EG-11`) ──────────────────────
     const ownerId = view.created_by || project?.user_id;
-    let ownerWorkspaceIds: string[] = [];
-    if (ownerId) {
-      const { data: mems } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', ownerId);
-      ownerWorkspaceIds = (mems || []).map((m: { workspace_id: string }) => m.workspace_id);
-    }
-    // Unresolved owner → withhold. A deck we cannot attribute is one we cannot scope, and
-    // serving on a maybe is how this class of bug survives.
-    const deckScopeUserId = ownerId ?? '00000000-0000-0000-0000-000000000000';
+    // Unresolved owner → withhold. A deck we cannot attribute is one we cannot scope.
+    const deckScopeUserId = ownerId ?? NIL_UUID;
+    const ownerWorkspaceIds = await activeWorkspaceIds(supabase, deckScopeUserId);
     const deckQuoteScope = { userId: deckScopeUserId, workspaceIds: ownerWorkspaceIds };
 
     const sheets = await fetchSheets(supabase, sheetIds, deckScopeUserId);

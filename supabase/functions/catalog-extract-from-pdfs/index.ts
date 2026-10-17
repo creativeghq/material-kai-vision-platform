@@ -399,8 +399,8 @@ async function rasterizeAll(supabase: any, candidates: Candidate[]): Promise<voi
             dpi: 200,
           },
         });
-        if (!error && data?.success && data.image_url) {
-          c.image_url = data.image_url;
+        if (!error && data?.success && data.storage_path) {
+          c.image_url = supabase.storage.from('pdf-tiles').getPublicUrl(data.storage_path).data.publicUrl;
         }
       } catch (e) {
         console.warn('[catalog-extract] rasterize failed (non-fatal):', e instanceof Error ? e.message : e);

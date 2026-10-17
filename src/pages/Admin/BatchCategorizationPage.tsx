@@ -53,7 +53,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
     const load = async () => {
       const { count } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('workspace_id', workspaceId)
         .or('metadata->material_category.is.null,metadata->>material_category.eq.');
 
@@ -91,7 +91,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
       // Refresh uncategorized count
       const { count } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('workspace_id', workspaceId)
         .or('metadata->material_category.is.null,metadata->>material_category.eq.');
       setUncategorizedCount(count ?? 0);

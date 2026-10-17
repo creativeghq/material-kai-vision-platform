@@ -17,15 +17,11 @@ export interface LineIdentityOption {
 }
 
 /**
- * Which registry keys feed the two dedicated columns, in precedence order.
- *
- * Order is the contract, not an accident: six colour-ish fields are classified `identity` for
- * tiles today because phase 4's classifier has not run and the 3.1 seed was heuristic. When a
- * product carries several, the same one must win every time — "whichever key enumerated first"
- * is how the same product yields a different label on two screens.
+ * Which registry keys feed the two dedicated columns, in precedence order: when a product carries
+ * several size keys the same one must win every time, or one product yields two labels.
  */
 export const SIZE_KEYS = ['available_sizes', 'size', 'format_code'] as const;
-export const COLOR_KEYS = ['color', 'available_colors', 'colors', 'primary_color'] as const;
+export const COLOR_KEYS = ['color'] as const;
 
 /**
  * Project the attribute map onto the two dedicated columns.

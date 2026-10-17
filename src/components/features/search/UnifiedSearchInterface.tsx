@@ -31,6 +31,7 @@ import { trackSearchImpression, trackSearchClick } from '@/services/manufacturer
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { FilterBar, useFilters, type FilterValues } from '@/components/core/filters';
 import { buildMaterialSearchFilters } from '@/components/features/search/materialSearchFilters';
+import { useFieldRegistry } from '@/hooks/useFieldRegistry';
 import {
   Select,
   SelectContent,
@@ -157,7 +158,11 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
   // Post-filters over the returned results. Facet options are derived from the current result
   // set, so the modal only ever offers constraints that can actually narrow it.
-  const filterGroups = useMemo(() => buildMaterialSearchFilters(results), [results]);
+  const fieldRegistry = useFieldRegistry();
+  const filterGroups = useMemo(
+    () => buildMaterialSearchFilters(results, fieldRegistry.snapshot),
+    [results, fieldRegistry.snapshot],
+  );
   const savedFilters = useMemo<FilterValues>(() => {
     try { return JSON.parse(localStorage.getItem(FILTERS_STORAGE_KEY) ?? '{}') as FilterValues; }
     catch { return {}; }

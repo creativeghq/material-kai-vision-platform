@@ -10,14 +10,16 @@ import { AdminStatCard } from '../AdminStatCard';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
 import { ImagesTab } from './ImagesTab';
-import { MIVAA_API_URL } from '@/config/mivaa';
+import { mivaaApi } from '@/services/mivaaApiClient';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { EmbeddingsTab } from './EmbeddingsTab';
 import { RelationsTab } from './RelationsTab';
 import { supabase } from '@/integrations/supabase/client';
 
 export const MaterialsDataPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [workspaceId, setWorkspaceId] = useState<string>('');
+  const { activeWorkspaceId } = useWorkspace();
+  const workspaceId = activeWorkspaceId ?? '';
   const [jobIdFilter, setJobIdFilter] = useState<string>(searchParams.get('jobId') || '');
   // `?productId=` — several places link here to open ONE product (AsyncJobQueueMonitor's
   // per-product row, the mention dashboard's "Open"). The param was never read, so every
@@ -31,52 +33,22 @@ export const MaterialsDataPage: React.FC = () => {
   });
 
   useEffect(() => {
-    loadWorkspaceAndStats();
-  }, []);
-
-  const loadWorkspaceAndStats = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get workspace with most images (the active one)
-      const { data: workspaces, error } = await supabase
-        .from('workspaces')
-        .select('id')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (error) {
-        console.error('Failed to load workspace:', error);
-        return;
-      }
-
-      if (workspaces && workspaces.length > 0) {
-        const wsId = workspaces[0].id;
-        console.log('[PDFProcessingDataPage] Loading workspace:', wsId);
-        setWorkspaceId(wsId);
-        await loadStats(wsId);
-      } else {
-        console.error('[PDFProcessingDataPage] No workspaces found!');
-      }
-    } catch (error) {
-      console.error('Failed to load workspace:', error);
-    }
-  };
+    if (activeWorkspaceId) void loadStats(activeWorkspaceId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId]);
 
   const loadStats = async (wsId: string) => {
+    if (!wsId) return;
     try {
-      // MIVAA endpoint counts VECS embeddings server-side
-      const response = await fetch(
-        `${MIVAA_API_URL}/api/rag/workspace-stats?workspace_id=${wsId}`,
+      const response = await mivaaApi.request<{ statistics?: Record<string, any> }>(
+        `/api/rag/workspace-stats?workspace_id=${encodeURIComponent(wsId)}`,
+        { method: 'GET' },
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch workspace stats');
+      const statsData = response.data?.statistics;
+      if (!response.success || !statsData) {
+        throw new Error(response.error || 'Failed to fetch workspace stats');
       }
-
-      const result = await response.json();
-      const statsData = result.statistics;
 
       setStats({
         products: statsData.products || 0,
@@ -96,7 +68,7 @@ export const MaterialsDataPage: React.FC = () => {
         ] = await Promise.all([
           supabase
             .from('products')
-            .select('*', { count: 'exact', head: true })
+            .select('id', { count: 'exact', head: true })
             .eq('workspace_id', wsId),
           supabase
             .from('document_chunks')

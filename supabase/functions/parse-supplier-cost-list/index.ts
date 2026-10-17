@@ -4,6 +4,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { parseLocaleNumber } from './number.ts';
 
 // Sales/Finance PR-A — Supplier Cost List parser
 // Reads a kb_docs row with price_doc_type='supplier_cost_list' and materializes
@@ -103,10 +104,8 @@ function parseMarkdownTable(content: string): { rows: ParsedRow[]; errors: strin
 
     if (!sku) continue;
 
-    // Strip currency symbols and thousands separators; accept comma decimal as fallback
-    const cleaned = costRaw.replace(/[€$£\s]/g, '').replace(/(?<=\d),(?=\d{3}(\D|$))/g, '').replace(/,/g, '.');
-    const cost = parseFloat(cleaned);
-    if (!Number.isFinite(cost) || cost < 0) {
+    const cost = parseLocaleNumber(costRaw);
+    if (cost === null || cost < 0) {
       errors.push(`Row ${i + 1}: cannot parse cost "${costRaw}" for SKU "${sku}"`);
       continue;
     }

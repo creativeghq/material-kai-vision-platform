@@ -44,7 +44,7 @@ export const UnifiedProcessingMonitor: React.FC = () => {
           supabase.from('document_chunks').select('*', { count: 'exact', head: true }),
           // `images` does not exist; extracted images live in `document_images`. (audit #270)
           supabase.from('document_images').select('*', { count: 'exact', head: true }),
-          supabase.from('products').select('*', { count: 'exact', head: true }),
+          supabase.from('products').select('id', { count: 'exact', head: true }),
         ]);
 
         // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)

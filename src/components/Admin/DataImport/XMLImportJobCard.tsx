@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { formatDate as formatDateValue } from '@/utils/datetime';
-import { FileText, CheckCircle, XCircle, AlertCircle, Clock, RefreshCw, Eye, Trash2 } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, AlertCircle, AlertTriangle, Clock, RefreshCw, Eye, Trash2, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -25,6 +25,7 @@ export interface XMLImportJob {
   cron_schedule?: string;
   last_run_at?: string;
   next_run_at?: string;
+  metadata?: { outcome?: string; schedule_last_attempt?: { status?: string; error?: string } } | null;
 }
 
 interface XMLImportJobCardProps {
@@ -34,6 +35,7 @@ interface XMLImportJobCardProps {
   onViewDetails?: (jobId: string) => void;
   onCancel?: (jobId: string) => void;
   onDelete?: (jobId: string) => void;
+  onSchedule?: (jobId: string) => void;
 }
 
 export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
@@ -43,8 +45,17 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
   onViewDetails,
   onCancel,
   onDelete,
+  onSchedule,
 }) => {
   const getStatusBadge = (status: string) => {
+    if (status === 'completed' && (job.failed_products > 0 || job.metadata?.outcome === 'partial')) {
+      return (
+        <Badge variant="warning">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          Completed with failures
+        </Badge>
+      );
+    }
     const variants = {
       pending: { variant: 'secondary' as const, icon: Clock, text: 'Pending', className: '' },
       processing: { variant: 'default' as const, icon: RefreshCw, text: 'Processing', className: '' },
@@ -154,6 +165,11 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
               <Clock className="h-4 w-4 text-primary" />
               <p className="text-sm text-primary font-medium">Scheduled Job</p>
             </div>
+            {job.metadata?.schedule_last_attempt?.status && job.metadata.schedule_last_attempt.status !== 'dispatched' && (
+              <p className="text-xs text-destructive mb-2 break-words">
+                Last scheduled run {job.metadata.schedule_last_attempt.status}: {job.metadata.schedule_last_attempt.error}
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <p className="text-muted-foreground">Schedule</p>
@@ -204,6 +220,13 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${retrying ? 'animate-spin' : ''}`} />
               {retrying ? 'Retrying…' : 'Retry'}
+            </Button>
+          )}
+
+          {onSchedule && job.import_type === 'xml' && (
+            <Button variant="outline" size="sm" onClick={() => onSchedule(job.id)}>
+              <Calendar className="h-4 w-4 mr-2" />
+              {job.is_scheduled ? 'Edit schedule' : 'Schedule'}
             </Button>
           )}
 

@@ -16,10 +16,11 @@ import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { MYDATA_PAYMENT_CODE } from '../_shared/paymentVocabulary.generated.ts';
 
-// Image extraction and the net→gross conversion moved to _shared once the #321 embed API became a
-// second public surface publishing the same products at the same prices. Two copies of a price
-// derivation is the failure CLAUDE.md's "one derivation per money quantity" rule is about.
-import { imageFromMetadata } from '../_shared/product-media.ts';
+import { associatedImagesByProduct, productImages } from '../_shared/product-media.ts';
+import {
+  PUBLIC_PRODUCT_STATUS, listingKey, loadDefaultVatRate, normaliseVariantKey, productVatPct,
+  variantAttrsFromKey as variantAttrs,
+} from '../_shared/commerce/public-catalogue.ts';
 
 Deno.serve(withApiLogging('finance-storefront', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
@@ -64,18 +65,29 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
     if (!enabled) return json({ error: 'store is not open' }, 403);
 
     if (action === 'products') {
-      const { data: rows } = await supabase
+      const { data: rows, error: rowsErr } = await supabase
         .from('product_prices')
-        .select('product_id, list_price, currency, unit, product:products(id, name, description, metadata, item_type)')
-        .eq('workspace_id', ws.id).eq('storefront_published', true).not('list_price', 'is', null);
-      // list_price is NET (ex-VAT) everywhere; the consumer storefront shows the
-      // VAT-inclusive price, so add VAT here for display.
-      const { data: fsP } = await supabase.from('finance_settings').select('default_vat_rate').eq('workspace_id', ws.id).maybeSingle();
-      const vatP = Number(fsP?.default_vat_rate ?? 24);
+        .select('product_id, variant_key, list_price, currency, unit, '
+          + 'product:products!inner(id, name, description, metadata, item_type, status, mydata_vat_category)')
+        .eq('workspace_id', ws.id).eq('storefront_published', true).not('list_price', 'is', null)
+        .eq('product.status', PUBLIC_PRODUCT_STATUS);
+      if (rowsErr) return json({ error: 'could not load products' }, 500);
+      // list_price is NET (ex-VAT); the consumer storefront shows the VAT-inclusive price.
+      const defaultVat = await loadDefaultVatRate(supabase, ws.id);
+      // A listing is the product's BASE price row; its published variant rows ride along under it.
+      const all = (rows ?? []).filter((r: any) => r.product);
+      const listed = all.filter((r: any) => r.variant_key == null);
+      const variantsOf = new Map<string, any[]>();
+      for (const r of all as any[]) {
+        if (r.variant_key == null) continue;
+        const list = variantsOf.get(r.product_id) ?? [];
+        list.push(r);
+        variantsOf.set(r.product_id, list);
+      }
+      const images = await associatedImagesByProduct(supabase, listed.map((r: any) => r.product_id));
       // GPSR art. 19: the manufacturer contact, the responsible person, the identifier and
       // the warnings travel WITH the offer. Art 2(1) excludes only Chapter III section 1 for
       // CE-marked goods, so a CE mark carves nothing out of this.
-      const listed = (rows ?? []).filter((r: any) => r.product);
       const disclosures = new Map<string, any>();
       await Promise.all(listed.map(async (r: any) => {
         const { data } = await supabase.rpc('product_offer_disclosure', {
@@ -83,25 +95,53 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         });
         if (data) disclosures.set(r.product_id, data);
       }));
-      const products = listed
-        .map((r: any) => ({
+      const variantLabels = new Map<string, string | null>();
+      const variantRows = [...variantsOf.values()].flat();
+      for (let i = 0; i < variantRows.length; i += 500) {
+        const { data } = await supabase.rpc('get_variant_labels', {
+          p_rows: variantRows.slice(i, i + 500).map((r: any) => ({
+            key: listingKey(r.product_id, r.variant_key), product_id: r.product_id, attributes: variantAttrs(r.variant_key),
+          })),
+        });
+        for (const l of (data ?? []) as Array<{ row_key: string; label: string | null }>) {
+          variantLabels.set(l.row_key, l.label ?? null);
+        }
+      }
+      const products = listed.map((r: any) => {
+        const vat = productVatPct(r.product.mydata_vat_category, defaultVat);
+        return {
           product_id: r.product_id,
           name: r.product.name,
           description: r.product.description ?? null,
           unit: r.unit ?? null,
           item_type: r.product.item_type ?? 'good',
-          price: grossFromNet(r.list_price, vatP),
+          price: grossFromNet(r.list_price, vat),
+          vat_percent: vat,
           currency: r.currency ?? 'EUR',
-          image_url: imageFromMetadata(r.product.metadata),
+          image_url: productImages(images.get(r.product_id), r.product.metadata)[0] ?? null,
           safety: disclosures.get(r.product_id) ?? null,
-        }));
+          variants: (variantsOf.get(r.product_id) ?? []).map((v: any) => ({
+            variant_key: v.variant_key,
+            label: variantLabels.get(listingKey(v.product_id, v.variant_key)) ?? null,
+            unit: v.unit ?? null,
+            price: grossFromNet(v.list_price, vat),
+            currency: v.currency ?? 'EUR',
+            image_url: productImages(images.get(v.product_id), r.product.metadata, v.variant_key)[0] ?? null,
+          })),
+        };
+      });
       return json({ ok: true, products });
     }
 
     if (action === 'checkout') {
-      const items: { product_id: string; qty: number }[] = Array.isArray(body?.items) ? body.items : [];
+      const items: { product_id: string; variant_key?: string | null; qty: number }[] =
+        Array.isArray(body?.items) ? body.items : [];
       const customer = body?.customer ?? {};
-      const clean = items.filter((i) => i?.product_id && Number(i.qty) > 0);
+      const clean = items
+        .filter((i) => i?.product_id && Number(i.qty) > 0)
+        .map((i) => ({
+          product_id: String(i.product_id), variant_key: normaliseVariantKey(i.variant_key), qty: Number(i.qty),
+        }));
       if (clean.length === 0) return json({ error: 'cart is empty' }, 400);
       if (!customer?.email || !customer?.name) return json({ error: 'name and email are required' }, 400);
 
@@ -118,38 +158,47 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
 
       // Recompute every line from the DB — the client cart never sets a price.
       const ids = [...new Set(clean.map((i) => i.product_id))];
-      const { data: priceRows } = await supabase
+      const { data: priceRows, error: priceErr } = await supabase
         .from('product_prices')
-        .select('product_id, list_price, currency, unit, product:products(name, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category)')
-        .eq('workspace_id', ws.id).eq('storefront_published', true).in('product_id', ids);
-      const priceById = new Map<string, any>();
-      for (const r of priceRows ?? []) priceById.set((r as any).product_id, r);
+        .select('product_id, variant_key, list_price, currency, unit, product:products!inner(name, status, '
+          + 'mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category)')
+        .eq('workspace_id', ws.id).eq('storefront_published', true).in('product_id', ids)
+        .eq('product.status', PUBLIC_PRODUCT_STATUS);
+      if (priceErr) return json({ error: 'could not price the cart' }, 500);
+      const priceByListing = new Map<string, any>();
+      for (const r of (priceRows ?? []) as any[]) priceByListing.set(listingKey(r.product_id, r.variant_key), r);
 
-      const { data: fs } = await supabase.from('finance_settings').select('default_vat_rate').eq('workspace_id', ws.id).maybeSingle();
-      const vatRate = Number(fs?.default_vat_rate ?? 24);
+      const defaultVat = await loadDefaultVatRate(supabase, ws.id);
 
       let currency = 'EUR';
       const lines: any[] = [];
       for (const it of clean) {
-        const pr = priceById.get(it.product_id);
+        const pr = priceByListing.get(listingKey(it.product_id, it.variant_key));
         if (!pr || pr.list_price == null) return json({ error: 'a product is no longer available' }, 409);
         currency = pr.currency ?? currency;
-        const qty = Math.min(Number(it.qty), 9999);
+        const qty = Math.min(it.qty, 9999);
         // list_price is NET (ex-VAT); keep net per line for myDATA.
         const unitNet = Number(pr.list_price);
+        const netValue = round2(unitNet * qty);
+        const vatPct = productVatPct(pr.product?.mydata_vat_category, defaultVat);
         lines.push({
           description: pr.product?.name ?? 'Item', quantity: qty,
-          unit_price: unitNet, net_value: round2(unitNet * qty), line_total: round2(unitNet * qty),
+          unit_price: unitNet, net_value: netValue, line_total: netValue,
+          vat_amount: round2(netValue * vatPct / 100),
           vat_category: pr.product?.mydata_vat_category ?? null,
           income_classification_type: pr.product?.mydata_income_classification_type ?? null,
           income_classification_category: pr.product?.mydata_income_classification_category ?? null,
           product_id: it.product_id,
+          selected_attributes: it.variant_key ? variantAttrs(it.variant_key) : null,
+          vat_pct: vatPct,
         });
       }
       // Header derived FROM THE LINES, in one direction only.
       const totalNet = round2(lines.reduce((s, l) => s + l.net_value, 0));
-      const totalVat = round2(totalNet * vatRate / 100);
+      const totalVat = round2(lines.reduce((s, l) => s + l.vat_amount, 0));
       const totalGross = round2(totalNet + totalVat);
+      const rates = new Set(lines.map((l) => l.vat_pct));
+      const vatRate = rates.size === 1 ? [...rates][0] : defaultVat;
 
       // Guest checkout carries only name+email. The invoices_customer_xor CHECK requires
       // exactly one of customer_company_id / customer_contact_id, so find-or-create a CRM
@@ -202,7 +251,14 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       }).select('id').single();
       if (insErr) return json({ error: `could not create order: ${insErr.message}` }, 500);
 
-      const itemsPayload = lines.map((l) => ({ ...l, invoice_id: (invoice as any).id }));
+      const itemsPayload = lines.map((l) => ({
+        description: l.description, quantity: l.quantity, unit_price: l.unit_price,
+        net_value: l.net_value, line_total: l.line_total, vat_amount: l.vat_amount,
+        vat_category: l.vat_category, income_classification_type: l.income_classification_type,
+        income_classification_category: l.income_classification_category,
+        product_id: l.product_id, selected_attributes: l.selected_attributes,
+        invoice_id: (invoice as any).id,
+      }));
       const { error: itErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itErr) return json({ error: `could not add items: ${itErr.message}` }, 500);
 

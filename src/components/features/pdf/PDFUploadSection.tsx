@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 interface PDFUploadSectionProps {
   onUploadComplete: (jobId: string, fileName?: string) => void;
@@ -24,6 +25,7 @@ interface MaterialCategory {
 
 export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComplete }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState<string>('');
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
@@ -125,17 +127,23 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
 
   const handleUpload = async () => {
     if (!file) return;
+    if (!activeWorkspaceId) {
+      toast({
+        title: 'No active workspace',
+        description: 'Select a workspace before uploading a catalogue.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsUploading(true);
 
     try {
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         throw new Error('User not authenticated');
       }
 
-      // Upload to Supabase Storage
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('pdf-documents')
@@ -155,12 +163,11 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         throw new Error(`Failed to sign upload URL: ${signError?.message ?? 'unknown error'}`);
       }
 
-      // Call MIVAA API to start processing using standardized client
       const formData = new FormData();
       formData.append('file_url', signed.signedUrl);
       formData.append('categories', 'products'); // Extraction type: products, certificates, logos, specifications, all, extract_only
       formData.append('material_category', category); // Material category: tiles, wood, heating, sanitary, etc.
-      formData.append('workspace_id', 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e'); // Default workspace ID
+      formData.append('workspace_id', activeWorkspaceId);
       formData.append('title', file.name);
 
       const response = await mivaaApi.uploadPDF(formData);
@@ -187,7 +194,6 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
 
       const uploadedFileName = file.name;
 
-      // Reset form
       setFile(null);
 
       console.log('🚀 Calling onUploadComplete with job ID:', jobId, 'and filename:', uploadedFileName);
@@ -268,7 +274,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
           <div className="flex justify-end">
             <Button
               onClick={handleUpload}
-              disabled={isUploading || !category}
+              disabled={isUploading || !category || !activeWorkspaceId}
             >
               {isUploading ? (
                 <>

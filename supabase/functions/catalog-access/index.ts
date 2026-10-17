@@ -7,6 +7,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
 import { fetchBrandingConfig } from '../_shared/pdf/branding.ts';
+import { escapeLike } from '../_shared/searchFold.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -227,7 +228,7 @@ async function resolveCatalog(
 ): Promise<{ catalog: any | null; canonicalHandle: string | null }> {
   if (handle) {
     const { data: ws } = await supabase
-      .from('workspaces').select('id, public_handle').ilike('public_handle', handle).maybeSingle();
+      .from('workspaces').select('id, public_handle').eq('public_handle', handle.toLowerCase()).maybeSingle();
     if (!ws) return { catalog: null, canonicalHandle: null };
     const { data } = await supabase
       .from('presentation_catalogs').select(columns)
@@ -329,7 +330,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       if (!body.email || !isLikelyEmail(body.email)) {
         return jsonResponse({ error: 'Valid email is required' }, 400);
       }
-      const email = body.email.toLowerCase().trim();
+      const email = normalizeEmail(body.email);
 
       const { catalog } = await resolveCatalog(
         supabase, handle, slug, 'id, status, owner_user_id, workspace_id, access_mode');
@@ -511,7 +512,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
 
       const { data: log } = await supabase
         .from('catalog_access_log')
-        .select('catalog_id, email, granted_access, cookie_expires_at')
+        .select('catalog_id, email, granted_access, cookie_expires_at, matched_kind')
         .eq('cookie_token', body.token)
         .maybeSingle();
 
@@ -522,7 +523,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
 
       const { data: catalog } = await supabase
         .from('presentation_catalogs')
-        .select('id, owner_user_id, workspace_id, slug, title, subtitle, description, cover_data, body_data, back_cover_data, status, pdf_url, pdf_storage_path')
+        .select('id, owner_user_id, workspace_id, slug, title, subtitle, description, cover_data, body_data, back_cover_data, status, pdf_url, pdf_storage_path, access_mode')
         .eq('id', log.catalog_id)
         .maybeSingle();
       if (!catalog || catalog.status !== 'published' || catalog.slug !== slug) {
@@ -533,8 +534,10 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       // produced it. Re-validate that the email STILL matches (grant revoked, CRM contact
       // removed, or workspace membership lost since the token was minted) using the SAME
       // resolution — and the same workspace — as the original `request` grant.
-      const recheck = await resolveEmailMatch(supabase, catalog.id, log.email, catalog.workspace_id ?? null);
-      if (!recheck.granted) {
+      const recheck = await resolveEmailMatch(supabase, catalog.id, normalizeEmail(log.email), catalog.workspace_id ?? null);
+      const mode = catalog.access_mode ?? 'allowlist';
+      const leadStillAdmitted = log.matched_kind === 'lead' && (mode === 'any_email' || mode === 'open');
+      if (!recheck.granted && !leadStillAdmitted) {
         return jsonResponse({ granted_access: false, reason: 'access_revoked' });
       }
 
@@ -586,6 +589,7 @@ interface MatchResult {
  * construction. Fail closed: an unresolved tenant withholds access, it does not widen it.
  */
 async function resolveEmailMatch(supabase: any, catalogId: string, email: string, workspaceId: string | null): Promise<MatchResult> {
+  const emailPattern = escapeLike(email);
   if (workspaceId) {
     // Check 1: platform user who is a member of the catalog's workspace
     const { data: members } = await supabase
@@ -598,7 +602,7 @@ async function resolveEmailMatch(supabase: any, catalogId: string, email: string
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('user_id')
-        .ilike('email', email)
+        .ilike('email', emailPattern)
         .in('user_id', memberIds)
         .limit(1)
         .maybeSingle();
@@ -609,26 +613,26 @@ async function resolveEmailMatch(supabase: any, catalogId: string, email: string
 
     // Check 2: CRM contact in the catalog's workspace
     const { data: contact } = await supabase.from('crm_contacts').select('id')
-      .ilike('email', email).eq('workspace_id', workspaceId).limit(1).maybeSingle();
+      .ilike('email', emailPattern).eq('workspace_id', workspaceId).limit(1).maybeSingle();
     if (contact?.id) {
       return { granted: true, kind: 'crm_contact', userId: null, crmContactId: contact.id, crmCompanyId: null, grantId: null };
     }
 
     // Check 3: CRM company in the catalog's workspace
     const { data: company } = await supabase.from('crm_companies').select('id')
-      .ilike('email', email).eq('workspace_id', workspaceId).limit(1).maybeSingle();
+      .ilike('email', emailPattern).eq('workspace_id', workspaceId).limit(1).maybeSingle();
     if (company?.id) {
       return { granted: true, kind: 'crm_company', userId: null, crmContactId: null, crmCompanyId: company.id, grantId: null };
     }
   }
 
-  const { data: grant } = await supabase
+  const { data: grants } = await supabase
     .from('catalog_email_grants')
     .select('id, expires_at, revoked_at')
     .eq('catalog_id', catalogId)
-    .ilike('email', email)
-    .maybeSingle();
-  if (grant?.id && !grant.revoked_at && (!grant.expires_at || new Date(grant.expires_at) > new Date())) {
+    .ilike('email', emailPattern);
+  const grant = (grants || []).find((g: any) => !g.revoked_at && (!g.expires_at || new Date(g.expires_at) > new Date()));
+  if (grant?.id) {
     return { granted: true, kind: 'email_grant', userId: null, crmContactId: null, crmCompanyId: null, grantId: grant.id };
   }
 
@@ -639,6 +643,11 @@ function generateToken(): string {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Matchers compare case-insensitively via `.ilike` on `escapeLike` of this form, so a typed `%`/`_` cannot widen it. */
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
 function isLikelyEmail(email: string): boolean {

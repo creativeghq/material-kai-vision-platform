@@ -39,15 +39,13 @@ export interface ProductMetadata {
   designer?: unknown;
   collection?: unknown;
   inspiration?: unknown;
-  available_colors?: unknown;
+  color?: unknown;
   available_sizes?: unknown;
   dimensions?: unknown;
   size?: unknown;
-  thickness?: unknown;
+  thickness_mm?: unknown;
   finish?: unknown;
   finishes?: unknown;
-  applications?: unknown;
-  recommended_use?: unknown;
   room_type?: unknown;
   joint_width_mm?: unknown;
   certifications?: unknown;

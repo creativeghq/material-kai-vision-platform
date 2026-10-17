@@ -172,7 +172,8 @@ export function getAvailableSizes(metadata?: Record<string, any> | null): string
  */
 export function getAvailableColors(metadata?: Record<string, any> | null): string[] {
   if (!metadata) return [];
-  const raw = metadata.available_colors ?? metadata.colors ?? [];
+  const color = metadata.color;
+  const raw = typeof color === 'string' ? [color] : color ?? [];
   if (!Array.isArray(raw)) return [];
   return raw
     .map((c: unknown) => {

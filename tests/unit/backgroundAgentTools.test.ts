@@ -57,7 +57,8 @@ describe('background agent tool declarations', () => {
   const loopAgents = agents.filter((a) => a.src.includes('runLangGraphAgent'));
 
   it('checks every agent that runs a tool loop', () => {
-    expect(loopAgents.length).toBeGreaterThanOrEqual(3);
+    // product-enrichment and material-tagger use schema-constrained output, not a tool loop (#494).
+    expect(loopAgents.map((a) => a.file)).toContain('kai-task-agent.ts');
   });
 
   it('declares only tools the file actually constructs', () => {

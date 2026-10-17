@@ -245,9 +245,9 @@ const ItemsPage: React.FC<{
                           : item.description}
                       </div>
                     )}
-                    {(item.selected_size || item.selected_color) && (
+                    {(item.variant || item.selected_size || item.selected_color) && (
                       <div style={{ fontSize: 47, color: C.gray, marginTop: 10 }}>
-                        {[item.selected_size, item.selected_color].filter(Boolean).join(' · ')}
+                        {item.variant ?? [item.selected_size, item.selected_color].filter(Boolean).join(' · ')}
                       </div>
                     )}
                   </td>
@@ -261,7 +261,9 @@ const ItemsPage: React.FC<{
                   </td>
                   {/* Price — strikethrough original + actual when discounted */}
                   <td style={{ padding: '35px 60px', textAlign: 'right', verticalAlign: 'top' }}>
-                    {item.discounted_price != null ? (
+                    {item.price_on_request ? (
+                      <div style={{ fontSize: 56, color: C.gray }}>Price on request</div>
+                    ) : item.discounted_price != null ? (
                       <div>
                         <div style={{ fontSize: 47, color: C.gray, textDecoration: 'line-through', opacity: 0.6, lineHeight: 1.2 }}>
                           {fmt(item.unit_price, data.currency)}
@@ -278,7 +280,9 @@ const ItemsPage: React.FC<{
                   </td>
                   {/* Total */}
                   <td style={{ padding: '35px 60px', fontSize: 65, fontWeight: 700, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
-                    {fmt(item.line_total, data.currency)}
+                    {item.price_on_request
+                      ? <span style={{ fontSize: 56, fontWeight: 400, color: C.gray }}>Price on request</span>
+                      : fmt(item.line_total, data.currency)}
                   </td>
                 </tr>
               );
@@ -355,6 +359,13 @@ const TotalsBlock: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <tbody>
+        {data.total_incomplete && (
+          <tr>
+            <td colSpan={2} style={{ fontSize: 50, color: C.primary, paddingBottom: 30 }}>
+              Some lines are priced on request; the totals below exclude them.
+            </td>
+          </tr>
+        )}
         {rows.map((row, i) => row.kind === 'final' ? (
           <tr key={i} style={{ borderTop: `6px solid ${C.lightGray}` }}>
             <td style={{ fontSize: 73, fontWeight: 700, color: C.primary, paddingTop: 40 }}>{row.label.toUpperCase()}</td>

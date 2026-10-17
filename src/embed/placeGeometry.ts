@@ -151,10 +151,10 @@ export function objectSizeM(spec: { attributes?: unknown; metadata?: unknown }):
   const a = obj(spec.attributes);
   const md = obj(spec.metadata);
   const dims = obj(md.dimensions ?? a.dimensions);
-  const unitRaw = [a.dimension_unit, a.unit, md.dimension_unit, md.unit, dims.unit].find((u) => typeof u === 'string' && UNIT_M[(u as string).toLowerCase()]);
+  const unitRaw = [a.unit, md.unit, dims.unit].find((u) => typeof u === 'string' && UNIT_M[(u as string).toLowerCase()]);
   const unit = typeof unitRaw === 'string' ? unitRaw.toLowerCase() : 'cm';
-  let widthM = lengthM(a.width ?? md.width ?? dims.width, unit);
-  let heightM = lengthM(a.height ?? md.height ?? dims.height, unit);
+  let widthM = lengthM(a.width_mm ?? md.width_mm ?? dims.width_mm, 'mm') ?? lengthM(a.width ?? md.width ?? dims.width, unit);
+  let heightM = lengthM(a.height_mm ?? md.height_mm ?? dims.height_mm, 'mm') ?? lengthM(a.height ?? md.height ?? dims.height, unit);
   const text = [md.dimensions, a.dimensions].find((v) => typeof v === 'string') as string | undefined;
   if (text && (widthM === null || heightM === null)) {
     const nums = [...text.matchAll(/(\d+(?:[.,]\d+)?)/g)].map((m) => Number(m[1].replace(',', '.')));

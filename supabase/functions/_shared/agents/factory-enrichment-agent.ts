@@ -5,6 +5,7 @@ import {
   factoryCompletenessScore,
   writeFactoryToProduct,
   propagateFactoryFieldsInScope,
+  isFactoryScopeColumn,
   type FactoryObject,
 } from './propagation-utils.ts';
 
@@ -181,10 +182,17 @@ export class FactoryEnrichmentAgent implements AgentRunner {
     const cfg         = { ...agentConfig.config, ...input } as Record<string, unknown>;
     const batchSize   = Math.min(Number(cfg.batch_size   ?? 20), 50);
     const minNameLen  = Number(cfg.min_name_length ?? 3);
-    const productIds  = (cfg.product_ids as string[] | undefined) ?? [];
-    const scopeColumn = cfg.scope_column as 'source_document_id' | 'scrape_session_id' | undefined;
-    const scopeValue  = cfg.scope_value  as string | undefined;
-    const workspaceId = (cfg.workspace_id as string | undefined) ?? ctx.workspaceId ?? null;
+    const productIds  = Array.isArray(cfg.product_ids)
+      ? (cfg.product_ids as unknown[]).filter((v): v is string => typeof v === 'string')
+      : [];
+    const scopeColumn = isFactoryScopeColumn(cfg.scope_column) ? cfg.scope_column : null;
+    const scopeValue  = typeof cfg.scope_value === 'string' ? cfg.scope_value : null;
+    // ctx.workspaceId is the runner's authorized boundary; input may only restate it.
+    const workspaceId = ctx.workspaceId;
+    if (!workspaceId || (cfg.workspace_id !== undefined && cfg.workspace_id !== workspaceId)) {
+      await log('error', 'Factory enrichment refused: run has no authorized workspace', { input_workspace: cfg.workspace_id ?? null });
+      return { success: false, output: { error: 'workspace_required' }, inputTokens: 0, outputTokens: 0, creditsDebited: 0 };
+    }
 
     await log('info', 'Starting factory enrichment', { batchSize, productCount: productIds.length });
 
@@ -193,12 +201,9 @@ export class FactoryEnrichmentAgent implements AgentRunner {
     // product. The agent run carries no triggering user (triggered_by='event'),
     // so bill the WORKSPACE OWNER, routing pool→personal via p_workspace_id.
     const FACTORY_ENRICH_CREDIT_COST = 8; // ≈ (Apollo $0.05 + Hunter $0.01) × 1.5 markup × 100
-    let billOwnerId: string | null = null;
-    if (workspaceId) {
-      const { data: ws } = await supabase
-        .from('workspaces').select('created_by').eq('id', workspaceId).maybeSingle();
-      billOwnerId = ((ws as { created_by?: string } | null)?.created_by) ?? null;
-    }
+    const { data: ws } = await supabase
+      .from('workspaces').select('created_by').eq('id', workspaceId).maybeSingle();
+    const billOwnerId: string | null = ((ws as { created_by?: string } | null)?.created_by) ?? null;
     if (!billOwnerId) {
       await log('warn', 'No billable workspace owner resolved — enrichment will run unmetered', { workspaceId });
     }
@@ -222,13 +227,12 @@ export class FactoryEnrichmentAgent implements AgentRunner {
     let query = supabase
       .from('products')
       .select('id, metadata')
+      .eq('workspace_id', workspaceId)
       .not('metadata', 'is', null)
       .limit(batchSize);
 
     if (productIds.length > 0) {
       query = query.in('id', productIds);
-    } else if (workspaceId) {
-      query = query.eq('workspace_id', workspaceId);
     }
 
     const { data: products, error: fetchErr } = await query;
@@ -345,7 +349,9 @@ export class FactoryEnrichmentAgent implements AgentRunner {
           ...enriched,
         };
 
-        await writeFactoryToProduct(supabase, product.id, merged);
+        if (!(await writeFactoryToProduct(supabase, workspaceId, product.id, merged))) {
+          throw new Error('factory write failed');
+        }
         enrichedCount++;
         await log('info', `Updated factory data for product ${product.id}`, {
           score: factoryCompletenessScore(merged).toFixed(2),
@@ -368,7 +374,7 @@ export class FactoryEnrichmentAgent implements AgentRunner {
     // ── After enrichment: re-propagate within scope ───────────────────────
     if (enrichedCount > 0 && scopeColumn && scopeValue) {
       await heartbeat();
-      const repropagated = await propagateFactoryFieldsInScope(supabase, scopeColumn, scopeValue);
+      const repropagated = await propagateFactoryFieldsInScope(supabase, workspaceId, scopeColumn, scopeValue);
       await log('info', `Re-propagated after enrichment: ${repropagated} additional products updated`);
     }
 

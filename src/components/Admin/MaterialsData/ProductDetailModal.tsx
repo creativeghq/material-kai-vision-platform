@@ -41,7 +41,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     description: extractStringValue(product.description),
     category: product.metadata?.material_category || 'Uncategorized',
     type: product.metadata?.material_category || 'other',
-    status: 'active',
+    status: product.status ?? 'unknown',
     sku: product.id.substring(0, 8),
     metadata: product.metadata || {},
     properties: {},
