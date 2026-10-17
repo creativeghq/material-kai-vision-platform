@@ -1,3 +1,5 @@
+import type { B2BCompanyType } from '@/config/b2bCompanyTypes';
+
 // =====================================================
 // Flow Status Types
 // =====================================================
@@ -1039,6 +1041,9 @@ export interface WebSearchConfig {
   country?: string;
   region?: string;
   limit?: number;
+  /** Keys of B2B_COMPANY_TYPES; omitted means manufacturer. */
+  company_types?: B2BCompanyType[];
+  keywords?: string[];
 }
 
 export interface FirecrawlScrapeConfig {

@@ -103,6 +103,7 @@ export interface InboxThread {
   agent_draft?: string | null;
   agent_draft_at?: string | null;
   agent_draft_error?: string | null;
+  agent_draft_avoid_hits?: string[] | null;
   /**
    * Does the draft still answer the customer's LATEST message? Derived server-side against
    * `inbox_newest_inbound_message_id`, the same definition the draft cron claims on.
@@ -926,7 +927,7 @@ export const inboxApi = {
    * operator's own words, and the member still reviews the draft before sending.
    */
   suggestReply(thread_id: string, instruction?: string) {
-    return call<{ draft: string }>('suggest_reply', { thread_id, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) });
+    return call<{ draft: string; avoid_hits?: string[] }>('suggest_reply', { thread_id, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) });
   },
 
   // ── Inbound email address (#342) — one per user, on the shared receiving domain ──

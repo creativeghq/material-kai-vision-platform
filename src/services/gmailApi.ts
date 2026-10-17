@@ -85,7 +85,7 @@ export const gmailApi = {
   share: (account_id: string, is_shared: boolean, member_ids: string[]) =>
     call<{ ok: boolean; is_shared: boolean; member_ids: string[] }>('share', { account_id, is_shared, member_ids }),
   assist: (account_id: string, thread_id: string, mode: 'summary' | 'draft' | 'actions' | 'ask' | 'rewrite' | 'shorten' | 'formal' | 'followup', instruction?: string, text?: string) =>
-    call<{ text: string; mode: string }>('assist', { account_id, thread_id, mode, instruction, text }),
+    call<{ text: string; mode: string; avoid_hits?: string[] }>('assist', { account_id, thread_id, mode, instruction, text }),
   schedule: (input: GmailSendInput & { send_at: string }) =>
     call<{ ok: boolean; scheduled: { id: string; send_at: string } }>('schedule', input),
   send: (input: GmailSendInput) => call<{ ok: boolean; message_id: string; thread_id: string; tracked: boolean }>('send', input),

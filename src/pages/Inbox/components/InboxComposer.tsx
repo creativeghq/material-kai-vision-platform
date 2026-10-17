@@ -275,7 +275,11 @@ export const InboxComposer: React.FC<{ m: MailComposerModel }> = ({ m }) => {
 
         {ai.draftShown && !isNote && (
           <div className="flex items-center justify-between gap-2 text-xs bg-primary/10 text-primary px-3 py-1.5 border-b border-primary/20">
-            <span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI draft — review and edit before you send.</span>
+            <span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI draft — review and edit before you send.
+              {ai.draftAvoidHits.length > 0 && (
+                <span className="text-warning">Uses words on your avoid list: {ai.draftAvoidHits.join(', ')}.</span>
+              )}
+            </span>
             <button onClick={() => { setDraft(''); ai.setDraftShown(false); }} className="inline-flex items-center gap-1 hover:underline shrink-0">
               <X className="w-3 h-3" /> Reject
             </button>

@@ -27,7 +27,7 @@ const FORBIDDEN = [
   'manage_contracts', 'manage_inbox', 'manage_reviews', 'manage_appointments', 'manage_messaging',
   'manage_email_campaign', 'manage_docs', 'search_workspace_docs',
   'create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item',
-  'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery',
+  'b2b_company_search', 'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery',
   'scrape_materials_from_url', 'suggest_extraction_fields',
   'track_job_search', 'find_jobs', 'manage_job_sites',
   'confirm',

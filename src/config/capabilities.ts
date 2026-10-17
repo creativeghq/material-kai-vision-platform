@@ -205,6 +205,7 @@ export const RESULT_SETUP_DESTINATION: Record<string, { destination: string; lab
 const UNCREATABLE_RESULT_TYPES = new Set([
   'record_search_results',    // search hits — you add the record, not the hit
   'industrial_facilities',    // the EU industrial register; we do not write to it
+  'b2b_company_results',
   'inbox_threads_list',       // a customer opens a thread; we cannot open one for them
   'reviews_list',             // a review you write about yourself is a fake review
   'price_summary',            // competitor prices are observations

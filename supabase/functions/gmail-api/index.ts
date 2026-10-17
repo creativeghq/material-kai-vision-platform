@@ -17,6 +17,7 @@ import { AUTO_REPLY_GMAIL_HEADERS, isAutoReplyFromHeaderList } from '../_shared/
 import { parseOutreachSteps } from '../_shared/outreach-steps.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
+import { brandDraftCheck, loadBrandContext } from '../_shared/brand-context.ts';
 import {
   EMAIL_ADDRESS, gmailAccessToken, gmailFetch, gmailHeader, prepareGmailSend, sendPreparedGmail,
 } from '../_shared/gmail-client.ts';
@@ -538,7 +539,10 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
         throw new HttpError(502, `The assistant did not answer: ${turn.error}`);
       }
       if (!turn.text) throw new HttpError(502, 'The assistant produced nothing — try again.');
-      return json({ text: turn.text, mode });
+      const avoidHits = mode === 'draft' || mode === 'followup' || REWRITE_MODES.has(mode)
+        ? brandDraftCheck(await loadBrandContext(db, account.workspace_id), turn.text).avoid_hits
+        : [];
+      return json({ text: turn.text, mode, avoid_hits: avoidHits });
     }
 
     case 'remind': {

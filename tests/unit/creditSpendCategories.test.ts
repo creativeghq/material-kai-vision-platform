@@ -90,6 +90,7 @@ describe('credit spend categories', () => {
       ['email_contacts_sync', 'Inbox & Email'],
       ['sam_segment', 'Image & Material Tools'],
       ['b2b_manufacturer_search', 'B2B & Company Research'],
+      ['b2b_company_search', 'B2B & Company Research'],
       ['company_website_scrape_analysis', 'B2B & Company Research'],
       ['presentation_sheet_moodboard', 'Presentation Sheets'],
     ];

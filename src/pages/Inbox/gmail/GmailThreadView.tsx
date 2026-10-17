@@ -103,6 +103,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
   const forwardSeq = useRef(0);
   const [drafting, setDrafting] = useState(false);
   const [draftShown, setDraftShown] = useState(false);
+  const [draftAvoidHits, setDraftAvoidHits] = useState<string[]>([]);
   const [steer, setSteer] = useState('');
   const [steerOpen, setSteerOpen] = useState(false);
   const [includeSignature, setIncludeSignature] = useState(true);
@@ -208,6 +209,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       const r = await gmailApi.assist(account.id, openId, 'draft', steer);
       if (composeMode === 'forward') { leaveForward(); startReply('reply', lastIncoming, false); }
       setDraft(r.text);
+      setDraftAvoidHits(r.avoid_hits ?? []);
       setDraftShown(true);
       setSteer('');
     } catch (e) {
@@ -302,7 +304,7 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       trackOpens, setTrackOpens, preview, setPreview, includeSignature, setIncludeSignature,
     },
     ai: {
-      drafting, draftShown, setDraftShown, steer, setSteer, steerOpen, setSteerOpen,
+      drafting, draftShown, draftAvoidHits, setDraftShown, steer, setSteer, steerOpen, setSteerOpen,
       suggest,
       rewrite: async (mode, text) => (await gmailApi.assist(account.id, openId, mode, undefined, text)).text,
     },

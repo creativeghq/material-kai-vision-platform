@@ -208,7 +208,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'ai-visibility': {
     capability: ['marketing.seo'],
-    tool_ids: ['check_llm_visibility', 'seo_brand_search_audit', 'seo_llm_mentions_search', 'seo_ai_keyword_volume'],
+    tool_ids: ['check_llm_visibility', 'seo_brand_search_audit', 'seo_llm_mentions_search', 'seo_ai_keyword_volume', 'propose_brand_change'],
   },
   'seo-article': {
     capability: ['marketing.seo'],
@@ -217,7 +217,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'b2b': {
     adminOnly: true,
     capability: ['workspace.manage'],
-    tool_ids: ['b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_registry_lookup', 'industrial_facility_search', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm', 'scrape_materials_from_url', 'suggest_extraction_fields'],
+    tool_ids: ['b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_registry_lookup', 'industrial_facility_search', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm', 'scrape_materials_from_url', 'suggest_extraction_fields'],
   },
   'sub-agents': {
     adminOnly: true,

@@ -687,8 +687,8 @@ export const paletteItems: NodePaletteItem[] = [
 
   // ── B2B Research ──
   { type: 'actionNode', category: 'action', subType: 'web_search', group: 'B2B Research',
-    label: 'Manufacturer Search', description: 'Search for B2B manufacturers using Claude web search', icon: 'Compass', color: 'blue',
-    defaultData: { label: 'Manufacturer Search', category: 'action', actionType: 'web_search', config: { category: '', limit: 30 } } as ActionNodeData },
+    label: 'Company Search', description: 'Search for B2B companies of a chosen type using Claude web search', icon: 'Compass', color: 'blue',
+    defaultData: { label: 'Company Search', category: 'action', actionType: 'web_search', config: { category: '', limit: 30, company_types: ['manufacturer'], keywords: [] } } as ActionNodeData },
   { type: 'actionNode', category: 'action', subType: 'firecrawl_scrape', group: 'B2B Research',
     label: 'Scrape Website', description: 'Extract company info from website', icon: 'FileSearch', color: 'blue',
     defaultData: { label: 'Scrape Website', category: 'action', actionType: 'firecrawl_scrape', config: { url: '' } } as ActionNodeData },

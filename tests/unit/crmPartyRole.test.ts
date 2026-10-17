@@ -76,11 +76,9 @@ describe('CRM party role is stated, never defaulted', () => {
   });
 
   /**
-   * The B2B discovery save is the other half of the same bug, arrived at from the opposite
-   * direction (#334 defect 1). It did not OMIT the role — it PINNED it, `is_customer: true`,
-   * under a comment reasoning that B2B research prospects a party we want to sell to. The
-   * toolkit's only discovery tool is `b2b_manufacturer_search`, which finds factories, so every
-   * porcelain tile plant the agent saved was filed as a customer with no way to say otherwise.
+   * The B2B discovery save is the other half of the same bug (#334 defect 1): it PINNED
+   * `is_customer: true`, so every factory saved was filed as a customer. Since #473 the search
+   * finds any company type, so the role follows the recorded `company_type` unless stated.
    */
   it('lets the B2B discovery save choose the party role instead of pinning it', () => {
     const src = stripComments(
@@ -95,9 +93,24 @@ describe('CRM party role is stated, never defaulted', () => {
 
     expect(
       src,
-      'The default must be supplier: the only discovery tool in this toolkit finds manufacturers, '
-      + 'and a party we intend to SELL to has to be named as one.',
-    ).toMatch(/company\.role\s*\?\?\s*'supplier'/);
+      'With no stated role, the role must come from the recorded company_type (a retailer is not a '
+      + 'supplier), and only then fall back to supplier.',
+    ).toMatch(/company\.role\s*\?\?\s*\(companyType\s*\?\s*B2B_COMPANY_TYPE_PARTY_ROLE\[companyType\]\s*:\s*null\)\s*\?\?\s*'supplier'/);
+  });
+
+  it('maps every company type to a party role, and retailers and installers are not suppliers', async () => {
+    const { B2B_COMPANY_TYPES, B2B_COMPANY_TYPE_PARTY_ROLE } = await import('../../src/config/b2bCompanyTypes');
+    for (const t of B2B_COMPANY_TYPES) expect(B2B_COMPANY_TYPE_PARTY_ROLE[t], t).toMatch(/^(supplier|customer)$/);
+    expect(B2B_COMPANY_TYPE_PARTY_ROLE.manufacturer).toBe('supplier');
+    expect(B2B_COMPANY_TYPE_PARTY_ROLE.stock_trader).toBe('supplier');
+    expect(B2B_COMPANY_TYPE_PARTY_ROLE.retailer_showroom).toBe('customer');
+    expect(B2B_COMPANY_TYPE_PARTY_ROLE.contractor_installer).toBe('customer');
+  });
+
+  it('derives both party flags in the insert instead of pinning either', () => {
+    const src = stripComments(
+      readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
+    );
 
     const insert = src.match(/from\(\s*'crm_companies'\s*\)[\s\S]{0,200}?\.insert\(\{([\s\S]{0,900}?)\}\s*\)/);
     expect(insert, '`save_to_crm` no longer inserts into crm_companies — re-point this guard.').toBeTruthy();

@@ -20,7 +20,7 @@ Follow this procedure exactly when the user asks you to research a specific manu
 
 1. **Identify the target.** Extract the company name, any known website, country, and material category from the user's message. If ambiguous (e.g. "Marazzi" — Italian tile vs. US distributor), ask one clarifying question before proceeding.
 
-2. **Run \`b2b_manufacturer_search\`** with the company name as the primary query. This hits the live web-search tool with a B2B-biased prompt and returns initial hits.
+2. **Run \`b2b_company_search\`** with the company name as the primary query and \`company_types\` set to what the company is claimed to be (\`manufacturer\`, \`distributor\`, \`importer_exporter\`, \`stock_trader\`, \`retailer_showroom\`, \`contractor_installer\`). Every row it returns carries \`company_type\` and a \`type_evidence\` quote from the company's own site; a row in \`unverified\` is NOT confirmed — say why, using its \`unverified_reason\`.
 
 3. **If a website is surfaced, run \`analyze_inspiration_url\`** on the official domain. This scrapes the site and extracts what materials/categories they actually produce — a sanity check against the web-search summary.
 
@@ -58,6 +58,18 @@ Follow this procedure exactly when the user asks you to research a specific manu
   "sources": ["url1", "url2", "url3"]
 }
 \`\`\`
+
+## Verifying a stock / surplus trader
+
+A stock trader buys and resells surplus, end-of-series, second-choice or liquidation lots. Hold it to the **core-business test**: stock lots must be what the WHOLE site sells, not one outlet or "restpartier" tab on an ordinary importer or retailer (Dansk Flise Lager is the canonical false positive — a normal importer whose outlet is under 15% of its site).
+
+1. **Open its own site** and quote the sentence that proves the core business — lot lists, a "stock" price list, an offer to buy other companies' surplus.
+2. **Search in the seller's words, not the buyer's.** Traders write "prezzi di stock", "fine serie", "segundas", "restos de serie", "ıskarta / defolu / spot", "II gatunek", "zaključene kolekcije" — nobody writes "liquidation buyer". \`b2b_company_search\` adds these from the vocabulary; add product words as \`keywords\`.
+3. **Red flags — record as \`tier-3\` and list them:**
+   - Gmail/Hotmail contact and no VAT number anywhere on the site
+   - a cloned "vendita diretta" / "direct sale" template shared with other sites
+   - a VAT number registered in a different province or country from the stated address
+   - prices far below any factory list with no lot or quality grade stated
 
 ## Guardrails
 

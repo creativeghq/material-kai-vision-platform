@@ -210,15 +210,32 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'b2b_company_search',
+    file: 'supabase/functions/_shared/tools/b2b-tools.ts',
+    factory: 'createB2BCompanySearchTool',
+    description: 'Search the web for B2B companies of a requested TYPE that deal in a product category.',
+    params: [
+      { name: 'category', type: 'string', optional: false, description: 'Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")' },
+      { name: 'company_types', type: 'array', enum: ['manufacturer', 'distributor', 'importer_exporter', 'stock_trader', 'retailer_showroom', 'contractor_installer'], optional: true, description: 'What kind of company to find — one or more. Omit for manufacturers. A stock trader deals in surplus, end-of-series, second-choice or liquidation lots.' },
+      { name: 'keywords', type: 'array', optional: true, description: 'Extra search terms from the user, e.g. "outlet", "stock lots", "container export".' },
+      { name: 'country', type: 'string', optional: true, description: 'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.' },
+      { name: 'region', type: 'string', optional: true, description: 'A whole market group. Ignored if `country` is provided.' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max companies per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.' },
+      { name: 'exclude_domains', type: 'array', optional: true, description: 'Domains returned by earlier searches in this conversation, so this one finds new companies.' },
+      { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.' },
+    ],
+  },
+  {
     name: 'b2b_manufacturer_search',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createB2BManufacturerSearchTool',
-    description: 'Search for B2B manufacturers using web search.',
+    description: 'Alias of b2b_company_search with company_types pinned to ["manufacturer"].',
     params: [
       { name: 'country', type: 'string', optional: true, description: 'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.' },
       { name: 'region', type: 'string', optional: true, description: 'A whole market group. Ignored if `country` is provided.' },
       { name: 'category', type: 'string', optional: false, description: 'Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")' },
-      { name: 'limit', type: 'number', optional: true, description: 'Max manufacturers per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.' },
+      { name: 'keywords', type: 'array', optional: true, description: 'Extra search terms from the user.' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max companies per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.' },
       { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.' },
     ],
   },
@@ -226,9 +243,9 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'b2b_research_validate',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createB2BResearchValidateTool',
-    description: 'Second-opinion check on a B2B manufacturer search that already ran.',
+    description: 'Second-opinion check on a B2B company search that already ran.',
     params: [
-      { name: 'validation_id', type: 'string', optional: false, description: 'The `validation_id` returned by a prior b2b_manufacturer_search call.' },
+      { name: 'validation_id', type: 'string', optional: false, description: 'The `validation_id` returned by a prior b2b_company_search call.' },
     ],
   },
   {
@@ -1615,6 +1632,21 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'product_id', type: 'string', optional: true, description: 'Product UUID' },
       { name: 'sku', type: 'string', optional: true, description: 'SKU / external SKU to resolve' },
+    ],
+  },
+  {
+    name: 'propose_brand_change',
+    file: 'supabase/functions/_shared/tools/brand-tools.ts',
+    factory: 'createProposeBrandChangeTool',
+    description: 'PROPOSE a change to the workspace brand profile — positioning, ideal customer, messaging pillars, active hypotheses, tone, personality, writing style, preferred terminology or words to avoid. It never applies: a works…',
+    params: [
+      { name: 'field', type: 'enum', enum: ['tone_attributes', 'personality_traits', 'terminology_preferences', 'avoid_list', 'messaging_pillars', 'active_hypotheses', 'writing_style', 'icp', 'positioning'], optional: false, description: 'The brand profile field to change.' },
+      { name: 'op', type: 'enum', enum: ['add', 'remove', 'set'], optional: false, description: 'add/remove one item of a list field; set replaces a text field.' },
+      { name: 'value', type: 'string', optional: false, description: 'The item to add or remove, or the full new text.' },
+      { name: 'rationale', type: 'string', optional: false, description: 'Why, in one or two sentences the approver can judge.' },
+      { name: 'source', type: 'enum', enum: ['agent', 'mention', 'unmet_request', 'editor_diff', 'member'], optional: false, description: 'What prompted it: your own analysis, a mention, a request we could not meet, an editor\'s changes, or the user asking.' },
+      { name: 'evidence', type: 'string', optional: true, description: 'The quote, URL or figure the proposal rests on.' },
+      { name: 'website_id', type: 'string', optional: true, description: 'A website whose own voice this is for; omit for the workspace default.' },
     ],
   },
   {

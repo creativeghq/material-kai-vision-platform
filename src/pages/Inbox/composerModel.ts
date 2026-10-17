@@ -67,6 +67,7 @@ export interface MailComposerModel {
   ai: {
     drafting: boolean;
     draftShown: boolean;
+    draftAvoidHits: string[];
     setDraftShown: (v: boolean) => void;
     steer: string;
     setSteer: (v: string) => void;
@@ -159,6 +160,7 @@ export function useInboxComposerModel(s: InboxPageState): MailComposerModel | nu
     ai: {
       drafting: s.aiDrafting,
       draftShown: s.aiDraftShown,
+      draftAvoidHits: s.aiDraftAvoidHits,
       setDraftShown: s.setAiDraftShown,
       steer: s.draftSteer,
       setSteer: s.setDraftSteer,

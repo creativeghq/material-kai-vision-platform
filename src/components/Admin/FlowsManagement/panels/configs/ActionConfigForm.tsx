@@ -5,6 +5,8 @@ import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
+import { Checkbox } from '@/components/core/ui/checkbox';
+import { B2B_COMPANY_TYPES } from '@/config/b2bCompanyTypes';
 import { riskyVariablesIn, SENSITIVITY_PRESENTATION } from '@/services/flows/triggerVariables';
 import {
   Select,
@@ -1194,7 +1196,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
       return (
         <div className="space-y-3">
           <div className="text-xs text-muted-foreground">
-            AI-powered B2B manufacturer search using Claude web search. Specify a country for focused results or leave blank for a broad global search.
+            AI-powered B2B company search using Claude web search. Pick the kind of company to find; specify a country for focused results or leave blank for a broad global search.
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Product Category</Label>
@@ -1202,6 +1204,35 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               value={cfg.category || ''}
               onChange={(e) => onChange({ ...cfg, category: e.target.value })}
               placeholder="e.g., ceramic tiles, bathroom furniture"
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Company types</Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {B2B_COMPANY_TYPES.map((type) => {
+                const selected = cfg.company_types?.length ? cfg.company_types : ['manufacturer'];
+                return (
+                  <label key={type} className="flex items-center gap-2 text-xs">
+                    <Checkbox
+                      checked={selected.includes(type)}
+                      onCheckedChange={(on) => {
+                        const next = on ? [...new Set([...selected, type])] : selected.filter((t) => t !== type);
+                        onChange({ ...cfg, company_types: next.length ? next : undefined });
+                      }}
+                    />
+                    {type.replace(/_/g, ' ')}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Keywords (optional, comma-separated)</Label>
+            <Input
+              defaultValue={(cfg.keywords ?? []).join(', ')}
+              onBlur={(e) => onChange({ ...cfg, keywords: e.target.value.split(',').map((k) => k.trim()).filter(Boolean) })}
+              placeholder="e.g., outlet, stock lots, container export"
               className="h-8 text-sm"
             />
           </div>

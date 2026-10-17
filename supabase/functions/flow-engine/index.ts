@@ -8,9 +8,9 @@
  * - trigger-event: Auto-dispatch from DB triggers (Phase 4)
  */
 
-import { loadPrompt, renderPromptTemplate, getToolPrompt } from '../_shared/prompt-utils.ts';
+import { normaliseCompanyTypes, normaliseKeywords, renderCompanySearch } from '../_shared/b2b-company-query.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
-import { buildMarketScope, loadVocabulary } from '../_shared/vocabularies.ts';
+import { loadVocabulary } from '../_shared/vocabularies.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -797,6 +797,8 @@ async function executeAction(
       const regionId = String(resolved.region || '');
       const category = String(resolved.category || '');
       const limit = Number(resolved.limit) || 30;
+      const companyTypes = normaliseCompanyTypes(resolved.company_types);
+      const keywords = normaliseKeywords(resolved.keywords);
 
       if (!category) throw new Error('Category is required');
 
@@ -820,22 +822,13 @@ async function executeAction(
         }
       }
 
-      // Same derivation b2b-tools uses. This copy had drifted twice over: it emitted the raw
-      // region KEY (`in the cee region`, meaningless to a web search) and, with nothing set, the
-      // vague `across Europe and major global manufacturing hubs` instead of the platform's 30
-      // named markets — so an identical request answered differently depending on which caller
-      // ran it (issue #370, Class A).
-      const geoScope = buildMarketScope(
+      // Same rows and the same renderer b2b-tools uses: this copy drifted twice when it built its
+      // own query and scope (#347 phase 3P, #370 Class A).
+      const { query, systemPrompt } = await renderCompanySearch(
+        supabase,
         await loadVocabulary(supabase, 'sourcing_markets'),
-        { country, region: regionId },
+        { category, country, region: regionId, limit, company_types: companyTypes, keywords },
       );
-
-      // Same row b2b-tools reads. This copy had drifted from it (#347 phase 3P).
-      const query = renderPromptTemplate(
-        await loadPrompt(supabase, 'tool', 'b2b_manufacturer_query'),
-        { category, scope: geoScope, limit },
-      );
-      const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
 
       let textContent = '';
       try {
@@ -884,7 +877,7 @@ async function executeAction(
         output: {
           success: !!textContent,
           search_results: textContent || 'No results found.',
-          query: { country, category, limit },
+          query: { country, region: regionId, category, limit, company_types: companyTypes, keywords },
           source: 'claude_web_search',
         },
       };

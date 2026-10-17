@@ -240,6 +240,7 @@ export function useInboxPage() {
   const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
   const [aiDrafting, setAiDrafting] = useState(false);
   const [aiDraftShown, setAiDraftShown] = useState(false);
+  const [aiDraftAvoidHits, setAiDraftAvoidHits] = useState<string[]>([]);
   /** The member's steer for "Draft with AI" — what the reply should offer or say. Optional. */
   const [draftSteer, setDraftSteer] = useState('');
   const [draftSteerOpen, setDraftSteerOpen] = useState(false);
@@ -632,6 +633,7 @@ export function useInboxPage() {
         } else if (thread.agent_draft && thread.agent_draft_is_current) {
           setDraft(thread.agent_draft);
           setIsNote(false);
+          setAiDraftAvoidHits(thread.agent_draft_avoid_hits ?? []);
           setAiDraftShown(true);
         }
         draftSnapshot.current = JSON.stringify(seeded
@@ -975,9 +977,10 @@ export function useInboxPage() {
     setAiDrafting(true);
     setDraftSteerOpen(false);
     try {
-      const { draft: suggestion } = await inboxApi.suggestReply(activeId, draftSteer);
+      const { draft: suggestion, avoid_hits } = await inboxApi.suggestReply(activeId, draftSteer);
       setDraft(suggestion);
       setIsNote(false);
+      setAiDraftAvoidHits(avoid_hits ?? []);
       setAiDraftShown(true);
     } catch (e) {
       toast({ title: 'Could not draft a reply', description: (e as Error).message, variant: 'destructive' });
@@ -1385,6 +1388,7 @@ export function useInboxPage() {
     setAiDrafting,
     aiDraftShown,
     setAiDraftShown,
+    aiDraftAvoidHits,
     draftSteer,
     setDraftSteer,
     draftSteerOpen,

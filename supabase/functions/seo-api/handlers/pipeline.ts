@@ -31,6 +31,7 @@ import { PHOTOS_PER_PAGE } from './site-pages.ts';
 import { PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, PHOTO_VERIFY_MODEL, type PhotoUsage } from './photo-verify.ts';
 import { WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS } from './write.ts';
 import { DEFAULT_CLAUDE_MODEL } from '../../_shared/ai-client.ts';
+import { avoidListHits, brandDraftCheck, loadBrandContext } from '../../_shared/brand-context.ts';
 
 /** What research + planning typically settle to before the write reservation is taken. */
 const PRE_WRITE_TYPICAL_CREDITS = 40;
@@ -777,6 +778,13 @@ async function runLateStages(ctx: {
     // Byline / disclosure go in before the final save; none is invented when provenance is absent.
     const publishedAt = new Date().toISOString();
     const publishedMarkdown = appendProvenanceBlock(finalMarkdown, brief, website);
+    const profileCheck = workspaceId
+      ? brandDraftCheck(await loadBrandContext(supabase, workspaceId, websiteId), finalMarkdown)
+      : { checked: false, avoid_hits: [] as string[] };
+    const brandCheck = {
+      checked: profileCheck.checked,
+      avoid_hits: [...new Set([...profileCheck.avoid_hits, ...avoidListHits(finalMarkdown, brief?.brandVoice.avoidList)])],
+    };
 
     const schemaMarkup = buildSchemaMarkup(plan, publishedMarkdown, {
       brief: brief,
@@ -959,6 +967,7 @@ async function runLateStages(ctx: {
       gaps_gains_data: gapsGains,
       research_tab_data: researchTabData,
       interlinking_data: interlinkingData,
+      brand_check: brandCheck,
       geo_score: analysis.geoScore?.overall || null,
       credits_used: Math.round(totalCredits * 100) / 100,
       credits_by_stage: creditsByStage,
@@ -968,7 +977,8 @@ async function runLateStages(ctx: {
       progress_percentage: 100,
       current_stage: 'done',
       completed_at: new Date().toISOString(),
-    }, `Pipeline complete: score ${analysis.overallScore}/100, ${finalWordCount} words`);
+    }, `Pipeline complete: score ${analysis.overallScore}/100, ${finalWordCount} words`
+      + (brandCheck.avoid_hits.length ? `; uses words on the avoid list: ${brandCheck.avoid_hits.join(', ')}` : ''));
 
     console.log(`[seo-pipeline] Complete! Article ${articleId}: score ${analysis.overallScore}/100, ${finalWordCount} words, ${processingTimeMs}ms`);
 

@@ -34,6 +34,7 @@ const CATEGORY_ICON: Record<string, string> = {
   'Admin': 'Settings2',
   'Appointments': 'CalendarClock',
   'B2B Research': 'Building2',
+  'Brand': 'BadgeCheck',
   'CRM': 'Users',
   'Calculators': 'Calculator',
   'Catalogs': 'BookOpen',

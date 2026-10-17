@@ -66,6 +66,7 @@ let getSkillsForAgent: any, getSkillContent: any, formatSkillsForSystemPrompt: a
 let emitFlowEvent: any;
 let aiCallLogger: any;
 let resolveBusinessIdentity: any, formatBusinessIdentityForPrompt: any;
+let loadBrandContext: any, formatBrandContextForPrompt: any;
 let resolveTurnClock: any, loadAgentUserContext: any, formatUserContextForPrompt: any;
 let clampToolsForCustomer: any, isCustomerAudience: any, fenceCustomerMessage: any,
   customerAudienceGuardrails: any, operatorInstructionBlock: any;
@@ -84,7 +85,7 @@ async function initRuntime() {
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY must be set');
 
   // Load all shared modules + npm packages in parallel
-  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod, memoryMod, bizMod, audienceMod, autopilotMod, userCtxMod] = await Promise.all([
+  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod, memoryMod, bizMod, audienceMod, autopilotMod, userCtxMod, brandMod] = await Promise.all([
     import('../_shared/credit-utils.ts'),
     import('../_shared/prompt-utils.ts'),
     import('../_shared/langgraph-core.ts'),
@@ -103,6 +104,7 @@ async function initRuntime() {
     import('../_shared/customer-audience.ts'),
     import('../_shared/inbox-autopilot.ts'),
     import('../_shared/agent-user-context.ts'),
+    import('../_shared/brand-context.ts'),
   ]);
 
   debitAgentChatTurn = creditMod.debitAgentChatTurn;
@@ -125,6 +127,8 @@ async function initRuntime() {
   emitFlowEvent = flowMod.emitFlowEvent;
   resolveBusinessIdentity = bizMod.resolveBusinessIdentity;
   formatBusinessIdentityForPrompt = bizMod.formatBusinessIdentityForPrompt;
+  loadBrandContext = brandMod.loadBrandContext;
+  formatBrandContextForPrompt = brandMod.formatBrandContextForPrompt;
   resolveTurnClock = userCtxMod.resolveTurnClock;
   loadAgentUserContext = userCtxMod.loadAgentUserContext;
   formatUserContextForPrompt = userCtxMod.formatUserContextForPrompt;
@@ -454,6 +458,7 @@ function createAgentGraph(
     const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
     const LONG_RUNNING_TOOL_TIMEOUT_MS: Record<string, number> = {
       // Multi-company web-search sweep: ~52s measured for 6 companies, 68.3s average overall.
+      b2b_company_search: 110_000,
       b2b_manufacturer_search: 110_000,
       // Whole-PDF translation + restructure into a catalog; timed out once at 90s.
       translate_pdf_to_catalog: 110_000,
@@ -1026,7 +1031,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
-      'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment',
+      'b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment',
       'company_registry_lookup', 'industrial_facility_search',
       'contact_discovery', 'email_validate', 'save_to_crm',
       // Material scraping — pull products off a supplier page (#347)
@@ -1077,6 +1082,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'price_lookup',
       // Mention monitoring (all users; per-tool credit cost gated inside the tool)
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
+      'propose_brand_change',
       // Price monitoring (all users; internal flow unmetered → 0 cr)
       'track_product_prices', 'get_price_summary',
       // Email marketing (module + entitlement gated inside the tool; draft-only, 0 cr)
@@ -1118,7 +1124,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // The open web (all users; metered per call — search settles on real tokens + the search
       // surcharge, fetch is one Firecrawl unit). JARVIS is the agent people actually reach, and
       // it had no way to look anything up outside the workspace: the platform's only web reach
-      // was sealed inside b2b_manufacturer_search, which returns manufacturers or nothing.
+      // was sealed inside the B2B company search, which returns company rows or nothing.
       'web_search', 'web_fetch', 'web_research_validate',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
@@ -1285,7 +1291,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
       'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
-      'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup',
+      'b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup',
       'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
       // The open web. Pepper is the agent people bring competitor, brand and distribution
@@ -1364,6 +1370,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'web_search', 'web_fetch', 'web_research_validate',
       // Email marketing — compose drafts + confirm-gated send (Edith is the marketing agent)
       'manage_email_campaign',
+      'propose_brand_change',
     ],
   },
   erp: {
@@ -1440,7 +1447,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
       'discover_platform_data', 'call_platform_rpc',
-      'manage_social',
+      'manage_social', 'propose_brand_change',
       // Hermes is the comms agent — also handles WhatsApp messaging (send is confirm-gated)
       'manage_messaging',
       // …and the customer Inbox — list conversations + reply (customer-facing reply is confirm-gated)
@@ -1935,6 +1942,17 @@ async function executeAgent(
     }
   }
 
+  // A customer turn gets the voice only; positioning, competitors and hypotheses are ours.
+  if (workspaceId) {
+    try {
+      systemPrompt += await formatBrandContextForPrompt(
+        supabase, await loadBrandContext(supabase, workspaceId), forCustomer ? 'customer' : 'internal',
+      );
+    } catch (brandErr) {
+      console.warn('[agent-chat] brand context failed:', brandErr instanceof Error ? brandErr.message : brandErr);
+    }
+  }
+
   // ─── Customer audience: the reply POLICY, and the facts that are not tunable ───
   if (forCustomer) {
     try {
@@ -2115,7 +2133,7 @@ async function executeAgent(
   const needsOps = isAdmin && config.tools.some((t: string) => ['checkServerHealth', 'querySentry'].includes(t));
   const needsDb = isAdmin && config.tools.includes('queryDatabase');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
-  const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'b2b_research_validate', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
+  const needsB2b = config.tools.some((t: string) => ['b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
   const needsWebResearch = config.tools.some((t: string) => ['web_search', 'web_fetch', 'web_research_validate'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_content_analyzer', 'seo_score_url', 'create_seo_article'].includes(t));
@@ -2172,6 +2190,7 @@ async function executeAgent(
   const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health', 'manage_counterparty_bank_account'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request', 'convert_quote_to_order'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
+  const needsBrand = config.tools.includes('propose_brand_change');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
   const needsTechRadar = isAdmin && config.tools.some((t: string) => ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'].includes(t));
@@ -2182,7 +2201,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod, constructionMod, platformApiMod, platformRpcMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod, constructionMod, platformApiMod, platformRpcMod, brandToolsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -2223,6 +2242,7 @@ async function executeAgent(
     needsConstruction ? import('../_shared/tools/construction-tools.ts') : null,
     needsPlatformApi ? import('../_shared/tools/platform-api-tools.ts') : null,
     needsPlatformRpc ? import('../_shared/tools/platform-rpc-tools.ts') : null,
+    needsBrand ? import('../_shared/tools/brand-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -2247,6 +2267,7 @@ async function executeAgent(
   const createAnalyticsAnalysisTool = subAgentMod?.createAnalyticsAnalysisTool;
   const createBusinessAnalysisTool = subAgentMod?.createBusinessAnalysisTool;
   const createProductAnalysisTool = subAgentMod?.createProductAnalysisTool;
+  const createB2BCompanySearchTool = b2bMod?.createB2BCompanySearchTool;
   const createB2BManufacturerSearchTool = b2bMod?.createB2BManufacturerSearchTool;
   const createB2BResearchValidateTool = b2bMod?.createB2BResearchValidateTool;
   const createCompanyWebsiteScrapeTool = b2bMod?.createCompanyWebsiteScrapeTool;
@@ -2864,6 +2885,10 @@ async function executeAgent(
     tools.push(createManageSocialTool(userId, workspaceId, userJwt, onChunk));
   }
 
+  if (config.tools.includes('propose_brand_change') && brandToolsMod?.createProposeBrandChangeTool) {
+    tools.push(brandToolsMod.createProposeBrandChangeTool(userId, workspaceId, userJwt, agentId, onChunk));
+  }
+
   // Sourcing tools (RPC-gated at the DB layer — resolve=member, create_po=finance-manager; 0 cr)
   if (config.tools.includes('source_product') && createSourceProductTool) {
     tools.push(createSourceProductTool(userId, workspaceId, userJwt, onChunk));
@@ -3149,7 +3174,7 @@ async function executeAgent(
     // B2B Research tools — onChunk wired so the search + save_to_crm tools
     // emit workflow_plan / workflow_step_progress / workflow_finished chunks
     // for the b2b-research wizard.
-    if (config.tools.includes('b2b_manufacturer_search')) {
+    if (config.tools.includes('b2b_company_search') || config.tools.includes('b2b_manufacturer_search')) {
       // The sourcing markets are DATA, and they have to be in hand BEFORE the tool is built: they
       // become the `region` enum and the country list in the description the model reads. Loading
       // them here rather than inside the tool body is what lets the model see them at all — the
@@ -3157,7 +3182,12 @@ async function executeAgent(
       // loadVocabulary throws if the store is unreachable; let it, rather than binding a tool that
       // silently advertises no markets.
       const markets = await loadVocabulary(supabase, 'sourcing_markets');
-      tools.push(createB2BManufacturerSearchTool(markets, userId, workspaceId ?? null, sendProgress, onChunk));
+      if (config.tools.includes('b2b_company_search')) {
+        tools.push(createB2BCompanySearchTool(markets, userId, workspaceId ?? null, sendProgress, onChunk));
+      }
+      if (config.tools.includes('b2b_manufacturer_search')) {
+        tools.push(createB2BManufacturerSearchTool(markets, userId, workspaceId ?? null, sendProgress, onChunk));
+      }
     }
     if (config.tools.includes('b2b_research_validate')) {
       tools.push(createB2BResearchValidateTool(userId, workspaceId ?? null, sendProgress));
@@ -3493,7 +3523,7 @@ async function executeAgent(
   const forceToolCall = agentId === 'interior-designer' && tools.length > 0;
 
   /** Step budget for this turn. */
-  const RESEARCH_TOOLS = ['web_search', 'web_fetch', 'web_research_validate', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'scrape_materials_from_url'];
+  const RESEARCH_TOOLS = ['web_search', 'web_fetch', 'web_research_validate', 'b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'scrape_materials_from_url'];
   const hasResearchTools = tools.some((t: any) => RESEARCH_TOOLS.includes(t?.name));
   const stepBudget = hasResearchTools ? 20 : 10;
 

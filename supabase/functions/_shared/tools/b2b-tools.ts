@@ -1,6 +1,6 @@
 /**
- * B2B Tools: validateEmailWithZeroBounce, createB2BManufacturerSearchTool,
- * createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool,
+ * B2B Tools: validateEmailWithZeroBounce, createB2BCompanySearchTool (+ its createB2BManufacturerSearchTool
+ * alias), createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool,
  * createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool
  */
 
@@ -25,7 +25,7 @@ const { createWorkflowEmitter, STEPS } = await import('./_workflow-chunks.ts');
 const { researchWithQwen } = await import('../ai-client.ts');
 const { compareResearchRuns } = await import('../research-validation.ts');
 const { resolveSecret } = await import('../secrets.ts');
-type ManufacturerRecord = import('../research-validation.ts').ManufacturerRecord;
+type CompanyRecord = import('../research-validation.ts').CompanyRecord;
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -40,8 +40,14 @@ import { describeAnthropicFailure } from './anthropic-failure.ts';
 const retryableStatus = (status: number) => status === 429 || status === 529 || status >= 500;
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
-import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
-import { allValues, buildMarketScope, describeGroups, groupKeys, resolveMarket, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
+import { getToolPrompt } from '../prompt-utils.ts';
+import { describeGroups, groupKeys, loadVocabulary, resolveMarket, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
+import {
+  B2B_COMPANY_TYPE_PARTY_ROLE, B2B_COMPANY_TYPES, B2B_RECORDED_COMPANY_TYPES, type B2BCompanyType,
+} from '../b2bCompanyTypes.generated.ts';
+import {
+  classifyCompanyRows, companyTypesLabel, normaliseCompanyTypes, normaliseKeywords, renderCompanySearch, searchCountryCode,
+} from '../b2b-company-query.ts';
 import { escapeLike, foldForSearch } from '../searchFold.ts';
 import { domainFromUrl } from '../seo-website.ts';
 import { transliterateToLatin } from '../transliterate.ts';
@@ -64,7 +70,7 @@ async function b2bAffordabilityGate(userId: string, ceiling: number, opType: str
 }
 
 // B2B RESEARCH TOOLS FOR INSIGHTS AGENT
-// These tools enable manufacturer discovery, verification, and CRM integration
+// These tools enable company discovery, verification, and CRM integration
 
 /**
  * ZeroBounce Email Validation Helper
@@ -127,12 +133,7 @@ export async function validateEmailWithZeroBounce(
   }
 }
 
-/**
- * B2B Research Tool: Manufacturer Search
- * Uses Claude's built-in web_search to find B2B manufacturers.
- * No extra API key required — uses ANTHROPIC_API_KEY.
- */
-/** Opus 5 at effort:low, measured against Sonnet 5 on the identical 6-company Polish sweep: */
+/** Opus 5 at effort:low, measured against Sonnet 5 on the identical 6-company Polish sweep. */
 const SEARCH_MODEL = 'claude-opus-5';
 /** The model the website-analysis pass runs on. Named so the price lookup and the usage row
  *  cannot name two different models, which is exactly what they did. */
@@ -167,47 +168,15 @@ async function postAnthropicWithRetry(init: RequestInit, budgetMs = 85_000): Pro
     const spent = Date.now() - startedAt;
     const perAttempt = spent / (attempt + 1);
     if (spent + BACKOFF_MS[attempt] + perAttempt > budgetMs) {
-      console.warn(`[b2b_manufacturer_search] Anthropic ${res.status} — no time left to retry (${spent}ms spent)`);
+      console.warn(`[b2b_company_search] Anthropic ${res.status} — no time left to retry (${spent}ms spent)`);
       return res;
     }
     // Drain the body so the connection is released before we sleep on it.
     await res.text().catch(() => undefined);
-    console.warn(`[b2b_manufacturer_search] Anthropic ${res.status} — retrying in ${BACKOFF_MS[attempt]}ms`);
+    console.warn(`[b2b_company_search] Anthropic ${res.status} — retrying in ${BACKOFF_MS[attempt]}ms`);
     await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
   }
   return res;
-}
-
-/**
- * "…also search in Polish, Romanian and Turkish" — built from the language each market row now
- * carries. Returns '' when the scope has no languages we know, so the query degrades to
- * English-only rather than instructing the model to search in nothing.
- */
-function nativeLanguageClause(
-  markets: VocabularyTerm[],
-  sel: { country?: string | null; region?: string | null },
-): string {
-  // Through resolveMarket, not an exact name match: `Czechia`, `Türkiye` and `UK` are the markets
-  // we sweep under another name, and matching on `value` alone dropped this clause for every one
-  // of them — the search ran, English-only, with nothing to say it had.
-  const inScope = sel.country
-    ? [resolveMarket(markets, sel.country)].filter((m): m is VocabularyTerm => m !== null)
-    : sel.region
-      ? termsInGroup(markets, sel.region.toLowerCase())
-      : markets;
-
-  const languages = [...new Set(
-    inScope
-      .map((m) => (m.metadata as Record<string, unknown> | undefined)?.language_name)
-      .filter((l): l is string => typeof l === 'string' && l !== 'English'),
-  )];
-  if (!languages.length) return '';
-
-  const list = languages.length === 1
-    ? languages[0]
-    : `${languages.slice(0, -1).join(', ')} and ${languages[languages.length - 1]}`;
-  return `\n\nSearch in ${list} as well as English — local-language queries surface local producers `
-    + `that English-only queries miss (a Polish factory advertises "producent mebli", not "furniture manufacturer").`;
 }
 
 /**
@@ -218,14 +187,14 @@ function nativeLanguageClause(
  * `required` with a nullable type rather than optional, because "the model omitted it" and "the
  * model checked and there is none" are different facts and only the second one is safe to store.
  */
-const RECORD_MANUFACTURERS_TOOL = {
-  name: 'record_manufacturers',
-  description: 'Record every manufacturer found, as structured rows. Use null for anything you could not verify — never guess a website, email or city.',
+const RECORD_COMPANIES_TOOL = {
+  name: 'record_companies',
+  description: 'Record every company found, as structured rows. Use null for anything you could not verify — never guess a website, email, city or quote.',
   input_schema: {
     type: 'object',
     additionalProperties: false,
     properties: {
-      manufacturers: {
+      companies: {
         type: 'array',
         items: {
           type: 'object',
@@ -237,18 +206,431 @@ const RECORD_MANUFACTURERS_TOOL = {
             city: { type: ['string', 'null'] },
             country: { type: 'string' },
             products: { type: 'array', items: { type: 'string' } },
-            is_manufacturer: { type: 'boolean', description: 'False for a distributor, retailer or marketplace listing.' },
+            company_type: {
+              type: 'string',
+              enum: [...B2B_RECORDED_COMPANY_TYPES],
+              description: 'The requested type this company matched on its CORE business, or "other" when it is something else.',
+            },
+            type_evidence: {
+              type: ['string', 'null'],
+              description: 'A short verbatim quote from the company\'s OWN website proving that core business. Null when you found none — never a paraphrase, never a directory or marketplace page.',
+            },
+            type_evidence_url: { type: ['string', 'null'], description: 'The page on its own site the quote comes from.' },
+            brands_carried: { type: 'array', items: { type: 'string' }, description: 'Brands it sells or stocks, as named on its site.' },
+            confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
             employee_estimate: { type: ['string', 'null'] },
             contact_email: { type: ['string', 'null'], description: 'Only a PUBLISHED address found on their site. Never constructed.' },
             source_urls: { type: 'array', items: { type: 'string' } },
           },
-          required: ['company_name', 'website', 'domain', 'city', 'country', 'products', 'is_manufacturer', 'employee_estimate', 'contact_email', 'source_urls'],
+          required: [
+            'company_name', 'website', 'domain', 'city', 'country', 'products', 'company_type', 'type_evidence',
+            'type_evidence_url', 'brands_carried', 'confidence', 'employee_estimate', 'contact_email', 'source_urls',
+          ],
         },
       },
     },
-    required: ['manufacturers'],
+    required: ['companies'],
   },
   strict: true,
+};
+
+/** Anthropic's web_search takes a domain list, not a pattern; past a few hundred the request is the bottleneck. */
+const MAX_BLOCKED_DOMAINS = 200;
+
+/** Domains this workspace already holds, so a sweep spends its searches on companies it does not know. */
+async function knownCompanyDomains(workspaceId: string | null): Promise<{ domains: Set<string>; error: string | null }> {
+  if (!workspaceId) return { domains: new Set(), error: null };
+  const { data, error } = await supabase
+    .from('crm_companies')
+    .select('website')
+    .eq('workspace_id', workspaceId)
+    .not('website', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(2000);
+  if (error) return { domains: new Set(), error: error.message };
+  return { domains: new Set((data ?? []).map((r: any) => domainFromUrl(r.website)).filter(Boolean)), error: null };
+}
+
+type CompanyRow = Record<string, any>;
+
+interface CompanySearchArgs {
+  country?: string;
+  region?: string;
+  category: string;
+  limit?: number;
+  company_types?: string[];
+  keywords?: string[];
+  exclude_domains?: string[];
+  _workflow_run_id?: string;
+}
+
+interface CompanySearchContext {
+  markets: VocabularyTerm[];
+  userId: string;
+  workspaceId: string | null;
+  onProgress?: (status: string) => void;
+  onChunk?: B2BChunkSink;
+  /** The name billed and logged — the alias keeps its own so spend history stays continuous. */
+  operation: string;
+}
+
+/** One search, shared by `b2b_company_search` and its `b2b_manufacturer_search` alias. Never throws. */
+async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchArgs): Promise<Record<string, unknown>> {
+  const { markets, userId, workspaceId, onProgress, onChunk, operation } = ctx;
+  let { country } = args;
+  const { region, category } = args;
+  // Measured, not guessed (#352 A14): 55 real calls averaged 75.7 credits, max 140.2.
+  const blocked = await b2bAffordabilityGate(userId, 150, operation);
+  if (blocked) return { success: false, error: blocked };
+
+  // CLAMP, don't just document: a measured 6-company search takes ~52s and the tool runner kills
+  // at 90s, so anything past ~10 cannot return. A smaller result plus "call again" is actionable.
+  const MAX_PER_CALL = 8;
+  const requestedLimit = args.limit ?? 8;
+  const limit = Math.min(requestedLimit, MAX_PER_CALL);
+  const companyTypes = normaliseCompanyTypes(args.company_types);
+  const keywords = normaliseKeywords(args.keywords);
+
+  // ONE resolution of what the country string means, at the boundary, so every clause, card and
+  // usage row names the same market. `Czechia` / `Türkiye` / `UK` are ours under another name.
+  const market = resolveMarket(markets, country);
+  if (market) country = market.value;
+  else if (country) console.warn(`[${operation}] "${country}" is not a defined sourcing market — no local-language terms for it`);
+  const queryParams = { country, region, category, limit, company_types: companyTypes, keywords };
+
+  const runId = args._workflow_run_id || crypto.randomUUID();
+  const emitter = createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: runId });
+  const failed = (message: string, extra: Record<string, unknown> = {}) => {
+    emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: message });
+    return { success: false, error: message, ...extra };
+  };
+
+  let rendered: Awaited<ReturnType<typeof renderCompanySearch>>;
+  try {
+    rendered = await renderCompanySearch(
+      supabase, markets, { category, country, region, limit, company_types: companyTypes, keywords }, { structured: true },
+    );
+  } catch (e) {
+    emitter.plan({ title: `${category} companies`, subtitle: country || region || 'global', metadata: queryParams });
+    return failed(e instanceof Error ? e.message : String(e));
+  }
+  const typesLabel = companyTypesLabel(rendered.definitions);
+  const regionLabel = region ? (termsInGroup(markets, region.toLowerCase())[0]?.group_label ?? region) : '';
+  const where = country ? ` in ${country}` : region ? ` in ${regionLabel}` : '';
+  emitter.plan({ title: `${category} ${typesLabel}`, subtitle: country || region || 'global', metadata: queryParams });
+  emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'running', status_line: `Searching for ${category} ${typesLabel}…`, input: queryParams });
+
+  try {
+    const anthropicKey = (await resolveSecret(supabase, 'ANTHROPIC_API_KEY')).value;
+    if (!anthropicKey) return failed('ANTHROPIC_API_KEY not configured.');
+
+    const known = await knownCompanyDomains(workspaceId);
+    if (known.error) console.warn(`[${operation}] could not read CRM domains to exclude: ${known.error}`);
+    const blockedDomains = [...new Set([
+      ...normaliseKeywords(args.exclude_domains).map((d) => domainFromUrl(d)).filter(Boolean),
+      ...known.domains,
+    ])].slice(0, MAX_BLOCKED_DOMAINS);
+    const countryCode = searchCountryCode(markets, country);
+
+    const searchStartedAt = Date.now();
+    // Search budget. Measured: Opus 5 at effort:low used 8 searches for 6 companies in 52s.
+    const searchBudget = Math.min(20, Math.max(6, Math.ceil(limit * 1.5)));
+    onProgress?.(`Searching for ${category} ${typesLabel}${where}...`);
+
+    const response = await postAnthropicWithRetry({
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: SEARCH_MODEL,
+        max_tokens: 8000,
+        // effort:low is the SETTING THAT WORKS, not a cost compromise: at high effort the model
+        // returned 3 records in 116s with zero domains; at low, 6 records in 52s, all with domains.
+        output_config: { effort: 'low' },
+        system: rendered.systemPrompt,
+        tools: [
+          {
+            type: 'web_search_20260209',
+            name: 'web_search',
+            max_uses: searchBudget,
+            ...(blockedDomains.length ? { blocked_domains: blockedDomains } : {}),
+            ...(countryCode ? { user_location: { type: 'approximate', country: countryCode } } : {}),
+          },
+          RECORD_COMPANIES_TOOL,
+        ],
+        messages: [{ role: 'user', content: rendered.query }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`❌ Web search API error ${response.status}: ${errText}`);
+      // 429/529/5xx are TRANSIENT and were already retried; `retryable` tells the agent to try
+      // again rather than reroute. A 400 is deterministic and `errText` is the only thing saying why.
+      const retryable = retryableStatus(response.status);
+      return failed(describeAnthropicFailure(response.status, errText, 'Web search', retryable), { retryable });
+    }
+
+    const data = await response.json();
+    const blocks = (data.content ?? []) as any[];
+    const textContent = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
+
+    // The RECORDS are the result: a prose blob lost ~75% of a real Poland sweep's domains, and a
+    // CRM write at the end of a free-form parse is what security invariant 9 forbids.
+    const recordBlock = blocks.find((b) => b.type === 'tool_use' && b.name === RECORD_COMPANIES_TOOL.name);
+    const recorded: CompanyRow[] = Array.isArray(recordBlock?.input?.companies) ? recordBlock.input.companies : [];
+    const { matches, unverified } = classifyCompanyRows(recorded, companyTypes, known.domains, domainFromUrl);
+
+    // Cost attribution: SEARCH_MODEL's rate from ai_model_pricing + the web_search fee (~$0.01/use,
+    // not broken out by Anthropic, so priced at the budget we set).
+    try {
+      const inputTokens = data?.usage?.input_tokens ?? 0;
+      const outputTokens = data?.usage?.output_tokens ?? 0;
+      const searchPrice = await resolveTokenPrice(supabase, SEARCH_MODEL);
+      if (!searchPrice) {
+        console.warn(`[b2b] no ai_model_pricing row for ${SEARCH_MODEL} — not charging for an unpriced call`);
+      } else {
+        const inputCost = (inputTokens / 1_000_000) * searchPrice.input;
+        const outputCost = (outputTokens / 1_000_000) * searchPrice.output;
+        const webSearchSurcharge = searchBudget * 0.01;
+        const rawCost = inputCost + outputCost + webSearchSurcharge;
+        const billedCost = rawCost * searchPrice.markup;
+
+        // `debit_credits` reports a failed charge in the returned row rather than throwing. The
+        // upstream call has already happened, so a failure here is made LOUD, not undone.
+        const { data: debitData, error: debitErr } = await supabase.rpc('debit_credits', {
+          p_user_id: userId,
+          p_amount: Math.round(billedCost * 100 * 100) / 100, // 1 credit = $0.01
+          p_operation_type: operation,
+          p_description: `B2B company web search (${category}, ${companyTypes.join('+')})`,
+          p_metadata: { ...queryParams, web_search_max_uses: searchBudget },
+          p_workspace_id: workspaceId ?? null,
+        });
+        const debitRow = Array.isArray(debitData) ? debitData[0] : debitData;
+        if (debitErr || (debitRow && debitRow.success === false)) {
+          console.error(
+            `[${operation}] BILLING: debit of ${Math.round(billedCost * 10000) / 100} `
+            + `credits FAILED for user ${userId} — the search already ran. `
+            + `${debitRow?.error_message ?? debitErr?.message ?? 'unknown'}`,
+          );
+        }
+
+        await supabase.from('ai_usage_logs').insert({
+          user_id: userId,
+          workspace_id: workspaceId,
+          operation_type: operation,
+          model_name: SEARCH_MODEL,
+          api_provider: 'anthropic',
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          input_cost_usd: inputCost,
+          output_cost_usd: outputCost,
+          raw_cost_usd: rawCost,
+          markup_multiplier: 1.5,
+          billed_cost_usd: billedCost,
+          credits_debited: Math.round(billedCost * 100 * 100) / 100,
+          metadata: {
+            feature: 'b2b_research',
+            sub_feature: 'web_search',
+            ...queryParams,
+            blocked_domains: blockedDomains.length,
+            user_location: countryCode,
+            web_search_surcharge_usd: webSearchSurcharge,
+          },
+          created_at: new Date().toISOString(),
+        });
+      }
+    } catch (logErr) {
+      console.warn(`[${operation}] cost log failed:`, logErr);
+    }
+
+    const withDomain = matches.filter((m) => m.domain).length;
+    onProgress?.(`Search complete — ${matches.length} matching ${typesLabel}, ${unverified.length} unverified.`);
+
+    // The INCUMBENT half of a validation pair (#394), recorded here so validating never re-runs
+    // this ~68s / ~76-credit call. The challenger completes the row against the same stored query.
+    let validationId: string | null = null;
+    try {
+      const { data: vRow } = await supabase
+        .from('research_validations')
+        .insert({
+          kind: 'b2b',
+          workspace_id: workspaceId,
+          user_id: userId,
+          query: queryParams,
+          incumbent_provider: 'anthropic',
+          incumbent_model: SEARCH_MODEL,
+          incumbent_results: recorded,
+          incumbent_ms: Date.now() - searchStartedAt,
+        })
+        .select('id')
+        .single();
+      validationId = vRow?.id ?? null;
+    } catch (vErr) {
+      console.warn(`[${operation}] validation row insert failed:`, vErr);
+    }
+    emitter.step({
+      step_id: STEPS.B2B_RESEARCH[0],
+      status: 'done',
+      status_line: matches.length || unverified.length
+        ? `${matches.length} ${typesLabel} (${withDomain} with a domain), ${unverified.length} unverified`
+        : 'No results found',
+      output: { source: 'claude_web_search', has_results: matches.length > 0, count: matches.length, unverified: unverified.length, with_domain: withDomain },
+    });
+
+    return {
+      // Success is VERIFIED RECORDS, not prose and not unproven rows.
+      success: matches.length > 0,
+      searched: true,
+      _workflow_run_id: runId,
+      title: `${category} ${typesLabel}${where}`,
+      ...(requestedLimit > MAX_PER_CALL
+        ? { limit_clamped: { requested: requestedLimit, used: MAX_PER_CALL,
+            note: `Capped at ${MAX_PER_CALL} per call — more than that cannot finish inside the 90s tool timeout. Call again for another country/region, or dispatch a background task for a full multi-market sweep.` } }
+        : {}),
+      // `results` is the countable shape shapeToolResult() recognises (#370, Class E).
+      results: matches,
+      companies: matches,
+      unverified,
+      unverified_note: unverified.length
+        ? 'These were found but are NOT matches: each carries `unverified_reason`. Present them separately, never as results.'
+        : undefined,
+      count: matches.length,
+      with_domain: withDomain,
+      excluded_domains: blockedDomains.length,
+      ...(known.error ? { crm_exclusion_unavailable: known.error } : {}),
+      // Human-facing summary only. Downstream steps read `companies`.
+      search_results: textContent || (recorded.length ? '' : 'No results found.'),
+      query_params: queryParams,
+      source: 'claude_web_search',
+      // Hand this to `b2b_research_validate`; null means the pair could not be recorded.
+      validation_id: validationId,
+    };
+  } catch (error) {
+    console.error(`[${operation}] search error:`, error);
+    return failed(error instanceof Error ? error.message : 'B2B company search failed');
+  }
+}
+
+/**
+ * The sourcing markets are DATA — `reference_vocabularies['sourcing_markets']`, loaded by the
+ * caller and passed in (issue #370, Class A). The company TYPE is part of the request (#473).
+ */
+export const createB2BCompanySearchTool = (
+  /** Active `sourcing_markets` terms, in sort order. Loaded by agent-chat's registerTools. */
+  markets: VocabularyTerm[],
+  userId: string,
+  /** Attribution on the usage row; the per-call fee comes from the caller's personal balance. */
+  workspaceId: string | null,
+  onProgress?: (status: string) => void,
+  onChunk?: B2BChunkSink,
+) => {
+  return tool(
+    async (args: CompanySearchArgs) => {
+      const out = await runCompanySearch({ markets, userId, workspaceId, onProgress, onChunk, operation: 'b2b_company_search' }, args);
+      if (out.searched) {
+        onChunk?.({
+          type: 'b2b_company_results',
+          title: out.title,
+          query: out.query_params,
+          companies: out.companies,
+          unverified: out.unverified,
+          timestamp: Date.now(),
+        });
+      }
+      return JSON.stringify(out);
+    },
+    {
+      name: 'b2b_company_search',
+      // The description ENUMERATES the markets: the model cannot read the vocabulary table.
+      description:
+        'Search the web for B2B companies of a requested TYPE that deal in a product category. Each type is '
+        + 'held to a core-business test — a company qualifies only when that type is its main business, '
+        + 'proven by a quote from its own website; rows without that proof come back as `unverified`. '
+        + 'Pass `company_types` (several allowed) and any extra `keywords` the user gave. '
+        + `The platform's defined sourcing markets are — ${describeGroups(markets)}. `
+        + 'Pass `country` for one market (any country is searchable, not just those listed), `region` '
+        + 'for a whole group, or OMIT BOTH to sweep every market above. Omitting both is a supported '
+        + 'default: do not ask the user which countries they want before calling this. Domains already '
+        + 'in this workspace\'s CRM are excluded automatically.',
+      schema: z.object({
+        category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
+        company_types: z.array(z.enum(B2B_COMPANY_TYPES)).optional().describe(
+          'What kind of company to find — one or more. Omit for manufacturers. A stock trader deals in surplus, end-of-series, second-choice or liquidation lots.',
+        ),
+        keywords: z.array(z.string()).optional().describe(
+          'Extra search terms from the user, e.g. "outlet", "stock lots", "container export".',
+        ),
+        country: z.string().optional().describe(
+          'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.',
+        ),
+        region: z.enum(groupKeys(markets) as [string, ...string[]]).optional().describe(
+          'A whole market group. Ignored if `country` is provided.',
+        ),
+        limit: z.number().optional().default(8).describe(
+          'Max companies per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.',
+        ),
+        exclude_domains: z.array(z.string()).optional().describe(
+          'Domains returned by earlier searches in this conversation, so this one finds new companies.',
+        ),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
+      }),
+    }
+  );
+};
+
+/** `b2b_company_search` with the type pinned to manufacturer — kept until every caller has moved (#473). */
+export const createB2BManufacturerSearchTool = (
+  markets: VocabularyTerm[],
+  userId: string,
+  workspaceId: string | null,
+  onProgress?: (status: string) => void,
+  onChunk?: B2BChunkSink,
+) => {
+  return tool(
+    async (args: CompanySearchArgs) => {
+      const out = await runCompanySearch(
+        { markets, userId, workspaceId, onProgress, onChunk, operation: 'b2b_manufacturer_search' },
+        { ...args, company_types: ['manufacturer'] },
+      );
+      if (out.searched) {
+        onChunk?.({
+          type: 'b2b_company_results',
+          title: out.title,
+          query: out.query_params,
+          companies: out.companies,
+          unverified: out.unverified,
+          timestamp: Date.now(),
+        });
+      }
+      return JSON.stringify(out);
+    },
+    {
+      name: 'b2b_manufacturer_search',
+      description:
+        'Alias of b2b_company_search with company_types pinned to ["manufacturer"]. Prefer b2b_company_search, '
+        + 'which also finds distributors, importers, stock traders, retailers and contractors. '
+        + `The platform's defined sourcing markets are — ${describeGroups(markets)}. `
+        + 'Pass `country`, `region`, or omit both to sweep every market.',
+      schema: z.object({
+        country: z.string().optional().describe(
+          'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.',
+        ),
+        region: z.enum(groupKeys(markets) as [string, ...string[]]).optional().describe(
+          'A whole market group. Ignored if `country` is provided.',
+        ),
+        category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
+        keywords: z.array(z.string()).optional().describe('Extra search terms from the user.'),
+        limit: z.number().optional().default(8).describe(
+          'Max companies per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.',
+        ),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
+      }),
+    }
+  );
 };
 
 /** The structured verdict `company_website_scrape` exists to produce. */
@@ -307,350 +689,6 @@ const COMPANY_PROFILE_TOOL = {
 function fenceUntrustedPage(content: string): string {
   return wrapUntrusted('page content', content);
 }
-
-/**
- * The sourcing markets are DATA — `reference_vocabularies['sourcing_markets']`, loaded by the
- * caller and passed in (issue #370, Class A).
- */
-export const createB2BManufacturerSearchTool = (
-  /** Active `sourcing_markets` terms, in sort order. Loaded by agent-chat's registerTools. */
-  markets: VocabularyTerm[],
-  userId: string,
-  /**
-   * The workspace this tool is running in — for ATTRIBUTION on the usage row, not for the
-   * debit. The per-call fee here deliberately comes from the caller's personal balance
-   * (`p_workspace_id: null` below); this answers the separate question of whose tenant the
-   * call belongs to, which is what decides whether a workspace admin can see it at all.
-   */
-  workspaceId: string | null,
-  onProgress?: (status: string) => void,
-  onChunk?: B2BChunkSink,
-) => {
-  return tool(
-    async ({ country, region, category, limit = 8, _workflow_run_id }) => {
-      // MEASURED, not guessed (#352 A14). 55 real calls in `ai_usage_logs`: average 75.7
-      // credits, max 140.2 — against a gate that reserved FIVE. So a caller with 6 credits
-      // sailed through, the sweep ran, and they were charged ~76 they did not have. #352
-      // estimated 7.5 credits from the web-search surcharge alone; the token half is ten times
-      // that again, because a server-side search turn carries every fetched result back through
-      // the context (66.6k input tokens on average).
-      const _blocked = await b2bAffordabilityGate(userId, 150, 'b2b_manufacturer_search');
-      if (_blocked) return _blocked;
-      // CLAMP, don't just document. The schema says >10 will blow the 90s tool timeout, but a
-      // description is a suggestion and the model is free to ignore it — watched live on
-      // 2026-08-18, the agent asked for limit 25 per region and every call was killed at 90s,
-      // three times in a row, having spent full price on each. A measured 6-company search takes
-      // ~52s, so anything past ~10 cannot return. Capping here converts a guaranteed timeout into
-      // a smaller result plus an explicit instruction to call again, which the agent can act on.
-      const MAX_PER_CALL = 8;
-      const requestedLimit = limit;
-      if (limit > MAX_PER_CALL) limit = MAX_PER_CALL;
-
-      // ONE resolution of what the country string means, at the boundary, so the scope clause, the
-      // native-language clause, the progress line, the workflow card and the usage row all name the
-      // same market. `country` is a free string by design — the model types whatever it has, and
-      // `Czechia` / `Türkiye` / `UK` are ours under another name.
-      const market = resolveMarket(markets, country);
-      if (market) country = market.value;
-      else if (country) console.warn(`[b2b_manufacturer_search] "${country}" is not a defined sourcing market — searching it in English only`);
-
-      const runId = _workflow_run_id || crypto.randomUUID();
-      const emitter = createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: runId });
-      emitter.plan({ title: `${category} manufacturers`, subtitle: country || region || 'global', metadata: { country, region, category, limit } });
-      emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'running', status_line: `Searching for ${category} manufacturers…`, input: { country, region, category, limit } });
-      try {
-        const anthropicKey = (await resolveSecret(supabase, 'ANTHROPIC_API_KEY')).value;
-        if (!anthropicKey) {
-          emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: 'ANTHROPIC_API_KEY not configured.' });
-          return JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured.' });
-        }
-
-        // Shared with flow-engine — see buildMarketScope for why there is only one of these.
-        const scope = buildMarketScope(markets, { country, region });
-
-        // Both this and flow-engine used to carry their own copy of this query, and the two
-        // had already drifted — flow-engine's dropped "or retailers" and stopped asking for
-        // manufacturing indicators. One row, two readers (#347 phase 3P).
-        const _searchStartedAt = Date.now();
-        const query = renderPromptTemplate(
-          await loadPrompt(supabase, 'tool', 'b2b_manufacturer_query'),
-          { category, scope, limit },
-        )
-          // Native-language search. A Polish factory's site says "producent mebli", not "furniture
-          // manufacturer", so an English-only query finds the exporters with English marketing and
-          // misses the workshops — which are the interesting half for sourcing. The Insights prompt
-          // has instructed this since it was written ("use native language queries — Polish,
-          // Turkish, Romanian") and no code ever did it: the language mapping sat in
-          // _shared/b2b-markets.ts, a file nothing imported. It now lives on the market rows.
-          + nativeLanguageClause(markets, { country, region })
-          // The rows are the deliverable; the prose is a courtesy.
-          + '\n\nWhen you are done, call record_manufacturers with every company you found. Use null '
-          + 'for any field you could not verify — never guess a website, city or email address.';
-
-        // The system prompt has existed in the table all along with nothing reading it.
-        const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
-
-        // Search budget. Measured: Opus 5 at effort:low used 8 searches for 6 companies and
-        // finished in 52s, comfortably inside the 150s edge idle timeout. Scaling roughly with the
-        // ask, floored so a small request still gets to look around and capped so one call cannot
-        // run the request off the end of the window.
-        const searchBudget = Math.min(20, Math.max(6, Math.ceil(limit * 1.5)));
-
-        const regionLabel = region ? (termsInGroup(markets, region.toLowerCase())[0]?.group_label ?? region) : '';
-        onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${regionLabel}` : ''}...`);
-
-        const response = await postAnthropicWithRetry({
-          method: 'POST',
-          headers: {
-            'x-api-key': anthropicKey,
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: SEARCH_MODEL,
-            max_tokens: 8000,
-            // effort:low is not a cost compromise here — it is the SETTING THAT WORKS. Measured on
-            // the same 6-company Polish sweep: at default (high) effort the model over-deliberated
-            // about verification and returned 3 records in 116s with ZERO domains and zero sources;
-            // at low it returned 6 records in 52s with 100% domains, 1.2 sources each, for less
-            // money. High effort spent its thinking refusing to assert a URL it had just read.
-            output_config: { effort: 'low' },
-            system: systemPrompt,
-            tools: [
-              { type: 'web_search_20260209', name: 'web_search', max_uses: searchBudget },
-              RECORD_MANUFACTURERS_TOOL,
-            ],
-            messages: [{ role: 'user', content: query }],
-          }),
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.error(`❌ Web search API error ${response.status}: ${errText}`);
-          // The step trail is what the USER watches, so it gets the same reason the agent gets —
-          // a step that says only "Web search failed: 400" is the console.error problem again,
-          // one layer up.
-          emitter.step({
-            step_id: STEPS.B2B_RESEARCH[0],
-            status: 'failed',
-            error_message: describeAnthropicFailure(response.status, errText, 'Web search', retryableStatus(response.status)),
-          });
-          // 429/529/5xx are TRANSIENT — the request was fine, the upstream was busy. Two 529s in
-          // seven seconds killed a real sweep on 2026-08-18 and sent the agent looking for a
-          // background lane it did not need. `retryable` tells the agent to try again rather than
-          // reroute; `postRequest` above already retries the transient ones itself, so reaching
-          // here means the retries were exhausted too.
-          const retryable = retryableStatus(response.status);
-          // A 400 is deterministic and `errText` is the only thing that says WHY. It used to go to
-          // console.error and nowhere else, so seven of them are logged with no cause at all.
-          return JSON.stringify({
-            success: false,
-            retryable,
-            error: describeAnthropicFailure(response.status, errText, 'Web search', retryable),
-          });
-        }
-
-        const data = await response.json();
-        const blocks = (data.content ?? []) as any[];
-        const textContent = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
-
-        // The RECORDS are the result. This used to return `search_results: <prose blob>` and
-        // nothing else, so every downstream step — scrape, enrich, contact discovery — had to
-        // re-read prose to find a domain, and mostly failed: ~75% of a real Poland sweep came back
-        // with no website captured, which then blocked the whole rest of the pipeline. It also put
-        // a CRM write at the end of a free-form parse, which security invariant 9 forbids.
-        const recordBlock = blocks.find((b) => b.type === 'tool_use' && b.name === 'record_manufacturers');
-        const manufacturers: any[] = Array.isArray(recordBlock?.input?.manufacturers)
-          ? recordBlock.input.manufacturers
-          : [];
-
-        // Cost attribution: Opus 5 ($5 in / $25 out per MTok) + the web_search server-tool fee
-        // (~$0.01/use; Anthropic does not break it out in the response, so the worst case is
-        // priced from the budget we set). Measured on a real 6-company sweep: 35k in / 1.4k out
-        // ≈ $0.21 before markup. These rates MUST move with SEARCH_MODEL — priced as Haiku while
-        // running Opus, this row would under-report by ~6x and the operations dashboard would
-        // quietly show a fraction of the real spend.
-        try {
-          const inputTokens = data?.usage?.input_tokens ?? 0;
-          const outputTokens = data?.usage?.output_tokens ?? 0;
-          const searchPrice = await resolveTokenPrice(supabase, SEARCH_MODEL);
-          if (!searchPrice) {
-            console.warn(`[b2b] no ai_model_pricing row for ${SEARCH_MODEL} — not charging for an unpriced call`);
-            return;
-          }
-          const inputCost = (inputTokens / 1_000_000) * searchPrice.input;
-          const outputCost = (outputTokens / 1_000_000) * searchPrice.output;
-          const webSearchSurcharge = searchBudget * 0.01; // worst case: every allowed search used
-          const rawCost = inputCost + outputCost + webSearchSurcharge;
-          const billedCost = rawCost * searchPrice.markup;
-
-          // The RESULT IS CHECKED (#352 A14). `debit_credits` reports a failed charge in the
-          // returned row rather than throwing, so an unchecked call meant the search ran, the
-          // debit silently failed, and the tool still returned `success: true` — our money
-          // spent and nothing recorded. It cannot be undone at this point (the upstream call
-          // has already happened), so the correct response is to make it LOUD rather than to
-          // pretend it charged.
-          const { data: debitData, error: debitErr } = await supabase.rpc('debit_credits', {
-            p_user_id: userId,
-            p_amount: Math.round(billedCost * 100 * 100) / 100, // 1 credit = $0.01
-            p_operation_type: 'b2b_manufacturer_search',
-            p_description: `B2B manufacturer web search (${category})`,
-            p_metadata: { country, region, category, limit, web_search_max_uses: searchBudget },
-            // Attributed, so per-tenant cost views can see it. It was null while the
-            // `ai_usage_logs` row below carried the workspace — the same spend counted in one
-            // ledger and anonymous in the other.
-            p_workspace_id: workspaceId ?? null,
-          });
-          const debitRow = Array.isArray(debitData) ? debitData[0] : debitData;
-          if (debitErr || (debitRow && debitRow.success === false)) {
-            console.error(
-              `[b2b_manufacturer_search] BILLING: debit of ${Math.round(billedCost * 10000) / 100} `
-              + `credits FAILED for user ${userId} — the search already ran. `
-              + `${debitRow?.error_message ?? debitErr?.message ?? 'unknown'}`,
-            );
-          }
-
-          await supabase.from('ai_usage_logs').insert({
-            user_id: userId,
-            workspace_id: workspaceId,
-            operation_type: 'b2b_manufacturer_search',
-            model_name: SEARCH_MODEL,
-            api_provider: 'anthropic',
-            input_tokens: inputTokens,
-            output_tokens: outputTokens,
-            input_cost_usd: inputCost,
-            output_cost_usd: outputCost,
-            raw_cost_usd: rawCost,
-            markup_multiplier: 1.5,
-            billed_cost_usd: billedCost,
-            credits_debited: Math.round(billedCost * 100 * 100) / 100,
-            metadata: {
-              feature: 'b2b_research',
-              sub_feature: 'web_search',
-              country, region, category, limit,
-              web_search_surcharge_usd: webSearchSurcharge,
-            },
-            created_at: new Date().toISOString(),
-          });
-        } catch (logErr) {
-          // Non-blocking — even if usage log/debit fails, the search has
-          // already happened (cost already incurred on Anthropic side).
-          console.warn('[b2b_manufacturer_search] cost log failed:', logErr);
-        }
-
-        const withDomain = manufacturers.filter((m) => m?.domain).length;
-        onProgress?.(`Search complete — ${manufacturers.length} companies, ${withDomain} with a domain.`);
-
-        // Record the INCUMBENT half of a validation pair (#394). Recording it here
-        // rather than re-running the search inside the validation lane is deliberate:
-        // this call takes ~68s and spends ~76 credits, and a validation that re-ran it
-        // would double both to learn nothing new about the incumbent. The challenger
-        // completes the row later, against the same stored query.
-        let validationId: string | null = null;
-        try {
-          const { data: vRow } = await supabase
-            .from('research_validations')
-            .insert({
-              kind: 'b2b',
-              workspace_id: workspaceId,
-              user_id: userId,
-              query: { country, region, category, limit },
-              incumbent_provider: 'anthropic',
-              incumbent_model: SEARCH_MODEL,
-              incumbent_results: manufacturers,
-              incumbent_ms: Date.now() - _searchStartedAt,
-            })
-            .select('id')
-            .single();
-          validationId = vRow?.id ?? null;
-        } catch (vErr) {
-          console.warn('[b2b_manufacturer_search] validation row insert failed:', vErr);
-        }
-        emitter.step({
-          step_id: STEPS.B2B_RESEARCH[0],
-          status: 'done',
-          status_line: manufacturers.length
-            ? `${manufacturers.length} manufacturers (${withDomain} with a domain)`
-            : 'No results found',
-          output: { source: 'claude_web_search', has_results: manufacturers.length > 0, count: manufacturers.length, with_domain: withDomain },
-        });
-
-        return JSON.stringify({
-          // Success is RECORDS, not prose. The old shape reported success on any text at all, so a
-          // paragraph explaining that nothing was found counted as a successful search.
-          success: manufacturers.length > 0,
-          _workflow_run_id: runId,
-          // Tell the agent it asked for more than one call can deliver, so it splits the work
-          // instead of assuming the tool under-delivered.
-          ...(requestedLimit > MAX_PER_CALL
-            ? { limit_clamped: { requested: requestedLimit, used: MAX_PER_CALL,
-                note: `Capped at ${MAX_PER_CALL} per call — more than that cannot finish inside the 90s tool timeout. Call again for another country/region, or dispatch a background task for a full multi-market sweep.` } }
-            : {}),
-          // `results` is the countable array shape shapeToolResult() recognises, so a search that
-          // finds nothing registers as zero-result rather than as unknown — which is what stops it
-          // being mistaken for work by the memory gate (#370, Class E).
-          results: manufacturers,
-          manufacturers,
-          count: manufacturers.length,
-          with_domain: withDomain,
-          // Kept for the human-facing summary only. Downstream steps must read `manufacturers`:
-          // parsing this prose for a domain is exactly what lost ~75% of a real Poland sweep.
-          search_results: textContent || (manufacturers.length ? '' : 'No results found.'),
-          query_params: { country, region, category, limit },
-          source: 'claude_web_search',
-          // Hand this to `b2b_research_validate` to run a second provider over the
-          // SAME query and get a coverage/verifiability comparison. Null means the
-          // pair could not be recorded, so validation is unavailable for this run.
-          validation_id: validationId,
-        });
-      } catch (error) {
-        console.error('B2B manufacturer search error:', error);
-        emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: error instanceof Error ? error.message : 'search failed' });
-        return JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : 'B2B manufacturer search failed',
-        });
-      }
-    },
-    {
-      name: 'b2b_manufacturer_search',
-      // The description now ENUMERATES the markets, because the model cannot read the vocabulary
-      // table and the old wording ("a region (cee/balkans/…)") named the keys without ever saying
-      // which countries were in them. That gap is the whole reason the agent invented a list when
-      // asked what countries we cover.
-      description:
-        'Search for B2B manufacturers using web search. Finds actual production companies with their '
-        + 'websites, locations and product info. '
-        + `The platform's defined sourcing markets are — ${describeGroups(markets)}. `
-        + 'Pass `country` for one market (any country is searchable, not just those listed), `region` '
-        + 'for a whole group, or OMIT BOTH to sweep every market above. Omitting both is a supported '
-        + 'default: do not ask the user which countries they want before calling this.',
-      schema: z.object({
-        // Deliberately NOT interpolated: `npm run tools:manifest` is a static AST projection and
-        // cannot evaluate the vocabulary, so an interpolated list lands in the manifest as a
-        // literal "…". The markets are enumerated in the tool description above, which is what
-        // the model reads; this stays static so the manifest stays truthful.
-        country: z.string().optional().describe(
-          'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.',
-        ),
-        // A real enum, built from the vocabulary. It was a bare string, so a value the tool did not
-        // recognise produced `in the <garbage> region` and searched nothing meaningful, silently.
-        region: z.enum(groupKeys(markets) as [string, ...string[]]).optional().describe(
-          'A whole market group. Ignored if `country` is provided.',
-        ),
-        category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
-        // 8, not 30. MEASURED: 6 companies takes ~52s; the agent-chat tool runner kills a tool at
-        // 90s (tighter than the 150s edge idle timeout I had been sizing against), and on
-        // 2026-08-18 three real sweeps died on exactly that — `Tool 'b2b_manufacturer_search'
-        // timed out after 90s`. A default of 30 could therefore never return: the call was
-        // guaranteed to be killed before it answered, which reads to the agent as a broken tool
-        // rather than an over-large request.
-        limit: z.number().optional().default(8).describe('Max manufacturers per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.'),
-        _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
-      }),
-    }
-  );
-};
 
 /**
  * B2B Research Tool: Company Website Scrape
@@ -1691,8 +1729,8 @@ export const createIndustrialFacilitySearchTool = (_userId: string, onProgress?:
         'Find real FACTORIES from the EU Industrial Emissions Database — ceramics, glass, cement, '
         + 'stone, steel, foundries, wood panels and more, across EU27 plus the UK, Switzerland, Norway '
         + 'and Iceland. FREE: no credits, no API key. Unlike a company register, this returns the PLANT '
-        + '(name, operator, city, street, coordinates) rather than the registered office. It is the only '
-        + 'tool here that can DISCOVER manufacturers rather than verify one you already named: ask for a '
+        + '(name, operator, city, street, coordinates) rather than the registered office. It DISCOVERS '
+        + 'plants from an official register rather than the web (b2b_company_search is the web route): ask for a '
         + 'sector and a country to enumerate the plants. Searching by sector + country is much more '
         + 'reliable than by company name, because the operator on file is often a legal entity rather '
         + 'than the trading brand.',
@@ -2106,13 +2144,16 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
       try {
         const startTime = Date.now();
 
-        // WHICH SIDE OF THE TRADE (#334 defect 1). This used to be `is_customer: true`, hardcoded,
-        // with a comment asserting that B2B research prospects a party we want to SELL to. It does
-        // not: `b2b_manufacturer_search` looks for FACTORIES, so every porcelain tile plant the
-        // agent found was filed as a customer. That is not cosmetic — a company with `is_supplier`
-        // false has its Products tab and factory link suppressed, and it turns up in customer lists
-        // and A/R views it has no business being in.
-        const partyRole: 'supplier' | 'customer' | 'both' = company.role ?? 'supplier';
+        // WHICH SIDE OF THE TRADE (#334 defect 1, #473): stated by the caller, else derived from the
+        // company type the search recorded, else supplier. A pinned role filed every factory found
+        // as a customer, which hides its Products tab and puts it in A/R views.
+        const companyType: B2BCompanyType | null = company.company_type && company.company_type !== 'other'
+          ? company.company_type
+          : null;
+        const partyRole: 'supplier' | 'customer' | 'both' = company.role
+          ?? (companyType ? B2B_COMPANY_TYPE_PARTY_ROLE[companyType] : null)
+          ?? 'supplier';
+        const isManufacturer = company.is_manufacturer ?? companyType === 'manufacturer';
         const roleLabel = partyRole === 'both' ? 'supplier and customer' : partyRole;
 
         // Send progress update
@@ -2133,7 +2174,7 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             // The ROLE is on the card because it is the half the operator is most likely to want
             // changed, and it is the half that decides which lists the row shows up in.
             summary: `Adds ${company.name}${company.website ? ` (${company.website})` : ''} as a **${roleLabel}**`
-              + `${company.is_manufacturer ? ' (manufacturer)' : ''}${contactLine} to your CRM. `
+              + `${companyType ? ` (${companyType.replace(/_/g, ' ')})` : isManufacturer ? ' (manufacturer)' : ''}${contactLine} to your CRM. `
               + `These came from web research, so check the details are right — contact names and emails in particular.`,
             toolkit_id: 'crm',
             timestamp: Date.now(),
@@ -2221,7 +2262,7 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             // column default nobody chose.
             is_supplier: partyRole === 'supplier' || partyRole === 'both',
             is_customer: partyRole === 'customer' || partyRole === 'both',
-            is_manufacturer: company.is_manufacturer === true,
+            is_manufacturer: isManufacturer === true,
             created_by: userId,
           })
           .select('id')
@@ -2384,11 +2425,11 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
     {
       name: 'save_to_crm',
       description: 'Save a researched company and its contacts to the CRM database. Use this after the user '
-        + 'confirms they want to save a manufacturer. ONLY `company.name` is required — every other field is '
+        + 'confirms they want to save a company. ONLY `company.name` is required — every other field is '
         + 'optional. Enrichment and contact discovery are enhancements, NOT prerequisites: if either is '
         + 'unavailable or returns nothing, save what you have and say which fields are missing. Never abandon '
         + 'a save the user asked for because an enrichment provider is down. '
-        + 'Pass `company.role` — a manufacturer you might buy from is a "supplier" (the default), not a customer.',
+        + 'Pass `company.company_type` straight from b2b_company_search; it decides the default role.',
       schema: z.object({
         company: z.object({
           name: z.string().describe('Company name'),
@@ -2404,15 +2445,17 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
           description: z.string().optional().describe('Company description'),
           notes: z.string().optional().describe('Additional notes'),
           role: z.enum(['supplier', 'customer', 'both']).optional().describe(
-            'Which side of the trade this party is on. A factory, producer, mill or brand you might BUY from '
-            + 'is "supplier" — that is the default and it is what `b2b_manufacturer_search` returns. Only pass '
-            + '"customer" for a party you intend to SELL to, and "both" when they are genuinely each. This '
-            + 'decides which lists the company appears in and whether its Products tab is shown, so do not '
-            + 'guess: if the user asked to find suppliers, it is a supplier.',
+            'Which side of the trade this party is on. Omit it to derive it from `company_type`: a '
+            + 'manufacturer, distributor, importer/exporter or stock trader is a "supplier"; a retailer/showroom '
+            + 'or contractor/installer is a "customer". Pass it only to override — "both" when they are '
+            + 'genuinely each. This decides which lists the company appears in and whether its Products tab '
+            + 'is shown, so do not guess.',
+          ),
+          company_type: z.enum(B2B_RECORDED_COMPANY_TYPES).optional().describe(
+            'The `company_type` b2b_company_search recorded for this row — pass it straight through.',
           ),
           is_manufacturer: z.boolean().optional().describe(
-            'True when this party actually produces goods, as opposed to distributing or retailing them. '
-            + '`b2b_manufacturer_search` returns this per row — pass it straight through rather than re-deciding it.',
+            'True when this party actually produces goods. Derived from `company_type` when omitted.',
           ),
         }).describe('Company information to save'),
         contacts: z.array(z.object({
@@ -2451,7 +2494,7 @@ export const createB2BResearchValidateTool = (
         if (loadErr || !row) {
           return JSON.stringify({
             success: false,
-            error: `No recorded research run with id ${validation_id}. Run b2b_manufacturer_search first and pass the validation_id it returns.`,
+            error: `No recorded research run with id ${validation_id}. Run b2b_company_search first and pass the validation_id it returns.`,
           });
         }
         // Tenancy: this is a service-role client, so the row's workspace must be
@@ -2460,38 +2503,49 @@ export const createB2BResearchValidateTool = (
           return JSON.stringify({ success: false, error: `No recorded research run with id ${validation_id}.` });
         }
 
-        const q = (row.query ?? {}) as { country?: string; region?: string; category?: string; limit?: number };
-        const incumbent = (row.incumbent_results ?? []) as ManufacturerRecord[];
+        const q = (row.query ?? {}) as {
+          country?: string; region?: string; category?: string; limit?: number; company_types?: string[]; keywords?: string[];
+        };
+        const incumbent = (row.incumbent_results ?? []) as CompanyRecord[];
 
         onProgress?.(`Running the challenger over the same query (${q.category ?? 'category'})…`);
 
-        const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
-        const where = q.country ? ` in ${q.country}` : q.region ? ` in the ${q.region} region` : '';
-        const prompt =
-          `Find up to ${q.limit ?? 8} B2B manufacturers of ${q.category ?? 'the requested product'}${where}. `
-          + `Use web search. Record every one you find with the record_manufacturers function. `
-          + `Use null for anything you could not verify — never guess a website, email or city.`;
+        // The SAME rendered request the incumbent ran, from the same rows; a run recorded before
+        // #473 carries no company_types and was a manufacturer search.
+        const { query: prompt, systemPrompt } = await renderCompanySearch(
+          supabase,
+          await loadVocabulary(supabase, 'sourcing_markets'),
+          {
+            category: q.category ?? '',
+            country: q.country,
+            region: q.region,
+            limit: q.limit ?? 8,
+            company_types: normaliseCompanyTypes(q.company_types),
+            keywords: normaliseKeywords(q.keywords),
+          },
+          { structured: true },
+        );
 
-        let challengerRows: ManufacturerRecord[] = [];
+        let challengerRows: CompanyRecord[] = [];
         let challengerError: string | null = null;
         let challengerMs: number | null = null;
         let challengerModel: string | null = null;
 
         const t0 = Date.now();
         try {
-          const out = await researchWithQwen<{ manufacturers: ManufacturerRecord[] }>({
+          const out = await researchWithQwen<{ companies: CompanyRecord[] }>({
             system: systemPrompt,
             prompt,
             fn: {
-              name: RECORD_MANUFACTURERS_TOOL.name,
-              description: RECORD_MANUFACTURERS_TOOL.description,
-              parameters: RECORD_MANUFACTURERS_TOOL.input_schema,
+              name: RECORD_COMPANIES_TOOL.name,
+              description: RECORD_COMPANIES_TOOL.description,
+              parameters: RECORD_COMPANIES_TOOL.input_schema,
             },
             task: 'b2b_research_validation_challenger',
             userId,
             workspaceId: workspaceId ?? undefined,
           });
-          challengerRows = Array.isArray(out.data?.manufacturers) ? out.data.manufacturers : [];
+          challengerRows = Array.isArray(out.data?.companies) ? out.data.companies : [];
           challengerModel = out.model;
           challengerMs = Date.now() - t0;
         } catch (e) {
@@ -2540,14 +2594,14 @@ export const createB2BResearchValidateTool = (
     {
       name: 'b2b_research_validate',
       description:
-        'Second-opinion check on a B2B manufacturer search that already ran. Pass the `validation_id` '
-        + 'returned by b2b_manufacturer_search; this re-runs the SAME query on a different provider '
+        'Second-opinion check on a B2B company search that already ran. Pass the `validation_id` '
+        + 'returned by b2b_company_search; this re-runs the SAME query on a different provider '
         + '(QwenCloud, with its own web search) and reports what each found, what only one found, and '
         + 'crucially how many of the domains actually resolve. It does NOT pick a winner and does not '
         + 'save anything to CRM — it is evidence for a person. Use it when the user asks to validate, '
         + 'double-check or second-source a research result, or wants to know what we might be missing.',
       schema: z.object({
-        validation_id: z.string().describe('The `validation_id` returned by a prior b2b_manufacturer_search call.'),
+        validation_id: z.string().describe('The `validation_id` returned by a prior b2b_company_search call.'),
       }),
     }
   );

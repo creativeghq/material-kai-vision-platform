@@ -309,17 +309,17 @@ const PRESENTATION_SHEET: WorkflowDefinition = {
 
 const B2B_RESEARCH: WorkflowDefinition = {
   id: 'b2b-research',
-  name: 'B2B manufacturer research',
-  description: 'Find manufacturers in a target market → scrape websites → enrich → discover contacts → validate emails → save to CRM.',
+  name: 'B2B company research',
+  description: 'Find companies of the requested type in a target market → scrape websites → enrich → discover contacts → validate emails → save to CRM.',
   icon: 'Building2',
   adminOnly: true,
   agent_id: 'kai',
   examples: [
     'Find me 10 porcelain tile manufacturers in Spain and save the qualified ones to CRM',
-    'Research kitchen-cabinet factories in Italy with verified email contacts',
+    'Find tile stock and surplus traders in Italy',
   ],
   steps: [
-    { id: 'search',    order: 1, title: 'Search manufacturers', icon: 'Search', tool_id: 'b2b_manufacturer_search',
+    { id: 'search',    order: 1, title: 'Search companies', icon: 'Search', tool_id: 'b2b_company_search',
       awaits_user_input: true,
       input_schema: [
         { name: 'industry', label: 'Industry / Product type', required: true, placeholder: 'porcelain tiles' },

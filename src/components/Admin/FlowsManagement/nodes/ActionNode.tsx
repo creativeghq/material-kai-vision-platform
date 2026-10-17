@@ -93,7 +93,8 @@ function getActionSummary(data: ActionNodeData): string {
     }
     case 'web_search': {
       const cfg = data.config as WebSearchConfig;
-      return cfg.country && cfg.category ? `${cfg.category} in ${cfg.country}` : 'Configure search...';
+      const types = (cfg.company_types?.length ? cfg.company_types : ['manufacturer']).join(', ').replace(/_/g, ' ');
+      return cfg.category ? `${cfg.category} (${types})${cfg.country ? ` in ${cfg.country}` : ''}` : 'Configure search...';
     }
     case 'firecrawl_scrape': {
       const cfg = data.config as FirecrawlScrapeConfig;

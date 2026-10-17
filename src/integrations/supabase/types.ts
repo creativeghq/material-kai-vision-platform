@@ -12414,6 +12414,7 @@ export type Database = {
           agent_draft: string | null
           agent_draft_at: string | null
           agent_draft_error: string | null
+          agent_draft_avoid_hits: string[]
           agent_draft_for_message_id: string | null
           agent_id: string | null
           agent_state: string
@@ -12443,6 +12444,7 @@ export type Database = {
           agent_draft?: string | null
           agent_draft_at?: string | null
           agent_draft_error?: string | null
+          agent_draft_avoid_hits?: string[]
           agent_draft_for_message_id?: string | null
           agent_id?: string | null
           agent_state?: string
@@ -12472,6 +12474,7 @@ export type Database = {
           agent_draft?: string | null
           agent_draft_at?: string | null
           agent_draft_error?: string | null
+          agent_draft_avoid_hits?: string[]
           agent_draft_for_message_id?: string | null
           agent_id?: string | null
           agent_state?: string

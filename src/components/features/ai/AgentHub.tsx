@@ -358,6 +358,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   construction_variations: 'Variations',
   construction_tenders: 'Tender packages',
   construction_bid_analysis: 'Bid analysis',
+  b2b_company_results: 'Companies found',
   project_report: 'Project report',
   // Deterministic surface preview (#447): the card draws it in the browser from this chunk.
   visualizer_render: 'Surface preview',
@@ -405,6 +406,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   email_campaigns_list: 'Email campaigns',
   email_templates_list: 'Email templates',
   email_campaign_created: 'Draft campaign created',
+  brand_change_proposed: 'Brand change proposed',
   email_campaign_sent: 'Campaign sending',
   // CRM
   crm_company_created: 'Company added to CRM',
@@ -2001,6 +2003,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       read_document_section: 'Reading the document',
       find_records: 'Searching your records',
       load_toolkit: 'Loading more tools',
+      b2b_company_search: 'Researching companies',
       b2b_manufacturer_search: 'Researching manufacturers',
       company_enrichment: 'Enriching the company',
       company_website_scrape: 'Reading their website',

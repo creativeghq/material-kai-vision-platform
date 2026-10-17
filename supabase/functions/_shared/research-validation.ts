@@ -1,7 +1,9 @@
 /** Comparing two B2B research runs (issue #394). */
 
-export interface ManufacturerRecord {
+export interface CompanyRecord {
   company_name: string;
+  company_type?: string;
+  type_evidence?: string | null;
   website?: string | null;
   domain?: string | null;
   city?: string | null;
@@ -12,6 +14,8 @@ export interface ManufacturerRecord {
   contact_email?: string | null;
   source_urls?: string[];
 }
+
+export type ManufacturerRecord = CompanyRecord;
 
 export interface SideStats {
   /** Rows returned. */
@@ -24,6 +28,8 @@ export interface SideStats {
   with_sources: number;
   /** Rows the model itself marked as a real manufacturer rather than a reseller. */
   claimed_manufacturer: number;
+  /** Rows quoting their own site for the type they were recorded as. */
+  with_type_evidence: number;
   /** Domains present here and in no other side. */
   unique_domains: string[];
 }
@@ -83,6 +89,7 @@ async function sideStats(
   let withDomain = 0;
   let withSources = 0;
   let claimed = 0;
+  let withEvidence = 0;
 
   for (const r of rows) {
     const d = normaliseDomain(r.domain ?? r.website);
@@ -91,7 +98,8 @@ async function sideStats(
       domains.add(d);
     }
     if ((r.source_urls?.length ?? 0) > 0) withSources++;
-    if (r.is_manufacturer) claimed++;
+    if (r.is_manufacturer || r.company_type === 'manufacturer') claimed++;
+    if (typeof r.type_evidence === 'string' && r.type_evidence.trim()) withEvidence++;
   }
 
   // Verified concurrently — a serial sweep of 8 domains at a 6s timeout can exceed
@@ -105,6 +113,7 @@ async function sideStats(
     domain_resolves: resolves,
     with_sources: withSources,
     claimed_manufacturer: claimed,
+    with_type_evidence: withEvidence,
     domains,
   };
 }
@@ -122,7 +131,7 @@ export async function compareResearchRuns(
   const inc = await sideStats(incumbentRows, verify);
   const cha = opts.challengerRan
     ? await sideStats(challengerRows, verify)
-    : { count: 0, with_domain: 0, domain_resolves: 0, with_sources: 0, claimed_manufacturer: 0, domains: new Set<string>() };
+    : { count: 0, with_domain: 0, domain_resolves: 0, with_sources: 0, claimed_manufacturer: 0, with_type_evidence: 0, domains: new Set<string>() };
 
   const overlap = [...inc.domains].filter((d) => cha.domains.has(d)).sort();
   const onlyInc = [...inc.domains].filter((d) => !cha.domains.has(d)).sort();

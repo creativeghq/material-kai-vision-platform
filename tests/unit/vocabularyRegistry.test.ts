@@ -131,8 +131,10 @@ describe('country vocabularies are data, not constants', () => {
   it('the scope clause has ONE derivation, shared by both callers', () => {
     const b2b = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'));
     const flow = strippedSource(join(ROOT, 'supabase/functions/flow-engine/index.ts'));
-    expect(b2b.includes('buildMarketScope('), 'b2b-tools must use buildMarketScope').toBe(true);
-    expect(flow.includes('buildMarketScope('), 'flow-engine must use buildMarketScope').toBe(true);
+    const query = strippedSource(join(ROOT, 'supabase/functions/_shared/b2b-company-query.ts'));
+    expect(query.includes('buildMarketScope('), 'the company-search renderer must use buildMarketScope').toBe(true);
+    expect(b2b.includes('renderCompanySearch('), 'b2b-tools must render through renderCompanySearch').toBe(true);
+    expect(flow.includes('renderCompanySearch('), 'flow-engine must render through renderCompanySearch').toBe(true);
     // flow-engine's own copy said "across Europe and major global manufacturing hubs" for a bare
     // sweep, so the same request searched different geography depending on the caller.
     expect(
@@ -145,7 +147,7 @@ describe('country vocabularies are data, not constants', () => {
     const b2b = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'));
     expect(
       /region:\s*z\.enum\(groupKeys\(markets\)/.test(b2b),
-      'b2b_manufacturer_search.region must be z.enum(groupKeys(markets)) — as a bare string, an ' +
+      'b2b_company_search.region must be z.enum(groupKeys(markets)) — as a bare string, an ' +
         'unrecognised value produced "in the <garbage> region" and searched nothing, silently.',
     ).toBe(true);
   });
@@ -242,7 +244,8 @@ describe('resolveMarket — a country string resolves to the market row it means
   });
 
   it('the b2b search resolves its country instead of matching the name exactly', () => {
-    const b2b = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'));
+    const b2b = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'))
+      + strippedSource(join(ROOT, 'supabase/functions/_shared/b2b-company-query.ts'));
     expect(
       b2b.includes('resolveMarket('),
       'b2b-tools must resolve `country` through resolveMarket — an exact match on `value` dropped ' +

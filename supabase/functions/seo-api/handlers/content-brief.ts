@@ -1,4 +1,5 @@
 /** Content brief — normalize at the boundary, never dereference raw. */
+import { formatBrandContextForPrompt, loadBrandContext, pickBrandProfile } from '../../_shared/brand-context.ts';
 
 /** `ContentBrief`'s shape with every field PRESENT, and every value allowed to be absent. */
 export interface NormalizedBrief {
@@ -287,13 +288,7 @@ function emptyBrief(overrides: Partial<NormalizedBrief>): NormalizedBrief {
   };
 }
 
-// deno-lint-ignore no-explicit-any
-type ProfileRow = { website_id: string | null; [column: string]: any };
-
-/** A website's own voice replaces the workspace default; a site without one uses the default. */
-export function pickBrandProfile<R extends { website_id: string | null }>(rows: R[], websiteId: string | null): R | null {
-  return rows.find((r) => websiteId && r.website_id === websiteId) ?? rows.find((r) => r.website_id === null) ?? null;
-}
+export { pickBrandProfile };
 
 /** Non-empty array, or null — so "the caller said nothing" is distinguishable from "[]". */
 const filled = (a: string[] | null | undefined): string[] | null =>
@@ -318,19 +313,18 @@ export async function resolveBriefWithProfile(
   const brief = normalizeContentBrief(raw);
   if (!workspaceId) return brief;
 
-  const { data: rows, error } = await supabase
-    .from('workspace_brand_profile')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-  const p = pickBrandProfile((rows ?? []) as ProfileRow[], websiteId);
+  const ctx = await loadBrandContext(supabase, workspaceId, websiteId);
+  const p = ctx.profile;
   // A profile we could not read is not an empty profile. Return the caller's brief untouched and
   // let the checks report honestly, rather than silently writing defaults we did not load.
-  if (error || !p) return withSupplyContext(supabase, workspaceId, brief);
+  if (ctx.status !== 'ok' || !p) return withSupplyContext(supabase, workspaceId, brief);
 
   const base = brief ?? emptyBrief({});
+  const positioning = await formatBrandContextForPrompt(supabase, ctx, 'strategy');
 
   return withSupplyContext(supabase, workspaceId, {
     ...base,
+    extraContext: positioning ? [...base.extraContext, positioning.trim()] : base.extraContext,
     brandVoice: {
       toneAttributes:         filled(base.brandVoice.toneAttributes)         ?? (p.tone_attributes ?? []),
       personalityTraits:      filled(base.brandVoice.personalityTraits)      ?? (p.personality_traits ?? []),

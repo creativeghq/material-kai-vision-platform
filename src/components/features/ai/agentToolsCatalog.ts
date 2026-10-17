@@ -146,6 +146,14 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'propose_brand_change', name: 'Propose a Brand Change', category: 'Brand',
+    desc: 'Propose a change to the brand profile every agent writes from — positioning, ideal customer, messaging pillars, hypotheses, voice, words to avoid. A workspace admin approves it before it applies.',
+    examples: [
+      'Mentions keep calling us "cheap" — propose adding it to the words to avoid',
+      'Propose a messaging pillar about same-week delivery to Thessaloniki',
+    ],
+  },
+  {
     id: 'find_negative_mentions', name: 'Negative Mentions', category: 'Mentions',
     moduleSlug: 'mention-monitoring',
     desc: 'List recent negative-sentiment mentions for a product. Use for reputation triage.',
@@ -825,16 +833,25 @@ const KAI_TOOLS: AgentToolEntry[] = [
   {
     id: 'b2b_research_validate', name: 'Validate Research', category: 'B2B Research',
     adminOnly: true,
-    desc: 'Second-source a manufacturer search that already ran: same query, different provider, and a check of which domains actually resolve.',
+    desc: 'Second-source a company search that already ran: same query, different provider, and a check of which domains actually resolve.',
     examples: [
-      'Validate that manufacturer search',
+      'Validate that company search',
       'What might we be missing from those results?',
+    ],
+  },
+  {
+    id: 'b2b_company_search', name: 'Company Search', category: 'B2B Research',
+    adminOnly: true,
+    desc: 'Find companies of a chosen type — manufacturers, distributors, importers, stock traders, retailers, installers — in target markets, each proven from its own website.',
+    examples: [
+      'Find tile stock and surplus traders in Italy',
+      'Find bathroom-furniture distributors in Romania',
     ],
   },
   {
     id: 'b2b_manufacturer_search', name: 'Manufacturer Search', category: 'B2B Research',
     adminOnly: true,
-    desc: 'Find manufacturers in target markets via web search (Anthropic web_search tool).',
+    desc: 'Company Search pinned to manufacturers. Kept as an alias while callers move to Company Search.',
     examples: [
       'Find me 10 porcelain tile manufacturers in Spain',
       'Search for kitchen-cabinet factories in Italy',
@@ -3563,9 +3580,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'Bot',
     tool_ids: [
       'check_llm_visibility', 'seo_brand_search_audit',
-      'seo_llm_mentions_search', 'seo_ai_keyword_volume',
+      'seo_llm_mentions_search', 'seo_ai_keyword_volume', 'propose_brand_change',
     ],
     quick_starts: [
+      {
+        label: 'Propose a brand change',
+        description: 'Suggest an edit to positioning or voice; an admin approves it',
+        icon: 'Bot',
+        prompt: 'I want to propose a change to our brand profile.',
+        done: 'Your proposal is saved. Nothing changes until a workspace admin approves it in the brand profile.',
+        promptTemplate: 'Propose this change to our brand profile: {{value}}',
+        run: { tool: 'propose_brand_change' },
+        autoFields: true,
+      },
       {
         label: 'Where do AI answers put us?',
         description: 'Share of voice, rank and sentiment across four answer engines',
@@ -3643,11 +3670,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'b2b',
     capability: 'workspace.manage',
     name: 'B2B Research',
-    description: 'Manufacturer search, website scrape, official-registry lookup, company enrichment, contact discovery, email validate, save to CRM. Admin-only.',
+    description: 'Company search (manufacturers, distributors, importers, stock traders, retailers, installers), website scrape, official-registry lookup, company enrichment, contact discovery, email validate, save to CRM. Admin-only.',
     icon: 'Building2',
     adminOnly: true,
     tool_ids: [
-      'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_registry_lookup',
+      'b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_registry_lookup',
       'industrial_facility_search', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
     ],
@@ -3679,16 +3706,45 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Find manufacturers',
-        description: 'Discover → scrape → enrich → save qualified ones to CRM',
-        prompt: 'Find manufacturers in a target market and save qualified ones to CRM.',
+        label: 'Find companies',
+        description: 'Any company type, proven from its own site',
+        prompt: 'Find companies of a chosen type in a target market.',
+        done: 'Here are the companies I found, with the unverified ones listed separately.',
         icon: 'Building2',
-        workflow_id: 'b2b-research',
-        promptTemplate: 'Find {{count}} {{industry}} manufacturers in {{country}}, then scrape + enrich the promising ones.',
+        run: { tool: 'b2b_company_search', argMap: { industry: 'category', count: 'limit' } },
+        autoFields: true,
         form: [
-          { key: 'industry', label: 'Industry / Product', kind: 'text', required: true, placeholder: 'porcelain tile' },
-          { key: 'country', label: 'Country / Region', kind: 'text', required: true, placeholder: 'Spain' },
-          { key: 'count', label: 'How many?', kind: 'number', default: '10' },
+          { key: 'industry', label: 'Product / industry', kind: 'text', required: true, placeholder: 'porcelain tile' },
+          { key: 'country', label: 'Country / region', kind: 'text', placeholder: 'Spain — leave empty for every market' },
+          { key: 'count', label: 'How many?', kind: 'number', default: '8' },
+        ],
+      },
+      {
+        label: 'Find manufacturers',
+        description: 'Factories in a target market',
+        prompt: 'Find manufacturers in a target market.',
+        done: 'Here are the manufacturers I found, with the unverified ones listed separately.',
+        icon: 'Factory',
+        run: { tool: 'b2b_company_search', argMap: { industry: 'category', count: 'limit' }, fixedArgs: { company_types: ['manufacturer'] } },
+        autoFields: true,
+        form: [
+          { key: 'industry', label: 'Product / industry', kind: 'text', required: true, placeholder: 'porcelain tile' },
+          { key: 'country', label: 'Country / region', kind: 'text', placeholder: 'Spain — leave empty for every market' },
+          { key: 'count', label: 'How many?', kind: 'number', default: '8' },
+        ],
+      },
+      {
+        label: 'Find stock / surplus traders',
+        description: 'End-of-series, second-choice and liquidation sellers',
+        prompt: 'Find stock and surplus traders in a target market.',
+        done: 'Here are the stock and surplus traders I found, with the unverified ones listed separately.',
+        icon: 'Building2',
+        run: { tool: 'b2b_company_search', argMap: { industry: 'category', count: 'limit' }, fixedArgs: { company_types: ['stock_trader'] } },
+        autoFields: true,
+        form: [
+          { key: 'industry', label: 'Product / industry', kind: 'text', required: true, placeholder: 'ceramic tiles' },
+          { key: 'country', label: 'Country / region', kind: 'text', placeholder: 'Italy — leave empty for every market' },
+          { key: 'count', label: 'How many?', kind: 'number', default: '8' },
         ],
       },
       {
@@ -3823,7 +3879,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   'real-estate': 'sales', sourcing: 'sales', calculators: 'sales',
   // Web Research sits beside B2B rather than under Marketing: the questions it answers here are
   // sourcing and competitor ones — who makes this, who already represents it in our market — and
-  // b2b_manufacturer_search is the tool people reach for it alongside.
+  // b2b_company_search is the tool people reach for it alongside.
   'web-research': 'sales',
   // Finance
   stock: 'finance', finance: 'finance', contracts: 'finance',

@@ -49,7 +49,7 @@ describe('a profile we could not read is not an empty profile', () => {
     // Writing defaults we failed to load would be inventing provenance — the one field where an
     // invented value is worse than an absent one.
     // The supply context is not a profile default: it comes from the CRM and defaults to the safe claim.
-    expect(BRIEF).toContain('if (error || !p) return withSupplyContext(supabase, workspaceId, brief);');
+    expect(BRIEF).toContain("if (ctx.status !== 'ok' || !p) return withSupplyContext(supabase, workspaceId, brief);");
   });
 });
 
@@ -69,7 +69,7 @@ describe('it is actually applied, and reachable', () => {
     expect(DASH).toMatch(/value="brand"/);
     expect(PANEL).toMatch(/from\('workspace_brand_profile'\)/);
     expect(PANEL).toMatch(/website_id: ownVoice \? websiteId : null/);
-    expect(DASH).toMatch(/<WebsiteBrandProfilePanel websiteId=\{website\.id\} \/>/);
+    expect(DASH).toMatch(/<WebsiteBrandProfilePanel websiteId=\{website\.id\}/);
   });
 
   it('blank AI disclosure means NOT STATED, never "human wrote it"', () => {

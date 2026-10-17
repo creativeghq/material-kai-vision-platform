@@ -15,6 +15,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { brandDraftCheck, formatBrandContextForPrompt, loadBrandContext } from '../_shared/brand-context.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -118,7 +119,9 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
   }
 
   try {
-    const systemPrompt = renderPromptTemplate(await loadPrompt(supabase, 'tool', 'social_content_system'), { tone: tone, platform: platform, max_chars: spec.max_chars, tone_notes: spec.tone_notes, hashtag_instruction: include_hashtags ? `Include ${hashtag_count} hashtags — style: ${spec.hashtag_style}.` : 'Do not include hashtags.' });
+    const brand = workspace_id ? await loadBrandContext(supabase, workspace_id) : null;
+    const systemPrompt = renderPromptTemplate(await loadPrompt(supabase, 'tool', 'social_content_system'), { tone: tone, platform: platform, max_chars: spec.max_chars, tone_notes: spec.tone_notes, hashtag_instruction: include_hashtags ? `Include ${hashtag_count} hashtags — style: ${spec.hashtag_style}.` : 'Do not include hashtags.' })
+      + (brand ? await formatBrandContextForPrompt(supabase, brand, 'internal') : '');
 
     const userPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'social_caption_variants'), { platform: platform, topic: topic, product_info: product_info ? `Product/material details: ${product_info}` : '' });
 
@@ -141,7 +144,14 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
     );
 
     // char_count is ours to compute, not the model's to claim.
-    parsed.captions = parsed.captions.map((c) => ({ ...c, char_count: (c?.caption || '').length }));
+    const captions = parsed.captions.map((c) => {
+      const check = brand ? brandDraftCheck(brand, `${c?.caption || ''} ${parsed.hashtags.join(' ')}`) : { checked: false, avoid_hits: [] };
+      return { ...c, char_count: (c?.caption || '').length, avoid_hits: check.avoid_hits };
+    });
+    const brandCheck = {
+      checked: !!brand && brand.status !== 'unavailable',
+      avoid_hits: [...new Set(captions.flatMap((c) => c.avoid_hits))],
+    };
 
     // Save draft post if no post_id provided
     let savedPostId = post_id;
@@ -153,13 +163,13 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
           user_id: userId,
           platform,
           post_type: 'image',
-          caption: parsed.captions[0]?.caption,
+          caption: captions[0]?.caption,
           hashtags: parsed.hashtags,
           status: 'draft',
           credits_used: debitResult.credits_debited,
           credits_breakdown: { caption: debitResult.credits_debited },
           generation_model: 'claude-haiku-4-5',
-          metadata: { topic, tone, all_captions: parsed.captions },
+          metadata: { topic, tone, all_captions: captions, brand_check: brandCheck },
         })
         .select('id')
         .single();
@@ -167,7 +177,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
     } else if (post_id) {
       const { data: existingPost } = await supabase
         .from('social_posts')
-        .select('credits_used, credits_breakdown')
+        .select('credits_used, credits_breakdown, metadata')
         .eq('id', post_id)
         .single();
 
@@ -178,8 +188,9 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
           .update({
             credits_used: (existingPost.credits_used || 0) + debitResult.credits_debited,
             credits_breakdown: newBreakdown,
-            caption: parsed.captions[0]?.caption,
+            caption: captions[0]?.caption,
             hashtags: parsed.hashtags,
+            metadata: { ...(existingPost.metadata || {}), brand_check: brandCheck },
           })
           .eq('id', post_id);
       }
@@ -188,8 +199,9 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
     return jsonResponse({
       success: true,
       post_id: savedPostId,
-      captions: parsed.captions,
+      captions,
       hashtags: parsed.hashtags,
+      brand_check: brandCheck,
       best_time_hint: parsed.best_time_hint,
       platform,
       credits_used: debitResult.credits_debited,

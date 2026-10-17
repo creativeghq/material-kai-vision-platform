@@ -28,6 +28,7 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const MODULE_SLUG = 'social-media';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { brandDraftCheck, loadBrandContext } from '../brand-context.ts';
 /** Call any edge function AS the user (so its authenticate() + workspace checks apply). */
 async function callEdge(jwt: string, path: string, payload: Record<string, unknown>): Promise<any> {
   try {
@@ -138,6 +139,8 @@ export const createManageSocialTool = (
         const resolved = await resolveAccount(ws, account_id, platform);
         if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
         const acct = resolved.account;
+        const brandCheck = brandDraftCheck(await loadBrandContext(svc, ws),
+          `${caption} ${Array.isArray(hashtags) ? hashtags.map(String).join(' ') : ''}`);
 
         // SECURITY INVARIANT 9 (#352 A3). Publishing had NO gate of any kind — no `confirm` in
         // the schema, no `action_confirmation` chunk. The only "confirm" in this file was the
@@ -156,7 +159,10 @@ export const createManageSocialTool = (
             summary: `"${preview}${tags}"${imgs} → ${acct.platform}${acct.handle ? ` (${acct.handle})` : ''}`
               + (action === 'publish'
                 ? '. It goes out immediately and cannot be recalled.'
-                : ` at ${scheduled_at}. It will go out automatically.`),
+                : ` at ${scheduled_at}. It will go out automatically.`)
+              + (brandCheck.avoid_hits.length ? ` Uses words on your avoid list: ${brandCheck.avoid_hits.join(', ')}.` : '')
+              + (brandCheck.checked ? '' : ' The avoid list could not be checked.'),
+            avoid_hits: brandCheck.avoid_hits,
             danger: true,
             toolkit_id: 'social',
             timestamp: Date.now(),
@@ -164,6 +170,7 @@ export const createManageSocialTool = (
           return JSON.stringify({
             success: true,
             awaiting_confirmation: true,
+            avoid_hits: brandCheck.avoid_hits,
             message: "Awaiting the user's approval to post. Do not retry.",
           });
         }

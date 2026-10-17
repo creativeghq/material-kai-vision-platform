@@ -32,6 +32,7 @@ import { runInBackground } from '../_shared/background.ts';
 import { loadEmailSignature, signEmail } from '../_shared/email-signature.ts';
 import { emailAddressOf, mailIdentityImages } from '../_shared/mail-identity.ts';
 import { formatBusinessIdentityForPrompt, resolveBusinessIdentity } from '../_shared/business-identity.ts';
+import { brandDraftCheck, loadBrandContext } from '../_shared/brand-context.ts';
 import {
   sendWhatsAppReply, sendWhatsAppMessage, setMessageReaction,
   sendSocialCommentReply, sendSocialDirectMessage,
@@ -584,6 +585,20 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
       if (!handoff?.send_reply) return;
     }
     if (!replyText) return;
+
+    const brandCheck = brandDraftCheck(await loadBrandContext(db, workspaceId), replyText);
+    if (!brandCheck.checked || brandCheck.avoid_hits.length) {
+      const { error: heldErr } = await db.from('inbox_messages').insert({
+        thread_id: threadId,
+        message_type: 'system',
+        body: brandCheck.checked
+          ? `The assistant's reply was held: it uses words on the brand avoid list (${brandCheck.avoid_hits.join(', ')}) — it needs a person.`
+          : "The assistant's reply was held: the brand avoid list could not be checked — it needs a person.",
+        metadata: { agent_reply_error: 'brand_avoid_list', avoid_hits: brandCheck.avoid_hits, held_reply: replyText.slice(0, 4000) },
+      });
+      if (heldErr) console.error('[inbox-api] could not record the held agent reply:', heldErr.message);
+      return;
+    }
 
     const { data: answered, error: answeredErr } = await db.from('inbox_messages')
       .select('id').eq('thread_id', threadId).eq('message_type', 'agent').is('deleted_at', null)
@@ -3105,7 +3120,7 @@ async function handleJwtAction(
         // would offer a reply from an assistant the operator has just switched off.
         const { error: clearErr } = await db.from('inbox_threads').update({
           agent_draft: null, agent_draft_at: null,
-          agent_draft_for_message_id: null, agent_draft_error: null,
+          agent_draft_for_message_id: null, agent_draft_error: null, agent_draft_avoid_hits: [],
         }).eq('id', threadId);
         if (clearErr) throw new HttpError(500, `Could not clear the draft: ${clearErr.message}`);
       } else {
@@ -5186,7 +5201,10 @@ async function handleJwtAction(
         throw new HttpError(502, `The assistant did not answer: ${turn.error}`);
       }
       if (!turn.text) throw new HttpError(502, 'The assistant produced nothing — try again.');
-      return json({ text: turn.text, mode });
+      const avoidHits = ['rewrite', 'shorten', 'formal', 'followup'].includes(mode)
+        ? brandDraftCheck(await loadBrandContext(db, String(thread.workspace_id)), turn.text).avoid_hits
+        : [];
+      return json({ text: turn.text, mode, avoid_hits: avoidHits });
     }
 
     case 'suggest_reply': {
@@ -5211,7 +5229,8 @@ async function handleJwtAction(
         // leave the member exactly where they were, with nothing charged.
         throw new HttpError(502, 'The assistant could not draft a reply — try again.');
       }
-      return json({ draft });
+      const brandCheck = brandDraftCheck(await loadBrandContext(db, workspaceId), draft);
+      return json({ draft, avoid_hits: brandCheck.avoid_hits, brand_checked: brandCheck.checked });
     }
 
     // ── Inbound email address (#342 §1) ───────────────────────────────────────────────────
@@ -6886,9 +6905,11 @@ async function handler(req: Request): Promise<Response> {
 
     let draft = '';
     let failure: string | null = null;
+    let avoidHits: string[] = [];
     try {
       draft = await buildAgentDraft(db, thread, { userId: owner, task: 'inbox_agent_suggest' });
       if (!draft) failure = 'The assistant produced no reply.';
+      else avoidHits = brandDraftCheck(await loadBrandContext(db, String(thread.workspace_id)), draft).avoid_hits;
     } catch (e) {
       failure = e instanceof Error ? e.message : String(e);
     }
@@ -6900,6 +6921,7 @@ async function handler(req: Request): Promise<Response> {
       .update({
         agent_draft: failure ? null : draft,
         agent_draft_error: failure ? failure.slice(0, 500) : null,
+        agent_draft_avoid_hits: failure ? [] : avoidHits,
         agent_draft_at: new Date().toISOString(),
       })
       .eq('id', threadId)
@@ -6909,7 +6931,7 @@ async function handler(req: Request): Promise<Response> {
     if (!written || written.length === 0) {
       return json({ ok: true, skipped: 'the conversation moved on while the draft was being written' });
     }
-    return json({ ok: true, drafted: !failure, error: failure });
+    return json({ ok: true, drafted: !failure, error: failure, avoid_hits: avoidHits });
   }
 
   // Internal branch — function-to-function (e.g. the Zernio webhook after a WhatsApp inbound).

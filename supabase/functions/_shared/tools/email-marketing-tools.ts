@@ -20,6 +20,7 @@ const MODULE_SLUG = 'email-marketing';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { callerDbClient } from '../caller-client.ts';
+import { brandDraftCheck, loadBrandContext } from '../brand-context.ts';
 
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -107,9 +108,12 @@ export const createManageEmailCampaignTool = (
           .select('id, name, status')
           .single();
         if (error) return JSON.stringify({ success: false, error: error.message });
+        const brandCheck = brandDraftCheck(await loadBrandContext(sb, workspaceId),
+          [name, subject_line, description].filter(Boolean).join('\n'));
 
         onChunk?.({
           type: 'email_campaign_created',
+          avoid_hits: brandCheck.avoid_hits,
           workspace_id: workspaceId,
           campaign_id: campaign.id,
           name: campaign.name,
@@ -121,7 +125,9 @@ export const createManageEmailCampaignTool = (
           success: true,
           campaign_id: campaign.id,
           status: 'draft',
-          message: `Draft campaign "${campaign.name}" created. Open Marketing → Email to pick the audience and send.`,
+          brand_check: brandCheck,
+          message: `Draft campaign "${campaign.name}" created. Open Marketing → Email to pick the audience and send.`
+            + (brandCheck.avoid_hits.length ? ` Its wording uses terms on the brand avoid list (${brandCheck.avoid_hits.join(', ')}) — reword before sending.` : ''),
         });
       }
 
