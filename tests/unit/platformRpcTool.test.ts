@@ -23,7 +23,7 @@ describe('the reader can only ever read', () => {
   });
 
   it('sends the user JWT, never the service role', () => {
-    expect(src).toMatch(/Authorization: `Bearer \$\{jwt\}`/);
+    expect(src).toMatch(/headers: \{ \.\.\.callerRestHeaders\(jwt, userId\)/);
     expect(src, 'a service-role key appears in the read path').not.toContain('SERVICE_ROLE');
   });
 
@@ -146,7 +146,7 @@ describe('the tools are reachable', () => {
     const agentChat = code('supabase/functions/agent-chat/index.ts');
     expect((agentChat.match(/'discover_platform_data', 'call_platform_rpc'/g) ?? []).length)
       .toBeGreaterThan(0);
-    expect(agentChat).toContain('createCallPlatformRpcTool(userJwt, onChunk)');
+    expect(agentChat).toContain('createCallPlatformRpcTool(userJwt, onChunk, userId)');
   });
 
   it('their output is registered, or the card renders nothing', () => {

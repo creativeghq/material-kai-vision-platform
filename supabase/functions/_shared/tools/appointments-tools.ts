@@ -15,18 +15,11 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MODULE_SLUG = 'crm';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
-function userClient(jwt: string | undefined) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
-  });
-}
+import { callerDbClient } from '../caller-client.ts';
 
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -53,7 +46,7 @@ export const createManageAppointmentsTool = (
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       if (!userId) return JSON.stringify({ success: false, error: 'No signed-in user.' });
-      const sb = userClient(jwt);
+      const sb = callerDbClient(jwt, userId, workspaceId);
 
       if (action === 'list') {
         const nowIso = new Date().toISOString();

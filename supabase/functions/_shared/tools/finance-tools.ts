@@ -15,10 +15,7 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MODULE_SLUG = 'sales-finance';
 
 // Invoice statuses that count as "owed" for the unpaid filter.
@@ -27,18 +24,13 @@ const UNPAID_STATUSES = ['issued', 'partially_paid', 'overdue', 'sent'];
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { attachPartyNames } from './record-labels.ts';
 import { roleGate } from './module-gate.ts';
+import { callerDbClient } from '../caller-client.ts';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const monthStartMonthsAgo = (n: number) => {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - n, 1)).toISOString().slice(0, 10);
 };
-/** User-scoped client so RLS + membership-asserting RPCs behave exactly as on the page. */
-function userClient(jwt: string | undefined) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
-  });
-}
 
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -55,7 +47,7 @@ async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: 
 }
 
 /** Resolve a customer company by explicit id or fuzzy name (workspace-scoped via RLS). */
-async function resolveCompany(sb: ReturnType<typeof userClient>, workspaceId: string, companyId?: string, name?: string) {
+async function resolveCompany(sb: ReturnType<typeof callerDbClient>, workspaceId: string, companyId?: string, name?: string) {
   if (companyId) {
     const { data } = await sb.from('crm_companies').select('id, name').eq('id', companyId).eq('workspace_id', workspaceId).maybeSingle();
     return data;
@@ -77,7 +69,7 @@ export const createManageFinanceTool = (
     async ({ action, customer_company_id, customer_name, unpaid_only, limit = 20, invoice_id, direction, confirm, order_id, order_type, search, from_date, to_date }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
-      const sb = userClient(jwt);
+      const sb = callerDbClient(jwt, userId, workspaceId);
 
       if (action === 'issue_invoice') {
         if (!invoice_id) return JSON.stringify({ success: false, error: 'issue_invoice needs an invoice_id (a draft invoice).' });

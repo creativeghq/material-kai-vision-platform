@@ -2438,7 +2438,7 @@ async function executeAgent(
   // Takes userJwt because global_search is SECURITY INVOKER: the caller's RLS is what scopes the
   // answer, and a service-role call would both over-answer and silently return no people.
   if (config.tools.includes('find_records') && recordSearchMod?.createFindRecordsTool) {
-    tools.push(recordSearchMod.createFindRecordsTool(workspaceId, userJwt, onChunk));
+    tools.push(recordSearchMod.createFindRecordsTool(workspaceId, userJwt, onChunk, userId));
   }
 
   // The platform's own API, for work no dedicated tool covers. `userJwt` is load-bearing: the
@@ -2456,7 +2456,7 @@ async function executeAgent(
     tools.push(platformRpcMod.createDiscoverPlatformDataTool(onChunk));
   }
   if (config.tools.includes('call_platform_rpc') && platformRpcMod?.createCallPlatformRpcTool) {
-    tools.push(platformRpcMod.createCallPlatformRpcTool(userJwt, onChunk));
+    tools.push(platformRpcMod.createCallPlatformRpcTool(userJwt, onChunk, userId));
   }
 
   if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {
@@ -2945,15 +2945,15 @@ async function executeAgent(
   if (config.tools.some((t: string) => ['product_provenance', 'product_price_history', 'projects_using_product', 'products_in_project', 'customer_overview', 'supplier_overview'].includes(t))) {
     try {
       const graphMod = await import('../_shared/tools/graph-tools.ts');
-      if (config.tools.includes('product_provenance')) tools.push(graphMod.createProductProvenanceTool(workspaceId, onChunk, userJwt));
+      if (config.tools.includes('product_provenance')) tools.push(graphMod.createProductProvenanceTool(workspaceId, onChunk, userJwt, userId));
       if (config.tools.includes('product_price_history')) tools.push(graphMod.createProductPriceHistoryTool(workspaceId, onChunk));
       if (config.tools.includes('projects_using_product')) tools.push(graphMod.createProjectsUsingProductTool(workspaceId, onChunk));
       if (config.tools.includes('products_in_project')) tools.push(graphMod.createProductsInProjectTool(workspaceId, onChunk));
-      if (config.tools.includes('customer_overview')) tools.push(graphMod.createCustomerOverviewTool(workspaceId, onChunk, userJwt));
-      if (isAdmin && config.tools.includes('supplier_overview')) tools.push(graphMod.createSupplierOverviewTool(workspaceId, onChunk, userJwt));
+      if (config.tools.includes('customer_overview')) tools.push(graphMod.createCustomerOverviewTool(workspaceId, onChunk, userJwt, userId));
+      if (isAdmin && config.tools.includes('supplier_overview')) tools.push(graphMod.createSupplierOverviewTool(workspaceId, onChunk, userJwt, userId));
       if (config.tools.includes('products_by_brand')) tools.push(graphMod.createProductsByBrandTool(workspaceId, onChunk));
       if (config.tools.includes('brand_overview')) tools.push(graphMod.createBrandOverviewTool(workspaceId, onChunk));
-      if (config.tools.includes('related_products')) tools.push(graphMod.createRelatedProductsTool(workspaceId, onChunk, userJwt));
+      if (config.tools.includes('related_products')) tools.push(graphMod.createRelatedProductsTool(workspaceId, onChunk, userJwt, userId));
       if (config.tools.includes('find_products_by_spec')) tools.push(graphMod.createFindProductsBySpecTool(workspaceId, onChunk));
       if (config.tools.includes('price_my_spec')) tools.push(graphMod.createPriceMySpecTool(workspaceId, onChunk));
     } catch (graphErr) {

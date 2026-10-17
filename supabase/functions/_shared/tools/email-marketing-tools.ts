@@ -15,19 +15,11 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MODULE_SLUG = 'email-marketing';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
-/** User-scoped client so the membership-guarded audience RPC + RLS behave as on the page. */
-function userClient(jwt: string | undefined) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
-  });
-}
+import { callerDbClient } from '../caller-client.ts';
 
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -149,7 +141,7 @@ export const createManageEmailCampaignTool = (
         // address, unsubscribes dropped. Membership-guarded, so it needs the user client. This tool
         // used to rebuild that union by hand and shipped for a while dropping manual_emails
         // outright; the count in the approval card is now the count that gets materialized.
-        const usb = userClient(jwt);
+        const usb = callerDbClient(jwt, userId, workspaceId);
         const { data: resolved, error: resolveErr } = await usb.rpc('resolve_campaign_audience', {
           p_workspace_id: workspaceId,
           p_audience: camp.audience_filter ?? {},

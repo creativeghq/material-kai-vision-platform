@@ -32,8 +32,8 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+import { callerDbClient } from '../caller-client.ts';
 
 // deno-lint-ignore no-explicit-any
 type AnyRow = Record<string, any>;
@@ -373,10 +373,7 @@ export const createManageDealTool = (
   jwt: string | undefined,
   onChunk?: (chunk: AnyRow) => void,
 ) => {
-  const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${jwt ?? ''}` } },
-    auth: { persistSession: false },
-  });
+  const sb = () => callerDbClient(jwt, userId, workspaceId);
 
   return tool(
     async ({ action, deal_type, deal_id, title, contact_query, value, stage, lost_reason, months }: AnyRow) => {
@@ -701,7 +698,7 @@ export const createCustomerHealthTool = (
  * as a CHECK here; it runs in-tool so the operator gets a sentence instead of a 23514.
  */
 export const createManageCounterpartyBankAccountTool = (
-  _userId: string,
+  userId: string,
   workspaceId: string,
   jwt: string | undefined,
   onChunk?: (chunk: AnyRow) => void,
@@ -710,10 +707,7 @@ export const createManageCounterpartyBankAccountTool = (
   // crm_bank_accounts is `is_workspace_member(workspace_id)`, so the caller's own token is what
   // scopes these. The service-role client this file uses elsewhere satisfies all four
   // unconditionally, which is exactly wrong for a payment destination.
-  const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${jwt ?? ''}` } },
-    auth: { persistSession: false },
-  });
+  const sb = () => callerDbClient(jwt, userId, workspaceId);
 
   return tool(
     async (

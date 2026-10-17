@@ -6,6 +6,7 @@
  * a VOLATILE function), and the caller's own EXECUTE grant bounds the rest.
  */
 import { platformRpcAccess } from '../platformRpcAccess.generated.ts';
+import { callerRestHeaders } from '../caller-client.ts';
 import { PLATFORM_RPC_CATALOG, type PlatformRpcEntry } from '../platformRpcCatalog.generated.ts';
 
 const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
@@ -18,7 +19,6 @@ const { z } = await import('npm:zod@3.25.76');
 
 // Lazy: the bootstrap populates env at HANDLER entry, so a module-load read is `undefined`.
 const supabaseUrl = () => Deno.env.get('SUPABASE_URL') ?? '';
-const anonKey = () => Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
 // deno-lint-ignore no-explicit-any
 type AnyRow = Record<string, any>;
@@ -100,6 +100,7 @@ export const createDiscoverPlatformDataTool = (onChunk?: (chunk: AnyRow) => void
 export const createCallPlatformRpcTool = (
   jwt: string | undefined,
   onChunk?: (chunk: AnyRow) => void,
+  userId = '',
 ) => tool(
   async ({ reader, args }: AnyRow) => {
     const name = String(reader ?? '').trim();
@@ -163,7 +164,7 @@ export const createCallPlatformRpcTool = (
       const url = `${supabaseUrl()}/rest/v1/rpc/${name}${qs ? `?${qs}` : ''}`;
       const resp = await fetch(url, {
         method: 'GET',
-        headers: { apikey: anonKey(), Authorization: `Bearer ${jwt}`, Accept: 'application/json' },
+        headers: { ...callerRestHeaders(jwt, userId), Accept: 'application/json' },
         signal: controller.signal,
       });
       const text = await resp.text();

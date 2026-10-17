@@ -85,8 +85,8 @@ export const isPresent = (m: SeoMetric | null | undefined): boolean =>
 
 /** The COLLECTOR's verdict words, translated into the same presentation vocabulary. */
 export function sourceStatusPresentation(status: string | null | undefined): SeoStatusPresentation | null {
-  if (status === 'ok') return null;
-  return statusPresentation(!status ? 'unknown' : status === 'failed' ? 'collector_failed' : status);
+  if (!status || status === 'ok') return null;
+  return statusPresentation(status === 'failed' ? 'collector_failed' : status);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

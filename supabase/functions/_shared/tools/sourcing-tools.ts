@@ -15,18 +15,11 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
+import { callerDbClient } from '../caller-client.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-// User-context client so the RPC's auth.uid() membership/finance checks resolve.
-function userClient(jwt?: string) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
-  });
-}
 
 // ───────────────────────────────────────────────────────────────────────────
 // 1) source_product — rank supply options
@@ -40,7 +33,7 @@ export const createSourceProductTool = (
   return tool(
     async ({ action, product_id, quantity, deliver_to_address_unit_id, mine, query, factory }) => {
       try {
-        const sb = userClient(jwt);
+        const sb = callerDbClient(jwt, userId, workspaceId);
         if (action === 'board') {
           const { data, error } = await sb.rpc('get_sourcing_board', { p_workspace_id: workspaceId, p_mine: mine === true });
           if (error) return JSON.stringify({ success: false, error: error.message });
@@ -124,7 +117,7 @@ export const createCreatePurchaseOrderTool = (
     async ({ demand_type, demand_id, selections, customer_company_id, customer_contact_id, deliver_to_address_unit_id, currency }) => {
       onChunk?.({ type: 'tool_progress', status: 'Committing sourcing plan…', timestamp: Date.now() });
       try {
-        const sb = userClient(jwt);
+        const sb = callerDbClient(jwt, userId, workspaceId);
         const { data, error } = await sb.rpc('commit_sourcing_options', {
           p_workspace_id: workspaceId,
           p_demand_type: demand_type,

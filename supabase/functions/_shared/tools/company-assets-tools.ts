@@ -3,6 +3,8 @@
  * data the Finance + HR "Assets" panels use). One tool, action enum: list / add / assign / return.
  */
 
+import { findOrCreateParty } from '../crm-party.ts';
+
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
 // makes agent-chat exceed 12 GB and drop out of the edge typecheck gate entirely (inbox-api is a
@@ -23,12 +25,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function svc() { return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY); }
-function userClient(jwt: string) {
-  return createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-    auth: { persistSession: false },
-  });
-}
+import { callerDbClient } from '../caller-client.ts';
 
 // One source (#391) — the generated mirror. These were hand-written twins of the unions
 // in `assetsService`, and they feed the z.enums below.
@@ -73,16 +70,10 @@ async function resolveAssignee(workspaceId: string, name: string): Promise<{ emp
 
 /** Find (or create) a supplier/lessor company by name. */
 async function resolveSupplier(workspaceId: string, name: string): Promise<{ id: string; name: string }> {
-  const sb = svc();
-  const found = await sb.from('crm_companies')
-    .select('id, name').eq('workspace_id', workspaceId).ilike('name', name.trim()).limit(1).maybeSingle();
-  if (found.data?.id) return { id: found.data.id, name: found.data.name };
-  const ins = await sb.from('crm_companies')
-    // is_customer explicitly false — the column DEFAULTS TO TRUE, so a lessor created here
-    // silently landed in the customer lists too.
-    .insert({ workspace_id: workspaceId, name: name.trim(), is_supplier: true, is_customer: false }).select('id, name').single();
-  if (ins.error) throw ins.error;
-  return { id: ins.data.id, name: ins.data.name };
+  const party = await findOrCreateParty(svc(), 'crm_companies', workspaceId, { name },
+    { name: name.trim(), is_supplier: true, is_customer: false });
+  if (party.status === 'unavailable' || party.status === 'failed') throw new Error(party.message);
+  return { id: party.id, name: party.name };
 }
 
 export const createManageCompanyAssetsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void, jwt?: string) =>
@@ -106,7 +97,7 @@ export const createManageCompanyAssetsTool = (userId: string, workspaceId: strin
         const book = new Map<string, any>();
         let bookNote: string | null = null;
         if (jwt && data?.length) {
-          const db = userClient(jwt);
+          const db = callerDbClient(jwt, userId, workspaceId);
           const denied = await roleGate(db, workspaceId, 'is_workspace_finance_viewer');
           if (denied) bookNote = 'Book values are finance data and are not shown to your role.';
           else {

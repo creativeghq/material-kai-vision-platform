@@ -21,11 +21,8 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
 const MODULE_SLUG = 'flows-toolkit';
 
@@ -36,20 +33,17 @@ const MODULE_SLUG = 'flows-toolkit';
 import { TENANT_TRIGGERS, TENANT_ACTIONS } from './tenantVocabulary.generated.ts';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { callerDbClient } from '../caller-client.ts';
 /**
  * Prefer a JWT-scoped client so the create/toggle/delete RPCs' `auth.uid()`-based
- * `assert_workspace_member` and RLS actually enforce. When no JWT is present (partner `kai_` keys and
- * the admin-secret on-behalf paths), this falls back to the service role — and under service role
+ * `assert_workspace_member` and RLS actually enforce (a `kai_` key acts as its owner). When no
+ * credential is present (trusted service-role turns), this falls back to the service role — and under service role
  * `auth.uid()` is null, so `assert_workspace_member` becomes a NO-OP. On those paths the only real
  * tenancy control is that `p_workspace_id` is SERVER-DERIVED from the resolved membership / api-key
  * workspace (never client-supplied) — so never pass a caller-influenced workspace id into these RPCs.
  */
-function callerClient(jwt?: string) {
-  if (jwt) {
-    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: `Bearer ${jwt}` } },
-    });
-  }
+function callerClient(jwt: string | undefined, userId: string, workspaceId: string | undefined) {
+  if (jwt) return callerDbClient(jwt, userId, workspaceId);
   return svcClient();
 }
 
@@ -82,7 +76,7 @@ export const createManageFlowsTool = (
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
 
-      const db = callerClient(jwt);
+      const db = callerClient(jwt, userId, workspaceId);
       const ws = workspaceId!;
 
       if (action === 'list') {

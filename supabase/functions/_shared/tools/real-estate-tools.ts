@@ -12,7 +12,6 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -20,20 +19,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 const MODULE_SLUG = 'real-estate';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { callerDbClient } from '../caller-client.ts';
 async function moduleEnabled(): Promise<boolean> {
   try {
     const { data } = await svcClient().from('modules').select('enabled').eq('slug', MODULE_SLUG).maybeSingle();
     return Boolean(data?.enabled);
   } catch { return false; }
-}
-
-/** RLS-scoped client for the caller — deals are read through the table, not a private
- *  endpoint, so the agent sees exactly what the CRM board would show this user (#311). */
-function dealsClient(jwt: string) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-    auth: { persistSession: false },
-  });
 }
 
 async function callApi(jwt: string, workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<any> {
@@ -54,7 +45,7 @@ async function callApi(jwt: string, workspaceId: string, action: string, extra: 
 }
 
 export const createManageRealEstateTool = (
-  _userId: string,
+  userId: string,
   workspaceId: string | undefined,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
@@ -154,7 +145,7 @@ export const createManageRealEstateTool = (
         case 'list_deals': {
           // Real-estate deals are crm_deals of the real_estate type. Stage names come from the
           // rows, never a list in this file — each type owns its own stages.
-          const sb = dealsClient(jwt);
+          const sb = callerDbClient(jwt, userId, workspaceId);
           const { data: reType } = await sb.from('crm_deal_types').select('id').is('workspace_id', null).eq('key', 'real_estate').maybeSingle();
           if (!reType) return JSON.stringify({ success: false, error: 'the real_estate deal type is missing' });
           const { data, error } = await sb
@@ -172,7 +163,7 @@ export const createManageRealEstateTool = (
         }
         case 'manage_deal': {
           if (!property_id && !deal_id) return JSON.stringify({ success: false, error: 'property_id (to create) or deal_id (to update) is required' });
-          const sb = dealsClient(jwt);
+          const sb = callerDbClient(jwt, userId, workspaceId);
           const { data: dealType } = await sb.from('crm_deal_types').select('id').is('workspace_id', null).eq('key', 'real_estate').maybeSingle();
           if (!dealType) return JSON.stringify({ success: false, error: 'the real_estate deal type is missing' });
           const { data: stageRows } = await sb.from('crm_deal_stages').select('key, sort').eq('deal_type_id', dealType.id).order('sort');
@@ -223,7 +214,7 @@ export const createManageRealEstateTool = (
           return JSON.stringify({ success: true, ...invPayload });
         }
         case 'property_performance': {
-          const sb = dealsClient(jwt);
+          const sb = callerDbClient(jwt, userId, workspaceId);
           let pq = sb.from('properties').select('id, title').eq('workspace_id', workspaceId);
           if (property_id) pq = pq.eq('id', property_id);
           const { data: props, error: pErr } = await pq.order('created_at', { ascending: false }).limit(50);
@@ -238,7 +229,7 @@ export const createManageRealEstateTool = (
         }
         case 'property_links': {
           if (!property_id) return JSON.stringify({ success: false, error: 'property_id is required' });
-          const sb = dealsClient(jwt);
+          const sb = callerDbClient(jwt, userId, workspaceId);
           const { data: own } = await sb.from('properties').select('id, title').eq('id', property_id).eq('workspace_id', workspaceId).maybeSingle();
           if (!own) return JSON.stringify({ success: false, error: 'listing not found' });
           const [links, projects] = await Promise.all([
@@ -251,7 +242,7 @@ export const createManageRealEstateTool = (
           return JSON.stringify({ success: true, ...linkPayload });
         }
         case 'rent_settlements': {
-          const sb = dealsClient(jwt);
+          const sb = callerDbClient(jwt, userId, workspaceId);
           let tq = sb.from('property_tenancies').select('id, property_id').eq('workspace_id', workspaceId);
           if (property_id) tq = tq.eq('property_id', property_id);
           const { data: tenancies, error: tErr } = await tq.limit(200);
@@ -273,7 +264,7 @@ export const createManageRealEstateTool = (
           return JSON.stringify({ success: true, count: settled.length, charges: settled });
         }
         case 'commission_splits': {
-          const sb = dealsClient(jwt);
+          const sb = callerDbClient(jwt, userId, workspaceId);
           let sq = sb.from('property_sales').select('id, property_id, completed_at').eq('workspace_id', workspaceId);
           if (property_id) sq = sq.eq('property_id', property_id);
           const { data: sales, error: sErr } = await sq.order('completed_at', { ascending: false, nullsFirst: false }).limit(25);

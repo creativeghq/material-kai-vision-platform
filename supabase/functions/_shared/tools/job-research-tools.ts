@@ -17,7 +17,6 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
 const MODULE_SLUG = 'job-research';
@@ -27,20 +26,17 @@ const MODULE_SLUG = 'job-research';
 // ───────────────────────────────────────────────────────────────────────────
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { mivaaAuthHeaders, type MivaaActor } from '../mivaa-caller.ts';
 import { moduleGate } from './module-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
 
 async function callMivaa(
   path: string,
-  init: RequestInit & { jwt?: string } = {},
+  init: RequestInit & { jwt?: string; actor?: MivaaActor } = {},
 ): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
-  if (init.jwt) {
-    headers.set('Authorization', `Bearer ${init.jwt}`);
-  } else {
-    headers.set('Authorization', `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`);
-  }
+  for (const [k, v] of Object.entries(mivaaAuthHeaders(init.jwt, init.actor))) headers.set(k, v);
   try {
     const resp = await fetch(`${MIVAA_GATEWAY_URL}${path}`, { ...init, headers });
     const text = await resp.text();
@@ -120,7 +116,7 @@ export const createTrackJobSearchTool = (
           patch.is_active = action === 'resume';
         }
         const r = await callMivaa(`/api/v1/job-research/track/${targetId}`, {
-          method: 'PUT', jwt,
+          method: 'PUT', jwt, actor: { userId, workspaceId },
           body: JSON.stringify(patch),
         });
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
@@ -138,7 +134,7 @@ export const createTrackJobSearchTool = (
       // delete
       if (action === 'delete') {
         if (!targetId) return JSON.stringify({ success: false, error: 'tracked_job not found by label or id' });
-        const r = await callMivaa(`/api/v1/job-research/track/${targetId}`, { method: 'DELETE', jwt });
+        const r = await callMivaa(`/api/v1/job-research/track/${targetId}`, { method: 'DELETE', jwt, actor: { userId, workspaceId } });
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
         onChunk?.({ type: 'job_search_updated', tracked_job_id: targetId, action: 'deleted', timestamp: Date.now() });
         return JSON.stringify({ success: true });
@@ -176,7 +172,7 @@ export const createTrackJobSearchTool = (
       // If we found an existing row by label OR id was passed, treat as update
       if (targetId) {
         const r = await callMivaa(`/api/v1/job-research/track/${targetId}`, {
-          method: 'PUT', jwt, body: JSON.stringify(body),
+          method: 'PUT', jwt, actor: { userId, workspaceId }, body: JSON.stringify(body),
         });
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
         onChunk?.({
@@ -191,7 +187,7 @@ export const createTrackJobSearchTool = (
 
       // create
       const r = await callMivaa(`/api/v1/job-research/track`, {
-        method: 'POST', jwt, body: JSON.stringify(body),
+        method: 'POST', jwt, actor: { userId, workspaceId }, body: JSON.stringify(body),
       });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
       onChunk?.({
@@ -283,7 +279,7 @@ export const createListMyJobSearchesTool = (
     async ({ only_active = true }) => {
       const denied = await moduleGate(workspaceId, MODULE_SLUG);
       if (denied) return denied;
-      const r = await callMivaa(`/api/v1/job-research/track?only_active=${only_active}`, { method: 'GET', jwt });
+      const r = await callMivaa(`/api/v1/job-research/track?only_active=${only_active}`, { method: 'GET', jwt, actor: { userId, workspaceId } });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
       const tracked = r.data?.tracked_jobs ?? [];
       onChunk?.({
@@ -332,7 +328,7 @@ export const createFindJobsTool = (
         only_actionable: only_unactioned ? 'true' : 'false',
         limit: String(Math.min(limit, 100)),
       }).toString();
-      const r = await callMivaa(`/api/v1/job-research/track/${targetId}/listings?${qs}`, { method: 'GET', jwt });
+      const r = await callMivaa(`/api/v1/job-research/track/${targetId}/listings?${qs}`, { method: 'GET', jwt, actor: { userId, workspaceId } });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
       const listings = r.data?.listings ?? [];
 
@@ -421,7 +417,7 @@ export const createManageJobSitesTool = (
 
       if (action === 'list') {
         const qs = site_type ? `?site_type=${encodeURIComponent(site_type)}` : '';
-        const r = await callMivaa(`/api/v1/job-research/sites${qs}`, { method: 'GET', jwt });
+        const r = await callMivaa(`/api/v1/job-research/sites${qs}`, { method: 'GET', jwt, actor: { userId, workspaceId } });
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
         onChunk?.({
           type: 'job_sites_list',
@@ -445,7 +441,7 @@ export const createManageJobSitesTool = (
           return JSON.stringify({ success: true, mode: 'form_opened', note: 'missing required fields; opened modal' });
         }
         const r = await callMivaa(`/api/v1/job-research/sites`, {
-          method: 'POST', jwt,
+          method: 'POST', jwt, actor: { userId, workspaceId },
           body: JSON.stringify({
             site_type, url_or_domain,
             display_name, country_code, category, notes,
@@ -469,7 +465,7 @@ export const createManageJobSitesTool = (
         // Resolve site_id by url_or_domain if needed
         let resolved = site_id;
         if (!resolved) {
-          const listR = await callMivaa(`/api/v1/job-research/sites${site_type ? '?site_type=' + site_type : ''}`, { method: 'GET', jwt });
+          const listR = await callMivaa(`/api/v1/job-research/sites${site_type ? '?site_type=' + site_type : ''}`, { method: 'GET', jwt, actor: { userId, workspaceId } });
           const match = (listR.data?.sites ?? []).find((s: any) =>
             (s.url_or_domain || '').toLowerCase() === (url_or_domain || '').toLowerCase()
           );
@@ -477,14 +473,14 @@ export const createManageJobSitesTool = (
           resolved = match.id;
         }
         if (action === 'remove') {
-          const r = await callMivaa(`/api/v1/job-research/sites/${resolved}`, { method: 'DELETE', jwt });
+          const r = await callMivaa(`/api/v1/job-research/sites/${resolved}`, { method: 'DELETE', jwt, actor: { userId, workspaceId } });
           if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
           onChunk?.({ type: 'job_sites_updated', change: 'removed', site_id: resolved, timestamp: Date.now() });
           return JSON.stringify({ success: true });
         }
         // toggle
         const r = await callMivaa(`/api/v1/job-research/sites/${resolved}`, {
-          method: 'PUT', jwt,
+          method: 'PUT', jwt, actor: { userId, workspaceId },
           body: JSON.stringify({ is_enabled: is_enabled !== false }),
         });
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });

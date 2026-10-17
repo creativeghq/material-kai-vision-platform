@@ -15,22 +15,19 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { callerDbClient } from '../caller-client.ts';
 
-async function readPartyWork(jwt: string | undefined, companyId: string): Promise<unknown> {
+async function readPartyWork(jwt: string | undefined, companyId: string, userId: string, workspaceId: string): Promise<unknown> {
   if (!jwt) return null;
-  const { data, error } = await userClient(jwt).rpc('get_party_work', { p_party_kind: 'company', p_party_id: companyId });
+  const { data, error } = await userClient(jwt, userId, workspaceId).rpc('get_party_work', { p_party_kind: 'company', p_party_id: companyId });
   return error ? { error: error.message } : (data ?? []);
 }
 
-function userClient(jwt: string) {
-  return createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-    auth: { persistSession: false },
-  });
+function userClient(jwt: string, userId: string, workspaceId: string) {
+  return callerDbClient(jwt, userId, workspaceId);
 }
 
 // ── id resolvers (workspace-scoped) ─────────────────────────────────────────
@@ -84,6 +81,7 @@ export const createProductProvenanceTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
   jwt?: string,
+  userId = '',
 ) => {
   return tool(
     async ({ product_id, sku }: { product_id?: string; sku?: string }) => {
@@ -97,7 +95,7 @@ export const createProductProvenanceTool = (
       let product: Record<string, any> | null = null;
       let costs: Record<string, any> | null = null;
       if (jwt) {
-        const db = userClient(jwt);
+        const db = userClient(jwt, userId, workspaceId);
         const { data: detail } = await db.rpc('get_product_detail', { p_product_id: pid });
         product = detail && detail.workspace_id === workspaceId ? detail : null;
         if (product?.viewer_can_see_internal === true) {
@@ -229,6 +227,7 @@ export const createCustomerOverviewTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
   jwt?: string,
+  userId = '',
 ) => {
   return tool(
     async ({ company_id, company_name }: { company_id?: string; company_name?: string }) => {
@@ -238,7 +237,7 @@ export const createCustomerOverviewTool = (
 
       const { data, error } = await sb.rpc('customer_360', { p_workspace_id: workspaceId, p_company_id: cid });
       if (error) return JSON.stringify({ success: false, error: error.message });
-      const work = await readPartyWork(jwt, cid);
+      const work = await readPartyWork(jwt, cid, userId, workspaceId);
 
       onChunk?.({ type: 'customer_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, work, timestamp: Date.now() });
       return JSON.stringify({ success: true, overview: data, work });
@@ -265,6 +264,7 @@ export const createSupplierOverviewTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
   jwt?: string,
+  userId = '',
 ) => {
   return tool(
     async ({ company_id, company_name }: { company_id?: string; company_name?: string }) => {
@@ -274,7 +274,7 @@ export const createSupplierOverviewTool = (
 
       const { data, error } = await sb.rpc('supplier_360', { p_workspace_id: workspaceId, p_company_id: cid });
       if (error) return JSON.stringify({ success: false, error: error.message });
-      const work = await readPartyWork(jwt, cid);
+      const work = await readPartyWork(jwt, cid, userId, workspaceId);
 
       onChunk?.({ type: 'supplier_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, work, timestamp: Date.now() });
       return JSON.stringify({ success: true, overview: data, work });
@@ -358,6 +358,7 @@ export const createRelatedProductsTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
   jwt?: string,
+  userId = '',
 ) => {
   return tool(
     async ({ product_id, sku, limit }: { product_id?: string; sku?: string; limit?: number }) => {
@@ -368,7 +369,7 @@ export const createRelatedProductsTool = (
       if (error) return JSON.stringify({ success: false, error: error.message });
       let linked: unknown = null;
       if (jwt) {
-        const { data: edges, error: edgeErr } = await userClient(jwt).rpc('get_related_products', {
+        const { data: edges, error: edgeErr } = await userClient(jwt, userId, workspaceId).rpc('get_related_products', {
           p_workspace_id: workspaceId, p_product_id: pid, p_types: null, p_limit: limit ?? 20,
         });
         linked = edgeErr ? { error: edgeErr.message } : edges;

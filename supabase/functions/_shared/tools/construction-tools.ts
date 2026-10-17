@@ -10,20 +10,13 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
+import { callerDbClient } from '../caller-client.ts';
 
 const MODULE_SLUG = 'projects';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { moduleGate, roleGate, type WorkspaceRolePredicate } from './module-gate.ts';
 import { resolveProjectId as sbResolveProjectId } from '../assessment.ts';
-
-function userClient(jwt: string) {
-  return createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-    auth: { persistSession: false },
-  });
-}
 
 type ProjectView = 'pnl' | 'finance_summary' | 'cost_by_code' | 'labor' | 'inspections';
 
@@ -35,7 +28,7 @@ const PROJECT_VIEW_GATES: Record<ProjectView, WorkspaceRolePredicate | null> = {
   inspections: null,
 };
 
-function readView(db: ReturnType<typeof userClient>, view: ProjectView, projectId: string) {
+function readView(db: ReturnType<typeof callerDbClient>, view: ProjectView, projectId: string) {
   switch (view) {
     case 'pnl': return db.rpc('get_project_pnl', { p_project_id: projectId });
     case 'finance_summary': return db.rpc('get_project_finance_summary', { p_project_id: projectId });
@@ -46,10 +39,10 @@ function readView(db: ReturnType<typeof userClient>, view: ProjectView, projectI
 }
 
 async function readProjectView(
-  jwt: string | undefined, workspaceId: string, projectId: string, view: ProjectView,
+  jwt: string | undefined, userId: string, workspaceId: string, projectId: string, view: ProjectView,
 ): Promise<{ payload: Record<string, unknown> } | { refusal: string }> {
   if (!jwt) return { refusal: JSON.stringify({ success: false, error: 'This report needs a signed-in user session.' }) };
-  const db = userClient(jwt);
+  const db = callerDbClient(jwt, userId, workspaceId);
   const gate = PROJECT_VIEW_GATES[view];
   if (gate) {
     const denied = await roleGate(db, workspaceId, gate);
@@ -99,7 +92,7 @@ export const createProjectCvrTool = (
       if (!id) return notFound(project_name);
 
       if (view && view !== 'cvr') {
-        const read = await readProjectView(jwt, workspaceId ?? '', id, view);
+        const read = await readProjectView(jwt, userId, workspaceId ?? '', id, view);
         if ('refusal' in read) return read.refusal;
         try {
           onChunk?.({ type: 'project_report', ...read.payload, timestamp: Date.now() });
@@ -493,10 +486,10 @@ export const createBidAnalysisTool = (
         });
       }
 
-      let lineDb: ReturnType<typeof userClient> | null = null;
+      let lineDb: ReturnType<typeof callerDbClient> | null = null;
       if (include_line_comparison) {
         if (!jwt) return JSON.stringify({ success: false, error: 'The line-by-line comparison needs a signed-in user session.' });
-        lineDb = userClient(jwt);
+        lineDb = callerDbClient(jwt, userId, workspaceId);
         const gated = await roleGate(lineDb, workspaceId ?? '', 'is_workspace_sell_side');
         if (gated) return gated;
       }

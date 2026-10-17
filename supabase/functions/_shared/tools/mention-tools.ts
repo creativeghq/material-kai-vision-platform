@@ -17,7 +17,6 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
 const MODULE_SLUG = 'mention-monitoring';
@@ -28,6 +27,7 @@ const LLM_PROBE_CREDITS = 2;
 // ───────────────────────────────────────────────────────────────────────────
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { mivaaAuthHeaders, type MivaaActor } from '../mivaa-caller.ts';
 import { moduleGate } from './module-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
 
@@ -240,15 +240,11 @@ async function resolveSubjectBase(
 
 async function callMivaa(
   path: string,
-  init: RequestInit & { jwt?: string } = {},
+  init: RequestInit & { jwt?: string; actor?: MivaaActor } = {},
 ): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
-  if (init.jwt) {
-    headers.set('Authorization', `Bearer ${init.jwt}`);
-  } else {
-    headers.set('Authorization', `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`);
-  }
+  for (const [k, v] of Object.entries(mivaaAuthHeaders(init.jwt, init.actor))) headers.set(k, v);
   try {
     const resp = await fetch(`${MIVAA_GATEWAY_URL}${path}`, { ...init, headers });
     const text = await resp.text();
@@ -299,7 +295,7 @@ export const createTrackProductMentionsTool = (
           // workspace's.
           const found = await resolveSubjectBase({ subject: label }, userId, workspaceId);
           if ('error' in found) return JSON.stringify({ success: false, ...found });
-          const r = await callMivaa(`/api/v1/mention-monitoring/track/${found.trackedMentionId}`, { method: 'DELETE', jwt });
+          const r = await callMivaa(`/api/v1/mention-monitoring/track/${found.trackedMentionId}`, { method: 'DELETE', jwt, actor: { userId, workspaceId } });
           return JSON.stringify({ success: r.ok, error: r.error, ...r.data });
         }
         onChunk?.({ type: 'tool_progress', status: `Starting mention monitoring for "${label}"...`, timestamp: Date.now() });
@@ -322,7 +318,7 @@ export const createTrackProductMentionsTool = (
         if (alert_on_new_outlet !== undefined) subjectBody.alert_on_new_outlet = alert_on_new_outlet;
         if (alert_on_llm_visibility_change !== undefined) subjectBody.alert_on_llm_visibility_change = alert_on_llm_visibility_change;
 
-        const r = await callMivaa('/api/v1/mention-monitoring/track', { method: 'POST', body: JSON.stringify(subjectBody), jwt });
+        const r = await callMivaa('/api/v1/mention-monitoring/track', { method: 'POST', body: JSON.stringify(subjectBody), jwt, actor: { userId, workspaceId } });
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
         onChunk?.({
           type: 'mention_tracking_started',
@@ -345,7 +341,7 @@ export const createTrackProductMentionsTool = (
       if (action === 'stop') {
         const r = await callMivaa(
           `/api/v1/mention-monitoring/products/${product_id}/track`,
-          { method: 'DELETE', jwt },
+          { method: 'DELETE', jwt, actor: { userId, workspaceId } },
         );
         return JSON.stringify({ success: r.ok, ...r.data });
       }
@@ -365,7 +361,7 @@ export const createTrackProductMentionsTool = (
 
       const r = await callMivaa(
         `/api/v1/mention-monitoring/products/${product_id}/track`,
-        { method: 'POST', body: JSON.stringify(body), jwt },
+        { method: 'POST', body: JSON.stringify(body), jwt, actor: { userId, workspaceId } },
       );
       if (!r.ok) {
         return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
@@ -424,7 +420,7 @@ export const createGetMentionSummaryTool = (
       onChunk?.({ type: 'tool_progress', status: `Loading ${days}d mention summary...`, timestamp: Date.now() });
       const r = await callMivaa(
         `${base}/summary?days=${days}`,
-        { method: 'GET', jwt },
+        { method: 'GET', jwt, actor: { userId, workspaceId } },
       );
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
       const summary = r.data?.data;
@@ -476,7 +472,7 @@ export const createCheckLlmVisibilityTool = (
         onChunk?.({ type: 'tool_progress', status: 'Running LLM visibility probe across models...', timestamp: Date.now() });
         let r: { ok: boolean; status: number; data?: any; error?: string };
         try {
-          r = await callMivaa(`${base}/probe-llm`, { method: 'POST', body: JSON.stringify({ models }), jwt });
+          r = await callMivaa(`${base}/probe-llm`, { method: 'POST', body: JSON.stringify({ models }), jwt, actor: { userId, workspaceId } });
         } catch (probeErr) {
           // Network or unexpected error — refund and surface
           await refund(userId, workspaceId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
@@ -488,13 +484,13 @@ export const createCheckLlmVisibilityTool = (
         }
       }
       // Read latest snapshot
-      const sn = await callMivaa(`${base}/llm-visibility`, { method: 'GET', jwt });
+      const sn = await callMivaa(`${base}/llm-visibility`, { method: 'GET', jwt, actor: { userId, workspaceId } });
       if (!sn.ok) return JSON.stringify({ success: false, error: sn.error || `backend ${sn.status}` });
       const snapshot = sn.data?.data;
       // The trend is the answer to "is that better or worse than last month", which is the
       // question anybody asking about visibility is actually asking. Free — it reads the
       // same rows the snapshot came from.
-      const tr = await callMivaa(`${base}/llm-visibility-trend?days=90`, { method: 'GET', jwt });
+      const tr = await callMivaa(`${base}/llm-visibility-trend?days=90`, { method: 'GET', jwt, actor: { userId, workspaceId } });
       const trend = tr.ok ? tr.data?.data : null;
       onChunk?.({
         type: 'llm_visibility_result',
@@ -541,7 +537,7 @@ export const createFindNegativeMentionsTool = (
       onChunk?.({ type: 'tool_progress', status: 'Loading negative-sentiment mentions...', timestamp: Date.now() });
       const r = await callMivaa(
         `${base}/history?days=${days}&sentiment=negative&limit=${limit}`,
-        { method: 'GET', jwt },
+        { method: 'GET', jwt, actor: { userId, workspaceId } },
       );
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
       const rows = r.data?.data || [];

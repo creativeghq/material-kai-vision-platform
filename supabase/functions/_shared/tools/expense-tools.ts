@@ -4,6 +4,7 @@ import { computeExpenseSplit } from '../finance/expense-math.ts';
 import { moduleGate } from './module-gate.ts';
 import { attachPartyNames } from './record-labels.ts';
 import { mentionsMyDataFeed } from '../finance/mydata-intent.ts';
+import { findOrCreateParty } from '../crm-party.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -25,7 +26,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function svc() { return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY); }
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+import { callerDbClient } from '../caller-client.ts';
 /**
  * User-scoped client, for the RPCs that ask WHO IS CALLING rather than which workspace.
  *
@@ -35,10 +36,8 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
  * `workspace_inbound_status` returns NO ROW — an unconfigured-looking answer for a workspace that
  * is configured, which is the silent zero this tool exists to close, not to ship.
  */
-function userClient(jwt: string | undefined) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
-  });
+function userClient(jwt: string | undefined, userId: string, workspaceId: string) {
+  return callerDbClient(jwt, userId, workspaceId);
 }
 
 /** Find (or create) an expense-side finance category by name. */
@@ -57,18 +56,14 @@ async function resolveCategory(workspaceId: string, name: string): Promise<{ id:
 /** Find (or create) a supplier/payee company by name. supplier_bills requires a counterparty. */
 async function resolvePayee(workspaceId: string, name: string): Promise<{ id: string; name: string }> {
   const sb = svc();
-  const found = await sb.from('crm_companies')
-    .select('id, name').eq('workspace_id', workspaceId).ilike('name', name.trim()).limit(1).maybeSingle();
-  if (found.data?.id) {
-    await sb.from('crm_companies').update({ is_supplier: true }).eq('id', found.data.id);
-    return { id: found.data.id, name: found.data.name };
+  const party = await findOrCreateParty(sb, 'crm_companies', workspaceId, { name },
+    { name: name.trim(), is_supplier: true, is_customer: false });
+  if (party.status === 'unavailable' || party.status === 'failed') throw new Error(party.message);
+  if (party.status === 'found') {
+    const { error } = await sb.from('crm_companies').update({ is_supplier: true }).eq('id', party.id).eq('workspace_id', workspaceId);
+    if (error) throw error;
   }
-  const ins = await sb.from('crm_companies')
-    // is_customer explicitly false — the column DEFAULTS TO TRUE, so a payee created here
-    // silently landed in the customer lists too.
-    .insert({ workspace_id: workspaceId, name: name.trim(), is_supplier: true, is_customer: false }).select('id, name').single();
-  if (ins.error) throw ins.error;
-  return { id: ins.data.id, name: ins.data.name };
+  return { id: party.id, name: party.name };
 }
 
 /** Resolve a FILING target by name — an expense card or a building. */
@@ -580,7 +575,7 @@ export const createMydataExpensesTool = (
       if (act === 'status') {
         // As the USER, not the service role — see `userClient`. Read through the service client
         // this answers "not configured" for every workspace, forever, and reads like data.
-        const { data, error } = await userClient(jwt).rpc('workspace_inbound_status', { p_workspace_id: workspaceId });
+        const { data, error } = await userClient(jwt, userId, workspaceId).rpc('workspace_inbound_status', { p_workspace_id: workspaceId });
         if (error) throw error;
         if (!data) {
           // The RPC yields no row to a caller who is not a finance manager. That is a permission

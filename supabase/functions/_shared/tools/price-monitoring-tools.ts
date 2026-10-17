@@ -17,7 +17,6 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
 const MODULE_SLUG = 'price-monitoring';
@@ -27,6 +26,7 @@ const MODULE_SLUG = 'price-monitoring';
 // ───────────────────────────────────────────────────────────────────────────
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { mivaaAuthHeaders, type MivaaActor } from '../mivaa-caller.ts';
 import { moduleGate } from './module-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
 
@@ -45,11 +45,11 @@ async function getProductRow(productId: string) {
 
 async function callMivaa(
   path: string,
-  init: RequestInit & { jwt?: string } = {},
+  init: RequestInit & { jwt?: string; actor?: MivaaActor } = {},
 ): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
-  headers.set('Authorization', `Bearer ${init.jwt || SUPABASE_SERVICE_ROLE_KEY}`);
+  for (const [k, v] of Object.entries(mivaaAuthHeaders(init.jwt, init.actor))) headers.set(k, v);
   try {
     const resp = await fetch(`${MIVAA_GATEWAY_URL}${path}`, { ...init, headers });
     const text = await resp.text();
@@ -81,14 +81,14 @@ export const createTrackProductPricesTool = (
       onChunk?.({ type: 'tool_progress', status: `${action} price monitoring for "${product.name}"...`, timestamp: Date.now() });
 
       if (action === 'stop') {
-        const r = await callMivaa(`/api/v1/price-monitoring/products/${product_id}/track`, { method: 'DELETE', jwt });
+        const r = await callMivaa(`/api/v1/price-monitoring/products/${product_id}/track`, { method: 'DELETE', jwt, actor: { userId, workspaceId } });
         return JSON.stringify({ success: r.ok, ...(r.ok ? r.data : { error: r.error || `backend ${r.status}` }) });
       }
 
       // start — get-or-create the internal tracked_query + run the first discovery refresh
       const r = await callMivaa(
         `/api/v1/price-monitoring/products/${product_id}/track`,
-        { method: 'POST', body: JSON.stringify({}), jwt },
+        { method: 'POST', body: JSON.stringify({}), jwt, actor: { userId, workspaceId } },
       );
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
 
@@ -130,14 +130,14 @@ export const createGetPriceSummaryTool = (
       if (denied) return denied;
       onChunk?.({ type: 'tool_progress', status: 'Loading price summary...', timestamp: Date.now() });
 
-      const summaryRes = await callMivaa(`/api/v1/price-monitoring/products/${product_id}`, { method: 'GET', jwt });
+      const summaryRes = await callMivaa(`/api/v1/price-monitoring/products/${product_id}`, { method: 'GET', jwt, actor: { userId, workspaceId } });
       if (!summaryRes.ok) return JSON.stringify({ success: false, error: summaryRes.error || `backend ${summaryRes.status}` });
       const summary = summaryRes.data?.data ?? summaryRes.data;
       if (!summary) return JSON.stringify({ success: true, data: null, message: 'product not enrolled in price monitoring' });
 
       let sources: any[] = [];
       if (include_sources) {
-        const srcRes = await callMivaa(`/api/v1/price-monitoring/products/${product_id}/sources`, { method: 'GET', jwt });
+        const srcRes = await callMivaa(`/api/v1/price-monitoring/products/${product_id}/sources`, { method: 'GET', jwt, actor: { userId, workspaceId } });
         if (srcRes.ok) sources = srcRes.data?.data?.results ?? srcRes.data?.results ?? [];
       }
 

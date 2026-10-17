@@ -405,6 +405,7 @@ async function validatePartnerApiKey(
  * RLS and auth.uid() apply exactly as in their own session; `x-workspace-id` names the workspace.
  */
 export function actingClient(userId: string, workspaceId?: string | null): DbClient {
+  if (!userId) throw new Error('actingClient needs a user: an empty actor would run as the service role');
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { 'x-acting-user': userId, ...(workspaceId ? { 'x-workspace-id': workspaceId } : {}) } },

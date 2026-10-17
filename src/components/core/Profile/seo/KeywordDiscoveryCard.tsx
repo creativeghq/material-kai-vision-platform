@@ -25,7 +25,7 @@ import {
 } from '@/components/core/ui/table-column-header';
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
-import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
+import { sourceStatusPresentation, statusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import {
   userWebsitesService, type KeywordCandidate, type KeywordCandidates, type UserWebsite,
 } from '@/services/userWebsitesService';
@@ -250,7 +250,7 @@ export const KeywordDiscoveryCard: React.FC<{
 
   // Not connected / never collected / nothing in the window: say which, never show an
   // empty table that reads as "Google has nothing on you".
-  const unavailable = data.status !== 'ok' ? sourceStatusPresentation(data.status) : null;
+  const unavailable = data.status !== 'ok' ? (sourceStatusPresentation(data.status) ?? statusPresentation('unknown')) : null;
   const counts = data.counts;
 
   return (

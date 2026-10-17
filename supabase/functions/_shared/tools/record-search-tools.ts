@@ -10,10 +10,8 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
+import { callerDbClient } from '../caller-client.ts';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 /**
  * The kinds `global_search` can return. Kept in step with `GLOBAL_SEARCH_KINDS`
@@ -50,6 +48,7 @@ export const createFindRecordsTool = (
   workspaceId: string,
   userJwt?: string,
   onChunk?: (c: any) => void,
+  userId = '',
 ) => {
   // One CARD per distinct answer, not one per call. A model hedging the spelling of a Greek
   // counterparty fires several searches in ONE parallel turn, and each emitted its own chunk --
@@ -76,9 +75,7 @@ export const createFindRecordsTool = (
           return JSON.stringify({ found: false, error: 'No active workspace for the current user.' });
         }
 
-        const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          global: { headers: { Authorization: `Bearer ${userJwt}` } },
-        });
+        const sb = callerDbClient(userJwt, userId, workspaceId);
 
         const wanted = Array.isArray(kinds) && kinds.length
           ? kinds.filter((k) => (KINDS as readonly string[]).includes(k))

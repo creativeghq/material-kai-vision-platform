@@ -135,8 +135,7 @@ describe('the write is allowlisted and narrow', () => {
   it('the writes run as the USER, so RLS is the boundary', () => {
     // Every policy on crm_bank_accounts is is_workspace_member(workspace_id); the service-role
     // client this file uses elsewhere satisfies all four unconditionally.
-    expect(body).toContain('SUPABASE_ANON_KEY');
-    expect(body).toMatch(/Authorization: `Bearer \$\{jwt/);
+    expect(body).toMatch(/const sb = \(\) => callerDbClient\(jwt, userId, workspaceId\)/);
     const add = body.slice(body.indexOf("if (action === 'add')"));
     expect(add, 'the insert runs on the service-role client').toMatch(/sb\(\)[\s\S]{0,80}\.insert\(payload\)/);
   });

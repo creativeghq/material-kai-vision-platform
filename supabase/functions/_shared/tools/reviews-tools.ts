@@ -15,19 +15,11 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MODULE_SLUG = 'reviews';
 
 import { moduleGate } from './module-gate.ts';
-/** User-scoped client so RLS scopes reads/writes to the caller exactly as on the page. */
-function userClient(jwt: string | undefined) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
-  });
-}
+import { callerDbClient } from '../caller-client.ts';
 
 export const createManageReviewsTool = (
   userId: string,
@@ -41,7 +33,7 @@ export const createManageReviewsTool = (
       const denied = await moduleGate(workspaceId, MODULE_SLUG);
       if (denied) return denied;
       if (!userId) return JSON.stringify({ success: false, error: 'No signed-in user.' });
-      const sb = userClient(jwt);
+      const sb = callerDbClient(jwt, userId, workspaceId);
 
       if (action === 'list') {
         let q = sb.from('profile_reviews')

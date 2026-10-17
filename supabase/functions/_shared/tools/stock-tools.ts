@@ -20,7 +20,6 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -30,6 +29,7 @@ const MODULE_SLUG = 'stock';
 const DIRECTIONS = ['in', 'out', 'adjust'] as const;
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { callerDbClient } from '../caller-client.ts';
 /** Call a stock-api action AS the user (so all stock-api RBAC/entitlement applies). */
 async function callStockApi(jwt: string, workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<any> {
   try {
@@ -49,7 +49,7 @@ async function callStockApi(jwt: string, workspaceId: string, action: string, ex
 }
 
 export const createManageStockTool = (
-  _userId: string,
+  userId: string,
   workspaceId: string | undefined,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
@@ -133,10 +133,7 @@ export const createManageStockTool = (
       }
 
       if (action === 'project_holds') {
-        const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          global: { headers: { Authorization: `Bearer ${jwt}` } },
-          auth: { persistSession: false },
-        });
+        const db = callerDbClient(jwt, userId, ws);
         let pq = db.from('projects').select('id, name').eq('workspace_id', ws);
         if (project_id) pq = pq.eq('id', String(project_id));
         else if (project_name) pq = pq.ilike('name', `%${String(project_name).trim()}%`);

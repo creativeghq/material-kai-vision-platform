@@ -11,7 +11,7 @@ import { userWebsitesService, type UserWebsite, type DomainIntel, type DomainBac
 import { formatNumber } from '@/utils/decimal';
 import { timeAgo } from '@/utils/datetime';
 import { safeHref } from '@/utils/safeUrl';
-import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
+import { sourceStatusPresentation, statusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import { useTableSegments } from './seo/useTableSegments';
 
 type LinkSortKey = 'domain' | 'rank' | 'anchor' | 'first_seen';
@@ -31,7 +31,7 @@ function dayLabel(date: string): string {
 
 /** A missing figure says WHY it is missing (CLAUDE.md rule 3). */
 function Figure({ label, value, status }: { label: string; value: number | null | undefined; status: string | null }) {
-  const p = value == null ? sourceStatusPresentation(status) : null;
+  const p = value == null ? (sourceStatusPresentation(status) ?? statusPresentation('unknown')) : null;
   return (
     <div className="border border-hairline rounded-sm p-3">
       <p className="text-xs text-muted-foreground">{label}</p>

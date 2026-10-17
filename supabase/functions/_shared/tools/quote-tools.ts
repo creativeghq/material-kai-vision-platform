@@ -15,13 +15,14 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
-const { createClient } = await import('npm:@supabase/supabase-js@2');
+import { callerDbClient } from '../caller-client.ts';
 
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { moduleGate } from './module-gate.ts';
 import { round2 } from '../money.ts';
 import { foldForSearch, escapeLike } from '../searchFold.ts';
+import { findExistingParty, normalizeEmail } from '../crm-party.ts';
 
 // One line item as the model supplies it. Either `product_id` (catalog, auto-priced),
 // `configuration_id` (a saved configuration — priced WITH its options), or `name` + `unit_price`
@@ -172,7 +173,7 @@ async function resolveLine(
 export const createCreateQuoteTool = (
   userId: string,
   workspaceId: string,
-  userJwt: string,
+  userJwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
@@ -225,6 +226,9 @@ export const createCreateQuoteTool = (
         }
         const vatRate = input.vat_rate ?? 24;
         const generatePdf = input.generate_pdf !== false; // default true
+        if (generatePdf && !userJwt) {
+          return JSON.stringify({ success: false, error: 'Rendering the quote PDF needs a signed-in user session. Retry with generate_pdf: false to save the quote without one.' });
+        }
         const customerCompanyId = input.customer_company_id ?? null;
         const customerContactId = input.customer_contact_id ?? null;
 
@@ -488,13 +492,14 @@ export const createCreateQuoteTool = (
 export const createGenerateQuotePdfTool = (
   userId: string,
   workspaceId: string,
-  userJwt: string,
+  userJwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
     async (input: { quote_id: string; regenerate?: boolean }) => {
       const denied = await moduleGate(workspaceId, 'quotes');
       if (denied) return denied;
+      if (!userJwt) return JSON.stringify({ success: false, error: 'Generating a quote PDF needs a signed-in user session.' });
       const sb = svcClient();
       try {
         // Ownership: the quote must be in the caller's workspace (defence in depth on
@@ -552,10 +557,7 @@ export const createListMyQuotesTool = (
       const denied = await moduleGate(workspaceId, 'quotes');
       if (denied) return denied;
       if (!jwt) return JSON.stringify({ success: false, error: 'Listing quotes needs a signed-in user session.' });
-      const sb = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-        global: { headers: { Authorization: `Bearer ${jwt}` } },
-        auth: { persistSession: false },
-      });
+      const sb = callerDbClient(jwt, userId, workspaceId);
       try {
         let q = sb
           .from('quotes')
@@ -651,9 +653,10 @@ export const createRaiseQuoteRequestTool = (
           });
         }
 
-        const email = (input.contact_email ?? '').trim();
-        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-          return JSON.stringify({ success: false, error: `"${email}" does not look like an email address.` });
+        const rawEmail = (input.contact_email ?? '').trim();
+        const email = rawEmail ? normalizeEmail(rawEmail) : null;
+        if (rawEmail && !email) {
+          return JSON.stringify({ success: false, error: `"${rawEmail}" does not look like an email address.` });
         }
         const contactName = (input.contact_name ?? '').trim();
 
@@ -670,9 +673,11 @@ export const createRaiseQuoteRequestTool = (
           contactId = (byId as { id: string }).id;
         }
         if (!contactId && email) {
-          const { data: byEmail } = await sb.from('crm_contacts')
-            .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1);
-          if (byEmail && byEmail.length > 0) contactId = (byEmail[0] as { id: string }).id;
+          const byEmail = await findExistingParty(sb, 'crm_contacts', workspaceId, { email }, { nameFallback: 'never' });
+          if (byEmail.status === 'unavailable') {
+            return JSON.stringify({ success: false, error: `Could not check for an existing contact: ${byEmail.message}` });
+          }
+          if (byEmail.status === 'duplicate') contactId = byEmail.existing.id;
         }
         if (!contactId && contactName) {
           // The FOLDED haystack with a FOLDED term, exactly as the CRM list endpoints search.
@@ -801,10 +806,7 @@ export const createConvertQuoteToOrderTool = (
         });
         return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user\'s approval to create the order. Do not retry.' });
       }
-      const asUser = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-        global: { headers: { Authorization: `Bearer ${jwt}` } },
-        auth: { persistSession: false },
-      });
+      const asUser = callerDbClient(jwt, userId, workspaceId);
       if (q.status !== 'accepted') {
         const { data: accepted, error: accErr } = await asUser.from('quotes').update({ status: 'accepted' }).eq('id', input.quote_id).select('id');
         if (accErr) return JSON.stringify({ success: false, error: `Could not accept the quote: ${accErr.message}` });
