@@ -32,36 +32,30 @@ class QuotePDFService {
     return data as PDFGenerationResult;
   }
 
-  /**
-   * Get a fresh signed URL for an existing PDF. If the stored PDF has been
-   * purged by the storage-retention sweep (pdf_storage_path nulled +
-   * pdf_generation_status='expired'), rebuild it on demand first — regeneration
-   * is credit-free, so an old quote's PDF transparently comes back on open.
-   */
+  /** Signed URL of the quote's current server PDF; the renderer re-renders only when the quote changed. */
   async refreshPDFUrl(quoteId: string): Promise<string | null> {
-    let { data: quote } = await supabase
-      .from('quotes')
-      .select('pdf_storage_path, pdf_generation_status')
-      .eq('id', quoteId)
-      .single();
+    const result = await this.generatePDF(quoteId);
+    return result.success ? result.pdf_url ?? null : null;
+  }
 
-    if (!quote?.pdf_storage_path && quote?.pdf_generation_status === 'expired') {
-      await this.generatePDF(quoteId, true);
-      const { data: fresh } = await supabase
-        .from('quotes')
-        .select('pdf_storage_path, pdf_generation_status')
-        .eq('id', quoteId)
-        .single();
-      quote = fresh;
+  /** Save the quote's server PDF to the user's device. */
+  async savePDF(quoteId: string, quoteNumber?: string | null): Promise<PDFGenerationResult & { filename?: string }> {
+    const result = await this.generatePDF(quoteId);
+    if (!result.success || !result.pdf_url) {
+      return { success: false, error: result.error || 'The quote PDF could not be generated.' };
     }
-
-    if (!quote?.pdf_storage_path) return null;
-
-    const { data } = await supabase.storage
-      .from('pdf-documents')
-      .createSignedUrl(quote.pdf_storage_path, 60 * 60); // 1 hour
-
-    return data?.signedUrl || null;
+    const response = await fetch(result.pdf_url);
+    if (!response.ok) return { success: false, error: `PDF download failed (${response.status}).` };
+    const blobUrl = URL.createObjectURL(await response.blob());
+    const filename = `quote-${result.quote_number || quoteNumber || quoteId.slice(0, 8)}.pdf`;
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+    return { ...result, filename };
   }
 
   /**

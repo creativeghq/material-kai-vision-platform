@@ -20,7 +20,6 @@ import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
 import { QuoteShareButton } from '../components/QuoteShareButton';
 import { QuoteEmailButton } from '../components/QuoteEmailButton';
-import { useQuoteDocument } from '../hooks/useQuoteDocument';
 import { trackQuoteView } from '@/services/quoteAnalyticsService';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { formatDate } from '@/utils/datetime';
@@ -47,8 +46,6 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [showAddProducts, setShowAddProducts] = useState(false);
   const [openInvoice, setOpenInvoice] = useState<{ id: string; internal_number: string; amount_due: number; currency: string; status: string } | null>(null);
   const [payingNow, setPayingNow] = useState(false);
-
-  const { data: docData } = useQuoteDocument(id || '');
 
   useEffect(() => {
     if (id) {
@@ -332,7 +329,6 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 <QuoteDownloadButtons
                   quoteId={quote.id}
                   quoteNumber={quote.quote_number}
-                  data={docData}
                   viewContext="customer"
                 />
               </>

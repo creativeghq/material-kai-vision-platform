@@ -21,7 +21,6 @@ import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { quotePDFService } from '../services/QuotePDFService';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
-import { useQuoteDocument } from '../hooks/useQuoteDocument';
 import { trackQuoteView } from '@/services/quoteAnalyticsService';
 import { QuoteAnalyticsPanel } from '../components/QuoteAnalyticsPanel';
 import { QuoteEmailButton } from '../components/QuoteEmailButton';
@@ -135,9 +134,6 @@ export const QuoteDetailPage: React.FC = () => {
   // no mirror of it — an unread busy flag only looks like protection.
   const [sendingQuote, setSendingQuote] = useState(false);
   const [acceptingQuote, setAcceptingQuote] = useState(false);
-
-  // HTML/client-side PDF — hook must be at top level (before any early returns)
-  const { data: docData } = useQuoteDocument(id || '');
 
   useEffect(() => {
     if (id) {
@@ -636,7 +632,6 @@ export const QuoteDetailPage: React.FC = () => {
             <QuoteDownloadButtons
               quoteId={quote.id}
               quoteNumber={quote.quote_number}
-              data={docData}
               viewContext="admin"
             />
 

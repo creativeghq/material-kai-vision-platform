@@ -25,7 +25,6 @@ const rel = (p: string) => p.slice(p.indexOf('/src/') + 1);
  * decision, which is the point — it is far harder to do by accident than declaring another helper.
  */
 const ALLOWED = new Set([
-  'src/modules/quotes/components/QuoteDocument.tsx',   // en-GB dd/mm/yyyy on a printed document
   'src/pages/AppointmentsPage.tsx',                    // date-only parsed as T00:00:00 (UTC shift)
   'src/modules/quotes/components/QuoteRequestModal.tsx', // month:'long'
   'src/pages/Inbox/inboxFormat.ts',                     // compact relative time, no "ago"

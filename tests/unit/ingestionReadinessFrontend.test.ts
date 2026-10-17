@@ -138,10 +138,6 @@ describe('B15 — quotes', () => {
     expect(isPriceOnRequest('priced', 12)).toBe(false);
     const reg = snapshot([field({ name: 'body_material', label: 'Body Material', labelByCategory: { kitchen: 'Material' } })]);
     expect(describeVariant({ body_material: 'Oak', finish: 'Matt' }, 'kitchen', reg)).toBe('Material: Oak · Finish: Matt');
-    const doc = src('src/modules/quotes/hooks/useQuoteDocument.ts');
-    expect(doc).toMatch(/selected_attributes/);
-    expect(doc).toMatch(/pricing_status/);
-    expect(doc).not.toMatch(/products\s*\(/);
   });
 
   it('the picker is scoped to the quote and reads the typed search contract', () => {

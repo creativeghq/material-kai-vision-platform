@@ -261,13 +261,10 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     })
     .then(() => {});
 
-  // Fresh 1-hour signed URL for the server-generated PDF. The public page renders
-  // fully from structured data, so a missing PDF only affects the "Download PDF"
-  // action — when the retention sweep has purged it, rebuild on the download event
-  // (credit-free; renderer accepts the service-role key). Plain views don't render.
+  // A download asks the renderer, which re-renders only when the quote changed since the stored PDF.
   let pdf_url: string | null = null;
   let pdfPath: string | null = quote.pdf_storage_path;
-  if (!pdfPath && event === 'download') {
+  if (event === 'download') {
     try {
       await fetch(`${SUPABASE_URL}/functions/v1/generate-quote-pdf`, {
         method: 'POST',
@@ -275,7 +272,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         },
-        body: JSON.stringify({ quote_id: quote.id, regenerate: true }),
+        body: JSON.stringify({ quote_id: quote.id }),
       });
       const { data: fresh } = await supabase
         .from('quotes').select('pdf_storage_path').eq('id', quote.id).maybeSingle();

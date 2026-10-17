@@ -9,10 +9,7 @@ const SCAN_ROOT = 'src';
 const CANONICAL = 'src/utils/datetime.ts';
 
 /** Documented, deliberate exceptions — each keeps its own formatter for a stated reason. */
-const ALLOWED: Record<string, string> = {
-  // A printed customer document, deliberately dd/mm/yyyy in en-GB.
-  'src/modules/quotes/components/QuoteDocument.tsx': 'printed customer document uses en-GB dd/mm/yyyy',
-};
+const ALLOWED: Record<string, string> = {};
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir, { withFileTypes: true })) {

@@ -32,7 +32,6 @@ const SCROLLS = ['overflow-x-auto', 'overflow-auto', 'overflow-x-scroll', 'table
  */
 const PRINT_DOCUMENTS = new Set([
   'src/modules/finance/components/InvoiceDocument.tsx',
-  'src/modules/quotes/components/QuoteDocument.tsx',
 ]);
 
 const BACKSLASH = String.fromCharCode(92);

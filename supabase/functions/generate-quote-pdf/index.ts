@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { fetchQuoteData, fetchStorageFile, fetchImageBytesFromUrl } from './data-fetcher.ts';
 import type { QuotePDFRequest, QuotePDFResponse, QuoteData } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -75,6 +75,15 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
   };
 }
 
+// Bump when renderBrandedDocument's output changes: a stored PDF is reused while its fingerprint matches.
+const RENDER_REVISION = '2026-10-17';
+
+async function documentFingerprint(doc: BrandedDoc, assetPaths: (string | null)[]): Promise<string> {
+  const input = new TextEncoder().encode(JSON.stringify({ r: RENDER_REVISION, doc, assetPaths }));
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input));
+  return Array.from(digest.slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -97,7 +106,8 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
     return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
   }
 
-  let quoteId: string;
+  let quoteId = '';
+  let rendering = false;
 
   try {
     const body: QuotePDFRequest = await req.json();
@@ -149,56 +159,65 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       return jsonResponse({ success: false, error: 'Missing quote_id' }, 400);
     }
 
-    // Tenant boundary: this handler runs under the service role (RLS bypassed), so we MUST
-    // verify the caller belongs to the quote's workspace before reading/generating/mutating
-    // it. Without this, any authenticated user could read another tenant's quote PDF (signed
-    // URL) or flip its pdf_generation_status by quote_id (cross-tenant IDOR). Internal
-    // service-role / admin-secret callers (level 'secret') legitimately operate cross-tenant.
-    {
-      const { data: ownerRow, error: ownerErr } = await supabase
-        .from('quotes')
-        .select('workspace_id')
-        .eq('id', quoteId)
-        .single();
-      if (ownerErr || !ownerRow) {
-        return jsonResponse({ success: false, error: 'Quote not found' }, 404);
-      }
-      if (auth.level !== 'secret') {
-        const { data: member } = await supabase
-          .from('workspace_members')
-          .select('user_id')
-          .eq('workspace_id', (ownerRow as any).workspace_id)
-          .eq('user_id', auth.userId ?? '')
-          .eq('status', 'active')
-          .maybeSingle();
-        if (!member) {
-          return jsonResponse({ success: false, error: 'Forbidden' }, 403);
-        }
-      }
+    const { data: ownerRow, error: ownerErr } = await supabase
+      .from('quotes')
+      .select('workspace_id, user_id, pdf_storage_path, pdf_generation_status')
+      .eq('id', quoteId)
+      .single();
+    if (ownerErr || !ownerRow) {
+      return jsonResponse({ success: false, error: 'Quote not found' }, 404);
     }
 
-    // Check if PDF already exists and regeneration not requested
-    if (!body.regenerate) {
-      const { data: existing } = await supabase
-        .from('quotes')
-        .select('pdf_storage_path, pdf_generation_status')
-        .eq('id', quoteId)
-        .single();
+    // The reader is whoever RLS lets read the quote (seller staff, or the quote's own customer).
+    let isSeller = auth.level === 'secret';
+    if (!isSeller) {
+      const { data: readable } = auth.supabaseAsUser
+        ? await auth.supabaseAsUser.from('quotes').select('id').eq('id', quoteId).maybeSingle()
+        : { data: null };
+      if (!readable) {
+        return jsonResponse({ success: false, error: 'Quote not found' }, 404);
+      }
+      isSeller = await userHasWorkspaceCapability(supabase, auth.userId, ownerRow.workspace_id, 'quotes.use');
+    }
+    const forceRender = body.regenerate === true && isSeller;
 
-      if (existing?.pdf_storage_path && existing?.pdf_generation_status === 'completed') {
-        // Refresh signed URL and return existing
-        const { data: signedUrl } = await supabase.storage
-          .from('pdf-documents')
-          .createSignedUrl(existing.pdf_storage_path, 60 * 60 * 24 * 7);
+    const quoteData = await fetchQuoteData(supabase, quoteId);
+    const branding = await fetchBrandingConfig(supabase, quoteData.workspace_id ?? null);
 
+    let logoPath: string | null = null;
+    try {
+      const { data: fs } = await supabase
+        .from('finance_settings').select('business_logo_path')
+        .eq('workspace_id', quoteData.workspace_id ?? '').maybeSingle();
+      logoPath = fs?.business_logo_path ?? null;
+    } catch { /* logo optional */ }
+
+    const outputPath = async () => {
+      const fingerprint = await documentFingerprint(mapQuoteToBrandedDoc(quoteData, branding), [
+        branding.cover_image_path, branding.intro_page_path, branding.content_page_path,
+        branding.backcover_image_path, logoPath, ...quoteData.items.map((it) => it.image_url),
+      ]);
+      return `quote-output/${quoteId}/quote-${quoteData.quote_number || quoteId}-${fingerprint}.pdf`;
+    };
+
+    const previousPath: string | null = ownerRow.pdf_storage_path ?? null;
+    let storagePath = await outputPath();
+    if (!forceRender && quoteData.quote_number && previousPath === storagePath
+      && ownerRow.pdf_generation_status === 'completed') {
+      const { data: cached } = await supabase.storage
+        .from('pdf-documents')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+      if (cached?.signedUrl) {
         return jsonResponse({
           success: true,
-          pdf_url: signedUrl?.signedUrl,
-          pdf_storage_path: existing.pdf_storage_path,
+          quote_number: quoteData.quote_number,
+          pdf_url: cached.signedUrl,
+          pdf_storage_path: storagePath,
         });
       }
     }
 
+    rendering = true;
     // Mark as generating (this also triggers the quote_number auto-generation)
     await supabase
       .from('quotes')
@@ -208,30 +227,15 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       })
       .eq('id', quoteId);
 
-    // Fetch the quote first so we can resolve THIS workspace's branding + template.
-    const quoteData = await fetchQuoteData(supabase, quoteId);
-    // Unified branding: workspace business identity + PDF template, one source.
-    const branding = await fetchBrandingConfig(supabase, (quoteData as any).workspace_id);
-
-    // Re-fetch quote_number (may have been generated by trigger)
     const { data: updatedQuote } = await supabase
       .from('quotes')
       .select('quote_number')
       .eq('id', quoteId)
       .single();
-
-    if (updatedQuote?.quote_number) {
+    if (updatedQuote?.quote_number && updatedQuote.quote_number !== quoteData.quote_number) {
       quoteData.quote_number = updatedQuote.quote_number;
+      storagePath = await outputPath();
     }
-
-    // The seller workspace's logo (same source as the invoice PDF) for the cover.
-    let logoPath: string | null = null;
-    try {
-      const { data: fs } = await supabase
-        .from('finance_settings').select('business_logo_path')
-        .eq('workspace_id', (quoteData as any).workspace_id).maybeSingle();
-      logoPath = fs?.business_logo_path ?? null;
-    } catch { /* logo optional */ }
 
     // Fetch template images (+ optional workspace logo) in parallel
     const [coverBytes, introBytes, bgBytes, backBytes, logoBytes] = await Promise.all([
@@ -260,8 +264,6 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       itemImages: itemImageBytes,
     });
 
-    // Upload to storage
-    const storagePath = `quote-output/${quoteId}/quote-${quoteData.quote_number || quoteId}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from('pdf-documents')
       .upload(storagePath, pdfBytes, {
@@ -289,10 +291,9 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       })
       .eq('id', quoteId);
 
-    // Log a download/generation analytics event (best-effort, service role).
     supabase.from('quote_analytics_events').insert({
       event_type: 'downloaded',
-      view_context: 'admin',
+      view_context: isSeller ? 'admin' : 'customer',
       quote_id: quoteId,
       user_id: auth.userId ?? null,
       session_id: auth.userId ?? 'server',
@@ -300,16 +301,10 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       metadata: { method: 'server_generate', quote_number: quoteData.quote_number ?? null },
     }).then(() => {});
 
-    // Notify quote owner that PDF is ready
-    const { data: quoteRecord } = await supabase
-      .from('quotes')
-      .select('user_id, workspace_id')
-      .eq('id', quoteId)
-      .single();
-    if (quoteRecord?.user_id) {
+    if (storagePath !== previousPath && ownerRow.user_id) {
       emitFlowEvent('quote_pdf_generated', {
-        user_id: quoteRecord.user_id,
-        workspace_id: quoteRecord.workspace_id ?? null,
+        user_id: ownerRow.user_id,
+        workspace_id: ownerRow.workspace_id ?? null,
         type: 'pdf_ready',
         title: 'Your quote PDF is ready',
         body: `Quote ${quoteData.quote_number || ''} PDF has been generated and is ready to download.`,
@@ -329,8 +324,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
   } catch (error) {
     console.error('PDF generation error:', error);
 
-    // Mark failure
-    if (quoteId!) {
+    if (rendering) {
       await supabase
         .from('quotes')
         .update({
