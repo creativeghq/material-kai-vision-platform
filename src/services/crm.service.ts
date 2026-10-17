@@ -455,6 +455,9 @@ export const contactsAPI = {
 export interface CreatePartyError extends Error {
   code?: 'duplicate_company' | 'duplicate_contact';
   existing?: { id: string; name: string };
+  /** `vat` is the same party; `name` may be a different one, which `allow_duplicate: true` overrides. */
+  matchedOn?: 'vat' | 'email' | 'name';
+  allowOverride?: boolean;
 }
 
 /** @deprecated Use {@link CreatePartyError}. Kept so existing importers keep compiling. */
@@ -462,7 +465,10 @@ export type CreateCompanyError = CreatePartyError;
 
 /** Carry crm-api's structured duplicate refusal through, rather than flattening it to a string. */
 function partyCreateError(
-  payload: { error?: string; code?: string; existing?: { id?: unknown; name?: unknown } },
+  payload: {
+    error?: string; code?: string; existing?: { id?: unknown; name?: unknown };
+    matched_on?: unknown; allow_override?: unknown;
+  },
   fallback: string,
   expected: 'duplicate_company' | 'duplicate_contact',
 ): CreatePartyError {
@@ -470,6 +476,10 @@ function partyCreateError(
   if (payload.code === expected && payload.existing?.id) {
     err.code = expected;
     err.existing = { id: String(payload.existing.id), name: String(payload.existing.name ?? '') };
+    if (payload.matched_on === 'vat' || payload.matched_on === 'email' || payload.matched_on === 'name') {
+      err.matchedOn = payload.matched_on;
+    }
+    err.allowOverride = payload.allow_override === true;
   }
   return err;
 }

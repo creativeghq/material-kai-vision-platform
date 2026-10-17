@@ -175,6 +175,8 @@ export interface KeywordResearchResult {
   guideContent?: RankingContent & { query: string };
   /** A page of the site that already serves this keyword; null when none was found, absent when not checked. */
   existingPage?: ExistingPage | null;
+  /** Source → why it did not answer. A source named here is UNKNOWN, never "Google showed none". */
+  failedSources?: Partial<Record<'ai_mode' | 'guide_serp' | 'serp_signals', string>>;
 }
 
 export interface ExistingPage {
@@ -334,7 +336,7 @@ export interface ArticlePlan {
 // ════════════════════════════════════════════════════════════════
 
 export interface SectionScore {
-  status: 'all_good' | 'issues_found';
+  status: 'all_good' | 'issues_found' | 'not_checked';
   issueCount: number;
   details: string[];
 }

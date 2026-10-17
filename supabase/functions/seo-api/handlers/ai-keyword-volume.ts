@@ -41,10 +41,12 @@ export async function handleAiKeywordVolume(req: Request, body: any): Promise<Re
 
   const now = new Date().toISOString();
   if (!r.ok) {
+    // `ai_volume` and `captured_at` are left out so a refused refresh keeps the last measured value and its date.
+    const reason = (r.error ?? 'the AI keyword source refused the call').slice(0, 200);
     const rows = keywords.map((keyword) => ({
       workspace_id: ent.workspaceId, keyword, language_code: language,
-      ai_volume: null, status: 'collector_failed',
-      note: (r.error ?? 'the AI keyword source refused the call').slice(0, 300), captured_at: now,
+      status: 'collector_failed',
+      note: `The last refresh failed: ${reason}. Any volume shown is from the previous successful read.`,
     }));
     const { error } = await db.from('ai_keyword_volumes')
       .upsert(rows, { onConflict: 'workspace_id,keyword,language_code' });

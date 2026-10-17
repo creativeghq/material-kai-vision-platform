@@ -2,7 +2,7 @@
  * RefreshResearchButton — drop-in "Refresh research" control for any surface that shows a CRM
  * company but isn't the company record page (Finance → Parties, and anywhere else that grows one).
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -34,7 +34,12 @@ export function useCompanyResearch({ companyId, workspaceId, onDone }: Pick<Prop
   const [status, setStatus] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
 
+  // Synchronous latch: a second click before `busy` renders would pay for a second research run.
+  const running = useRef(false);
+
   const run = async () => {
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setSummary(null);
     try {
@@ -74,6 +79,7 @@ export function useCompanyResearch({ companyId, workspaceId, onDone }: Pick<Prop
     } catch (e: any) {
       toast({ title: 'Refresh failed', description: e?.message, variant: 'destructive' });
     } finally {
+      running.current = false;
       setBusy(false);
       setStatus(null);
     }

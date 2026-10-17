@@ -76,8 +76,8 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
         const result = await callSEOFunction('seo-research', {
           topic,
           target_keyword,
-          language_code: language_code || 'en',
-          location_code: location_code || 2840,
+          language_code: language_code || undefined,
+          location_code: location_code || undefined,
           user_id: userId,
           website_id: website_id || undefined,
         }, 60_000);
@@ -312,10 +312,6 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
           content_type: content_type || 'guide',
           user_id: userId,
           website_id: website_id || undefined,
-          // The pipeline defaults these to 2840/'en' — the US in English. `seo_keyword_research`
-          // has always accepted them and this tool never did, so a run asked for "for Greece"
-          // researched American SERPs and planned the article against them. Nothing failed:
-          // US competitor headings for a Greek keyword are a plausible research result.
           language_code: language_code || undefined,
           location_code: location_code || undefined,
           allow_duplicate: allow_duplicate === true,

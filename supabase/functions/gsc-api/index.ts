@@ -1,7 +1,7 @@
 /** gsc-api — Google Search Console integration for connected websites. */
 
 import { createClient } from '@supabase/supabase-js';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { inspectSiteUrls, buildInspectionQueue, INSPECT_QUOTA_PER_DAY } from './urlInspection.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -33,6 +33,20 @@ const SITES_URL = 'https://www.googleapis.com/webmasters/v3/sites';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 const STATE_TTL_MS = 10 * 60 * 1000;
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+/** Stop starting work here; the gateway cuts the request at 150s. */
+const RUN_DEADLINE_MS = 120_000;
+const RECONNECT_MESSAGE = 'Google access for this site was revoked or has expired. Reconnect Search Console to resume syncing.';
+
+/** The Google grant itself is gone: no retry fixes it, only the user reconnecting. */
+class GrantRevokedError extends HttpError {
+  constructor(detail?: string) {
+    super(409, detail ? `${RECONNECT_MESSAGE} (Google: ${detail})` : RECONNECT_MESSAGE);
+  }
+}
+
+function errorStatus(e: unknown, fallback: number): number {
+  return e instanceof HttpError ? e.status : fallback;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,16 +142,40 @@ async function refreshToken(refresh: string): Promise<any> {
   });
   const r = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error_description || j.error || `token refresh ${r.status}`);
+  if (!r.ok) {
+    const detail = j.error_description || j.error || `token refresh ${r.status}`;
+    if (j.error === 'invalid_grant' || j.error === 'unauthorized_client' || r.status === 401) throw new GrantRevokedError(detail);
+    throw new Error(detail);
+  }
   return j;
 }
+
+/** Stops the crons retrying a dead grant; the status RPC then reads `connected:false` with the reason. */
+async function markNeedsReconnect(supabase: any, websiteId: string, message: string): Promise<void> {
+  const { error } = await supabase.from('website_gsc_connections')
+    .update({ is_active: false, access_token: null, token_expires_at: null, last_sync_error: message.slice(0, 500), updated_at: new Date().toISOString() })
+    .eq('website_id', websiteId);
+  if (error) console.error('[gsc-api] could not mark the connection for reconnect:', error.message);
+}
+
 async function validAccessToken(supabase: any, conn: any): Promise<string> {
   const exp = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
   if (conn.access_token && exp - Date.now() > REFRESH_BUFFER_MS) return conn.access_token;
-  if (!conn.refresh_secret_id) throw new Error('no_refresh_token');
+  if (!conn.refresh_secret_id) throw new GrantRevokedError();
   const { data: refresh, error: vaultErr } = await supabase.rpc('gsc_refresh_token', { p_website_id: conn.website_id });
-  if (vaultErr || typeof refresh !== 'string' || !refresh) throw new Error('no_refresh_token');
-  const t = await refreshToken(refresh);
+  if (vaultErr) throw new Error(`Could not read the stored Google token: ${vaultErr.message}`);
+  if (typeof refresh !== 'string' || !refresh) {
+    const e = new GrantRevokedError();
+    await markNeedsReconnect(supabase, conn.website_id, e.message);
+    throw e;
+  }
+  let t: any;
+  try {
+    t = await refreshToken(refresh);
+  } catch (e) {
+    if (e instanceof GrantRevokedError) await markNeedsReconnect(supabase, conn.website_id, e.message);
+    throw e;
+  }
   const expiresAt = new Date(Date.now() + (Number(t.expires_in || 3600) * 1000)).toISOString();
   await supabase.from('website_gsc_connections')
     .update({ access_token: t.access_token, token_expires_at: expiresAt, is_active: true, updated_at: new Date().toISOString() })
@@ -147,6 +185,10 @@ async function validAccessToken(supabase: any, conn: any): Promise<string> {
 async function listSites(accessToken: string): Promise<any[]> {
   const r = await fetch(SITES_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
   const j = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new GrantRevokedError(j.error?.message);
+  if (r.status === 403) {
+    throw new HttpError(403, `Google refused the Search Console site list (${j.error?.message || 'forbidden'}). Check that the connected Google account can read this property.`);
+  }
   if (!r.ok) throw new Error(j.error?.message || `sites list ${r.status}`);
   return j.siteEntry || [];
 }
@@ -177,11 +219,11 @@ async function listGaProperties(token: string): Promise<Array<{ property: string
     // 403 here is almost always the Analytics Admin API not being enabled on the
     // Cloud project, which is a console setting no amount of retrying fixes. Say so.
     const msg = jsonBody?.error?.message || `HTTP ${resp.status}`;
-    throw new Error(
-      resp.status === 403
-        ? `Google refused the Analytics request (${msg}). Enable the Google Analytics Admin API and Data API on the Cloud project behind these OAuth credentials.`
-        : `Analytics property list failed: ${msg}`,
-    );
+    if (resp.status === 401) throw new GrantRevokedError(msg);
+    if (resp.status === 403) {
+      throw new HttpError(403, `Google refused the Analytics request (${msg}). Enable the Google Analytics Admin API and Data API on the Cloud project behind these OAuth credentials.`);
+    }
+    throw new Error(`Analytics property list failed: ${msg}`);
   }
   const out: Array<{ property: string; name: string; account: string; measurement_id?: string | null }> = [];
   for (const acct of jsonBody.accountSummaries || []) {
@@ -729,6 +771,8 @@ async function gscQuery(token: string, property: string, body: Record<string, un
       body: JSON.stringify({ ...body, rowLimit: GSC_ROW_LIMIT, startRow, dataState: 'all' }),
     });
     const j = await r.json().catch(() => ({}));
+    if (r.status === 401) throw new GrantRevokedError(j.error?.message);
+    if (r.status === 403) throw new HttpError(403, `Google refused the Search Console query (${j.error?.message || 'forbidden'}).`);
     if (!r.ok) throw new Error(j.error?.message || `searchAnalytics ${r.status}`);
     const rows: any[] = j.rows || [];
     all.push(...rows);
@@ -754,14 +798,21 @@ const GSC_BREAKDOWNS: { dim: string; gscDims: string[] }[] = [
   { dim: 'searchAppearance', gscDims: ['date', 'searchAppearance'] },
 ];
 
+type SyncResult = { rows: number; partial: string[] };
+
+/** What a sync leaves in `last_sync_error`: null only when every part answered. */
+function syncNote(r: SyncResult): string | null {
+  return r.partial.length ? `Synced, but these parts failed: ${r.partial.join(' · ')}`.slice(0, 500) : null;
+}
+
 /**
  * Pull all of a property's search-analytics for [startDate,endDate] and upsert it:
  *   - query×page×date   → gsc_performance (paginated past 25k)
  *   - date/device/country/searchAppearance → gsc_breakdown
- * Returns the number of query×page rows persisted. Breakdown failures are non-fatal
- * (a property with no rich-result data, say, just yields an empty searchAppearance).
+ * A failed breakdown does not fail the sync; it is returned in `partial` and kept in `last_sync_error`.
  */
-async function syncConnection(supabase: any, conn: any, startDate: string, endDate: string): Promise<number> {
+async function syncConnection(supabase: any, conn: any, startDate: string, endDate: string): Promise<SyncResult> {
+  const partial: string[] = [];
   const token = await validAccessToken(supabase, conn);
   const base = { website_id: conn.website_id, workspace_id: conn.workspace_id };
 
@@ -785,14 +836,18 @@ async function syncConnection(supabase: any, conn: any, startDate: string, endDa
       });
       if (payload.length) await upsertChunked(supabase, 'gsc_breakdown', payload, 'website_id,date,dimension,value');
     } catch (e) {
-      console.warn(`[gsc-api] breakdown '${dim}' failed for ${conn.property}:`, e instanceof Error ? e.message : e);
+      if (e instanceof GrantRevokedError) throw e;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[gsc-api] breakdown '${dim}' failed for ${conn.property}:`, msg);
+      partial.push(`${dim}: ${msg.slice(0, 120)}`);
     }
   }
 
   // 3. Query × country / device. A site with none yet gets a 90-day backfill.
-  const { count: haveQueryBreakdown } = await supabase.from('gsc_query_breakdown')
+  const { count: haveQueryBreakdown, error: qbCountErr } = await supabase.from('gsc_query_breakdown')
     .select('id', { count: 'exact', head: true }).eq('website_id', conn.website_id);
-  const qbStart = haveQueryBreakdown ? startDate : ymd(new Date(Date.now() - 90 * 86400000));
+  if (qbCountErr) partial.push(`query breakdown backfill check: ${qbCountErr.message.slice(0, 120)}`);
+  const qbStart = haveQueryBreakdown || qbCountErr ? startDate : ymd(new Date(Date.now() - 90 * 86400000));
   for (const dim of ['country', 'device']) {
     try {
       const rows = await gscQuery(token, conn.property, { startDate: qbStart, endDate, dimensions: ['date', 'query', dim] });
@@ -803,10 +858,13 @@ async function syncConnection(supabase: any, conn: any, startDate: string, endDa
       });
       if (payload.length) await upsertChunked(supabase, 'gsc_query_breakdown', payload, 'website_id,date,query,dimension,value');
     } catch (e) {
-      console.warn(`[gsc-api] query×${dim} failed for ${conn.property}:`, e instanceof Error ? e.message : e);
+      if (e instanceof GrantRevokedError) throw e;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[gsc-api] query×${dim} failed for ${conn.property}:`, msg);
+      partial.push(`query×${dim}: ${msg.slice(0, 120)}`);
     }
   }
-  return corePayload.length;
+  return { rows: corePayload.length, partial };
 }
 
 /** Pull one site's Analytics window and record the outcome on the connection; throws on failure. */
@@ -882,8 +940,9 @@ async function finishConnect(
         .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at').eq('website_id', args.websiteId).single();
       const end = ymd(new Date(Date.now() - 1 * 86400000));
       const start = ymd(new Date(Date.now() - 28 * 86400000));
-      await syncConnection(supabase, fresh, start, end);
-      await supabase.from('website_gsc_connections').update({ last_sync_at: new Date().toISOString() }).eq('website_id', args.websiteId);
+      const r = await syncConnection(supabase, fresh, start, end);
+      await supabase.from('website_gsc_connections')
+        .update({ last_sync_at: new Date().toISOString(), last_sync_error: syncNote(r) }).eq('website_id', args.websiteId);
     } catch (e) {
       await supabase.from('website_gsc_connections').update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', args.websiteId);
     }
@@ -930,11 +989,15 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
   // Sharing a schedule would either starve the backfill or re-pull performance data hourly.
   if (action === 'cron-inspect') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: conns } = await supabase.from('website_gsc_connections')
+    const { data: conns, error: connErr } = await supabase.from('website_gsc_connections')
       .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at')
       .eq('is_active', true).not('property', 'is', null).not('refresh_secret_id', 'is', null);
+    if (connErr) return json({ ok: false, error: connErr.message }, 500);
+    const deadline = Date.now() + RUN_DEADLINE_MS;
     const results: unknown[] = [];
+    const notReached: string[] = [];
     for (const c of conns || []) {
+      if (Date.now() > deadline) { notReached.push(c.website_id); continue; }
       try {
         const token = await validAccessToken(supabase, c);
         const queue = await buildInspectionQueue(supabase, c.website_id, INSPECT_QUOTA_PER_DAY);
@@ -944,11 +1007,13 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
         // Recorded against the connection, not swallowed: a collector that fails silently is
         // indistinguishable from one that found nothing.
-        await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', c.website_id);
+        if (!(e instanceof GrantRevokedError)) {
+          await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', c.website_id);
+        }
         results.push({ website_id: c.website_id, error: msg });
       }
     }
-    return json({ ok: true, sites: results });
+    return json({ ok: notReached.length === 0, sites: results, not_reached: notReached });
   }
   // ── Cron: refresh Analytics for every connection with a GA property ──
   if (action === 'cron-ga-sync') {
@@ -957,8 +1022,11 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
       .select('website_id, workspace_id, ga_property_id, access_token, refresh_secret_id, token_expires_at')
       .eq('is_active', true).not('ga_property_id', 'is', null).not('refresh_secret_id', 'is', null);
     if (connErr) return json({ ok: false, error: connErr.message }, 500);
+    const deadline = Date.now() + RUN_DEADLINE_MS;
     const results: unknown[] = [];
+    const notReached: string[] = [];
     for (const c of conns || []) {
+      if (Date.now() > deadline) { notReached.push(c.website_id); continue; }
       try {
         const r = await syncGaConnection(supabase, c, 28);
         results.push({ website_id: c.website_id, rows: r.rows });
@@ -966,31 +1034,44 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         results.push({ website_id: c.website_id, error: String(e instanceof Error ? e.message : e).slice(0, 300) });
       }
     }
-    return json({ ok: true, sites: results });
+    return json({ ok: notReached.length === 0, sites: results, not_reached: notReached });
   }
   // ── Cron: refresh every active, property-bound connection ──
   if (action === 'cron-sync') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: conns } = await supabase.from('website_gsc_connections')
+    const { data: conns, error: connErr } = await supabase.from('website_gsc_connections')
       .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at')
       .eq('is_active', true).not('property', 'is', null).not('refresh_secret_id', 'is', null);
+    if (connErr) return json({ ok: false, error: connErr.message }, 500);
     const end = ymd(new Date(Date.now() - 1 * 86400000));
     const start = ymd(new Date(Date.now() - 5 * 86400000));
-    let ok = 0, failed = 0, rows = 0;
+    const deadline = Date.now() + RUN_DEADLINE_MS;
+    let ok = 0, failed = 0, partialSites = 0, stampFailed = 0, rows = 0;
+    const notReached: string[] = [];
     for (const c of conns || []) {
+      if (Date.now() > deadline) { notReached.push(c.website_id); continue; }
       try {
-        rows += await syncConnection(supabase, c, start, end);
-        await supabase.from('website_gsc_connections').update({ last_sync_at: new Date().toISOString(), last_sync_error: null }).eq('website_id', c.website_id);
+        const r = await syncConnection(supabase, c, start, end);
+        rows += r.rows;
+        if (r.partial.length) partialSites++;
+        const { error: stampErr } = await supabase.from('website_gsc_connections')
+          .update({ last_sync_at: new Date().toISOString(), last_sync_error: syncNote(r) }).eq('website_id', c.website_id);
+        if (stampErr) { stampFailed++; console.error('[gsc-api] last_sync_at write failed:', stampErr.message); }
         ok++;
       } catch (e) {
         failed++;
-        await supabase.from('website_gsc_connections').update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', c.website_id);
+        if (!(e instanceof GrantRevokedError)) {
+          await supabase.from('website_gsc_connections').update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', c.website_id);
+        }
       }
     }
     const cutoff = ymd(new Date(Date.now() - 180 * 86400000));
-    await supabase.from('gsc_performance').delete().lt('date', cutoff);
-    await supabase.from('gsc_breakdown').delete().lt('date', cutoff);
-    await supabase.from('gsc_query_breakdown').delete().lt('date', cutoff);
+    const retentionErrors: string[] = [];
+    for (const table of ['gsc_performance', 'gsc_breakdown', 'gsc_query_breakdown']) {
+      const { error: delErr } = await supabase.from(table).delete().lt('date', cutoff);
+      if (delErr) retentionErrors.push(`${table}: ${delErr.message}`);
+    }
+    if (retentionErrors.length) console.error('[gsc-api] retention sweep failed:', retentionErrors.join(' · '));
 
     // The day's rows have landed, so this is the moment the keyword engine has
     // something new to judge: promote the queries that now clear the bar, retire the
@@ -1006,7 +1087,10 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
       autotrack = { error: String(e instanceof Error ? e.message : e).slice(0, 300) };
       console.warn('[gsc-api] autotrack sweep failed:', autotrack);
     }
-    return json({ ok: true, synced: ok, failed, rows, autotrack });
+    return json({
+      ok: notReached.length === 0, synced: ok, failed, partial: partialSites, stamp_failed: stampFailed, rows,
+      not_reached: notReached, retention_errors: retentionErrors, autotrack,
+    });
   }
 
   // ── User actions require a JWT ──
@@ -1115,7 +1199,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           return json({ ok: true, ...(await gaRealtime(token, conn.ga_property_id)) });
         } catch (e) {
           // Never zero: nobody on the site and we could not ask are different answers.
-          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 400) }, 502);
+          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 400) }, errorStatus(e, 502));
         }
       }
 
@@ -1131,7 +1215,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           const token = await validAccessToken(supabase, conn);
           return json({ ok: true, ...(await gaDrillReport(token, conn.ga_property_id, q)) });
         } catch (e) {
-          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, 502);
+          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, errorStatus(e, 502));
         }
       }
 
@@ -1145,7 +1229,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         try {
           return json({ ok: true, ...(await syncGaConnection(supabase, { ...conn, workspace_id: website.workspace_id }, days)) });
         } catch (e) {
-          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, 502);
+          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, errorStatus(e, 502));
         }
       }
 
@@ -1162,8 +1246,10 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           return json({ ok: true, ...r });
         } catch (e) {
           const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
-          await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', websiteId);
-          return json({ ok: false, error: msg }, 400);
+          if (!(e instanceof GrantRevokedError)) {
+            await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', websiteId);
+          }
+          return json({ ok: false, error: msg }, errorStatus(e, 400));
         }
       }
       case 'sync': {
@@ -1175,13 +1261,17 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         const end = ymd(new Date(Date.now() - 1 * 86400000));
         const start = ymd(new Date(Date.now() - days * 86400000));
         try {
-          const rows = await syncConnection(supabase, conn, start, end);
-          await supabase.from('website_gsc_connections').update({ last_sync_at: new Date().toISOString(), last_sync_error: null }).eq('website_id', websiteId);
-          return json({ ok: true, rows, from: start, to: end });
+          const r = await syncConnection(supabase, conn, start, end);
+          const { error: stampErr } = await supabase.from('website_gsc_connections')
+            .update({ last_sync_at: new Date().toISOString(), last_sync_error: syncNote(r) }).eq('website_id', websiteId);
+          if (stampErr) return json({ ok: false, error: `Synced ${r.rows} rows but could not record the sync: ${stampErr.message}` }, 500);
+          return json({ ok: true, rows: r.rows, partial: r.partial, from: start, to: end });
         } catch (e) {
           const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
-          await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', websiteId);
-          return json({ ok: false, error: msg }, 400);
+          if (!(e instanceof GrantRevokedError)) {
+            await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', websiteId);
+          }
+          return json({ ok: false, error: msg }, errorStatus(e, 400));
         }
       }
 
@@ -1199,6 +1289,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         return json({ error: `Unknown action: ${action}` }, 400);
     }
   } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.message }, e.status);
     return json({ error: String(e instanceof Error ? e.message : e) }, 500);
   }
 }));

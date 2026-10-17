@@ -223,7 +223,9 @@ export async function enforceLexicon(
   let markdown = opts.markdown;
   const house: { from: string; to: string }[] = [];
   try {
-    if (!(await hasLexicon(supabase, language))) return { markdown, report: empty };
+    if (!(await hasLexicon(supabase, language))) {
+      return { markdown, report: { ...empty, failed: `not checked: no dictionary is loaded for ${language || 'this article\'s language'}` } };
+    }
     if (language === 'el') markdown = fixGreekPunctuation(markdown);
     for (const g of await approvedGlossary(supabase, opts.workspaceId, language)) {
       const r = replaceWordInProse(markdown, g.from, g.to);

@@ -1,10 +1,11 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { blankedSource } from '../helpers/sourceIndex';
 
 const PICKER = 'src/components/business/crm/SupplyCategorySelect.tsx';
 const SERVICE = 'src/services/crmCategoriesService.ts';
-const INDUSTRY = 'src/components/business/crm/IndustrySelect.tsx';
 const ASSIGNMENT = 'src/components/business/catalogs/CategoryAssignmentPicker.tsx';
 const CONTACT_PAGE = 'src/modules/crm/pages/ContactDetailPage.tsx';
 const COMPANY_PAGE = 'src/modules/crm/pages/CompanyDetailPage.tsx';
@@ -33,7 +34,7 @@ describe('the supply vocabulary comes from the product-import registry', () => {
 
 describe('the industry scope has one writer per surface and cannot clobber other lists', () => {
   it('every picker reconciles WITHIN its own scope — a full replace would delete what the picker beside it just wrote', () => {
-    for (const p of [PICKER, INDUSTRY, ASSIGNMENT]) {
+    for (const p of [PICKER, ASSIGNMENT]) {
       const body = code(p);
       expect(body, `${p} writes with the replace-everything setter`)
         .not.toMatch(/setMembershipsFor(Contact|Company)\(/);
@@ -43,14 +44,25 @@ describe('the industry scope has one writer per surface and cannot clobber other
 
   it('every company-side writer of the industry scope also refreshes the denormalized label', () => {
     let checked = 0;
-    for (const p of [PICKER, INDUSTRY]) {
+    for (const p of [PICKER]) {
       const body = code(p);
       if (!/setCompanyMembershipsWithinScope\(/.test(body)) continue;
       checked += 1;
       expect(body, `${p} updates company industry memberships without refreshing crm_companies.industry`)
         .toContain('companiesAPI.updateCompany(');
     }
-    expect(checked, 'no company-side industry writer was found to check').toBe(2);
+    expect(checked, 'no company-side industry writer was found to check').toBe(1);
+  });
+
+  it('the company page has ONE industry picker — a second over the same scope deletes what the first saved (#485 C-5)', () => {
+    expect(existsSync(join(__dirname, '..', '..', 'src/components/business/crm/IndustrySelect.tsx'))).toBe(false);
+    expect(code(COMPANY_PAGE)).not.toContain('IndustrySelect');
+  });
+
+  it('only a platform operator is offered the reconcile, which refuses everyone else', () => {
+    const body = code(PICKER);
+    expect(body).toContain('isPlatformOperator');
+    expect(body).toMatch(/canSync \? syncButton : undefined/);
   });
 });
 

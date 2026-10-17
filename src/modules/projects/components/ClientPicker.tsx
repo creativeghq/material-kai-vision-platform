@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { projectsService } from '../services/projectsService';
+import { contactsAPI, type CreatePartyError } from '@/services/crm.service';
 
 export interface ClientPickerValue {
   client_company_id: string | null;
@@ -57,6 +58,7 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [savingNew, setSavingNew] = useState(false);
+  const [contactDuplicate, setContactDuplicate] = useState<{ id: string; name: string; allowOverride: boolean } | null>(null);
 
   useEffect(() => {
     // Lazy search: don't show any results until the user actually types. Clears
@@ -86,36 +88,30 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
     return () => { cancelled = true; clearTimeout(t); };
   }, [search, tab, mode]);
 
-  const handleCreateContact = async () => {
+  const handleCreateContact = async (allowDuplicate = false) => {
     if (!newFirstName.trim() && !newLastName.trim() && !newEmail.trim()) {
       toast({ title: 'Enter at least a first name, last name, or email', variant: 'destructive' });
       return;
     }
     try {
       setSavingNew(true);
+      setContactDuplicate(null);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const displayName = [newFirstName.trim(), newLastName.trim()].filter(Boolean).join(' ') || newEmail.trim() || 'Unnamed contact';
 
-      const { data, error } = await (supabase as any)
-        .from('crm_contacts')
-        .insert({
-          // NB: do NOT set user_id — that column is the platform-user↔contact link (one per user).
-          // Binding a new CLIENT contact to the creator's user_id creates a second self-contact and
-          // breaks GET /contacts/by-user/{creator} (.single() → "multiple rows"). created_by is the
-          // right attribution field.
-          created_by: user.id,
-          workspace_id: getActiveWorkspaceId(user.id) ?? undefined,
-          name: displayName,
-          first_name: newFirstName.trim() || null,
-          last_name: newLastName.trim() || null,
-          email: newEmail.trim() || null,
-          phone: newPhone.trim() || null,
-        })
-        .select('id, name, first_name, last_name, email')
-        .single();
-      if (error) throw error;
+      // Through crm-api, whose duplicate guard runs before the insert. Never set user_id here —
+      // that column is the platform-user↔contact link, one per user.
+      const { data } = await contactsAPI.createContact({
+        workspace_id: getActiveWorkspaceId(user.id) ?? undefined,
+        name: displayName,
+        first_name: newFirstName.trim() || null,
+        last_name: newLastName.trim() || null,
+        email: newEmail.trim() || null,
+        phone: newPhone.trim() || null,
+        ...(allowDuplicate ? { allow_duplicate: true } : {}),
+      });
 
       onChange({
         client_company_id: null,
@@ -130,6 +126,11 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
       setNewPhone('');
       setAddingNew(false);
     } catch (err) {
+      const dup = err as CreatePartyError;
+      if (dup?.code === 'duplicate_contact' && dup.existing) {
+        setContactDuplicate({ ...dup.existing, allowOverride: dup.allowOverride === true });
+        return;
+      }
       if (handleQuotaError(err)) return; // plan-limit reached → upsell toast
       toast({
         title: 'Failed to add client',
@@ -273,12 +274,31 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
                 className="mt-1"
               />
             </div>
+            {contactDuplicate && (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span><span className="font-medium">{contactDuplicate.name}</span> is already in the CRM.</span>
+                <span className="flex gap-1">
+                  {contactDuplicate.allowOverride && (
+                    <Button type="button" size="sm" variant="ghost" disabled={savingNew} onClick={() => void handleCreateContact(true)}>
+                      Create anyway
+                    </Button>
+                  )}
+                  <Button type="button" size="sm" variant="outline" disabled={savingNew} onClick={() => {
+                    onChange({ client_company_id: null, client_contact_id: contactDuplicate.id, display_name: contactDuplicate.name });
+                    setContactDuplicate(null);
+                    setAddingNew(false);
+                  }}>
+                    Use it
+                  </Button>
+                </span>
+              </div>
+            )}
             <div className="flex gap-2 pt-1">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setAddingNew(false)}
+                onClick={() => { setAddingNew(false); setContactDuplicate(null); }}
                 disabled={savingNew}
                 className="flex-1"
               >
@@ -287,7 +307,7 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
               <Button
                 type="button"
                 size="sm"
-                onClick={handleCreateContact}
+                onClick={() => void handleCreateContact()}
                 disabled={savingNew || disabled}
                 className="flex-1"
               >

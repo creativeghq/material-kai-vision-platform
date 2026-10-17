@@ -9,12 +9,15 @@ import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { agentReviewLink } from '../_shared/agent-handoff.ts';
 
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
+import { resolveSeoMarket } from '../_shared/seo-market.ts';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 const KEYWORD_LIMIT = 100;
 const BACKLINK_LIMIT = 100;
+/** Stop starting work here; the gateway cuts the request at 150s. */
+const RUN_DEADLINE_MS = 120_000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,54 +28,19 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-// GSC returns ISO alpha-3 (lowercase); DataForSEO wants alpha-2 + we pick a language.
-const A3_TO_A2: Record<string, string> = {
-  usa: 'US', gbr: 'GB', grc: 'GR', deu: 'DE', fra: 'FR', ita: 'IT', esp: 'ES', nld: 'NL', bel: 'BE',
-  aut: 'AT', che: 'CH', prt: 'PT', irl: 'IE', can: 'CA', aus: 'AU', pol: 'PL', swe: 'SE', dnk: 'DK',
-  nor: 'NO', fin: 'FI', tur: 'TR', bgr: 'BG', rou: 'RO', cyp: 'CY', cze: 'CZ', hun: 'HU', hrv: 'HR',
-  svk: 'SK', svn: 'SI', ltu: 'LT', lva: 'LV', est: 'EE', ukr: 'UA', rus: 'RU', bra: 'BR', mex: 'MX',
-  ind: 'IN', jpn: 'JP', chn: 'CN', kor: 'KR', are: 'AE', sau: 'SA', zaf: 'ZA', nzl: 'NZ',
-};
-const TLD_TO_A2: Record<string, string> = {
-  gr: 'GR', uk: 'GB', de: 'DE', fr: 'FR', it: 'IT', es: 'ES', nl: 'NL', be: 'BE', at: 'AT', ch: 'CH',
-  pt: 'PT', ie: 'IE', ca: 'CA', au: 'AU', pl: 'PL', se: 'SE', dk: 'DK', no: 'NO', fi: 'FI', tr: 'TR',
-  bg: 'BG', ro: 'RO', cy: 'CY', cz: 'CZ', hu: 'HU', hr: 'HR', sk: 'SK', si: 'SI', jp: 'JP', br: 'BR',
-};
-const A2_TO_LANG: Record<string, string> = {
-  US: 'en', GB: 'en', IE: 'en', CA: 'en', AU: 'en', NZ: 'en', ZA: 'en', IN: 'en',
-  GR: 'el', DE: 'de', AT: 'de', CH: 'de', FR: 'fr', BE: 'fr', IT: 'it', ES: 'es', MX: 'es',
-  NL: 'nl', PT: 'pt', BR: 'pt', PL: 'pl', SE: 'sv', DK: 'da', NO: 'no', FI: 'fi', TR: 'tr',
-  BG: 'bg', RO: 'ro', CY: 'el', CZ: 'cs', HU: 'hu', HR: 'hr', SK: 'sk', SI: 'sl', RU: 'ru',
-  UA: 'uk', JP: 'ja', CN: 'zh', KR: 'ko', AE: 'en', SA: 'ar',
-};
-
 function domainOf(url: string): string {
   try { return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./i, ''); }
   catch { return String(url || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || ''; }
 }
 
-/** Resolve the market (country+language) for a website: GSC top country → TLD → US. */
-async function resolveMarket(supabase: any, websiteId: string, domain: string): Promise<{ country: string; language: string }> {
-  let country = '';
-  const { data } = await supabase.from('gsc_breakdown')
-    .select('value, impressions').eq('website_id', websiteId).eq('dimension', 'country')
-    .order('impressions', { ascending: false }).limit(1);
-  const a3 = (data?.[0]?.value || '').toLowerCase();
-  if (a3 && A3_TO_A2[a3]) country = A3_TO_A2[a3];
-  if (!country) {
-    const tld = domain.split('.').pop()?.toLowerCase() || '';
-    if (TLD_TO_A2[tld]) country = TLD_TO_A2[tld];
-  }
-  if (!country) country = 'US';
-  return { country, language: A2_TO_LANG[country] || 'en' };
-}
+/** MIVAA debits `user_id` per call; a cron run carries only `workspace_id`, so it is attributed but not billed. */
+type Attribution = { workspace_id: string; user_id?: string };
 
-/** DataForSEO dispatcher via MIVAA's seo-agent route. */
 /** Throws when the source did not answer. A refusal arrives as HTTP 200 + `success:false` + `raw: {}`. */
-async function dfs(kind: string, params: Record<string, unknown>): Promise<{ items: any[] }> {
+async function dfs(kind: string, params: Record<string, unknown>, attribution: Attribution): Promise<{ items: any[] }> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
-    body: JSON.stringify({ params, attribution: {} }),
+    body: JSON.stringify({ params, attribution }),
   });
   const text = await resp.text();
   let parsed: any = null; try { parsed = JSON.parse(text); } catch { parsed = text; }
@@ -84,7 +52,10 @@ async function dfs(kind: string, params: Record<string, unknown>): Promise<{ ite
 }
 
 const n = (v: any): number | null => (typeof v === 'number' ? v : null);
-const sum = (...v: any[]) => v.reduce((s, x) => s + (typeof x === 'number' ? x : 0), 0);
+const sum = (...v: any[]): number | null => {
+  const nums = v.filter((x): x is number => typeof x === 'number');
+  return nums.length ? nums.reduce((s, x) => s + x, 0) : null;
+};
 
 /**
  * Emit a workspace-scoped movement alert if a metric moved materially week-over-week.
@@ -126,11 +97,17 @@ async function maybeAlert(
 async function trackWebsite(
   supabase: any,
   website: { id: string; workspace_id: string; url: string },
-  opts: { competitorKeywords: boolean },
-): Promise<{ ok: boolean; error?: string }> {
+  opts: { competitorKeywords: boolean; attribution: Attribution; deadline: number },
+): Promise<{ ok: boolean; error?: string; competitors_not_reached?: number; competitors_error?: string }> {
   const domain = domainOf(website.url);
-  const { country, language } = await resolveMarket(supabase, website.id, domain);
+  let country: string | null = null;
+  let language: string | null = null;
   try {
+    const resolved = await resolveSeoMarket(supabase, { websiteId: website.id, workspaceId: website.workspace_id });
+    if (!resolved.ok) throw new Error(`Not measured: ${resolved.reason}`);
+    country = resolved.market.country_code;
+    language = resolved.market.language_code;
+    const attr = opts.attribution;
     // A failed source is `failed` with its message, never `no_data`: a stored set is only
     // replaced when its call answered.
     const sourceErrors: Record<string, string> = {};
@@ -149,10 +126,10 @@ async function trackWebsite(
       }
     };
     const [overview, backlinks, ranked, links] = await Promise.all([
-      settle('overview', dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language })),
-      settle('backlinks', dfs('backlinks_summary', { target: domain })),
-      settle('ranked', dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT })),
-      settle('backlink_list', dfs('backlinks_backlinks', { target: domain, mode: 'one_per_domain', limit: BACKLINK_LIMIT })),
+      settle('overview', dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language }, attr)),
+      settle('backlinks', dfs('backlinks_summary', { target: domain }, attr)),
+      settle('ranked', dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT }, attr)),
+      settle('backlink_list', dfs('backlinks_backlinks', { target: domain, mode: 'one_per_domain', limit: BACKLINK_LIMIT }, attr)),
     ]);
     const rankedFailed = sourceStatus.ranked === 'failed';
 
@@ -229,9 +206,17 @@ async function trackWebsite(
     // Competitors ride the same weekly run, in the SAME market, so the lines on the
     // comparison chart are actually comparable — a competitor measured in a different
     // country is a different question wearing the same axis.
-    await trackCompetitors(supabase, website, country, language, snapshot.captured_at, opts.competitorKeywords);
-
-    return { ok: true };
+    try {
+      const notReached = await trackCompetitors(supabase, website, {
+        country, language, capturedAt: snapshot.captured_at, withKeywords: opts.competitorKeywords,
+        attribution: attr, deadline: opts.deadline,
+      });
+      return { ok: true, competitors_not_reached: notReached };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[seo-domain-tracker] competitors not measured:', msg);
+      return { ok: true, competitors_error: msg };
+    }
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
     await supabase.from('seo_domain_snapshots').upsert({
@@ -246,26 +231,28 @@ async function trackWebsite(
 async function trackCompetitors(
   supabase: any,
   website: { id: string; workspace_id: string },
-  country: string,
-  language: string,
-  capturedAt: string,
-  withKeywords: boolean,
-): Promise<void> {
+  run: { country: string; language: string; capturedAt: string; withKeywords: boolean; attribution: Attribution; deadline: number },
+): Promise<number> {
+  const { country, language, capturedAt, withKeywords, attribution } = run;
   const { data: rivals, error } = await supabase.from('seo_competitors')
     .select('id, competitor_domain')
     .eq('website_id', website.id).eq('is_active', true)
     .limit(25);
-  if (error) { console.warn('[seo-domain-tracker] competitor read failed:', error.message); return; }
-  if (!rivals?.length) return;
+  if (error) throw new Error(`Could not read the tracked competitors: ${error.message}`);
+  if (!rivals?.length) return 0;
 
-  for (const rival of rivals) {
+  for (const [i, rival] of rivals.entries()) {
+    if (Date.now() > run.deadline) {
+      console.warn(`[seo-domain-tracker] out of time — ${rivals.length - i} competitor(s) of ${website.id} not measured`);
+      return rivals.length - i;
+    }
     const status: Record<string, string> = {};
     const errors: Record<string, string> = {};
     let row: any = {};
     const [overview, ranked] = await Promise.allSettled([
-      dfs('labs_domain_rank_overview', { target: rival.competitor_domain, country_code: country, language_code: language }),
+      dfs('labs_domain_rank_overview', { target: rival.competitor_domain, country_code: country, language_code: language }, attribution),
       withKeywords
-        ? dfs('labs_ranked_keywords', { target: rival.competitor_domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT })
+        ? dfs('labs_ranked_keywords', { target: rival.competitor_domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT }, attribution)
         : Promise.resolve(null),
     ]);
     if (overview.status === 'fulfilled') {
@@ -303,6 +290,7 @@ async function trackCompetitors(
     }, { onConflict: 'competitor_id,captured_at' });
     if (upErr) console.warn('[seo-domain-tracker] competitor snapshot write failed:', upErr.message);
   }
+  return 0;
 }
 
 Deno.serve(withApiLogging('seo-domain-tracker', async (req: Request) => {
@@ -315,10 +303,26 @@ Deno.serve(withApiLogging('seo-domain-tracker', async (req: Request) => {
 
   if (action === 'cron-run') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: sites } = await supabase.from('user_websites').select('id, workspace_id, url').eq('is_active', true);
-    let ok = 0, failed = 0;
-    for (const s of sites || []) { const r = await trackWebsite(supabase, s, { competitorKeywords: true }); if (r.ok) ok++; else failed++; }
-    return json({ ok: true, tracked: ok, failed });
+    const { data: sites, error: sitesErr } = await supabase.from('user_websites')
+      .select('id, workspace_id, url').eq('is_active', true).order('id');
+    if (sitesErr) return json({ ok: false, error: `Could not read the websites to track: ${sitesErr.message}` }, 500);
+    const deadline = Date.now() + RUN_DEADLINE_MS;
+    let ok = 0, failed = 0, competitorsNotReached = 0, competitorReadsFailed = 0;
+    const notReached: string[] = [];
+    for (const s of sites || []) {
+      if (Date.now() > deadline) { notReached.push(s.id); continue; }
+      const r = await trackWebsite(supabase, s, {
+        competitorKeywords: true, attribution: { workspace_id: s.workspace_id }, deadline,
+      });
+      if (r.ok) ok++; else failed++;
+      competitorsNotReached += r.competitors_not_reached ?? 0;
+      if (r.competitors_error) competitorReadsFailed++;
+    }
+    return json({
+      ok: notReached.length === 0, tracked: ok, failed,
+      not_reached: notReached.length, not_reached_website_ids: notReached,
+      competitors_not_reached: competitorsNotReached, competitor_reads_failed: competitorReadsFailed,
+    });
   }
 
   const auth = await authenticate(req, { requireUser: true });
@@ -331,6 +335,10 @@ Deno.serve(withApiLogging('seo-domain-tracker', async (req: Request) => {
   // Paid module — refuse before the DataForSEO snapshot (#212). Cron branch stays ungated.
   const ent = await assertEntitled(supabase, website.workspace_id, 'seo-toolkit');
   if (!ent.ok) return ent.response;
-  const r = await trackWebsite(supabase, website, { competitorKeywords: false });
+  const r = await trackWebsite(supabase, website, {
+    competitorKeywords: false,
+    attribution: { workspace_id: website.workspace_id, user_id: auth.userId },
+    deadline: Date.now() + RUN_DEADLINE_MS,
+  });
   return json(r, r.ok ? 200 : 400);
 }));

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { foldedName } from '@/services/crmSearch';
 
 export { AUTO_CATEGORY_KINDS, isHandAssignableKind } from './crmCategoryKinds';
 import { isHandAssignableKind } from './crmCategoryKinds';
@@ -111,8 +112,9 @@ class CrmCategoriesService {
     workspace_id?: string;
   }): Promise<CrmCategory> {
     const { data: { user } } = await supabase.auth.getUser();
-    const slug = (input.slug || input.name).toLowerCase().trim()
-      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+    const slug = foldedName((input.slug || input.name).trim())
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
+      || `category-${crypto.randomUUID().slice(0, 8)}`;
     const { data, error } = await supabase
       .from('crm_categories')
       .insert({

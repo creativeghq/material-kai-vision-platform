@@ -24,6 +24,11 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 const pct = (s: any): number | null => (typeof s === 'number' ? Math.round(s * 100) : null);
+/** Stop starting work here; the gateway cuts the request at 150s. */
+const RUN_DEADLINE_MS = 120_000;
+
+/** MIVAA debits `user_id` per call; a cron run carries only `workspace_id`, so it is attributed but not billed. */
+type Attribution = { workspace_id: string; user_id?: string | null };
 
 // DataForSEO instant-page `checks` that mean a real problem when true. (Other checks like
 // seo_friendly_url / has_html_doctype are GOOD when true, so we only whitelist negatives.)
@@ -43,27 +48,30 @@ const BAD_CHECKS: Record<string, string> = {
 };
 
 /** Call MIVAA's quick-page audit for one URL (instant on-page + Lighthouse). */
-async function quickPage(url: string, userId: string | null): Promise<any> {
+async function quickPage(url: string, attribution: Attribution): Promise<any> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/onpage/quick-page`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
-    body: JSON.stringify({ url, for_mobile: false, attribution: { user_id: userId } }),
+    body: JSON.stringify({ url, for_mobile: false, attribution }),
   });
   const text = await resp.text();
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { parsed = text; }
   if (!resp.ok) throw new Error(`quick-page ${describeUpstreamError(resp.status, parsed)}`);
-  return parsed?.data ?? parsed;
+  if (parsed?.success !== true) {
+    throw new Error(`quick-page ${String(parsed?.data?.error || parsed?.error || 'the audit source reported an error inside a successful HTTP response').slice(0, 300)}`);
+  }
+  return parsed.data ?? {};
 }
 
 // ── OnPage crawl (async) ────────────────────────────────────────────────────
 
 /** Call the DataForSEO dispatcher for one `kind`. Throws on transport failure. */
-async function dfs(kind: string, params: Record<string, unknown>, userId: string | null): Promise<any> {
+async function dfs(kind: string, params: Record<string, unknown>, attribution: Attribution): Promise<any> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
-    body: JSON.stringify({ params, attribution: { user_id: userId } }),
+    body: JSON.stringify({ params, attribution }),
   });
   const text = await resp.text();
   let parsed: any = null;
@@ -136,9 +144,10 @@ function issueUrl(item: any): string | null {
  */
 async function syncCrawl(supabase: any, crawl: any, userId: string | null): Promise<any> {
   if (!crawl.task_id) return { ok: false, error: 'crawl has no task id' };
+  const attribution: Attribution = { workspace_id: crawl.workspace_id, user_id: userId };
   let summary: any;
   try {
-    const r = await dfs('onpage_summary', { task_id: crawl.task_id }, userId);
+    const r = await dfs('onpage_summary', { task_id: crawl.task_id }, attribution);
     summary = (r.items || [])[0] || {};
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e).slice(0, 400);
@@ -159,20 +168,22 @@ async function syncCrawl(supabase: any, crawl: any, userId: string | null): Prom
   };
 
   if (!done) {
-    await supabase.from('website_crawls').update(patch).eq('id', crawl.id);
+    const { error: progErr } = await supabase.from('website_crawls').update(patch).eq('id', crawl.id);
+    if (progErr) return { ok: false, error: `Could not record crawl progress: ${progErr.message}` };
     return { ok: true, status: 'running', pages_crawled: info.pages_crawled ?? 0 };
   }
 
   // Finished — pull every issue class. Replace this crawl's rows wholesale so a
   // re-sync cannot double-count.
-  await supabase.from('website_crawl_issues').delete().eq('crawl_id', crawl.id);
+  const { error: clearErr } = await supabase.from('website_crawl_issues').delete().eq('crawl_id', crawl.id);
+  if (clearErr) return { ok: false, error: `Could not clear the previous issue rows: ${clearErr.message}` };
   const sectionStatus: Record<string, string> = {};
   const rows: any[] = [];
 
   for (const section of ISSUE_SECTIONS) {
     try {
       // Only the params this endpoint declares — see ISSUE_SECTIONS.
-      const r = await dfs(section.kind, { task_id: crawl.task_id, ...(section.params || {}) }, userId);
+      const r = await dfs(section.kind, { task_id: crawl.task_id, ...(section.params || {}) }, attribution);
       // An OnPage section answers with a task envelope — `{crawl_progress, items_count,
       // items: [...]}` — and when the section is EMPTY the dispatcher hands that envelope
       // back as the one item (`items: null`). Stored as an issue it became "Cannot be
@@ -206,14 +217,23 @@ async function syncCrawl(supabase: any, crawl: any, userId: string | null): Prom
 
   if (rows.length) {
     const { error: insErr } = await supabase.from('website_crawl_issues').insert(rows);
-    if (insErr) console.warn('[seo-site-audit] issue insert failed:', insErr.message);
+    if (insErr) {
+      const msg = `The crawl finished but its ${rows.length} issues could not be stored: ${insErr.message}`.slice(0, 400);
+      console.error('[seo-site-audit]', msg);
+      await supabase.from('website_crawls').update({
+        ...patch, status: 'failed', error: msg, section_status: sectionStatus, pages_with_issues: null,
+        finished_at: new Date().toISOString(),
+      }).eq('id', crawl.id);
+      return { ok: false, error: msg };
+    }
   }
 
-  await supabase.from('website_crawls').update({
+  const { error: finErr } = await supabase.from('website_crawls').update({
     ...patch, status: 'finished', section_status: sectionStatus,
     pages_with_issues: rows.length ? new Set(rows.map((r) => r.url)).size : 0,
     finished_at: new Date().toISOString(),
   }).eq('id', crawl.id);
+  if (finErr) return { ok: false, error: `Could not mark the crawl finished: ${finErr.message}` };
 
   return { ok: true, status: 'finished', issues: rows.length, sections: sectionStatus };
 }
@@ -222,7 +242,7 @@ async function syncCrawl(supabase: any, crawl: any, userId: string | null): Prom
 async function auditWebsite(supabase: any, website: { id: string; workspace_id: string; url: string }, userId: string | null): Promise<any> {
   const homepage = /^https?:\/\//i.test(website.url) ? website.url : `https://${website.url}`;
   try {
-    const data = await quickPage(homepage, userId);
+    const data = await quickPage(homepage, { workspace_id: website.workspace_id, user_id: userId });
     const sections = data?.sections || {};
 
     // Google Lighthouse is async on DataForSEO and often empty in the sync window — treat as a bonus.
@@ -235,11 +255,13 @@ async function auditWebsite(supabase: any, website: { id: string; workspace_id: 
       throw new Error(errs || 'The audit returned no on-page data and no Lighthouse data.');
     }
 
-    // Failing on-page checks → issues (score is the on-page score for context, not per-check).
-    const issues = Object.entries(BAD_CHECKS)
+    // No instant-page answer means the checks are UNKNOWN: `issues` stays null, never [].
+    const onpageFailed = sections?.instant_page?.items?.length ? null
+      : String(data?.errors?.instant_page || 'the on-page audit returned no page').slice(0, 300);
+    const issues = onpageFailed ? null : Object.entries(BAD_CHECKS)
       .filter(([k]) => checks[k] === true || ip[k] === true)
       .map(([, title]) => ({ title, score: null as number | null, display_value: null as string | null }));
-    if ((ip.broken_links ?? 0) > 0 && !issues.some((i) => i.title.includes('broken links')))
+    if (issues && (ip.broken_links ?? 0) > 0 && !issues.some((i) => i.title.includes('broken links')))
       issues.push({ title: `Broken links: ${ip.broken_links}`, score: null, display_value: null });
 
     // Prefer the Lighthouse SEO score when present; else the instant on-page score (0-100).
@@ -253,7 +275,9 @@ async function auditWebsite(supabase: any, website: { id: string; workspace_id: 
       // would read undefined forever.
       bp_score: pct(cats['best-practices']?.score), seo_score: seoScore,
       lighthouse: Object.keys(cats).length ? { categories: cats } : null,
-      onpage: { onpage_score: ip.onpage_score ?? null, meta: ip.meta ?? null, page_timing: ip.page_timing ?? null, checks },
+      onpage: onpageFailed
+        ? { failed: onpageFailed }
+        : { onpage_score: ip.onpage_score ?? null, meta: ip.meta ?? null, page_timing: ip.page_timing ?? null, checks },
       issues, error: null,
     };
     // Previous on-page score (for the week-over-week change alert) — read BEFORE insert.
@@ -307,16 +331,25 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
   // ── Cron: weekly audit of every active connected website ──
   if (action === 'cron-run') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: sites } = await supabase.from('user_websites')
-      .select('id, workspace_id, url').eq('is_active', true);
+    const { data: sites, error: sitesErr } = await supabase.from('user_websites')
+      .select('id, workspace_id, url').eq('is_active', true).order('id');
+    if (sitesErr) return json({ ok: false, error: `Could not read the websites to audit: ${sitesErr.message}` }, 500);
+    const deadline = Date.now() + RUN_DEADLINE_MS;
     let ok = 0, failed = 0;
+    const notReached: string[] = [];
     for (const s of sites || []) {
+      if (Date.now() > deadline) { notReached.push(s.id); continue; }
       const r = await auditWebsite(supabase, s, null);
       if (r.ok) ok++; else failed++;
     }
     // Retention: keep 180 days of audit history.
-    await supabase.from('website_health_audits').delete().lt('created_at', new Date(Date.now() - 180 * 86400000).toISOString());
-    return json({ ok: true, audited: ok, failed });
+    const { error: pruneErr } = await supabase.from('website_health_audits')
+      .delete().lt('created_at', new Date(Date.now() - 180 * 86400000).toISOString());
+    if (pruneErr) console.error('[seo-site-audit] retention sweep failed:', pruneErr.message);
+    return json({
+      ok: notReached.length === 0, audited: ok, failed,
+      not_reached: notReached.length, not_reached_website_ids: notReached, retention_error: pruneErr?.message ?? null,
+    });
   }
 
   // ── Cron: advance every running crawl ──
@@ -324,20 +357,27 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
   // moves is indistinguishable from one still working. This is what closes them.
   if (action === 'cron-sync-crawls') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: running } = await supabase.from('website_crawls')
+    const { data: running, error: runErr } = await supabase.from('website_crawls')
       .select('id, website_id, workspace_id, task_id')
-      .eq('status', 'running').limit(25);
-    let advanced = 0, finished = 0;
+      .eq('status', 'running').order('started_at').limit(25);
+    if (runErr) return json({ ok: false, error: `Could not read the running crawls: ${runErr.message}` }, 500);
+    const deadline = Date.now() + RUN_DEADLINE_MS;
+    let advanced = 0, finished = 0, failedSyncs = 0, notReached = 0;
     for (const c of running || []) {
+      if (Date.now() > deadline) { notReached++; continue; }
       const r = await syncCrawl(supabase, c, null);
-      if (r.ok) { advanced++; if (r.status === 'finished') finished++; }
+      if (r.ok) { advanced++; if (r.status === 'finished') finished++; } else failedSyncs++;
     }
     // A crawl still 'running' after 24h is stuck, not slow. Left alone it stays a
     // permanent spinner on the panel with nothing saying it died.
-    await supabase.from('website_crawls')
+    const { error: staleErr } = await supabase.from('website_crawls')
       .update({ status: 'failed', error: 'The crawl did not finish within 24 hours and was abandoned.', finished_at: new Date().toISOString() })
       .eq('status', 'running').lt('started_at', new Date(Date.now() - 86400000).toISOString());
-    return json({ ok: true, advanced, finished });
+    if (staleErr) console.error('[seo-site-audit] stale-crawl sweep failed:', staleErr.message);
+    return json({
+      ok: notReached === 0 && !staleErr, advanced, finished, failed: failedSyncs, not_reached: notReached,
+      stale_sweep_error: staleErr?.message ?? null,
+    });
   }
 
   // ── User: audit one website now ──
@@ -376,7 +416,7 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
       // is a hard 400, not an ignored field.
       const r = await dfs('onpage_task_post', {
         target, max_crawl_pages: pages, load_resources: false, enable_javascript: false,
-      }, auth.userId);
+      }, { workspace_id: website.workspace_id, user_id: auth.userId });
       // `task_post` returns 20100 "Task Created" with result:null — the id is on the TASK,
       // not in `result`, so the client's `items` projection is legitimately EMPTY here.
       // Reading items[0].id could never have worked.

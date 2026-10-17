@@ -98,12 +98,17 @@ export async function reviewArticle(
   const parts = [...sections(opts.markdown), metaPart];
   const perPart = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, REVIEW_MAX_INPUT_TOKENS, REVIEW_MAX_OUTPUT_TOKENS, 25);
   const ceiling = perPart * parts.length;
+  let system: string;
+  try {
+    system = await getToolPrompt(supabase, 'seo_reviewer') + businessContext(opts.brief);
+  } catch (e) {
+    return { markdown: opts.markdown, meta: opts.meta, report: { applied: [], skipped: [], credits: 0, failed: `not reviewed: ${(e as Error).message.slice(0, 200)}` } };
+  }
   const hold = await reserveStage(supabase, wallet, ceiling, 'SEO article review');
   if (!hold.ok) {
     return { markdown: opts.markdown, meta: opts.meta, report: { applied: [], skipped: [], credits: 0, failed: `not reviewed: ${hold.error}` } };
   }
 
-  const system = await getToolPrompt(supabase, 'seo_reviewer') + businessContext(opts.brief);
   const bodyEdits: ReviewEdit[] = [];
   const metaEdits: ReviewEdit[] = [];
   const priced: (number | null)[] = [];

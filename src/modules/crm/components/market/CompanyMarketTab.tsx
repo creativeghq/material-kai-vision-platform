@@ -35,8 +35,6 @@ interface CompanyMarketTabProps {
   company: CompanyMarketSeed;
 }
 
-const eur = (n: number) => formatMoney(n || 0, 'EUR');
-
 const hostOf = (url?: string | null): string | null => {
   if (!url) return null;
   return url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || null;
@@ -370,6 +368,9 @@ const LookalikesPanel: React.FC<{ companyId: string }> = ({ companyId }) => {
 const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, companyId, company }) => {
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<{ billedTotal: number; paidTotal: number; outstandingTotal: number } | null>(null);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  // The account view sums `total` across currencies, so its figures carry a currency only when every bill shares one.
+  const [billCurrencies, setBillCurrencies] = useState<string[]>([]);
   /**
    * Unbooked myDATA documents, TOTALLED PER CURRENCY (#353 CRM-19).
    *
@@ -386,7 +387,19 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
     (async () => {
       setLoading(true);
       // Booked AP totals from the finance rollup view (converted supplier_bills only).
-      const acct = await financeService.getSupplierAccount({ companyId }).catch(() => null);
+      let acctError: string | null = null;
+      const acct = await financeService.getSupplierAccount({ companyId }).catch((e: unknown) => {
+        acctError = e instanceof Error ? e.message : 'Could not load the supplier account';
+        return null;
+      });
+      let currencies: string[] = [];
+      if (acct) {
+        let cq = supabase.from('supplier_bills').select('currency').eq('supplier_company_id', companyId).neq('status', 'void');
+        if (workspaceId) cq = cq.eq('workspace_id', workspaceId);
+        const { data: curRows, error: curErr } = await cq;
+        if (curErr) acctError = curErr.message;
+        else currencies = [...new Set(((curRows ?? []) as Array<{ currency: string | null }>).map((r) => (r.currency || 'EUR').toUpperCase()))];
+      }
 
       // Unbooked myDATA received docs: matched to this company by issuer VAT, not yet a bill.
       let unb: { count: number; totals: Array<{ currency: string; total: number }> } | null = null;
@@ -422,6 +435,8 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
 
       if (cancelled) return;
       setAccount(acct ? { billedTotal: acct.billedTotal, paidTotal: acct.paidTotal, outstandingTotal: acct.outstandingTotal } : null);
+      setAccountError(acctError);
+      setBillCurrencies(currencies);
       setUnbooked(unb);
       setLoading(false);
     })();
@@ -429,6 +444,8 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
   }, [companyId, workspaceId, company.vat_number]);
 
   const hasBooked = account && (account.billedTotal || account.paidTotal || account.outstandingTotal);
+  const billCurrency = billCurrencies.length <= 1 ? (billCurrencies[0] ?? 'EUR') : null;
+  const billMoney = (n: number) => (billCurrency ? formatMoney(n || 0, billCurrency) : '—');
 
   return (
     <Card>
@@ -452,12 +469,21 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
         ) : (
           <>
-            {hasBooked ? (
-              <div className="grid grid-cols-3 gap-3">
-                <StatCell label="Billed to us" value={eur(account!.billedTotal)} />
-                <StatCell label="Paid to them" value={eur(account!.paidTotal)} />
-                <StatCell label="We owe" value={eur(account!.outstandingTotal)} accent={account!.outstandingTotal > 0} />
-              </div>
+            {accountError ? (
+              <p className="text-sm text-destructive">Could not load the booked amounts: {accountError}</p>
+            ) : hasBooked ? (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <StatCell label="Billed to us" value={billMoney(account!.billedTotal)} />
+                  <StatCell label="Paid to them" value={billMoney(account!.paidTotal)} />
+                  <StatCell label="We owe" value={billMoney(account!.outstandingTotal)} accent={account!.outstandingTotal > 0} />
+                </div>
+                {!billCurrency && (
+                  <p className="text-xs text-muted-foreground">
+                    Bills are in {billCurrencies.join(', ')}, so no single total is true — the ledger shows each currency.
+                  </p>
+                )}
+              </>
             ) : (
               <p className="text-sm text-muted-foreground italic">
                 No booked supplier bills for this company yet. Bills counted here come from converted myDATA documents or manually-entered supplier bills.

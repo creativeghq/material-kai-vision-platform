@@ -78,7 +78,14 @@ export const sampleLoanService = {
           quantity: i.quantity ?? 1,
         })),
       );
-      if (iErr) throw iErr;
+      if (iErr) {
+        // Undo the header so a retry does not leave a second, empty loan behind.
+        const { error: undoErr } = await supabase.from('sample_loans').delete().eq('id', (loan as SampleLoanRow).id);
+        if (undoErr) {
+          throw new Error(`The loan was saved without its items (${iErr.message}) and could not be removed: ${undoErr.message}. Delete it before lending again.`);
+        }
+        throw iErr;
+      }
     }
     return loan as SampleLoanRow;
   },

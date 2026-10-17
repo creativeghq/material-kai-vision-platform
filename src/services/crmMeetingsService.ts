@@ -124,10 +124,15 @@ class CrmMeetingsService {
     let inviteError: string | undefined;
     if (input.sendInvites && attendeeContactIds.length > 0) {
       try {
-        const { data: rows } = await supabase
+        const { data: rows, error: attendeesError } = await supabase
           .from('crm_contacts').select('id, name, email').in('id', attendeeContactIds);
+        if (attendeesError) throw attendeesError;
         const attendees = (rows ?? []).filter((c: any) => (c.email ?? '').trim());
         const emails = attendees.map((c: any) => c.email.trim());
+        if (emails.length < attendeeContactIds.length) {
+          invitesFailed = attendeeContactIds.length - emails.length;
+          inviteError = `${invitesFailed} attendee${invitesFailed === 1 ? ' has' : 's have'} no email address.`;
+        }
         if (emails.length > 0) {
           const start = new Date(input.meetingAt);
           const end = new Date(start.getTime() + 60 * 60 * 1000); // default 1h

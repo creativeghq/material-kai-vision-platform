@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { quotesService } from '@/modules/quotes/services/QuotesService';
+import { contactsAPI, type CreatePartyError } from '@/services/crm.service';
 
 export interface CustomerOption { type: 'contact' | 'company'; id: string; label: string; sub?: string; }
 
@@ -29,6 +30,7 @@ export const NewOrderDialog: React.FC<{
   const [busy, setBusy] = useState(false);
   const [addingContact, setAddingContact] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', email: '' });
+  const [contactDuplicate, setContactDuplicate] = useState<{ id: string; name: string; allowOverride: boolean } | null>(null);
 
   // Reset when opened.
   useEffect(() => {
@@ -70,19 +72,25 @@ export const NewOrderDialog: React.FC<{
     return () => { cancelled = true; clearTimeout(t); };
   }, [term]);
 
-  const quickAddContact = async () => {
+  const quickAddContact = async (allowDuplicate = false) => {
     if (!newContact.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
     if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
     try {
       setBusy(true);
-      const { data, error } = await supabase.from('crm_contacts')
-        .insert({ workspace_id: workspaceId, name: newContact.name.trim(), email: newContact.email.trim() || null } as any)
-        .select('id, name, email').single();
-      if (error) throw error;
-      setCustomer({ type: 'contact', id: (data as any).id, label: (data as any).name, sub: (data as any).email || undefined });
+      setContactDuplicate(null);
+      const { data } = await contactsAPI.createContact({
+        workspace_id: workspaceId, name: newContact.name.trim(), email: newContact.email.trim() || null,
+        ...(allowDuplicate ? { allow_duplicate: true } : {}),
+      });
+      setCustomer({ type: 'contact', id: data.id, label: data.name, sub: data.email || undefined });
       setAddingContact(false);
-    } catch (e: any) {
-      toast({ title: 'Failed to add contact', description: e?.message, variant: 'destructive' });
+    } catch (e: unknown) {
+      const dup = e as CreatePartyError;
+      if (dup?.code === 'duplicate_contact' && dup.existing) {
+        setContactDuplicate({ ...dup.existing, allowOverride: dup.allowOverride === true });
+      } else {
+        toast({ title: 'Failed to add contact', description: (e as Error)?.message, variant: 'destructive' });
+      }
     } finally {
       setBusy(false);
     }
@@ -139,9 +147,24 @@ export const NewOrderDialog: React.FC<{
               <div className="grid grid-cols-1 gap-2 rounded-md border border-border/60 p-3">
                 <Input className="h-8 text-xs" placeholder="Customer name *" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} />
                 <Input className="h-8 text-xs" placeholder="Email (optional)" value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} />
+                {contactDuplicate && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span><span className="font-medium">{contactDuplicate.name}</span> is already in the CRM.</span>
+                    <span className="flex gap-1">
+                      {contactDuplicate.allowOverride && (
+                        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void quickAddContact(true)}>Create anyway</Button>
+                      )}
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => {
+                        setCustomer({ type: 'contact', id: contactDuplicate.id, label: contactDuplicate.name });
+                        setContactDuplicate(null);
+                        setAddingContact(false);
+                      }}>Use it</Button>
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setAddingContact(false)}>Cancel</Button>
-                  <Button size="sm" onClick={quickAddContact} disabled={busy}>Add</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setAddingContact(false); setContactDuplicate(null); }}>Cancel</Button>
+                  <Button size="sm" onClick={() => void quickAddContact()} disabled={busy}>Add</Button>
                 </div>
               </div>
             ) : (

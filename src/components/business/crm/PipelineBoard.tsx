@@ -81,6 +81,7 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
   const [typeId, setTypeId] = useState<string | null>(null);
   const [stages, setStages] = useState<DealStage[]>([]);
   const [deals, setDeals] = useState<Deal[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState<string[]>([]);
   const [forecast, setForecast] = useState<DealForecastRow[]>([]);
   const [stageTotals, setStageTotals] = useState<DealStageTotalRow[]>([]);
   const [creating, setCreating] = useState(false);
@@ -121,16 +122,23 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
 
   const load = useCallback(async () => {
     if (!ws || !typeId) return;
-    const [s, d, f, t] = await Promise.all([
-      dealsService.listStages(typeId).catch(() => [] as DealStage[]),
-      dealsService.listDeals(ws, typeId).catch(() => [] as Deal[]),
-      getDealForecast(ws, typeId).catch(() => [] as DealForecastRow[]),
-      getDealStageTotals(ws, typeId).catch(() => [] as DealStageTotalRow[]),
+    const [s, d, f, t] = await Promise.allSettled([
+      dealsService.listStages(typeId),
+      dealsService.listDeals(ws, typeId),
+      getDealForecast(ws, typeId),
+      getDealStageTotals(ws, typeId),
     ]);
-    setStages(s);
-    setDeals(d);
-    setForecast(f);
-    setStageTotals(t);
+    const failed = [
+      s.status === 'rejected' ? 'stages' : null,
+      d.status === 'rejected' ? 'deals' : null,
+      f.status === 'rejected' ? 'forecast' : null,
+      t.status === 'rejected' ? 'stage totals' : null,
+    ].filter(Boolean) as string[];
+    setLoadFailed(failed);
+    setStages(s.status === 'fulfilled' ? s.value : []);
+    setDeals(d.status === 'fulfilled' ? d.value : []);
+    setForecast(f.status === 'fulfilled' ? f.value : []);
+    setStageTotals(t.status === 'fulfilled' ? t.value : []);
   }, [ws, typeId]);
 
   useEffect(() => { setDeals(null); void load(); }, [load]);
@@ -206,6 +214,12 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
 
   return (
     <div className="space-y-3">
+      {loadFailed.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs">
+          <span className="text-destructive">Could not load the {loadFailed.join(', ')} — what is shown is incomplete.</span>
+          <Button size="sm" variant="outline" onClick={() => void load()}>Retry</Button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* The segmentation the pipeline is organised by. Hidden when the caller pins a type. */}

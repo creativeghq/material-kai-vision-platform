@@ -76,8 +76,13 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
         }
         try {
           const r = await runAuditFor(sb, td, 'cron');
-          results.push({ id: td.id, ok: true, audit_id: r.audit_id });
+          results.push({ id: td.id, ok: true, audit_id: r.audit_id, failed_sections: r.failed_sections });
         } catch (e) {
+          if (gate.charged > 0) {
+            await (td.workspace_id
+              ? refundCronWorkspace(sb, td.workspace_id, 'seo-toolkit-audit', gate.charged, 'Audit failed')
+              : refundCronUser(sb, td.user_id, 'seo-toolkit-audit', gate.charged, 'Audit failed'));
+          }
           results.push({ id: td.id, ok: false, error: e instanceof Error ? e.message : String(e) });
         }
       }
@@ -133,7 +138,7 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
       return jsonResponse({ ok: false, error: 'Not enough credits to run this audit.' }, 402);
     }
 
-    let result: { audit_id: string };
+    let result: AuditResult;
     try {
       result = await runAuditFor(sb, td, source);
     } catch (e) {
@@ -146,7 +151,7 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
       }
       throw e;
     }
-    return jsonResponse({ ok: true, audit_id: result.audit_id });
+    return jsonResponse({ ok: true, audit_id: result.audit_id, failed_sections: result.failed_sections });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[seo-toolkit-audit] error:', msg);
@@ -158,7 +163,13 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
 // Audit pipeline
 // ─────────────────────────────────────────────────────────────────
 
-async function runAuditFor(sb: any, td: any, source: string): Promise<{ audit_id: string }> {
+type AuditResult = { audit_id: string; failed_sections: Record<string, string> };
+
+/** The sections each stored figure comes from; a figure whose section failed is never written. */
+const METRIC_SECTIONS = ['domain_rank_overview', 'ranked_keywords', 'backlinks_summary'] as const;
+
+/** Throws when no metric section answered, so the caller refunds and the domain stays due. */
+async function runAuditFor(sb: any, td: any, source: string): Promise<AuditResult> {
   // Fire MIVAA composite site-review
   const url = `${PYTHON_BACKEND_URL.replace(/\/+$/, '')}/api/v1/seo-agent/site-review`;
   const resp = await fetch(url, {
@@ -184,7 +195,17 @@ async function runAuditFor(sb: any, td: any, source: string): Promise<{ audit_id
     throw new Error(`MIVAA ${resp.status}: ${text.slice(0, 200)}`);
   }
   const json = await resp.json();
+  if (json?.success !== true) throw new Error(`MIVAA site-review refused: ${String(json?.error || json?.data?.error || 'no reason given').slice(0, 200)}`);
   const sections = json?.data?.sections || {};
+  const failed: Record<string, string> = {};
+  for (const [k, v] of Object.entries(json?.data?.errors || {})) failed[k] = String(v).slice(0, 300);
+  const answered = (k: string) => !!sections[k] && !(k in failed);
+  if (!METRIC_SECTIONS.some(answered)) {
+    const why = Object.entries(failed).map(([k, v]) => `${k}: ${v}`).join(' · ');
+    throw new Error(`Audit not recorded — no metric section answered${why ? ` (${why})` : ''}`);
+  }
+  const dfsOk = answered('domain_rank_overview');
+  const blOk = answered('backlinks_summary');
 
   // Extract metrics from the composite response
   const dr = sections.domain_rank_overview?.items?.[0] || {};
@@ -222,7 +243,7 @@ async function runAuditFor(sb: any, td: any, source: string): Promise<{ audit_id
         domain: it.domain,
         intersections: it.intersections,
       })),
-      raw_sections: sections,
+      raw_sections: Object.keys(failed).length ? { ...sections, _errors: failed } : sections,
       cost_usd: totalCost,
       source,
     })
@@ -230,17 +251,21 @@ async function runAuditFor(sb: any, td: any, source: string): Promise<{ audit_id
     .single();
   if (snapErr) throw snapErr;
 
-  // Update denormalised current_* + cadence
+  // A failed section leaves the previous current_* values standing rather than nulling them.
   const now = new Date();
   const next = new Date(now.getTime() + (td.audit_cadence_hours || 168) * 3600 * 1000);
   const { error: updErr } = await sb
     .from('seo_tracked_domains')
     .update({
-      current_domain_rank: dr.metrics_info?.rank ?? null,
-      current_ranking_keywords: drOrganic.count ?? null,
-      current_organic_traffic: drOrganic.etv ?? null,
-      current_referring_domains: bs.referring_domains ?? null,
-      current_backlinks: bs.backlinks ?? null,
+      ...(dfsOk ? {
+        current_domain_rank: dr.metrics_info?.rank ?? null,
+        current_ranking_keywords: drOrganic.count ?? null,
+        current_organic_traffic: drOrganic.etv ?? null,
+      } : {}),
+      ...(blOk ? {
+        current_referring_domains: bs.referring_domains ?? null,
+        current_backlinks: bs.backlinks ?? null,
+      } : {}),
       last_audited_at: now.toISOString(),
       last_audit_id: snap.id,
       next_audit_at: next.toISOString(),
@@ -248,7 +273,7 @@ async function runAuditFor(sb: any, td: any, source: string): Promise<{ audit_id
     .eq('id', td.id);
   if (updErr) throw updErr;
 
-  return { audit_id: snap.id };
+  return { audit_id: snap.id, failed_sections: failed };
 }
 
 function jsonResponse(body: unknown, status = 200): Response {

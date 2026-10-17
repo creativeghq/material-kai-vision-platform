@@ -108,6 +108,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
 
   // Outside the try: the refund lives in the catch and has to know which wallet was charged.
   let workspaceId: string | null = null;
+  let debited = 0;
 
   try {
 
@@ -151,6 +152,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
       const msg = debitResult?.[0]?.error_message || debitError?.message || 'Insufficient credits';
       return jsonResponse({ success: false, error: msg }, 402);
     }
+    debited = ANALYSIS_CREDIT_COST;
 
     // Freshness needs a DATE, and the authoritative one is on the article row. A
     // client-supplied `content_dated_at` stays supported for content that is not a
@@ -191,10 +193,10 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     return jsonResponse(response);
   } catch (error: any) {
     console.error('[seo-analyze] Error:', error);
-    try {
+    if (debited > 0) try {
       await supabase.rpc('refund_credits', {
         p_user_id: userId,
-        p_amount: ANALYSIS_CREDIT_COST,
+        p_amount: debited,
         p_operation_type: 'seo_analyze_refund',
         p_description: 'Refund: SEO analysis failed',
         p_metadata: { error: error.message },
@@ -969,7 +971,7 @@ function buildSectionScores(
 
   return {
     promptCoverage: makeScore(['section_coverage', 'paa_coverage', 'related_search_coverage']),
-    schemaMarkup: { status: 'all_good', issueCount: 0, details: [] }, // Schema generated post-analysis
+    schemaMarkup: { status: 'not_checked', issueCount: 0, details: ['Schema markup is generated after analysis, so it is not scored here.'] },
     keyTerms: makeScore(['secondary_keywords', 'geo_entities', 'entity_authority', 'intent_alignment']),
     metaTags: makeScore(['meta_tags']),
     url: { status: plan.slug.length <= 75 ? 'all_good' : 'issues_found', issueCount: plan.slug.length > 75 ? 1 : 0, details: plan.slug.length > 75 ? ['URL slug exceeds 75 characters'] : [] },

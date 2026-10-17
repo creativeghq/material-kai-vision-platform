@@ -23,7 +23,8 @@ import { readRankingPages } from '../serp-content.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts';
 import { refundStage, reserveStage, serviceCredits, settleStage, type StageWallet } from './stage-billing.ts';
-import { countryForLocation, marketForCountry } from './market.ts';
+import { countryForLocation } from './market.ts';
+import { resolveSeoMarket } from '../../_shared/seo-market.ts';
 import { guideQuery, readerQuestions } from './reader-questions.ts';
 import { findExistingPage } from './existing-page.ts';
 
@@ -142,13 +143,21 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
-    // No market named → the business's own (GR → Greece, Greek), the same rule the pipeline applies.
-    const market = (!body.location_code || !body.language_code) && workspaceId
-      ? marketForCountry((await supabase.from('finance_settings').select('business_country_code')
-          .eq('workspace_id', workspaceId).maybeSingle()).data?.business_country_code)
-      : null;
-    const locationCode = body.location_code || market?.location_code || 2840;
-    const languageCode = body.language_code || market?.language_code || 'en';
+    // No market named → the site's own (`website_ai_market`, then the business country); never a guessed default.
+    let locationCode: number | null = body.location_code || null;
+    let languageCode: string | null = body.language_code || null;
+    if (!locationCode || !languageCode) {
+      const site = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
+      const resolved = await resolveSeoMarket(supabase, { websiteId: site?.id ?? null, workspaceId });
+      if (!resolved.ok) {
+        return jsonResponse({ success: false, error: `No search market to research in: ${resolved.reason} Name a location_code and language_code for this request.` }, 422);
+      }
+      locationCode ||= resolved.market.location_code;
+      languageCode ||= resolved.market.language_code;
+      if (!locationCode) {
+        return jsonResponse({ success: false, error: `No search location is mapped for ${resolved.market.country_code}. Name a location_code for this request.` }, 422);
+      }
+    }
 
     const reused = body.refresh === true || !workspaceId ? null : await recentResearch(supabase, {
       workspaceId, keyword: String(body.target_keyword), locationCode, languageCode, needPages: readPages,
@@ -180,8 +189,14 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
 
     // DataForSEO research and MIVAA SERP signals (PAA, AI Overview, related searches) IN PARALLEL.
     const client = new DataForSEOClient(dfs.login, dfs.password);
-    const countryCode = countryForLocation(locationCode) ?? 'US';
+    const countryCode = countryForLocation(locationCode);
     const guideForm = guideQuery(body.target_keyword, languageCode);
+    const failedSources: NonNullable<KeywordResearchResult['failedSources']> = {};
+    const failed = (key: keyof typeof failedSources, e: unknown) => {
+      failedSources[key] = String((e as Error)?.message ?? e).slice(0, 300);
+      console.warn(`[seo-research] ${key} unavailable: ${failedSources[key]}`);
+    };
+    if (!countryCode) failed('serp_signals', `no country is mapped for location ${locationCode}`);
     const [research, serpSignals, aiMode, guideSerp] = await Promise.all([
       client.researchKeyword(
         body.target_keyword,
@@ -189,29 +204,25 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
         locationCode,
         languageCode,
       ),
-      fetchOpportunitiesStateless(supabase, {
-        subjectLabel: body.target_keyword,
-        workspaceId,
-        languageCodes: [languageCode],
-        countryCodes: [countryCode],
-        limitPerType: 5,
-      }).catch((e) => {
-        console.warn(`[seo-research] opportunities enrichment failed: ${(e as Error).message}`);
-        return null;
-      }),
-      client.aiModeAnswer(body.target_keyword, locationCode, languageCode).catch((e) => {
-        console.warn(`[seo-research] AI Mode answer unavailable: ${(e as Error).message}`);
-        return undefined;
-      }),
+      countryCode
+        ? fetchOpportunitiesStateless(supabase, {
+          subjectLabel: body.target_keyword,
+          workspaceId,
+          languageCodes: [languageCode],
+          countryCodes: [countryCode],
+          limitPerType: 5,
+        }).catch((e) => { failed('serp_signals', e); return null; })
+        : Promise.resolve(null),
+      client.aiModeAnswer(body.target_keyword, locationCode, languageCode)
+        .catch((e) => { failed('ai_mode', e); return undefined; }),
       readPages
-        ? client.serpOrganic(guideForm, locationCode, languageCode).catch((e) => {
-          console.warn(`[seo-research] guide-form SERP unavailable: ${(e as Error).message}`);
-          return [];
-        })
-        : Promise.resolve([]),
+        ? client.serpOrganic(guideForm, locationCode, languageCode)
+          .catch((e) => { failed('guide_serp', e); return [] as Awaited<ReturnType<typeof client.serpOrganic>>; })
+        : Promise.resolve([] as Awaited<ReturnType<typeof client.serpOrganic>>),
     ]);
 
     research.aiModeAnswer = aiMode;
+    if (Object.keys(failedSources).length) research.failedSources = failedSources;
     research.readerQuestions = readerQuestions(
       research.clusters.flatMap((c) => [c.primaryKeyword, ...c.secondaryKeywords]).filter(Boolean),
       languageCode,

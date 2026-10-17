@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/core/errors/utils';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { CrmRecordActivity } from '@/components/business/crm/CrmRecordActivity';
 import { DealTeamCard } from '@/components/business/crm/DealTeamCard';
@@ -25,6 +26,7 @@ export const DealDetailPage: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
 
   const [deal, setDeal] = useState<Deal | null | 'missing'>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [stages, setStages] = useState<DealStage[]>([]);
   const [type, setType] = useState<DealType | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,16 +34,27 @@ export const DealDetailPage: React.FC = () => {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const d = await getDeal(id).catch(() => null);
+    let d: Deal | null;
+    try {
+      d = await getDeal(id);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(getErrorMessage(e));
+      return;
+    }
     if (!d) { setDeal('missing'); return; }
     setDeal(d);
-    const [s, types] = await Promise.all([
-      dealsService.listStages(d.deal_type_id).catch(() => [] as DealStage[]),
-      activeWorkspaceId ? dealsService.listTypes(activeWorkspaceId).catch(() => [] as DealType[]) : Promise.resolve([]),
-    ]);
-    setStages(s);
-    setType(types.find((t) => t.id === d.deal_type_id) ?? null);
-  }, [id, activeWorkspaceId]);
+    try {
+      const [s, types] = await Promise.all([
+        dealsService.listStages(d.deal_type_id),
+        activeWorkspaceId ? dealsService.listTypes(activeWorkspaceId) : Promise.resolve([] as DealType[]),
+      ]);
+      setStages(s);
+      setType(types.find((t) => t.id === d.deal_type_id) ?? null);
+    } catch (e) {
+      toast({ title: 'Could not load the pipeline stages', description: getErrorMessage(e), variant: 'destructive' });
+    }
+  }, [id, activeWorkspaceId, toast]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -49,6 +62,16 @@ export const DealDetailPage: React.FC = () => {
     if (!deal || deal === 'missing') return 'Deal';
     return deal.title?.trim() || deal.property?.title || deal.company?.name || deal.contact?.name || 'Deal';
   }, [deal]);
+
+  if (loadError && (deal === null || deal === 'missing')) {
+    return (
+      <div className="mx-auto max-w-md py-24 text-center">
+        <h1 className="font-display text-lg">Could not load this deal</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{loadError}</p>
+        <Button variant="outline" className="mt-4" onClick={() => void load()}>Try again</Button>
+      </div>
+    );
+  }
 
   if (deal === null) return <div className="flex justify-center py-24"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 

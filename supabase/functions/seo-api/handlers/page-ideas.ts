@@ -7,13 +7,10 @@ import { assertEntitled } from '../../_shared/entitlement.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
 import { openSpendGate } from '../../_shared/tools/dataforseo-spend-gate.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
+import { resolveSeoMarket } from '../../_shared/seo-market.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-/** Greece / Greek — the market every site in this hub is measured in. */
-const LOCATION_CODE = 2300;
-const LANGUAGE_CODE = 'el';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -66,6 +63,13 @@ export async function handlePageIdeas(req: Request, body: any): Promise<Response
   const seed = seedFrom(pageRow.title, pageRow.url);
   if (!seed) return json({ success: false, error: 'The page has no title to seed keyword ideas from.' }, 422);
 
+  const resolved = await resolveSeoMarket(supabase, { websiteId: website.id, workspaceId: website.workspace_id });
+  if (!resolved.ok) return json({ success: false, error: `No search market for this site: ${resolved.reason}` }, 422);
+  const { location_code: locationCode, language_code: languageCode } = resolved.market;
+  if (!locationCode) {
+    return json({ success: false, error: `No search location is mapped for ${resolved.market.country_code}, so keyword ideas cannot be read for it.` }, 422);
+  }
+
   const [login, password] = await Promise.all([
     resolveSecret(supabase, 'DATAFORSEO_LOGIN'),
     resolveSecret(supabase, 'DATAFORSEO_PASSWORD'),
@@ -83,7 +87,7 @@ export async function handlePageIdeas(req: Request, body: any): Promise<Response
 
   let result: { items: any[]; costUsd: number | null };
   try {
-    result = await new DataForSEOClient(login.value, password.value).keywordIdeas(seed, LOCATION_CODE, LANGUAGE_CODE, 60);
+    result = await new DataForSEOClient(login.value, password.value).keywordIdeas(seed, locationCode, languageCode, 60);
   } catch (e) {
     await gate.settle(0);
     return json({ success: false, error: `Keyword ideas failed: ${e instanceof Error ? e.message : String(e)}` }, 502);
@@ -95,8 +99,9 @@ export async function handlePageIdeas(req: Request, body: any): Promise<Response
     data: {
       seed,
       page: pageRow.url,
-      location_code: LOCATION_CODE,
-      language_code: LANGUAGE_CODE,
+      location_code: locationCode,
+      language_code: languageCode,
+      market_source: resolved.market.source,
       ideas: result.items.map((k) => ({
         term: k.term,
         search_volume: Number.isFinite(k.searchVolume) ? k.searchVolume : null,

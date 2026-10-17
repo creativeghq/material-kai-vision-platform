@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, FileText, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { escapeHtml } from '@/utils/escapeHtml';
@@ -195,8 +195,12 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
   const sentDescription = (messageId: string) =>
     `${selectedEmails.length === 1 ? `Delivered to ${selectedEmails[0]}` : `Delivered to ${selectedEmails.length} recipients`} · message ${messageId.slice(0, 12)}…`;
 
+  // Synchronous latch: `sending` is state, so a double click lands before it re-renders.
+  const sendingRef = useRef(false);
+
   const handleSendTemplate = async () => {
-    if (!selectedTemplate || !hasRecipient) return;
+    if (!selectedTemplate || !hasRecipient || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     try {
       const result = await emailService.sendEmail({
@@ -215,12 +219,14 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       if (isSenderNotConfigured(err)) { await handleSenderBlocked(); return; }
       toast({ title: 'Send failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
 
   const handleSendCustom = async () => {
-    if (!hasRecipient || !customSubject.trim() || !customBody.trim()) return;
+    if (!hasRecipient || !customSubject.trim() || !customBody.trim() || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     try {
       // The body comes in as plain text; convert newlines so it renders as
@@ -243,6 +249,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       if (isSenderNotConfigured(err)) { await handleSenderBlocked(); return; }
       toast({ title: 'Send failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };

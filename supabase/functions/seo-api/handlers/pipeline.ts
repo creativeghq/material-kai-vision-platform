@@ -18,7 +18,7 @@ import { enforceSiteAssets, findSitePages, saveCorrectedPhotoDescriptions, type 
 import { imageAlts, slugTerms } from './site-assets.ts';
 import { latinTerms } from './foreign-words.ts';
 
-import { marketForCountry } from './market.ts';
+import { resolveSeoMarket } from '../../_shared/seo-market.ts';
 import { reviewArticle } from './review.ts';
 import { checkCoverage, mustCoverFrom } from './coverage.ts';
 import { approvedLessonLines } from './lessons.ts';
@@ -238,20 +238,22 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const websiteId = website?.id ?? null;
     const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief, websiteId);
 
-    // A caller that names no market gets the business's own (GR → Greece, Greek), never a silent US.
-    let marketSource = body.language_code && body.location_code ? 'caller' : 'default_us';
-    if ((!body.language_code || !body.location_code) && workspaceId) {
-      const { data: fin } = await supabase
-        .from('finance_settings').select('business_country_code').eq('workspace_id', workspaceId).maybeSingle();
-      const market = marketForCountry(fin?.business_country_code);
-      if (market) {
-        body.language_code ||= market.language_code;
-        body.location_code ||= market.location_code;
-        marketSource = 'workspace_country';
+    // A caller that names no market gets the site's own (`website_ai_market`, then the business country), never a guess.
+    let marketSource = 'caller';
+    if (!body.language_code || !body.location_code) {
+      const resolved = await resolveSeoMarket(supabase, { websiteId, workspaceId });
+      if (!resolved.ok) {
+        return jsonResponse({ success: false, error: `No search market to write for: ${resolved.reason} Name a location_code and language_code for this article.` }, 422);
       }
+      if (!body.location_code && !resolved.market.location_code) {
+        return jsonResponse({ success: false, error: `No search location is mapped for ${resolved.market.country_code}. Name a location_code for this article.` }, 422);
+      }
+      body.language_code ||= resolved.market.language_code;
+      body.location_code ||= resolved.market.location_code;
+      marketSource = resolved.market.source;
     }
     // Approved lessons from earlier published articles reach the writer and the reviewer through the brief.
-    if (brief && workspaceId) brief.extraContext.push(...await approvedLessonLines(supabase, workspaceId, body.language_code || 'en'));
+    if (brief && workspaceId) brief.extraContext.push(...await approvedLessonLines(supabase, workspaceId, body.language_code));
 
     // A second article on one keyword for one site competes for the same ranking: refused unless a deliberate rewrite.
     if (websiteId && body.allow_duplicate !== true) {
@@ -306,8 +308,8 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         current_stage: 'research',
         pipeline_log: [`[${new Date().toISOString()}] Pipeline started for "${body.target_keyword}"`],
         stages_data: { extra: {
-          language_code: body.language_code || 'en',
-          location_code: body.location_code || 2840,
+          language_code: body.language_code,
+          location_code: body.location_code,
           market_source: marketSource,
           site_url: website?.url ?? null,
         } },
@@ -406,8 +408,8 @@ async function runPipelineStages(ctx: {
       const researchResult = await callStage('research', req, {
         topic: body.topic,
         target_keyword: body.target_keyword,
-        language_code: body.language_code || 'en',
-        location_code: body.location_code || 2840,
+        language_code: body.language_code,
+        location_code: body.location_code,
         user_id: userId,
         website_id: websiteId,
       }, 90_000);
@@ -732,7 +734,9 @@ async function runLateStages(ctx: {
     }, reviewed.report.failed
       ? `Review did not run: ${reviewed.report.failed}`
       : `Reviewed: ${reviewed.report.applied.length} corrections applied (${correctedPhotos.size} photo descriptions), ${reviewed.report.skipped.length} could not be placed; `
-        + `dictionary: ${lexicon.report.unknown_before.length} unknown words, ${lexicon.report.corrected.length} corrected, ${lexicon.report.unverified.length} left to verify`);
+        + (lexicon.report.failed
+          ? `dictionary: ${lexicon.report.failed}`
+          : `dictionary: ${lexicon.report.unknown_before.length} unknown words, ${lexicon.report.corrected.length} corrected, ${lexicon.report.unverified.length} left to verify`));
 
     const coverage = await checkCoverage(supabase, {
       text: finalMarkdown, mustCover: mustCoverFrom(research), languageCode: resume.language_code, userId, workspaceId,

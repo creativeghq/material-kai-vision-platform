@@ -239,14 +239,15 @@ function buildPlanningSystemPrompt(
   if (research?.serpFeatures?.hasAiOverview) {
     // `hasAiOverview` being true does not guarantee the sources array came with it — the flag and
     // the list are separate fields from the SERP payload, and the guard above only checks the flag.
-    const citedDomains = (research.serpFeatures.aiOverviewSources || []).map((s) => s.domain).join(', ');
+    const citedDomains = (research.serpFeatures.aiOverviewSources || [])
+      .map((s) => serpValue(s.domain, 120)).filter(Boolean).slice(0, 10).join(', ');
     prompt += `
 
 === AI OVERVIEW DETECTED ===
 Google shows an AI Overview for this keyword. Optimize for AI citation:
-- Cited sources in AI Overview: ${citedDomains || 'various'}
 - Use structured definitions, statistics with attribution, direct answers
-- Match the format of cited sources (well-structured, authoritative, Q&A-friendly)`;
+- Match the format of cited sources (well-structured, authoritative, Q&A-friendly)${
+  citedDomains ? serpBlock(`Cited sources in AI Overview: ${citedDomains}`) : ''}`;
   }
 
   // ── Mention-monitoring SERP signals (Phase 2 enrichment) ──
@@ -494,7 +495,9 @@ function buildSerpSignalsSystemBlock(
     }
   }
   if (signals.paidCompetitors?.length) {
-    block += `\n- ${signals.paidCompetitors.length} advertisers paying Google Ads on this keyword (${signals.paidCompetitors.slice(0, 3).map((p) => p.domain).join(', ')}) — high commercial intent. Bias plan toward conversion CTAs and product-comparison structure.`;
+    const advertisers = signals.paidCompetitors.slice(0, 3).map((p) => serpValue(p.domain, 120)).filter(Boolean).join(', ');
+    block += `\n- ${signals.paidCompetitors.length} advertisers paying Google Ads on this keyword — high commercial intent. Bias plan toward conversion CTAs and product-comparison structure.`
+      + (advertisers ? serpBlock(`Advertisers: ${advertisers}`) : '');
   }
   if (signals.shoppingListings?.length) {
     block += `\n- Google Shopping carousel renders for this query. Plan should include a structured price/spec section to match shopping-listing context.`;

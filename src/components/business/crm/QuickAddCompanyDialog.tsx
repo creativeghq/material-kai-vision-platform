@@ -69,7 +69,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   // A business already in this workspace matching the VAT (or the exact name). Offered instead of
   // a create — the duplicate is what makes spend-per-supplier and AP aging wrong later.
-  const [duplicate, setDuplicate] = useState<QuickCreatedCompany | null>(null);
+  const [duplicate, setDuplicate] = useState<(QuickCreatedCompany & { allowOverride: boolean }) | null>(null);
   // The probe is debounced, so there is a window where the operator has finished typing and the
   // answer is not back yet. Create used to be live in that window and could beat it.
   const [probing, setProbing] = useState(false);
@@ -110,7 +110,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
         const { data, error } = await q.maybeSingle();
         if (cancelled) return;
         if (error) throw error;
-        setDuplicate(data ? { id: (data as any).id, name: (data as any).name ?? name } : null);
+        setDuplicate(data ? { id: (data as any).id, name: (data as any).name ?? name, allowOverride: !vatKey } : null);
       } catch {
         // Still non-blocking, but no longer the whole story: crm-api runs the same folded check
         // immediately before the insert and 409s, so a probe that fails (or that Create outruns)
@@ -139,11 +139,11 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
     } catch {
       // Non-blocking — the operator picked an existing business; the flag can be set on its record.
     }
-    onCreated(duplicate);
+    onCreated({ id: duplicate.id, name: duplicate.name });
     onOpenChange(false);
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (allowDuplicate = false) => {
     const name = draft.name.trim();
     if (!name) {
       toast({ title: 'Company name required', description: 'Enter a name (or run a VAT lookup to fetch it).', variant: 'destructive' });
@@ -158,7 +158,9 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
       if (role === 'manufacturer') { payload.is_manufacturer = true; payload.is_brand = true; }
       // A typed email beats one the web research guessed — same rule as the name.
       if (email.trim()) payload.email = email.trim();
-      const { data } = await companiesAPI.createCompany({ ...payload, workspace_id: workspaceId });
+      const { data } = await companiesAPI.createCompany({
+        ...payload, workspace_id: workspaceId, ...(allowDuplicate ? { allow_duplicate: true } : {}),
+      });
       if (!data?.id) throw new Error('The company was not returned by the server.');
       toast({
         title: `${data.name ?? name} added`,
@@ -172,7 +174,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
       // "Use it" shortcut rather than a dead end. (#366 BU-3)
       const dup = err as CreateCompanyError;
       if (dup?.code === 'duplicate_company' && dup.existing) {
-        setDuplicate({ id: dup.existing.id, name: dup.existing.name || name });
+        setDuplicate({ id: dup.existing.id, name: dup.existing.name || name, allowOverride: dup.allowOverride === true });
         toast({ title: 'Already in CRM', description: `"${dup.existing.name || name}" exists in this workspace — use it instead of adding a second one.` });
       } else {
         toast({ title: 'Could not create the business', description: err?.message, variant: 'destructive' });
@@ -205,9 +207,18 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
             <div className="flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.06] p-2 text-xs">
               <span>
                 <span className="font-medium text-foreground">{duplicate.name}</span>
-                <span className="text-muted-foreground"> is already in CRM.</span>
+                <span className="text-muted-foreground">
+                  {duplicate.allowOverride ? ' has the same name.' : ' has this VAT number and is already in CRM.'}
+                </span>
               </span>
-              <Button type="button" size="sm" variant="outline" onClick={() => void adoptExisting()}>Use it</Button>
+              <span className="flex shrink-0 gap-1">
+                {duplicate.allowOverride && (
+                  <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => void handleCreate(true)}>
+                    Create anyway
+                  </Button>
+                )}
+                <Button type="button" size="sm" variant="outline" onClick={() => void adoptExisting()}>Use it</Button>
+              </span>
             </div>
           )}
         </CompanyIdentityLookup>

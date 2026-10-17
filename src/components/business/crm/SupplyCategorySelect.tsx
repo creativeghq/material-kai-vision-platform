@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/core/errors/utils';
 import { companiesAPI } from '@/services/crm.service';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   crmCategoriesService,
   type SupplyCategoryOption,
@@ -21,6 +22,9 @@ interface Props {
 
 export const SupplyCategorySelect: React.FC<Props> = ({ target, readOnly, className, onChange }) => {
   const { toast } = useToast();
+  // crm_sync_supply_categories() refuses everyone but a platform admin.
+  const { isPlatformOperator } = useWorkspace();
+  const canSync = isPlatformOperator && !readOnly;
   const [options, setOptions] = useState<SupplyCategoryOption[]>([]);
   const [unsynced, setUnsynced] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -135,8 +139,10 @@ export const SupplyCategorySelect: React.FC<Props> = ({ target, readOnly, classN
       <HubEmptyState
         icon={Package}
         title="No product categories yet"
-        description="Pull the categories in from the product catalogue, then tag what this party deals in."
-        action={readOnly ? undefined : syncButton}
+        description={canSync
+          ? 'Pull the categories in from the product catalogue, then tag what this party deals in.'
+          : 'The platform has not matched the product catalogue categories yet.'}
+        action={canSync ? syncButton : undefined}
         className={className}
       />
     );
@@ -192,7 +198,7 @@ export const SupplyCategorySelect: React.FC<Props> = ({ target, readOnly, classN
         </p>
       )}
 
-      {unsynced > 0 && !readOnly && (
+      {unsynced > 0 && canSync && (
         <div className="flex flex-wrap items-center gap-2 border-t pt-3 text-xs text-muted-foreground">
           <span>{unsynced} product {unsynced === 1 ? 'category is' : 'categories are'} not offered here yet.</span>
           {syncButton}

@@ -120,7 +120,7 @@ async function fetchSerp(budget: number, init: RequestInit): Promise<Response> {
 }
 
 /** Who the SERP is fetched for. A city `location_code` replaces the country. */
-type SerpTarget = Pick<DueKeyword, 'keyword' | 'country_code' | 'language_code' | 'device' | 'location_code'>;
+type SerpTarget = Pick<DueKeyword, 'keyword' | 'country_code' | 'language_code' | 'device' | 'location_code' | 'workspace_id'>;
 
 async function serp(
   kw: SerpTarget, userId: string | null,
@@ -143,7 +143,7 @@ async function serp(
         device: kw.device === 'mobile' ? 'mobile' : 'desktop',
         ...(kw.location_code ? { location_code: kw.location_code } : {}),
       },
-      attribution: { user_id: userId },
+      attribution: { user_id: userId, workspace_id: kw.workspace_id },
     }),
   });
   const text = await resp.text();
@@ -318,7 +318,10 @@ async function trackKeywords(
   keywords: DueKeyword[],
   userId: string | null,
   deadline: number,
-): Promise<{ checked: number; ranking: number; failed: number; writeFailed: number; doneIdsBySite: Map<string, string[]> }> {
+): Promise<{
+  checked: number; ranking: number; failed: number; writeFailed: number; advanceFailed: number; notReached: number;
+  doneIdsBySite: Map<string, string[]>;
+}> {
   const today = new Date().toISOString().slice(0, 10);
   const hosts = new Map<string, string>();
   const hostFor = (url: string): string => {
@@ -327,7 +330,7 @@ async function trackKeywords(
     return h;
   };
 
-  let checked = 0, ranking = 0, failed = 0, writeFailed = 0;
+  let checked = 0, ranking = 0, failed = 0, writeFailed = 0, advanceFailed = 0, outOfTime = 0;
   const doneIdsBySite = new Map<string, string[]>();
 
   /**
@@ -390,7 +393,7 @@ async function trackKeywords(
       // where three deep ones did not. "Not in the top 50" is a real answer and the row
       // carries the depth that produced it; unknown is not an answer at all.
       // Nothing was observed — the run simply ended.
-      if (e instanceof OutOfTime) return;
+      if (e instanceof OutOfTime) { outOfTime++; return; }
       try {
         if (triedShallow) throw e;
         const r = await serp(kw, userId, false, 50, deadline);
@@ -441,8 +444,12 @@ async function trackKeywords(
     // stay first in the rotation forever and starve every keyword behind it. Being
     // taken first on the next DAY's first leg is `seo_keywords_due`'s job, and it
     // reads the error row this just wrote.
-    await supabase.from('seo_tracked_keywords')
+    const { error: stampErr } = await supabase.from('seo_tracked_keywords')
       .update({ last_checked_at: new Date().toISOString() }).eq('id', kw.id);
+    if (stampErr) {
+      advanceFailed++;
+      console.error('[seo-rank-tracker] last_checked_at write failed — this keyword stays due:', stampErr.message);
+    }
   };
 
   // A pool, not batches: a slow SERP holds up one slot, not the eleven beside it.
@@ -456,7 +463,7 @@ async function trackKeywords(
     }
   }));
 
-  return { checked, ranking, failed, writeFailed, doneIdsBySite };
+  return { checked, ranking, failed, writeFailed, advanceFailed, notReached: queue.length + outOfTime, doneIdsBySite };
 }
 
 /**
@@ -572,9 +579,13 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
       if (site && ids.length > 0) await alertOnDrops(supabase, site, today, ids);
     }
     // 730 days of history is the RPC's ceiling; keep a little past it and no more.
-    await supabase.from('seo_keyword_positions')
+    const { error: pruneErr } = await supabase.from('seo_keyword_positions')
       .delete().lt('captured_at', new Date(Date.now() - 760 * 86400000).toISOString().slice(0, 10));
-    return json({ ok: true, due: rows.length, checked, failed, skipped, write_failed: r.writeFailed });
+    if (pruneErr) console.error('[seo-rank-tracker] retention sweep failed:', pruneErr.message);
+    return json({
+      ok: true, due: rows.length, checked, failed, skipped, write_failed: r.writeFailed,
+      advance_failed: r.advanceFailed, not_reached: r.notReached, retention_error: pruneErr?.message ?? null,
+    });
   }
 
   // ── User: check one website now ──
@@ -614,5 +625,8 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
   );
   const doneIds = r.doneIdsBySite.get(website.id) ?? [];
   if (doneIds.length > 0) await alertOnDrops(supabase, website, today, doneIds);
-  return json({ ok: true, checked: r.checked, ranking: r.ranking, failed: r.failed });
+  return json({
+    ok: true, checked: r.checked, ranking: r.ranking, failed: r.failed,
+    write_failed: r.writeFailed, advance_failed: r.advanceFailed, not_reached: r.notReached,
+  });
 }));

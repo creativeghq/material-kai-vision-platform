@@ -56,7 +56,6 @@ import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { SupplierProfileCard, type SupplierProfile } from '@/modules/crm/components/SupplierProfileCard';
 import { CompanyRepresentationsCard, useRepresentationContactIds } from '@/modules/crm/components/CompanyRepresentationsCard';
-import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { SupplyCategorySelect } from '@/components/business/crm/SupplyCategorySelect';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
@@ -223,6 +222,8 @@ export const CompanyDetailPage: React.FC = () => {
   // `?tab=` so a notification can deep-link straight to the right tab (see ContactDetailPage).
   const [searchParams] = useSearchParams();
   const [mainTab, setMainTab] = useState(resolveRecordTab(searchParams.get('tab')));
+  const [detailsTab, setDetailsTab] = useState('address');
+  const [nameDuplicate, setNameDuplicate] = useState<{ id: string; name: string } | null>(null);
   // Bump to force the Activity timeline to reload after the PAGE logs something
   // (registry enrichment, etc). Email logging is owned by CrmRecordActivity itself.
   const [activityRefresh, setActivityRefresh] = useState(0);
@@ -299,7 +300,7 @@ export const CompanyDetailPage: React.FC = () => {
   };
 
   // Create-new only. Existing companies self-save per field (view-first inline edit).
-  const handleSave = async () => {
+  const handleSave = async (allowDuplicate = false) => {
     if (!company) return;
     if (!company.name || company.name.trim() === '') {
       toast({ title: 'Validation Error', description: 'Company name is required', variant: 'destructive' });
@@ -307,9 +308,12 @@ export const CompanyDetailPage: React.FC = () => {
     }
     try {
       setSaving(true);
+      setNameDuplicate(null);
       // Name the workspace. crm-api used to default to `scope.workspaceIds[0]` when a create
       // omitted it, which filed the company in whichever workspace sorted first (#366 BU-10).
-      const response = await companiesAPI.createCompany({ ...company, workspace_id: activeWorkspaceId });
+      const response = await companiesAPI.createCompany({
+        ...company, workspace_id: activeWorkspaceId, ...(allowDuplicate ? { allow_duplicate: true } : {}),
+      });
       if (scopedCategoryIds.length) {
         await crmCategoriesService.setCompanyMembershipsWithinScope(response.data.id, scopedCategoryIds, scopedCategoryIds).catch((e) => {
           toast({ title: 'Saved, but not added to the category', description: getErrorMessage(e), variant: 'destructive' });
@@ -323,9 +327,12 @@ export const CompanyDetailPage: React.FC = () => {
       const dup = error as CreateCompanyError;
       if (dup?.code === 'duplicate_company' && dup.existing) {
         const existing = dup.existing;
+        if (dup.allowOverride) setNameDuplicate(existing);
         toast({
           title: 'That business is already in your CRM',
-          description: `"${existing.name}" already exists. Open it instead of creating a second record — duplicates are what make spend-per-supplier and AP aging wrong later.`,
+          description: dup.allowOverride
+            ? `"${existing.name}" has the same name. Open it, or use Create anyway if this is a different business.`
+            : `"${existing.name}" already has this VAT number. Open it instead of creating a second record — duplicates are what make spend-per-supplier and AP aging wrong later.`,
           action: (
             <ToastAction altText="Open the existing business" onClick={() => navigate(`/crm/companies/${existing.id}`)}>
               Open it
@@ -744,7 +751,13 @@ export const CompanyDetailPage: React.FC = () => {
           {isNew ? (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/crm')}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving}>
+              {nameDuplicate && (
+                <Button variant="outline" onClick={() => void handleSave(true)} disabled={saving}
+                  title={`A business named "${nameDuplicate.name}" already exists`}>
+                  Create anyway
+                </Button>
+              )}
+              <Button onClick={() => void handleSave()} disabled={saving}>
                 <Save className="h-4 w-4 mr-2"/>
                 {saving ? 'Saving...' : 'Create Company'}
               </Button>
@@ -824,14 +837,20 @@ export const CompanyDetailPage: React.FC = () => {
                   <div>
                     <InlineText alwaysEdit={isNew} label="Trading Name (Διακριτικός Τίτλος)" value={company.commercial_title} onSave={(v) => patchInline({ commercial_title: v })} placeholder="e.g. Furnibath" copy={false} />
                   </div>
-                  {isNew ? (
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">Industry</div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">Industry</div>
+                    {isNew ? (
                       <p className="text-sm text-muted-foreground mt-0.5">Save the company first to assign industries.</p>
-                    </div>
-                  ) : (
-                    <IndustrySelect label="Industry" companyId={id!} onChange={(names) => patchInline({ industry: names.join(', ') })} />
-                  )}
+                    ) : (
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-sm">{company.industry || '—'}</span>
+                        <Button type="button" size="sm" variant="ghost" className="shrink-0"
+                          onClick={() => { setMainTab('details'); setDetailsTab('categories'); }}>
+                          Edit
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
                       <InlineText alwaysEdit={isNew} type="email" label="Email" value={company.email} onSave={(v) => patchInline({ email: v })} placeholder="contact@company.com" />
@@ -889,7 +908,7 @@ export const CompanyDetailPage: React.FC = () => {
 
               {/* Details — section nav (left) + property panel (right). */}
               <TabsContent value="details">
-                <Tabs defaultValue="address" orientation="vertical" className="flex flex-col gap-6 lg:flex-row lg:items-start">
+                <Tabs value={detailsTab} onValueChange={setDetailsTab} orientation="vertical" className="flex flex-col gap-6 lg:flex-row lg:items-start">
                   <TabsList className="section-rail h-auto w-full shrink-0 flex-row justify-start gap-1 bg-transparent p-0 lg:w-52 lg:flex-col lg:flex-nowrap">
                     <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2"/>Address &amp; Phone</TabsTrigger>
                     <TabsTrigger value="tax" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><ShieldCheck className="h-4 w-4 mr-2"/>Tax &amp; VAT</TabsTrigger>

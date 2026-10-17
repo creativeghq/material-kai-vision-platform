@@ -120,7 +120,7 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
   const [researching, setResearching] = useState(false);
   const [identity, setIdentity] = useState<CounterpartyIdentity | null>(null);
   const [draft, setDraft] = useState<CompanyIdentityDraft>(emptyCompanyIdentity());
-  const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
+  const [duplicate, setDuplicate] = useState<{ id: string; name: string; allowOverride?: boolean } | null>(null);
   /** A company matched on the NUMBER. Held apart from `duplicate`, which the name probe rewrites
    *  as the operator types — that was clearing a certain match and re-arming "Add as a business"
    *  for a number already on file. */
@@ -305,7 +305,7 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
     }
   };
 
-  const createAndLink = async () => {
+  const createAndLink = async (allowDuplicate = false) => {
     const name = draft.name.trim();
     if (!name) {
       toast({ title: 'A name is needed', description: 'Type the business name, or look its VAT number up.', variant: 'destructive' });
@@ -321,13 +321,15 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
         is_supplier: role === 'supplier' || role === 'both',
         is_customer: role === 'customer' || role === 'both',
       });
-      const { data } = await companiesAPI.createCompany({ ...payload, workspace_id: workspaceId });
+      const { data } = await companiesAPI.createCompany({
+        ...payload, workspace_id: workspaceId, ...(allowDuplicate ? { allow_duplicate: true } : {}),
+      });
       if (!data?.id) throw new Error('The business was not returned by the server.');
       created = { id: data.id as string, name: (data.name as string) ?? name };
     } catch (err) {
       const dup = err as CreateCompanyError;
       if (dup?.code === 'duplicate_company' && dup.existing) {
-        setDuplicate({ id: dup.existing.id, name: dup.existing.name || name });
+        setDuplicate({ id: dup.existing.id, name: dup.existing.name || name, allowOverride: dup.allowOverride === true });
         toast({ title: 'Already in the CRM', description: `"${dup.existing.name || name}" is on file — link the conversation to it instead.` });
       } else {
         toast({ title: 'Could not add the business', description: (err as Error)?.message, variant: 'destructive' });
@@ -455,9 +457,16 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
                 <p className="text-xs">
                   <span className="font-medium">{duplicate.name}</span> is already in the CRM.
                 </p>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={useExisting}>
-                  <Link2 className="w-3.5 h-3.5 mr-1.5" />Link to it
-                </Button>
+                <div className="flex shrink-0 gap-1">
+                  {duplicate.allowOverride && (
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => void createAndLink(true)}>
+                      Create anyway
+                    </Button>
+                  )}
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={useExisting}>
+                    <Link2 className="w-3.5 h-3.5 mr-1.5" />Link to it
+                  </Button>
+                </div>
               </div>
             )}
           </div>
