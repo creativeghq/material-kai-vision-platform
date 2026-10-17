@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, CitabilityReport, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
+import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, CitabilityReport, CitedPageComparison, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -1773,6 +1773,15 @@ export const userWebsitesService = {
     });
     if (error) throw new Error(await edgeErrorMessage(error, 'Could not analyse the page'));
     return data;
+  },
+
+  /** Score the page an assistant cited instead of us, beside our own score for the question. */
+  async compareCitedPage(websiteId: string, question: string, rivalUrl: string): Promise<CitedPageComparison> {
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'citability', website_id: websiteId, question, rival_url: rivalUrl },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not read that page'));
+    return data as CitedPageComparison;
   },
 
   /** The matrix behind the visibility figures: every assistant's latest reply to every question. */

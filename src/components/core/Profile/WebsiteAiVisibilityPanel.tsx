@@ -42,7 +42,7 @@ import { LlmMentionsPanel } from './seo/LlmMentionsPanel';
 import { Sparkline } from './seo/Sparkline';
 import {
   VERDICT_BADGE, VERDICT_FILL, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
-  withRosterEngines,
+  withRosterEngines, type AiQuestionSource,
 } from './seo/aiCitations';
 import { compact, statusPresentation } from './seo/seoMetrics';
 
@@ -282,8 +282,8 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   // the measurement; they have to be editable where the answers are read.
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<{ prompts: string; keys: Record<string, string>; aliases: string; languages: string; countries: string; includeDefaults: boolean; tier: MentionProbeTier }>({
-    prompts: '', keys: {}, aliases: '', languages: '', countries: '', includeDefaults: true, tier: 'dataforseo',
+  const [form, setForm] = useState<{ prompts: string; keys: Record<string, string>; sources: Record<string, string>; aliases: string; languages: string; countries: string; includeDefaults: boolean; tier: MentionProbeTier }>({
+    prompts: '', keys: {}, sources: {}, aliases: '', languages: '', countries: '', includeDefaults: true, tier: 'dataforseo',
   });
   const openEditor = async () => {
     const id = state?.own_brand_subject_id;
@@ -294,10 +294,11 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       .eq('id', id)
       .maybeSingle();
     const cfg = (data as any)?.source_config ?? {};
-    const probes: { key?: string; prompt?: string }[] = Array.isArray(cfg.custom_probes) ? cfg.custom_probes : [];
+    const probes: { key?: string; prompt?: string; source?: string }[] = Array.isArray(cfg.custom_probes) ? cfg.custom_probes : [];
     setForm({
       prompts: probes.map((p) => p.prompt ?? '').filter(Boolean).join('\n'),
       keys: Object.fromEntries(probes.filter((p) => p.key && p.prompt).map((p) => [String(p.prompt).trim(), String(p.key)])),
+      sources: Object.fromEntries(probes.filter((p) => p.source && p.prompt).map((p) => [String(p.prompt).trim(), String(p.source)])),
       aliases: ((data as any)?.aliases ?? []).join(', '),
       languages: ((data as any)?.language_codes ?? []).join(', '),
       countries: ((data as any)?.country_codes ?? []).join(', '),
@@ -312,7 +313,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     return ((data as any)?.source_config ?? {}) as Record<string, unknown>;
   };
 
-  const trackQuestion = async (question: string) => {
+  const trackQuestion = async (question: string, source: AiQuestionSource) => {
     const id = state?.own_brand_subject_id;
     if (!id) return;
     try {
@@ -325,7 +326,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         return;
       }
       await updateTrackedMention(id, {
-        source_config: { ...cfg, custom_probes: [...probes, { key: `tracked_${Date.now().toString(36)}`, prompt: text }] },
+        source_config: { ...cfg, custom_probes: [...probes, { key: `${source}_${Date.now().toString(36)}`, prompt: text, source }] },
       });
       toast({ title: 'Question tracked', description: 'The next probe run asks it. Run probes now to see it today.' });
       await load();
@@ -347,7 +348,11 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         country_codes: list(form.countries).map((c) => c.toUpperCase()),
         source_config: {
           ...(await currentSourceConfig(id)),
-          custom_probes: prompts.map((prompt, i) => ({ key: form.keys[prompt] ?? `custom_${Date.now().toString(36)}_${i}`, prompt })),
+          custom_probes: prompts.map((prompt, i) => ({
+            key: form.keys[prompt] ?? `custom_${Date.now().toString(36)}_${i}`,
+            prompt,
+            source: form.sources[prompt] ?? 'manual',
+          })),
           include_default_probes: form.includeDefaults,
         },
         probe_tier: form.tier,
@@ -726,6 +731,14 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             setCitability(await userWebsitesService.citabilityReport(website.id, 90));
           } catch (e: any) {
             toast({ title: 'Could not read the page', description: e?.message, variant: 'destructive' });
+          }
+        }}
+        onCompare={async (question, url) => {
+          try {
+            return await userWebsitesService.compareCitedPage(website.id, question, url);
+          } catch (e: any) {
+            toast({ title: 'Could not compare the pages', description: e?.message, variant: 'destructive' });
+            return null;
           }
         }}
       />

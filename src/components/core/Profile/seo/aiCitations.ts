@@ -175,6 +175,20 @@ export interface LostQuestion {
   status: SeoMetricStatus | string;
 }
 
+export interface CitabilityDimensionScore {
+  key: string;
+  score: number | null;
+  status: string;
+  evidence: string;
+}
+
+/** A page cited instead of ours, scored on the same scale, beside our stored score. Not persisted. */
+export interface CitedPageComparison {
+  success: boolean;
+  rival: { url: string; status: string; score: number | null; note: string | null; dimensions: CitabilityDimensionScore[]; words: number };
+  ours: { url: string; score: number | null; status: string; dimensions: CitabilityDimensionScore[] | null; analysed_at: string | null } | null;
+}
+
 export interface CitabilityReport {
   status: string;
   window_days: number;
@@ -339,4 +353,17 @@ export interface SearchQuestion {
 export interface AiQuestionsReport {
   cited: { status: AiQuestionsFetchStatus[]; rows: AiCitedQuestion[] };
   search: { days: number; from: string; to: string; status: 'ok' | 'no_data' | 'not_connected' | string; rows: SearchQuestion[] };
+  /** Absent on a payload from before the PAA source existed. */
+  paa?: { status: 'ok' | 'no_data' | 'not_collected' | string; research_runs: number; rows: PaaQuestion[] };
 }
+
+export interface PaaQuestion {
+  question: string;
+  seen: number;
+  keywords: string[];
+  last_seen: string | null;
+  tracked: boolean;
+}
+
+/** Where a tracked question came from; stored on its `custom_probes` entry. */
+export type AiQuestionSource = 'ai_cited' | 'gsc' | 'paa' | 'manual';

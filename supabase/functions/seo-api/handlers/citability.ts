@@ -40,18 +40,29 @@ function pickPage(question: string, pages: PageRow[]): PageRow | null {
 }
 
 async function readPage(url: string): Promise<{ html: string | null; error: string | null }> {
-  let safe: string;
+  // Redirects are followed by hand so every hop passes the SSRF guard (invariant 7).
+  let next = url;
+  let res: Response | null = null;
   try {
-    safe = await assertSafeUrl(url);
-  } catch (e) {
-    return { html: null, error: e instanceof SSRFError ? `refused: ${e.message}` : 'refused' };
-  }
-  try {
-    const res = await fetch(safe, {
-      redirect: 'follow',
-      headers: { 'User-Agent': 'MaterialsHubBot/1.0 (+https://materialshub.gr)' },
-      signal: AbortSignal.timeout(20_000),
-    });
+    for (let hop = 0; hop <= 3; hop++) {
+      let safe: string;
+      try {
+        safe = await assertSafeUrl(next);
+      } catch (e) {
+        return { html: null, error: e instanceof SSRFError ? `refused: ${e.message}` : 'refused' };
+      }
+      res = await fetch(safe, {
+        redirect: 'manual',
+        headers: { 'User-Agent': 'MaterialsHubBot/1.0 (+https://materialshub.gr)' },
+        signal: AbortSignal.timeout(20_000),
+      });
+      const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (!location) break;
+      await res.body?.cancel();
+      next = new URL(location, safe).toString();
+      res = null;
+    }
+    if (!res) return { html: null, error: 'too many redirects' };
     if (!res.ok) return { html: null, error: `HTTP ${res.status}` };
     const buf = new Uint8Array(await res.arrayBuffer());
     if (buf.byteLength > MAX_BYTES) return { html: null, error: 'page too large' };
@@ -59,6 +70,48 @@ async function readPage(url: string): Promise<{ html: string | null; error: stri
   } catch (e) {
     return { html: null, error: (e instanceof Error ? e.message : 'fetch failed').slice(0, 140) };
   }
+}
+
+/**
+ * Score the page an assistant cited INSTEAD of us, on the same scale as ours, next to our stored
+ * score for the question. Only a URL a probe of this site actually cited is accepted, so this is
+ * never a general-purpose fetcher. Not persisted: the rival page is not ours to keep a record of.
+ */
+async function scoreRival(
+  db: any, websiteId: string, workspaceId: string, question: string, rivalUrl: string,
+): Promise<Response> {
+  const { data: probes, error: probeErr } = await db
+    .from('llm_mention_probes')
+    .select('cited_urls, tracked_mentions!inner(website_id, workspace_id)')
+    .eq('tracked_mentions.website_id', websiteId)
+    .eq('tracked_mentions.workspace_id', workspaceId)
+    .eq('prompt_text', question)
+    .contains('cited_urls', [rivalUrl])
+    .limit(1);
+  if (probeErr) return json({ success: false, error: probeErr.message }, 500);
+  if (!probes || probes.length === 0) {
+    return json({ success: false, error: 'That page was not cited for this question.' }, 404);
+  }
+
+  const { data: ours } = await db
+    .from('website_page_citability')
+    .select('url, score, status, dimensions, analysed_at')
+    .eq('website_id', websiteId)
+    .eq('question', question)
+    .order('analysed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const read = await readPage(rivalUrl);
+  if (!read.html) {
+    return json({
+      success: true,
+      rival: { url: rivalUrl, status: 'not_collected', score: null, note: `Could not read the page: ${read.error ?? 'unknown'}`, dimensions: [], words: 0 },
+      ours: ours ?? null,
+    });
+  }
+  const report = scoreCitability({ html: read.html, question });
+  return json({ success: true, rival: { url: rivalUrl, ...report }, ours: ours ?? null });
 }
 
 export async function handleCitability(req: Request, body: any): Promise<Response> {
@@ -84,6 +137,10 @@ export async function handleCitability(req: Request, body: any): Promise<Respons
   }
   const ent = await resolveAndAssertSeoEntitled(db, auth.userId);
   if (ent.response) return ent.response;
+
+  if (typeof body?.rival_url === 'string' && body.rival_url) {
+    return await scoreRival(db, websiteId, site.workspace_id, question, body.rival_url);
+  }
 
   const { data: pages } = await db
     .from('user_website_pages')

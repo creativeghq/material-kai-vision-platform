@@ -9,7 +9,7 @@ import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { HubToolbar } from '@/components/core/hub/HubToolbar';
 import { formatDate } from '@/utils/datetime';
 import { compact, statusPresentation } from './seoMetrics';
-import type { AiQuestionsReport, SearchQuestion } from './aiCitations';
+import type { AiQuestionSource, AiQuestionsReport, SearchQuestion } from './aiCitations';
 
 const pathOf = (url: string | null): string => {
   if (!url) return '—';
@@ -30,9 +30,9 @@ export const AiQuestionsPanel: React.FC<{
   canTrack: boolean;
   trackedCount: number;
   trackLimit: number;
-  onTrack: (question: string) => Promise<void>;
+  onTrack: (question: string, source: AiQuestionSource) => Promise<void>;
 }> = ({ report, canTrack, trackedCount, trackLimit, onTrack }) => {
-  const [tab, setTab] = useState<'cited' | 'search'>('cited');
+  const [tab, setTab] = useState<'cited' | 'search' | 'paa'>('cited');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [openAnswer, setOpenAnswer] = useState<string | null>(null);
@@ -42,14 +42,16 @@ export const AiQuestionsPanel: React.FC<{
   const q = search.trim().toLowerCase();
   const citedShown = cited.filter((r) => !q || r.question.toLowerCase().includes(q));
   const searchShown = searchRows.filter((r) => !q || r.query.toLowerCase().includes(q));
+  const paaRows = useMemo(() => report?.paa?.rows ?? [], [report]);
+  const paaShown = paaRows.filter((r) => !q || r.question.toLowerCase().includes(q));
   const full = trackedCount >= trackLimit;
 
-  const track = async (question: string) => {
+  const track = async (question: string, source: AiQuestionSource) => {
     setBusy(question);
-    try { await onTrack(question); } finally { setBusy(null); }
+    try { await onTrack(question, source); } finally { setBusy(null); }
   };
 
-  const trackButton = (question: string, tracked: boolean) => {
+  const trackButton = (question: string, tracked: boolean, source: AiQuestionSource) => {
     if (tracked) {
       return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5" />Tracked</span>;
     }
@@ -59,7 +61,7 @@ export const AiQuestionsPanel: React.FC<{
         variant="outline"
         disabled={!canTrack || full || busy !== null}
         title={!canTrack ? 'Track this site in AI visibility first.' : full ? `The probe list holds ${trackLimit} questions; remove one in Edit questions.` : 'Ask the assistants this question on every probe run.'}
-        onClick={() => void track(question)}
+        onClick={() => void track(question, source)}
       >
         {busy === question ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
         Track
@@ -79,17 +81,19 @@ export const AiQuestionsPanel: React.FC<{
               Questions you already show up for
             </CardTitle>
             <CardDescription>
-              Real questions where an AI answer already cites your site, and question-shaped searches you already
-              rank for in Google. Track one to measure it on every probe run.
+              Real questions where an AI answer already cites your site, question-shaped searches you already
+              rank for in Google, and the People Also Ask questions next to keywords you researched. Track one to
+              measure it on every probe run.
             </CardDescription>
           </div>
           <HubSegmented
             aria-label="Question source"
             value={tab}
-            onChange={(v) => setTab(v as 'cited' | 'search')}
+            onChange={(v) => setTab(v as 'cited' | 'search' | 'paa')}
             options={[
               { value: 'cited', label: `AI cites you (${cited.length})` },
               { value: 'search', label: `You rank in Google (${searchRows.length})` },
+              { value: 'paa', label: `People also ask (${paaRows.length})` },
             ]}
           />
         </div>
@@ -165,7 +169,7 @@ export const AiQuestionsPanel: React.FC<{
                               {r.our_sources.length > 1 && <span className="ml-1 text-muted-foreground">+{r.our_sources.length - 1}</span>}
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">{r.last_response_at ? formatDate(r.last_response_at) : '—'}</td>
-                            <td className="px-3 py-2 text-right">{trackButton(r.question, r.tracked)}</td>
+                            <td className="px-3 py-2 text-right">{trackButton(r.question, r.tracked, 'ai_cited')}</td>
                           </tr>
                           {openAnswer === key && r.answer && (
                             <tr>
@@ -225,7 +229,47 @@ export const AiQuestionsPanel: React.FC<{
                           ) : '—'}
                         </td>
                         <td className="px-3 py-2"><Badge variant={AIO_BADGE[r.ai_overview].variant}>{AIO_BADGE[r.ai_overview].label}</Badge></td>
-                        <td className="px-3 py-2 text-right">{trackButton(r.query, r.tracked)}</td>
+                        <td className="px-3 py-2 text-right">{trackButton(r.query, r.tracked, 'gsc')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
+        )}
+        {tab === 'paa' && (
+          report?.paa?.status === 'not_collected' || !report?.paa ? (
+            <HubEmptyState title="No keyword research yet" description="People Also Ask questions are captured when you research a keyword for this site. Run keyword research in the article writer to collect them." />
+          ) : paaRows.length === 0 ? (
+            <HubEmptyState title="No People Also Ask questions" description={`None of the ${report.paa.research_runs} research runs for this site returned a People Also Ask block.`} />
+          ) : paaShown.length === 0 ? (
+            <HubEmptyState variant="filtered" title="No question matches" action={<Button size="sm" variant="outline" onClick={() => setSearch('')}>Clear filters</Button>} />
+          ) : (
+            <>
+              <p className="border-b border-hairline px-3 py-1.5 text-xs text-muted-foreground">
+                From {report.paa.research_runs} keyword research runs. Google shows these beside the keyword, so they are what a buyer
+                asks next.
+              </p>
+              <div className="table-scroll">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Question</th>
+                      <th className="px-3 py-2 text-left">Researched keyword</th>
+                      <th className="px-3 py-2 text-right">Seen</th>
+                      <th className="px-3 py-2 text-left">Last seen</th>
+                      <th className="px-3 py-2"><span className="sr-only">Action</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {paaShown.map((r) => (
+                      <tr key={r.question} className="align-top">
+                        <td className="max-w-[420px] px-3 py-2 text-xs font-medium leading-snug text-foreground">{r.question}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{r.keywords.length > 0 ? r.keywords.join(', ') : '—'}</td>
+                        <td className="px-3 py-2 text-right text-xs tabular-nums">{r.seen}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{r.last_seen ? formatDate(r.last_seen) : '—'}</td>
+                        <td className="px-3 py-2 text-right">{trackButton(r.question, r.tracked, 'paa')}</td>
                       </tr>
                     ))}
                   </tbody>

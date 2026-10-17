@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, FileSearch, Loader2, Wrench } from 'lucide-react';
+import { AlertTriangle, FileSearch, GitCompare, Loader2, Wrench } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { timeAgo } from '@/utils/datetime';
 import { statusPresentation } from './seoMetrics';
 import { CITABILITY_DIMENSIONS } from './citabilityDimensions';
-import { displayHost, modelLabel, type CitabilityReport, type LostQuestion } from './aiCitations';
+import { displayHost, modelLabel, type CitabilityReport, type CitedPageComparison, type LostQuestion } from './aiCitations';
 
 const FIX_BY_KEY = new Map(CITABILITY_DIMENSIONS.map((d) => [d.key, d]));
 
@@ -18,11 +18,54 @@ function scoreTone(score: number): string {
   return 'text-[hsl(var(--error))]';
 }
 
+/** Their score, ours, and every dimension where their page beats ours. */
+const ComparisonBlock: React.FC<{ c: CitedPageComparison }> = ({ c }) => {
+  const rivalScored = c.rival.status === 'ok' && c.rival.score != null;
+  const ours = c.ours && c.ours.status === 'ok' && c.ours.score != null ? c.ours : null;
+  const ourByKey = new Map((ours?.dimensions ?? []).map((d) => [d.key, d.score]));
+  const ahead = rivalScored && ours
+    ? c.rival.dimensions
+        .filter((d) => d.score != null && (ourByKey.get(d.key) ?? null) != null && (d.score as number) > (ourByKey.get(d.key) as number))
+        .sort((a, b) => ((b.score as number) - (ourByKey.get(b.key) as number)) - ((a.score as number) - (ourByKey.get(a.key) as number)))
+    : [];
+  return (
+    <div className="rounded-sm border border-hairline bg-card px-2.5 py-2 text-[11px] leading-snug">
+      <p className="text-muted-foreground">
+        <span className="font-medium text-foreground">{displayHost(c.rival.url)}</span>{' '}
+        {rivalScored
+          ? <>scores <b className={scoreTone(c.rival.score as number)}>{c.rival.score}</b></>
+          : (c.rival.note || 'could not be read')}
+        {' · yours '}
+        {ours ? <b className={scoreTone(ours.score as number)}>{ours.score}</b> : 'not read yet — use Find the page first'}
+      </p>
+      {rivalScored && ours && (ahead.length > 0 ? (
+        <ul className="mt-1 space-y-0.5">
+          {ahead.slice(0, 4).map((d) => {
+            const dim = FIX_BY_KEY.get(d.key);
+            return (
+              <li key={d.key} className="text-foreground">
+                <b>{dim?.label ?? d.key}</b>{' '}
+                <span className="tabular-nums text-muted-foreground">{d.score} vs {ourByKey.get(d.key)}</span>
+                {dim?.fix ? <span className="text-muted-foreground"> — {dim.fix}</span> : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-1 text-muted-foreground">Their page beats yours on no dimension, so the gap is authority, not the page.</p>
+      ))}
+    </div>
+  );
+};
+
 const QuestionRow: React.FC<{
   q: LostQuestion;
   busy: boolean;
   onAnalyse: () => void;
-}> = ({ q, busy, onAnalyse }) => {
+  comparing: string | null;
+  comparisons: Record<string, CitedPageComparison>;
+  onCompare: (url: string) => void;
+}> = ({ q, busy, onAnalyse, comparing, comparisons, onCompare }) => {
   const page = q.page;
   const scored = page && page.status === 'ok' && page.score != null;
   const presentation = statusPresentation(page?.status ?? 'not_collected');
@@ -56,14 +99,25 @@ const QuestionRow: React.FC<{
       </div>
       <div className="space-y-2 px-3 py-2">
         {q.rival_urls.length > 0 && (
-          <p className="text-[11px] text-muted-foreground">
-            Cited instead:{' '}
-            {q.rival_urls.slice(0, 5).map((u, i) => (
-              <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="mr-2 text-primary hover:underline">
-                {displayHost(u)}
-              </a>
-            ))}
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-[11px] text-muted-foreground">Cited instead:</p>
+            <ul className="space-y-1">
+              {q.rival_urls.slice(0, 5).map((u) => (
+                <li key={u} className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <a href={u} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-primary hover:underline">
+                      {displayHost(u)}
+                    </a>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" disabled={comparing !== null} onClick={() => onCompare(u)}>
+                      {comparing === u ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <GitCompare className="mr-1 h-3 w-3" />}
+                      Compare with yours
+                    </Button>
+                  </div>
+                  {comparisons[u] && <ComparisonBlock c={comparisons[u]} />}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         {q.rival_urls.length === 0 && q.rival_brands.length > 0 && (
           <p className="text-[11px] text-muted-foreground" title={q.rival_brands.join(', ')}>
@@ -119,11 +173,21 @@ const QuestionRow: React.FC<{
 export const CitabilityPanel: React.FC<{
   report: CitabilityReport | null;
   onAnalyse: (question: string) => Promise<void>;
-}> = ({ report, onAnalyse }) => {
+  onCompare: (question: string, url: string) => Promise<CitedPageComparison | null>;
+}> = ({ report, onAnalyse, onCompare }) => {
   const [busy, setBusy] = useState<string | null>(null);
+  const [comparing, setComparing] = useState<string | null>(null);
+  const [comparisons, setComparisons] = useState<Record<string, CitedPageComparison>>({});
   const run = async (question: string) => {
     setBusy(question);
     try { await onAnalyse(question); } finally { setBusy(null); }
+  };
+  const compare = async (question: string, url: string) => {
+    setComparing(`${question}|${url}`);
+    try {
+      const c = await onCompare(question, url);
+      if (c) setComparisons((s) => ({ ...s, [`${question}|${url}`]: c }));
+    } finally { setComparing(null); }
   };
   const questions = report?.questions ?? [];
   return (
@@ -157,6 +221,11 @@ export const CitabilityPanel: React.FC<{
                 q={q}
                 busy={busy === q.prompt_text}
                 onAnalyse={() => run(q.prompt_text)}
+                comparing={comparing?.startsWith(`${q.prompt_text}|`) ? comparing.slice(q.prompt_text.length + 1) : comparing ? '' : null}
+                comparisons={Object.fromEntries(Object.entries(comparisons)
+                  .filter(([k]) => k.startsWith(`${q.prompt_text}|`))
+                  .map(([k, v]) => [k.slice(q.prompt_text.length + 1), v]))}
+                onCompare={(url) => void compare(q.prompt_text, url)}
               />
             ))}
           </ul>
