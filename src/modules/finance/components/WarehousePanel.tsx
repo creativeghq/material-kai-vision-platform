@@ -632,7 +632,7 @@ const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle>Add Warehouse</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
-          <FormField label="Name *"><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Athens depot" /></FormField>
+          <FormField label="Name"><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Athens depot" /></FormField>
           <FormGrid>
             <FormField label="Code" optional><Input value={code} onChange={(e) => setCode(e.target.value)} /></FormField>
             <FormField label="Location" optional><Input value={location} onChange={(e) => setLocation(e.target.value)} /></FormField>

@@ -9,7 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
-import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
+import { FormField, FormGrid, FormSection, OptionalTag } from '@/components/core/ui/form-layout';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -271,7 +271,7 @@ export const NewDeliveryNoteDialog: React.FC<{
           {/* myDATA v2.0.2: a ΔΠΠ must state its issuance reason — AADE rejects one without. */}
           {kind === 'receipt' ? (
             <FormGrid>
-              <FormField label={<>Issuance reason <span className="text-destructive">*</span></>} hint="Required by myDATA.">
+              <FormField label="Issuance reason" hint="Required by myDATA.">
                 <Select value={receivingPurpose} onValueChange={setReceivingPurpose}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose a reason…" /></SelectTrigger>
                   <SelectContent>
@@ -282,7 +282,7 @@ export const NewDeliveryNoteDialog: React.FC<{
                 </Select>
               </FormField>
               {Number(receivingPurpose) === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER ? (
-                <FormField label={<>Name the reason <span className="text-destructive">*</span></>}>
+                <FormField label="Name the reason">
                   <Input
                     className="h-8 text-xs"
                     maxLength={150}
@@ -300,7 +300,7 @@ export const NewDeliveryNoteDialog: React.FC<{
           {kind === 'dispatch' ? (
           <div className="space-y-2 rounded-md border border-border/60 p-3">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">Packaging <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Label className="text-xs font-medium">Packaging<OptionalTag /></Label>
               <Button
                 type="button"
                 variant="outline"

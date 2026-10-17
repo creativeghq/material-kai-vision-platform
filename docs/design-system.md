@@ -406,15 +406,19 @@ A form is three primitives from `src/components/core/ui/form-layout.tsx`, and th
 - **`FormSection`** — a titled group ("Document", "Supplier", "Amounts", "Classification"). A dialog
   with **8 or more fields** is split into 2–5 of them; a flat grid of twelve inputs gives the reader
   no way to see where one subject ends and the next begins.
-- **`FormGrid`** — the columns (1/2/3/4/6). Width follows content: a two-letter country code takes one
+- **`FormGrid`** — the columns (1/2/3/4/6). `4` auto-fits to the dialog's own width (`sm:`/`md:` measure
+  the window, which is wider than any dialog). Width follows content: a two-letter country code takes one
   column of six, a name takes three. Never leave a lone field orphaned beside an unrelated one.
 - **`FormField`** — label ABOVE the control at the 12px caption size, `hint` below it. A long
   explanation goes in `hint`, never in the label.
 
 Rules:
 
-- **"Optional" is said in the label** (`optional` prop), never as placeholder text. A placeholder
-  reading "Optional" or "Required" looks like a value that was already chosen.
+- **Mark the optional fields; an unmarked field is required.** "Optional" is said in the label
+  (`optional` prop, or `OptionalTag` beside a plain `Label`), never as placeholder text — a placeholder
+  reading "Optional" looks like a value already chosen. No required asterisks: two conventions in one
+  app means a reader cannot tell which a form is using.
+- **`htmlFor` is generated when omitted**, so a `FormField` with one control still labels it.
 - **Labels are `text-xs`.** No `text-[10px]`/`text-[11px]` on a `Label`.
 - **Derive what can be derived.** VAT from net × rate, totals from their parts — editable where a
   document can legitimately differ, disabled where it cannot (0% categories).

@@ -204,7 +204,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
                   </SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Title *" className="sm:col-span-2">
+              <FormField label="Title" className="sm:col-span-2">
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Rent — June 2026" />
               </FormField>
             </FormGrid>
@@ -247,7 +247,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
 
           <FormSection title="Amount and schedule">
             <FormGrid cols={4}>
-              <FormField label="Amount *">
+              <FormField label="Amount">
                 <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </FormField>
               <FormField label="Currency">
@@ -258,7 +258,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
                   </SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Date *">
+              <FormField label="Date">
                 <Input type="date" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} />
               </FormField>
               <FormField label="Reminder date" optional>

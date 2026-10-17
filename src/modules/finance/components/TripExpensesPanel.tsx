@@ -31,6 +31,7 @@ import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, scopedFilterValue, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { OptionalTag } from '@/components/core/ui/form-layout';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import { receiptScanService, splitForForm, RECEIPT_ACCEPT, ReceiptTooLargeError } from '@/services/receiptScanService';
 interface Props {
@@ -786,8 +787,10 @@ const NewTripCardDialog: React.FC<{
               </div>
             )}
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{isTrip ? 'Purpose' : 'Note'}</label>
-              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder={isTrip ? 'Client meetings' : 'Optional'} />
+              <label htmlFor="tripexpensespanel-purpose" className="text-xs text-muted-foreground">
+                {isTrip ? 'Purpose' : <>Note<OptionalTag /></>}
+              </label>
+              <Input id="tripexpensespanel-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder={isTrip ? 'Client meetings' : undefined} />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">{isTrip ? 'Trip start' : 'Period from'}</label>

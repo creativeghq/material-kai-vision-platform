@@ -34,7 +34,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
+import { FormField, FormGrid, FormSection, OptionalTag } from '@/components/core/ui/form-layout';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import {
@@ -695,7 +695,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                     <div className="flex items-center justify-between gap-2">
                       <Label htmlFor="cp-price" className="text-xs">
                         Unit price ({currency || 'EUR'})
-                        <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
+                       <OptionalTag />
                       </Label>
                       <Button
                         type="button"

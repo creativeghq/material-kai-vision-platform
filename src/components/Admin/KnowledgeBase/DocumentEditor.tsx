@@ -403,7 +403,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
               <FormSection title="Document">
                 <FormGrid cols={1}>
-                  <FormField label="Title *" htmlFor="title">
+                  <FormField label="Title" htmlFor="title">
                     <Input
                       id="title"
                       value={document.title}
@@ -439,7 +439,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     return (
                       <>
                         <FormField
-                          label="Price document type *"
+                          label="Price document type"
                           htmlFor="price_doc_type"
                           hint={<>Guides the agent: <span className="font-medium">price_list</span> for retail catalogs, <span className="font-medium">discount_rule</span> for blanket rules, <span className="font-medium">contract_terms</span> for negotiated terms, <span className="font-medium">promotion</span> for time-limited offers, <span className="font-medium">supplier_cost_list</span> for procurement costs (materialized to <code className="text-[10px]">products.cost</code>).</>}
                         >

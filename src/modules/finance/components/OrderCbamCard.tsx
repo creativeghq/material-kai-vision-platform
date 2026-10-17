@@ -11,6 +11,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { OptionalTag } from '@/components/core/ui/form-layout';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
@@ -219,7 +220,7 @@ export const OrderCbamCard: React.FC<{
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="cbam-mrn" className="text-xs">Declaration / MRN<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
+              <Label htmlFor="cbam-mrn" className="text-xs">Declaration / MRN<OptionalTag /></Label>
               <Input
                 id="cbam-mrn" value={declarationRef}
                 onChange={(e) => setDeclarationRef(e.target.value)} className="h-9 w-56"

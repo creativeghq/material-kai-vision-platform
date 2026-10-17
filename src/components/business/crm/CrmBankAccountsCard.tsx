@@ -3,6 +3,7 @@ import { Landmark, Plus, Trash2, Pencil, Loader2, Star, X, Check, FileText, Aler
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { OptionalTag } from '@/components/core/ui/form-layout';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub';
@@ -339,7 +340,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="crmb-ref">SWIFT / Account #<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
+            <Label className="text-xs" htmlFor="crmb-ref">SWIFT / Account #<OptionalTag /></Label>
             <Input id="crmb-ref" value={form.account_ref ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_ref: e.target.value }))} placeholder="e.g. ETHNGRAA" />
           </div>
           <div className="space-y-1.5">

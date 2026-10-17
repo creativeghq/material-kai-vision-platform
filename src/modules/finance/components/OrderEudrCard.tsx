@@ -11,6 +11,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { OptionalTag } from '@/components/core/ui/form-layout';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
@@ -239,7 +240,7 @@ export const OrderEudrCard: React.FC<{
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="eudr-decl" className="text-xs">Declaration identifier<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
+              <Label htmlFor="eudr-decl" className="text-xs">Declaration identifier<OptionalTag /></Label>
               <Input
                 id="eudr-decl" className="h-9 w-56" value={declId}
                 onChange={(e) => setDeclId(e.target.value)}

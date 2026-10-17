@@ -20,6 +20,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Separator } from '@/components/core/ui/separator';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { OptionalTag } from '@/components/core/ui/form-layout';
 import { useToast } from '@/hooks/use-toast';
 import { edgeError } from '@/utils/edgeError';
 import { supabase } from '@/integrations/supabase/client';
@@ -824,7 +825,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="price-discount">Discount %<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
+                <Label htmlFor="price-discount">Discount %<OptionalTag /></Label>
                 <Input
                   id="price-discount"
                   type="number"

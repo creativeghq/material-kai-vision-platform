@@ -355,7 +355,7 @@ export const ContractsSection: React.FC<{
                     </Select>
                   </FormField>
                 )}
-                <FormField label="Title *" htmlFor="ct-title" className="sm:col-span-2">
+                <FormField label="Title" htmlFor="ct-title" className="sm:col-span-2">
                   <Input id="ct-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Framework supply agreement" />
                 </FormField>
                 <FormField label="Type" htmlFor="ct-type">
@@ -368,7 +368,7 @@ export const ContractsSection: React.FC<{
             </FormSection>
             <FormSection title="Counterparty">
               <FormGrid>
-                <FormField label={<>Counterparty {createContext === 'finance' && !subject?.customer_company_id ? '*' : ''}</>} htmlFor="ct-counterparty">
+                <FormField label="Counterparty" optional={!(createContext === 'finance' && !subject?.customer_company_id)} htmlFor="ct-counterparty">
                   <Input id="ct-counterparty" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder="Signer / Company name" />
                 </FormField>
                 <FormField label="Counterparty email" htmlFor="ct-email">

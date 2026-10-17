@@ -1902,12 +1902,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   )}
                 </FormField>
               ) : (
-                <FormField
-                  label="Withholding tax"
-                  hint="Available on service invoices (document type 2.x). Switch the document type to a service invoice to apply a withholding rate."
-                >
-                  {null}
-                </FormField>
+                <div className="min-w-0 space-y-1">
+                  <p className="text-xs font-semibold">Withholding tax</p>
+                  <p className="text-xs text-muted-foreground">
+                    Available on service invoices (document type 2.x). Switch the document type to a service invoice to apply a withholding rate.
+                  </p>
+                </div>
               )}
               <FormField label="Digital transaction fee" htmlFor="ni-digital-fee">
                 <Input id="ni-digital-fee" className="h-9 text-right" type="text" inputMode="decimal" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />

@@ -487,7 +487,7 @@ function JobDialog({ workspaceId, departments, posting, onDone, scope }: { works
         <div className="space-y-5">
           <FormSection title="Role">
             <FormGrid cols={6}>
-              <FormField label="Title *" className="sm:col-span-3"><Input value={f.title} onChange={(e) => upd('title', e.target.value)} placeholder="Senior Product Designer" /></FormField>
+              <FormField label="Title" className="sm:col-span-3"><Input value={f.title} onChange={(e) => upd('title', e.target.value)} placeholder="Senior Product Designer" /></FormField>
               <FormField label="Department" optional className="sm:col-span-3">
                 <Select value={f.department_id || 'none'} onValueChange={(v) => upd('department_id', v === 'none' ? '' : v)}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>

@@ -768,7 +768,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           <FormSection title="Expense">
             <FormGrid>
               <FormField
-                label="Category *"
+                label="Category"
                 hint={expenseCats.length === 0 ? 'Add expense categories in Settings → Finance Categories (Import defaults).' : undefined}
               >
                 <Select value={categoryId} onValueChange={setCategoryId}>
@@ -788,7 +788,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </FormSection>
 
           <FormSection title="Payee">
-          <FormField label="Supplier / Payee *" hint="A company or a person.">
+          <FormField label="Supplier / Payee" hint="A company or a person.">
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.label}{party.type === 'adhoc' && <span className="ml-1.5 text-[10px] text-muted-foreground">· one-off, not in CRM</span>}</span>

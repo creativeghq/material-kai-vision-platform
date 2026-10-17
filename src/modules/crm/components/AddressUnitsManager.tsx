@@ -182,7 +182,7 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
           <div className="space-y-5 py-2">
             <FormSection title="Unit">
               <FormGrid>
-                <FormField label="Name *" htmlFor="su-label">
+                <FormField label="Name" htmlFor="su-label">
                   <Input id="su-label" value={form.label || ''} onChange={(e) => setField('label', e.target.value)} placeholder="Warehouse / Branch A" />
                 </FormField>
                 <FormField label="ΑΑΔΕ Branch #" htmlFor="su-branch" optional>

@@ -252,7 +252,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone, departmentId, emp
         <div className="space-y-5">
           <FormSection title="Person">
             <FormGrid>
-              <FormField label="Full name *" className="sm:col-span-2"><Input value={f.name} onChange={(e) => upd('name', e.target.value)} placeholder="Jane Doe" /></FormField>
+              <FormField label="Full name" className="sm:col-span-2"><Input value={f.name} onChange={(e) => upd('name', e.target.value)} placeholder="Jane Doe" /></FormField>
               <FormField label="Email" optional><Input type="email" value={f.email} onChange={(e) => upd('email', e.target.value)} /></FormField>
               <FormField label="Position" optional><Input value={f.position} onChange={(e) => upd('position', e.target.value)} placeholder="Designer" /></FormField>
               <FormField label="VAT number" optional hint="For Ergani."><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></FormField>

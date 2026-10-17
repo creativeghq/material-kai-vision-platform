@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { OptionalTag } from '@/components/core/ui/form-layout';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
@@ -103,7 +104,7 @@ export const LostSaleDialog: React.FC<{
             </div>
           </div>
           <div>
-            <Label htmlFor="lost-notes" className="text-xs">Notes<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
+            <Label htmlFor="lost-notes" className="text-xs">Notes<OptionalTag /></Label>
             <Input
               id="lost-notes" className="mt-1 h-9 text-sm" value={notes}
               onChange={(e) => setNotes(e.target.value)}
