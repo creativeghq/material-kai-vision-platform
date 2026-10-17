@@ -7,6 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { StripeService } from '@/services/stripe.service';
@@ -21,6 +22,7 @@ const stripeService = new StripeService();
 
 export const SubscriptionTab: React.FC = () => {
   const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const changelogSlug = searchParams.get('changelog');
@@ -117,7 +119,7 @@ export const SubscriptionTab: React.FC = () => {
     if (!user || !newKeyName.trim()) return;
     setGeneratingKey(true);
     try {
-      const key = await apiGatewayService.generateApiKey(user.id, newKeyName.trim());
+      const key = await apiGatewayService.generateApiKey(user.id, newKeyName.trim(), { workspaceId: activeWorkspaceId });
       setApiKeys((prev) => [key, ...prev]);
       setNewKeyName('');
       setShowNewKeyForm(false);

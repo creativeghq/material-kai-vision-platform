@@ -72,6 +72,7 @@ class ApiGatewayService {
       rateLimit?: number;
       allowedEndpoints?: string[];
       expiresAt?: string;
+      workspaceId?: string | null;
     },
   ): Promise<ApiKey> {
     // Generated and hashed IN THE DATABASE (#390), so the plaintext exists in exactly
@@ -85,6 +86,7 @@ class ApiGatewayService {
       p_key_name: keyName,
       p_allowed_endpoints: options?.allowedEndpoints ?? null,
       p_expires_at: options?.expiresAt ?? null,
+      p_workspace_id: options?.workspaceId ?? null,
     });
 
     if (error) throw error;
