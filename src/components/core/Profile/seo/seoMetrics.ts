@@ -85,8 +85,8 @@ export const isPresent = (m: SeoMetric | null | undefined): boolean =>
 
 /** The COLLECTOR's verdict words, translated into the same presentation vocabulary. */
 export function sourceStatusPresentation(status: string | null | undefined): SeoStatusPresentation | null {
-  if (!status || status === 'ok') return null;
-  return statusPresentation(status === 'failed' ? 'collector_failed' : status);
+  if (status === 'ok') return null;
+  return statusPresentation(!status ? 'unknown' : status === 'failed' ? 'collector_failed' : status);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,6 +222,17 @@ function round(v: number, dp: number): number {
 }
 
 /** 1.8k / 39.4k / 3.9M — the reference density, and it keeps tiles on one line. */
+/** A nullable count off the wire. `Number(null)` is 0, so an absent figure must never reach Number(). */
+export function formatCount(n: unknown): string {
+  if (n == null || (typeof n === 'string' && n.trim() === '')) return '—';
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
+  if (Number.isInteger(v)) return String(v);
+  return v < 10 ? v.toFixed(1).replace(/\.0$/, '') : String(Math.round(v));
+}
+
 export function compact(v: number): string {
   const a = Math.abs(v);
   if (a >= 1_000_000_000) return `${round(v / 1_000_000_000, 1)}B`;

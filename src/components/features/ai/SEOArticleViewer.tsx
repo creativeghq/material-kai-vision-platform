@@ -714,7 +714,7 @@ function PipelineProgress({ currentStage, progress, status }: { currentStage: st
 
 // ─── Optimize Tab ───────────────────────────────────────────────
 
-function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore: number }) {
+function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore: number | null }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   // Convert sectionScores dict to array for rendering
@@ -731,7 +731,9 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
     <div className="space-y-6">
       {/* Score header */}
       <div className="flex items-center gap-8 flex-wrap">
-        <ScoreGauge score={overallScore} label="SEO Score" size="lg" />
+        {overallScore != null
+          ? <ScoreGauge score={overallScore} label="SEO Score" size="lg" />
+          : <p className="text-xs text-muted-foreground">Not scored yet.</p>}
         {data.geoScore && (
           <ScoreGauge score={data.geoScore.overall} label="GEO Score" size="lg" />
         )}
@@ -3214,7 +3216,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                       onReanalyze={reanalyze}
                       reanalyzing={reanalyzing}
                     />
-                    <OptimizeTab data={article.optimize_data} overallScore={article.overall_score || 0} />
+                    <OptimizeTab data={article.optimize_data} overallScore={article.overall_score ?? null} />
                   </TabsContent>
                 )}
 

@@ -69,6 +69,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string }> = ({ webs
   const [glossary, setGlossary] = useState<GlossaryLesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
@@ -78,7 +79,14 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string }> = ({ webs
       supabase.from('seo_writer_lessons').select('id, from_text, to_text')
         .eq('workspace_id', activeWorkspaceId).eq('kind', 'glossary').eq('status', 'approved').order('created_at'),
     ]);
-    if (error) toast({ title: 'Could not load the brand profile', description: error.message, variant: 'destructive' });
+    if (error) {
+      // Leave the form unloaded: showing EMPTY would let Save write blanks over the real profile.
+      toast({ title: 'Could not load the brand profile', description: error.message, variant: 'destructive' });
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
+    setLoadFailed(false);
     const all = (data ?? []) as unknown as Row[];
     const own = all.find((r) => r.website_id === websiteId);
     const used = own ?? all.find((r) => r.website_id === null);
@@ -92,7 +100,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string }> = ({ webs
   useEffect(() => { void load(); }, [load]);
 
   const save = async () => {
-    if (!activeWorkspaceId) return;
+    if (!activeWorkspaceId || loadFailed) return;
     setSaving(true);
     const target = rows.find((r) => r.website_id === (ownVoice ? websiteId : null));
     const payload = pickProfile(p);
@@ -184,7 +192,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string }> = ({ webs
             {ownVoice ? 'Use the workspace default instead' : 'Give this website its own voice'}
           </Button>
         </div>
-        <Button onClick={() => void save()} disabled={saving}>
+        <Button onClick={() => void save()} disabled={saving || loadFailed}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           <span className="ml-2">Save</span>
         </Button>

@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
 import { userWebsitesService, type CrawlIssueDetail, type CrawlReport, type UserWebsite } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
+import { safeHref } from '@/utils/safeUrl';
 
 /** Websites → Site Health → the full crawl. */
 
@@ -319,7 +320,7 @@ export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website 
                               {shown.map((sm, i) => (
                                 <li key={i} className="min-w-0 text-[11px]">
                                   {sm.url ? (
-                                    <a href={sm.url} target="_blank" rel="noopener noreferrer" className="block truncate text-foreground hover:text-primary hover:underline">
+                                    <a href={safeHref(sm.url)} target="_blank" rel="noopener noreferrer" className="block truncate text-foreground hover:text-primary hover:underline">
                                       {sm.url}
                                     </a>
                                   ) : null}

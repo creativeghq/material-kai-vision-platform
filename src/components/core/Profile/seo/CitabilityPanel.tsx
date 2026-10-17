@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { cn } from '@/lib/utils';
+import { safeHref } from '@/utils/safeUrl';
 import { timeAgo } from '@/utils/datetime';
 import { statusPresentation } from './seoMetrics';
 import { CITABILITY_DIMENSIONS } from './citabilityDimensions';
@@ -105,7 +106,7 @@ const QuestionRow: React.FC<{
               {q.rival_urls.slice(0, 5).map((u) => (
                 <li key={u} className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                    <a href={u} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-primary hover:underline">
+                    <a href={safeHref(u)} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-primary hover:underline">
                       {displayHost(u)}
                     </a>
                     <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" disabled={comparing !== null} onClick={() => onCompare(u)}>
@@ -140,7 +141,7 @@ const QuestionRow: React.FC<{
           <>
             <p className="text-[11px] text-muted-foreground">
               Best match:{' '}
-              <a href={page!.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              <a href={safeHref(page!.url)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 {displayHost(page!.url)}{new URL(page!.url).pathname}
               </a>
               {page!.words ? ` · ${page!.words} words` : ''}

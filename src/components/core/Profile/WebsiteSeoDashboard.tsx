@@ -143,10 +143,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
           `HubStatTile` puts the figures on a `tabular-nums` grid so the column can be compared
           down the page instead of read one at a time. */}
       <HubStatGrid>
-        <HubStatTile label="Articles" value={loading ? '—' : overview?.articles.total ?? 0} onClick={() => setTab('articles')} />
-        <HubStatTile label="Keyword research" value={loading ? '—' : overview?.keyword_research.total ?? 0} onClick={() => setTab('research')} />
-        <HubStatTile label="Toolkit runs" value={loading ? '—' : overview?.toolkit_runs.total ?? 0} onClick={() => setTab('runs')} />
-        <HubStatTile label="Tracked domains" value={loading ? '—' : overview?.tracked_domains.total ?? 0} onClick={() => setTab('domains')} />
+        <HubStatTile label="Articles" value={loading || !overview ? '—' : overview.articles.total} onClick={() => setTab('articles')} />
+        <HubStatTile label="Keyword research" value={loading || !overview ? '—' : overview.keyword_research.total} onClick={() => setTab('research')} />
+        <HubStatTile label="Toolkit runs" value={loading || !overview ? '—' : overview.toolkit_runs.total} onClick={() => setTab('runs')} />
+        <HubStatTile label="Tracked domains" value={loading || !overview ? '—' : overview.tracked_domains.total} onClick={() => setTab('domains')} />
       </HubStatGrid>
 
       {/* Rendered from `SEO_SECTIONS` — seo/sections.ts. `HubRailSectionLabel` is how a group

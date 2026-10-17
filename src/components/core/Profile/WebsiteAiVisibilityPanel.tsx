@@ -46,6 +46,7 @@ import {
   withRosterEngines, type AiQuestionSource,
 } from './seo/aiCitations';
 import { compact, statusPresentation } from './seo/seoMetrics';
+import { safeHref } from '@/utils/safeUrl';
 
 /** The feed's own health, above its numbers. */
 function MonitoringBanner({
@@ -289,11 +290,15 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const openEditor = async () => {
     const id = state?.own_brand_subject_id;
     if (!id) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('tracked_mentions')
       .select('aliases, language_codes, country_codes, source_config, probe_tier')
       .eq('id', id)
       .maybeSingle();
+    if (error || !data) {
+      toast({ title: 'Could not open the questions', description: error?.message ?? 'The tracked subject could not be read.', variant: 'destructive' });
+      return;
+    }
     const cfg = (data as any)?.source_config ?? {};
     const probes: { key?: string; prompt?: string; source?: string }[] = Array.isArray(cfg.custom_probes) ? cfg.custom_probes : [];
     setForm({
@@ -310,8 +315,10 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     setEditing(true);
   };
   const currentSourceConfig = async (id: string): Promise<Record<string, unknown>> => {
-    const { data } = await supabase.from('tracked_mentions').select('source_config').eq('id', id).maybeSingle();
-    return ((data as any)?.source_config ?? {}) as Record<string, unknown>;
+    const { data, error } = await supabase.from('tracked_mentions').select('source_config').eq('id', id).maybeSingle();
+    // A failed read must abort the write that follows: merging into {} would erase every saved key.
+    if (error || !data) throw new Error(error?.message ?? 'The tracked subject could not be read.');
+    return ((data as any).source_config ?? {}) as Record<string, unknown>;
   };
 
   const trackQuestion = async (question: string, source: AiQuestionSource) => {
@@ -897,7 +904,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                                 {a.cited_urls.length > 0 && (
                                   <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                                     {a.cited_urls.slice(0, 8).map((u, i) => (
-                                      <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                      <a key={i} href={safeHref(u)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                                         {displayHost(u)}
                                       </a>
                                     ))}

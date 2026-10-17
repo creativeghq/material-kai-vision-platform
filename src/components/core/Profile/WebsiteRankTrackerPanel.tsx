@@ -31,6 +31,7 @@ import { Sparkline } from './seo/Sparkline';
 import { compact } from './seo/seoMetrics';
 import { KeywordDiscoveryCard } from './seo/KeywordDiscoveryCard';
 import { SerpTargetPicker, shortLocationName } from './seo/SerpTargetPicker';
+import { safeHref } from '@/utils/safeUrl';
 
 const COUNTRY = 'GR';
 const LANGUAGE = 'el';
@@ -742,7 +743,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       </TableCell>
                       <TableCell className="max-w-[240px]">
                         {r.url
-                          ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="block truncate text-xs text-primary hover:underline">{r.url}</a>
+                          ? <a href={safeHref(r.url)} target="_blank" rel="noopener noreferrer" className="block truncate text-xs text-primary hover:underline">{r.url}</a>
                           : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">

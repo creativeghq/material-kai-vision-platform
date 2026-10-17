@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { safeHref } from '@/utils/safeUrl';
+import { formatCount } from '@/components/core/Profile/seo/seoMetrics';
 
 export interface SEOResearchCardData {
   keyword: string;
@@ -565,10 +566,4 @@ function Stat({ label, value }: { label: string; value: any }) {
   );
 }
 
-function fmtNum(n: any): string {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '—';
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
-  return String(v);
-}
+const fmtNum = formatCount;

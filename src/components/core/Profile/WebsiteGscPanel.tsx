@@ -22,6 +22,7 @@ import { formatNumber } from '@/utils/decimal';
 import {
   userWebsitesService, type UserWebsite, type GscStatus, type GscSummary, type GscQueryPageRows,
 } from '@/services/userWebsitesService';
+import { safeHref } from '@/utils/safeUrl';
 
 
 const fmt = (n: number) => formatNumber((n ?? 0));
@@ -44,7 +45,7 @@ const WINDOWS: { value: string; label: string; title: string }[] = [
 
 /** Search Console figures are a VALUE or a stated REASON (CLAUDE.md rule 3). */
 function GscMetric({ label, value, status }: { label: string; value: string; status: string | undefined }) {
-  const p = sourceStatusPresentation(status === 'ok' ? null : status);
+  const p = status === 'ok' ? null : sourceStatusPresentation(status);
   if (!p) return <Metric label={label} value={value} />;
   return (
     <Metric
@@ -333,10 +334,10 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             <div className="mb-3 text-xs text-[hsl(var(--error))] flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5" /><span className="break-all">{status.last_sync_error}</span></div>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <GscMetric label="Clicks" value={fmt(t?.clicks ?? 0)} status={summary?.status} />
-            <GscMetric label="Impressions" value={fmt(t?.impressions ?? 0)} status={summary?.status} />
-            <GscMetric label="Avg CTR" value={`${(t?.ctr ?? 0).toFixed(1)}%`} status={summary?.status} />
-            <GscMetric label="Avg position" value={(t?.position ?? 0).toFixed(1)} status={summary?.status} />
+            <GscMetric label="Clicks" value={t?.clicks != null ? fmt(t.clicks) : '—'} status={summary?.status} />
+            <GscMetric label="Impressions" value={t?.impressions != null ? fmt(t.impressions) : '—'} status={summary?.status} />
+            <GscMetric label="Avg CTR" value={t?.ctr != null ? `${t.ctr.toFixed(1)}%` : '—'} status={summary?.status} />
+            <GscMetric label="Avg position" value={t?.position != null ? t.position.toFixed(1) : '—'} status={summary?.status} />
           </div>
           {summary?.note && (
             // Which day this actually ends on, and whether the stored history is
@@ -463,7 +464,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                             >
                               {pathOf(r.page)}
                             </button>
-                            <a href={r.page} target="_blank" rel="noopener noreferrer" aria-label="Open page" className="text-muted-foreground hover:text-primary">
+                            <a href={safeHref(r.page)} target="_blank" rel="noopener noreferrer" aria-label="Open page" className="text-muted-foreground hover:text-primary">
                               <ExternalLink className="w-3 h-3 shrink-0" />
                             </a>
                           </span>
@@ -597,7 +598,7 @@ function GscDrillDialog({
                     <TableRow key={label}>
                       <TableCell className="max-w-[320px] truncate font-medium" title={label}>
                         {byPage ? label : (
-                          <a href={label} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary max-w-full">
+                          <a href={safeHref(label)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary max-w-full">
                             <span className="truncate">{pathOf(label)}</span><ExternalLink className="w-3 h-3 shrink-0" />
                           </a>
                         )}

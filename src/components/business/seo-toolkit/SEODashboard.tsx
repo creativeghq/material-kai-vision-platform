@@ -26,14 +26,9 @@ import {
 import { SeoInterlinkingPanel } from '@/modules/seo-interlinking/pages/SeoInterlinkingModulePage';
 import { statusTone } from '@/utils/statusTone';
 import { formatDate } from '@/utils/datetime';
+import { formatCount } from '@/components/core/Profile/seo/seoMetrics';
 
-const fmtNum = (n: any): string => {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '—';
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
-  return String(v);
-};
+const fmtNum = formatCount;
 
 // ───────────────────────────────────────────────────────────────────
 // Dashboard root

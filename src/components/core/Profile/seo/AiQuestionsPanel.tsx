@@ -10,6 +10,7 @@ import { HubToolbar } from '@/components/core/hub/HubToolbar';
 import { formatDate } from '@/utils/datetime';
 import { compact, statusPresentation } from './seoMetrics';
 import type { AiQuestionSource, AiQuestionsReport, SearchQuestion } from './aiCitations';
+import { safeHref } from '@/utils/safeUrl';
 
 const pathOf = (url: string | null): string => {
   if (!url) return '—';
@@ -161,7 +162,7 @@ export const AiQuestionsPanel: React.FC<{
                             <td className="px-3 py-2 text-right text-xs tabular-nums">{r.ai_search_volume != null ? compact(r.ai_search_volume) : '—'}</td>
                             <td className="px-3 py-2 text-xs">
                               {first ? (
-                                <a href={first.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                                <a href={safeHref(first.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
                                   {pathOf(first.url)}<ExternalLink className="h-3 w-3" />
                                 </a>
                               ) : '—'}
@@ -223,7 +224,7 @@ export const AiQuestionsPanel: React.FC<{
                         <td className="px-3 py-2 text-right text-xs tabular-nums">{r.position ?? '—'}</td>
                         <td className="px-3 py-2 text-xs">
                           {r.top_page ? (
-                            <a href={r.top_page} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                            <a href={safeHref(r.top_page)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
                               {pathOf(r.top_page)}<ExternalLink className="h-3 w-3" />
                             </a>
                           ) : '—'}

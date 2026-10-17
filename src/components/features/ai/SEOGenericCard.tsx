@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { safeHref } from '@/utils/safeUrl';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { SeoMetricTile } from '@/components/core/Profile/seo/SeoMetricTile';
-import { metricDescriptor, statusPresentation, type SeoMetric } from '@/components/core/Profile/seo/seoMetrics';
+import { formatCount, metricDescriptor, statusPresentation, type SeoMetric } from '@/components/core/Profile/seo/seoMetrics';
 
 export interface SEOGenericCardData {
   type: string;
@@ -79,18 +79,11 @@ export const seoCardTitle = (type: string | undefined): string =>
   ?? (String(type || '').replace(/^seo_/, '').replace(/_card$/, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
     || 'SEO');
 
-const fmtNum = (n: any): string => {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '—';
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
-  if (Number.isInteger(v)) return String(v);
-  // 0.2939999997615814 visits/month is a float straight off the wire, and was printed verbatim.
-  return v < 10 ? v.toFixed(1).replace(/\.0$/, '') : String(Math.round(v));
-};
+const fmtNum = formatCount;
 
 /** Fixed decimals, or the dash — for money and per-keyword estimates. */
 const fmtDec = (n: any, digits = 1): string => {
+  if (n == null || n === '') return '—';
   const v = Number(n);
   return Number.isFinite(v) ? v.toFixed(digits) : '—';
 };
@@ -1568,7 +1561,11 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             <Empty>Search Console is not connected for this site — connect it under Profile → Websites.</Empty>
           ) : gsc.status !== 'ok' ? (
             <Empty>
-              {gsc.status === 'not_collected' ? 'Connected, but nothing has been synced yet.' : 'Google reported no impressions in this window.'}
+              {gsc.status === 'not_collected'
+                ? 'Connected, but nothing has been synced yet.'
+                : gsc.status === 'no_data'
+                  ? 'Google reported no impressions in this window.'
+                  : statusPresentation(gsc.status).explain}
               {gsc.sync_error ? ` Last sync error: ${gsc.sync_error}` : ''}
             </Empty>
           ) : (

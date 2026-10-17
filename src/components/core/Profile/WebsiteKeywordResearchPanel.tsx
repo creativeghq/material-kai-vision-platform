@@ -23,6 +23,7 @@ import {
 } from '@/services/userWebsitesService';
 import { Loading, useLaunchQuickStart } from './seo/dashboardPrimitives';
 import { AGE_WINDOW_LABELS, AGE_WINDOW_ORDER, ageWindowOf, timeOf, useTableSegments } from './seo/useTableSegments';
+import { safeHref } from '@/utils/safeUrl';
 
 const RESEARCH_LIMIT = 500;
 type SortKey = 'keyword' | 'topic' | 'volume' | 'difficulty' | 'cpc' | 'competition' | 'opportunity' | 'trend' | 'related' | 'addressable' | 'created';
@@ -368,7 +369,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
             {chosenPage && (
               <div className="space-y-4 rounded-sm border border-hairline p-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <a href={chosenPage.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm font-medium text-foreground hover:underline">
+                  <a href={safeHref(chosenPage.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm font-medium text-foreground hover:underline">
                     {chosenPage.title}
                   </a>
                   <span className="text-[11px] text-muted-foreground">seed: “{seedOf(chosenPage.title)}”</span>
@@ -497,7 +498,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
             <div className="grid gap-1.5 sm:grid-cols-2">
               {suggestions.map((sg) => (
                 <div key={sg.keyword} className="flex items-center gap-2 rounded-sm border border-hairline px-2.5 py-1.5">
-                  <a href={sg.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-xs text-foreground hover:underline" title={sg.url}>
+                  <a href={safeHref(sg.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-xs text-foreground hover:underline" title={sg.url}>
                     {sg.keyword}
                   </a>
                   <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => researchKeyword(sg.keyword)}>

@@ -14,6 +14,7 @@ import {
 } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
 import { useTableSegments } from './seo/useTableSegments';
+import { safeHref } from '@/utils/safeUrl';
 
 type SortKey = 'impressions' | 'pages' | 'position' | 'severity' | 'query';
 const SORT_OPTIONS: { value: SortKey; label: string; dir: 'asc' | 'desc' }[] = [
@@ -124,7 +125,7 @@ function Row({ item }: { item: CannibalItem }) {
         {item.pages.map((p) => (
           <li key={p.page} className="flex items-baseline gap-2 rounded-sm bg-surface-sunken px-2 py-1">
             <a
-              href={p.page}
+              href={safeHref(p.page)}
               target="_blank"
               rel="noopener noreferrer"
               className="min-w-0 flex-1 truncate text-xs text-primary hover:underline"
