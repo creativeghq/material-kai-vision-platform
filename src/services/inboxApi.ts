@@ -416,7 +416,8 @@ export interface InboxCatalogItem {
 export interface InboxCustomerMetrics {
   currency: string;
   lifetime_value: number;
-  open_balance: number;
+  /** From `get_customer_open_balance`; null when that read failed. */
+  open_balance: number | null;
   invoice_count: number;
   open_count: number;
 }
@@ -626,7 +627,7 @@ export const inboxApi = {
   sendWhatsAppForm(input: { thread_id: string; form_id: string; body?: string }) {
     return call<{ message: InboxMessage | null }>('send_whatsapp_form', input);
   },
-  sendWhatsAppTemplate(input: { thread_id: string; template_id: string; variables: Record<string, string> }) {
+  sendWhatsAppTemplate(input: { thread_id: string; template_id: string; variables: Record<string, string>; client_token?: string }) {
     return call<{ message: InboxMessage | null }>('send_whatsapp_template', input);
   },
   scheduleMessage(input: {

@@ -51,7 +51,8 @@ export function isCustomerAudience(v: unknown): v is 'customer' {
 export function neutraliseFenceMarkers(text: string): string {
   return text
     .replace(/<<<\s*CUSTOMER_CONVERSATION_(BEGIN|END)\s*>>>/gi, '‹‹‹customer_conversation_$1›››')
-    .replace(/\[\s*OPERATOR INSTRUCTION/gi, '[operator instruction (quoted by the customer)');
+    .replace(/\[\s*OPERATOR INSTRUCTION/gi, '[operator instruction (quoted by the customer)')
+    .replace(/={3,}(\s*)(BEGIN|END)(\s+)UNTRUSTED/gi, '≡≡≡$1$2$3(quoted) untrusted');
 }
 
 export function fenceCustomerMessage(rawTranscript: string): string {

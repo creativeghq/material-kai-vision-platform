@@ -42,6 +42,12 @@ async function accountFor(db: Db, userId: string, accountId: string, ownerOnly =
     .select('id, user_id, workspace_id, email, display_name, status, is_shared, picture_url').eq('id', accountId).maybeSingle();
   if (error) throw new HttpError(500, `Could not read the mailbox: ${error.message}`);
   if (!data || data.status === 'disconnected') throw new HttpError(404, 'Mailbox not found');
+  // Same rule as SQL `mail_account_visible`: a suspended or removed member reaches no mailbox.
+  const { data: membership, error: wmErr } = await db.from('workspace_members')
+    .select('user_id').eq('workspace_id', data.workspace_id).eq('user_id', userId).eq('status', 'active')
+    .limit(1).maybeSingle();
+  if (wmErr) throw new HttpError(500, `Could not read your workspace membership: ${wmErr.message}`);
+  if (!membership) throw new HttpError(404, 'Mailbox not found');
   if (data.user_id === userId) return data as Account;
   if (!ownerOnly && data.is_shared) {
     const { data: member, error: mErr } = await db.from('mail_account_members')
@@ -223,7 +229,9 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
       const tok = await exchangeGoogleCode(url.searchParams.get('code') ?? '', REDIRECT_URI());
       if (!tok.refresh_token) return back('no_refresh_token');
       const granted = String(tok.scope ?? '').split(' ');
-      if (!granted.some((s) => s.endsWith('/gmail.modify'))) return back('scope_missing');
+      if (!granted.some((s) => s.endsWith('/gmail.modify')) || !granted.some((s) => s.endsWith('/gmail.send'))) {
+        return back('scope_missing');
+      }
       const who = await fetch(GOOGLE_USERINFO_URL, { headers: { Authorization: `Bearer ${tok.access_token}` } })
         .then((r) => r.json()).catch(() => ({})) as { email?: string; name?: string; picture?: string };
       if (!who.email) return back('no_email');
@@ -314,10 +322,11 @@ Deno.serve(withApiLogging('gmail-api', async (req) => {
     case 'disconnect': {
       const account = await accountFor(db, userId, String(body.account_id ?? ''), true);
       const { data: refresh } = await db.rpc('mail_account_refresh_token', { p_account_id: account.id });
-      if (refresh) await revokeGoogleToken(String(refresh));
+      const revoked = refresh ? await revokeGoogleToken(String(refresh)) : true;
+      if (!revoked) console.error('[gmail-api] Google did not confirm the token revoke', account.id);
       const { error } = await db.rpc('mail_account_forget_token', { p_account_id: account.id });
       if (error) throw new HttpError(500, `Could not disconnect: ${error.message}`);
-      return json({ ok: true });
+      return json({ ok: true, google_access_revoked: revoked });
     }
 
     case 'labels': {

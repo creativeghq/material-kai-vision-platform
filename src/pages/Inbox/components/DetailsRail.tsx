@@ -185,8 +185,8 @@ export const DetailsRail: React.FC<{
               <div className="text-[11px] text-muted-foreground mt-0.5">{metrics ? 'Lifetime' : `Quoted · ${quotes.length}`}</div>
             </div>
             <div className="rounded-sm bg-surface-sunken border border-hairline p-3">
-              <div className={`text-lg font-semibold tabular-nums ${metrics && metrics.open_balance > 0 ? 'text-warning' : ''}`}>
-                {metrics ? money(metrics.open_balance, metrics.currency) : projects.length}
+              <div className={`text-lg font-semibold tabular-nums ${metrics && (metrics.open_balance ?? 0) > 0 ? 'text-warning' : ''}`}>
+                {metrics ? (metrics.open_balance === null ? '—' : money(metrics.open_balance, metrics.currency)) : projects.length}
               </div>
               <div className="text-[11px] text-muted-foreground mt-0.5">{metrics ? 'Open balance' : `Project${projects.length === 1 ? '' : 's'}`}</div>
             </div>

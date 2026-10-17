@@ -345,8 +345,49 @@ async function getThreadOrThrow(db: DbClient, threadId: string) {
 async function workspaceOwner(db: DbClient, workspaceId: string): Promise<string | null> {
   const { data } = await db
     .from('workspace_members').select('user_id')
-    .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']).limit(1).maybeSingle();
+    .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']).eq('status', 'active')
+    .order('role', { ascending: false }).order('joined_at', { ascending: true })
+    .limit(1).maybeSingle();
   return (data as { user_id?: string } | null)?.user_id ?? null;
+}
+
+/** Rows a customer projection never returns: private notes AND team-only system events. */
+const CUSTOMER_HIDDEN_MESSAGE_TYPES = '(note,system)';
+
+/** An inbound message older than this is history, not something the assistant should answer now. */
+const AGENT_REPLY_MAX_AGE_MS = 60 * 60_000;
+
+/** A customer cannot sign a private-bucket object themselves, so the server hands them a URL. */
+async function signAttachmentsForCustomer(db: DbClient, messages: Array<Record<string, unknown>>): Promise<void> {
+  await Promise.all(messages.map(async (m) => {
+    if (!Array.isArray(m.attachments)) return;
+    m.attachments = await Promise.all((m.attachments as Array<Record<string, unknown>>).map(async (a) => {
+      const bucket = typeof a?.storage_bucket === 'string' ? a.storage_bucket : '';
+      const path = typeof a?.storage_object_path === 'string' ? a.storage_object_path : '';
+      if (!bucket || !path) return a;
+      const { data } = await db.storage.from(bucket).createSignedUrl(path, 3600);
+      return data?.signedUrl ? { ...a, url: data.signedUrl } : a;
+    }));
+  }));
+}
+
+/** Compare-and-set on the inbound message: exactly one run may answer it. */
+async function claimInboundForAgentReply(db: DbClient, messageId: string): Promise<boolean> {
+  const { data: row, error: readErr } = await db.from('inbox_messages')
+    .select('metadata').eq('id', messageId).maybeSingle();
+  if (readErr || !row) return false;
+  const meta = ((row as { metadata?: Json | null }).metadata ?? {}) as Json;
+  if (meta.agent_reply_claimed_at) return false;
+  const { data: claimed, error } = await db.from('inbox_messages')
+    .update({ metadata: { ...meta, agent_reply_claimed_at: new Date().toISOString() } })
+    .eq('id', messageId)
+    .is('metadata->>agent_reply_claimed_at', null)
+    .select('id');
+  if (error) {
+    console.warn('[inbox-api] agent reply claim failed:', error.message);
+    return false;
+  }
+  return (claimed as unknown[] | null)?.length === 1;
 }
 
 type InboxAgentSettings = { autoRespond: boolean; allowAccountData: boolean };
@@ -409,7 +450,7 @@ async function maybeRunOrderIntake(db: DbClient, threadId: string): Promise<void
       .select('message_type, sender_participant_id')
       .eq('thread_id', threadId)
       .is('deleted_at', null)
-      .neq('message_type', 'note')
+      .not('message_type', 'in', '(note,system)')
       .order('created_at', { ascending: false })
       .limit(1);
     const latest = ((history || []) as Array<{ message_type: string; sender_participant_id: string | null }>)[0];
@@ -461,17 +502,17 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
     if (thread.agent_state !== 'active') return;
     const workspaceId = String(thread.workspace_id);
 
-    // Recent conversation (exclude private notes), newest first — used for the guard and transcript.
+    // System rows are excluded too: an auto-label event landing first must not cancel the reply.
     const { data: history } = await db
       .from('inbox_messages')
-      .select('body, message_type, sender_participant_id, metadata, created_at')
+      .select('id, body, message_type, sender_participant_id, metadata, created_at')
       .eq('thread_id', threadId)
       .is('deleted_at', null)
-      .neq('message_type', 'note')
+      .not('message_type', 'in', '(note,system)')
       .order('created_at', { ascending: false })
       .limit(20);
     const rows = (history || []) as Array<{
-      body: string | null; message_type: string; sender_participant_id: string | null; metadata: Json | null;
+      id: string; body: string | null; message_type: string; sender_participant_id: string | null; metadata: Json | null;
       created_at: string;
     }>;
 
@@ -494,8 +535,12 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
       if ((latest.metadata as Json | null)?.direction !== 'incoming') return;
     }
 
+    if (Date.now() - Date.parse(latest.created_at) > AGENT_REPLY_MAX_AGE_MS) return;
+
     const owner = await workspaceOwner(db, workspaceId);
     if (!owner) return;
+
+    if (!(await claimInboundForAgentReply(db, latest.id))) return;
 
     if (thread.channel === 'whatsapp' && !(await whatsappWindow(db, threadId, thread)).open) {
       const { error: noteErr } = await db.from('inbox_messages').insert({
@@ -539,6 +584,11 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
       if (!handoff?.send_reply) return;
     }
     if (!replyText) return;
+
+    const { data: answered, error: answeredErr } = await db.from('inbox_messages')
+      .select('id').eq('thread_id', threadId).eq('message_type', 'agent').is('deleted_at', null)
+      .gt('created_at', latest.created_at).limit(1);
+    if (answeredErr || (answered as unknown[] | null)?.length) return;
 
     // The agent participant (created when the thread was handed over / auto-engaged).
     const { data: agentP } = await db
@@ -1355,6 +1405,7 @@ async function resumeStoredMessage(
   db: DbClient,
   thread: Record<string, unknown>,
   clientToken: string,
+  senderUserId: string,
 ): Promise<Record<string, unknown> | null> {
   const { data: existing } = await db
     .from('inbox_messages').select('*')
@@ -1364,7 +1415,11 @@ async function resumeStoredMessage(
   const row = existing as Record<string, unknown>;
   const meta = ((row.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
   const status = String(meta.delivery_status ?? '');
-  if (thread.channel !== 'whatsapp' || status === 'sent' || !Array.isArray(meta.relay_legs)) return row;
+  if (status === 'sent') return row;
+  if (thread.channel === 'email' || thread.channel === 'social') {
+    return await resendStoredRelay(db, thread, row, senderUserId);
+  }
+  if (thread.channel !== 'whatsapp' || !Array.isArray(meta.relay_legs)) return row;
 
   const tmeta = (thread.metadata as Json) || {};
   const accountId = String(tmeta.zernio_account_id || '');
@@ -1380,6 +1435,61 @@ async function resumeStoredMessage(
   if (result.failedAt !== null) throw new HttpError(502, whatsAppLegFailure(result.legs, result.failedAt, legs.length));
   const { data: fresh } = await db.from('inbox_messages').select('*').eq('id', String(row.id)).maybeSingle();
   return (fresh as Record<string, unknown> | null) ?? row;
+}
+
+/** Re-run the email/social relay of a stored row that did not go out; claimed so two retries send once. */
+async function resendStoredRelay(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  row: Record<string, unknown>,
+  senderUserId: string,
+): Promise<Record<string, unknown>> {
+  const id = String(row.id);
+  const meta = ((row.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const { data: claimed, error: claimErr } = await db.from('inbox_messages')
+    .update({ metadata: { ...meta, delivery_status: 'resending' } })
+    .eq('id', id)
+    .or('metadata->>delivery_status.is.null,metadata->>delivery_status.eq.relay_failed')
+    .select('*');
+  if (claimErr) throw new HttpError(500, `Could not resend the message: ${claimErr.message}`);
+  const claimedRow = ((claimed as Array<Record<string, unknown>> | null) ?? [])[0];
+  if (!claimedRow) throw new HttpError(409, 'This message is already being resent. Refresh the conversation in a moment.');
+  const body = (row.body as string | null) ?? null;
+  const cards = (Array.isArray(meta.cards) ? meta.cards : []) as InboxCard[];
+  try {
+    if (thread.channel === 'social') {
+      await relaySocialMessage(db, thread, claimedRow, { body, cards });
+    } else {
+      await relayEmailMessage(db, thread, claimedRow, {
+        messageType: String(row.message_type),
+        body,
+        cards,
+        attachments: (row.attachments as Attachment[]) ?? [],
+        emailCopies: {
+          cc: Array.isArray(meta.email_cc) ? (meta.email_cc as string[]) : [],
+          bcc: Array.isArray(meta.email_bcc) ? (meta.email_bcc as string[]) : [],
+        },
+        signature: typeof meta.email_signature === 'string',
+        senderUserId,
+      });
+    }
+  } catch (err) {
+    const { error: resetErr } = await db.from('inbox_messages')
+      .update({
+        metadata: {
+          ...relayBaseMetadata(claimedRow),
+          delivery_status: 'relay_failed',
+          relay_error: (err instanceof Error ? err.message : String(err)).slice(0, 500),
+        },
+      })
+      .eq('id', id).eq('metadata->>delivery_status', 'resending');
+    if (resetErr) console.error('[inbox-api] could not record the failed resend', id, resetErr.message);
+    throw err;
+  }
+  await db.from('inbox_messages').update({ metadata: meta })
+    .eq('id', id).eq('metadata->>delivery_status', 'resending');
+  const { data: fresh } = await db.from('inbox_messages').select('*').eq('id', id).maybeSingle();
+  return (fresh as Record<string, unknown> | null) ?? claimedRow;
 }
 
 /** Persist a message, bump the thread, fan out the channel relay + the in-app bell. */
@@ -1448,6 +1558,34 @@ function parseThreadCursor(raw: unknown): { at: string; id: string } | null {
   return { at, id };
 }
 
+/** The same rule as SQL `phone_digits_match`: the last 10 digits agree, whatever the formatting. */
+function phoneDigitsMatch(stored: unknown, digits: string): boolean {
+  const d = String(stored ?? '').replace(/[^0-9]/g, '');
+  return d.length >= 10 && digits.length >= 10 && d.slice(-10) === digits.slice(-10);
+}
+
+/** A workspace contact whose phone, mobile or `crm_phones` row is this number; throws on a failed read. */
+async function findContactByPhoneDigits(db: DbClient, workspaceId: string, digits: string): Promise<string | null> {
+  if (digits.length < 10) return null;
+  const last10 = digits.slice(-10);
+  const spread = `%${last10.split('').join('%')}%`;
+  const [phones, contacts] = await Promise.all([
+    db.from('crm_phones').select('contact_id, phone_normalized')
+      .eq('workspace_id', workspaceId).not('contact_id', 'is', null)
+      .like('phone_normalized', `%${last10}`).limit(20),
+    db.from('crm_contacts').select('id, phone, mobile').eq('workspace_id', workspaceId)
+      .or(`phone.ilike.${pgrstQuote(spread)},mobile.ilike.${pgrstQuote(spread)}`).limit(20),
+  ]);
+  if (phones.error) throw new HttpError(500, `Could not check the CRM for this number: ${phones.error.message}`);
+  if (contacts.error) throw new HttpError(500, `Could not check the CRM for this number: ${contacts.error.message}`);
+  const viaPhones = ((phones.data ?? []) as Array<{ contact_id: string | null; phone_normalized: string | null }>)
+    .find((r) => r.contact_id && phoneDigitsMatch(r.phone_normalized, digits));
+  if (viaPhones?.contact_id) return viaPhones.contact_id;
+  const viaContact = ((contacts.data ?? []) as Array<{ id: string; phone: string | null; mobile: string | null }>)
+    .find((c) => phoneDigitsMatch(c.phone, digits) || phoneDigitsMatch(c.mobile, digits));
+  return viaContact?.id ?? null;
+}
+
 /** A value inside a PostgREST or() list: quoted, so commas and parentheses in it stay literal. */
 function pgrstQuote(value: string): string {
   return `"${value.replace(/["\\]/g, '\\$&')}"`;
@@ -1473,6 +1611,257 @@ async function messageOpens(db: DbClient, messageIds: string[]): Promise<Message
     };
   }
   return out;
+}
+
+/** A message's metadata minus the previous relay outcome, so a resend records only its own. */
+function relayBaseMetadata(msg: Record<string, unknown>): Record<string, unknown> {
+  const { relay_error: _e, delivery_status: _d, ...rest } = ((msg.metadata as Record<string, unknown> | null) ?? {});
+  return rest;
+}
+
+/** Relay a stored message to its social thread; records `delivery_status` and throws 502 on failure. */
+async function relaySocialMessage(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  msg: Record<string, unknown>,
+  ctx: { body: string | null; cards: InboxCard[] },
+): Promise<void> {
+  const { body, cards } = ctx;
+  const storedMetadata = relayBaseMetadata(msg);
+  // Social relay. A `social` thread is one of two things and they relay to DIFFERENT endpoints:
+  // a comment thread (many commenters under one of our posts) or a 1:1 DM. Sending one down the
+  // other's path would either post a private answer publicly under a post, or silently drop a
+  // public reply into a DM nobody is in — both "succeed" at the API layer.
+  const meta = (thread.metadata as Json) || {};
+  const accountId = String(meta.zernio_account_id || '');
+  const kind = String(meta.social_kind || '');
+  // A social DM or comment has no card layout of its own: the cards go as lines under the
+  // text, fitted to the tightest platform cap (Instagram DMs take 1,000 characters) — the
+  // member's words are never cut, and cards that do not fit are counted, not dropped silently.
+  const socialText = cards.length ? fitTextWithCards(body, cards, 1000) : String(body);
+  let res: { success?: boolean; messageId?: string; error?: string } = { success: false, error: 'unrouted' };
+
+  if (!accountId) {
+    throw new HttpError(502, 'Message stored but NOT delivered: this social thread has no connected account.');
+  }
+
+  if (kind === 'comments') {
+    const postId = String(meta.zernio_post_id || '');
+    if (!postId) throw new HttpError(502, 'Message stored but NOT delivered: the thread has no post id.');
+
+    // Reply UNDER the comment we are answering, not as a fresh top-level comment: a
+    // top-level comment does not notify the person who asked, so the answer is written and
+    // never read. The target is the most recent inbound comment on the thread, which is what
+    // the transcript shows the operator replying to.
+    const { data: lastInbound } = await db
+      .from('inbox_messages').select('metadata')
+      .eq('thread_id', thread.id)
+      .eq('metadata->>direction', 'incoming')
+      .order('created_at', { ascending: false })
+      .limit(1).maybeSingle();
+    const commentId = (lastInbound?.metadata as Json | undefined)?.comment_id as string | undefined;
+
+    res = await sendSocialCommentReply({ accountId, postId, message: socialText, commentId });
+  } else {
+    const participantId = String(meta.participant_id || '');
+    if (!participantId) throw new HttpError(502, 'Message stored but NOT delivered: the thread has no recipient.');
+    res = await sendSocialDirectMessage({ accountId, participantId, message: socialText });
+  }
+
+  const relayOk = !!res?.success;
+  // This row carries the provider id that delivery receipts match on, plus the only record
+  // of whether the relay worked. Losing it silently means receipts never apply to this
+  // message and the failure marker is gone — so read the error rather than assume.
+  const { error: metaErr } = await db.from('inbox_messages').update({
+    metadata: {
+      // Merge, never replace: the insert already stored `cards` / `reply_to` here.
+      ...storedMetadata,
+      channel: 'social',
+      direction: 'outgoing',
+      social_kind: kind,
+      wamid: res?.messageId ?? null,
+      relay: res,
+      delivery_status: relayOk ? 'sent' : 'relay_failed',
+    },
+  }).eq('id', (msg as { id: string }).id);
+  if (metaErr) console.error('[inbox-api] social relay metadata write FAILED', (msg as { id: string }).id, metaErr);
+
+  // Same contract as the WhatsApp branch: these helpers never throw, so an unread result
+  // leaves a delivered-looking bubble in the operator's thread that nobody ever received.
+  if (!relayOk) {
+    throw new HttpError(502, `Message stored but NOT delivered: ${String(res?.error ?? 'social relay failed')}`);
+  }
+}
+
+/** Relay a stored message by email; records `delivery_status` and throws 502 on failure. */
+async function relayEmailMessage(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  msg: Record<string, unknown>,
+  opts: {
+    messageType: string;
+    body: string | null;
+    cards: InboxCard[];
+    attachments: Attachment[];
+    emailCopies?: { cc: string[]; bcc: string[] };
+    trackOpens?: boolean;
+    signature?: boolean;
+    senderUserId?: string | null;
+  },
+): Promise<void> {
+  const { messageType, body, cards, attachments } = opts;
+  const threadId = String(thread.id);
+  // Email relay (#342). Without this an email thread is write-only: a member replies, sees their
+  // own bubble, the composer clears — and the customer is never sent anything. Same failure the
+  // WhatsApp branch above was fixed for, so it is built the same way: send, CHECK the result, and
+  // fail loudly rather than leave a delivered-looking message that never left.
+  const meta = (thread.metadata as Json) || {};
+  let toAddress = String(meta.email_from || '');
+  const ourMailbox = String(meta.email_to || '');
+  // A recipient with no mailbox to send FROM used to fall straight through this branch: the
+  // member saw their own reply, the composer cleared, and nothing left the building. Inbound
+  // mail always carries `email_to`, but a public-profile enquiry files even when the owner's
+  // address could not be allocated (two people wanting the same handle), so the state is
+  // reachable — and a skipped relay is indistinguishable from a delivered one.
+  if (toAddress && !ourMailbox) {
+    throw new HttpError(
+      502,
+      'Message stored but NOT delivered: this conversation has no address to send from. '
+        + 'Pick your inbox email address first, then resend.',
+    );
+  }
+  if (toAddress && ourMailbox) {
+    const messageId = (msg as { id: string }).id;
+    const domain = ourMailbox.split('@')[1] || '';
+
+    // Everything the customer's client needs to keep this in ONE conversation:
+    //  • Reply-To carries the thread id, which is what actually threads the reply (the
+    //    recipient address is the one field no intermediary rewrites).
+    //  • In-Reply-To / References chain to their last message, so clients nest it visually.
+    // A sender who is not on the conversation (#485 I-8) never becomes where the reply goes.
+    const { data: lastInbound } = await db
+      .from('inbox_messages')
+      .select('metadata')
+      .eq('thread_id', threadId)
+      .eq('metadata->>direction', 'incoming')
+      .or('metadata->>sender_unverified.is.null,metadata->>sender_unverified.neq.true')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const inboundMeta = (lastInbound as { metadata?: Record<string, unknown> } | null)?.metadata ?? {};
+    const inboundId = (inboundMeta.email_message_id ?? null) as string | null;
+    const replyTo = Array.isArray(inboundMeta.email_reply_to) ? String(inboundMeta.email_reply_to[0] ?? '') : '';
+    if (replyTo) toAddress = replyTo;
+    const copies = cleanEmailCopies(opts.emailCopies, [toAddress, ourMailbox]);
+
+    const ourMessageId = buildOutboundMessageId(threadId, messageId, domain);
+    const headers: Record<string, string> = { 'Message-ID': `<${ourMessageId}>` };
+    if (inboundId) {
+      const { data: chainRows } = await db.from('inbox_messages')
+        .select('metadata')
+        .eq('thread_id', threadId).neq('id', messageId).not('metadata->>email_message_id', 'is', null)
+        .order('created_at', { ascending: false }).limit(20);
+      const chain = ((chainRows || []) as Array<{ metadata?: { email_message_id?: string } }>)
+        .map((r) => r.metadata?.email_message_id).filter((id): id is string => !!id).reverse();
+      if (!chain.includes(inboundId)) chain.push(inboundId);
+      headers['In-Reply-To'] = `<${inboundId}>`;
+      headers['References'] = chain.map((id) => `<${id}>`).join(' ');
+    }
+    // An assistant-authored reply is marked as automated so a customer's autoresponder does not
+    // ping-pong with ours. A finance document must NEVER carry these (guarded by
+    // tests/security/inbound-email-isolation.test.ts).
+    if (messageType === 'agent') {
+      headers['Auto-Submitted'] = 'auto-replied';
+      headers['Precedence'] = 'auto_reply';
+    }
+
+    const subjectBase = String(thread.subject || 'Your message');
+    const subject = !lastInbound || /^re:/i.test(subjectBase) ? subjectBase : `Re: ${subjectBase}`;
+    const [emailAttachments, signature] = await Promise.all([
+      emailAttachmentsFor(db, attachments),
+      opts.signature && opts.senderUserId
+        ? loadEmailSignature(db, opts.senderUserId, String(thread.workspace_id))
+        : Promise.resolve(null),
+    ]);
+    const unsignedText = cards.length
+      ? buildEmailCardsText(cards, body)
+      : (body ?? `Attached: ${emailAttachments.map((a) => a.filename).join(', ')}`);
+    const bodyHtml = cards.length
+      ? buildEmailCardsHtml(cards, body)
+      : hasEmailMarkup(body) ? renderEmailMarkup(String(body), escapeHtml) : null;
+    const signed = signature
+      ? signEmail(unsignedText, signature, (t) => (hasEmailMarkup(t) ? renderEmailMarkup(t, escapeHtml) : null), cards.length ? bodyHtml : null)
+      : null;
+    const text = signed ? signed.text : unsignedText;
+
+    let trackId: string | null = null;
+    if (opts.trackOpens && opts.senderUserId) {
+      trackId = crypto.randomUUID();
+      const { error: trackErr } = await db.from('mail_open_tracking').insert({
+        id: trackId, workspace_id: String(thread.workspace_id), user_id: opts.senderUserId, kind: 'platform',
+        inbox_message_id: messageId, recipients: [toAddress, ...copies.cc].join(', ').slice(0, 500),
+      });
+      if (trackErr) { console.error('[inbox-api] open tracking unavailable, sending untracked', trackErr.message); trackId = null; }
+    }
+    const markupHtml = signed ? signed.html : bodyHtml;
+    const html = trackId ? withTrackingPixel(markupHtml, text, trackId) : markupHtml;
+
+    let sendErr: string | null = null;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/email-api`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'send',
+          to: toAddress,
+          ...(copies.cc.length ? { cc: copies.cc } : {}),
+          ...(copies.bcc.length ? { bcc: copies.bcc } : {}),
+          subject,
+          // HTML only from the two builders that escape everything first (invariant 11).
+          text,
+          ...(html ? { html } : {}),
+          ...(emailAttachments.length ? { attachments: emailAttachments } : {}),
+          replyTo: buildReplyToAddress(ourMailbox, threadId),
+          headers,
+          emailType: 'agent_reply',
+          workspace_id: String(thread.workspace_id),
+          // Deliberately NOT requireWorkspaceSender: an inbox reply is not a business document
+          // and must never be pinned to (or borrow) the finance sending identity.
+          tags: { feature: 'inbox_email_reply', thread_id: threadId },
+        }),
+      });
+      if (!res.ok) sendErr = `email-api returned ${res.status}`;
+      else {
+        const payload = await res.json().catch(() => null) as { success?: boolean; error?: string } | null;
+        if (payload && payload.success === false) sendErr = payload.error || 'send failed';
+      }
+    } catch (e) {
+      sendErr = e instanceof Error ? e.message : String(e);
+    }
+
+    await db.from('inbox_messages').update({
+      metadata: {
+        ...relayBaseMetadata(msg),
+        channel: 'email',
+        direction: 'outgoing',
+        // Stored so a reply quoting this Message-ID threads via ladder step 1.
+        email_message_id: ourMessageId,
+        email_to: toAddress,
+        ...(signature ? { email_signature: signature.text } : {}),
+        ...(copies.cc.length ? { email_cc: copies.cc } : {}),
+        ...(copies.bcc.length ? { email_bcc: copies.bcc } : {}),
+        delivery_status: sendErr ? 'relay_failed' : 'sent',
+        ...(sendErr ? { relay_error: sendErr } : {}),
+      },
+    }).eq('id', messageId);
+
+    if (sendErr) {
+      throw new HttpError(502, `Message stored but NOT delivered by email: ${sendErr}`);
+    }
+  }
 }
 
 async function insertMessageAndNotify(
@@ -1574,223 +1963,16 @@ async function insertMessageAndNotify(
     }
   }
 
-  // Social relay. A `social` thread is one of two things and they relay to DIFFERENT endpoints:
-  // a comment thread (many commenters under one of our posts) or a 1:1 DM. Sending one down the
-  // other's path would either post a private answer publicly under a post, or silently drop a
-  // public reply into a DM nobody is in — both "succeed" at the API layer.
   if (thread.channel === 'social' && (messageType === 'text' || messageType === 'agent') && (body || cards.length)) {
-    const meta = (thread.metadata as Json) || {};
-    const accountId = String(meta.zernio_account_id || '');
-    const kind = String(meta.social_kind || '');
-    // A social DM or comment has no card layout of its own: the cards go as lines under the
-    // text, fitted to the tightest platform cap (Instagram DMs take 1,000 characters) — the
-    // member's words are never cut, and cards that do not fit are counted, not dropped silently.
-    const socialText = cards.length ? fitTextWithCards(body, cards, 1000) : String(body);
-    let res: { success?: boolean; messageId?: string; error?: string } = { success: false, error: 'unrouted' };
-
-    if (!accountId) {
-      throw new HttpError(502, 'Message stored but NOT delivered: this social thread has no connected account.');
-    }
-
-    if (kind === 'comments') {
-      const postId = String(meta.zernio_post_id || '');
-      if (!postId) throw new HttpError(502, 'Message stored but NOT delivered: the thread has no post id.');
-
-      // Reply UNDER the comment we are answering, not as a fresh top-level comment: a
-      // top-level comment does not notify the person who asked, so the answer is written and
-      // never read. The target is the most recent inbound comment on the thread, which is what
-      // the transcript shows the operator replying to.
-      const { data: lastInbound } = await db
-        .from('inbox_messages').select('metadata')
-        .eq('thread_id', thread.id)
-        .eq('metadata->>direction', 'incoming')
-        .order('created_at', { ascending: false })
-        .limit(1).maybeSingle();
-      const commentId = (lastInbound?.metadata as Json | undefined)?.comment_id as string | undefined;
-
-      res = await sendSocialCommentReply({ accountId, postId, message: socialText, commentId });
-    } else {
-      const participantId = String(meta.participant_id || '');
-      if (!participantId) throw new HttpError(502, 'Message stored but NOT delivered: the thread has no recipient.');
-      res = await sendSocialDirectMessage({ accountId, participantId, message: socialText });
-    }
-
-    const relayOk = !!res?.success;
-    // This row carries the provider id that delivery receipts match on, plus the only record
-    // of whether the relay worked. Losing it silently means receipts never apply to this
-    // message and the failure marker is gone — so read the error rather than assume.
-    const { error: metaErr } = await db.from('inbox_messages').update({
-      metadata: {
-        // Merge, never replace: the insert already stored `cards` / `reply_to` here.
-        ...storedMetadata,
-        channel: 'social',
-        direction: 'outgoing',
-        social_kind: kind,
-        wamid: res?.messageId ?? null,
-        relay: res,
-        delivery_status: relayOk ? 'sent' : 'relay_failed',
-      },
-    }).eq('id', (msg as { id: string }).id);
-    if (metaErr) console.error('[inbox-api] social relay metadata write FAILED', (msg as { id: string }).id, metaErr);
-
-    // Same contract as the WhatsApp branch: these helpers never throw, so an unread result
-    // leaves a delivered-looking bubble in the operator's thread that nobody ever received.
-    if (!relayOk) {
-      throw new HttpError(502, `Message stored but NOT delivered: ${String(res?.error ?? 'social relay failed')}`);
-    }
+    await relaySocialMessage(db, thread, msg as Record<string, unknown>, { body, cards });
   }
 
-  // Email relay (#342). Without this an email thread is write-only: a member replies, sees their
-  // own bubble, the composer clears — and the customer is never sent anything. Same failure the
-  // WhatsApp branch above was fixed for, so it is built the same way: send, CHECK the result, and
-  // fail loudly rather than leave a delivered-looking message that never left.
   if (thread.channel === 'email' && (messageType === 'text' || messageType === 'agent')
       && (body || cards.length || attachments.length > 0)) {
-    const meta = (thread.metadata as Json) || {};
-    let toAddress = String(meta.email_from || '');
-    const ourMailbox = String(meta.email_to || '');
-    // A recipient with no mailbox to send FROM used to fall straight through this branch: the
-    // member saw their own reply, the composer cleared, and nothing left the building. Inbound
-    // mail always carries `email_to`, but a public-profile enquiry files even when the owner's
-    // address could not be allocated (two people wanting the same handle), so the state is
-    // reachable — and a skipped relay is indistinguishable from a delivered one.
-    if (toAddress && !ourMailbox) {
-      throw new HttpError(
-        502,
-        'Message stored but NOT delivered: this conversation has no address to send from. '
-          + 'Pick your inbox email address first, then resend.',
-      );
-    }
-    if (toAddress && ourMailbox) {
-      const messageId = (msg as { id: string }).id;
-      const domain = ourMailbox.split('@')[1] || '';
-
-      // Everything the customer's client needs to keep this in ONE conversation:
-      //  • Reply-To carries the thread id, which is what actually threads the reply (the
-      //    recipient address is the one field no intermediary rewrites).
-      //  • In-Reply-To / References chain to their last message, so clients nest it visually.
-      const { data: lastInbound } = await db
-        .from('inbox_messages')
-        .select('metadata')
-        .eq('thread_id', threadId)
-        .eq('metadata->>direction', 'incoming')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const inboundMeta = (lastInbound as { metadata?: Record<string, unknown> } | null)?.metadata ?? {};
-      const inboundId = (inboundMeta.email_message_id ?? null) as string | null;
-      const replyTo = Array.isArray(inboundMeta.email_reply_to) ? String(inboundMeta.email_reply_to[0] ?? '') : '';
-      if (replyTo) toAddress = replyTo;
-      const copies = cleanEmailCopies(opts.emailCopies, [toAddress, ourMailbox]);
-
-      const ourMessageId = buildOutboundMessageId(threadId, messageId, domain);
-      const headers: Record<string, string> = { 'Message-ID': `<${ourMessageId}>` };
-      if (inboundId) {
-        const { data: chainRows } = await db.from('inbox_messages')
-          .select('metadata')
-          .eq('thread_id', threadId).neq('id', messageId).not('metadata->>email_message_id', 'is', null)
-          .order('created_at', { ascending: false }).limit(20);
-        const chain = ((chainRows || []) as Array<{ metadata?: { email_message_id?: string } }>)
-          .map((r) => r.metadata?.email_message_id).filter((id): id is string => !!id).reverse();
-        if (!chain.includes(inboundId)) chain.push(inboundId);
-        headers['In-Reply-To'] = `<${inboundId}>`;
-        headers['References'] = chain.map((id) => `<${id}>`).join(' ');
-      }
-      // An assistant-authored reply is marked as automated so a customer's autoresponder does not
-      // ping-pong with ours. A finance document must NEVER carry these (guarded by
-      // tests/security/inbound-email-isolation.test.ts).
-      if (messageType === 'agent') {
-        headers['Auto-Submitted'] = 'auto-replied';
-        headers['Precedence'] = 'auto_reply';
-      }
-
-      const subjectBase = String(thread.subject || 'Your message');
-      const subject = !lastInbound || /^re:/i.test(subjectBase) ? subjectBase : `Re: ${subjectBase}`;
-      const [emailAttachments, signature] = await Promise.all([
-        emailAttachmentsFor(db, attachments),
-        opts.signature && opts.senderUserId
-          ? loadEmailSignature(db, opts.senderUserId, String(thread.workspace_id))
-          : Promise.resolve(null),
-      ]);
-      const unsignedText = cards.length
-        ? buildEmailCardsText(cards, body)
-        : (body ?? `Attached: ${emailAttachments.map((a) => a.filename).join(', ')}`);
-      const bodyHtml = cards.length
-        ? buildEmailCardsHtml(cards, body)
-        : hasEmailMarkup(body) ? renderEmailMarkup(String(body), escapeHtml) : null;
-      const signed = signature
-        ? signEmail(unsignedText, signature, (t) => (hasEmailMarkup(t) ? renderEmailMarkup(t, escapeHtml) : null), cards.length ? bodyHtml : null)
-        : null;
-      const text = signed ? signed.text : unsignedText;
-
-      let trackId: string | null = null;
-      if (opts.trackOpens && opts.senderUserId) {
-        trackId = crypto.randomUUID();
-        const { error: trackErr } = await db.from('mail_open_tracking').insert({
-          id: trackId, workspace_id: String(thread.workspace_id), user_id: opts.senderUserId, kind: 'platform',
-          inbox_message_id: messageId, recipients: [toAddress, ...copies.cc].join(', ').slice(0, 500),
-        });
-        if (trackErr) { console.error('[inbox-api] open tracking unavailable, sending untracked', trackErr.message); trackId = null; }
-      }
-      const markupHtml = signed ? signed.html : bodyHtml;
-      const html = trackId ? withTrackingPixel(markupHtml, text, trackId) : markupHtml;
-
-      let sendErr: string | null = null;
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/email-api`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'send',
-            to: toAddress,
-            ...(copies.cc.length ? { cc: copies.cc } : {}),
-            ...(copies.bcc.length ? { bcc: copies.bcc } : {}),
-            subject,
-            // HTML only from the two builders that escape everything first (invariant 11).
-            text,
-            ...(html ? { html } : {}),
-            ...(emailAttachments.length ? { attachments: emailAttachments } : {}),
-            replyTo: buildReplyToAddress(ourMailbox, threadId),
-            headers,
-            emailType: 'agent_reply',
-            workspace_id: String(thread.workspace_id),
-            // Deliberately NOT requireWorkspaceSender: an inbox reply is not a business document
-            // and must never be pinned to (or borrow) the finance sending identity.
-            tags: { feature: 'inbox_email_reply', thread_id: threadId },
-          }),
-        });
-        if (!res.ok) sendErr = `email-api returned ${res.status}`;
-        else {
-          const payload = await res.json().catch(() => null) as { success?: boolean; error?: string } | null;
-          if (payload && payload.success === false) sendErr = payload.error || 'send failed';
-        }
-      } catch (e) {
-        sendErr = e instanceof Error ? e.message : String(e);
-      }
-
-      await db.from('inbox_messages').update({
-        metadata: {
-          ...(msg as { metadata?: Record<string, unknown> }).metadata,
-          channel: 'email',
-          direction: 'outgoing',
-          // Stored so a reply quoting this Message-ID threads via ladder step 1.
-          email_message_id: ourMessageId,
-          email_to: toAddress,
-          ...(signature ? { email_signature: signature.text } : {}),
-          ...(copies.cc.length ? { email_cc: copies.cc } : {}),
-          ...(copies.bcc.length ? { email_bcc: copies.bcc } : {}),
-          delivery_status: sendErr ? 'relay_failed' : 'sent',
-          ...(sendErr ? { relay_error: sendErr } : {}),
-        },
-      }).eq('id', messageId);
-
-      if (sendErr) {
-        throw new HttpError(502, `Message stored but NOT delivered by email: ${sendErr}`);
-      }
-    }
+    await relayEmailMessage(db, thread, msg as Record<string, unknown>, {
+      messageType, body, cards, attachments, emailCopies: opts.emailCopies,
+      trackOpens: opts.trackOpens, signature: opts.signature, senderUserId: opts.senderUserId,
+    });
   }
 
   // In-app bell to every OTHER active participant that has an account (members + converted
@@ -2318,7 +2500,7 @@ async function handleJwtAction(
       const clientToken = typeof payload.client_token === 'string' && /^[0-9a-f-]{36}$/i.test(payload.client_token)
         ? payload.client_token : null;
       if (clientToken && access.isMember && messageType !== 'note') {
-        const resumed = await resumeStoredMessage(db, thread, clientToken);
+        const resumed = await resumeStoredMessage(db, thread, clientToken, userId);
         if (resumed) return json({ message: resumed, resumed: true });
       }
       // Catalog cards (`/product`, `/service` in the composer). Members only — a customer has no
@@ -2570,14 +2752,16 @@ async function handleJwtAction(
       }
 
       const digits = phone.replace(/[^\d]/g, '');
-      const { data: dupe } = phone
-        ? await db.from('crm_contacts')
-          .select('id').eq('workspace_id', workspaceId)
-          .or(`phone.eq.+${digits},mobile.eq.+${digits}`).limit(1).maybeSingle()
-        : await db.from('crm_contacts')
+      let contactId: string | null;
+      if (phone) {
+        contactId = await findContactByPhoneDigits(db, workspaceId, digits);
+      } else {
+        const { data: dupe, error: dupeErr } = await db.from('crm_contacts')
           .select('id').eq('workspace_id', workspaceId)
           .ilike('email', escapeLike(senderEmail)).limit(1).maybeSingle();
-      let contactId = (dupe as { id?: string } | null)?.id ?? null;
+        if (dupeErr) throw new HttpError(500, `Could not check the CRM for this sender: ${dupeErr.message}`);
+        contactId = (dupe as { id?: string } | null)?.id ?? null;
+      }
       let created = false;
 
       if (!contactId) {
@@ -3047,10 +3231,26 @@ async function handleJwtAction(
       const search = typeof payload.search === 'string' ? payload.search.trim().slice(0, 100) : '';
       if (search) {
         const like = `%${escapeLike(search)}%`;
-        const { data: hits, error: hitErr } = await db.from('inbox_messages')
-          .select('thread_id').ilike('body', like).neq('message_type', 'note').limit(500);
+        // Scoped to the caller's threads BEFORE the cap, so other tenants' matches cannot use it up.
+        const hitQuery = (scope: 'all' | 'participant' | 'workspace') => {
+          let hq = db.from('inbox_messages')
+            .select(scope === 'workspace' ? 'thread_id, inbox_threads!inbox_messages_thread_id_fkey!inner(workspace_id, thread_type)' : 'thread_id')
+            .ilike('body', like).neq('message_type', 'note').is('deleted_at', null);
+          if (scope === 'participant') hq = hq.in('thread_id', participantThreadIds);
+          if (scope === 'workspace') {
+            hq = hq.in('inbox_threads.workspace_id', businessWsIds).in('inbox_threads.thread_type', ['customer', 'upstream']);
+          }
+          return hq.limit(500);
+        };
+        const hitResults = await Promise.all(wantAll
+          ? [hitQuery('all')]
+          : [
+            ...(participantThreadIds.length ? [hitQuery('participant')] : []),
+            ...(businessWsIds.length ? [hitQuery('workspace')] : []),
+          ]);
+        const hitErr = hitResults.find((r) => r.error)?.error;
         if (hitErr) throw new HttpError(500, `Search failed: ${hitErr.message}`);
-        const hitIds = [...new Set((hits ?? []).map((h: { thread_id: string }) => h.thread_id))];
+        const hitIds = [...new Set(hitResults.flatMap((r) => ((r.data ?? []) as unknown as Array<{ thread_id: string }>).map((h) => h.thread_id)))];
         const terms = [`subject.ilike.${pgrstQuote(like)}`, `last_message_preview.ilike.${pgrstQuote(like)}`,
           `metadata->>email_from.ilike.${pgrstQuote(like)}`, `metadata->>contact_phone.ilike.${pgrstQuote(like)}`];
         if (hitIds.length) terms.push(`id.in.(${hitIds.join(',')})`);
@@ -3308,10 +3508,11 @@ async function handleJwtAction(
         mq = mq.or(`created_at.lt.${pgrstQuote(olderThan.at)},and(created_at.eq.${pgrstQuote(olderThan.at)},id.lt.${olderThan.id})`);
       }
       mq = mq.limit(pageSize + 1);
-      if (!isMember) mq = mq.neq('message_type', 'note'); // customers never see notes
+      if (!isMember) mq = mq.not('message_type', 'in', CUSTOMER_HIDDEN_MESSAGE_TYPES);
       const [{ data: participants }, { data: messagesRaw, error: msgErr }] = await Promise.all([participantsP, mq]);
       if (msgErr) throw new HttpError(500, `Could not load messages: ${msgErr.message}`);
       const newestFirst = (messagesRaw || []) as unknown as Array<Record<string, unknown>>;
+      if (!isMember) await signAttachmentsForCustomer(db, newestFirst);
       const hasOlder = newestFirst.length > pageSize;
       const messages = newestFirst.slice(0, pageSize).reverse();
       const oldest = messages[0] as { id?: string; created_at?: string } | undefined;
@@ -3584,7 +3785,7 @@ async function handleJwtAction(
       if (inq2.status !== 'open') throw new HttpError(409, `Inquiry is ${inq2.status}, not open`);
 
       const { data: listingRow } = await db.from('marketplace_listings')
-        .select('id, workspace_id, seller_name, title, price, currency, unit, status')
+        .select('id, workspace_id, seller_name, title, price, currency, unit, status, qty_remaining')
         .eq('id', inq2.listing_id).maybeSingle();
       const lst = listingRow as Record<string, any> | null;
       if (!lst) throw new HttpError(404, 'Listing not found');
@@ -3596,96 +3797,132 @@ async function handleJwtAction(
         throw new HttpError(403, 'Only a member of the selling workspace can accept this inquiry');
       }
 
-      const acceptQty = Number(payload.accepted_qty ?? inq2.qty_wanted ?? 1) || 1;
-      const acceptPrice = Number(payload.unit_price ?? lst.price ?? 0) || 0;
+      const acceptQty = Number(payload.accepted_qty ?? inq2.qty_wanted ?? 1);
+      const acceptPrice = Number(payload.unit_price ?? lst.price ?? 0);
+      if (!Number.isFinite(acceptQty) || acceptQty <= 0) throw new HttpError(400, 'accepted_qty must be a positive number');
+      if (inq2.qty_wanted != null && acceptQty > Number(inq2.qty_wanted)) {
+        throw new HttpError(400, 'accepted_qty cannot exceed the quantity the buyer asked for');
+      }
+      if (lst.qty_remaining != null && acceptQty > Number(lst.qty_remaining)) {
+        throw new HttpError(409, 'accepted_qty is more than the listing has left');
+      }
+      if (!Number.isFinite(acceptPrice) || acceptPrice < 0) throw new HttpError(400, 'unit_price must be zero or more');
+      if (lst.price != null && acceptPrice > Number(lst.price)) {
+        throw new HttpError(400, 'unit_price cannot be above the listed price');
+      }
       const acceptCurrency = lst.currency || 'EUR';
+
+      const { data: claimedInq, error: claimInqErr } = await db.from('marketplace_inquiries')
+        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+        .eq('id', acceptInquiryId).eq('status', 'open').select('id');
+      if (claimInqErr) throw new HttpError(500, `Could not accept the inquiry: ${claimInqErr.message}`);
+      if (!(claimedInq as unknown[] | null)?.length) throw new HttpError(409, 'This inquiry is already being accepted');
+      const releaseInquiry = async () => {
+        const { error } = await db.from('marketplace_inquiries')
+          .update({ status: 'open', accepted_at: null })
+          .eq('id', acceptInquiryId).eq('status', 'accepted').is('accepted_order_id', null);
+        if (error) console.error('[inbox-api] could not reopen the inquiry after a failed accept', acceptInquiryId, error.message);
+      };
       const sellerName = lst.seller_name || 'Marketplace seller';
+      let acceptOrderId: string | null = null;
+      let acceptOrderItemId: string | null = null;
+      try {
 
-      // Seller's legal-entity VAT (if their workspace links one) → carried onto the buyer-side
-      // supplier row, where the _crm_link_platform_supplier trigger links the canonical identity.
-      let sellerVat: string | null = null; let sellerCountry: string | null = null;
-      const { data: sellerWsRow } = await db.from('workspaces').select('parent_crm_company_id').eq('id', sellerWs).maybeSingle();
-      const parentCo = (sellerWsRow as Record<string, any> | null)?.parent_crm_company_id;
-      if (parentCo) {
-        const { data: co } = await db.from('crm_companies').select('vat_number, country_code').eq('id', parentCo).maybeSingle();
-        sellerVat = (co as Record<string, any> | null)?.vat_number ?? null;
-        sellerCountry = (co as Record<string, any> | null)?.country_code ?? null;
-      }
-
-      // Find-or-create a supplier in the BUYER's workspace representing the seller.
-      let supplierCompanyId: string;
-      const { data: existingSup } = await db.from('crm_companies')
-        .select('id').eq('workspace_id', buyerWs).eq('is_supplier', true).ilike('name', sellerName).maybeSingle();
-      if (existingSup) {
-        supplierCompanyId = (existingSup as Record<string, any>).id;
-      } else {
-        const { data: newSup, error: supErr } = await db.from('crm_companies')
-          // is_customer explicitly false — the column DEFAULTS TO TRUE, so the seller landed in
-          // the buyer's customer lists as well as their supplier lists.
-          .insert({ workspace_id: buyerWs, name: sellerName, is_supplier: true, is_customer: false, vat_number: sellerVat, country_code: sellerCountry })
-          .select('id').single();
-        if (supErr) throw new HttpError(500, `Failed to create supplier: ${supErr.message}`);
-        supplierCompanyId = (newSup as Record<string, any>).id;
-      }
-
-      /** Re-checked at accept, not merely at create (#359 CM-9). */
-      let productId: string | null = null;
-      if (inq2.demand_type && inq2.demand_id) {
-        const { data: stillOurs } = await db.rpc('demand_line_belongs_to_workspace', {
-          p_workspace_id: buyerWs,
-          p_demand_type: inq2.demand_type,
-          p_demand_id: inq2.demand_id,
-        });
-        if (stillOurs !== true) throw new HttpError(404, 'not found');
-
-        if (inq2.demand_type === 'order_item') {
-          const { data: di } = await db.from('order_items').select('product_id').eq('id', inq2.demand_id).eq('workspace_id', buyerWs).maybeSingle();
-          productId = (di as Record<string, any> | null)?.product_id ?? null;
-        } else {
-          const { data: di } = await db.from('quote_items')
-            .select('product_id, quote:quotes!quote_id(workspace_id)')
-            .eq('id', inq2.demand_id)
-            .maybeSingle();
-          const row = di as { product_id?: string; quote?: { workspace_id?: string } | Array<{ workspace_id?: string }> } | null;
-          const q = Array.isArray(row?.quote) ? row?.quote[0] : row?.quote;
-          productId = q?.workspace_id === buyerWs ? (row?.product_id ?? null) : null;
+        // Seller's legal-entity VAT (if their workspace links one) → carried onto the buyer-side
+        // supplier row, where the _crm_link_platform_supplier trigger links the canonical identity.
+        let sellerVat: string | null = null; let sellerCountry: string | null = null;
+        const { data: sellerWsRow } = await db.from('workspaces').select('parent_crm_company_id').eq('id', sellerWs).maybeSingle();
+        const parentCo = (sellerWsRow as Record<string, any> | null)?.parent_crm_company_id;
+        if (parentCo) {
+          const { data: co } = await db.from('crm_companies').select('vat_number, country_code').eq('id', parentCo).maybeSingle();
+          sellerVat = (co as Record<string, any> | null)?.vat_number ?? null;
+          sellerCountry = (co as Record<string, any> | null)?.country_code ?? null;
         }
+
+        // Find-or-create a supplier in the BUYER's workspace representing the seller.
+        let supplierCompanyId: string;
+        const { data: existingSup } = await db.from('crm_companies')
+          .select('id').eq('workspace_id', buyerWs).eq('is_supplier', true).ilike('name', sellerName).maybeSingle();
+        if (existingSup) {
+          supplierCompanyId = (existingSup as Record<string, any>).id;
+        } else {
+          const { data: newSup, error: supErr } = await db.from('crm_companies')
+            // is_customer explicitly false — the column DEFAULTS TO TRUE, so the seller landed in
+            // the buyer's customer lists as well as their supplier lists.
+            .insert({ workspace_id: buyerWs, name: sellerName, is_supplier: true, is_customer: false, vat_number: sellerVat, country_code: sellerCountry })
+            .select('id').single();
+          if (supErr) throw new HttpError(500, `Failed to create supplier: ${supErr.message}`);
+          supplierCompanyId = (newSup as Record<string, any>).id;
+        }
+
+        /** Re-checked at accept, not merely at create (#359 CM-9). */
+        let productId: string | null = null;
+        if (inq2.demand_type && inq2.demand_id) {
+          const { data: stillOurs } = await db.rpc('demand_line_belongs_to_workspace', {
+            p_workspace_id: buyerWs,
+            p_demand_type: inq2.demand_type,
+            p_demand_id: inq2.demand_id,
+          });
+          if (stillOurs !== true) throw new HttpError(404, 'not found');
+
+          if (inq2.demand_type === 'order_item') {
+            const { data: di } = await db.from('order_items').select('product_id').eq('id', inq2.demand_id).eq('workspace_id', buyerWs).maybeSingle();
+            productId = (di as Record<string, any> | null)?.product_id ?? null;
+          } else {
+            const { data: di } = await db.from('quote_items')
+              .select('product_id, quote:quotes!quote_id(workspace_id)')
+              .eq('id', inq2.demand_id)
+              .maybeSingle();
+            const row = di as { product_id?: string; quote?: { workspace_id?: string } | Array<{ workspace_id?: string }> } | null;
+            const q = Array.isArray(row?.quote) ? row?.quote[0] : row?.quote;
+            productId = q?.workspace_id === buyerWs ? (row?.product_id ?? null) : null;
+          }
+        }
+
+        const net = Math.round(acceptQty * acceptPrice * 100) / 100;
+
+        const { data: ord, error: ordErr } = await db.from('orders').insert({
+          workspace_id: buyerWs, order_type: 'purchase', status: 'draft',
+          supplier_company_id: supplierCompanyId, currency: acceptCurrency,
+          subtotal_net: net, vat_amount: 0, total: net,
+          notes: `Sourced from marketplace listing "${lst.title || ''}" (${sellerName}).`,
+        }).select('id').single();
+        if (ordErr) throw new HttpError(500, `Failed to create purchase order: ${ordErr.message}`);
+        acceptOrderId = (ord as Record<string, any>).id as string;
+
+        const { data: oi, error: oiErr } = await db.from('order_items').insert({
+          order_id: acceptOrderId, workspace_id: buyerWs, product_id: productId,
+          description: lst.title || 'Marketplace item', quantity: acceptQty,
+          unit_price: acceptPrice, unit_cost: acceptPrice, supplier_company_id: supplierCompanyId,
+          net_value: net, vat_amount: 0, line_total: net, update_warehouse: true, sort_order: 0,
+        }).select('id').single();
+        if (oiErr) throw new HttpError(500, `Failed to create order line: ${oiErr.message}`);
+        acceptOrderItemId = (oi as Record<string, any>).id as string;
+
+        // on_order allocation against the sourcing demand (only when the inquiry carried one).
+        if (inq2.demand_type && inq2.demand_id) {
+          const { error: allocErr } = await db.from('stock_allocations').insert({
+            workspace_id: buyerWs, demand_type: inq2.demand_type, demand_id: inq2.demand_id,
+            product_id: productId, quantity: acceptQty, source_type: 'purchase_order',
+            supply_order_item_id: acceptOrderItemId, status: 'on_order',
+          });
+          if (allocErr) throw new HttpError(500, `Failed to reserve against the demand: ${allocErr.message}`);
+        }
+
+        const { error: stampErr } = await db.from('marketplace_inquiries')
+          .update({ accepted_order_id: acceptOrderId })
+          .eq('id', acceptInquiryId);
+        if (stampErr) throw new HttpError(500, `Purchase order created but the inquiry was not linked to it: ${stampErr.message}`);
+      } catch (err) {
+        if (acceptOrderId) {
+          const { error: dropErr } = await db.from('orders').delete().eq('id', acceptOrderId).eq('status', 'draft');
+          if (dropErr) console.error('[inbox-api] orphan draft PO left after a failed accept', acceptOrderId, dropErr.message);
+        }
+        await releaseInquiry();
+        throw err;
       }
-
-      const net = Math.round(acceptQty * acceptPrice * 100) / 100;
-
-      const { data: ord, error: ordErr } = await db.from('orders').insert({
-        workspace_id: buyerWs, order_type: 'purchase', status: 'draft',
-        supplier_company_id: supplierCompanyId, currency: acceptCurrency,
-        subtotal_net: net, vat_amount: 0, total: net,
-        notes: `Sourced from marketplace listing "${lst.title || ''}" (${sellerName}).`,
-      }).select('id').single();
-      if (ordErr) throw new HttpError(500, `Failed to create purchase order: ${ordErr.message}`);
-      const acceptOrderId = (ord as Record<string, any>).id;
-
-      const { data: oi, error: oiErr } = await db.from('order_items').insert({
-        order_id: acceptOrderId, workspace_id: buyerWs, product_id: productId,
-        description: lst.title || 'Marketplace item', quantity: acceptQty,
-        unit_price: acceptPrice, unit_cost: acceptPrice, supplier_company_id: supplierCompanyId,
-        net_value: net, vat_amount: 0, line_total: net, update_warehouse: true, sort_order: 0,
-      }).select('id').single();
-      if (oiErr) throw new HttpError(500, `Failed to create order line: ${oiErr.message}`);
-      const acceptOrderItemId = (oi as Record<string, any>).id;
-
-      // on_order allocation against the sourcing demand (only when the inquiry carried one).
-      if (inq2.demand_type && inq2.demand_id) {
-        await db.from('stock_allocations').insert({
-          workspace_id: buyerWs, demand_type: inq2.demand_type, demand_id: inq2.demand_id,
-          product_id: productId, quantity: acceptQty, source_type: 'purchase_order',
-          supply_order_item_id: acceptOrderItemId, status: 'on_order',
-        });
-      }
-
-      // Decrement the seller's listing + close the inquiry.
-      await db.rpc('mark_listing_sold', { p_id: lst.id, p_qty: acceptQty }).then(() => {}, () => {});
-      await db.from('marketplace_inquiries')
-        .update({ status: 'accepted', accepted_order_id: acceptOrderId, accepted_at: new Date().toISOString() })
-        .eq('id', acceptInquiryId);
+      const { error: soldErr } = await db.rpc('mark_listing_sold', { p_id: lst.id, p_qty: acceptQty });
+      if (soldErr) console.error('[inbox-api] listing quantity not decremented', lst.id, soldErr.message);
 
       // Notify the buyer on the inquiry thread.
       if (inq2.inbox_thread_id) {
@@ -3712,6 +3949,13 @@ async function handleJwtAction(
       const access = await resolveThreadAccess(db, userId, thread, operator);
       assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may analyse a conversation');
+      if (payload.force) {
+        const { data: withinLimit, error: limitErr } = await db.rpc('consume_user_rate_limit', {
+          p_user_id: userId, p_bucket: 'inbox-sentiment-force', p_limit: 10, p_window_seconds: 600,
+        });
+        if (limitErr) throw new HttpError(503, 'Conversation analysis is unavailable right now.');
+        if (withinLimit === false) throw new HttpError(429, 'Too many re-reads of conversations. Try again in a few minutes.');
+      }
 
       const r = await readConversationSentiment(
         db, threadId, thread.metadata as Record<string, unknown> | null, !!payload.force,
@@ -3801,7 +4045,7 @@ async function handleJwtAction(
       // the finance status vocabulary.
       // Invoices and orders are independent reads of the same party: one wave.
       const invoiceParty = partyFilter(party, 'customer_contact_id', 'customer_company_id');
-      const [{ data: invRows }, orders] = await Promise.all([
+      const [{ data: invRows }, orders, openBalanceRes] = await Promise.all([
         db
           .from('invoices')
           .select('id, total, amount_due, status, currency, due_at, issued_at, internal_number, legal_number')
@@ -3814,14 +4058,23 @@ async function handleJwtAction(
         // The customer's SALES orders with what is still owed — the same read the assistant's
         // `list_orders` makes, settlement from `get_order_settlements` (rule 1).
         listCustomerSalesOrders(db, { workspaceId: String(thread.workspace_id), party }),
+        db.rpc('get_customer_open_balance', {
+          p_workspace_id: String(thread.workspace_id),
+          p_company_id: party.companyId ?? null,
+          p_contact_id: party.contactId ?? null,
+        }),
       ]);
       const allInv = (invRows || []) as Array<Record<string, unknown>>;
       const num = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0);
       const openInv = allInv.filter((i) => num(i.amount_due) > 0);
+      if (openBalanceRes.error) console.error('[inbox-api] open balance unavailable', openBalanceRes.error.message);
+      const openBalance = openBalanceRes.error
+        ? null
+        : num((openBalanceRes.data as { open_invoices_due?: unknown } | null)?.open_invoices_due);
       const metrics = {
         currency: (allInv[0]?.currency as string) || (quotes?.[0]?.currency as string) || 'EUR',
         lifetime_value: allInv.reduce((s, i) => s + num(i.total), 0),
-        open_balance: openInv.reduce((s, i) => s + num(i.amount_due), 0),
+        open_balance: openBalance,
         invoice_count: allInv.length,
         open_count: openInv.length,
       };
@@ -4515,6 +4768,7 @@ async function handleJwtAction(
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const labelIds = Array.isArray(payload.label_ids) ? payload.label_ids.map(String) : [];
+      if (labelIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) throw new HttpError(400, 'label_ids must be label ids');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
       assertThreadVisible(access);
@@ -4523,22 +4777,30 @@ async function handleJwtAction(
       let valid: string[] = [];
       let validNames: string[] = [];
       if (labelIds.length) {
-        const { data: ok } = await db.from('inbox_labels')
+        const { data: ok, error: okErr } = await db.from('inbox_labels')
           .select('id, name').eq('workspace_id', String(thread.workspace_id)).in('id', labelIds);
+        if (okErr) throw new HttpError(500, `Could not read the labels: ${okErr.message}`);
         const rows = (ok || []) as Array<{ id: string; name: string }>;
         valid = rows.map((r) => r.id);
         validNames = rows.map((r) => r.name);
       }
       // What was on it BEFORE, so the event can say what was ADDED. A flow that fires on every
       // save would run again each time somebody removes a different label from the same thread.
-      const { data: beforeRows } = await db.from('inbox_thread_labels')
+      const { data: beforeRows, error: beforeErr } = await db.from('inbox_thread_labels')
         .select('label_id').eq('thread_id', threadId);
+      if (beforeErr) throw new HttpError(500, `Could not read the current labels: ${beforeErr.message}`);
       const before = new Set(((beforeRows || []) as Array<{ label_id: string }>).map((r) => r.label_id));
 
-      await db.from('inbox_thread_labels').delete().eq('thread_id', threadId);
-      if (valid.length) {
-        await db.from('inbox_thread_labels')
-          .insert(valid.map((label_id) => ({ thread_id: threadId, label_id, created_by: userId })));
+      const removed = [...before].filter((id) => !valid.includes(id));
+      if (removed.length) {
+        const { error: delErr } = await db.from('inbox_thread_labels').delete().eq('thread_id', threadId).in('label_id', removed);
+        if (delErr) throw new HttpError(500, `Could not remove labels: ${delErr.message}`);
+      }
+      const toAdd = valid.filter((id) => !before.has(id));
+      if (toAdd.length) {
+        const { error: insErr } = await db.from('inbox_thread_labels')
+          .insert(toAdd.map((label_id) => ({ thread_id: threadId, label_id, created_by: userId })));
+        if (insErr) throw new HttpError(500, `Could not add labels: ${insErr.message}`);
       }
 
       /* `inbox.thread_labeled` — "tell me when a conversation is marked Urgent". */
@@ -4731,6 +4993,20 @@ async function handleJwtAction(
       const refusal = await whyNotSendable(db, { workspaceId, to, isTemplate: true });
       if (refusal) throw new HttpError(409, refusal);
 
+      const clientToken = typeof payload.client_token === 'string' && /^[0-9a-f-]{36}$/i.test(payload.client_token)
+        ? payload.client_token : null;
+      if (clientToken) {
+        const { data: prior, error: priorErr } = await db.from('inbox_messages').select('*')
+          .eq('thread_id', String(thread.id)).eq('metadata->>client_token', clientToken)
+          .is('deleted_at', null).limit(1).maybeSingle();
+        if (priorErr) throw new HttpError(500, `Could not check for an earlier send: ${priorErr.message}`);
+        if (prior) {
+          const priorStatus = ((prior as { metadata?: Json }).metadata ?? {}).delivery_status;
+          if (priorStatus === 'sent') return json({ message: prior, resumed: true });
+          throw new HttpError(409, 'This template is already being sent. Refresh the conversation before sending it again.');
+        }
+      }
+
       const priced = await priceWhatsAppMessage(db, { to, isTemplate: true, category: template.category ?? null });
       const debit = await debitExternalServiceCredits(
         db, userId, priced.serviceKey, 'messaging_whatsapp', 1,
@@ -4740,6 +5016,23 @@ async function handleJwtAction(
       if (!debit.success) throw new HttpError(402, debit.error || 'Insufficient credits');
 
       const body = renderTemplate(template.content, variables);
+      let senderParticipantId = access.participant?.id ?? null;
+      if (!senderParticipantId) senderParticipantId = await ensureMemberParticipant(db, thread, userId);
+      const templateMeta = {
+        channel: 'whatsapp', direction: 'outgoing',
+        template: { id: template.id, name: template.name },
+        ...(clientToken ? { client_token: clientToken } : {}),
+      };
+      const { data: pending, error: pendingErr } = await db.from('inbox_messages').insert({
+        thread_id: thread.id, sender_participant_id: senderParticipantId, body, attachments: [], message_type: 'text',
+        metadata: { ...templateMeta, delivery_status: 'sending' },
+      }).select('id').single();
+      if (pendingErr) {
+        await refundWhatsAppCredits(db, userId, debit.credits_debited ?? 0, to);
+        if (pendingErr.code === '23505') throw new HttpError(409, 'This template is already being sent.');
+        throw new HttpError(500, `Template NOT sent: the message could not be stored (${pendingErr.message})`);
+      }
+      const pendingId = (pending as { id: string }).id;
       const fixture = await isFixtureWorkspace(db, workspaceId);
       const sent = fixture
         ? { success: true, messageId: undefined as string | undefined, error: undefined as string | undefined }
@@ -4751,18 +5044,14 @@ async function handleJwtAction(
         }).catch((e: unknown) => ({ success: false, messageId: undefined, error: e instanceof Error ? e.message : String(e) }));
       if (!sent.success) {
         await refundWhatsAppCredits(db, userId, debit.credits_debited ?? 0, to);
+        const { error: dropErr } = await db.from('inbox_messages').delete().eq('id', pendingId);
+        if (dropErr) console.error('[inbox-api] unsent template row could not be removed', pendingId, dropErr.message);
         throw new HttpError(502, `Template NOT sent: ${sent.error ?? 'WhatsApp refused it'}`);
       }
 
-      let senderParticipantId = access.participant?.id ?? null;
-      if (!senderParticipantId) senderParticipantId = await ensureMemberParticipant(db, thread, userId);
-      const { data: msg, error: msgErr } = await db.from('inbox_messages').insert({
-        thread_id: thread.id, sender_participant_id: senderParticipantId, body, attachments: [], message_type: 'text',
-        metadata: {
-          channel: 'whatsapp', direction: 'outgoing', wamid: sent.messageId ?? null, delivery_status: 'sent',
-          template: { id: template.id, name: template.name },
-        },
-      }).select('*').single();
+      const { data: msg, error: msgErr } = await db.from('inbox_messages').update({
+        metadata: { ...templateMeta, wamid: sent.messageId ?? null, delivery_status: 'sent' },
+      }).eq('id', pendingId).select('*').single();
       if (msgErr) console.error('[inbox-api] template sent but its message row FAILED', thread.id, msgErr);
       const { error: threadErr } = await db.from('inbox_threads')
         .update({ last_message_at: new Date().toISOString(), last_message_preview: body.replace(/\s+/g, ' ').slice(0, 140) })
@@ -5484,16 +5773,20 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
     case 'token_get_thread': {
       const tok = await resolveToken(db, token);
       const thread = await getThreadOrThrow(db, String(tok.thread_id));
-      const { data: messages } = await db
+      const { data: newestFirst, error: msgErr } = await db
         .from('inbox_messages')
         // Same projection `get_thread` gives a customer: the column list plus the ONE metadata
         // key that is theirs — the catalog cards the business sent them.
         .select('id, body, attachments, message_type, sender_participant_id, created_at, cards:metadata->cards')
         .eq('thread_id', thread.id)
         .is('deleted_at', null)
-        .neq('message_type', 'note') // customers never see private notes
-        .order('created_at', { ascending: true })
+        .not('message_type', 'in', CUSTOMER_HIDDEN_MESSAGE_TYPES)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(500);
+      if (msgErr) throw new HttpError(500, `Could not load messages: ${msgErr.message}`);
+      const messages = ((newestFirst || []) as unknown as Array<Record<string, unknown>>).reverse();
+      await signAttachmentsForCustomer(db, messages);
       const { data: participants } = await db
         .from('inbox_participants')
         .select('id, participant_type, thread_role')
@@ -6294,7 +6587,8 @@ async function readConversationSentiment(
     // outbound rows predate the direction stamp (42 of them) and their participant still knows.
     .select('id, body, message_type, metadata, sender_participant_id, created_at')
     .eq('thread_id', threadId)
-    .neq('message_type', 'system')
+    .is('deleted_at', null)
+    .not('message_type', 'in', '(note,system)')
     .order('created_at', { ascending: false })
     .limit(WINDOW);
   if (msgErr) throw new HttpError(500, `Could not read the conversation: ${msgErr.message}`);
@@ -6399,81 +6693,41 @@ async function readConversationSentiment(
     },
   };
 
-  // `.value` — resolveSecret returns {key, value, source}, and the object is always truthy, so
-  // testing it directly would send the literal "[object Object]" as the api key.
-  const key = (await resolveSecret(db, 'ANTHROPIC_API_KEY')).value;
-  if (!key) throw new HttpError(503, 'The AI service is not configured.');
-
   let verdict: Record<string, unknown>;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        // Haiku: this runs on every thread open and every assistant reply. Reading tone in twenty
-        // short messages is not what the expensive models are for.
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 700,
-        tools: [TOOL],
-        // FORCED (invariant 9): the verdict drives a stored field and a UI state, so it arrives as
-        // a validated tool call, never as free-form JSON with a salvage parser behind it.
-        tool_choice: { type: 'tool', name: TOOL.name },
-        // FENCED (#359 CM-8, invariant 9). `<conversation>…</conversation>` was a bare tag, and a
-        // tag is something a message can itself contain and thereby close — after which the rest
-        // of the customer's text reads as instructions to the classifier. The canonical wrapper
-        // states outright that the block is data, and it is the same wording every other ingested
-        // source on this platform carries.
-        messages: [{
-          role: 'user',
-          content: `${rubric}\n\nThe other party in this conversation is ${relationship}\n\n`
-            + wrapUntrusted('conversation', transcript),
-        }],
-      }),
+    const body = await callClaudeMessages({
+      // Haiku: this runs on every thread open and every assistant reply.
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 700,
+      tools: [TOOL],
+      // FORCED (invariant 9): the verdict drives a stored field and a UI state.
+      tool_choice: { type: 'tool', name: TOOL.name },
+      messages: [{
+        role: 'user',
+        content: `${rubric}
+
+The other party in this conversation is ${relationship}
+
+`
+          + wrapUntrusted('conversation', transcript),
+      }],
+    }, {
+      userId: actorUserId ?? undefined,
+      workspaceId: workspaceId ?? null,
+      timeoutMs: 60_000,
+      task: 'inbox_conversation_sentiment',
     });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      if (/credit balance is too low/i.test(detail)) {
-        throw new HttpError(402, 'The AI account is out of credit, so the conversation cannot be read. Top up Anthropic billing.');
-      }
-      throw new Error(`HTTP ${res.status}: ${detail.slice(0, 200)}`);
-    }
-    const body = await res.json();
-    const use = (body.content ?? []).find((c: Record<string, unknown>) => c.type === 'tool_use');
+    const use = (body.content || []).find((c) => c.type === 'tool_use');
     if (!use?.input) throw new Error('the model returned no verdict');
     verdict = use.input as Record<string, unknown>;
-
-    /* Book the spend. */
-    const inTok = Number(body?.usage?.input_tokens ?? 0);
-    const outTok = Number(body?.usage?.output_tokens ?? 0);
-    const rawUsd = (inTok / 1e6) * 1.0 + (outTok / 1e6) * 5.0;
-    // CHECKED: supabase-js RESOLVES on an RLS denial, so an unchecked insert would leave the
-    // operator's cost panel reading zero while every conversation billed.
-    const { error: logErr } = await db.from('ai_usage_logs').insert({
-        user_id: actorUserId ?? null,
-        workspace_id: workspaceId ?? null,
-        module_slug: 'inbox',
-        operation_type: 'inbox_conversation_sentiment',
-        model_name: 'claude-haiku-4-5-20251001',
-        api_provider: 'anthropic',
-        input_tokens: inTok,
-        output_tokens: outTok,
-        raw_cost_usd: rawUsd,
-        billed_cost_usd: rawUsd,
-        // Not debited: this is the operator's own overhead on their own inbox, not a customer
-        // action, and a credit charge here would bill a tenant for a background read they never
-        // asked for. `success` is what ops.silent_zero_provider reads.
-        credits_debited: 0,
-        unbilled_reason: 'platform_overhead',
-        metadata: { success: true, thread_id: threadId, message_count: withText.length },
-    });
-    if (logErr) console.warn('[inbox-api] sentiment usage log failed:', logErr.message);
   } catch (err) {
     if (err instanceof HttpError) throw err;
-    throw new HttpError(502, `Could not read the conversation: ${err instanceof Error ? err.message : String(err)}`);
+    const message = err instanceof Error ? err.message : String(err);
+    if (/credit balance is too low/i.test(message)) {
+      throw new HttpError(402, 'The AI account is out of credit, so the conversation cannot be read. Top up Anthropic billing.');
+    }
+    if (/ANTHROPIC_API_KEY unresolved/.test(message)) throw new HttpError(503, 'The AI service is not configured.');
+    throw new HttpError(502, `Could not read the conversation: ${message}`);
   }
 
   /**

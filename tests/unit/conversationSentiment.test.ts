@@ -152,8 +152,9 @@ describe('conversation sentiment', () => {
     const api = stripComments(API);
     expect(api).toMatch(/sentimentSettings\(db, workspaceId\)/);
     expect(api).toMatch(/if \(!settings\.enabled\) return \{ sentiment: null[^}]*'disabled'/);
-    const gate = api.indexOf("reason: 'disabled'");
-    const call = api.indexOf('api.anthropic.com');
+    const fn = api.slice(api.indexOf('async function readConversationSentiment('));
+    const gate = fn.indexOf("reason: 'disabled'");
+    const call = fn.indexOf('callClaudeMessages(');
     expect(gate).toBeGreaterThan(0);
     expect(gate).toBeLessThan(call);
   });
@@ -173,8 +174,8 @@ describe('conversation sentiment', () => {
     // A raw fetch to Anthropic logs nothing on its own, and the operator's switch sits next to a
     // figure read from ai_usage_logs. No insert = a confident $0 beside a switch that bills.
     const api = stripComments(API);
-    expect(api).toMatch(/operation_type: 'inbox_conversation_sentiment'/);
-    expect(api).toMatch(/input_tokens: inTok/);
+    expect(api).toMatch(/task: 'inbox_conversation_sentiment'/);
+    expect(api).not.toMatch(/readConversationSentiment[\s\S]{0,6000}api\.anthropic\.com/);
     // And the panel must read the columns that actually exist.
     const panel = stripComments(PANEL);
     expect(panel).toMatch(/\.eq\('operation_type', 'inbox_conversation_sentiment'\)/);
@@ -185,7 +186,7 @@ describe('conversation sentiment', () => {
   it('attributes the spend to a workspace', () => {
     // ai_usage_logs.workspace_id being NULL is what broke every per-tenant cost view once
     // already, so it is passed in rather than looked up and forgotten.
-    expect(stripComments(API)).toMatch(/workspace_id: workspaceId \?\? null/);
+    expect(stripComments(API)).toMatch(/userId: actorUserId \?\? undefined,\s*workspaceId: workspaceId \?\? null,[\s\S]{0,60}task: 'inbox_conversation_sentiment'/);
   });
 
   it('maps per-message moods to ids server-side, with bounds checking', () => {

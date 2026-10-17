@@ -16,7 +16,7 @@ describe('the thread list pages instead of stopping at 200', () => {
   });
 
   it('searches on the server, message bodies included, and never inside private notes', () => {
-    expect(list).toMatch(/from\('inbox_messages'\)[\s\S]{0,120}\.ilike\('body', like\)\.neq\('message_type', 'note'\)/);
+    expect(list).toMatch(/from\('inbox_messages'\)[\s\S]{0,250}\.ilike\('body', like\)\.neq\('message_type', 'note'\)/);
     expect(list).toContain('escapeLike(search)');
     expect(list).toMatch(/subject\.ilike\.\$\{pgrstQuote\(like\)\}/);
   });

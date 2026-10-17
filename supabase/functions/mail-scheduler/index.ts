@@ -91,6 +91,39 @@ async function tellFollowUpFailed(db: Db, row: Record<string, unknown>, failure:
   });
 }
 
+/** Same rule as `mail_account_visible`: the person who scheduled it must still be an active member, and still see the mailbox. */
+async function schedulerMayStillSend(
+  db: Db,
+  row: { user_id: string; workspace_id: string; account_id: string | null; kind: string },
+  account: { id: string } | null,
+): Promise<string | null> {
+  const { data: member, error } = await db.from('workspace_members').select('user_id')
+    .eq('workspace_id', row.workspace_id).eq('user_id', row.user_id).eq('status', 'active').limit(1).maybeSingle();
+  if (error) return `could not confirm the sender is still in the workspace: ${error.message}`;
+  if (!member) return 'the person who scheduled this is no longer an active member of the workspace';
+  if (row.kind !== 'gmail' || !account) return null;
+  const { data: acct, error: acctErr } = await db.from('mail_accounts').select('user_id, is_shared').eq('id', account.id).maybeSingle();
+  if (acctErr) return `could not confirm access to the mailbox: ${acctErr.message}`;
+  if (acct?.user_id === row.user_id) return null;
+  if (!acct?.is_shared) return 'the person who scheduled this no longer has access to the mailbox';
+  const { data: share, error: shareErr } = await db.from('mail_account_members').select('user_id')
+    .eq('account_id', account.id).eq('user_id', row.user_id).maybeSingle();
+  if (shareErr) return `could not confirm access to the mailbox: ${shareErr.message}`;
+  return share ? null : 'the person who scheduled this no longer has access to the mailbox';
+}
+
+/** A send that will not go out keeps what it said, never the attachment bytes. */
+function payloadWithoutFileBytes(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object') return payload;
+  const p = payload as Record<string, unknown>;
+  if (!Array.isArray(p.attachments)) return payload;
+  return {
+    ...p,
+    attachments: (p.attachments as Array<Record<string, unknown>>)
+      .map((a) => ({ filename: a?.filename ?? null, contentType: a?.contentType ?? null, bytes_dropped: true })),
+  };
+}
+
 async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number; skipped: number }> {
   const now = new Date();
   const { data: due, error } = await db.from('mail_scheduled_sends')
@@ -109,6 +142,8 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
     let result: Record<string, unknown> | null = null;
     let failure: string | null = null;
     try {
+      const refusal = await schedulerMayStillSend(db, row, row.kind === 'gmail' ? row.mail_accounts : null);
+      if (refusal) throw new Error(refusal);
       if (row.kind === 'gmail') {
         const account = row.mail_accounts;
         if (!account || account.status !== 'active') throw new Error('the Gmail account needs reconnecting');
@@ -132,7 +167,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
       failure = (e as Error).message;
     }
     const { error: doneErr } = await db.from('mail_scheduled_sends').update(failure
-      ? { status: 'failed', error: failure.slice(0, 1000) }
+      ? { status: 'failed', error: failure.slice(0, 1000), payload: payloadWithoutFileBytes(row.payload) }
       : { status: 'sent', sent_at: new Date().toISOString(), result, payload: { delivered: true } }).eq('id', row.id);
     if (doneErr) console.error('[mail-scheduler] outcome not recorded', row.id, doneErr.message);
     if (failure && row.if_no_reply) await tellFollowUpFailed(db, row, failure);

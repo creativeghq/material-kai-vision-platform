@@ -69,7 +69,7 @@ describe('inbox attachment intelligence — both inbound paths read what arrived
     // was fetch_failed because of it. Both upload sites now pick the bucket by content type.
     const media = read('supabase/functions/_shared/inbox-media.ts');
     expect(media).toContain("export const INBOX_DOCUMENT_BUCKET = 'pdf-documents'");
-    expect(media).toMatch(/startsWith\('image\/'\) \|\| ct\.startsWith\('video\/'\) \? INBOX_ATTACHMENT_BUCKET : INBOX_DOCUMENT_BUCKET/);
+    expect(media).toMatch(/function bucketForAttachment\([^)]*\): string \{\s*return INBOX_DOCUMENT_BUCKET;/);
     expect(media).toContain('const bucket = bucketForAttachment(contentType)');
     expect(ZERNIO).toContain('const bucket = bucketForAttachment(got.contentType)');
     // Neither ATTACHMENT upload site writes the image bucket by name any more. (Profile pictures

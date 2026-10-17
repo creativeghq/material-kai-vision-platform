@@ -135,7 +135,10 @@ export async function fetchZernioMediaUrl(
     // but "it came from a source we trust" is not a reason to hand a bearer token to whatever
     // hostname it happens to name.
     const isZernio = (() => {
-      try { return new URL(url).hostname.endsWith('zernio.com'); } catch { return false; }
+      try {
+        const host = new URL(url).hostname.toLowerCase();
+        return host === 'zernio.com' || host.endsWith('.zernio.com');
+      } catch { return false; }
     })();
 
     // Through the guard, not a bare fetch (invariant 7). The url is a value from an external API
@@ -210,17 +213,17 @@ export async function fetchZernioAttachment(params: {
       console.warn(`[zernio] attachment JSON carried no url: ${path} keys=${Object.keys(inner).join(',')}`);
       return null;
     }
-    // NOT through the SSRF guard on purpose: this URL is not user-influenced — it comes from an
-    // authenticated response from a fixed vendor host, on a path we constructed. Invariant 7 is
-    // about fetching URLs a user can steer.
-    const bin = await fetch(url).catch((err) => {
-      console.warn('[zernio] attachment url fetch failed:', err);
+    let fetched: { bytes: Uint8Array; mimeType: string };
+    try {
+      fetched = await fetchBinaryGuarded(url, { maxBytes: 32 * 1024 * 1024, timeoutMs: 30_000 });
+    } catch (err) {
+      const why = err instanceof SSRFError ? 'blocked by the SSRF guard' : String(err);
+      console.warn(`[zernio] attachment url fetch failed: ${url.split('?')[0]} → ${why}`);
       return null;
-    });
-    if (!bin || !bin.ok) return null;
+    }
     return {
-      bytes: new Uint8Array(await bin.arrayBuffer()),
-      contentType: bin.headers.get('content-type')
+      bytes: fetched.bytes,
+      contentType: fetched.mimeType
         || (typeof inner.contentType === 'string' ? inner.contentType : '')
         || 'application/octet-stream',
       fileName: typeof inner.fileName === 'string' ? inner.fileName

@@ -228,7 +228,7 @@ describe('inbox-api resolves the card server-side for the one customer party', (
     expect(src).toMatch(/thread\.channel === 'email'[\s\S]{0,80}\(body \|\| cards\.length \|\| attachments\.length > 0\)/);
     expect(src).toMatch(/fitTextWithCards\(body, cards, 1000\)/);
     // The social metadata write merges; it used to replace the column and delete `cards`.
-    const social = slice(src, "if (thread.channel === 'social'", "if (thread.channel === 'email'");
+    const social = slice(src, 'async function relaySocialMessage(', 'async function relayEmailMessage(');
     expect(social).toMatch(/metadata: \{\s*\.\.\.storedMetadata,/);
     expect(src).toMatch(/\? buildEmailCardsHtml\(cards, body\)/);
     expect(src).toMatch(/const unsignedText = cards\.length\s*\? buildEmailCardsText\(cards, body\)/);
@@ -254,7 +254,7 @@ describe('several WhatsApp sends for one message are recorded, named on failure,
   it('a retry with the same client token resumes the stored message instead of storing a second', () => {
     const src = api();
     const c = slice(src, "case 'send_message'", "case 'mark_read'");
-    expect(c).toMatch(/resumeStoredMessage\(db, thread, clientToken\)/);
+    expect(c).toMatch(/resumeStoredMessage\(db, thread, clientToken, userId\)/);
     expect(c.indexOf('resumeStoredMessage')).toBeLessThan(c.indexOf('insertMessageAndNotify'));
     const resume = slice(src, 'async function resumeStoredMessage', 'async function insertMessageAndNotify');
     expect(resume).toMatch(/\.eq\('metadata->>client_token', clientToken\)/);

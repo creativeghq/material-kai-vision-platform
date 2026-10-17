@@ -10,6 +10,7 @@ import { inboxAutopilotSettings } from './inbox-autopilot.ts';
 import { enrichInboundAttachments } from './inbox-attachment-intelligence.ts';
 import { runInBackground } from './background.ts';
 import { isAutoReply } from './mail-auto-reply.ts';
+import { escapeLike } from './searchFold.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
@@ -57,6 +58,7 @@ export {
   bareAddress,
   normalizeSubject,
   parseMessageIdRefs,
+  normalizeMessageId,
   buildOutboundMessageId,
   threadIdFromOurMessageId,
   splitPlusTag,
@@ -73,6 +75,7 @@ import {
   threadIdFromTag,
   normalizeSubject,
   parseMessageIdRefs,
+  normalizeMessageId,
   threadIdFromOurMessageId,
   handleFromIdentity,
   validateChosenLocalPart,
@@ -260,13 +263,15 @@ export async function resolveCustomer(
   const platform = await isPlatformAddress(db, addr);
   if (platform) return { ...empty, platformUserId: platform.user_id };
 
-  const { data: existing } = await db
+  // Escaped: a `_` or `%` in a sender address must not match somebody else's contact.
+  const { data: existing, error: existingErr } = await db
     .from('crm_contacts')
     .select('id')
     .eq('workspace_id', workspaceId)
-    .ilike('email', addr)
+    .ilike('email', escapeLike(addr))
     .limit(1)
     .maybeSingle();
+  if (existingErr) throw new Error(`crm_contacts lookup failed: ${existingErr.message}`);
 
   let contactId = (existing as { id?: string } | null)?.id ?? null;
   let created = false;
@@ -468,7 +473,7 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedInbound> {
     cc: addressList(email.cc),
     replyTo: addressList(email.replyTo),
     subject: email.subject || null,
-    messageId: email.messageId ? parseMessageIdRefs(email.messageId)[0] || email.messageId : null,
+    messageId: normalizeMessageId(email.messageId),
     inReplyTo: email.inReplyTo || null,
     references: email.references || null,
     text: email.text || null,
@@ -550,7 +555,7 @@ export async function logInbound(
   try {
     await db.from('agent_email_inbound_log').insert({
       workspace_id: row.workspaceId ?? null,
-      message_id: row.envelope.message_id,
+      message_id: normalizeMessageId(row.envelope.message_id),
       from_addr: bareAddress(row.envelope.from),
       to_addr: bareAddress(row.envelope.to),
       matched_address_id: row.matchedAddressId ?? null,
@@ -568,17 +573,83 @@ export async function logInbound(
   }
 }
 
-/** Already seen this Message-ID? Cloudflare retries, and a duplicate must not double-post. */
-export async function alreadyProcessed(db: DbClient, messageId: string | null): Promise<boolean> {
+/** Already routed this Message-ID to this address? Cloudflare retries, and a duplicate must not double-post. */
+export async function alreadyProcessed(
+  db: DbClient,
+  rawMessageId: string | null,
+  matchedAddressId?: string | null,
+): Promise<boolean> {
+  const messageId = normalizeMessageId(rawMessageId);
   if (!messageId) return false;
-  const { data } = await db
+  let q = db
     .from('agent_email_inbound_log')
     .select('id')
     .eq('message_id', messageId)
-    .eq('outcome', 'routed_inbox')
-    .limit(1)
-    .maybeSingle();
+    .in('outcome', ['routed_inbox', 'processing']);
+  if (matchedAddressId) q = q.eq('matched_address_id', matchedAddressId);
+  const { data, error } = await q.limit(1).maybeSingle();
+  if (error) throw new Error(`inbound dedupe read failed: ${error.message}`);
   return Boolean((data as { id?: string } | null)?.id);
+}
+
+/** A claim older than this is a crashed run, and a retry may take it over. */
+const INBOUND_CLAIM_STALE_MS = 10 * 60_000;
+
+export type InboundClaim =
+  | { kind: 'claimed'; id: string }
+  | { kind: 'duplicate' }
+  | { kind: 'unclaimed' };
+
+/**
+ * Claim (message_id, address) BEFORE delivery, so a retry that arrives mid-delivery is a duplicate.
+ * `unclaimed` means the claim schema is not in place yet (CHECK refuses 'processing'): deliver anyway.
+ */
+export async function claimInbound(
+  db: DbClient,
+  row: { workspaceId: string; envelope: InboundEnvelope; matchedAddressId: string },
+): Promise<InboundClaim> {
+  const messageId = normalizeMessageId(row.envelope.message_id);
+  if (!messageId) return { kind: 'unclaimed' };
+  const { data, error } = await db.from('agent_email_inbound_log').insert({
+    workspace_id: row.workspaceId,
+    message_id: messageId,
+    from_addr: bareAddress(row.envelope.from),
+    to_addr: bareAddress(row.envelope.to),
+    matched_address_id: row.matchedAddressId,
+    outcome: 'processing',
+    storage_path: row.envelope.storage_path ?? null,
+    size_bytes: row.envelope.size ?? null,
+  }).select('id').single();
+  if (!error) return { kind: 'claimed', id: (data as { id: string }).id };
+  if (error.code === '23514') return { kind: 'unclaimed' };
+  if (error.code !== '23505') throw new Error(`inbound claim failed: ${error.message}`);
+
+  const staleBefore = new Date(Date.now() - INBOUND_CLAIM_STALE_MS).toISOString();
+  const { data: taken, error: takeErr } = await db.from('agent_email_inbound_log')
+    .update({ created_at: new Date().toISOString(), storage_path: row.envelope.storage_path ?? null })
+    .eq('message_id', messageId).eq('matched_address_id', row.matchedAddressId)
+    .eq('outcome', 'processing').lt('created_at', staleBefore)
+    .select('id');
+  if (takeErr) throw new Error(`inbound claim takeover failed: ${takeErr.message}`);
+  const stale = ((taken as Array<{ id: string }> | null) ?? [])[0];
+  return stale ? { kind: 'claimed', id: stale.id } : { kind: 'duplicate' };
+}
+
+/** Settle a claim with the run's outcome; an error releases it so the sender's retry can deliver. */
+export async function settleInboundClaim(
+  db: DbClient,
+  claimId: string,
+  result: { outcome: 'routed_inbox' | 'error'; threadId?: string | null; auth?: AuthResults | null; error?: string | null },
+): Promise<void> {
+  const { error } = await db.from('agent_email_inbound_log').update({
+    outcome: result.outcome,
+    thread_id: result.threadId ?? null,
+    spf: result.auth?.spf ?? null,
+    dkim: result.auth?.dkim ?? null,
+    dmarc: result.auth?.dmarc ?? null,
+    error: result.error ?? null,
+  }).eq('id', claimId);
+  if (error) console.error('[inbound-email] could not settle the inbound claim', claimId, error.message);
 }
 
 /**
@@ -597,7 +668,7 @@ export async function deliverToInbox(
     storagePath: string | null;
     autoReplyAllowed: boolean;
   },
-): Promise<{ threadId: string; created: boolean }> {
+): Promise<{ threadId: string; created: boolean; senderUnverified: boolean }> {
   const { address, parsed, customer } = args;
   const workspaceId = address.workspace_id;
 
@@ -623,6 +694,7 @@ export async function deliverToInbox(
   let threadId = found.threadId;
   let created = false;
   let customerParticipantId: string | null = null;
+  let senderUnverified = false;
 
   if (!threadId) {
     // Auto-engage the assistant only when the workspace has explicitly turned it ON and the
@@ -695,11 +767,6 @@ export async function deliverToInbox(
       action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
     }).catch(() => {});
   } else {
-    // `status` is the trigger's (`inbox_message_moves_thread_state`) — an inbound email is a
-    // customer message, so it reopens, but that is decided in one place for every channel.
-    await db.from('inbox_threads')
-      .update({ metadata: meta, last_message_at: new Date().toISOString() })
-      .eq('id', threadId);
     if (customer.contactId) {
       const { data: cp } = await db
         .from('inbox_participants').select('id')
@@ -707,6 +774,21 @@ export async function deliverToInbox(
         .limit(1).maybeSingle();
       customerParticipantId = (cp as { id?: string } | null)?.id ?? null;
     }
+    // Knowing a Message-ID or reply tag is not being on the conversation: a stranger who was
+    // CC'd or forwarded our mail must not become the address our replies go to.
+    senderUnverified = !(await isThreadParticipant(db, threadId, args.fromAddress, customerParticipantId));
+    const { email_from: _from, ...metaWithoutSender } = meta;
+    const { error: mergeErr } = await db.rpc('inbox_thread_merge_metadata', {
+      p_thread_id: threadId,
+      p_patch: senderUnverified ? metaWithoutSender : meta,
+    });
+    if (mergeErr) throw new Error(`inbox_threads metadata merge failed: ${mergeErr.message}`);
+    // `status` is the trigger's (`inbox_message_moves_thread_state`), decided in one place for every channel.
+    const { error: bumpErr } = await db.from('inbox_threads')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', threadId);
+    if (bumpErr) throw new Error(`inbox_threads update failed: ${bumpErr.message}`);
+    if (senderUnverified) await holdAgentForUnverifiedSender(db, threadId, args.fromAddress);
   }
 
   const attachments = await storeAttachments(db, threadId, parsed.attachments);
@@ -733,6 +815,7 @@ export async function deliverToInbox(
       email_reply_to: parsed.replyTo,
       email_html: parsed.html,
       thread_matched_by: found.matchedBy,
+      ...(senderUnverified ? { sender_unverified: true } : {}),
       ...(isAutoReply({
         autoSubmitted: parsed.headers.get('auto-submitted'), precedence: parsed.headers.get('precedence'),
         xAutoreply: parsed.headers.get('x-autoreply'), xAutorespond: parsed.headers.get('x-autorespond'), subject: parsed.subject,
@@ -757,19 +840,68 @@ export async function deliverToInbox(
     })(), `inbound-email-reader:${messageId}`);
   }
 
-  // Notify every member participant through Flows — never a hardcoded notification insert.
-  const { data: members } = await db
-    .from('inbox_participants').select('user_id')
-    .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active')
-    .not('user_id', 'is', null);
-  const preview = (parsed.text || parsed.subject || '[no content]').replace(/\s+/g, ' ').slice(0, 200);
-  await emitInboxMessageEvent({
-    userIds: ((members || []) as Array<{ user_id: string }>).map((m) => m.user_id),
-    threadId,
-    workspaceId,
-    title: `Email · ${parsed.from.name || args.fromAddress}`,
-    body: preview,
-  });
+  // The message is filed: nothing below may throw, or the sender's retry files it a second time.
+  try {
+    const { data: members } = await db
+      .from('inbox_participants').select('user_id')
+      .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active')
+      .not('user_id', 'is', null);
+    const preview = (parsed.text || parsed.subject || '[no content]').replace(/\s+/g, ' ').slice(0, 200);
+    await emitInboxMessageEvent({
+      userIds: ((members || []) as Array<{ user_id: string }>).map((m) => m.user_id),
+      threadId,
+      workspaceId,
+      title: `Email · ${parsed.from.name || args.fromAddress}`,
+      body: preview,
+    });
+  } catch (err) {
+    console.error('[inbound-email] filed, but the notification failed:', err instanceof Error ? err.message : String(err));
+  }
 
-  return { threadId, created };
+  return { threadId, created, senderUnverified };
+}
+
+/** Is this sender already on the thread — its recorded counterparty, an earlier sender, or a linked contact? */
+async function isThreadParticipant(
+  db: DbClient,
+  threadId: string,
+  fromAddress: string,
+  customerParticipantId: string | null,
+): Promise<boolean> {
+  if (customerParticipantId) return true;
+  const sender = fromAddress.toLowerCase();
+  if (!sender) return false;
+  const { data: thread, error: threadErr } = await db
+    .from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle();
+  if (threadErr) return false;
+  const recorded = String(((thread as { metadata?: Record<string, unknown> } | null)?.metadata ?? {}).email_from ?? '');
+  if (recorded.toLowerCase() === sender) return true;
+  const { data: earlier, error: earlierErr } = await db
+    .from('inbox_messages').select('id')
+    .eq('thread_id', threadId).eq('metadata->>direction', 'incoming')
+    .ilike('metadata->>email_from', escapeLike(sender))
+    .or('metadata->>sender_unverified.is.null,metadata->>sender_unverified.neq.true')
+    .limit(1);
+  if (earlierErr) return false;
+  return ((earlier as unknown[] | null) ?? []).length > 0;
+}
+
+/** The assistant does not answer a sender nobody has verified; a person decides. */
+async function holdAgentForUnverifiedSender(db: DbClient, threadId: string, fromAddress: string): Promise<void> {
+  const { data: paused, error } = await db.from('inbox_threads')
+    .update({ agent_state: 'paused' })
+    .eq('id', threadId).eq('agent_state', 'active')
+    .select('id');
+  if (error) {
+    console.error('[inbound-email] could not hold the assistant for an unverified sender', threadId, error.message);
+    return;
+  }
+  if (!((paused as unknown[] | null) ?? []).length) return;
+  const { error: noteErr } = await db.from('inbox_messages').insert({
+    thread_id: threadId,
+    message_type: 'system',
+    body: `${fromAddress} is not on this conversation. The assistant is paused until someone on the team checks it.`,
+    metadata: { agent_paused_reason: 'unverified_sender' },
+  });
+  if (noteErr) console.error('[inbound-email] could not record the assistant hold', threadId, noteErr.message);
 }

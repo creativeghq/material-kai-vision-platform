@@ -22,13 +22,11 @@ export const AttachmentLightbox: React.FC<{
   /** The stored object, for the agent hand-off — which needs a durable URL, not a signed one. */
   att?: InboxAttachment;
 }> = ({ open, onOpenChange, href, name, kind, att }) => {
-  // The agent is handed a PUBLIC url, not the signed one the lightbox renders. A signed URL
-  // expires in an hour and the agent may act on it later — a visual search that 403s halfway
-  // through is a worse answer than not offering the button. `generation-images` is public-read,
-  // so the object already has a stable address.
-  const publicUrl = att?.storage_bucket && att?.storage_object_path
+  // Older inbound photos sit in public `generation-images` and have a stable address; newer ones
+  // are private (#485 I-3), so the agent gets the signed URL the lightbox already holds.
+  const publicUrl = att?.storage_bucket === 'generation-images' && att?.storage_object_path
     ? supabase.storage.from(att.storage_bucket).getPublicUrl(att.storage_object_path).data.publicUrl
-    : null;
+    : (href ?? null);
   return (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-5xl w-[92vw] p-0 overflow-hidden">

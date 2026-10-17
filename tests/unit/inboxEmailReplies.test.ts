@@ -6,14 +6,14 @@ import { emailReplyRecipients, splitAddresses } from '@/pages/Inbox/emailRecipie
 
 const API = stripComments(readFileSync(join(process.cwd(), 'supabase/functions/inbox-api/index.ts'), 'utf8'));
 const emailBranch = (() => {
-  const start = API.indexOf("thread.channel === 'email' && (messageType === 'text' || messageType === 'agent')");
+  const start = API.indexOf('async function relayEmailMessage(');
   expect(start, 'the email relay branch moved — re-anchor this slice').toBeGreaterThan(-1);
   return API.slice(start, API.indexOf("delivery_status: sendErr ? 'relay_failed' : 'sent'", start));
 })();
 
 describe('an email reply carries what the member attached', () => {
   it('relays an attachment-only reply instead of skipping it', () => {
-    expect(emailBranch).toMatch(/attachments\.length > 0/);
+    expect(API).toMatch(/thread\.channel === 'email' && \(messageType === 'text' \|\| messageType === 'agent'\)\s*&& \(body \|\| cards\.length \|\| attachments\.length > 0\)\) \{\s*await relayEmailMessage\(/);
   });
 
   it('sends the stored files to email-api', () => {

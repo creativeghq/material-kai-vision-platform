@@ -74,7 +74,7 @@ describe('what a message does to a conversation', () => {
     expect(social, 'the Zernio social refresh is forcing open again').not.toMatch(/status:\s*'open'/);
 
     const email = code(EMAIL);
-    const at = email.indexOf('update({ metadata: meta');
+    const at = email.indexOf("update({ last_message_at: new Date().toISOString() })");
     expect(at).toBeGreaterThan(-1);
     const emailUpdate = email.slice(at, at + 200);
     expect(emailUpdate, 'the inbound-email handler is forcing open again').not.toMatch(/status:\s*'open'/);

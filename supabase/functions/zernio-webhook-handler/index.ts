@@ -16,7 +16,7 @@ import {
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import {
-  INBOX_ATTACHMENT_BUCKET, bucketForAttachment, materialiseInlineAttachments, extensionFor, storeParticipantPicture,
+  bucketForAttachment, materialiseInlineAttachments, extensionFor, storeParticipantPicture,
   stableImageKey,
 } from '../_shared/inbox-media.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -315,8 +315,6 @@ async function fetchAndStoreInboundAttachments(
     const ext = extensionFor(got.contentType, got.fileName);
     const safeName = (got.fileName || `attachment-${i + 1}${ext}`).replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `inbox/${params.threadId}/${crypto.randomUUID()}-${safeName}`;
-    // A photo goes to the public image bucket; a PDF or a spreadsheet to the private document
-    // bucket, whose MIME allowlist does not refuse it (see INBOX_DOCUMENT_BUCKET).
     const bucket = bucketForAttachment(got.contentType);
 
     const { error } = await supabase.storage
@@ -1216,7 +1214,13 @@ async function handleSocialDirectMessage(supabase: any, payload: any): Promise<v
       ...(socialUnresolved ? { attachment_unresolved: true, provider_keys: Object.keys(msg) } : {}),
     },
   });
-  if (msgErr) throw new Error(`social DM inbox_messages insert failed: ${msgErr.message}`);
+  if (msgErr) {
+    // Another delivery of the same DM already filed it.
+    if ((msgErr as { code?: string }).code === '23505') return;
+    throw new Error(`social DM inbox_messages insert failed: ${msgErr.message}`);
+  }
+  // Replayed history is filed, never announced or answered.
+  if (payload.backfill === true) return;
 
   await notifyThreadMembers(
     supabase, threadId, workspaceId,
@@ -1657,6 +1661,10 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
   // Read raw body BEFORE parsing (required for HMAC verification)
   const rawBody = await req.arrayBuffer();
 
+  if (!webhookSecret()) {
+    console.error('[zernio-webhook] ZERNIO_WEBHOOK_SECRET is unset — refusing every event (fail closed)');
+    return jsonResponse({ error: 'Webhook not configured' }, 503);
+  }
   const signature = req.headers.get('X-Zernio-Signature') || req.headers.get('x-zernio-signature') || '';
   const isValid = await verifySignature(rawBody, signature);
 

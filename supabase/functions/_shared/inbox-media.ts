@@ -9,15 +9,14 @@
 import { fetchZernioMediaUrl } from './zernio.ts';
 import { fetchImageGuardedOrNull } from './fetch-image.ts';
 
-/** Where inbound MEDIA lands — the same bucket and prefix inbox-api writes outbound ones to. */
+/** Public bucket that holds inbound media filed BEFORE #485 I-3; read paths still honour it. */
 export const INBOX_ATTACHMENT_BUCKET = 'generation-images';
-/** Where inbound DOCUMENTS land — the private bucket the email path already uses. */
+/** Where every NEW inbound file lands — private, signed on read, like email attachments. */
 export const INBOX_DOCUMENT_BUCKET = 'pdf-documents';
 
-/** Media goes to the public image bucket; anything else to the private document bucket. */
-export function bucketForAttachment(contentType: string): string {
-  const ct = String(contentType || '').toLowerCase();
-  return ct.startsWith('image/') || ct.startsWith('video/') ? INBOX_ATTACHMENT_BUCKET : INBOX_DOCUMENT_BUCKET;
+/** A customer's photo can be an ID card, so no inbound file goes to a public bucket. */
+export function bucketForAttachment(_contentType: string): string {
+  return INBOX_DOCUMENT_BUCKET;
 }
 
 /**
@@ -137,6 +136,15 @@ export function stableImageKey(url: unknown): string | null {
 }
 
 
+async function shortHash(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest).slice(0, 8)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function isAlreadyExists(error: { message?: string; statusCode?: string | number }): boolean {
+  return String(error.statusCode ?? '') === '409' || /already exists|duplicate/i.test(String(error.message ?? ''));
+}
+
 /** Store a counterparty's profile picture on their thread. */
 export async function storeParticipantPicture(
   supabase: any,
@@ -148,14 +156,15 @@ export async function storeParticipantPicture(
     const img = await fetchImageGuardedOrNull(pictureUrl);
     let avatarPath: string | null = null;
     if (img) {
-      // FIXED per thread, upserted — a fresh uuid per pass stacked a copy of the same face on
-      // every webhook that carried a picture url.
-      const path = `inbox/${threadId}/profile/avatar${extensionFor(img.mimeType) || '.jpg'}`;
+      // Keyed on the picture, not a fresh uuid: the same face re-arriving is "already stored".
+      const key = await shortHash(stableImageKey(pictureUrl) ?? pictureUrl);
+      const path = `inbox/${threadId}/profile/avatar-${key}${extensionFor(img.mimeType) || '.jpg'}`;
       const { error } = await supabase.storage
-        .from(INBOX_ATTACHMENT_BUCKET)
-        .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
-      if (error) console.warn('[inbox-media] participant picture upload failed:', error.message);
-      else avatarPath = path;
+        .from(INBOX_DOCUMENT_BUCKET)
+        .upload(path, img.bytes, { contentType: img.mimeType, upsert: false });
+      if (error && !isAlreadyExists(error)) {
+        console.warn('[inbox-media] participant picture upload failed:', error.message);
+      } else avatarPath = path;
     }
     // MERGE, not assign: `wa_profile` also carries the display name, and a whole-column write
     // would drop it. PostgREST `.update({metadata})` replaces the column outright.
@@ -171,7 +180,7 @@ export async function storeParticipantPicture(
           // Kept so the next pass can tell "same picture" from "they changed it" without
           // downloading anything. Cleared bytes with a live source would re-download forever.
           avatar_source: avatarPath ? pictureUrl : null,
-          avatar_bucket: avatarPath ? INBOX_ATTACHMENT_BUCKET : null,
+          avatar_bucket: avatarPath ? INBOX_DOCUMENT_BUCKET : null,
           avatar_path: avatarPath,
         },
         wa_profile_checked_at: new Date().toISOString(),
@@ -217,14 +226,13 @@ export async function fetchOwnBusinessAvatar(
   if (picUrl && (stableImageKey(knownCfg.avatar_source) !== stableImageKey(picUrl) || !avatarPath)) {
     const img = await fetchImageGuardedOrNull(picUrl);
     if (img) {
-      // A FIXED path, upserted. A fresh uuid per download left every previous copy behind under
-      // a prefix `build_storage_reference_set()` did not claim — four byte-identical copies of
-      // one photo, the cleanup cron eating the oldest each night, and the live one next in line.
-      const path = `inbox/channel/${accountId}/profile.jpg`;
+      // Keyed on the picture: the bucket refuses an overwrite, and only the current path is claimed.
+      const key = await shortHash(stableImageKey(picUrl) ?? picUrl);
+      const path = `inbox/channel/${accountId}/profile-${key}.jpg`;
       const { error: upErr } = await supabase.storage
         .from(INBOX_ATTACHMENT_BUCKET)
-        .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
-      if (upErr) error = upErr.message;
+        .upload(path, img.bytes, { contentType: img.mimeType, upsert: false });
+      if (upErr && !isAlreadyExists(upErr)) error = upErr.message;
       else avatarPath = path;
     } else {
       error = 'the profile photo could not be downloaded';

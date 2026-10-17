@@ -12,6 +12,7 @@ import {
   RAW_EMAIL_BUCKET,
   alreadyProcessed,
   bareAddress,
+  claimInbound,
   deliverToInbox,
   isAutomatedSender,
   isPlatformAddress,
@@ -22,6 +23,7 @@ import {
   parseRawEmail,
   resolveCustomer,
   resolveRecipient,
+  settleInboundClaim,
   workspaceOwner,
   type InboundEnvelope,
 } from '../_shared/inbound-email.ts';
@@ -203,18 +205,19 @@ async function handleInbound(
     return inboundJson({ error: 'storage_path is required' }, 400);
   }
 
-  // Cloudflare retries; a duplicate must not double-post into the thread.
-  if (await alreadyProcessed(db, envelope.message_id)) {
-    await logInbound(db, { envelope, outcome: 'duplicate' });
-    return inboundJson({ ok: true, outcome: 'duplicate' });
-  }
-
   // Re-resolve the recipient rather than trusting anything carried over from inbound_begin —
   // the tenant binding is derived here, on every call (invariant 1).
   const address = await resolveRecipient(db, envelope.to);
   if (!address) {
     await logInbound(db, { envelope, outcome: 'rejected_unknown_address' });
     return inboundJson({ ok: true, outcome: 'rejected_unknown_address' });
+  }
+
+  // Cloudflare retries; a duplicate must not double-post into the thread. Keyed per address, since
+  // one message to two of our addresses is legitimately filed twice.
+  if (await alreadyProcessed(db, envelope.message_id, address.id)) {
+    await logInbound(db, { envelope, matchedAddressId: address.id, outcome: 'duplicate' });
+    return inboundJson({ ok: true, outcome: 'duplicate' });
   }
 
   const { data: blob, error: dlErr } = await db.storage
@@ -262,18 +265,29 @@ async function handleInbound(
   // human-in-the-loop control for invariant 9, which makes it the last switch that may be inert.
   const autoReplyAllowed = address.auto_reply_enabled === true && !automated && !platformSender;
 
-  const owner = await workspaceOwner(db, address.workspace_id);
-  const customer = await resolveCustomer(
-    db, address.workspace_id, fromAddress, parsed.from.name, owner ?? address.user_id,
-  );
+  const claim = await claimInbound(db, {
+    workspaceId: address.workspace_id, envelope: logBase.envelope, matchedAddressId: address.id,
+  });
+  if (claim.kind === 'duplicate') {
+    await logInbound(db, { ...logBase, outcome: 'duplicate' });
+    return inboundJson({ ok: true, outcome: 'duplicate' });
+  }
 
   try {
+    const owner = await workspaceOwner(db, address.workspace_id);
+    const customer = await resolveCustomer(
+      db, address.workspace_id, fromAddress, parsed.from.name, owner ?? address.user_id,
+    );
     const { threadId } = await deliverToInbox(db, {
       address, parsed, customer, toAddress, fromAddress,
       storagePath: envelope.storage_path, autoReplyAllowed,
     });
 
-    await logInbound(db, { ...logBase, outcome: 'routed_inbox', threadId });
+    if (claim.kind === 'claimed') {
+      await settleInboundClaim(db, claim.id, { outcome: 'routed_inbox', threadId, auth });
+    } else {
+      await logInbound(db, { ...logBase, outcome: 'routed_inbox', threadId });
+    }
 
     // Hand off to the single agent/intake chokepoint, exactly as zernio-webhook-handler does. The
     // THREAD's agent_state decides, so a conversation a member handed to the assistant is answered
@@ -292,7 +306,11 @@ async function handleInbound(
     return inboundJson({ ok: true, outcome: 'routed_inbox', thread_id: threadId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await logInbound(db, { ...logBase, outcome: 'error', error: msg });
+    if (claim.kind === 'claimed') {
+      await settleInboundClaim(db, claim.id, { outcome: 'error', auth, error: msg });
+    } else {
+      await logInbound(db, { ...logBase, outcome: 'error', error: msg });
+    }
     // 5xx so the Worker rejects and the sender retries rather than believing it was delivered.
     return inboundJson({ error: msg }, 503);
   }

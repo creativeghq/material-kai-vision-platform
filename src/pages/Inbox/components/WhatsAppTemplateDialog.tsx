@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,8 @@ export const WhatsAppTemplateDialog: React.FC<{
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const clientToken = useRef<string>(crypto.randomUUID());
+  useEffect(() => { clientToken.current = crypto.randomUUID(); }, [pickedId, values]);
 
   useEffect(() => {
     inboxApi.listWhatsAppTemplates(threadId)
@@ -37,7 +39,9 @@ export const WhatsAppTemplateDialog: React.FC<{
     if (!picked || !ready) return;
     setBusy(true);
     try {
-      await inboxApi.sendWhatsAppTemplate({ thread_id: threadId, template_id: picked.id, variables: values });
+      await inboxApi.sendWhatsAppTemplate({
+        thread_id: threadId, template_id: picked.id, variables: values, client_token: clientToken.current,
+      });
       toast({ title: 'Template sent' });
       onSent();
     } catch (e) {

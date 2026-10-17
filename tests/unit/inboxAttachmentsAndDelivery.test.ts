@@ -259,7 +259,8 @@ describe('the CRM is not filled in behind your back', () => {
     // The whole reason it moved behind a button is to stop duplicating people, so the button
     // itself must not duplicate them either.
     expect(inboxApiSrc).toMatch(/already linked/);
-    expect(inboxApiSrc).toMatch(/crm_contacts'\)\s*[\s\S]{0,200}?\.or\(`phone\.eq/);
+    expect(inboxApiSrc).toMatch(/findContactByPhoneDigits\(db, workspaceId, digits\)/);
+    expect(inboxApiSrc).toMatch(/from\('crm_phones'\)[\s\S]{0,200}?phone_normalized/);
   });
 });
 
@@ -424,7 +425,8 @@ describe('a photo renders as a photo, and opens in place', () => {
     // bearer key. A browser gets a broken image, and it expires besides.
     expect(zernioClient).toMatch(/export async function fetchZernioMediaUrl/);
     expect(inboxMedia).toMatch(/export async function materialiseInlineAttachments/);
-    expect(zernioClient).toMatch(/hostname\.endsWith\('zernio\.com'\)/);
+    expect(zernioClient).toMatch(/host === 'zernio\.com' \|\| host\.endsWith\('\.zernio\.com'\)/);
+    expect(zernioClient).not.toMatch(/hostname\.endsWith\('zernio\.com'\)/);
     // Guarded, with the bearer passed THROUGH it — needing a header is not a reason to
     // fetch a provider URL raw (invariant 7).
     expect(zernioClient).toMatch(/fetchBinaryGuarded\(url, \{/);

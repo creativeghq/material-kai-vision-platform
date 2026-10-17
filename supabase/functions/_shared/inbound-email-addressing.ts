@@ -46,6 +46,14 @@ export function parseMessageIdRefs(...values: Array<string | null | undefined>):
   return [...new Set(out)];
 }
 
+/** One Message-ID in the bracket-less form we store, whichever form the header arrived in. */
+export function normalizeMessageId(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const first = parseMessageIdRefs(raw)[0];
+  const bare = (first ?? String(raw).trim().replace(/^<+|>+$/g, '')).trim();
+  return bare || null;
+}
+
 /**
  * Our own outbound Message-ID carries the thread it belongs to, so a reply threads exactly with
  * no lookup and no heuristic. Format: `inbox.{threadId}.{messageId}@{domain}`.

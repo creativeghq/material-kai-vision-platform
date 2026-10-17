@@ -174,6 +174,6 @@ describe('#359 CM-10 — a customer sees the customer projection', () => {
 
   it('notes stay excluded — the loud half of the rule', () => {
     const get = sliceCase("case 'get_thread'");
-    expect(get).toMatch(/if \(!isMember\) mq = mq\.neq\('message_type', 'note'\)/);
+    expect(get).toMatch(/if \(!isMember\) mq = mq\.not\('message_type', 'in', CUSTOMER_HIDDEN_MESSAGE_TYPES\)/);
   });
 });

@@ -73,6 +73,9 @@ export const exchangeGoogleCode = (code: string, redirectUri: string) =>
 export const refreshGoogleToken = (refreshToken: string) =>
   tokenCall({ refresh_token: refreshToken, grant_type: 'refresh_token' });
 
-export async function revokeGoogleToken(token: string): Promise<void> {
-  await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`, { method: 'POST' }).catch(() => undefined);
+/** True when Google confirmed the revoke; false means the grant may still be live on their side. */
+export async function revokeGoogleToken(token: string): Promise<boolean> {
+  const res = await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`, { method: 'POST' })
+    .catch(() => null);
+  return !!res && res.ok;
 }
