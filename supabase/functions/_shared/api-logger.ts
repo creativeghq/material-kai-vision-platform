@@ -9,6 +9,7 @@ import {
 } from './upstream-failure.ts';
 import { callerRoleFromAuthHeader } from './caller-role.ts';
 import { getTrustedClientIp } from './client-ip.ts';
+import { requestContext } from './request-context.ts';
 
 type Handler = (req: Request) => Promise<Response> | Response;
 
@@ -91,7 +92,7 @@ export function withApiLogging(
   name: string | ((req: Request) => string),
   handler: Handler,
 ): Handler {
-  return async (req: Request): Promise<Response> => {
+  const inner = async (req: Request): Promise<Response> => {
     const start = Date.now();
 
     // Skip logging for CORS preflight — they're noise
@@ -231,6 +232,7 @@ export function withApiLogging(
 
     return response;
   };
+  return (req: Request) => requestContext.run({}, () => inner(req));
 }
 
 async function logToDb(

@@ -126,3 +126,30 @@ describe('a kai_ key is accepted only where the spec says, and works past the do
     expect(declared.filter((fn) => KEY_REFUSED[fn])).toEqual([]);
   });
 });
+
+describe('a kai_ key acts in ONE workspace, on the edge as in the database', () => {
+  const auth = readFileSync('supabase/functions/_shared/auth.ts', 'utf8');
+  const fnBody = (name: string): string => {
+    const start = auth.indexOf(`export async function ${name}(`);
+    return auth.slice(start, auth.indexOf('\n}\n', start));
+  };
+
+  it('every request runs inside its own context scope', () => {
+    expect(readFileSync('supabase/functions/_shared/api-logger.ts', 'utf8'))
+      .toMatch(/return \(req: Request\) => requestContext\.run\(\{\}, \(\) => inner\(req\)\)/);
+  });
+
+  it('authenticate() records the key workspace for the request', () => {
+    expect(auth).toMatch(/ctx\.keyWorkspaceId = partnerAuth\.apiKey\?\.workspace_id/);
+  });
+
+  it.each(['userCanAccessWorkspace', 'userHasWorkspaceCapability', 'listWorkspaceIdsWithCapability', 'listUserWorkspaceIds'])(
+    '%s refuses every workspace but the key one',
+    (name) => expect(fnBody(name)).toMatch(/keyWorkspaceFence\(\)/),
+  );
+
+  it('a key never inherits the operator or global-admin bypass', () => {
+    expect(fnBody('userHasWorkspaceCapability')).toMatch(/fence \? false : isPlatformOperator/);
+    expect(fnBody('userCanAccessWorkspace')).toMatch(/if \(fence\) return false;\s*const globalRole/);
+  });
+});

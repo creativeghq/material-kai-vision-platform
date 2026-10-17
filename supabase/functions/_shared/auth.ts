@@ -1,5 +1,6 @@
 import type { DbClient } from './supabase-client.ts';
 import { API_KEY_ENDPOINTS } from './apiKeyEndpoints.generated.ts';
+import { keyWorkspaceFence, requestContext } from './request-context.ts';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { bootstrapSecretsFromDb } from './secrets-bootstrap.ts';
 import { roleHasCapability, type Capability } from './roleCapabilities.generated.ts';
@@ -101,6 +102,8 @@ export async function authenticate(
       if (partnerAuth.success && !isEndpointAllowed(partnerAuth.apiKey?.allowed_endpoints ?? null, functionPath(req))) {
         return { ...partnerAuth, success: false, level: 'none', error: 'This API key does not permit access to this endpoint' };
       }
+      const ctx = requestContext.getStore();
+      if (partnerAuth.success && ctx) ctx.keyWorkspaceId = partnerAuth.apiKey?.workspace_id ?? null;
       return partnerAuth;
     }
 
@@ -505,6 +508,8 @@ export async function userCanAccessWorkspace(
   workspaceId: string | null | undefined,
 ): Promise<boolean> {
   if (!userId || !workspaceId) return false;
+  const fence = keyWorkspaceFence();
+  if (fence && workspaceId !== fence) return false;
   const [{ data: mem }, { data: prof }] = await Promise.all([
     adminClient
       .from('workspace_members')
@@ -520,6 +525,7 @@ export async function userCanAccessWorkspace(
       .maybeSingle(),
   ]);
   if (mem) return true;
+  if (fence) return false;
   const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
   return !!globalRole && ['admin', 'super_admin'].includes(globalRole);
 }
@@ -535,6 +541,8 @@ export async function userHasWorkspaceCapability(
   capability: Capability | readonly Capability[],
 ): Promise<boolean> {
   if (!userId || !workspaceId) return false;
+  const fence = keyWorkspaceFence();
+  if (fence && workspaceId !== fence) return false;
   const [{ data: mem }, operator] = await Promise.all([
     adminClient
       .from('workspace_members')
@@ -543,7 +551,7 @@ export async function userHasWorkspaceCapability(
       .eq('user_id', userId)
       .eq('status', 'active')
       .maybeSingle(),
-    isPlatformOperator(adminClient, userId),
+    fence ? false : isPlatformOperator(adminClient, userId),
   ]);
   return operator || roleHasCapability((mem as { role?: string } | null)?.role, capability);
 }
@@ -562,8 +570,9 @@ export async function listWorkspaceIdsWithCapability(
     .eq('status', 'active');
   // Fail closed: an unreadable membership list is not "no workspaces", which reads as nothing to do.
   if (error) throw new Error(`Could not read workspace memberships: ${error.message}`);
+  const fence = keyWorkspaceFence();
   return ((data ?? []) as Array<{ workspace_id: string; role: string }>)
-    .filter((m) => roleHasCapability(m.role, capability))
+    .filter((m) => roleHasCapability(m.role, capability) && (!fence || m.workspace_id === fence))
     .map((m) => m.workspace_id);
 }
 
@@ -619,5 +628,6 @@ export async function listUserWorkspaceIds(
     .select('workspace_id')
     .eq('user_id', userId)
     .eq('status', 'active');
-  return (data ?? []).map((r: { workspace_id: string }) => r.workspace_id);
+  const fence = keyWorkspaceFence();
+  return (data ?? []).map((r: { workspace_id: string }) => r.workspace_id).filter((w: string) => !fence || w === fence);
 }
