@@ -5,6 +5,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { runInBackground } from '../../_shared/background.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { secretMatches } from '../../_shared/timing-safe.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts';
@@ -198,8 +199,7 @@ export const ARTICLE_COLUMNS = 'id, user_id, workspace_id, website_id, slug, pub
 export async function handleAnswerCheck(req: Request, body: any): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const cronHeader = req.headers.get('x-cron-secret');
-  const isCron = !!cronHeader && cronHeader === CRON_SECRET();
+  const isCron = secretMatches(req.headers.get('x-cron-secret'), CRON_SECRET());
 
   if (!isCron) {
     const auth = await authenticate(req);

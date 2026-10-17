@@ -9,8 +9,7 @@ import {
   buildExpenseEnvelope, expenseEnvelopeProblems, parseSendResponse,
   type ExpenseEnvelopeInput, type ExpenseLine,
 } from '../_shared/fiscal/mydata-expense-envelope.ts';
-
-const DEFAULT_BASE = 'https://mydatapi.aade.gr/myDATA';
+import { MydataEndpointRefused, mydataFetch, resolveMydataBase } from '../_shared/aade/mydata-endpoint.ts';
 
 interface Creds { aade_user_id: string; subscription_key: string; base_url: string | null }
 
@@ -26,16 +25,22 @@ async function credentialsFor(service: any, workspaceId: string): Promise<Creds>
   return data as Creds;
 }
 
-function post(creds: Creds, path: string, body: string): Promise<Response> {
-  return fetch(`${creds.base_url || DEFAULT_BASE}/${path}`, {
-    method: 'POST',
-    headers: {
-      'aade-user-id': creds.aade_user_id,
-      'Ocp-Apim-Subscription-Key': creds.subscription_key,
-      'Content-Type': 'application/xml',
-    },
-    body,
-  });
+async function post(creds: Creds, path: string, body: string): Promise<Response> {
+  try {
+    const base = await resolveMydataBase(creds.base_url);
+    return await mydataFetch(`${base}/${path}`, {
+      method: 'POST',
+      headers: {
+        'aade-user-id': creds.aade_user_id,
+        'Ocp-Apim-Subscription-Key': creds.subscription_key,
+        'Content-Type': 'application/xml',
+      },
+      body,
+    });
+  } catch (e) {
+    if (e instanceof MydataEndpointRefused) throw new HttpError(400, e.message);
+    throw e;
+  }
 }
 
 function linesFor(doc: any): ExpenseLine[] {
@@ -97,7 +102,7 @@ Deno.serve(withApiLogging('finance-mydata-send', async (req) => {
     case 'check-rights': {
       const creds = await credentialsFor(service, workspaceId);
       const res = await post(creds, 'SendInvoices', '<not-a-document/>');
-      const text = await res.text().catch(() => '');
+      await res.body?.cancel();
       return jsonResponse({
         ok: true,
         canSend: res.status !== 401 && res.status !== 403,
@@ -105,7 +110,6 @@ Deno.serve(withApiLogging('finance-mydata-send', async (req) => {
         detail: res.status === 401 || res.status === 403
           ? 'ΑΑΔΕ refused the credentials for SendInvoices. The subscription reads your book but may not file.'
           : 'ΑΑΔΕ accepted the call and rejected the document, which is what a malformed probe should do.',
-        raw: text.slice(0, 500),
       });
     }
 

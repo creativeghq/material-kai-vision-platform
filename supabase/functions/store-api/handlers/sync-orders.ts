@@ -3,7 +3,7 @@ import { HttpError } from '../../_shared/api-logger.ts';
 import { jsonResponse as json } from '../../_shared/http.ts';
 import { authenticate, getUserId, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { ADAPTERS, type AdapterConnection } from '../../_shared/commerce/adapters.ts';
-import { assertSafeUrl, SSRFError } from '../../_shared/ssrf-guard.ts';
+import { assertSafeUrl, guardedFetch, SSRFError } from '../../_shared/ssrf-guard.ts';
 
 type Row = Record<string, unknown>;
 
@@ -26,8 +26,8 @@ async function fetchUpstream(
     const version = String(conn.api_version ?? '2025-07');
     const url = `${store}/admin/api/${version}/orders.json?status=any&limit=${limit}`
       + `&updated_at_min=${encodeURIComponent(sinceIso)}`;
-    const res = await fetch(url, { headers: { 'X-Shopify-Access-Token': token } });
-    if (!res.ok) throw new HttpError(502, `Shopify refused the pull: ${res.status} ${await res.text()}`);
+    const res = await guardedFetch(url, { headers: { 'X-Shopify-Access-Token': token } });
+    if (!res.ok) throw new HttpError(502, `Shopify refused the pull: HTTP ${res.status}`);
     const body = await res.json();
     return { orders: body?.orders ?? [], note: `Shopify ${version}` };
   }
@@ -37,10 +37,10 @@ async function fetchUpstream(
     const secret = creds.consumer_secret;
     if (!key || !secret) throw new HttpError(400, 'This connection has no WooCommerce consumer key and secret.');
     const url = `${store}/wp-json/wc/v3/orders?per_page=${limit}&after=${encodeURIComponent(sinceIso)}`;
-    const res = await fetch(url, {
+    const res = await guardedFetch(url, {
       headers: { Authorization: `Basic ${btoa(`${key}:${secret}`)}` },
     });
-    if (!res.ok) throw new HttpError(502, `WooCommerce refused the pull: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new HttpError(502, `WooCommerce refused the pull: HTTP ${res.status}`);
     return { orders: await res.json(), note: 'WooCommerce v3' };
   }
 
@@ -96,7 +96,10 @@ export async function handleSyncOrders(req: Request, body: Row): Promise<Respons
   }
 
   const sinceIso = new Date(Date.now() - days * 86400_000).toISOString();
-  const { orders, note } = await fetchUpstream(conn as Row, sinceIso, 100);
+  const { orders, note } = await fetchUpstream(conn as Row, sinceIso, 100).catch((err) => {
+    if (err instanceof SSRFError) throw new HttpError(502, `The store could not be reached safely: ${err.message}`);
+    throw err;
+  });
 
   const keys = observedKeys(String(conn.platform), orders);
   if (discoverOnly) {

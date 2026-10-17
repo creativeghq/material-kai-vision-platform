@@ -11,13 +11,14 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { recordInvoicePayment } from '../_shared/payments/record-payment.ts';
 import { retrieveVivaOrder, retrieveVivaTransaction, VIVA_ORDER_STATE, vivaHosts } from '../_shared/payments/viva-provider.ts';
-import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import type { PaymentProviderContext } from '../_shared/payments/types.ts';
 
 /** Viva event type ids we act on. */
 const EVENT_PAYMENT_CREATED = 1796;
 const EVENT_REVERSAL_CREATED = 1797;
 const EVENT_PAYMENT_FAILED = 1798;
+const VIVA_TX_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EVENT_ACCOUNT_TRANSACTION = 2054; // merchant-level: covers incoming bank transfers (RF)
 
 function json(body: unknown, status = 200): Response {
@@ -256,16 +257,37 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
 
   const ctx = ctxFromConfig(cfg);
 
+  /** The POST is unsigned, so 1797/1798 act only on a transaction Viva confirms under this merchant's credentials. */
+  const readBack = async (txId: string): Promise<Awaited<ReturnType<typeof retrieveVivaTransaction>> | Response> => {
+    if (!VIVA_TX_ID.test(txId)) {
+      await settleDelivery('done', { outcome: 'unverifiable', reason: 'no_transaction_id' });
+      return json({ ok: true, ignored: true, reason: 'no transaction id' });
+    }
+    try {
+      return await retrieveVivaTransaction(txId, ctx);
+    } catch (err) {
+      console.error('[viva-webhooks] read-back failed', txId, err);
+      await settleDelivery('failed', { reason: 'read_back_failed' });
+      return json({ error: 'could not verify the transaction with Viva' }, 502);
+    }
+  };
+
   // Failures are informational only — nothing to reverse, and the customer may retry
   // (a later success fires 1796 normally).
   if (eventTypeId === EVENT_PAYMENT_FAILED) {
-    const oc = rawOrderCode(rawBody);
-    if (oc) {
+    const failedTx = await readBack(String(data?.TransactionId ?? ''));
+    if (failedTx instanceof Response) return failedTx;
+    if (failedTx.statusId === 'F' || failedTx.statusId === 'C') {
+      await settleDelivery('done', { outcome: 'not_failed', status_id: failedTx.statusId });
+      return json({ ok: true, recorded: false, status_id: failedTx.statusId });
+    }
+    if (failedTx.orderCode) {
       await db
         .from('invoice_payment_intents')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
+        .eq('workspace_id', cfg.workspace_id)
         .eq('provider', 'viva')
-        .eq('provider_order_code', oc);
+        .eq('provider_order_code', failedTx.orderCode);
     }
     await settleDelivery('done', { outcome: 'payment_failed' });
     return json({ ok: true, recorded: false, outcome: 'failed' });
@@ -275,9 +297,12 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
   // rewrite settled books from an unsigned message. Flag it loudly for a human and
   // let the finance module's credit-note flow do the reversal properly.
   if (eventTypeId === EVENT_REVERSAL_CREATED) {
-    const parentId = String(data?.ParentId ?? '');
+    const reversalTx = await readBack(String(data?.TransactionId ?? ''));
+    if (reversalTx instanceof Response) return reversalTx;
+    const rawParent = String(data?.ParentId ?? '');
+    const parentId = VIVA_TX_ID.test(rawParent) ? rawParent : '';
     console.error(
-      `[viva-webhooks] REVERSAL for merchant ${merchantId}, original transaction ${parentId}, amount ${data?.Amount} — needs a credit note`,
+      `[viva-webhooks] REVERSAL for merchant ${merchantId}, original transaction ${parentId}, amount ${reversalTx.amount} — needs a credit note`,
     );
     // The intent update is REMOVED, not repointed. It filtered on
     // `provider_order_code = rawOrderCode(rawBody)` — the REVERSAL message's own order code,
@@ -288,6 +313,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       const { data: pay } = await db
         .from('payments')
         .select('id, workspace_id')
+        .eq('workspace_id', cfg.workspace_id)
         .eq('provider', 'viva')
         .eq('provider_ref', parentId)
         .maybeSingle();
@@ -296,12 +322,13 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     // RF payments carry provider_ref 'viva-rf-<orderCode>', so the ParentId lookup
     // misses them and the flag had no recipient (audit L2). Fall back to the reversal
     // message's own order code when present.
+    const revOrderCode = reversalTx.orderCode;
     if (!paymentRow) {
-      const revOrderCode = rawOrderCode(rawBody);
       if (revOrderCode) {
         const { data: rfPay } = await db
           .from('payments')
           .select('id, workspace_id')
+          .eq('workspace_id', cfg.workspace_id)
           .eq('provider', 'viva')
           .eq('provider_ref', `viva-rf-${revOrderCode}`)
           .maybeSingle();
@@ -312,8 +339,8 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     // "Flag it loudly for a human" was only ever a console.error — which reaches no human.
     // Emit the same payment_reversed event the Stripe path now emits, so the seeded default
     // flow puts it in front of the workspace's owners and admins.
-    const amount = Number(data?.Amount ?? 0);
-    const wsId = paymentRow?.workspace_id ?? null;
+    const amount = Math.abs(Number(reversalTx.amount ?? 0));
+    const wsId: string = cfg.workspace_id;
     const payload = {
       type: 'payment_reversed',
       reversal_kind: 'refund' as const,
@@ -328,33 +355,27 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       action_url: '/finance?tab=doc_payments',
     };
     /** THE REVERSAL GOES IN THE BOOKS, NOT JUST IN A NOTIFICATION (#360 CB-7). */
-    if (wsId) {
-      const feed = await upsertVivaFeedRow(db, wsId, {
-        ref: `viva-reversal-${parentId || rawOrderCode(rawBody) || messageId}`,
-        type: 'refund',
-        direction: 'out',
-        amount,
-        currency: 'EUR',
-        reference: parentId
-          ? `Reversal of Viva transaction ${parentId}`
-          : 'Viva reversal — original transaction not identified',
-        matchedInvoiceId: null,
-        paymentId: null,
-      });
-      if (!feed.ok) {
-        // Refuse the acknowledgement: Viva retries, and a reversal nobody recorded is a hole in
-        // the books that no later process can find.
-        await settleDelivery('failed', { reason: 'reversal_not_recorded', parent_transaction_id: parentId });
-        return json({ error: 'could not record the reversal' }, 500);
-      }
+    const feed = await upsertVivaFeedRow(db, wsId, {
+      ref: `viva-reversal-${parentId || revOrderCode || messageId}`,
+      type: 'refund',
+      direction: 'out',
+      amount,
+      currency: 'EUR',
+      reference: parentId
+        ? `Reversal of Viva transaction ${parentId}`
+        : 'Viva reversal — original transaction not identified',
+      matchedInvoiceId: null,
+      paymentId: null,
+    });
+    if (!feed.ok) {
+      // Refuse the acknowledgement: Viva retries, and a reversal nobody recorded is a hole in
+      // the books that no later process can find.
+      await settleDelivery('failed', { reason: 'reversal_not_recorded', parent_transaction_id: parentId });
+      return json({ error: 'could not record the reversal' }, 500);
     }
 
-    if (wsId) {
-      await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'payment_reversed',
-        (recipientUserId) => ({ ...payload, user_id: recipientUserId })).catch(() => {});
-    } else {
-      await emitFlowEvent('payment_reversed', payload).catch(() => {});
-    }
+    await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'payment_reversed',
+      (recipientUserId) => ({ ...payload, user_id: recipientUserId })).catch(() => {});
     await settleDelivery('done', { outcome: 'reversal_recorded', parent_transaction_id: parentId });
     return json({ ok: true, recorded: true, outcome: 'reversal_recorded' });
   }

@@ -178,9 +178,11 @@ recorded and shown either way; the verdict is an annotation next to the diff.
 the `page-monitoring` module (disabled by default). The manual "check now" action debits before
 the upstream call and refuses with 402 if the debit fails.
 
-**Scheduled checks are not per-request**, so they carry no per-call debit — the ongoing cost is
-the module's. Watch this if the feature grows: a daily watch is ~30 credits/month, and the bill
-scales with the number of watches, not with usage.
+**Scheduled checks are debited by `page-watch-webhook`**, once per Firecrawl check id and before
+the check or its changes are recorded (`ensureCheckPaid`). The first check after a manual run
+claims that run's up-front debit instead of paying twice. A check that cannot be paid pauses the
+watch locally and upstream. A workspace may hold at most 25 active watches, and `page-watches`
+requires the workspace to be entitled to `page-monitoring`.
 
 ## Surfaces
 

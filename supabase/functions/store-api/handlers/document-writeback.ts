@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { HttpError } from '../../_shared/api-logger.ts';
 import { jsonResponse as json } from '../../_shared/http.ts';
 import { authenticate, getUserId, isServiceRoleRequest, userHasWorkspaceCapability } from '../../_shared/auth.ts';
-import { assertSafeUrl, SSRFError } from '../../_shared/ssrf-guard.ts';
+import { assertSafeUrl, guardedFetch, SSRFError } from '../../_shared/ssrf-guard.ts';
 
 type Row = Record<string, unknown>;
 
@@ -12,16 +12,16 @@ async function pushShopify(store: string, creds: Record<string, string>, apiVers
   externalOrderId: string, link: string, number: string): Promise<void> {
   const token = creds.admin_token;
   if (!token) throw new HttpError(400, 'This connection has no Shopify Admin token.');
-  const res = await fetch(`${store}/admin/api/${apiVersion}/orders/${externalOrderId}/metafields.json`, {
+  const res = await guardedFetch(`${store}/admin/api/${apiVersion}/orders/${encodeURIComponent(externalOrderId)}/metafields.json`, {
     method: 'POST',
     headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       metafield: { namespace: 'materialkai', key: 'document_url', type: 'url', value: link },
     }),
   });
-  if (!res.ok) throw new HttpError(502, `Shopify refused the metafield: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new HttpError(502, `Shopify refused the metafield: HTTP ${res.status}`);
 
-  await fetch(`${store}/admin/api/${apiVersion}/orders/${externalOrderId}/metafields.json`, {
+  await guardedFetch(`${store}/admin/api/${apiVersion}/orders/${encodeURIComponent(externalOrderId)}/metafields.json`, {
     method: 'POST',
     headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -37,7 +37,7 @@ async function pushWoo(store: string, creds: Record<string, string>,
   if (!key || !secret) throw new HttpError(400, 'This connection has no WooCommerce consumer key and secret.');
   const auth = `Basic ${btoa(`${key}:${secret}`)}`;
 
-  const res = await fetch(`${store}/wp-json/wc/v3/orders/${externalOrderId}`, {
+  const res = await guardedFetch(`${store}/wp-json/wc/v3/orders/${encodeURIComponent(externalOrderId)}`, {
     method: 'PUT',
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -47,9 +47,9 @@ async function pushWoo(store: string, creds: Record<string, string>,
       ],
     }),
   });
-  if (!res.ok) throw new HttpError(502, `WooCommerce refused the update: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new HttpError(502, `WooCommerce refused the update: HTTP ${res.status}`);
 
-  await fetch(`${store}/wp-json/wc/v3/orders/${externalOrderId}/notes`, {
+  await guardedFetch(`${store}/wp-json/wc/v3/orders/${encodeURIComponent(externalOrderId)}/notes`, {
     method: 'POST',
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({ note: `Invoice ${number}: ${link}`, customer_note: true }),
@@ -128,6 +128,7 @@ export async function handleDocumentWriteback(req: Request, body: Row): Promise<
       order_id: order.id, invoice_id: inv.id,
       message: err instanceof Error ? err.message : String(err),
     } as Row);
+    if (err instanceof SSRFError) throw new HttpError(502, `The store could not be reached safely: ${err.message}`);
     throw err;
   }
 

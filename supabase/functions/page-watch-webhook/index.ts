@@ -6,6 +6,7 @@ import { resolveSecret } from '../_shared/secrets.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { PAGE_WATCH_STATUSES } from '../_shared/pageWatchVocabulary.generated.ts';
+import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 
 const WEBHOOK_SECRET_KEY = 'FIRECRAWL_WEBHOOK_SECRET';
 const SECRET_HEADER = 'x-firecrawl-webhook-secret';
@@ -102,6 +103,68 @@ async function findWatch(
   return (data as WatchRow | null) ?? null;
 }
 
+const RUN_OPS = ['page_watch.scheduled_run', 'page_watch.manual_run'];
+
+async function pauseWatch(supabase: DbClient, watch: WatchRow, monitorId: string, reason: string): Promise<void> {
+  await supabase.from('page_watches').update({
+    is_active: false, cache_status: 'failed', last_error: reason, updated_at: new Date().toISOString(),
+  }).eq('id', watch.id);
+  const apiKey = await resolveSecret(supabase, 'FIRECRAWL_API_KEY');
+  if (!apiKey.value) return;
+  const res = await fetch(`https://api.firecrawl.dev/v2/monitor/${encodeURIComponent(monitorId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${apiKey.value}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'paused' }),
+  }).catch(() => null);
+  if (!res?.ok) console.error(`[page-watch-webhook] could not pause monitor ${monitorId} upstream (HTTP ${res?.status ?? 'none'})`);
+  await res?.body?.cancel();
+}
+
+/**
+ * One debit per Firecrawl check, taken before anything about it is recorded. A replayed delivery, or the
+ * page and completion events of the same check, find the existing row; a manual run's up-front debit is
+ * claimed by the first check that follows it.
+ */
+async function ensureCheckPaid(
+  supabase: DbClient, watch: WatchRow, monitorId: string, checkId: string | undefined,
+): Promise<boolean> {
+  if (!checkId) {
+    console.warn(`[page-watch-webhook] check without checkId for watch ${watch.id}; not recorded (cannot bill it once)`);
+    return false;
+  }
+  const { data: billed } = await supabase.from('ai_usage_logs').select('id')
+    .eq('workspace_id', watch.workspace_id).in('operation_type', RUN_OPS)
+    .eq('metadata->>firecrawl_check_id', checkId).limit(1).maybeSingle();
+  if (billed) return true;
+
+  const { data: manual } = await supabase.from('ai_usage_logs').select('id, metadata')
+    .eq('workspace_id', watch.workspace_id).eq('operation_type', 'page_watch.manual_run')
+    .eq('metadata->>page_watch_id', watch.id).is('metadata->>firecrawl_check_id', null)
+    .gte('created_at', new Date(Date.now() - 3600_000).toISOString())
+    .order('created_at', { ascending: true }).limit(1).maybeSingle();
+  if (manual) {
+    const m = manual as { id: string; metadata: Record<string, unknown> | null };
+    const { data: claimed } = await supabase.from('ai_usage_logs')
+      .update({ metadata: { ...(m.metadata ?? {}), firecrawl_check_id: checkId } })
+      .eq('id', m.id).is('metadata->>firecrawl_check_id', null).select('id');
+    if (claimed?.length) return true;
+  }
+
+  if (!watch.created_by) {
+    await pauseWatch(supabase, watch, monitorId, 'Paused: this watch has no owner to bill its checks to.');
+    return false;
+  }
+  const debit = await debitExternalServiceCredits(
+    supabase, watch.created_by, 'firecrawl-scrape', 'page_watch.scheduled_run', 1,
+    { page_watch_id: watch.id, firecrawl_check_id: checkId }, watch.workspace_id,
+  );
+  if (!debit.success) {
+    await pauseWatch(supabase, watch, monitorId, `Paused: the scheduled check could not be paid for (${debit.error ?? 'insufficient credits'}).`);
+    return false;
+  }
+  return true;
+}
+
 /** What the notification should SAY, which is not the same for every status. */
 function notificationCopy(watchName: string, status: string, reason: string | null) {
   switch (status) {
@@ -146,6 +209,8 @@ async function handleMonitorPage(
     }
 
     const status = STATUSES.has(e.status ?? '') ? e.status! : 'error';
+
+    if (!(await ensureCheckPaid(supabase, watch, e.monitorId!, e.checkId))) continue;
 
     // 'same' is the overwhelming majority of deliveries and carries nothing: no
     // diff, no judgment, no error. Recording it would turn the change log into a
@@ -269,6 +334,7 @@ async function handleCheckCompleted(
   for (const e of entries) {
     const watch = await findWatch(supabase, e.monitorId);
     if (!watch) continue;
+    if (!(await ensureCheckPaid(supabase, watch, e.monitorId!, e.checkId))) continue;
 
     // cache_status distinguishes "ran clean, nothing changed" from "the check
     // itself broke and must be retried" — the difference the price pipeline

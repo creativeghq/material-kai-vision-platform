@@ -5,6 +5,9 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
 
+/** A draft has not been offered, and a rejected or expired one is closed; only these may be signed. */
+const ACCEPTABLE_QUOTE_STATUSES = new Set(['submitted', 'quoted', 'accepted']);
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -110,6 +113,9 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       const g = gq as { status?: string; expires_at?: string } | null;
       if (g?.status === 'expired' || (g?.expires_at && new Date(g.expires_at).getTime() < Date.now())) {
         return jsonResponse({ error: 'This quote has expired. Please request an updated quote.' }, 409);
+      }
+      if (!g?.status || !ACCEPTABLE_QUOTE_STATUSES.has(g.status)) {
+        return jsonResponse({ error: 'This quote is not open for acceptance. Please contact the sender.' }, 409);
       }
       const { count: unpriced } = await supabase.from('quote_items')
         .select('id', { count: 'exact', head: true }).eq('quote_id', quote.id).neq('pricing_status', 'priced');

@@ -203,7 +203,7 @@ describe('the edge function', () => {
   const src = blankComments(readFileSync(join(ROOT, 'supabase/functions/finance-mydata-delivery/index.ts'), 'utf8'));
   it('claims the leg before the AADE call, and the claim is conditional', () => {
     const claim = src.indexOf("transmission_claim_token: token");
-    const call = src.indexOf('fetch(`${baseOf(creds)}/${request.method}`');
+    const call = src.indexOf('mydataFetch(`${base}/${request.method}`');
     expect(claim).toBeGreaterThan(-1);
     expect(call).toBeGreaterThan(claim);
     expect(src.slice(claim, call)).toMatch(/\.is\('transmitted_at', null\)\.is\('transmission_claim_token', null\)/);

@@ -1,7 +1,8 @@
 /** seo-toolkit-audit — composite domain audit for /admin/seo dashboard. */
 
 import { createClient } from '@supabase/supabase-js';
-import { authenticate } from '../../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
+import { secretMatches } from '../../_shared/timing-safe.ts';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { chargeCronWorkspace, chargeCronUser, refundCronWorkspace, refundCronUser } from '../../_shared/cron-billing.ts';
@@ -30,8 +31,7 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
   }
 
   try {
-    const cronSecretHeader = req.headers.get('x-cron-secret');
-    const isCron = !!cronSecretHeader && cronSecretHeader === CRON_SECRET();
+    const isCron = secretMatches(req.headers.get('x-cron-secret'), CRON_SECRET());
 
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -48,6 +48,14 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
       const results: any[] = [];
       let skippedUnpaid = 0;
       for (const td of due || []) {
+        // The row policy binds user_id only, so workspace_id is whatever the owner wrote.
+        if (td.workspace_id && !(await userHasWorkspaceCapability(sb, td.user_id, td.workspace_id, 'marketing.seo'))) {
+          await sb.from('seo_tracked_domains').update({
+            next_audit_at: new Date(Date.now() + (td.audit_cadence_hours || 168) * 3600 * 1000).toISOString(),
+          }).eq('id', td.id);
+          results.push({ id: td.id, ok: false, skipped: 'owner_not_in_workspace' });
+          continue;
+        }
         // Meter the owner BEFORE the paid audit. `runAuditFor` calls MIVAA's composite
         // site-review — domain rank, ranked keywords, competitors, backlinks, anchors — which
         // is DataForSEO spend on the operator's account. Registered cron_key
@@ -95,7 +103,11 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
     if (error) return jsonResponse({ ok: false, error: error.message }, 500);
     if (!td) return jsonResponse({ ok: false, error: 'tracked_domain not found' }, 404);
     if ((td as any).user_id !== userId) {
-      return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+      return jsonResponse({ ok: false, error: 'tracked_domain not found' }, 404);
+    }
+    if ((td as any).workspace_id
+      && !(await userHasWorkspaceCapability(sb, userId, (td as any).workspace_id, 'marketing.seo'))) {
+      return jsonResponse({ ok: false, error: 'tracked_domain not found' }, 404);
     }
 
     // Paid module — refuse before firing the MIVAA composite audit (#212). Cron batch

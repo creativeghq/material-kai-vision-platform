@@ -5,7 +5,8 @@ import { authenticate, listWorkspaceIdsWithCapability } from '../_shared/auth.ts
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { MYDATA_PRODUCTION_BASE, mydataFetch, resolveMydataBase } from '../_shared/aade/mydata-endpoint.ts';
+import { secretMatches } from '../_shared/timing-safe.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,7 +103,7 @@ async function fetchAllPages(
 
     let res: Response;
     try {
-      res = await fetch(`${baseUrl}/${endpoint}?${q.toString()}`, {
+      res = await mydataFetch(`${baseUrl}/${endpoint}?${q.toString()}`, {
         headers: { 'aade-user-id': creds.aade_user_id, 'Ocp-Apim-Subscription-Key': creds.subscription_key },
       });
     } catch (err) {
@@ -242,7 +243,7 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
 
   // Auth: cron secret OR a signed-in finance user (the "Refresh from AADE" button).
   const cronSecret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
-  const cronOk = !!cronSecret && req.headers.get('x-cron-secret') === cronSecret;
+  const cronOk = secretMatches(req.headers.get('x-cron-secret'), cronSecret);
 
   // The manual path is scoped to the caller's OWN workspaces — without this, one tenant's
   // finance user triggers (and reads the outcome of) an AADE pull for every workspace.
@@ -270,7 +271,7 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
   if (!dateFrom || !dateTo) throw new HttpError(400, 'date_from and date_to must be yyyy-mm-dd');
   if (String(rawFrom) > String(rawTo)) throw new HttpError(400, 'date_from must not be after date_to');
 
-  const defaultBase = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value || 'https://mydatapi.aade.gr/myDATA';
+  const defaultBase = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value || MYDATA_PRODUCTION_BASE;
 
   let credsQuery = supabase
     .from('workspace_inbound_credentials')
@@ -319,17 +320,12 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
     }
 
     const attemptAt = new Date().toISOString();
-    // `base_url` is tenant-writable (Profile → Keys, BYOK), and this function runs under the
-    // service role, so an unchecked value is a server-side fetch of a user-supplied URL —
-    // invariant 7. https-only, and the guard resolves DNS and refuses RFC1918 / loopback /
-    // link-local / 169.254.169.254. A refused URL is a COLLECTOR FAILURE for that workspace,
-    // never a silent skip and never a zeroed month.
-    const rawBase = (c.base_url as string | null) || defaultBase;
+    // A refused base_url is a COLLECTOR FAILURE for that workspace, never a silent skip or a zeroed month.
     let baseUrl: string;
     try {
-      baseUrl = await assertSafeUrl(rawBase, { allowSchemes: ['https:'] });
+      baseUrl = await resolveMydataBase(c.base_url as string | null, defaultBase);
     } catch (e) {
-      const reason = `Refused to fetch the configured myDATA endpoint: ${(e as Error).message}`;
+      const reason = (e as Error).message;
       // Same verdict shape as any other collector failure: the stored figures stay untouched and
       // the state says WHY, so this can never read as a month with nothing in it.
       await writeSyncState({

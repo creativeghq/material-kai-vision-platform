@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate } from '../../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { checkChannelSeat } from '../../_shared/channel-seats.ts';
 import { zernioApi, zernioKey, ensureZernioSecrets, publicAppUrl, resolveWorkspaceProfile, fetchZernioAccount } from '../zernio.ts';
@@ -80,7 +80,7 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
         .eq('status', 'active')
         .maybeSingle();
       if (!membership) {
-        return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
+        return jsonResponse({ success: false, error: 'Workspace not found' }, 404);
       }
     }
 
@@ -135,17 +135,8 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
     // workspace_id comes from the body — bind it to the caller before touching Zernio
     // (resolveWorkspaceProfile find-or-creates a Zernio profile for the workspace, so an
     // unchecked id let any user attach OAuth flows to another tenant).
-    if (userId) {
-      const { data: membership } = await supabase
-        .from('workspace_members')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('workspace_id', workspace_id)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (!membership) {
-        return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
-      }
+    if (userId && !(await userHasWorkspaceCapability(supabase, userId, workspace_id, 'marketing.seo'))) {
+      return jsonResponse({ success: false, error: 'Workspace not found' }, 404);
     }
 
     // Connecting an account consumes the platform's Zernio subscription — paid module (#212).
@@ -207,17 +198,8 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
     }
 
     // Verify caller belongs to the workspace before writing.
-    if (userId) {
-      const { data: membership } = await supabase
-        .from('workspace_members')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('workspace_id', workspace_id)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (!membership) {
-        return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
-      }
+    if (userId && !(await userHasWorkspaceCapability(supabase, userId, workspace_id, 'marketing.seo'))) {
+      return jsonResponse({ success: false, error: 'Workspace not found' }, 404);
     }
 
     const callbackEnt = await assertEntitled(supabase, workspace_id, 'social-media');
@@ -310,17 +292,8 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
     }
 
     // Verify caller belongs to the account's workspace
-    if (userId && account.workspace_id) {
-      const { data: membership } = await supabase
-        .from('workspace_members')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('workspace_id', account.workspace_id)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (!membership) {
-        return jsonResponse({ success: false, error: 'Not authorized to disconnect this account' }, 403);
-      }
+    if (userId && account.workspace_id && !(await userHasWorkspaceCapability(supabase, userId, account.workspace_id, 'marketing.seo'))) {
+      return jsonResponse({ success: false, error: 'Account not found' }, 404);
     }
 
     // Revoke via Zernio (non-fatal: mark inactive regardless of Zernio response).

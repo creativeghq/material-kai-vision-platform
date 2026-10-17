@@ -253,6 +253,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     const PLATFORM_ACTIONS = new Set([
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
       'bill-channels-monthly', 'set-channel-seats', 'update-settings', 'register-webhook',
+      'plan-status', 'webhook-status', 'get-settings',
     ]);
     if (PLATFORM_ACTIONS.has(action) && !isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) {
       return jsonResponse({ error: 'Platform operator access required' }, 403);
@@ -291,7 +292,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       if (explicit) {
         if (isAdminAccess(auth)) return explicit;
         const ids = await callerWorkspaceIds();
-        if (!ids.includes(explicit)) throw new HttpError(403, 'Not a member of the target workspace');
+        if (!ids.includes(explicit)) throw new HttpError(404, 'Workspace not found');
         return explicit;
       }
       const ids = await callerWorkspaceIds();
@@ -1716,6 +1717,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        await requireWorkspaceManager(wsId, 'backfill the inbox');
 
         // Default raised with paging: 50 was a single page, and the old ceiling of 200 was
         // chosen when one request was all we made.

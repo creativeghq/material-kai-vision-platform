@@ -143,10 +143,26 @@ export async function assertSafeUrl(
         // record type may not exist / resolver unavailable — ignore per-type
       }
     }
+    if (addrs.length === 0) throw new SSRFError('Host did not resolve');
     for (const ip of addrs) {
       const blocked = ip.includes(':') ? ipv6IsBlocked(ip) : ipv4IsBlocked(ip);
       if (blocked) throw new SSRFError('Host resolves to a blocked address');
     }
   }
   return u.toString();
+}
+
+/** One guarded request that never follows a redirect, for calls carrying credentials. A 3xx throws SSRFError. */
+export async function guardedFetch(
+  rawUrl: string,
+  init: RequestInit = {},
+  opts: { allowSchemes?: string[] } = {},
+): Promise<Response> {
+  const url = await assertSafeUrl(rawUrl, { allowSchemes: opts.allowSchemes ?? ['https:'] });
+  const res = await fetch(url, { ...init, redirect: 'manual' });
+  if (res.status >= 300 && res.status < 400) {
+    await res.body?.cancel();
+    throw new SSRFError(`Redirect (HTTP ${res.status}) not followed`);
+  }
+  return res;
 }

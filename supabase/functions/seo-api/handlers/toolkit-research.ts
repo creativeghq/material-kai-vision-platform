@@ -19,6 +19,31 @@ interface ResearchPayload {
   label?: string | null;
 }
 
+const strList = (v: unknown, max: number, len = 200): string[] | undefined =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, len)).slice(0, max) : undefined;
+
+/** The MIVAA body, built field by field. `workspace_id` is the server-resolved one, never the caller's. */
+export function buildResearchParams(raw: Record<string, unknown>, workspaceId: string | null): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    subject_label: String(raw.subject_label ?? '').slice(0, 200),
+    workspace_id: workspaceId,
+  };
+  if (typeof raw.brand_name === 'string') out.brand_name = raw.brand_name.slice(0, 200);
+  if (typeof raw.homepage_domain === 'string') out.homepage_domain = raw.homepage_domain.slice(0, 253);
+  const aliases = strList(raw.aliases, 20);
+  if (aliases) out.aliases = aliases;
+  const languages = strList(raw.language_codes, 10, 10);
+  if (languages) out.language_codes = languages;
+  const countries = strList(raw.country_codes, 10, 10);
+  if (countries) out.country_codes = countries;
+  const types = strList(raw.types, 20, 64);
+  if (types) out.types = types;
+  const limit = Number(raw.limit_per_type);
+  if (Number.isInteger(limit)) out.limit_per_type = Math.min(Math.max(limit, 1), 20);
+  if (typeof raw.use_llm_summary === 'boolean') out.use_llm_summary = raw.use_llm_summary;
+  return out;
+}
+
 export async function handleToolkitResearch(req: Request, body: any): Promise<Response> {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
@@ -36,7 +61,7 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
     if (!auth.success || !auth.userId) return jsonResponse({ ok: false, error: auth.error || 'unauthorized' }, 401);
     const userId = auth.userId;
 
-    if (!body?.subject || !body?.params) {
+    if (!body?.subject || !body?.params || typeof body.params !== 'object') {
       return jsonResponse({ ok: false, error: 'subject and params required' }, 400);
     }
 
@@ -48,12 +73,14 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
     // the workspace the run is filed under (was a late `.maybeSingle()` lookup below).
     const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(sbAdmin, userId, auth.apiKey?.workspace_id);
     if (entResponse) return entResponse;
+    const params = buildResearchParams(body.params as Record<string, unknown>, workspaceId ?? null);
+    if (!params.subject_label) return jsonResponse({ ok: false, error: 'params.subject_label required' }, 400);
 
     // Meter BEFORE the engine runs (invariant 10, #365 `AD-13`). opportunities-stateless fans out
     // to DataForSEO SERP + Labs on the OPERATOR's x-cron-secret credential, so entitlement alone
     // ("this workspace bought the module") left every run of it free and unbounded. Reserve a
     // ceiling, settle the cost MIVAA reports back.
-    const gate = await openSpendGate('composite_opportunities', userId, body.params, workspaceId);
+    const gate = await openSpendGate('composite_opportunities', userId, params, workspaceId);
     if (!gate.ok) {
       return jsonResponse({ ok: false, error: gate.message ?? 'Insufficient credits' }, 402);
     }
@@ -69,7 +96,7 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
           'Content-Type': 'application/json',
           'x-cron-secret': CRON_SECRET(),
         },
-        body: JSON.stringify(body.params),
+        body: JSON.stringify(params),
       });
     } catch (e) {
       await gate.settle(0);
@@ -99,10 +126,10 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
         website_id: website?.id ?? null,
         kind: body.kind,
         subject: body.subject.slice(0, 200),
-        request_params: body.params,
+        request_params: params,
         response: data || null,
-        country_code: (body.params as any)?.country_codes?.[0] || null,
-        language_code: (body.params as any)?.language_codes?.[0] || null,
+        country_code: (params.country_codes as string[] | undefined)?.[0] || null,
+        language_code: (params.language_codes as string[] | undefined)?.[0] || null,
         cost_usd: Number.isFinite(upstreamCostUsd) ? upstreamCostUsd : null,
         latency_ms,
         success: ok,

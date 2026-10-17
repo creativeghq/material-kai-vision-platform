@@ -60,7 +60,13 @@ function headlineOf(payload: any): string {
 async function generate(
   supabase: any,
   report: { id: string; website_id: string; workspace_id: string; name: string; sections: string[]; cadence: string },
-): Promise<{ ok: boolean; run_id?: string; error?: string }> {
+): Promise<{ ok: boolean; run_id?: string; error?: string; not_found?: boolean }> {
+  // The policy binds seo_reports.workspace_id only, so a row can name another tenant's website.
+  const { data: site } = await supabase.from('user_websites')
+    .select('workspace_id').eq('id', report.website_id).maybeSingle();
+  if (!site || site.workspace_id !== report.workspace_id) {
+    return { ok: false, not_found: true, error: 'Report not found' };
+  }
   const days = DAYS_FOR[report.cadence] ?? 30;
   let payload: any = null;
   let error: string | null = null;
@@ -137,6 +143,9 @@ Deno.serve(withApiLogging('seo-reports', async (req: Request) => {
     let sent = 0, failed = 0;
     for (const r of due || []) {
       const out = await generate(supabase, r);
+      if (out.not_found) {
+        await supabase.from('seo_reports').update({ next_due_at: nextDue(r.cadence) }).eq('id', r.id);
+      }
       if (out.ok) sent++; else failed++;
     }
     return json({ ok: true, sent, failed });
@@ -165,5 +174,6 @@ Deno.serve(withApiLogging('seo-reports', async (req: Request) => {
   if (!ent.ok) return ent.response;
 
   const out = await generate(supabase, report);
+  if (out.not_found) return json({ error: 'Report not found' }, 404);
   return json(out, out.ok ? 200 : 502);
 }));

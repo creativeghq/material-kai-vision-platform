@@ -7,7 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import {
   parseCsv, parseStatement, sniffDelimiter, statementRefs, type StatementMapping,
@@ -22,7 +22,7 @@ const json = (body: unknown, status = 200) =>
 
 interface Account { id: string; workspace_id: string; name: string; currency: string | null; feed_kind: string }
 
-/** The account, proven to be in a workspace the caller belongs to. */
+/** The account, proven to be in a workspace where the caller may write finance records. */
 async function loadAccount(db: DbClient, userId: string, accountId: string): Promise<Account> {
   const { data, error } = await db
     .from('finance_bank_accounts')
@@ -34,13 +34,9 @@ async function loadAccount(db: DbClient, userId: string, accountId: string): Pro
   // 404 on a foreign account, never 403 — a 403 confirms the id exists (invariant 1).
   if (!acct) throw new HttpError(404, 'Not found');
 
-  const { data: member } = await db
-    .from('workspace_members')
-    .select('user_id')
-    .eq('workspace_id', acct.workspace_id)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (!member) throw new HttpError(404, 'Not found');
+  if (!(await userHasWorkspaceCapability(db, userId, acct.workspace_id, 'finance.operate'))) {
+    throw new HttpError(404, 'Not found');
+  }
   return acct;
 }
 

@@ -5,6 +5,7 @@ import { authenticate, getUserId, userHasWorkspaceCapability } from '../_shared/
 import { resolveSecret } from '../_shared/secrets.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { assertEntitled } from '../_shared/entitlement.ts';
 // One source (#391) — the generated mirror.
 import { PAGE_WATCH_CATEGORIES } from '../_shared/pageWatchVocabulary.generated.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -13,6 +14,8 @@ import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 
 const FIRECRAWL_BASE = 'https://api.firecrawl.dev';
 const MODULE_SLUG = 'page-monitoring';
+/** Every active watch is a recurring Firecrawl spend, so a workspace holds a bounded number. */
+const MAX_ACTIVE_WATCHES_PER_WORKSPACE = 25;
 
 /**
  * How often a watch runs. The key is what we store and show; the value is what
@@ -157,6 +160,20 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
     // 404 not 403 — a 403 confirms the workspace exists (invariant 1).
     throw new HttpError(404, 'Not found');
   }
+  const ent = await assertEntitled(supabase, workspaceId, MODULE_SLUG);
+  if (!ent.ok) return ent.response;
+
+  async function assertUnderWatchCap(): Promise<void> {
+    const { count, error } = await supabase
+      .from('page_watches')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true);
+    if (error) throw new HttpError(503, 'Could not verify the watch limit right now. Please try again.');
+    if ((count ?? 0) >= MAX_ACTIVE_WATCHES_PER_WORKSPACE) {
+      throw new HttpError(400, `A workspace may run at most ${MAX_ACTIVE_WATCHES_PER_WORKSPACE} active page watches.`);
+    }
+  }
 
   const apiKeySecret = await resolveSecret(supabase, 'FIRECRAWL_API_KEY');
   const webhookSecret = await resolveSecret(supabase, 'FIRECRAWL_WEBHOOK_SECRET');
@@ -232,6 +249,7 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
       const name = String(body.name ?? '').trim();
       const rawUrl = String(body.url ?? '').trim();
       if (!name) throw new HttpError(400, 'name is required');
+      await assertUnderWatchCap();
 
       // Invariant 7. We never fetch this URL ourselves — Firecrawl does — but a
       // stored URL is validated at write time regardless: it stops an internal
@@ -346,7 +364,10 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
         patch.schedule_text = next;
       }
       if (typeof body.timezone === 'string' && body.timezone.trim()) patch.timezone = body.timezone.trim().slice(0, 64);
-      if (typeof body.is_active === 'boolean') patch.is_active = body.is_active;
+      if (typeof body.is_active === 'boolean') {
+        if (body.is_active && !watch.is_active) await assertUnderWatchCap();
+        patch.is_active = body.is_active;
+      }
       if (CATEGORIES.has(String(body.category))) patch.category = String(body.category);
 
       const { data: updated } = await supabase

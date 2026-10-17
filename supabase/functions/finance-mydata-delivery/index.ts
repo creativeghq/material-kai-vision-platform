@@ -5,10 +5,11 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import {
-  MYDATA_PRODUCTION_BASE, buildDeliveryRequest, deliveryRequestProblems, matchHistoryEvent,
+  buildDeliveryRequest, deliveryRequestProblems, matchHistoryEvent,
   normalizeVat, parseDeliveryResponse, parseDeliveryStatus,
   type DeliveryEventForFiling, type DeliveryNoteForFiling,
 } from '../_shared/fiscal/delivery-lifecycle.ts';
+import { MydataEndpointRefused, mydataFetch, resolveMydataBase } from '../_shared/aade/mydata-endpoint.ts';
 
 const CALL_TIMEOUT_MS = 45_000;
 const RECONCILE_AFTER_MS = 2 * 60_000;
@@ -36,7 +37,14 @@ function aadeHeaders(creds: Creds): Record<string, string> {
   };
 }
 
-const baseOf = (creds: Creds) => (creds.base_url || MYDATA_PRODUCTION_BASE).replace(/\/+$/, '');
+async function baseOf(creds: Creds): Promise<string> {
+  try {
+    return await resolveMydataBase(creds.base_url);
+  } catch (e) {
+    if (e instanceof MydataEndpointRefused) throw new HttpError(400, e.message);
+    throw e;
+  }
+}
 
 async function loadNote(service: any, noteId: string) {
   const { data } = await service
@@ -53,17 +61,21 @@ async function ourVatFor(service: any, workspaceId: string): Promise<string> {
 }
 
 async function fetchStatus(creds: Creds, mark: string) {
-  const res = await fetch(`${baseOf(creds)}/GetDeliveryNoteStatus?mark=${encodeURIComponent(mark)}`, {
+  const base = await baseOf(creds);
+  const res = await mydataFetch(`${base}/GetDeliveryNoteStatus?mark=${encodeURIComponent(mark)}`, {
     method: 'GET',
     headers: aadeHeaders(creds),
     signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+  }).catch((e) => {
+    if (e instanceof MydataEndpointRefused) throw new HttpError(502, e.message);
+    throw e;
   });
-  const text = await res.text().catch(() => '');
   if (!res.ok) {
+    await res.body?.cancel();
     throw new HttpError(res.status === 401 || res.status === 403 ? 400 : 502,
-      `AADE GetDeliveryNoteStatus answered HTTP ${res.status}: ${text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300)}`);
+      `AADE GetDeliveryNoteStatus answered HTTP ${res.status}.`);
   }
-  return parseDeliveryStatus(text);
+  return parseDeliveryStatus(await res.text().catch(() => ''));
 }
 
 Deno.serve(withApiLogging('finance-mydata-delivery', async (req) => {
@@ -189,6 +201,7 @@ Deno.serve(withApiLogging('finance-mydata-delivery', async (req) => {
   if (problems.length) throw new HttpError(400, problems.join(' '));
   const request = buildDeliveryRequest(event, note);
   const creds = await credentialsFor(service, workspaceId);
+  const base = await baseOf(creds);
 
   const token = crypto.randomUUID();
   const claimedAt = new Date().toISOString();
@@ -204,7 +217,7 @@ Deno.serve(withApiLogging('finance-mydata-delivery', async (req) => {
   let httpStatus = 0;
   let text = '';
   try {
-    const res = await fetch(`${baseOf(creds)}/${request.method}`, {
+    const res = await mydataFetch(`${base}/${request.method}`, {
       method: 'POST',
       headers: { ...aadeHeaders(creds), 'Content-Type': 'application/xml' },
       body: request.body,

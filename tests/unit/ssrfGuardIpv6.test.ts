@@ -61,4 +61,37 @@ describe('ssrf-guard blocks internal destinations however they are spelled', () 
     await expect(assertSafeUrl('http://[::7f00:1]/')).rejects.toThrow(/Blocked/);
     await expect(assertSafeUrl('http://0x7f.1/')).rejects.toThrow(/Blocked/);
   });
+
+  it('blocks the IETF protocol and benchmarking v4 ranges', () => {
+    for (const ip of ['192.0.0.1', '192.0.0.255', '198.19.255.255']) {
+      expect(ipv4IsBlocked(ip)).toBe(true);
+    }
+  });
+});
+
+describe('ssrf-guard DNS resolution', () => {
+  const g = globalThis as unknown as { Deno?: unknown };
+  const withResolver = async (resolveDns: (h: string, t: string) => Promise<string[]>, fn: () => Promise<void>) => {
+    const prev = g.Deno;
+    g.Deno = { resolveDns };
+    try { await fn(); } finally { g.Deno = prev; }
+  };
+
+  it('fails closed when no record resolves', async () => {
+    await withResolver(() => Promise.reject(new Error('resolver down')), async () => {
+      await expect(assertSafeUrl('https://example.com/')).rejects.toThrow(/did not resolve/);
+    });
+  });
+
+  it('refuses a name that resolves to a blocked address', async () => {
+    await withResolver((_h, t) => Promise.resolve(t === 'A' ? ['93.184.216.34'] : ['::ffff:a9fe:a9fe']), async () => {
+      await expect(assertSafeUrl('https://example.com/')).rejects.toThrow(/blocked address/);
+    });
+  });
+
+  it('allows a name that resolves only to public addresses', async () => {
+    await withResolver((_h, t) => Promise.resolve(t === 'A' ? ['93.184.216.34'] : []), async () => {
+      await expect(assertSafeUrl('https://example.com/')).resolves.toBe('https://example.com/');
+    });
+  });
 });

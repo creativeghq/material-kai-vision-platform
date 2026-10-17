@@ -589,6 +589,9 @@ interface MatchResult {
  * construction. Fail closed: an unresolved tenant withholds access, it does not widen it.
  */
 async function resolveEmailMatch(supabase: any, catalogId: string, email: string, workspaceId: string | null): Promise<MatchResult> {
+  if (!isLikelyEmail(email)) {
+    return { granted: false, kind: 'denied', userId: null, crmContactId: null, crmCompanyId: null, grantId: null };
+  }
   const emailPattern = escapeLike(email);
   if (workspaceId) {
     // Check 1: platform user who is a member of the catalog's workspace
@@ -645,12 +648,15 @@ function generateToken(): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Matchers compare case-insensitively via `.ilike` on `escapeLike` of this form, so a typed `%`/`_` cannot widen it. */
+/** Matchers compare case-insensitively via `.ilike`; with `%*\` refused and `_` escaped, that is exact equality. */
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+const LIKE_PATTERN_CHARS = /[%*\\]/;
+
+/** PostgREST reads `*` as `%` inside a like filter, which `escapeLike` does not cover. `_` is a real email character and stays escaped. */
 function isLikelyEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return !LIKE_PATTERN_CHARS.test(email) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 

@@ -56,7 +56,7 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
     return jsonResponse({ success: false, error: 'Post and social account are not in the same workspace' }, 403);
   }
   if (!(await userHasWorkspaceCapability(supabase, auth.user.id, post.workspace_id, 'marketing.seo'))) {
-    return jsonResponse({ success: false, error: 'You are not a member of this workspace' }, 403);
+    return jsonResponse({ success: false, error: 'Post not found' }, 404);
   }
 
   // Publishing consumes the platform's Zernio subscription — paid module (#212).
