@@ -39,6 +39,7 @@ import { Progress } from '@/components/core/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   CheckCircle2,
+  MinusCircle,
   Circle,
   Loader2,
   AlertTriangle,
@@ -237,7 +238,7 @@ interface OptimizeData {
 
 // Matches ContentAnalysisResult.sectionScores[key]
 interface SectionScore {
-  status: 'all_good' | 'issues_found';
+  status: 'all_good' | 'issues_found' | 'not_checked';
   issueCount: number;
   details: string[];
 }
@@ -810,13 +811,17 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
               <div className="flex items-center gap-2">
                 {section.status === 'all_good' ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                ) : section.status === 'not_checked' ? (
+                  <MinusCircle className="w-4 h-4 text-muted-foreground" />
                 ) : (
                   <AlertTriangle className="w-4 h-4 text-amber-800 dark:text-amber-400" />
                 )}
                 <span className="text-sm font-medium">{section.name}</span>
               </div>
               <div className="flex items-center gap-2">
-                {section.issueCount > 0 ? (
+                {section.status === 'not_checked' ? (
+                  <span className="text-xs text-muted-foreground">Not checked</span>
+                ) : section.issueCount > 0 ? (
                   <Badge variant="secondary" className="text-xs">
                     {section.issueCount} issue{section.issueCount > 1 ? 's' : ''}
                   </Badge>
