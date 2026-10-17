@@ -120,7 +120,7 @@ export const createManageStockTool = (
   }
 
   return tool(
-    async ({ action, item_id, item_query, direction, quantity, reason, to_warehouse_id, warehouse_query, pending_id, project_id, project_name }: any) => {
+    async ({ action, item_id, item_query, direction, quantity, reason, to_warehouse_id, warehouse_query, pending_id, project_id, project_name, confirm }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -286,6 +286,23 @@ export const createManageStockTool = (
 
       if (action === 'approve_pending' || action === 'dismiss_pending') {
         if (!pending_id) return JSON.stringify({ success: false, error: 'pending_id is required (get it from list_pending).' });
+        // Rule 6: the intake queue is real deliveries a person works. The agent proposes; the user decides.
+        if (confirm !== true) {
+          const approving = action === 'approve_pending';
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'manage_stock',
+            input: { action, pending_id },
+            title: approving ? 'Add this delivery line to stock?' : 'Dismiss this pending delivery line?',
+            summary: approving
+              ? 'Approving books the pending intake item into the warehouse catalog and stock.'
+              : 'Dismissing removes the pending intake item from the queue.',
+            danger: approving,
+            toolkit_id: 'stock',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user approval. Do not retry.' });
+        }
         const res = await callStockApi(jwt!, ws, action === 'approve_pending' ? 'approve-pending' : 'dismiss-pending', { pending_id: String(pending_id) });
         if (!res.ok) return JSON.stringify({ success: false, error: res.error });
         onChunk?.({ type: 'stock_pending_resolved', pending_id, action, timestamp: Date.now() });
@@ -345,6 +362,7 @@ export const createManageStockTool = (
         to_warehouse_id: z.string().uuid().optional().describe('Destination warehouse id (transfer).'),
         warehouse_query: z.string().optional().describe('Fuzzy destination warehouse name/code to resolve (transfer).'),
         pending_id: z.string().uuid().optional().describe('Pending intake item id (approve_pending / dismiss_pending).'),
+        confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
         project_id: z.string().uuid().optional().describe('project_holds: the project id.'),
         project_name: z.string().optional().describe('project_holds: project name fragment to resolve when you have no id.'),
       }),

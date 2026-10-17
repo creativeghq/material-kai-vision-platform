@@ -77,6 +77,7 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   { name: 'finance-pay-invoice', reason: 'Opens a payment session against an invoice.' },
   { name: 'stripe-api', reason: 'Moves real money through the Stripe account, and changes the workspace payment account.' },
   { name: 'revolut-api', reason: 'Acts directly on the business bank account.' },
+  { name: 'stock-api', reason: 'Approves pending intake into stock and moves quantities — the intake queue is worked by a person (rule 6).' },
   {
     name: 'store-api',
     reason: 'Pulls and creates orders in bulk from the merchant\'s own store, accepts or rejects a real Skroutz order '

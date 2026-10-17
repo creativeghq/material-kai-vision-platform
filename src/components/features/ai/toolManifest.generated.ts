@@ -1464,6 +1464,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'to_warehouse_id', type: 'string', optional: true, description: 'Destination warehouse id (transfer).' },
       { name: 'warehouse_query', type: 'string', optional: true, description: 'Fuzzy destination warehouse name/code to resolve (transfer).' },
       { name: 'pending_id', type: 'string', optional: true, description: 'Pending intake item id (approve_pending / dismiss_pending).' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
       { name: 'project_id', type: 'string', optional: true, description: 'project_holds: the project id.' },
       { name: 'project_name', type: 'string', optional: true, description: 'project_holds: project name fragment to resolve when you have no id.' },
     ],
