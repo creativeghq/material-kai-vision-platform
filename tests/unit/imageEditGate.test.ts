@@ -166,3 +166,13 @@ describe('multimodal blocks the agent sends', () => {
     expect(src).toMatch(/type:\s*'document'/);
   });
 });
+
+describe('region edit is gated like every other edit (#483 H1)', () => {
+  it('calls assertEditableSource before it debits', () => {
+    const src = stripComments(readFileSync(join(__dirname, '..', '..', 'supabase', 'functions', 'generate-region-edit', 'index.ts'), 'utf8'));
+    const gateAt = src.indexOf('assertEditableSource(');
+    const debitAt = src.indexOf("rpc('debit_credits'");
+    expect(gateAt).toBeGreaterThan(-1);
+    expect(debitAt).toBeGreaterThan(gateAt);
+  });
+});

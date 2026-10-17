@@ -50,14 +50,27 @@ export const GENERATION_OUTPUT_PREFIXES = [
   'virtual-staging',  // generate-virtual-staging
 ] as const;
 
+function hostOf(url: string): string {
+  try { return new URL(url).host; } catch { return ''; }
+}
+
 /** Did THIS platform generate the image at `url`? */
-export function isPlatformGeneratedImage(url: string | undefined): boolean {
-  if (!url) return false;
-  const marker = '/generation-images/';
-  const i = url.indexOf(marker);
-  if (i === -1) return false;
-  // Drop any query string (signed-URL params) before matching.
-  const key = url.slice(i + marker.length).split('?')[0];
+export function isPlatformGeneratedImage(
+  url: string | undefined,
+  storageHost: string = hostOf(
+    (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get('SUPABASE_URL') ?? '',
+  ),
+): boolean {
+  if (!url || !storageHost) return false;
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return false; }
+  // Our own storage host and object path only: a marker anywhere else in a URL proves nothing.
+  if (parsed.protocol !== 'https:' || parsed.host !== storageHost) return false;
+  const m = parsed.pathname.match(/^\/storage\/v1\/object\/(?:public|sign|authenticated)\/generation-images\/(.+)$/);
+  if (!m) return false;
+  let key: string;
+  try { key = decodeURIComponent(m[1]); } catch { return false; }
+  if (key.split('/').some((seg) => seg === '..' || seg === '.')) return false;
 
   // Session layout: u/{user}/sessions/{conversation}/gen/{file}. `uploads/` is the user's own
   // attachment and must NOT match.

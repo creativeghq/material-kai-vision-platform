@@ -6,7 +6,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { editImageWithGrok } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
+import { resolveOutputPath, isPlatformGeneratedImage, type SessionPathCtx } from '../_shared/storage-paths.ts';
+import { assertEditableSource } from '../_shared/image-edit-gate.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
@@ -118,6 +119,15 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
   if (!body.image_url) return jsonResponse({ success: false, error: 'image_url is required' }, 400);
   if (!body.mask_data_url) return jsonResponse({ success: false, error: 'mask_data_url is required' }, 400);
   if (!body.prompt?.trim()) return jsonResponse({ success: false, error: 'prompt is required' }, 400);
+
+  // Invariant 9b: the source artefact is gated before any debit, exactly as the gemini edit modes are.
+  const gate = await assertEditableSource(
+    supabase, body.image_url, body.prompt, isPlatformGeneratedImage(body.image_url), userId, body.workspace_id ?? null,
+  );
+  if (!gate.allowed) {
+    console.warn(`[generate-region-edit] edit refused (${gate.documentKind ?? 'unknown'}) user=${userId}`);
+    return jsonResponse({ success: false, error: gate.message, refused: true }, 422);
+  }
 
   const jobId = crypto.randomUUID();
 
