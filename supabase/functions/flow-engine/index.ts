@@ -685,17 +685,12 @@ async function executeAction(
     }
 
     case 'build_quote': {
-      // Look up the user's workspace_id so the quote isn't orphaned
-      let workspaceId: string | null = null;
-      if (resolved.user_id) {
-        const { data: member } = await supabase
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', resolved.user_id)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        workspaceId = member?.workspace_id ?? null;
+      // The flow's own workspace, else the event's — never a guess from the user's memberships.
+      const eventWs = (context.trigger as { data?: Record<string, unknown> } | undefined)?.data?.workspace_id;
+      const workspaceId = (!scope?.isGlobal && scope?.workspaceId) || (typeof eventWs === 'string' && eventWs ? eventWs : null);
+      if (!workspaceId) throw new Error('Build quote failed: neither the automation nor its event names a workspace');
+      if (resolved.user_id && !(await userHasWorkspaceCapability(supabase, String(resolved.user_id), workspaceId, 'quotes.use'))) {
+        throw new Error('Build quote failed: the quote owner cannot use quotes in that workspace');
       }
 
       const { data, error } = await supabase.from('quotes').insert({

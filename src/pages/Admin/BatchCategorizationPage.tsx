@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 interface CategorizeResult {
   id: string;
@@ -35,7 +36,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const [uncategorizedCount, setUncategorizedCount] = useState<number | null>(null);
   const [onlyUncategorized, setOnlyUncategorized] = useState(true);
   const [limit, setLimit] = useState(200);
@@ -47,33 +48,19 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
     setApiUrl(MIVAA_API_URL);
   }, []);
 
-  // Fetch workspace and uncategorized count
   useEffect(() => {
-    if (!user) return;
+    if (!user || !workspaceId) return;
     const load = async () => {
-      const { data: wm } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (!wm) return;
-      setWorkspaceId(wm.workspace_id);
-
-      // Count products missing material_category
       const { count } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', wm.workspace_id)
+        .eq('workspace_id', workspaceId)
         .or('metadata->material_category.is.null,metadata->>material_category.eq.');
 
       setUncategorizedCount(count ?? 0);
     };
     load();
-  }, [user]);
+  }, [user, workspaceId]);
 
   const runBatch = async () => {
     if (!workspaceId || !apiUrl) {

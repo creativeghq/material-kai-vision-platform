@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLES } from '@/auth/roles';
 import { workspaceManagementService, REFERRAL_STORAGE_KEY, INVITE_STORAGE_KEY } from '@/services/workspaceManagementService';
-import { ACTIVE_WORKSPACE_KEY } from '@/utils/activeWorkspace';
+import { ACTIVE_WORKSPACE_KEY, setRequestWorkspaceId } from '@/utils/activeWorkspace';
 import { toast } from 'sonner';
 
 /**
@@ -99,6 +99,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [memberships, setMemberships] = useState<WorkspaceMembership[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [accountRole, setAccountRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRequestWorkspaceId(activeWorkspaceId);
+  }, [activeWorkspaceId]);
 
   const load = useCallback(async () => {
     if (!user) {

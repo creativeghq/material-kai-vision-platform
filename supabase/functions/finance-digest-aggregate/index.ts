@@ -4,7 +4,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { formatMoney } from '../_shared/money.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
-import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, listWorkspaceIdsWithCapability, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -448,13 +448,9 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
     const nb = body as NowBody;
     let workspaceId = nb.workspace_id;
     if (!workspaceId) {
-      const { data: m } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', auth.userId)
-        .eq('status', 'active')
-        .limit(1).maybeSingle();
-      workspaceId = m?.workspace_id;
+      const runnable = await listWorkspaceIdsWithCapability(supabase, auth.userId, 'finance.operate');
+      if (runnable.length > 1) return json({ error: 'workspace_id is required: you run finance in more than one workspace' }, 400);
+      workspaceId = runnable[0];
     }
     if (!workspaceId) return json({ error: 'no workspace' }, 400);
 

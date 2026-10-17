@@ -1,7 +1,4 @@
-// Shared accessor for the active workspace id that WorkspaceContext persists.
-// Lets non-hook code (services) stamp new rows with the workspace the user is
-// actually in, instead of relying on the server-side root default. The durable
-// fix is an X-Workspace-Id header / JWT claim; this closes the gap client-side.
+// Shared accessor for the active workspace id that WorkspaceContext persists, for non-hook code.
 
 export const ACTIVE_WORKSPACE_KEY = (userId: string) => `mk_active_workspace_${userId}`;
 
@@ -12,4 +9,15 @@ export function getActiveWorkspaceId(userId: string | null | undefined): string 
   } catch {
     return null;
   }
+}
+
+let requestWorkspaceId: string | null = null;
+
+/** Set by WorkspaceContext; sent as `x-workspace-id` on PostgREST calls, where `stamp_workspace_id` reads it. */
+export function setRequestWorkspaceId(id: string | null): void {
+  requestWorkspaceId = id;
+}
+
+export function getRequestWorkspaceId(): string | null {
+  return requestWorkspaceId;
 }

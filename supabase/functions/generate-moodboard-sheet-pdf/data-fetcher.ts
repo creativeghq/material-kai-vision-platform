@@ -100,16 +100,9 @@ export async function resolveBrandingWorkspaceId(
     if (wsId) return wsId;
   }
   if (userId) {
-    const { data } = await supabase
-      .from('workspace_members')
-      // `joined_at`, not `created_at` — workspace_members has no created_at, so both the
-      // projection and the ordering named a column that is not there and the query returned
-      // nothing. Membership order is by when they joined, which is what this wanted.
-      .select('workspace_id, joined_at')
-      .eq('user_id', userId)
-      .order('joined_at', { ascending: true })
-      .limit(1);
-    const wsId = (data as Array<{ workspace_id?: string }> | null)?.[0]?.workspace_id;
+    // No project: brand as the business the owner invoices as — the same answer as Profile → Business.
+    const { data } = await supabase.rpc('user_business_identity', { p_user_id: userId });
+    const wsId = (data as { invoicing_workspace_id?: string } | null)?.invoicing_workspace_id;
     if (wsId) return wsId;
   }
   return undefined;

@@ -54,6 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 // ── Batch Categorization types ──────────────────────────────────────────────
 interface CategorizeResult {
@@ -426,7 +427,7 @@ export const MetadataManagement: React.FC = () => {
   };
 
   // ── Batch Categorization state ──────────────────────────────────────────
-  const [batchWorkspaceId, setBatchWorkspaceId] = useState<string | null>(null);
+  const { activeWorkspaceId: batchWorkspaceId } = useWorkspace();
   const [uncategorizedCount, setUncategorizedCount] = useState<number | null>(null);
   const [onlyUncategorized, setOnlyUncategorized] = useState(true);
   const [batchLimit, setBatchLimit] = useState(200);
@@ -439,27 +440,17 @@ export const MetadataManagement: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !batchWorkspaceId) return;
     const load = async () => {
-      const { data: wm } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .single();
-      if (!wm) return;
-      setBatchWorkspaceId(wm.workspace_id);
       const { count } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', wm.workspace_id)
+        .eq('workspace_id', batchWorkspaceId)
         .or('metadata->material_category.is.null,metadata->>material_category.eq.');
       setUncategorizedCount(count ?? 0);
     };
     load();
-  }, [user]);
+  }, [user, batchWorkspaceId]);
 
   const runBatch = async () => {
     if (!batchWorkspaceId || !batchApiUrl) {

@@ -54,6 +54,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveUploadPath } from '@/utils/storagePaths';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { agentChatHistoryService, ChatConversation, SaveMessageOptions } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useVoiceRecording } from '@/hooks/useVoiceRecording';
@@ -1145,7 +1146,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
+  const { activeWorkspaceId } = useWorkspace();
+  const workspaceId = activeWorkspaceId ?? undefined;
   // First name for the agent's confirmations ("Done, Maria!"). Empty when the
   // profile has no name — the greeting drops the comma rather than addressing
   // anyone as "there". `user_profiles.full_name` can be null (the owner account
@@ -1827,7 +1829,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     },
   });
 
-  // Get current user ID and workspace
   useEffect(() => {
     const fetchUserId = async () => {
       const {
@@ -1835,16 +1836,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        // workspace_id lives in workspace_members, not user_metadata
-        const { data: memberRow } = await supabase
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        setWorkspaceId(memberRow?.workspace_id ?? user.user_metadata?.workspace_id);
         const { data: profileRow } = await supabase
           .from('user_profiles')
           .select('full_name')
@@ -2714,9 +2705,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         // Tell the agent which workspace to act in — the switcher-active one — so a
         // multi-workspace user's chat writes land in the workspace they're viewing.
         // The server validates this against membership before trusting it.
-        requestBody.workspace_id = getActiveWorkspaceId(session.user?.id)
-          ?? workspaceId
-          ?? session.user?.user_metadata?.workspace_id;
+        requestBody.workspace_id = getActiveWorkspaceId(session.user?.id) ?? workspaceId;
 
         // Get Supabase URL from the client
         const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
@@ -7478,7 +7467,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   image_url: result.imageUrl,
                   mask_data_url: result.maskDataUrl,
                   prompt: result.prompt,
-                  workspace_id: getActiveWorkspaceId(session.user?.id) ?? session.user?.user_metadata?.workspace_id,
+                  workspace_id: getActiveWorkspaceId(session.user?.id) ?? workspaceId,
                   conversation_id: conversationIdRef.current ?? undefined,
                 }),
               });

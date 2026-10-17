@@ -28,7 +28,6 @@ import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { UnifiedSearchService, type SearchResult as ServiceSearchResult } from '@/services/unifiedSearchService';
 import { trackSearchImpression, trackSearchClick } from '@/services/manufacturerAnalyticsService';
-import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { FilterBar, useFilters, type FilterValues } from '@/components/core/filters';
 import { buildMaterialSearchFilters } from '@/components/features/search/materialSearchFilters';
@@ -286,17 +285,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     setActiveQuery(IMAGE_MODES.includes(searchType) ? (selectedImage?.name ?? '') : effectiveQuery.trim());
 
     try {
-      // Prefer the active workspace (switcher-aware); fall back to a membership lookup.
-      let workspaceId = activeWorkspaceId;
+      const workspaceId = activeWorkspaceId;
       if (!workspaceId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
-        const { data: wd } = await supabase
-          .from('workspace_members').select('workspace_id').eq('user_id', user.id).maybeSingle();
-        workspaceId = wd?.workspace_id ?? null;
-      }
-      if (!workspaceId) {
-        throw new Error('No workspace found for user');
+        throw new Error('Your workspace is still loading — try the search again in a moment');
       }
 
       let searchResponse;
@@ -379,17 +370,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       impressedRef.current = new Set();
       setActiveQuery(searchQuery.trim());
       try {
-        // Prefer the active workspace (switcher-aware); fall back to a membership lookup.
-        let workspaceId = activeWorkspaceId;
+        const workspaceId = activeWorkspaceId;
         if (!workspaceId) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error('User not authenticated');
-          const { data: wd } = await supabase
-            .from('workspace_members').select('workspace_id').eq('user_id', user.id).maybeSingle();
-          workspaceId = wd?.workspace_id ?? null;
-        }
-        if (!workspaceId) {
-          throw new Error('No workspace found for user');
+          throw new Error('Your workspace is still loading — try the search again in a moment');
         }
 
         // Quick text-based search using multi_vector strategy

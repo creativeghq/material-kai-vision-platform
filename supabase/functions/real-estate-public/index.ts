@@ -333,8 +333,17 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     const userId = String(body?.user_id ?? '').trim();
     let workspaceId = wsId;
     if (!workspaceId && userId) {
-      const { data: owned } = await supabase.from('workspace_members').select('workspace_id').eq('user_id', userId).eq('role', 'owner').eq('status', 'active').limit(1).maybeSingle();
-      workspaceId = owned?.workspace_id ?? '';
+      // Only an owned agency with public stock can receive the lead; two of those is ambiguous, never a guess.
+      const { data: owned } = await supabase.from('workspace_members').select('workspace_id').eq('user_id', userId).eq('role', 'owner').eq('status', 'active');
+      const ownedIds = (owned ?? []).map((m: { workspace_id: string }) => m.workspace_id);
+      const { data: listed } = ownedIds.length
+        ? await supabase.from('properties').select('workspace_id').in('workspace_id', ownedIds)
+          .eq('is_public', true).eq('listing_status', 'active')
+        : { data: [] };
+      const agencies = [...new Set((listed ?? []).map((p: { workspace_id: string }) => p.workspace_id))];
+      if (agencies.length > 1) return json({ error: 'workspace_id is required: this agent runs more than one agency' }, 400);
+      if (!agencies.length) return json({ error: 'Not found' }, 404);
+      workspaceId = agencies[0];
     }
     if (!workspaceId) return json({ error: 'workspace_id or user_id is required' }, 400);
 

@@ -49,6 +49,7 @@ import {
   KnowledgeBaseService,
 } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { slugifyKbTitle } from '@/utils/kbSlug';
 
 // Agents that consume the Knowledge Base via agent KB search. Used by the
@@ -93,12 +94,19 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [activeTab, setActiveTab] = useState('edit');
 
   const { toast } = useToast();
+  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
 
-  // Load workspace + categories on mount
   useEffect(() => {
-    loadWorkspace();
     loadCategories();
   }, []);
+
+  /** A document is filed under the workspace on screen (#365 `AD-42`, #496). */
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    setWorkspaceId(activeWorkspaceId);
+    setWorkspaceName(activeWorkspace?.name ?? null);
+    setDocument((prev) => ({ ...prev, workspace_id: activeWorkspaceId }));
+  }, [activeWorkspaceId, activeWorkspace?.name]);
 
   // Load document only once workspaceId is known (avoids race condition)
   useEffect(() => {
@@ -106,42 +114,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       loadDocument();
     }
   }, [documentId, workspaceId]);
-
-  /** Which workspace this document is filed under (#365 `AD-42`). */
-  const loadWorkspace = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: membership, error } = await supabase
-        .from('workspace_members')
-        .select('workspace_id, joined_at, workspaces(name)')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: false })
-        .limit(1);
-
-      if (error) {
-        console.error('Failed to resolve workspace:', error);
-        return;
-      }
-      const row = (membership ?? [])[0] as
-        | { workspace_id: string; workspaces?: { name?: string } | null }
-        | undefined;
-      if (!row) {
-        // No active membership. Leaving workspaceId null is correct — the save path is gated on
-        // it, so nothing is written to an arbitrary tenant.
-        console.warn('[DocumentEditor] no active workspace membership for this user');
-        return;
-      }
-
-      setWorkspaceId(row.workspace_id);
-      setWorkspaceName(row.workspaces?.name ?? null);
-      setDocument((prev) => ({ ...prev, workspace_id: row.workspace_id }));
-    } catch (error) {
-      console.error('Failed to load workspace:', error);
-    }
-  };
 
   const loadCategories = async () => {
     try {

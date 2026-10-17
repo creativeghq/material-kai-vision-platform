@@ -328,19 +328,32 @@ async function validatePartnerApiKey(
       };
     }
 
-    // Resolve workspace via oldest active membership — matches the MIVAA Python pattern
-    // in price_lookup_routes._resolve_workspace_for_user
+    // The key acts in api_keys.workspace_id, and only while its owner is still an active member there.
+    // A legacy key with no workspace resolves only when the owner has exactly one (#496).
     let workspaceId: string | null = null;
     if (row.user_id) {
-      const { data: mem } = await adminClient
+      const { data: mems } = await adminClient
         .from('workspace_members')
         .select('workspace_id')
         .eq('user_id', row.user_id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      workspaceId = mem?.workspace_id ?? null;
+        .eq('status', 'active');
+      const ids: string[] = (mems ?? []).map((m: { workspace_id: string }) => m.workspace_id);
+      if (row.workspace_id) {
+        if (!ids.includes(row.workspace_id)) {
+          return {
+            success: false,
+            level: 'none',
+            user: null,
+            userId: null,
+            error: "API key's workspace is no longer accessible",
+            supabase: adminClient,
+            apiKey: null,
+          };
+        }
+        workspaceId = row.workspace_id;
+      } else if (ids.length === 1) {
+        workspaceId = ids[0];
+      }
     }
 
     // Touch last_used_at — fire and forget

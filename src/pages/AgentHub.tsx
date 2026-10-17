@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { AgentHub as AgentHubComponent } from '@/components/features/ai/AgentHub';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { resolveCapabilityHandoff } from '@/config/capabilities';
 
 const AgentHubPage: React.FC = () => {
@@ -61,38 +62,25 @@ const AgentHubPage: React.FC = () => {
   // When arriving via `?capability=` with NO specific action, hand the capability's toolkit to the
   // Hub so it auto-enables it and shows its quick-starts (onboarding) — never a blank chat.
   const initialToolkitId = initialQuickStart ? undefined : capHandoff.toolkitId;
-  const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
+  const { workspaceRole } = useWorkspace();
+  const userRole = (workspaceRole ?? 'member') as 'viewer' | 'member' | 'admin' | 'owner';
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const checkSignedIn = async () => {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) {
-          navigate('/auth');
-          return;
-        }
-
-        // Get user's role from workspace_members
-        const { data: workspaceData } = await supabase
-          .from('workspace_members')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (workspaceData?.role) {
-          setUserRole(workspaceData.role as 'viewer' | 'member' | 'admin' | 'owner');
-        }
+        if (!user) navigate('/auth');
       } catch (error) {
-        console.error('Error fetching user role:', error);
+        console.error('Error checking sign-in:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserRole();
+    checkSignedIn();
   }, [navigate]);
 
   const handleConversationChange = (conversationId: string | null) => {

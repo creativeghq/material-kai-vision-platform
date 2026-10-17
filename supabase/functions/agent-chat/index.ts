@@ -3790,14 +3790,14 @@ async function getUserWorkspaceMembership(
       return { role: 'viewer', workspaceId: null };
     }
 
-    // Honor the client's active workspace (switcher) ONLY if the user is actually a member of it
-    // — a body-supplied id is never trusted blind (CLAUDE.md invariant 1). Otherwise fall back to
-    // the user's first membership (stable; matches prior single-workspace behavior).
+    // Honor the client's active workspace ONLY if the user is a member of it (invariant 1). Without
+    // one, a single membership is unambiguous; several is a guess, so run in none (#496).
     if (preferredWorkspaceId) {
       const match = data.find((m: any) => m.workspace_id === preferredWorkspaceId);
       if (match) return { role: match.role, workspaceId: match.workspace_id };
     }
-    return { role: data[0].role, workspaceId: data[0].workspace_id };
+    if (data.length === 1) return { role: data[0].role, workspaceId: data[0].workspace_id };
+    return { role: 'viewer', workspaceId: null };
   } catch (error) {
     console.error('Error getting workspace membership:', error);
     return { role: 'viewer', workspaceId: null };
