@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
@@ -456,104 +457,112 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, workspaceId, on
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Welcome Message"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Slug</Label>
-              <Input
-                value={formData.slug}
-                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                placeholder="welcome-message"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <Select
-              value={formData.category}
-              onValueChange={(value) => setFormData({ ...formData, category: value as MessageType })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="marketing">Marketing</SelectItem>
-                <SelectItem value="transactional">Transactional</SelectItem>
-                <SelectItem value="otp">OTP</SelectItem>
-                <SelectItem value="notification">Notification</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Description (Optional)</Label>
-            <Input
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Brief description of the template"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Message Content</Label>
-              <span className="text-xs text-muted-foreground">{formData.content.length} chars</span>
-            </div>
-            <Textarea
-              value={formData.content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              placeholder="Hello {{name}}, your order #{{order_id}} has been shipped!"
-              rows={5}
-            />
-            <p className="text-xs text-muted-foreground">
-              Use {'{{variable}}'} for dynamic content. Detected variables: {variables.join(', ') || 'none'}
-            </p>
-          </div>
-
-          {formData.channel_type === 'whatsapp' && (
-            <div className="space-y-2">
-              <Label>Media URL (Optional)</Label>
-              <Input
-                value={formData.media_url}
-                onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
-          )}
-
-          {formData.channel_type === 'whatsapp' && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>WhatsApp Template Name</Label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <FormSection title="Template">
+            <FormGrid>
+              <FormField label="Name" htmlFor="mt-name">
                 <Input
-                  value={formData.whatsapp_template_name}
-                  onChange={(e) => setFormData({ ...formData, whatsapp_template_name: e.target.value })}
-                  placeholder="approved_template_name"
+                  id="mt-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Welcome Message"
                 />
-                <p className="text-xs text-muted-foreground">
-                  {formData.whatsapp_template_name
+              </FormField>
+              <FormField label="Slug" htmlFor="mt-slug">
+                <Input
+                  id="mt-slug"
+                  value={formData.slug}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  placeholder="welcome-message"
+                />
+              </FormField>
+              <FormField label="Category" htmlFor="mt-category">
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value as MessageType })}
+                >
+                  <SelectTrigger id="mt-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="marketing">Marketing</SelectItem>
+                    <SelectItem value="transactional">Transactional</SelectItem>
+                    <SelectItem value="otp">OTP</SelectItem>
+                    <SelectItem value="notification">Notification</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Description" htmlFor="mt-description" optional>
+                <Input
+                  id="mt-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Brief description of the template"
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Message">
+            <FormGrid cols={1}>
+              <FormField
+                label="Message content"
+                htmlFor="mt-content"
+                hint={
+                  <span className="flex justify-between gap-2">
+                    <span>Use {'{{variable}}'} for dynamic content. Detected variables: {variables.join(', ') || 'none'}</span>
+                    <span className="shrink-0">{formData.content.length} chars</span>
+                  </span>
+                }
+              >
+                <Textarea
+                  id="mt-content"
+                  value={formData.content}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  placeholder="Hello {{name}}, your order #{{order_id}} has been shipped!"
+                  rows={5}
+                />
+              </FormField>
+              {formData.channel_type === 'whatsapp' && (
+                <FormField label="Media URL" htmlFor="mt-media" optional>
+                  <Input
+                    id="mt-media"
+                    value={formData.media_url}
+                    onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </FormField>
+              )}
+            </FormGrid>
+          </FormSection>
+
+          {formData.channel_type === 'whatsapp' && (
+            <FormSection title="WhatsApp">
+              <FormGrid>
+                <FormField
+                  label="WhatsApp template name"
+                  htmlFor="mt-wa-name"
+                  hint={formData.whatsapp_template_name
                     ? 'Bound. Cold sends will use this template.'
                     : 'Required for a cold send — WhatsApp refuses an untemplated first message.'}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Language Code</Label>
-                <Input
-                  value={formData.whatsapp_language_code}
-                  onChange={(e) => setFormData({ ...formData, whatsapp_language_code: e.target.value })}
-                  placeholder="en"
-                />
-              </div>
-            </div>
+                >
+                  <Input
+                    id="mt-wa-name"
+                    value={formData.whatsapp_template_name}
+                    onChange={(e) => setFormData({ ...formData, whatsapp_template_name: e.target.value })}
+                    placeholder="approved_template_name"
+                  />
+                </FormField>
+                <FormField label="Language code" htmlFor="mt-wa-lang">
+                  <Input
+                    id="mt-wa-lang"
+                    value={formData.whatsapp_language_code}
+                    onChange={(e) => setFormData({ ...formData, whatsapp_language_code: e.target.value })}
+                    placeholder="en"
+                  />
+                </FormField>
+              </FormGrid>
+            </FormSection>
           )}
 
           {formData.channel_type === 'whatsapp' && (
@@ -579,10 +588,11 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, workspaceId, on
 
           <div className="flex items-center gap-2">
             <Switch
+              id="mt-active"
               checked={formData.is_active}
               onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
             />
-            <Label>Active</Label>
+            <Label htmlFor="mt-active">Active</Label>
           </div>
 
           <DialogFooter>

@@ -5,7 +5,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -184,36 +184,34 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Direction</Label>
-              <Select value={direction} onValueChange={(v) => setDirection(v as PlannedPaymentDirection)} disabled={isEdit}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="out">Outgoing (we pay)</SelectItem>
-                  <SelectItem value="in">Incoming (we expect)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Category</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as PlannedPaymentCategory)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div className="space-y-5">
+          <FormSection title="Payment">
+            <FormGrid>
+              <FormField label="Direction">
+                <Select value={direction} onValueChange={(v) => setDirection(v as PlannedPaymentDirection)} disabled={isEdit}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="out">Outgoing (we pay)</SelectItem>
+                    <SelectItem value="in">Incoming (we expect)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Category">
+                <Select value={category} onValueChange={(v) => setCategory(v as PlannedPaymentCategory)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Title *" className="sm:col-span-2">
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Rent — June 2026" />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div className="space-y-1">
-            <Label>Title *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Rent — June 2026" />
-          </div>
-
-          <div className="space-y-1">
-            <Label>{direction === 'out' ? 'Pay to (CRM)' : 'Expect from (CRM)'}</Label>
+          <FormSection title="Party">
+          <FormField label={direction === 'out' ? 'Pay to (CRM)' : 'Expect from (CRM)'} optional>
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.label}</span>
@@ -244,37 +242,33 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
                   : 'This plan has no party attached.'}
               </p>
             )}
-          </div>
+          </FormField>
+          </FormSection>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label>Amount *</Label>
-              <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency} disabled={isEdit}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EUR">EUR</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="GBP">GBP</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Date *</Label>
-              <Input type="date" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <Label>Reminder date (optional)</Label>
-            <Input type="date" value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-          </div>
+          <FormSection title="Amount and schedule">
+            <FormGrid cols={4}>
+              <FormField label="Amount *">
+                <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              </FormField>
+              <FormField label="Currency">
+                <Select value={currency} onValueChange={setCurrency} disabled={isEdit}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EUR">EUR</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Date *">
+                <Input type="date" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} />
+              </FormField>
+              <FormField label="Reminder date" optional>
+                <Input type="date" value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
+              </FormField>
+            </FormGrid>
+            <FormField label="Notes" optional>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            </FormField>
+          </FormSection>
         </div>
 
         <DialogFooter>

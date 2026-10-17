@@ -498,12 +498,11 @@ export const PhoneNumbersTab: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pn-area">Area code</Label>
+              <Label htmlFor="pn-area">Area code<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
               <Input
                 id="pn-area"
                 value={areaCode}
                 onChange={e => setAreaCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="optional"
                 inputMode="numeric"
               />
             </div>

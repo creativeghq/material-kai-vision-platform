@@ -145,14 +145,14 @@ export const AccessibilityCard: React.FC<{ workspaceId: string }> = ({ workspace
           <p className="text-sm font-medium">Record an assessment</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <Label htmlFor="eaa-date" className="text-[11px]">Assessed on</Label>
+              <Label htmlFor="eaa-date" className="text-xs">Assessed on</Label>
               <Input
                 id="eaa-date" type="date" className="mt-1 h-8 text-xs" value={form.assessed_on}
                 onChange={(e) => setForm((f) => ({ ...f, assessed_on: e.target.value }))}
               />
             </div>
             <div>
-              <Label htmlFor="eaa-funding-source" className="text-[11px]">Funding source, if any</Label>
+              <Label htmlFor="eaa-funding-source" className="text-xs">Funding source, if any</Label>
               <Input
                 id="eaa-funding-source" className="mt-1 h-8 text-xs" value={form.funding_source}
                 onChange={(e) => setForm((f) => ({ ...f, funding_source: e.target.value }))}
@@ -161,14 +161,14 @@ export const AccessibilityCard: React.FC<{ workspaceId: string }> = ({ workspace
             </div>
           </div>
           <div>
-            <Label htmlFor="eaa-conclusion" className="text-[11px]">Conclusion</Label>
+            <Label htmlFor="eaa-conclusion" className="text-xs">Conclusion</Label>
             <Textarea
               id="eaa-conclusion" className="mt-1 text-xs" rows={2} value={form.conclusion}
               onChange={(e) => setForm((f) => ({ ...f, conclusion: e.target.value }))}
             />
           </div>
           <div>
-            <Label htmlFor="eaa-annex" className="text-[11px]">Annex VI documentation</Label>
+            <Label htmlFor="eaa-annex" className="text-xs">Annex VI documentation</Label>
             <Textarea
               id="eaa-annex" className="mt-1 text-xs" rows={2} value={form.annex_vi_documentation}
               onChange={(e) => setForm((f) => ({ ...f, annex_vi_documentation: e.target.value }))}

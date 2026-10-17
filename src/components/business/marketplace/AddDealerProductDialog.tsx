@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -187,12 +188,11 @@ export const AddDealerProductDialog: React.FC<{
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Add Product</DialogTitle></DialogHeader>
 
-        <div className="space-y-4">
-          {/* Basics */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1 col-span-2">
-              <Label>Name *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Calacatta Lux" />
+        <div className="space-y-5">
+          <FormSection title="Product">
+          <FormGrid>
+            <FormField label="Name" htmlFor="dp-name" className="sm:col-span-2">
+              <Input id="dp-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Calacatta Lux" />
               {dupes.length > 0 && (
                 <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 space-y-2">
                   <div className="flex items-start justify-between gap-2">
@@ -233,61 +233,52 @@ export const AddDealerProductDialog: React.FC<{
                   ))}
                 </div>
               )}
-            </div>
-            <div className="space-y-1">
-              <Label>Category</Label>
-              <Input list="dealer-cat-suggestions" value={category} onChange={(e) => setCategory(e.target.value.toLowerCase())} placeholder="tiles, wood…" />
+            </FormField>
+            <FormField label="Category" htmlFor="dp-category" optional>
+              <Input id="dp-category" list="dealer-cat-suggestions" value={category} onChange={(e) => setCategory(e.target.value.toLowerCase())} placeholder="tiles, wood…" />
               <datalist id="dealer-cat-suggestions">
                 {CATEGORY_SUGGESTIONS.map((c) => <option key={c} value={c} />)}
               </datalist>
-            </div>
-            <div className="space-y-1">
-              <Label>SKU</Label>
-              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="optional" />
-            </div>
-            <div className="space-y-1">
-              <Label>Price</Label>
-              <Input type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label>Currency</Label>
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{['EUR', 'USD', 'GBP'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Unit</Label>
-                <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="m², pcs" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Dimensions</Label>
-              <Input value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="60×60 cm" />
-            </div>
-            <div className="space-y-1">
-              <Label>Supply mode</Label>
+            </FormField>
+            <FormField label="SKU" htmlFor="dp-sku" optional>
+              <Input id="dp-sku" value={sku} onChange={(e) => setSku(e.target.value)} />
+            </FormField>
+            <FormField label="Dimensions" htmlFor="dp-dims" optional>
+              <Input id="dp-dims" value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="60×60 cm" />
+            </FormField>
+            <FormField label="Description" htmlFor="dp-desc" optional className="sm:col-span-2">
+              <Textarea id="dp-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+            </FormField>
+          </FormGrid>
+          </FormSection>
+
+          <FormSection title="Price and supply">
+          <FormGrid cols={4}>
+            <FormField label="Price" htmlFor="dp-price" optional>
+              <Input id="dp-price" type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
+            </FormField>
+            <FormField label="Currency" htmlFor="dp-currency">
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger id="dp-currency"><SelectValue /></SelectTrigger>
+                <SelectContent>{['EUR', 'USD', 'GBP'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Unit" htmlFor="dp-unit" optional>
+              <Input id="dp-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="m², pcs" />
+            </FormField>
+            <FormField label="Supply mode" htmlFor="dp-supply">
               <Select value={supplyMode} onValueChange={(v: any) => setSupplyMode(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="dp-supply"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="platform_sold">Platform-sold</SelectItem>
                   <SelectItem value="reference_only">Reference only</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
+            </FormField>
+          </FormGrid>
+          </FormSection>
 
-          <div className="space-y-1">
-            <Label>Description</Label>
-            <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-
-          {/* Dynamic attributes */}
-          <div className="space-y-2 rounded-md border border-border/60 p-3">
-            <div className="text-sm font-medium">
-              Attributes {category && <span className="text-xs text-muted-foreground">— for {category}</span>}
-            </div>
+          <FormSection title="Attributes" description={category ? `For ${category}` : undefined}>
             <div className="grid grid-cols-2 gap-2">
               {attrKeys.map((k) => (
                 <div key={k} className="space-y-1">
@@ -317,11 +308,9 @@ export const AddDealerProductDialog: React.FC<{
                 placeholder="add attribute key…" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }} />
               <Button type="button" size="sm" variant="outline" onClick={addCustom}><Plus className="h-3 w-3" /></Button>
             </div>
-          </div>
+          </FormSection>
 
-          {/* Images */}
-          <div className="space-y-2">
-            <Label className="text-sm">Images</Label>
+          <FormSection title="Images">
             <div className="flex flex-wrap gap-2">
               {files.map((f, i) => (
                 <div key={i} className="relative h-16 w-16 rounded-md overflow-hidden border border-border/60">
@@ -340,7 +329,7 @@ export const AddDealerProductDialog: React.FC<{
             <p className="text-[11px] text-muted-foreground flex items-center gap-1">
               <ImageIcon className="h-3 w-3" /> Images run the full visual-search embedding suite, same as catalog products.
             </p>
-          </div>
+          </FormSection>
         </div>
 
         <DialogFooter>

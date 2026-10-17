@@ -212,18 +212,17 @@ export const OrderCbamCard: React.FC<{
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
-              <Label htmlFor="cbam-entry-date" className="text-[11px]">Entry date</Label>
+              <Label htmlFor="cbam-entry-date" className="text-xs">Entry date</Label>
               <Input
                 id="cbam-entry-date" type="date" value={entryDate}
                 onChange={(e) => setEntryDate(e.target.value)} className="h-9 w-40"
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="cbam-mrn" className="text-[11px]">Declaration / MRN</Label>
+              <Label htmlFor="cbam-mrn" className="text-xs">Declaration / MRN<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
               <Input
                 id="cbam-mrn" value={declarationRef}
-                onChange={(e) => setDeclarationRef(e.target.value)}
-                placeholder="optional" className="h-9 w-56"
+                onChange={(e) => setDeclarationRef(e.target.value)} className="h-9 w-56"
               />
             </div>
             <Button onClick={record} disabled={saving || !entryDate}>

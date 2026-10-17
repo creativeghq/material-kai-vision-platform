@@ -10,7 +10,7 @@ import {
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -390,75 +390,70 @@ const PurchaseItemDialog: React.FC<{
       <DialogContent className="max-w-lg max-h-[88vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{isEdit ? 'Edit purchase item' : 'Add purchase item'}</DialogTitle></DialogHeader>
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label>Type</Label>
-              <Select value={itemType} onValueChange={(v) => setItemType(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PURCHASE_ITEM_TYPES.map(t => <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Room (optional)</Label>
-              <Select value={roomId || '__none'} onValueChange={(v) => setRoomId(v === '__none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none">—</SelectItem>
-                  {rooms.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div className="space-y-5">
+          <FormSection title="Item">
+            <FormGrid>
+              <FormField label="Type" htmlFor="pi-type">
+                <Select value={itemType} onValueChange={(v) => setItemType(v)}>
+                  <SelectTrigger id="pi-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PURCHASE_ITEM_TYPES.map(t => <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Room" htmlFor="pi-room" optional>
+                <Select value={roomId || '__none'} onValueChange={(v) => setRoomId(v === '__none' ? '' : v)}>
+                  <SelectTrigger id="pi-room"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">—</SelectItem>
+                    {rooms.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Name" htmlFor="pi-name" className="sm:col-span-2">
+                <Input id="pi-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={itemType === 'window' ? 'e.g. Living room tilt-turn window' : 'e.g. Master bedroom oak door'} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div className="space-y-1">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={itemType === 'window' ? 'e.g. Living room tilt-turn window' : 'e.g. Master bedroom oak door'} />
-          </div>
-
-          {/* Optional catalog link → real photo */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Link a catalog product for a real photo (optional)</Label>
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-8" placeholder="Search catalog products…" value={query}
-                onChange={(e) => { setQuery(e.target.value); runSearch(e.target.value); }} />
-            </div>
-            {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
-            {results.length > 0 && (
-              <div className="max-h-40 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
-                {results.map(p => (
-                  <button key={p.id} type="button" className="w-full text-left p-2 hover:bg-muted/40" onClick={() => pickProduct(p)}>
-                    <p className="text-sm font-medium truncate">{p.name}</p>
-                    {p.sku && <p className="text-xs text-muted-foreground">{p.sku}</p>}
-                  </button>
-                ))}
+          <FormSection title="Photo">
+            <FormField label="Catalog product" htmlFor="pi-catalog" optional hint="Link a catalog product for a real photo.">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="pi-catalog" className="pl-8" placeholder="Search catalog products…" value={query}
+                  onChange={(e) => { setQuery(e.target.value); runSearch(e.target.value); }} />
               </div>
-            )}
-            {imageUrl && (
-              <div className="flex items-center gap-2 rounded-md border border-white/10 p-2">
-                <img src={imageUrl} alt="design" className="h-12 w-12 rounded object-cover" />
-                <span className="text-xs text-muted-foreground flex-1 truncate">Image attached (catalog photo or generated)</span>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setImageUrl(null)}><X className="h-4 w-4" /></Button>
-              </div>
-            )}
-            {!imageUrl && (
-              <p className="text-[11px] text-muted-foreground">No photo — after saving, use the ✨ button on the row to generate one from the spec.</p>
-            )}
-          </div>
+              {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
+              {results.length > 0 && (
+                <div className="max-h-40 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
+                  {results.map(p => (
+                    <button key={p.id} type="button" className="w-full text-left p-2 hover:bg-muted/40" onClick={() => pickProduct(p)}>
+                      <p className="text-sm font-medium truncate">{p.name}</p>
+                      {p.sku && <p className="text-xs text-muted-foreground">{p.sku}</p>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {imageUrl && (
+                <div className="flex items-center gap-2 rounded-md border border-white/10 p-2">
+                  <img src={imageUrl} alt="design" className="h-12 w-12 rounded object-cover" />
+                  <span className="text-xs text-muted-foreground flex-1 truncate">Image attached (catalog photo or generated)</span>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setImageUrl(null)}><X className="h-4 w-4" /></Button>
+                </div>
+              )}
+              {!imageUrl && (
+                <p className="text-[11px] text-muted-foreground">No photo — after saving, use the ✨ button on the row to generate one from the spec.</p>
+              )}
+            </FormField>
+          </FormSection>
 
-          {/* Spec / measurements */}
-          <div>
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Measurements &amp; spec</Label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
+          <FormSection title="Measurements & spec">
+            <FormGrid>
               {fields.map(f => (
-                <div key={String(f.key)} className="space-y-1">
-                  <Label className="text-xs">{f.label}</Label>
+                <FormField key={String(f.key)} label={f.label} htmlFor={`pi-spec-${String(f.key)}`}>
                   {f.options ? (
                     <Select value={(details[f.key] as string) || '__none'} onValueChange={(v) => setField(f.key, v === '__none' ? '' : v)}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectTrigger id={`pi-spec-${String(f.key)}`} className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">—</SelectItem>
                         {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
@@ -466,31 +461,38 @@ const PurchaseItemDialog: React.FC<{
                     </Select>
                   ) : (
                     <Input
+                      id={`pi-spec-${String(f.key)}`}
                       type={f.type === 'number' ? 'number' : 'text'}
                       value={details[f.key] != null ? String(details[f.key]) : ''}
                       onChange={(e) => setField(f.key, e.target.value, f.type === 'number')}
                     />
                   )}
-                </div>
+                </FormField>
               ))}
-            </div>
-          </div>
+            </FormGrid>
+          </FormSection>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>
-            <div className="space-y-1"><Label className="text-xs">Unit cost</Label><Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="—" /></div>
-            <div className="space-y-1">
-              <Label className="text-xs">Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['EUR', 'USD', 'GBP'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1"><Label className="text-xs">Notes (optional)</Label><Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+          <FormSection title="Quantity & cost">
+            <FormGrid cols={3}>
+              <FormField label="Quantity" htmlFor="pi-qty">
+                <Input id="pi-qty" type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              </FormField>
+              <FormField label="Unit cost" htmlFor="pi-cost">
+                <Input id="pi-cost" type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="—" />
+              </FormField>
+              <FormField label="Currency" htmlFor="pi-currency">
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger id="pi-currency" className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['EUR', 'USD', 'GBP'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Notes" htmlFor="pi-notes" optional className="sm:col-span-3">
+                <Textarea id="pi-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
         </div>
 
         <DialogFooter>

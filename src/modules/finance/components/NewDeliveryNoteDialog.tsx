@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -196,9 +197,9 @@ export const NewDeliveryNoteDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><Truck className="h-4 w-4" /> New {kind === 'receipt' ? 'goods-receipt note' : 'delivery note'}</DialogTitle><DialogDescription className="sr-only">Create a delivery note or goods-receipt note.</DialogDescription></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>Type</Label>
+        <div className="space-y-5">
+          <FormSection title="Document">
+          <FormField label="Type">
             <Select value={kind} onValueChange={(v: any) => setKind(v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -206,10 +207,9 @@ export const NewDeliveryNoteDialog: React.FC<{
                 <SelectItem value="receipt">Goods-receipt note (receive · stock in)</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label>{kind === 'receipt' ? 'Supplier' : 'Customer'} (optional)</Label>
+          </FormField>
+          <FormGrid>
+            <FormField label={kind === 'receipt' ? 'Supplier' : 'Customer'} optional>
               <Select value={customer} onValueChange={setCustomer}>
                 <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
                 <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
@@ -233,31 +233,29 @@ export const NewDeliveryNoteDialog: React.FC<{
                   }}
                 />
               )}
-            </div>
+            </FormField>
             {branches.length > 1 && (
-              <div className="space-y-1">
-                <Label>Establishment</Label>
+              <FormField label="Establishment">
                 <Select value={branchCode} onValueChange={setBranchCode}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}</SelectContent>
                 </Select>
-              </div>
+              </FormField>
             )}
-          </div>
+          </FormGrid>
+          </FormSection>
 
+          <FormSection title="Transport">
           {/* Transport details */}
-          <div className="grid grid-cols-2 gap-2 rounded-md border border-border/60 p-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Transport date</Label>
+          <FormGrid cols={3}>
+            <FormField label="Transport date">
               <Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Vehicle no.</Label>
+            </FormField>
+            <FormField label="Vehicle no.">
               <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" />
-            </div>
+            </FormField>
             {kind === 'dispatch' ? (
-              <div className="space-y-1">
-                <Label className="text-xs">Purpose</Label>
+              <FormField label="Purpose">
                 <Select value={movePurpose} onValueChange={setMovePurpose}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -266,27 +264,25 @@ export const NewDeliveryNoteDialog: React.FC<{
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
             ) : null}
-          </div>
+          </FormGrid>
 
           {/* myDATA v2.0.2: a ΔΠΠ must state its issuance reason — AADE rejects one without. */}
           {kind === 'receipt' ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Issuance reason <span className="text-destructive">*</span></Label>
+            <FormGrid>
+              <FormField label={<>Issuance reason <span className="text-destructive">*</span></>} hint="Required by myDATA.">
                 <Select value={receivingPurpose} onValueChange={setReceivingPurpose}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Required by myDATA" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose a reason…" /></SelectTrigger>
                   <SelectContent>
                     {receivingPurposeOptions.map((p) => (
                       <SelectItem key={p.code} value={String(p.code)}>{p.code} — {p.en}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
               {Number(receivingPurpose) === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER ? (
-                <div className="space-y-1">
-                  <Label className="text-xs">Name the reason <span className="text-destructive">*</span></Label>
+                <FormField label={<>Name the reason <span className="text-destructive">*</span></>}>
                   <Input
                     className="h-8 text-xs"
                     maxLength={150}
@@ -294,9 +290,9 @@ export const NewDeliveryNoteDialog: React.FC<{
                     onChange={(e) => setReceivingPurposeTitle(e.target.value)}
                     placeholder="What the table cannot express"
                   />
-                </div>
+                </FormField>
               ) : null}
-            </div>
+            </FormGrid>
           ) : null}
 
           {/* AADE PackingsDeclaration — a COUNT of packages, never a price. A ΔΠΠ records what
@@ -304,7 +300,7 @@ export const NewDeliveryNoteDialog: React.FC<{
           {kind === 'dispatch' ? (
           <div className="space-y-2 rounded-md border border-border/60 p-3">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">Packaging (optional)</Label>
+              <Label className="text-xs font-medium">Packaging <span className="font-normal text-muted-foreground">(optional)</span></Label>
               <Button
                 type="button"
                 variant="outline"
@@ -368,7 +364,9 @@ export const NewDeliveryNoteDialog: React.FC<{
             </label>
           </div>
           ) : null}
+          </FormSection>
 
+          <FormSection title="Addresses">
           {/* Structured from/to addresses (myDATA 9.3) */}
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1 rounded-md border border-border/60 p-3">
@@ -385,7 +383,9 @@ export const NewDeliveryNoteDialog: React.FC<{
               Delivery address looks incomplete (street, postal code and city are needed). myDATA may reject this 9.3 note until it’s filled.
             </p>
           )}
+          </FormSection>
 
+          <FormSection title="Items">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Items</Label>
@@ -416,10 +416,10 @@ export const NewDeliveryNoteDialog: React.FC<{
             )}
           </div>
 
-          <div className="space-y-1">
-            <Label>Notes</Label>
+          <FormField label="Notes" optional>
             <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Shipping reference, vehicle, etc." />
-          </div>
+          </FormField>
+          </FormSection>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => submit(false)} disabled={busy}>Save draft</Button>

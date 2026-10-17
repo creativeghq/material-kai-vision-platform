@@ -173,19 +173,19 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
 
       <div className="grid grid-cols-2 gap-x-2 gap-y-2 sm:grid-cols-5 items-end">
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">From quantity</Label>
+          <Label className="text-xs text-muted-foreground">From quantity</Label>
           <Input className="h-8 text-xs" inputMode="decimal" value={qty}
             onChange={(e) => setQty(e.target.value)} placeholder="5" />
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Unit</Label>
+          <Label className="text-xs text-muted-foreground">Unit</Label>
           <Select value={unit} onValueChange={setUnit}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>{units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Gives</Label>
+          <Label className="text-xs text-muted-foreground">Gives</Label>
           <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -195,7 +195,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">{kind === 'percent' ? 'Percent' : 'Price'}</Label>
+          <Label className="text-xs text-muted-foreground">{kind === 'percent' ? 'Percent' : 'Price'}</Label>
           <Input className="h-8 text-xs" inputMode="decimal" value={value}
             onChange={(e) => setValue(e.target.value)} placeholder={kind === 'percent' ? '15' : '450'} />
         </div>

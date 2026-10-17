@@ -160,7 +160,7 @@ export const DeliveryEvidenceCard: React.FC<{
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <Label htmlFor="pod-outcome" className="text-[11px]">Outcome</Label>
+              <Label htmlFor="pod-outcome" className="text-xs">Outcome</Label>
               <Select
                 value={proof.outcome}
                 onValueChange={(v) => setProof((p) => ({ ...p, outcome: v as DeliveryOutcome }))}
@@ -174,14 +174,14 @@ export const DeliveryEvidenceCard: React.FC<{
               </Select>
             </div>
             <div>
-              <Label htmlFor="pod-recipient" className="text-[11px]">Received by</Label>
+              <Label htmlFor="pod-recipient" className="text-xs">Received by</Label>
               <Input
                 id="pod-recipient" className="mt-1 h-8 w-44 text-xs" value={proof.recipient}
                 onChange={(e) => setProof((p) => ({ ...p, recipient: e.target.value }))}
               />
             </div>
             <div>
-              <Label htmlFor="pod-notes" className="text-[11px]">Notes</Label>
+              <Label htmlFor="pod-notes" className="text-xs">Notes</Label>
               <Input
                 id="pod-notes" className="mt-1 h-8 w-56 text-xs" value={proof.notes}
                 onChange={(e) => setProof((p) => ({ ...p, notes: e.target.value }))}
@@ -227,7 +227,7 @@ export const DeliveryEvidenceCard: React.FC<{
           <div className="flex flex-wrap items-end gap-2">
             {(['received', 'accepted', 'rejected'] as const).map((k) => (
               <div key={k}>
-                <Label htmlFor={`insp-${k}`} className="text-[11px]">{k}</Label>
+                <Label htmlFor={`insp-${k}`} className="text-xs">{k}</Label>
                 <Input
                   id={`insp-${k}`} type="number" className="mt-1 h-8 w-24 text-xs"
                   value={insp[k]} onChange={(e) => setInsp((i) => ({ ...i, [k]: e.target.value }))}
@@ -235,7 +235,7 @@ export const DeliveryEvidenceCard: React.FC<{
               </div>
             ))}
             <div>
-              <Label htmlFor="insp-disp" className="text-[11px]">Disposition</Label>
+              <Label htmlFor="insp-disp" className="text-xs">Disposition</Label>
               <Select
                 value={insp.disposition}
                 onValueChange={(v) => setInsp((i) => ({ ...i, disposition: v as Disposition }))}

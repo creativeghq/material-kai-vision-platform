@@ -193,18 +193,18 @@ export const InstallerQualityCard: React.FC<{ workspaceId: string; canManage?: b
             {canManage && (
               <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
                 <div>
-                  <Label htmlFor="cert-kind" className="text-[11px]">Document</Label>
+                  <Label htmlFor="cert-kind" className="text-xs">Document</Label>
                   <Input id="cert-kind" className="mt-1 h-8 w-52 text-xs" value={draft.kind}
                     placeholder="e.g. ασφαλιστική ενημερότητα"
                     onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value }))} />
                 </div>
                 <div>
-                  <Label htmlFor="cert-ref" className="text-[11px]">Reference</Label>
+                  <Label htmlFor="cert-ref" className="text-xs">Reference</Label>
                   <Input id="cert-ref" className="mt-1 h-8 w-40 text-xs" value={draft.reference}
                     onChange={(e) => setDraft((d) => ({ ...d, reference: e.target.value }))} />
                 </div>
                 <div>
-                  <Label htmlFor="cert-exp" className="text-[11px]">Expires</Label>
+                  <Label htmlFor="cert-exp" className="text-xs">Expires</Label>
                   <Input id="cert-exp" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.expiresOn}
                     onChange={(e) => setDraft((d) => ({ ...d, expiresOn: e.target.value }))} />
                 </div>

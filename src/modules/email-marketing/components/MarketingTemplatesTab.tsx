@@ -8,7 +8,7 @@ import { Plus, Pencil, Trash2, FileText, Loader2, Copy, Check, Mail } from 'luci
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
@@ -261,14 +261,12 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New Email Template</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tpl-name">Template Name *</Label>
+            <FormField label="Template name" htmlFor="tpl-name">
               <Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Summer Newsletter" autoFocus />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tpl-desc">Description</Label>
-              <Textarea id="tpl-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Optional" />
-            </div>
+            </FormField>
+            <FormField label="Description" htmlFor="tpl-desc" optional>
+              <Textarea id="tpl-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+            </FormField>
             <p className="text-xs text-muted-foreground">You'll be taken to the visual builder to design the email.</p>
           </div>
           <DialogFooter>

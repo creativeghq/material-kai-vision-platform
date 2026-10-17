@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
@@ -415,65 +416,70 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Payroll Settings</DialogTitle></DialogHeader>
         {loading || !s ? <Skeleton className="h-40 w-full" /> : (
-          <div className="space-y-3">
+          <div className="space-y-5">
             <p className="text-xs text-muted-foreground">Defaults are the Greek 2026 rates. These change yearly — adjust as needed. Set country to “None” to disable auto-tax and enter deductions manually.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Country / Mode</Label>
-                <Select value={s.country_code} onValueChange={(v) => upd('country_code', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="GR">Greece (auto)</SelectItem><SelectItem value="none">None (manual)</SelectItem></SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1"><Label>Salaries / year</Label><Input type="number" value={s.salaries_per_year} onChange={(e) => upd('salaries_per_year', Number(e.target.value))} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Employee EFKA %</Label><NumField scale={100} value={s.employee_contribution_rate} onChange={(n) => upd('employee_contribution_rate', n ?? 0)} /></div>
-              <div className="space-y-1"><Label>Employer EFKA %</Label><NumField scale={100} value={s.employer_contribution_rate} onChange={(n) => upd('employer_contribution_rate', n ?? 0)} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>EFKA monthly ceiling</Label><NumField allowNull value={s.contribution_monthly_ceiling} onChange={(n) => upd('contribution_monthly_ceiling', n)} placeholder="none" /></div>
-              <div className="space-y-1"><Label>Currency</Label><Input value={s.currency} onChange={(e) => upd('currency', e.target.value)} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Tax credit (base)</Label><NumField value={s.tax_credit_base} onChange={(n) => upd('tax_credit_base', n ?? 0)} /></div>
-              <div className="space-y-1"><Label>Taper /€1,000</Label><NumField value={s.tax_credit_taper_per_1000} onChange={(n) => upd('tax_credit_taper_per_1000', n ?? 0)} /></div>
-              <div className="space-y-1"><Label>Taper floor</Label><NumField value={s.tax_credit_taper_floor} onChange={(n) => upd('tax_credit_taper_floor', n ?? 0)} /></div>
-            </div>
-            <div className="space-y-1">
-              <Label>Income-tax brackets (annual) — JSON</Label>
-              <textarea
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono min-h-[90px]"
-                value={JSON.stringify(s.income_tax_brackets)}
-                onChange={(e) => { try { upd('income_tax_brackets', JSON.parse(e.target.value)); } catch { /* keep typing */ } }}
-              />
-              <p className="text-[11px] text-muted-foreground">Array of {'{up_to, rate}'}; last entry uses <code>up_to: null</code> for the top band. Rates are fractions (0.09 = 9%).</p>
-            </div>
-            {s.country_code !== 'none' && (
-              <div className="space-y-2 rounded-md border border-input p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <Label className="text-sm">Young-worker &amp; family tax reliefs</Label>
-                    <p className="text-[11px] text-muted-foreground">GR 2026 reform: under-25 → 0% up to €20k · 26–30 → 9% on the 10–20k band · reduced band by children. Age is read from each employee’s date of birth.</p>
-                  </div>
-                  <Switch
-                    checked={reliefsOn}
-                    disabled={!gr2026Preset}
-                    onCheckedChange={(on) => upd('bracket_reductions', on ? (gr2026Preset ?? {}) : {})}
-                  />
-                </div>
-                {reliefsOn && (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-500">⚠ Verify these rates against the enacted 2026 law before running production payroll — edit the JSON below to adjust.</p>
-                )}
-                {reliefsOn && (
+            <FormSection title="General">
+              <FormGrid cols={3}>
+                <FormField label="Country / Mode">
+                  <Select value={s.country_code} onValueChange={(v) => upd('country_code', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="GR">Greece (auto)</SelectItem><SelectItem value="none">None (manual)</SelectItem></SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Salaries / year"><Input type="number" value={s.salaries_per_year} onChange={(e) => upd('salaries_per_year', Number(e.target.value))} /></FormField>
+                <FormField label="Currency"><Input value={s.currency} onChange={(e) => upd('currency', e.target.value)} /></FormField>
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Contributions (EFKA)">
+              <FormGrid cols={3}>
+                <FormField label="Employee %"><NumField scale={100} value={s.employee_contribution_rate} onChange={(n) => upd('employee_contribution_rate', n ?? 0)} /></FormField>
+                <FormField label="Employer %"><NumField scale={100} value={s.employer_contribution_rate} onChange={(n) => upd('employer_contribution_rate', n ?? 0)} /></FormField>
+                <FormField label="Monthly ceiling" optional><NumField allowNull value={s.contribution_monthly_ceiling} onChange={(n) => upd('contribution_monthly_ceiling', n)} placeholder="none" /></FormField>
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Income tax">
+              <FormGrid cols={3}>
+                <FormField label="Tax credit (base)"><NumField value={s.tax_credit_base} onChange={(n) => upd('tax_credit_base', n ?? 0)} /></FormField>
+                <FormField label="Taper /€1,000"><NumField value={s.tax_credit_taper_per_1000} onChange={(n) => upd('tax_credit_taper_per_1000', n ?? 0)} /></FormField>
+                <FormField label="Taper floor"><NumField value={s.tax_credit_taper_floor} onChange={(n) => upd('tax_credit_taper_floor', n ?? 0)} /></FormField>
+                <FormField
+                  label="Income-tax brackets (annual) — JSON"
+                  hint={<>Array of {'{up_to, rate}'}; last entry uses <code>up_to: null</code> for the top band. Rates are fractions (0.09 = 9%).</>}
+                  className="sm:col-span-3"
+                >
                   <textarea
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono min-h-[90px]"
-                    value={JSON.stringify(s.bracket_reductions ?? {}, null, 0)}
-                    onChange={(e) => { try { upd('bracket_reductions', JSON.parse(e.target.value)); } catch { /* keep typing */ } }}
+                    value={JSON.stringify(s.income_tax_brackets)}
+                    onChange={(e) => { try { upd('income_tax_brackets', JSON.parse(e.target.value)); } catch { /* keep typing */ } }}
                   />
-                )}
-              </div>
-            )}
+                </FormField>
+              </FormGrid>
+              {s.country_code !== 'none' && (
+                <div className="space-y-2 rounded-md border border-input p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label className="text-sm">Young-worker &amp; family tax reliefs</Label>
+                      <p className="text-[11px] text-muted-foreground">GR 2026 reform: under-25 → 0% up to €20k · 26–30 → 9% on the 10–20k band · reduced band by children. Age is read from each employee’s date of birth.</p>
+                    </div>
+                    <Switch
+                      checked={reliefsOn}
+                      disabled={!gr2026Preset}
+                      onCheckedChange={(on) => upd('bracket_reductions', on ? (gr2026Preset ?? {}) : {})}
+                    />
+                  </div>
+                  {reliefsOn && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-500">⚠ Verify these rates against the enacted 2026 law before running production payroll — edit the JSON below to adjust.</p>
+                  )}
+                  {reliefsOn && (
+                    <textarea
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono min-h-[90px]"
+                      value={JSON.stringify(s.bracket_reductions ?? {}, null, 0)}
+                      onChange={(e) => { try { upd('bracket_reductions', JSON.parse(e.target.value)); } catch { /* keep typing */ } }}
+                    />
+                  )}
+                </div>
+              )}
+            </FormSection>
           </div>
         )}
         <DialogFooter>

@@ -142,23 +142,23 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
 
                 <div className="flex flex-wrap items-end gap-2 pt-1">
                   <div>
-                    <Label htmlFor="bl-desc" className="text-[11px]">Committed item</Label>
+                    <Label htmlFor="bl-desc" className="text-xs">Committed item</Label>
                     <Input id="bl-desc" className="mt-1 h-8 w-48 text-xs" value={line.description}
                       onChange={(e) => setLine((l) => ({ ...l, description: e.target.value }))} />
                   </div>
                   <div>
-                    <Label htmlFor="bl-qty" className="text-[11px]">Quantity</Label>
+                    <Label htmlFor="bl-qty" className="text-xs">Quantity</Label>
                     <Input id="bl-qty" type="number" min="0" className="mt-1 h-8 w-24 text-xs"
                       value={line.quantity}
                       onChange={(e) => setLine((l) => ({ ...l, quantity: e.target.value }))} />
                   </div>
                   <div>
-                    <Label htmlFor="bl-unit" className="text-[11px]">Unit</Label>
+                    <Label htmlFor="bl-unit" className="text-xs">Unit</Label>
                     <Input id="bl-unit" className="mt-1 h-8 w-20 text-xs" value={line.unit}
                       onChange={(e) => setLine((l) => ({ ...l, unit: e.target.value }))} />
                   </div>
                   <div>
-                    <Label htmlFor="bl-price" className="text-[11px]">Agreed price</Label>
+                    <Label htmlFor="bl-price" className="text-xs">Agreed price</Label>
                     <Input id="bl-price" type="number" min="0" className="mt-1 h-8 w-24 text-xs"
                       value={line.price}
                       onChange={(e) => setLine((l) => ({ ...l, price: e.target.value }))} />
@@ -184,18 +184,18 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
 
             <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
               <div>
-                <Label htmlFor="bo-ref" className="text-[11px]">Contract reference</Label>
+                <Label htmlFor="bo-ref" className="text-xs">Contract reference</Label>
                 <Input id="bo-ref" className="mt-1 h-8 w-40 text-xs" value={contract.reference}
                   onChange={(e) => setContract((c) => ({ ...c, reference: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="bo-allow" className="text-[11px]">Allowance %</Label>
+                <Label htmlFor="bo-allow" className="text-xs">Allowance %</Label>
                 <Input id="bo-allow" type="number" min="0" max="100" className="mt-1 h-8 w-24 text-xs"
                   value={contract.allowance}
                   onChange={(e) => setContract((c) => ({ ...c, allowance: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="bo-ends" className="text-[11px]">Runs until</Label>
+                <Label htmlFor="bo-ends" className="text-xs">Runs until</Label>
                 <Input id="bo-ends" type="date" className="mt-1 h-8 w-40 text-xs" value={contract.endsOn}
                   onChange={(e) => setContract((c) => ({ ...c, endsOn: e.target.value }))} />
               </div>
@@ -346,7 +346,7 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
                 <div className="flex flex-wrap items-end gap-2 pt-1">
                   {(['on_time', 'quality', 'price_stability'] as const).map((c) => (
                     <div key={c}>
-                      <Label htmlFor={`w-${c}`} className="text-[11px]">{c.replace('_', ' ')}</Label>
+                      <Label htmlFor={`w-${c}`} className="text-xs">{c.replace('_', ' ')}</Label>
                       <Input
                         id={`w-${c}`} type="number" min="0" max="100"
                         className="mt-1 h-8 w-24 text-xs" defaultValue={0} disabled={busy}
@@ -362,7 +362,7 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
                 <p className="text-[11px] text-muted-foreground">{PRICE_ONLY_DISCIPLINE}</p>
 
                 <div className="space-y-1 pt-1">
-                  <Label htmlFor="price-file" className="text-[11px]">
+                  <Label htmlFor="price-file" className="text-xs">
                     Price update — one JSON row per line, prices only
                   </Label>
                   <Textarea

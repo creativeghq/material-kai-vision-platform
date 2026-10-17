@@ -77,7 +77,7 @@ export const LostSaleDialog: React.FC<{
 
         <div className="space-y-2">
           <div>
-            <Label htmlFor="lost-desc" className="text-[11px]">What they wanted</Label>
+            <Label htmlFor="lost-desc" className="text-xs">What they wanted</Label>
             <Input
               id="lost-desc" className="mt-1 h-9 text-sm" value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -86,14 +86,14 @@ export const LostSaleDialog: React.FC<{
           </div>
           <div className="flex gap-2">
             <div className="w-28">
-              <Label htmlFor="lost-qty" className="text-[11px]">Quantity</Label>
+              <Label htmlFor="lost-qty" className="text-xs">Quantity</Label>
               <Input
                 id="lost-qty" type="number" className="mt-1 h-9 text-sm" value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
               />
             </div>
             <div className="flex-1">
-              <Label htmlFor="lost-outcome" className="text-[11px]">Why they left</Label>
+              <Label htmlFor="lost-outcome" className="text-xs">Why they left</Label>
               <Select value={outcome} onValueChange={(v) => setOutcome(v as LostSale['outcome'])}>
                 <SelectTrigger id="lost-outcome" className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -103,10 +103,10 @@ export const LostSaleDialog: React.FC<{
             </div>
           </div>
           <div>
-            <Label htmlFor="lost-notes" className="text-[11px]">Notes</Label>
+            <Label htmlFor="lost-notes" className="text-xs">Notes<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
             <Input
               id="lost-notes" className="mt-1 h-9 text-sm" value={notes}
-              onChange={(e) => setNotes(e.target.value)} placeholder="optional"
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
         </div>

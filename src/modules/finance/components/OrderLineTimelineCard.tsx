@@ -121,7 +121,7 @@ export const OrderLineTimelineCard: React.FC<{ orderId: string }> = ({ orderId }
 
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <Label htmlFor={`status-${l.id}`} className="text-[11px]">Status</Label>
+              <Label htmlFor={`status-${l.id}`} className="text-xs">Status</Label>
               <Select
                 value={l.line_status ?? ''}
                 onValueChange={(v) => guard(
@@ -143,7 +143,7 @@ export const OrderLineTimelineCard: React.FC<{ orderId: string }> = ({ orderId }
               </Select>
             </div>
             <div>
-              <Label htmlFor={`ff-${l.id}`} className="text-[11px]">Fulfilment</Label>
+              <Label htmlFor={`ff-${l.id}`} className="text-xs">Fulfilment</Label>
               <Select
                 value={l.fulfilment_type ?? ''}
                 onValueChange={(v) => guard(
@@ -174,7 +174,7 @@ export const OrderLineTimelineCard: React.FC<{ orderId: string }> = ({ orderId }
           <div className="grid gap-2 sm:grid-cols-4">
             {LINE_DATE_FIELDS.map((f) => (
               <div key={f.key}>
-                <Label htmlFor={`${f.key}-${l.id}`} className="text-[11px]">
+                <Label htmlFor={`${f.key}-${l.id}`} className="text-xs">
                   {f.label}
                   {f.side === 'money' && <span className="ml-1 text-muted-foreground">(money)</span>}
                 </Label>

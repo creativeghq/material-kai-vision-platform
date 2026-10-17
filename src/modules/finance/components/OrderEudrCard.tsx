@@ -232,21 +232,21 @@ export const OrderEudrCard: React.FC<{
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
-              <Label htmlFor="eudr-ref" className="text-[11px]">DDS reference number</Label>
+              <Label htmlFor="eudr-ref" className="text-xs">DDS reference number</Label>
               <Input
                 id="eudr-ref" className="h-9 w-64" value={ref}
                 onChange={(e) => setRef(e.target.value)}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="eudr-decl" className="text-[11px]">Declaration identifier</Label>
+              <Label htmlFor="eudr-decl" className="text-xs">Declaration identifier<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
               <Input
                 id="eudr-decl" className="h-9 w-56" value={declId}
-                onChange={(e) => setDeclId(e.target.value)} placeholder="optional"
+                onChange={(e) => setDeclId(e.target.value)}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="eudr-mass" className="text-[11px]">Net mass (kg)</Label>
+              <Label htmlFor="eudr-mass" className="text-xs">Net mass (kg)</Label>
               <Input
                 id="eudr-mass" type="number" className="h-9 w-32" value={netMass}
                 onChange={(e) => setNetMass(e.target.value)}

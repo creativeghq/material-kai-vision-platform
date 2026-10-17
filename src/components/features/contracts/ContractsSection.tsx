@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, FileSignature, Plus, Link2, Ban, CheckCircle2, Send, Download, Layers } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
@@ -336,45 +336,67 @@ export const ContractsSection: React.FC<{
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New {createContext} contract</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-5">
             <Button variant="outline" className="w-full" disabled={busy} onClick={() => setTemplatePickerOpen(true)}>
               <Layers className="h-4 w-4 mr-2" /> Start from a template
             </Button>
-            {pickCategory && (
-              <div className="space-y-1"><Label>Category</Label>
-                <Select value={createContext} onValueChange={(v) => changeCategory(v as ContractContext)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="finance">Finance</SelectItem>
-                    <SelectItem value="hr">HR</SelectItem>
-                    <SelectItem value="project">Projects</SelectItem>
-                    <SelectItem value="realestate">Real estate</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1 col-span-2"><Label>Title *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Framework supply agreement" /></div>
-              <div className="space-y-1"><Label>Type</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TYPE_OPTIONS[createContext].map((t) => <SelectItem key={t} value={t} className="capitalize">{t.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1"><Label>Counterparty {createContext === 'finance' && !subject?.customer_company_id ? '*' : ''}</Label><Input value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder="Signer / Company name" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Counterparty email</Label><Input type="email" value={counterpartyEmail} onChange={(e) => setCounterpartyEmail(e.target.value)} placeholder="signer@example.com" /></div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1"><Label>Value</Label><Input type="number" min={0} value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" /></div>
-                <div className="space-y-1"><Label>Currency</Label><Input value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="EUR" /></div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Effective</Label><Input type="date" value={effective} onChange={(e) => setEffective(e.target.value)} /></div>
-              <div className="space-y-1"><Label>Expires</Label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
-            </div>
-            <div className="space-y-1"><Label>Terms</Label><Textarea rows={6} value={bodyText} onChange={(e) => setBodyText(e.target.value)} placeholder="The agreement text the signer will read and sign…" /></div>
+            <FormSection title="Contract">
+              <FormGrid>
+                {pickCategory && (
+                  <FormField label="Category" htmlFor="ct-category" className="sm:col-span-2">
+                    <Select value={createContext} onValueChange={(v) => changeCategory(v as ContractContext)}>
+                      <SelectTrigger id="ct-category"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="finance">Finance</SelectItem>
+                        <SelectItem value="hr">HR</SelectItem>
+                        <SelectItem value="project">Projects</SelectItem>
+                        <SelectItem value="realestate">Real estate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                )}
+                <FormField label="Title *" htmlFor="ct-title" className="sm:col-span-2">
+                  <Input id="ct-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Framework supply agreement" />
+                </FormField>
+                <FormField label="Type" htmlFor="ct-type">
+                  <Select value={type} onValueChange={setType}>
+                    <SelectTrigger id="ct-type"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TYPE_OPTIONS[createContext].map((t) => <SelectItem key={t} value={t} className="capitalize">{t.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
+                  </Select>
+                </FormField>
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Counterparty">
+              <FormGrid>
+                <FormField label={<>Counterparty {createContext === 'finance' && !subject?.customer_company_id ? '*' : ''}</>} htmlFor="ct-counterparty">
+                  <Input id="ct-counterparty" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder="Signer / Company name" />
+                </FormField>
+                <FormField label="Counterparty email" htmlFor="ct-email">
+                  <Input id="ct-email" type="email" value={counterpartyEmail} onChange={(e) => setCounterpartyEmail(e.target.value)} placeholder="signer@example.com" />
+                </FormField>
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Value and term">
+              <FormGrid cols={4}>
+                <FormField label="Value" htmlFor="ct-value">
+                  <Input id="ct-value" type="number" min={0} value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" />
+                </FormField>
+                <FormField label="Currency" htmlFor="ct-currency">
+                  <Input id="ct-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="EUR" />
+                </FormField>
+                <FormField label="Effective" htmlFor="ct-effective">
+                  <Input id="ct-effective" type="date" value={effective} onChange={(e) => setEffective(e.target.value)} />
+                </FormField>
+                <FormField label="Expires" htmlFor="ct-expires">
+                  <Input id="ct-expires" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+                </FormField>
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Terms">
+              <FormField label="Terms" htmlFor="ct-terms">
+                <Textarea id="ct-terms" rows={6} value={bodyText} onChange={(e) => setBodyText(e.target.value)} placeholder="The agreement text the signer will read and sign…" />
+              </FormField>
+            </FormSection>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setOpen(false); resetForm(); }} disabled={busy}>Cancel</Button>

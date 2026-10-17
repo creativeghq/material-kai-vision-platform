@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -609,28 +610,25 @@ const AddSiteLogDialog: React.FC<{ projectId: string; onClose: () => void; onSav
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Log a site visit</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Date</Label>
-            <Input type="date" className="h-9" value={logDate} onChange={(e) => setLogDate(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Notes</Label>
+          <FormField label="Date" htmlFor="sl-date">
+            <Input id="sl-date" type="date" className="h-9" value={logDate} onChange={(e) => setLogDate(e.target.value)} />
+          </FormField>
+          <FormField label="Notes" htmlFor="sl-notes">
             <textarea
+              id="sl-notes"
               className="min-h-24 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               value={notes} onChange={(e) => setNotes(e.target.value)}
               placeholder="What was done, what was found, what was agreed"
             />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Who attended</Label>
-              <Input className="h-9" value={attendance} onChange={(e) => setAttendance(e.target.value)} placeholder="Optional" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Weather</Label>
-              <Input className="h-9" value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="Optional" />
-            </div>
-          </div>
+          </FormField>
+          <FormGrid>
+            <FormField label="Who attended" htmlFor="sl-attendance" optional>
+              <Input id="sl-attendance" className="h-9" value={attendance} onChange={(e) => setAttendance(e.target.value)} placeholder="e.g. Site manager, electrician" />
+            </FormField>
+            <FormField label="Weather" htmlFor="sl-weather" optional>
+              <Input id="sl-weather" className="h-9" value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="e.g. Dry, 18°C" />
+            </FormField>
+          </FormGrid>
           <div className="space-y-1">
             <Label className="text-xs flex items-center gap-1"><ImagePlus className="h-3 w-3" /> Photos</Label>
             <input type="file" accept="image/*" multiple className="text-xs"

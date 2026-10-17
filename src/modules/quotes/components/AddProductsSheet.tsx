@@ -34,6 +34,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import {
@@ -628,30 +629,24 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
           {/* ── Custom Product Tab ── */}
           <TabsContent value="custom" className="flex-1 flex flex-col gap-4 min-h-0 mt-0">
             <ScrollArea className="flex-1">
-              <div className="space-y-4 pr-1">
+              <div className="space-y-5 pr-1">
                 <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
                   Add a product that isn't in the catalog — a one-off item, a special order, or a service charge.
                 </div>
 
-                {/* Name + SKU */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2 space-y-1.5">
-                    <Label htmlFor="cp-name">Product Name <span className="text-destructive">*</span></Label>
+                <FormSection title="Product">
+                <FormGrid>
+                  <FormField label="Product name" htmlFor="cp-name" className="sm:col-span-2">
                     <Input id="cp-name" value={customForm.name} onChange={e => setCustomField('name', e.target.value)} placeholder="e.g. Custom Marble Slab" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cp-sku">SKU / Code</Label>
+                  </FormField>
+                  <FormField label="SKU / Code" htmlFor="cp-sku" optional>
                     <Input id="cp-sku" value={customForm.sku} onChange={e => setCustomField('sku', e.target.value)} placeholder="e.g. MRB-001" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cp-unit">Unit</Label>
+                  </FormField>
+                  <FormField label="Unit" htmlFor="cp-unit">
                     <Input id="cp-unit" value={customForm.unit} onChange={e => setCustomField('unit', e.target.value)} placeholder="pcs / m² / kg" />
-                  </div>
-                </div>
+                  </FormField>
 
-                {/* Image */}
-                <div className="space-y-1.5">
-                  <Label>Image</Label>
+                <FormField label="Image" optional className="sm:col-span-2">
                   <div className="flex items-center gap-3">
                     <div className="w-20 h-20 rounded-lg border border-border/60 bg-muted/30 overflow-hidden flex items-center justify-center flex-shrink-0">
                       {customForm.image_url ? (
@@ -679,26 +674,29 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                       )}
                     </div>
                   </div>
-                </div>
+                </FormField>
 
-                {/* Description */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="cp-desc">Description</Label>
+                <FormField label="Description" htmlFor="cp-desc" optional className="sm:col-span-2">
                   <textarea
                     id="cp-desc"
                     value={customForm.description}
                     onChange={e => setCustomField('description', e.target.value)}
-                    placeholder="Optional description or notes about this item…"
+                    placeholder="Notes about this item…"
                     rows={3}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                   />
-                </div>
+                </FormField>
+                </FormGrid>
+                </FormSection>
 
-                {/* Price + Quantity */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                <FormSection title="Price and quantity">
+                <FormGrid>
+                  <div className="min-w-0 space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor="cp-price">Unit Price ({currency || 'EUR'})</Label>
+                      <Label htmlFor="cp-price" className="text-xs">
+                        Unit price ({currency || 'EUR'})
+                        <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
+                      </Label>
                       <Button
                         type="button"
                         variant="ghost"
@@ -714,8 +712,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                     </div>
                     <Input id="cp-price" type="text" inputMode="decimal" value={customForm.unit_price} onChange={e => setCustomField('unit_price', e.target.value)} placeholder="0.00" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cp-qty">Quantity</Label>
+                  <FormField label="Quantity" htmlFor="cp-qty">
                     <div className="flex items-center gap-1">
                       <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0" onClick={() => setCustomField('quantity', Math.max(1, customForm.quantity - 1))}>
                         <Minus className="h-3 w-3" />
@@ -725,46 +722,41 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-                  </div>
-                </div>
+                  </FormField>
+                </FormGrid>
+                </FormSection>
 
-                {/* Size + Color */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cp-size">Size / Variant</Label>
+                <FormSection title="Variant">
+                <FormGrid>
+                  <FormField label="Size / Variant" htmlFor="cp-size" optional>
                     <Input id="cp-size" value={customForm.size} onChange={e => setCustomField('size', e.target.value)} placeholder="e.g. 60×60 cm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cp-color">Color / Finish</Label>
+                  </FormField>
+                  <FormField label="Color / Finish" htmlFor="cp-color" optional>
                     <Input id="cp-color" value={customForm.color} onChange={e => setCustomField('color', e.target.value)} placeholder="e.g. Carrara White" />
-                  </div>
-                </div>
+                  </FormField>
+                </FormGrid>
+                </FormSection>
 
-                {/* FF&E Fields */}
-                <div className="rounded-lg border border-border/60 p-3 space-y-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">FF&E Specification</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="cp-room">Room / Area</Label>
+                <FormSection title="FF&E specification">
+                  <FormGrid>
+                    <FormField label="Room / Area" htmlFor="cp-room" optional>
                       <Input id="cp-room" value={customForm.room} onChange={e => setCustomField('room', e.target.value)} placeholder="e.g. Living Room" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="cp-dims">Dimensions (W×H×D)</Label>
+                    </FormField>
+                    <FormField label="Dimensions (W×H×D)" htmlFor="cp-dims" optional>
                       <Input id="cp-dims" value={customForm.dimensions} onChange={e => setCustomField('dimensions', e.target.value)} placeholder="e.g. 120×60×45" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cp-install">Installation Requirements</Label>
-                    <textarea
-                      id="cp-install"
-                      value={customForm.installation_requirements}
-                      onChange={e => setCustomField('installation_requirements', e.target.value)}
-                      placeholder="e.g. Requires wall anchoring, electrical outlet within 1m..."
-                      rows={2}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                    />
-                  </div>
-                </div>
+                    </FormField>
+                    <FormField label="Installation requirements" htmlFor="cp-install" optional className="sm:col-span-2">
+                      <textarea
+                        id="cp-install"
+                        value={customForm.installation_requirements}
+                        onChange={e => setCustomField('installation_requirements', e.target.value)}
+                        placeholder="e.g. Requires wall anchoring, electrical outlet within 1m..."
+                        rows={2}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                      />
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
 
                 {/* Preview total */}
                 {customForm.unit_price && parseDecimalOr(customForm.unit_price, 0) > 0 && (

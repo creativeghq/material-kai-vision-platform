@@ -205,7 +205,7 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
             )}
 
             <div className="rounded-md border border-hairline bg-surface-sunken p-2 text-[11px] text-muted-foreground">
-              <Label className="text-[11px] font-medium">Establishment code</Label>
+              <Label className="text-xs font-medium">Establishment code</Label>
               <p className="mt-1">{BRANCH_IS_IDENTITY}</p>
             </div>
           </>

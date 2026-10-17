@@ -339,8 +339,8 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="crmb-ref">SWIFT / Account #</Label>
-            <Input id="crmb-ref" value={form.account_ref ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_ref: e.target.value }))} placeholder="Optional" />
+            <Label className="text-xs" htmlFor="crmb-ref">SWIFT / Account #<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
+            <Input id="crmb-ref" value={form.account_ref ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_ref: e.target.value }))} placeholder="e.g. ETHNGRAA" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="crmb-ccy">Currency</Label>

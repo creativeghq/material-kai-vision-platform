@@ -277,7 +277,7 @@ export const TemplateEditorPage: React.FC = () => {
                       <div key={idx} className="px-6 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {spec.fields.map((f) => (
                           <div key={f} className="space-y-1">
-                            <Label className="text-[11px] text-muted-foreground">{f.replace(/_/g, ' ')}</Label>
+                            <Label className="text-xs text-muted-foreground">{f.replace(/_/g, ' ')}</Label>
                             <Input
                               className="h-8 text-sm"
                               type={NUMERIC_FIELD.test(f) ? 'number' : 'text'}

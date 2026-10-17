@@ -4,7 +4,7 @@ import { Loader2, Plus, Link2, Link2Off, Receipt } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -175,31 +175,26 @@ const AddProjectExpenseDialog: React.FC<{
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Add an expense to this project</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Date</Label>
-              <Input type="date" className="h-9" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Amount (incl. VAT)</Label>
-              <Input inputMode="decimal" className="h-9" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Category</Label>
-            <select className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
+          <FormGrid>
+            <FormField label="Date" htmlFor="pe-date">
+              <Input id="pe-date" type="date" className="h-9" value={date} onChange={(e) => setDate(e.target.value)} />
+            </FormField>
+            <FormField label="Amount (incl. VAT)" htmlFor="pe-amount">
+              <Input id="pe-amount" inputMode="decimal" className="h-9" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+            </FormField>
+          </FormGrid>
+          <FormField label="Category" htmlFor="pe-category">
+            <select id="pe-category" className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
               value={category} onChange={(e) => setCategory(e.target.value)}>
               {TRIP_EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{humanizeLabel(c)}</option>)}
             </select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Taxi to site" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Vendor</Label>
-            <Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Optional" />
-          </div>
+          </FormField>
+          <FormField label="Description" htmlFor="pe-description">
+            <Input id="pe-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Taxi to site" />
+          </FormField>
+          <FormField label="Vendor" htmlFor="pe-vendor" optional>
+            <Input id="pe-vendor" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g. Athens Taxi" />
+          </FormField>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={billable} onCheckedChange={(v) => setBillable(!!v)} />
             Rebillable to the client

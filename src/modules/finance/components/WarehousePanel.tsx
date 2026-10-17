@@ -3,7 +3,7 @@ import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -533,13 +533,12 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
 
           {!selected ? (
             <div className="space-y-3">
-              <div className="space-y-1">
-                <Label>Find a product</Label>
+              <FormField label="Find a product">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input className="pl-8" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search catalog by name or SKU…" />
                 </div>
-              </div>
+              </FormField>
               <div className="min-h-[3rem] max-h-64 overflow-y-auto rounded-md border border-border/60 divide-y divide-border/40">
                 {searching ? (
                   <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
@@ -573,23 +572,24 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => setSelected(null)} title="Choose a different product"><X className="h-4 w-4" /></Button>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1"><Label>On hand</Label><Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-                <div className="space-y-1"><Label>Reorder pt</Label><Input type="text" inputMode="decimal" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
-                <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></div>
-              </div>
-              <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="optional — e.g. Aisle 3 / Shelf B" /></div>
-              {/* Codes & myDATA classification (optional) */}
+              <FormSection title="Stock">
+                <FormGrid cols={3}>
+                  <FormField label="On hand"><Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} /></FormField>
+                  <FormField label="Reorder pt"><Input type="text" inputMode="decimal" value={reorder} onChange={(e) => setReorder(e.target.value)} /></FormField>
+                  <FormField label="Unit"><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></FormField>
+                  <FormField label="Location" optional className="sm:col-span-3"><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Aisle 3 / Shelf B" /></FormField>
+                </FormGrid>
+              </FormSection>
               <details className="rounded-md border border-border/60 px-3 py-2">
                 <summary className="cursor-pointer text-xs text-muted-foreground select-none">Codes &amp; myDATA classification (optional)</summary>
-                <div className="grid grid-cols-2 gap-3 pt-3">
-                  <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
-                  <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
-                  <div className="space-y-1"><Label className="text-xs">CPV code</Label><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></div>
-                  <div className="space-y-1"><Label className="text-xs">TARIC code</Label><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></div>
-                  <div className="space-y-1"><Label className="text-xs">myDATA class. type</Label><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></div>
-                  <div className="space-y-1"><Label className="text-xs">myDATA class. category</Label><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></div>
-                </div>
+                <FormGrid className="pt-3">
+                  <FormField label="Barcode"><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></FormField>
+                  <FormField label="Serial number (S/N)"><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></FormField>
+                  <FormField label="CPV code"><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></FormField>
+                  <FormField label="TARIC code"><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></FormField>
+                  <FormField label="myDATA class. type"><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></FormField>
+                  <FormField label="myDATA class. category"><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></FormField>
+                </FormGrid>
               </details>
             </div>
           )}
@@ -632,11 +632,11 @@ const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle>Add Warehouse</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1"><Label>Name *</Label><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Athens depot" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="optional" /></div>
-            <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="optional" /></div>
-          </div>
+          <FormField label="Name *"><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Athens depot" /></FormField>
+          <FormGrid>
+            <FormField label="Code" optional><Input value={code} onChange={(e) => setCode(e.target.value)} /></FormField>
+            <FormField label="Location" optional><Input value={location} onChange={(e) => setLocation(e.target.value)} /></FormField>
+          </FormGrid>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
@@ -718,16 +718,28 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Edit item — {item.name}</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><Label className="text-xs">Reorder point</Label><Input type="number" min={0} value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} placeholder="0" /></div>
-          <div className="space-y-1"><Label className="text-xs">Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pcs" /></div>
-          <div className="space-y-1 col-span-2"><Label className="text-xs">Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="aisle / bin" /></div>
-          <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
-          <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
-          <div className="space-y-1"><Label className="text-xs">CPV code</Label><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></div>
-          <div className="space-y-1"><Label className="text-xs">TARIC code</Label><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></div>
-          <div className="space-y-1"><Label className="text-xs">myDATA class. type</Label><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></div>
-          <div className="space-y-1"><Label className="text-xs">myDATA class. category</Label><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></div>
+        <div className="space-y-5">
+          <FormSection title="Stock">
+            <FormGrid>
+              <FormField label="Reorder point"><Input type="number" min={0} value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} placeholder="0" /></FormField>
+              <FormField label="Unit"><Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pcs" /></FormField>
+              <FormField label="Location" optional className="sm:col-span-2"><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="aisle / bin" /></FormField>
+            </FormGrid>
+          </FormSection>
+          <FormSection title="Codes">
+            <FormGrid>
+              <FormField label="Barcode" optional><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></FormField>
+              <FormField label="Serial number (S/N)" optional><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></FormField>
+              <FormField label="CPV code" optional><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></FormField>
+              <FormField label="TARIC code" optional><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></FormField>
+            </FormGrid>
+          </FormSection>
+          <FormSection title="myDATA classification">
+            <FormGrid>
+              <FormField label="Type" optional><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></FormField>
+              <FormField label="Category" optional><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></FormField>
+            </FormGrid>
+          </FormSection>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
@@ -893,7 +905,7 @@ const ListToMarketplaceDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>List “{item.name}” to Marketplace</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-5">
           {imageUrls.length > 0 && (
             <div className="flex gap-2 overflow-x-auto">
               {imageUrls.slice(0, 4).map((u) => (
@@ -902,70 +914,67 @@ const ListToMarketplaceDialog: React.FC<{
             </div>
           )}
 
-          <div className="space-y-1"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+          <FormSection title="Listing">
+            <FormGrid>
+              <FormField label="Title" className="sm:col-span-2"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></FormField>
+              <FormField label="Condition">
+                <Select value={condition} onValueChange={(v) => setCondition(v as ListingCondition)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{CONDITIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Batch / Lot" optional><Input value={batchLot} onChange={(e) => setBatchLot(e.target.value)} /></FormField>
+              <FormField label="Description" optional className="sm:col-span-2"><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Anything a buyer should know" /></FormField>
+            </FormGrid>
+          </FormSection>
 
-          {/* Suggested-price panel */}
-          <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            {loadingMeta ? (
-              <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking comparable surplus…</span>
-            ) : comps && comps.n > 0 ? (
-              <>Similar surplus: <span className="text-foreground font-medium">€{comps.min}–€{comps.max}</span> (median €{Math.round(comps.median ?? 0)}) across {comps.n} listing{comps.n === 1 ? '' : 's'}.</>
-            ) : (
-              <>No comparable surplus listed yet — you set the market.</>
-            )}
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label>Price (€)</Label>
-              <Input type="text" inputMode="decimal" value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value); }} />
-            </div>
-            <div className="space-y-1">
-              <Label>Qty ({item.unit})</Label>
-              <Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
-              <span className="text-[11px] text-muted-foreground">{available} available</span>
-            </div>
-            <div className="space-y-1">
-              <Label>Condition</Label>
-              <Select value={condition} onValueChange={(v) => setCondition(v as ListingCondition)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{CONDITIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Market price-cap feedback (surplus may not exceed market_median × (1 + cap%)). */}
-          {(pcLoading || pc) && (
-            <div className={`rounded-md border px-3 py-2 text-xs ${pcLoading || !pc || pc.unverified ? 'border-border/60 text-muted-foreground' : pc.allowed ? 'border-emerald-500/40 text-emerald-800 dark:text-emerald-400' : 'border-destructive/50 text-destructive'}`}>
-              {pcLoading ? (
-                <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking market price…</span>
-              ) : pc!.unverified ? (
-                <>No market price found for this item — it will be listed without a cap check.</>
-              ) : pc!.allowed ? (
-                <>✓ Within cap · market median €{Math.round(pc!.market_median ?? 0)} · max €{pc!.max_allowed} ({pc!.cap_pct}% over market)</>
+          <FormSection title="Price and quantity">
+            <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              {loadingMeta ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking comparable surplus…</span>
+              ) : comps && comps.n > 0 ? (
+                <>Similar surplus: <span className="text-foreground font-medium">€{comps.min}–€{comps.max}</span> (median €{Math.round(comps.median ?? 0)}) across {comps.n} listing{comps.n === 1 ? '' : 's'}.</>
               ) : (
-                <>✗ Over the {pc!.cap_pct}% cap · market median €{Math.round(pc!.market_median ?? 0)} · max allowed €{pc!.max_allowed}. Lower the price to list.</>
+                <>No comparable surplus listed yet — you set the market.</>
               )}
             </div>
-          )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Batch / Lot</Label><Input value={batchLot} onChange={(e) => setBatchLot(e.target.value)} placeholder="optional" /></div>
-            <div className="space-y-1"><Label>Location</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Athens" /></div>
-            <div className="space-y-1">
-              <Label>Delivery</Label>
-              <Select value={delivery} onValueChange={(v) => setDelivery(v as DeliveryOption)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{DELIVERY.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
+            <FormGrid>
+              <FormField label="Price (€)">
+                <Input type="text" inputMode="decimal" value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value); }} />
+              </FormField>
+              <FormField label={`Qty (${item.unit})`} hint={`${available} available`}>
+                <Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
+              </FormField>
+            </FormGrid>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Listing expires</Label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
-          </div>
+            {(pcLoading || pc) && (
+              <div className={`rounded-md border px-3 py-2 text-xs ${pcLoading || !pc || pc.unverified ? 'border-border/60 text-muted-foreground' : pc.allowed ? 'border-emerald-500/40 text-emerald-800 dark:text-emerald-400' : 'border-destructive/50 text-destructive'}`}>
+                {pcLoading ? (
+                  <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking market price…</span>
+                ) : pc!.unverified ? (
+                  <>No market price found for this item — it will be listed without a cap check.</>
+                ) : pc!.allowed ? (
+                  <>✓ Within cap · market median €{Math.round(pc!.market_median ?? 0)} · max €{pc!.max_allowed} ({pc!.cap_pct}% over market)</>
+                ) : (
+                  <>✗ Over the {pc!.cap_pct}% cap · market median €{Math.round(pc!.market_median ?? 0)} · max allowed €{pc!.max_allowed}. Lower the price to list.</>
+                )}
+              </div>
+            )}
+          </FormSection>
 
-          <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional — anything a buyer should know" /></div>
+          <FormSection title="Delivery">
+            <FormGrid cols={3}>
+              <FormField label="Location"><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Athens" /></FormField>
+              <FormField label="Delivery">
+                <Select value={delivery} onValueChange={(v) => setDelivery(v as DeliveryOption)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{DELIVERY.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Listing expires"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></FormField>
+            </FormGrid>
+          </FormSection>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

@@ -189,12 +189,12 @@ export const VatReturnPanel: React.FC<{ workspaceId: string; filingFrequency: Va
               </SelectContent>
             </Select>
             <div>
-              <Label htmlFor="vat-return-from" className="text-[11px] text-muted-foreground">From</Label>
+              <Label htmlFor="vat-return-from" className="text-xs text-muted-foreground">From</Label>
               <Input id="vat-return-from" type="date" className="mt-1 h-9 w-36 text-xs"
                 value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} />
             </div>
             <div>
-              <Label htmlFor="vat-return-to" className="text-[11px] text-muted-foreground">To</Label>
+              <Label htmlFor="vat-return-to" className="text-xs text-muted-foreground">To</Label>
               <Input id="vat-return-to" type="date" className="mt-1 h-9 w-36 text-xs"
                 value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} />
             </div>

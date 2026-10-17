@@ -7,6 +7,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -483,94 +484,96 @@ function JobDialog({ workspaceId, departments, posting, onDone, scope }: { works
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{isEdit ? 'Edit job posting' : 'New job posting'}</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Title *</Label><Input value={f.title} onChange={(e) => upd('title', e.target.value)} placeholder="Senior Product Designer" /></div>
-            <div className="space-y-1">
-              <Label>Department</Label>
-              <Select value={f.department_id || 'none'} onValueChange={(v) => upd('department_id', v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Type</Label>
-              <Select value={f.employment_type} onValueChange={(v) => upd('employment_type', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => <SelectItem key={t} value={t}>{EMPLOYMENT_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Work setup</Label>
-              <Select value={f.location_type || 'none'} onValueChange={(v) => upd('location_type', v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">—</SelectItem>
-                  {(Object.keys(LOCATION_TYPE_LABELS) as LocationType[]).map((t) => <SelectItem key={t} value={t}>{LOCATION_TYPE_LABELS[t]}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Location</Label><Input value={f.location} onChange={(e) => upd('location', e.target.value)} placeholder="United Kingdom; Ireland" /></div>
-            <div className="space-y-1"><Label>Level</Label><Input value={f.level} onChange={(e) => upd('level', e.target.value)} placeholder="P4" /></div>
-            <div className="space-y-1"><Label>Applications close</Label><Input type="date" value={f.closes_at} onChange={(e) => upd('closes_at', e.target.value)} /></div>
-          </div>
+        <div className="space-y-5">
+          <FormSection title="Role">
+            <FormGrid cols={6}>
+              <FormField label="Title *" className="sm:col-span-3"><Input value={f.title} onChange={(e) => upd('title', e.target.value)} placeholder="Senior Product Designer" /></FormField>
+              <FormField label="Department" optional className="sm:col-span-3">
+                <Select value={f.department_id || 'none'} onValueChange={(v) => upd('department_id', v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Type" className="sm:col-span-3">
+                <Select value={f.employment_type} onValueChange={(v) => upd('employment_type', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => <SelectItem key={t} value={t}>{EMPLOYMENT_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Work setup" optional className="sm:col-span-3">
+                <Select value={f.location_type || 'none'} onValueChange={(v) => upd('location_type', v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    {(Object.keys(LOCATION_TYPE_LABELS) as LocationType[]).map((t) => <SelectItem key={t} value={t}>{LOCATION_TYPE_LABELS[t]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Location" optional className="sm:col-span-2"><Input value={f.location} onChange={(e) => upd('location', e.target.value)} placeholder="United Kingdom; Ireland" /></FormField>
+              <FormField label="Level" optional className="sm:col-span-2"><Input value={f.level} onChange={(e) => upd('level', e.target.value)} placeholder="P4" /></FormField>
+              <FormField label="Applications close" optional className="sm:col-span-2"><Input type="date" value={f.closes_at} onChange={(e) => upd('closes_at', e.target.value)} /></FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label className="flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-primary" /> AI job description</Label>
-              <Button size="sm" variant="outline" className="h-8" onClick={generate} disabled={aiBusy}>{aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate'}</Button>
-            </div>
-            <Input value={f.keywords} onChange={(e) => upd('keywords', e.target.value)} placeholder="Must-haves / keywords (e.g. Figma, design systems, 5+ yrs)" />
-          </div>
-
-          <div className="space-y-1"><Label>Description</Label><Textarea rows={6} value={f.description} onChange={(e) => upd('description', e.target.value)} placeholder="Role overview & responsibilities (markdown)" /></div>
-          <div className="space-y-1"><Label>Requirements</Label><Textarea rows={4} value={f.requirements} onChange={(e) => upd('requirements', e.target.value)} /></div>
-          <p className="text-xs text-muted-foreground">Both fields render as Markdown on the public page — use <code>##</code> headings and <code>-</code> bullets.</p>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Salary min</Label><Input type="text" inputMode="decimal" value={f.salary_min} onChange={(e) => upd('salary_min', e.target.value)} /></div>
-            <div className="space-y-1"><Label>Salary max</Label><Input type="text" inputMode="decimal" value={f.salary_max} onChange={(e) => upd('salary_max', e.target.value)} /></div>
-            <div className="space-y-1"><Label>Currency</Label><Input value={f.currency} onChange={(e) => upd('currency', e.target.value.toUpperCase())} placeholder="EUR" /></div>
-          </div>
-
-          {/* Optional per-region bands — when present they replace the flat range on the public page. */}
-          <div className="rounded-xl border border-border/60 p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label>Compensation by region <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <Button size="sm" variant="outline" className="h-8" onClick={addComp}><Plus className="h-3.5 w-3.5 mr-1" />Add region</Button>
-            </div>
-            {comp.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Leave empty to show the single salary range above.</p>
-            ) : comp.map((r, i) => (
-              <div key={i} className="rounded-lg border border-border/40 p-2 space-y-2">
-                <div className="grid grid-cols-[1fr_auto] gap-2">
-                  <Input value={r.region} onChange={(e) => updComp(i, { region: e.target.value })} placeholder="United Kingdom" className="h-8" />
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => setComp((rows) => rows.filter((_, idx) => idx !== i))}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Input value={r.min} inputMode="decimal" onChange={(e) => updComp(i, { min: e.target.value })} placeholder="Min" className="h-8" />
-                  <Input value={r.max} inputMode="decimal" onChange={(e) => updComp(i, { max: e.target.value })} placeholder="Max" className="h-8" />
-                  <Input value={r.currency} onChange={(e) => updComp(i, { currency: e.target.value.toUpperCase() })} placeholder="GBP" className="h-8" />
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={r.equity} onCheckedChange={(v) => updComp(i, { equity: v === true })} />Offers equity</label>
-                  <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={r.bonus} onCheckedChange={(v) => updComp(i, { bonus: v === true })} />Offers bonus</label>
-                </div>
+          <FormSection title="Description">
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-primary" /> AI job description</Label>
+                <Button size="sm" variant="outline" className="h-8" onClick={generate} disabled={aiBusy}>{aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate'}</Button>
               </div>
-            ))}
-            <div className="space-y-1">
-              <Label className="text-xs">Compensation note</Label>
-              <Textarea rows={2} value={f.compensation_note} onChange={(e) => upd('compensation_note', e.target.value)} placeholder="How you determine compensation, link to your philosophy, etc." />
+              <Input value={f.keywords} onChange={(e) => upd('keywords', e.target.value)} placeholder="Must-haves / keywords (e.g. Figma, design systems, 5+ yrs)" />
             </div>
-          </div>
 
-          {/* What the public application form asks for. */}
-          <div className="rounded-xl border border-border/60 p-3 space-y-2">
-            <Label>Application form</Label>
+            <FormGrid cols={1}>
+              <FormField label="Description" optional><Textarea rows={6} value={f.description} onChange={(e) => upd('description', e.target.value)} placeholder="Role overview & responsibilities (markdown)" /></FormField>
+              <FormField
+                label="Requirements"
+                optional
+                hint={<>Both fields render as Markdown on the public page — use <code>##</code> headings and <code>-</code> bullets.</>}
+              >
+                <Textarea rows={4} value={f.requirements} onChange={(e) => upd('requirements', e.target.value)} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Pay">
+            <FormGrid cols={3}>
+              <FormField label="Salary min" optional><Input type="text" inputMode="decimal" value={f.salary_min} onChange={(e) => upd('salary_min', e.target.value)} /></FormField>
+              <FormField label="Salary max" optional><Input type="text" inputMode="decimal" value={f.salary_max} onChange={(e) => upd('salary_max', e.target.value)} /></FormField>
+              <FormField label="Currency"><Input value={f.currency} onChange={(e) => upd('currency', e.target.value.toUpperCase())} placeholder="EUR" /></FormField>
+            </FormGrid>
+
+            <div className="rounded-xl border border-border/60 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Compensation by region <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Button size="sm" variant="outline" className="h-8" onClick={addComp}><Plus className="h-3.5 w-3.5 mr-1" />Add region</Button>
+              </div>
+              {comp.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Leave empty to show the single salary range above.</p>
+              ) : comp.map((r, i) => (
+                <div key={i} className="rounded-lg border border-border/40 p-2 space-y-2">
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <Input value={r.region} onChange={(e) => updComp(i, { region: e.target.value })} placeholder="United Kingdom" className="h-8" />
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => setComp((rows) => rows.filter((_, idx) => idx !== i))}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input value={r.min} inputMode="decimal" onChange={(e) => updComp(i, { min: e.target.value })} placeholder="Min" className="h-8" />
+                    <Input value={r.max} inputMode="decimal" onChange={(e) => updComp(i, { max: e.target.value })} placeholder="Max" className="h-8" />
+                    <Input value={r.currency} onChange={(e) => updComp(i, { currency: e.target.value.toUpperCase() })} placeholder="GBP" className="h-8" />
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={r.equity} onCheckedChange={(v) => updComp(i, { equity: v === true })} />Offers equity</label>
+                    <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={r.bonus} onCheckedChange={(v) => updComp(i, { bonus: v === true })} />Offers bonus</label>
+                  </div>
+                </div>
+              ))}
+              <FormField label="Compensation note" optional>
+                <Textarea rows={2} value={f.compensation_note} onChange={(e) => upd('compensation_note', e.target.value)} placeholder="How you determine compensation, link to your philosophy, etc." />
+              </FormField>
+            </div>
+          </FormSection>
+
+          <FormSection title="Application form">
             <div className="grid grid-cols-2 gap-2 text-sm">
               {([
                 ['require_resume', 'Require a résumé (PDF)'], ['ask_phone', 'Ask for phone'],
@@ -582,7 +585,7 @@ function JobDialog({ workspaceId, departments, posting, onDone, scope }: { works
                 </label>
               ))}
             </div>
-          </div>
+          </FormSection>
         </div>
         <DialogFooter>
           {isEdit ? (

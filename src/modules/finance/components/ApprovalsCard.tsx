@@ -230,7 +230,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
         {draft && (
           <div className="grid gap-2 rounded-md border border-hairline p-3 sm:grid-cols-3">
             <div>
-              <Label className="text-[11px]">Subject</Label>
+              <Label className="text-xs">Subject</Label>
               <Select
                 value={draft.subject}
                 onValueChange={(v) => setDraft((d) => (d ? { ...d, subject: v as ApprovalSubject } : d))}
@@ -242,7 +242,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
               </Select>
             </div>
             <div>
-              <Label className="text-[11px]">Applies to role</Label>
+              <Label className="text-xs">Applies to role</Label>
               <Select
                 value={draft.workspace_role ?? '__all'}
                 onValueChange={(v) => setDraft((d) => (d ? { ...d, workspace_role: v === '__all' ? null : v } : d))}
@@ -255,7 +255,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
               </Select>
             </div>
             <div>
-              <Label className="text-[11px]">Approver role</Label>
+              <Label className="text-xs">Approver role</Label>
               <Select
                 value={draft.approver_role ?? '__none'}
                 onValueChange={(v) => setDraft((d) => (d ? { ...d, approver_role: v === '__none' ? null : v } : d))}
@@ -268,21 +268,21 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
               </Select>
             </div>
             <div>
-              <Label className="text-[11px]">Band from</Label>
+              <Label className="text-xs">Band from</Label>
               <Input
                 type="number" className="mt-1 h-8 text-xs" value={String(draft.band_from ?? 0)}
                 onChange={(e) => setDraft((d) => (d ? { ...d, band_from: Number(e.target.value) } : d))}
               />
             </div>
             <div>
-              <Label className="text-[11px]">Band to (blank = no ceiling)</Label>
+              <Label className="text-xs">Band to (blank = no ceiling)</Label>
               <Input
                 type="number" className="mt-1 h-8 text-xs" value={draft.band_to == null ? '' : String(draft.band_to)}
                 onChange={(e) => setDraft((d) => (d ? { ...d, band_to: e.target.value === '' ? null : Number(e.target.value) } : d))}
               />
             </div>
             <div>
-              <Label className="text-[11px]">Action</Label>
+              <Label className="text-xs">Action</Label>
               <Select
                 value={draft.action ?? 'warn'}
                 onValueChange={(v) => setDraft((d) => (d ? { ...d, action: v as ApprovalAction } : d))}
@@ -297,7 +297,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
             {draft.subject === 'margin_floor' && (
               <>
                 <div>
-                  <Label className="text-[11px]">Minimum margin %</Label>
+                  <Label className="text-xs">Minimum margin %</Label>
                   <Input
                     type="number" className="mt-1 h-8 text-xs"
                     value={draft.min_margin_percent == null ? '' : String(draft.min_margin_percent)}
@@ -305,7 +305,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px]">Maximum discount %</Label>
+                  <Label className="text-xs">Maximum discount %</Label>
                   <Input
                     type="number" className="mt-1 h-8 text-xs"
                     value={draft.max_discount_percent == null ? '' : String(draft.max_discount_percent)}
@@ -318,14 +318,14 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
             {draft.subject === 'credit_hold' && (
               <>
                 <div>
-                  <Label className="text-[11px]">Grace days</Label>
+                  <Label className="text-xs">Grace days</Label>
                   <Input
                     type="number" className="mt-1 h-8 text-xs" value={String(draft.grace_days ?? 0)}
                     onChange={(e) => setDraft((d) => (d ? { ...d, grace_days: Number(e.target.value) } : d))}
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px]">Counted as</Label>
+                  <Label className="text-xs">Counted as</Label>
                   <Select
                     value={draft.grace_basis ?? 'calendar'}
                     onValueChange={(v) => setDraft((d) => (d ? { ...d, grace_basis: v as 'calendar' | 'working' } : d))}

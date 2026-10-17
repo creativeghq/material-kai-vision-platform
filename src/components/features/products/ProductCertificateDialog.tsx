@@ -5,7 +5,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -66,68 +66,71 @@ export function ProductCertificateDialog({ productId, draft, onClose, onSaved }:
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Label htmlFor="cert-standard">Standard</Label>
-            <Input
-              id="cert-standard" value={form.standard}
-              onChange={(e) => set('standard', e.target.value)}
-              placeholder="EN 13501-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="cert-result">Result</Label>
-            <Input
-              id="cert-result" value={form.result}
-              onChange={(e) => set('result', e.target.value)}
-              placeholder="A1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="cert-number">Certificate number</Label>
-            <Input
-              id="cert-number" value={form.certificate_number}
-              onChange={(e) => set('certificate_number', e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="cert-issuer">Issuer</Label>
-            <Input
-              id="cert-issuer" value={form.issuer}
-              onChange={(e) => set('issuer', e.target.value)}
-              placeholder="Notified body or laboratory"
-            />
-          </div>
-          <div>
-            <Label htmlFor="cert-scope">Scope</Label>
-            <Input
-              id="cert-scope" value={form.scope}
-              onChange={(e) => set('scope', e.target.value)}
-              placeholder="What the certificate covers"
-            />
-          </div>
-          <div>
-            <Label htmlFor="cert-from">Valid from</Label>
-            <Input
-              id="cert-from" type="date" value={form.valid_from}
-              onChange={(e) => set('valid_from', e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="cert-until">Valid until</Label>
-            <Input
-              id="cert-until" type="date" value={form.valid_until}
-              onChange={(e) => set('valid_until', e.target.value)}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="cert-notes">Notes</Label>
-            <Textarea
-              id="cert-notes" value={form.notes} rows={2}
-              onChange={(e) => set('notes', e.target.value)}
-              placeholder="Internal — never shown outside this workspace"
-            />
-          </div>
+        <div className="space-y-5">
+          <FormSection title="Certificate">
+            <FormGrid>
+              <FormField label="Standard" htmlFor="cert-standard" className="sm:col-span-2">
+                <Input
+                  id="cert-standard" value={form.standard}
+                  onChange={(e) => set('standard', e.target.value)}
+                  placeholder="EN 13501-1"
+                />
+              </FormField>
+              <FormField label="Result" htmlFor="cert-result" optional>
+                <Input
+                  id="cert-result" value={form.result}
+                  onChange={(e) => set('result', e.target.value)}
+                  placeholder="A1"
+                />
+              </FormField>
+              <FormField label="Certificate number" htmlFor="cert-number" optional>
+                <Input
+                  id="cert-number" value={form.certificate_number}
+                  onChange={(e) => set('certificate_number', e.target.value)}
+                />
+              </FormField>
+              <FormField label="Issuer" htmlFor="cert-issuer" optional>
+                <Input
+                  id="cert-issuer" value={form.issuer}
+                  onChange={(e) => set('issuer', e.target.value)}
+                  placeholder="Notified body or laboratory"
+                />
+              </FormField>
+              <FormField label="Scope" htmlFor="cert-scope" optional>
+                <Input
+                  id="cert-scope" value={form.scope}
+                  onChange={(e) => set('scope', e.target.value)}
+                  placeholder="What the certificate covers"
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Validity">
+            <FormGrid>
+              <FormField label="Valid from" htmlFor="cert-from" optional>
+                <Input
+                  id="cert-from" type="date" value={form.valid_from}
+                  onChange={(e) => set('valid_from', e.target.value)}
+                />
+              </FormField>
+              <FormField label="Valid until" htmlFor="cert-until" optional>
+                <Input
+                  id="cert-until" type="date" value={form.valid_until}
+                  onChange={(e) => set('valid_until', e.target.value)}
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Notes">
+            <FormField label="Notes" htmlFor="cert-notes" optional hint="Internal — never shown outside this workspace.">
+              <Textarea
+                id="cert-notes" value={form.notes} rows={2}
+                onChange={(e) => set('notes', e.target.value)}
+              />
+            </FormField>
+          </FormSection>
         </div>
 
         <DialogFooter>

@@ -949,8 +949,8 @@ const LineCard: React.FC<{
               <Field className="sm:col-span-3" label="Description">
                 <Input className="h-8 text-xs" value={row.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Product name" />
               </Field>
-              <Field label="Code (SKU)">
-                <Input className="h-8 text-xs" value={row.sku} onChange={(e) => onChange({ sku: e.target.value })} placeholder="optional" />
+              <Field label="Code (SKU, optional)">
+                <Input className="h-8 text-xs" value={row.sku} onChange={(e) => onChange({ sku: e.target.value })} />
               </Field>
               <Field label="Type">
                 <Select value={row.itemType} onValueChange={(v) => onChange({ itemType: v })}>
@@ -1124,7 +1124,7 @@ const LineCard: React.FC<{
               onChange={(m) => onChange({ match: m })}
             />
             <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Photos</Label>
+              <Label className="text-xs text-muted-foreground">Photos</Label>
               <div className="flex flex-wrap items-center gap-2">
                 {row.images.map((img) => (
                   <div key={img.storage_path} className="relative">
@@ -1183,7 +1183,7 @@ const NONE_OPT = '__none';
 
 const Field: React.FC<{ label: React.ReactNode; children: React.ReactNode; className?: string }> = ({ label, children, className }) => (
   <div className={`space-y-1 min-w-0 ${className ?? ''}`}>
-    <Label className="block truncate text-[11px] text-muted-foreground">{label}</Label>
+    <Label className="block truncate text-xs text-muted-foreground">{label}</Label>
     {children}
   </div>
 );
@@ -1260,7 +1260,7 @@ const CatalogMatchPicker: React.FC<{
   if (value) {
     return (
       <div className="space-y-1">
-        <Label className="text-[11px] text-muted-foreground">Catalog product</Label>
+        <Label className="text-xs text-muted-foreground">Catalog product</Label>
         <div className="flex items-center gap-2 rounded-md border border-border/60 px-2 py-1.5">
           {value.image_url
             ? <img src={value.image_url} alt="" className="h-8 w-8 rounded object-cover" />
@@ -1281,7 +1281,7 @@ const CatalogMatchPicker: React.FC<{
 
   return (
     <div className="space-y-1">
-      <Label className="text-[11px] text-muted-foreground">Catalog product</Label>
+      <Label className="text-xs text-muted-foreground">Catalog product</Label>
       {!open ? (
         <Button type="button" size="sm" variant="outline" className="h-8 w-full justify-start"
           onClick={() => setOpen(true)}>

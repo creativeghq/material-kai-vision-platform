@@ -147,7 +147,7 @@ export const DealDrawer: React.FC<Props> = ({ deal, stages, canManage, onClose, 
           {canManage && (
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
-                <Label className="text-[11px] text-muted-foreground" htmlFor="drawer-stage">Stage</Label>
+                <Label className="text-xs text-muted-foreground" htmlFor="drawer-stage">Stage</Label>
                 <Select value={deal.stage} onValueChange={moveStage}>
                   <SelectTrigger id="drawer-stage" className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>

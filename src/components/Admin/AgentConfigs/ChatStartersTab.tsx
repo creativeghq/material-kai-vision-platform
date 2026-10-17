@@ -17,6 +17,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { HubEmptyState } from '@/components/core/hub';
 import {
@@ -411,130 +412,120 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-          <div>
-            <Label>Name</Label>
-            <Input value={form.name} onChange={(e) => patch({ name: e.target.value })} className="mt-1" />
-          </div>
-          <div>
-            <Label>Agent</Label>
-            <Select value={form.category} onValueChange={(v) => patch({ category: v })}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {AGENT_OPTIONS.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-5 py-4">
+          <FormSection title="Starter">
+            <FormGrid>
+              <FormField label="Name">
+                <Input value={form.name} onChange={(e) => patch({ name: e.target.value })} />
+              </FormField>
+              <FormField label="Agent">
+                <Select value={form.category} onValueChange={(v) => patch({ category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {AGENT_OPTIONS.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Group" hint="The UI label the starter is grouped under.">
+                <Input
+                  value={config.group ?? ''}
+                  onChange={(e) => patchConfig({ group: e.target.value })}
+                  placeholder="B2B Research / Material Specs / Staging / SEO"
+                />
+              </FormField>
+              <FormField label="Slug" hint={!isNew ? 'Slug is immutable after creation.' : undefined}>
+                <Input
+                  value={form.subcategory ?? ''}
+                  onChange={(e) => patch({ subcategory: e.target.value })}
+                  placeholder="auto-derived from name if empty"
+                  disabled={!isNew}
+                />
+              </FormField>
+              <FormField label="Description" className="sm:col-span-2">
+                <Input
+                  value={form.description ?? ''}
+                  onChange={(e) => patch({ description: e.target.value })}
+                  placeholder="One-line summary shown under the name in the picker."
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div>
-            <Label>Group (UI label)</Label>
-            <Input
-              value={config.group ?? ''}
-              onChange={(e) => patchConfig({ group: e.target.value })}
-              placeholder="B2B Research / Material Specs / Staging / SEO"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label>Slug</Label>
-            <Input
-              value={form.subcategory ?? ''}
-              onChange={(e) => patch({ subcategory: e.target.value })}
-              placeholder="auto-derived from name if empty"
-              disabled={!isNew}
-              className="mt-1"
-            />
-            {!isNew && (
-              <p className="text-[10px] text-muted-foreground mt-1">Slug is immutable after creation.</p>
-            )}
-          </div>
+          <FormSection title="Prompt">
+            <FormGrid>
+              <FormField
+                label="Prompt text"
+                hint="Phrase this to reliably trigger the intended skill — include the skill's trigger verbs (research, verify, identify, stage, extract) + the inputs it expects."
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  value={form.prompt_text}
+                  onChange={(e) => patch({ prompt_text: e.target.value })}
+                  className="font-mono text-sm min-h-[200px]"
+                  placeholder="What the agent receives when this starter is inserted. Use {variable} placeholders."
+                />
+              </FormField>
+              <FormField label="Skill hint" optional>
+                <Input
+                  value={config.skill_hint ?? ''}
+                  onChange={(e) => patchConfig({ skill_hint: e.target.value || null })}
+                  placeholder="e.g. b2b-manufacturer-research"
+                />
+              </FormField>
+              <FormField label="Credit estimate" optional>
+                <Input
+                  value={config.credit_estimate ?? ''}
+                  onChange={(e) => patchConfig({ credit_estimate: e.target.value || null })}
+                  placeholder="1-2 / 15-20 / etc"
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div className="sm:col-span-2">
-            <Label>Description</Label>
-            <Input
-              value={form.description ?? ''}
-              onChange={(e) => patch({ description: e.target.value })}
-              placeholder="One-line summary shown under the name in the picker."
-              className="mt-1"
-            />
-          </div>
+          <FormSection title="Availability">
+            <FormGrid>
+              <FormField label="Visibility">
+                <Select value={config.visibility ?? 'all'} onValueChange={(v) => patchConfig({ visibility: v as 'all' | 'admin' })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All users</SelectItem>
+                    <SelectItem value="admin">Admin / Owner only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 sm:col-span-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={config.requires_image ?? false}
+                    onCheckedChange={(c) => patchConfig({ requires_image: c })}
+                    id="requires_image"
+                  />
+                  <Label htmlFor="requires_image" className="text-sm">Requires image</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={form.is_default}
+                    onCheckedChange={(c) => patch({ is_default: c })}
+                    id="is_default"
+                  />
+                  <Label htmlFor="is_default" className="text-sm">Default (pinned in picker)</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={form.is_active}
+                    onCheckedChange={(c) => patch({ is_active: c })}
+                    id="is_active"
+                  />
+                  <Label htmlFor="is_active" className="text-sm">Active</Label>
+                </div>
+              </div>
+            </FormGrid>
+          </FormSection>
 
-          <div className="sm:col-span-2">
-            <Label>Prompt text</Label>
-            <Textarea
-              value={form.prompt_text}
-              onChange={(e) => patch({ prompt_text: e.target.value })}
-              className="font-mono text-sm min-h-[200px] mt-1"
-              placeholder="What the agent receives when this starter is inserted. Use {variable} placeholders."
-            />
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Phrase this to reliably trigger the intended skill — include the skill's trigger verbs (research, verify, identify, stage, extract) + the inputs it expects.
-            </p>
-          </div>
-
-          <div>
-            <Label>Visibility</Label>
-            <Select value={config.visibility ?? 'all'} onValueChange={(v) => patchConfig({ visibility: v as 'all' | 'admin' })}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All users</SelectItem>
-                <SelectItem value="admin">Admin / Owner only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Skill hint (optional)</Label>
-            <Input
-              value={config.skill_hint ?? ''}
-              onChange={(e) => patchConfig({ skill_hint: e.target.value || null })}
-              placeholder="e.g. b2b-manufacturer-research"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label>Credit estimate (optional)</Label>
-            <Input
-              value={config.credit_estimate ?? ''}
-              onChange={(e) => patchConfig({ credit_estimate: e.target.value || null })}
-              placeholder="1-2 / 15-20 / etc"
-              className="mt-1"
-            />
-          </div>
-
-          <div className="flex items-center gap-6 pt-6">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={config.requires_image ?? false}
-                onCheckedChange={(c) => patchConfig({ requires_image: c })}
-                id="requires_image"
-              />
-              <Label htmlFor="requires_image" className="text-sm">Requires image</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={form.is_default}
-                onCheckedChange={(c) => patch({ is_default: c })}
-                id="is_default"
-              />
-              <Label htmlFor="is_default" className="text-sm">Default (pinned in picker)</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={form.is_active}
-                onCheckedChange={(c) => patch({ is_active: c })}
-                id="is_active"
-              />
-              <Label htmlFor="is_active" className="text-sm">Active</Label>
-            </div>
-          </div>
-
-          <div className="sm:col-span-2 pt-4 border-t">
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-semibold">Variables</Label>
-              <Button size="sm" variant="outline" onClick={addVar}>
-                <Plus className="h-3 w-3 mr-1" />Add variable
-              </Button>
-            </div>
+          <FormSection
+            title="Variables"
+            description={<>Use the <code>key</code> in the prompt text as <code>{'{key}'}</code>. Defaults pre-fill the picker form.</>}
+          >
             {vars.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No variables. The prompt is inserted as-is when picked.
@@ -543,18 +534,15 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
               <div className="space-y-2">
                 {vars.map((v, i) => (
                   <div key={i} className="grid grid-cols-[1fr_1fr_2fr_auto] gap-2 items-end">
-                    <div>
-                      <Label className="text-[10px]">key</Label>
+                    <FormField label="key">
                       <Input value={v.key} onChange={(e) => setVar(i, { key: e.target.value })} placeholder="N / region / company" />
-                    </div>
-                    <div>
-                      <Label className="text-[10px]">default</Label>
+                    </FormField>
+                    <FormField label="default">
                       <Input value={v.default} onChange={(e) => setVar(i, { default: e.target.value })} placeholder="10" />
-                    </div>
-                    <div>
-                      <Label className="text-[10px]">description</Label>
+                    </FormField>
+                    <FormField label="description">
                       <Input value={v.description ?? ''} onChange={(e) => setVar(i, { description: e.target.value })} placeholder="Helper text shown in the form" />
-                    </div>
+                    </FormField>
                     <Button size="icon" variant="ghost" onClick={() => removeVar(i)}>
                       <Trash2 className="h-3.5 w-3.5 text-red-500" />
                     </Button>
@@ -562,10 +550,10 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
                 ))}
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground mt-2">
-              Use the <code>key</code> in the prompt text as <code>{'{key}'}</code>. Defaults pre-fill the picker form.
-            </p>
-          </div>
+            <Button size="sm" variant="outline" onClick={addVar}>
+              <Plus className="h-3 w-3 mr-1" />Add variable
+            </Button>
+          </FormSection>
         </div>
 
         <DialogFooter>

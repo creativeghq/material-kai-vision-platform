@@ -370,7 +370,7 @@ export const SupplierInboundDocs: React.FC<{
           <span className="text-[11px] font-semibold text-muted-foreground">Issued</span>
         </div>
         <div className="space-y-1">
-          <Label htmlFor={`${fieldId}-from`} className="text-[10px] uppercase tracking-wide text-muted-foreground">From</Label>
+          <Label htmlFor={`${fieldId}-from`} className="text-xs uppercase tracking-wide text-muted-foreground">From</Label>
           <Input
             id={`${fieldId}-from`}
             type="date"
@@ -382,7 +382,7 @@ export const SupplierInboundDocs: React.FC<{
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor={`${fieldId}-to`} className="text-[10px] uppercase tracking-wide text-muted-foreground">To</Label>
+          <Label htmlFor={`${fieldId}-to`} className="text-xs uppercase tracking-wide text-muted-foreground">To</Label>
           <Input
             id={`${fieldId}-to`}
             type="date"

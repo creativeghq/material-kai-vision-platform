@@ -11,7 +11,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -170,82 +170,72 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="single">
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs">Site type</Label>
-            <Select value={siteType} onValueChange={setSiteType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {SITE_TYPE_OPTIONS.map(o => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">
-              {isPerplexity ? 'Domain (e.g. kariera.gr — no protocol)' : 'Full URL'}
-            </Label>
-            <Input
-              value={urlOrDomain}
-              onChange={(e) => setUrlOrDomain(e.target.value)}
-              placeholder={
-                isPerplexity
-                  ? 'kariera.gr'
-                  : siteType === 'rss_feed_default'
-                  ? 'https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss'
-                  : 'https://stripe.com/jobs'
-              }
-            />
-            {isPerplexity && (
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Perplexity caps the filter at 10 domains. Disable a less-used one if you're at the limit.
-              </p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Display name (optional)</Label>
-              <Input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Kariera.gr"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Country (ISO-2, optional)</Label>
-              <Input
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value.toUpperCase())}
-                maxLength={3}
-                placeholder="GR"
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs">Category (optional)</Label>
-            <Input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="general | tech | remote | startup | finance | ..."
-            />
-          </div>
-          <div>
-            <Label className="text-xs">Notes (optional)</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Why we added this, who curated it, etc."
-              rows={2}
-            />
-          </div>
-        </div>
+            <FormGrid>
+              <FormField label="Site type" className="sm:col-span-2">
+                <Select value={siteType} onValueChange={setSiteType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SITE_TYPE_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField
+                label={isPerplexity ? 'Domain' : 'Full URL'}
+                hint={isPerplexity
+                  ? "No protocol, e.g. kariera.gr. Perplexity caps the filter at 10 domains. Disable a less-used one if you're at the limit."
+                  : undefined}
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={urlOrDomain}
+                  onChange={(e) => setUrlOrDomain(e.target.value)}
+                  placeholder={
+                    isPerplexity
+                      ? 'kariera.gr'
+                      : siteType === 'rss_feed_default'
+                      ? 'https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss'
+                      : 'https://stripe.com/jobs'
+                  }
+                />
+              </FormField>
+              <FormField label="Display name" optional>
+                <Input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Kariera.gr"
+                />
+              </FormField>
+              <FormField label="Country" optional hint="ISO-2 code.">
+                <Input
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value.toUpperCase())}
+                  maxLength={3}
+                  placeholder="GR"
+                />
+              </FormField>
+              <FormField label="Category" optional className="sm:col-span-2">
+                <Input
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="general | tech | remote | startup | finance | ..."
+                />
+              </FormField>
+              <FormField label="Notes" optional className="sm:col-span-2">
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Why we added this, who curated it, etc."
+                  rows={2}
+                />
+              </FormField>
+            </FormGrid>
           </TabsContent>
 
           <TabsContent value="bulk">
-            <div className="space-y-3">
-              <div>
-                <Label className="text-xs">Scope</Label>
+            <FormGrid>
+              <FormField label="Scope" className="sm:col-span-2">
                 <Select value={bulkScope} onValueChange={v => setBulkScope(v as BulkScope)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -253,11 +243,10 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
                     <SelectItem value="per_search">Pin to ONE specific tracked search</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
 
               {bulkScope === 'global' && (
-                <div>
-                  <Label className="text-xs">Site type</Label>
+                <FormField label="Site type" className="sm:col-span-2">
                   <Select value={bulkSiteType} onValueChange={setBulkSiteType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -266,13 +255,15 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </FormField>
               )}
 
               {bulkScope === 'per_search' && (
                 <>
-                  <div>
-                    <Label className="text-xs">Which tracked search?</Label>
+                  <FormField
+                    label="Which tracked search?"
+                    hint={trackedJobs.length === 0 ? 'No tracked searches yet. Create one via KAI first.' : undefined}
+                  >
                     <Select value={bulkTrackedJobId} onValueChange={setBulkTrackedJobId}>
                       <SelectTrigger>
                         <SelectValue placeholder={trackedJobs.length ? 'Pick a tracked search…' : 'Loading…'} />
@@ -283,12 +274,8 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
                         ))}
                       </SelectContent>
                     </Select>
-                    {trackedJobs.length === 0 && (
-                      <p className="text-[11px] text-muted-foreground mt-1">No tracked searches yet. Create one via KAI first.</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs">URL type</Label>
+                  </FormField>
+                  <FormField label="URL type">
                     <Select value={bulkField} onValueChange={v => setBulkField(v as 'careers_page_urls' | 'rss_feed_urls')}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -296,12 +283,15 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
                         <SelectItem value="rss_feed_urls">RSS / Atom feeds</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  </FormField>
                 </>
               )}
 
-              <div>
-                <Label className="text-xs">URLs (one per line)</Label>
+              <FormField
+                label="URLs"
+                hint="One per line. Whitespace trimmed, duplicates skipped, blank lines ignored. Max 200 per request."
+                className="sm:col-span-2"
+              >
                 <Textarea
                   value={bulkUrls}
                   onChange={(e) => setBulkUrls(e.target.value)}
@@ -315,31 +305,25 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
                   rows={8}
                   className="font-mono text-xs"
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Whitespace trimmed, duplicates skipped, blank lines ignored. Max 200 per request.
-                </p>
-              </div>
+              </FormField>
 
               {bulkScope === 'global' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">Country (optional)</Label>
+                <>
+                  <FormField label="Country" optional>
                     <Input value={bulkCountry} onChange={(e) => setBulkCountry(e.target.value.toUpperCase())} maxLength={3} placeholder="GR" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Category (optional)</Label>
+                  </FormField>
+                  <FormField label="Category" optional>
                     <Input value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} placeholder="general | tech | remote | ..." />
-                  </div>
-                </div>
+                  </FormField>
+                </>
               )}
 
               {bulkScope === 'global' && (
-                <div>
-                  <Label className="text-xs">Notes (optional, applied to all rows)</Label>
+                <FormField label="Notes" optional hint="Applied to all rows." className="sm:col-span-2">
                   <Input value={bulkNotes} onChange={(e) => setBulkNotes(e.target.value)} placeholder="Imported from operator's list…" />
-                </div>
+                </FormField>
               )}
-            </div>
+            </FormGrid>
           </TabsContent>
         </Tabs>
 

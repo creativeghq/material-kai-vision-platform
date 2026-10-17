@@ -568,7 +568,7 @@ const Grid: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const FieldBox: React.FC<{ label: string; className?: string; children: React.ReactNode }> =
   ({ label, className, children }) => (
     <div className={`space-y-1 ${className ?? ''}`}>
-      <Label className="text-[11px] text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

@@ -154,12 +154,12 @@ export const PackagingComponentsPanel: React.FC<Props> = ({ workspaceId, product
 
       <div className="flex flex-wrap items-end gap-2">
         <div>
-          <Label htmlFor="pkc-name" className="text-[11px]">Component</Label>
+          <Label htmlFor="pkc-name" className="text-xs">Component</Label>
           <Input id="pkc-name" className="mt-1 h-8 w-36 text-xs" value={draft.name}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
         </div>
         <div>
-          <Label htmlFor="pkc-tier" className="text-[11px]">Tier</Label>
+          <Label htmlFor="pkc-tier" className="text-xs">Tier</Label>
           <Select value={draft.tier} onValueChange={(v) => setDraft((d) => ({ ...d, tier: v as PackagingTier }))}>
             <SelectTrigger id="pkc-tier" className="mt-1 h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -168,7 +168,7 @@ export const PackagingComponentsPanel: React.FC<Props> = ({ workspaceId, product
           </Select>
         </div>
         <div>
-          <Label htmlFor="pkc-mat" className="text-[11px]">Material</Label>
+          <Label htmlFor="pkc-mat" className="text-xs">Material</Label>
           <Select value={draft.material} onValueChange={(v) => setDraft((d) => ({ ...d, material: v }))}>
             <SelectTrigger id="pkc-mat" className="mt-1 h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -177,17 +177,17 @@ export const PackagingComponentsPanel: React.FC<Props> = ({ workspaceId, product
           </Select>
         </div>
         <div>
-          <Label htmlFor="pkc-g" className="text-[11px]">Grams</Label>
+          <Label htmlFor="pkc-g" className="text-xs">Grams</Label>
           <Input id="pkc-g" type="number" min="0" className="mt-1 h-8 w-24 text-xs" value={draft.grams}
             onChange={(e) => setDraft((d) => ({ ...d, grams: e.target.value }))} />
         </div>
         <div>
-          <Label htmlFor="pkc-p" className="text-[11px]">Pieces</Label>
+          <Label htmlFor="pkc-p" className="text-xs">Pieces</Label>
           <Input id="pkc-p" type="number" min="0" className="mt-1 h-8 w-20 text-xs" value={draft.pieces}
             onChange={(e) => setDraft((d) => ({ ...d, pieces: e.target.value }))} />
         </div>
         <div>
-          <Label htmlFor="pkc-grade" className="text-[11px]">Recyclability</Label>
+          <Label htmlFor="pkc-grade" className="text-xs">Recyclability</Label>
           <Select value={draft.grade} onValueChange={(v) => setDraft((d) => ({ ...d, grade: v as RecyclabilityGrade }))}>
             <SelectTrigger id="pkc-grade" className="mt-1 h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -196,7 +196,7 @@ export const PackagingComponentsPanel: React.FC<Props> = ({ workspaceId, product
           </Select>
         </div>
         <div>
-          <Label htmlFor="pkc-rec" className="text-[11px]">Recycled %</Label>
+          <Label htmlFor="pkc-rec" className="text-xs">Recycled %</Label>
           <Input id="pkc-rec" type="number" min="0" max="100" className="mt-1 h-8 w-24 text-xs" value={draft.recycled}
             onChange={(e) => setDraft((d) => ({ ...d, recycled: e.target.value }))} />
         </div>

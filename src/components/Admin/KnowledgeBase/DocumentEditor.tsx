@@ -30,6 +30,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import {
   Select,
   SelectContent,
@@ -397,154 +398,155 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               backdropFilter: 'var(--glass-blur)',
             }}
           >
-            <div className="space-y-4">
+            <div className="space-y-5">
               <h3 className="font-semibold text-lg">Document Settings</h3>
 
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  value={document.title}
-                  onChange={(e) => setDocument({ ...document, title: e.target.value })}
-                  placeholder="Enter document title"
-                />
-              </div>
+              <FormSection title="Document">
+                <FormGrid cols={1}>
+                  <FormField label="Title *" htmlFor="title">
+                    <Input
+                      id="title"
+                      value={document.title}
+                      onChange={(e) => setDocument({ ...document, title: e.target.value })}
+                      placeholder="Enter document title"
+                    />
+                  </FormField>
 
-              {/* Category */}
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={document.category_id}
-                  onValueChange={(value) => setDocument({ ...document, category_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.icon} {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Pricing sub-type — only shown when the selected category is "Pricing" */}
-              {(() => {
-                const selectedCat = categories.find((c) => c.id === document.category_id);
-                const isPricing =
-                  !!selectedCat &&
-                  (selectedCat.slug === 'pricing' || selectedCat.name.toLowerCase() === 'pricing');
-                if (!isPricing) return null;
-                return (
-                  <div className="space-y-2">
-                    <Label htmlFor="price_doc_type">Price document type *</Label>
+                  <FormField label="Category" htmlFor="category">
                     <Select
-                      value={document.price_doc_type ?? undefined}
-                      onValueChange={(value: PriceDocType) =>
-                        setDocument({ ...document, price_doc_type: value })
-                      }
+                      value={document.category_id}
+                      onValueChange={(value) => setDocument({ ...document, category_id: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select sub-type" />
+                        <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(Object.keys(PRICE_DOC_TYPE_LABELS) as PriceDocType[]).map((key) => (
-                          <SelectItem key={key} value={key}>
-                            {PRICE_DOC_TYPE_LABELS[key]}
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.icon} {cat.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Guides the agent: <span className="font-medium">price_list</span> for retail catalogs, <span className="font-medium">discount_rule</span> for blanket rules, <span className="font-medium">contract_terms</span> for negotiated terms, <span className="font-medium">promotion</span> for time-limited offers, <span className="font-medium">supplier_cost_list</span> for procurement costs (materialized to <code className="text-[10px]">products.cost</code>).
-                    </p>
+                  </FormField>
 
-                    {document.price_doc_type === 'supplier_cost_list' && documentId && (
-                      <ApplySupplierCostListButton kbDocId={documentId} />
-                    )}
-                  </div>
-                );
-              })()}
+                  {(() => {
+                    const selectedCat = categories.find((c) => c.id === document.category_id);
+                    const isPricing =
+                      !!selectedCat &&
+                      (selectedCat.slug === 'pricing' || selectedCat.name.toLowerCase() === 'pricing');
+                    if (!isPricing) return null;
+                    return (
+                      <>
+                        <FormField
+                          label="Price document type *"
+                          htmlFor="price_doc_type"
+                          hint={<>Guides the agent: <span className="font-medium">price_list</span> for retail catalogs, <span className="font-medium">discount_rule</span> for blanket rules, <span className="font-medium">contract_terms</span> for negotiated terms, <span className="font-medium">promotion</span> for time-limited offers, <span className="font-medium">supplier_cost_list</span> for procurement costs (materialized to <code className="text-[10px]">products.cost</code>).</>}
+                        >
+                          <Select
+                            value={document.price_doc_type ?? undefined}
+                            onValueChange={(value: PriceDocType) =>
+                              setDocument({ ...document, price_doc_type: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select sub-type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(PRICE_DOC_TYPE_LABELS) as PriceDocType[]).map((key) => (
+                                <SelectItem key={key} value={key}>
+                                  {PRICE_DOC_TYPE_LABELS[key]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormField>
 
-              {/* PDF Upload */}
+                        {document.price_doc_type === 'supplier_cost_list' && documentId && (
+                          <ApplySupplierCostListButton kbDocId={documentId} />
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  <FormField
+                    label="Upload PDF"
+                    htmlFor="pdf"
+                    optional
+                    hint={isExtractingPdf
+                      ? 'Reading PDF…'
+                      : 'Fills the content with the PDF text; tables stay tables. Scanned PDFs have no text to read.'}
+                  >
+                    <Input
+                      id="pdf"
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileUpload}
+                      disabled={isExtractingPdf || !workspaceId}
+                      className="cursor-pointer"
+                    />
+                  </FormField>
+                </FormGrid>
+              </FormSection>
+
+              <FormSection title="Publishing">
+                <FormGrid cols={1}>
+                  <FormField label="Status" htmlFor="status">
+                    <Select
+                      value={document.status}
+                      onValueChange={(value: any) => setDocument({ ...document, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">📝 Draft</SelectItem>
+                        <SelectItem value="published">✅ Published</SelectItem>
+                        <SelectItem value="archived">📦 Archived</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+
+                  <FormField
+                    label="Priority"
+                    htmlFor="content_tier"
+                    hint="Featured pages lead the public KB, dashboard and search. Secondary pages stay public & searchable but rank after featured ones."
+                  >
+                    <Select
+                      value={String((document as any).content_tier ?? 1)}
+                      onValueChange={(value) => setDocument({ ...document, content_tier: Number(value) } as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">⭐ Featured (informational)</SelectItem>
+                        <SelectItem value="2">📄 Secondary (brand / product / low-value)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+
               <div className="space-y-2">
-                <Label htmlFor="pdf">Upload PDF</Label>
-                <Input
-                  id="pdf"
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileUpload}
-                  disabled={isExtractingPdf || !workspaceId}
-                  className="cursor-pointer"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {isExtractingPdf
-                    ? 'Reading PDF…'
-                    : 'Fills the content with the PDF text; tables stay tables. Scanned PDFs have no text to read.'}
-                </p>
-              </div>
-
-              {/* Status */}
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={document.status}
-                  onValueChange={(value: any) => setDocument({ ...document, status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">📝 Draft</SelectItem>
-                    <SelectItem value="published">✅ Published</SelectItem>
-                    <SelectItem value="archived">📦 Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Priority / value tier */}
-              <div className="space-y-2">
-                <Label htmlFor="content_tier">Priority</Label>
-                <Select
-                  value={String((document as any).content_tier ?? 1)}
-                  onValueChange={(value) => setDocument({ ...document, content_tier: Number(value) } as any)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">⭐ Featured (informational)</SelectItem>
-                    <SelectItem value="2">📄 Secondary (brand / product / low-value)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground leading-snug">
-                  Featured pages lead the public KB, dashboard and search. Secondary pages stay public &amp; searchable but rank after featured ones.
-                </p>
-              </div>
-
-              {/* Visibility */}
-              <div className="space-y-2">
-                <Label htmlFor="visibility">Visibility</Label>
-                <Select
-                  value={document.visibility}
-                  onValueChange={(value: any) => setDocument({ ...document, visibility: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">🌍 Public</SelectItem>
-                    <SelectItem value="private">🔒 Private</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground leading-snug">
-                  {document.visibility === 'private'
+                <FormField
+                  label="Visibility"
+                  htmlFor="visibility"
+                  hint={document.visibility === 'private'
                     ? 'Private — readable by admins (UI + AI agents). Hidden from non-admin agent users and from the public Knowledge Base page.'
                     : 'Public — available to all agents, platform calls, and the public Knowledge Base page.'}
-                </p>
+                >
+                  <Select
+                    value={document.visibility}
+                    onValueChange={(value: any) => setDocument({ ...document, visibility: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">🌍 Public</SelectItem>
+                      <SelectItem value="private">🔒 Private</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
 
                 {/* THE THIRD CONDITION, which is on the CATEGORY and not on this form.
                     `kb_docs_public_read` grants anon access only when status='published' AND
@@ -594,8 +596,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   </div>
                 )}
               </div>
+                </FormGrid>
+              </FormSection>
 
-              {/* Lock — protects the doc from deletion / platform reset. */}
+              <FormSection title="Access">
+                <FormGrid cols={1}>
               {(() => {
                 const selectedCat = categories.find((c) => c.id === document.category_id);
                 const autoSynced = (document.metadata as Record<string, unknown> | undefined)?.auto_synced === true
@@ -604,8 +609,17 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                 const lockValue = document.is_locked === true ? 'locked' : document.is_locked === false ? 'unlocked' : 'auto';
                 const effectiveLocked = document.is_locked === true ? true : document.is_locked === false ? false : derivedLocked;
                 return (
-                  <div className="space-y-2">
-                    <Label htmlFor="lock">Lock</Label>
+                  <FormField
+                    label="Lock"
+                    htmlFor="lock"
+                    hint={<>
+                      {effectiveLocked
+                        ? 'Locked — cannot be manually deleted.'
+                        : 'Unlocked — can be deleted normally.'}
+                      {' '}Agent-readable categories lock their docs by default; choose <span className="font-medium">Unlocked</span> to override and allow deletion.
+                      {' '}All Knowledge Base articles are preserved on a platform reset regardless of this setting — the lock only blocks manual deletion.
+                    </>}
+                  >
                     <Select
                       value={lockValue}
                       onValueChange={(value) =>
@@ -624,21 +638,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         <SelectItem value="unlocked">🔓 Unlocked</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground leading-snug">
-                      {effectiveLocked
-                        ? 'Locked — cannot be manually deleted.'
-                        : 'Unlocked — can be deleted normally.'}
-                      {' '}Agent-readable categories lock their docs by default; choose <span className="font-medium">Unlocked</span> to override and allow deletion.
-                      {' '}All Knowledge Base articles are preserved on a platform reset regardless of this setting — the lock only blocks manual deletion.
-                    </p>
-                  </div>
+                  </FormField>
                 );
               })()}
 
-              {/* Agent access — which agents may retrieve this doc in agent KB search.
-                  Empty = all agents (default). Enforced server-side in MIVAA. */}
-              <div className="space-y-2">
-                <Label>Agent access</Label>
+              <FormField
+                label="Agent access"
+                hint={(document.allowed_agents?.length ?? 0) === 0
+                  ? 'All agents can read this doc in agent KB search (default).'
+                  : `Only the selected agent${document.allowed_agents!.length === 1 ? '' : 's'} can retrieve this doc in agent KB search. Admin reads are unaffected.`}
+              >
                 <div className="flex flex-wrap gap-2">
                   {KB_AGENTS.map((a) => {
                     const selected = (document.allowed_agents ?? []).includes(a.id);
@@ -659,12 +668,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     );
                   })}
                 </div>
-                <p className="text-xs text-muted-foreground leading-snug">
-                  {(document.allowed_agents?.length ?? 0) === 0
-                    ? 'All agents can read this doc in agent KB search (default).'
-                    : `Only the selected agent${document.allowed_agents!.length === 1 ? '' : 's'} can retrieve this doc in agent KB search. Admin reads are unaffected.`}
-                </p>
-              </div>
+              </FormField>
+                </FormGrid>
+              </FormSection>
             </div>
           </div>
 
@@ -813,29 +819,28 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   </div>
 
                   {/* SEO title override */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="seo_title">SEO title (&lt;title&gt; / og:title)</Label>
+                  <FormField
+                    label="SEO title (<title> / og:title)"
+                    htmlFor="seo_title"
+                    optional
+                    hint="Overrides the browser tab / search-result title. Falls back to the article title."
+                  >
                     <Input
                       id="seo_title"
                       value={(document.metadata as Record<string, any> | undefined)?.seo_title ?? ''}
                       onChange={(e) => setDocument({ ...document, metadata: { ...(document.metadata || {}), seo_title: e.target.value } })}
                       placeholder={document.title || 'Defaults to the article title'}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Optional. Overrides the browser tab / search-result title. Falls back to the article title.
-                    </p>
-                  </div>
+                  </FormField>
 
-                  {/* SEO keywords */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="seo_keywords">SEO keywords (comma-separated)</Label>
+                  <FormField label="SEO keywords" htmlFor="seo_keywords" hint="Comma-separated.">
                     <Input
                       id="seo_keywords"
                       value={(document.seo_keywords ?? []).join(', ')}
                       onChange={(e) => setDocument({ ...document, seo_keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
                       placeholder="heat pump, installation, manual"
                     />
-                  </div>
+                  </FormField>
 
                   {/* FAQ repeater */}
                   <div className="space-y-3">

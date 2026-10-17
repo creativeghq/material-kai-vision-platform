@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
@@ -660,16 +660,16 @@ export const RecordPaymentDialog: React.FC<{
             {payingExpense ? 'Settle an existing expense or a received myDATA document.' : 'Record a customer payment or a refund.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-5">
+          <FormSection title="Payment">
+          <FormGrid>
             {/* Paying an expense is money OUT to a supplier — the other side of the trade, not a
                 third flavour of "record a payment from a customer". It is entered from the
                 cost's own row instead of hiding as an option in this list, so the two
                 directions can't be picked by accident. When that action opened this dialog the
                 Type is fixed, so the control is a label rather than a select that can only
                 un-choose itself. */}
-            <div className="space-y-1">
-              <Label>Type</Label>
+            <FormField label="Type">
               {payingExpense ? (
                 <div className="flex h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm">
                   Paying an expense
@@ -689,9 +689,8 @@ export const RecordPaymentDialog: React.FC<{
                   </SelectContent>
                 </Select>
               )}
-            </div>
-            <div className="space-y-1">
-              <Label>Amount</Label>
+            </FormField>
+            <FormField label="Amount">
               <div className="flex gap-2">
                 <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
                 {/* Shown for EVERY direction. It used to render only for `received`, so on a
@@ -706,27 +705,28 @@ export const RecordPaymentDialog: React.FC<{
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </div>
+            </FormField>
+          </FormGrid>
 
           {foreign && (
-            <div className="grid grid-cols-1 gap-3 rounded-md border border-border/60 p-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Rate → {settleCurrency}</Label>
+            <FormGrid className="rounded-md border border-border/60 p-3">
+              <FormField
+                label={`Rate → ${settleCurrency}`}
+                hint={`1 ${currency} = X ${settleCurrency}${selectedTarget ? ' — what this settles on the invoice' : ''}`}
+              >
                 <Input type="text" inputMode="decimal" value={fxRate} onChange={(e) => setFxRate(e.target.value)} />
-                <p className="text-[10px] text-muted-foreground">1 {currency} = X {settleCurrency}{selectedTarget ? ' — what this settles on the invoice' : ''}</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Rate → EUR (base)</Label>
+              </FormField>
+              <FormField label="Rate → EUR (base)" hint="drives realized FX gain/loss">
                 <Input type="text" inputMode="decimal" value={fxRateToBase} onChange={(e) => setFxRateToBase(e.target.value)} />
-                <p className="text-[10px] text-muted-foreground">drives realized FX gain/loss</p>
-              </div>
-            </div>
+              </FormField>
+            </FormGrid>
           )}
+          </FormSection>
 
+          <FormSection title="What it settles">
           {kind === 'expense' && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
-              <Label>Expense being paid</Label>
+              <FormField label="Expense being paid">
               <Select value={expenseId} onValueChange={pickExpense}>
                 <SelectTrigger><SelectValue placeholder="Pick the expense this payment settles…" /></SelectTrigger>
                 <SelectContent>
@@ -741,6 +741,7 @@ export const RecordPaymentDialog: React.FC<{
                     ))}
                 </SelectContent>
               </Select>
+              </FormField>
               {selectedOption?.expense?.inbox && (
                 <p className="text-[11px] text-muted-foreground">
                   From the Inbox — {selectedOption.expense.inbox.issuer_name ?? selectedOption.expense.inbox.issuer_vat ?? 'received document'}
@@ -757,8 +758,13 @@ export const RecordPaymentDialog: React.FC<{
           )}
 
           {kind === 'supplier' && (
-            <div className="space-y-1">
-              <Label>For (optional)</Label>
+            <FormField
+              label="For"
+              optional
+              hint={selectedBill
+                ? 'Settling this bill will mark it paid when fully covered.'
+                : 'Leave empty to log the money against the order without settling a specific bill.'}
+            >
               <Select value={billId} onValueChange={setBillId}>
                 <SelectTrigger><SelectValue placeholder="None — just money paid on this order" /></SelectTrigger>
                 <SelectContent>
@@ -771,17 +777,11 @@ export const RecordPaymentDialog: React.FC<{
                     ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {selectedBill
-                  ? 'Settling this bill will mark it paid when fully covered.'
-                  : 'Leave empty to log the money against the order without settling a specific bill.'}
-              </p>
-            </div>
+            </FormField>
           )}
 
           {kind === 'received' && (
-            <div className="space-y-1">
-              <Label>For (optional)</Label>
+            <FormField label="For" optional>
               <Select value={forValue} onValueChange={pickFor}>
                 <SelectTrigger><SelectValue placeholder={noTargetLabel} /></SelectTrigger>
                 <SelectContent>
@@ -843,12 +843,11 @@ export const RecordPaymentDialog: React.FC<{
                       ? 'Recorded against this order and counted towards what it still owes — not held as loose credit. Pick an invoice only to settle a specific one.'
                       : 'Leave as None to hold the money as on-account customer credit.'}
               </p>
-            </div>
+            </FormField>
           )}
 
           {kind === 'received' && (
-            <div className="space-y-1 rounded-md border border-border/60 p-3">
-              <Label>Document to issue</Label>
+            <FormField label="Document to issue" className="rounded-md border border-border/60 p-3">
               <Select value={issueChoice} onValueChange={(v: any) => setIssueChoice(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -881,13 +880,12 @@ export const RecordPaymentDialog: React.FC<{
                     ? 'Proof the money was received. Not a sales document — nothing is filed with AADE.'
                     : 'Nothing is issued or emailed. Use this for a deposit you will invoice later, or a part-payment on an invoice that already exists.'}
               </p>
-            </div>
+            </FormField>
           )}
 
           {kind === 'refund' && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
-              <div className="space-y-1">
-                <Label>Invoice to credit</Label>
+              <FormField label="Invoice to credit">
                 <Select value={invoiceId} onValueChange={pickRefundInvoice}>
                   <SelectTrigger><SelectValue placeholder="Pick the invoice being refunded…" /></SelectTrigger>
                   <SelectContent>
@@ -895,7 +893,7 @@ export const RecordPaymentDialog: React.FC<{
                       : pickableInvoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — {Number((i as any).total ?? 0).toFixed(2)}{(i as any).fiscal_mark ? ' · MARK' : ''}</SelectItem>)}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
               <label className="flex items-center justify-between text-xs cursor-pointer">
                 <span>Issue credit note to myDATA (nets the invoice)</span>
                 <Switch checked={issueCreditNote} onCheckedChange={setIssueCreditNote} />
@@ -907,7 +905,9 @@ export const RecordPaymentDialog: React.FC<{
               </p>
             </div>
           )}
+          </FormSection>
 
+          <FormSection title="Account">
           <PaidFromSelect
             workspaceId={workspaceId}
             label={kind === 'received' ? 'Deposit to account' : 'Pay from account'}
@@ -939,34 +939,30 @@ export const RecordPaymentDialog: React.FC<{
               disabled={busy}
             />
           )}
+          </FormSection>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Date</Label>
-              <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Category</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
-                    : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Reference</Label>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank ref / Cheque no. / Credit note" />
-            </div>
-            <div className="space-y-1">
-              <Label>Notes</Label>
-              <Textarea rows={1} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-          </div>
+          <FormSection title="Details">
+            <FormGrid>
+              <FormField label="Date">
+                <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+              </FormField>
+              <FormField label="Category" optional>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
+                      : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Reference" optional>
+                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank ref / Cheque no. / Credit note" />
+              </FormField>
+              <FormField label="Notes" optional>
+                <Textarea rows={1} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

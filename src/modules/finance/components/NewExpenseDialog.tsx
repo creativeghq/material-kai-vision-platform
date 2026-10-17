@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -716,7 +717,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-5">
           {/* Read the receipt first, correct it second. Placed above the form rather than beside a
               field because it fills several of them at once, and because on the paper-in-hand path
               it is the first thing the operator wants — typing is the fallback. */}
@@ -764,32 +765,30 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Category *</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder={expenseCats.length ? 'Pick a category' : 'No expense categories'} /></SelectTrigger>
-                <SelectContent>
-                  {expenseCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {expenseCats.length === 0 && (
-                <p className="text-[11px] text-muted-foreground">Add expense categories in Settings → Finance Categories (Import defaults).</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>Reference / Bill #</Label>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="optional — e.g. DEH-2026/06" />
-            </div>
-          </div>
+          <FormSection title="Expense">
+            <FormGrid>
+              <FormField
+                label="Category *"
+                hint={expenseCats.length === 0 ? 'Add expense categories in Settings → Finance Categories (Import defaults).' : undefined}
+              >
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger><SelectValue placeholder={expenseCats.length ? 'Pick a category' : 'No expense categories'} /></SelectTrigger>
+                  <SelectContent>
+                    {expenseCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Reference / Bill #" optional>
+                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. DEH-2026/06" />
+              </FormField>
+              <FormField label="Description" className="sm:col-span-2">
+                <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Office rent — June 2026" />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div className="space-y-1">
-            <Label>Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Office rent — June 2026" />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Supplier / Payee * <span className="text-muted-foreground font-normal">(a company or a person)</span></Label>
+          <FormSection title="Payee">
+          <FormField label="Supplier / Payee *" hint="A company or a person.">
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.label}{party.type === 'adhoc' && <span className="ml-1.5 text-[10px] text-muted-foreground">· one-off, not in CRM</span>}</span>
@@ -832,7 +831,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 )}
               </div>
             )}
-          </div>
+          </FormField>
 
           {/* An expense has no line items, so there is nothing to MERGE — this only ever attributes
               the cost: to a project, to the customer order it was incurred against, or to the
@@ -850,63 +849,61 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             allowProperty={realEstate}
             label="What is this for? (optional)"
           />
+          </FormSection>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label>Subtotal (net)</Label>
-              <Input type="text" inputMode="decimal" value={subtotalNet} onChange={(e) => setSubtotalNet(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>VAT amount</Label>
-              <Input type="text" inputMode="decimal" value={vatAmount} onChange={(e) => setVatAmount(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Total</Label>
-              <Input value={total.toFixed(2)} disabled />
-            </div>
-          </div>
+          <FormSection title="Amounts">
+            <FormGrid cols={4}>
+              <FormField label="Subtotal (net)">
+                <Input type="text" inputMode="decimal" value={subtotalNet} onChange={(e) => setSubtotalNet(e.target.value)} />
+              </FormField>
+              <FormField label="VAT amount">
+                <Input type="text" inputMode="decimal" value={vatAmount} onChange={(e) => setVatAmount(e.target.value)} />
+              </FormField>
+              <FormField label="Total">
+                <Input value={total.toFixed(2)} disabled />
+              </FormField>
+              <FormField label="Currency">
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EUR">EUR</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label>Date</Label>
-              <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EUR">EUR</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="GBP">GBP</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {!paidNow && (
-              <div className="space-y-1">
-                <Label>Due date</Label>
-                <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
-              </div>
-            )}
-          </div>
+          <FormSection title="Schedule">
+            <FormGrid cols={3}>
+              <FormField label="Date">
+                <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+              </FormField>
+              {!paidNow && (
+                <FormField label="Due date">
+                  <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+                </FormField>
+              )}
+              <FormField
+                label="Repeat"
+                hint={repeat !== 'none'
+                  ? `Records this one now; the next ${repeat === 'weekly' ? 'week' : repeat === 'monthly' ? 'month' : repeat === 'quarterly' ? 'quarter' : 'year'} onward auto-generates${paidNow ? ' and auto-pays' : ''}.`
+                  : undefined}
+              >
+                <Select value={repeat} onValueChange={(v) => setRepeat(v as 'none' | RecurringCadence)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">One-off (no repeat)</SelectItem>
+                    <SelectItem value="weekly">Every week</SelectItem>
+                    <SelectItem value="monthly">Every month</SelectItem>
+                    <SelectItem value="quarterly">Every quarter</SelectItem>
+                    <SelectItem value="yearly">Every year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <div className="space-y-1">
-            <Label>Repeat</Label>
-            <Select value={repeat} onValueChange={(v) => setRepeat(v as 'none' | RecurringCadence)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">One-off (no repeat)</SelectItem>
-                <SelectItem value="weekly">Every week</SelectItem>
-                <SelectItem value="monthly">Every month</SelectItem>
-                <SelectItem value="quarterly">Every quarter</SelectItem>
-                <SelectItem value="yearly">Every year</SelectItem>
-              </SelectContent>
-            </Select>
-            {repeat !== 'none' && (
-              <p className="text-[11px] text-muted-foreground">
-                Records this one now; the next {repeat === 'weekly' ? 'week' : repeat === 'monthly' ? 'month' : repeat === 'quarterly' ? 'quarter' : 'year'} onward auto-generates{paidNow ? ' and auto-pays' : ''}.
-              </p>
-            )}
-          </div>
-
+          <FormSection title="Payment">
           {/* Paid-now toggle: settled cost vs open payable */}
           <div className="rounded-md border border-border/60 p-3 space-y-3">
             <div className="flex items-center justify-between">
@@ -929,10 +926,9 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* Bank Payment → which of the payee's own banks you paid to. Optional; only shows
                 once a payee with saved bank accounts is picked. */}
             {paidNow && method === 'bank_transfer' && payeeBanks.length > 0 && (
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Paid to their bank</Label>
+              <FormField label="Paid to their bank" optional>
                 <Select value={counterpartyBankId || '__none__'} onValueChange={(v) => setCounterpartyBankId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger><SelectValue placeholder="Their bank (optional)…" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Choose their bank…" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">— Not specified —</SelectItem>
                     {payeeBanks.map((b) => (
@@ -942,14 +938,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
             )}
           </div>
 
-          <div className="space-y-1">
-            <Label>Notes</Label>
+          <FormField label="Notes" optional>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-          </div>
+          </FormField>
+          </FormSection>
         </div>
 
         <DialogFooter>

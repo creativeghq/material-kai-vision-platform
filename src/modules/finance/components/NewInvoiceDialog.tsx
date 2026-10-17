@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
@@ -1356,15 +1357,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
               <TabsContent value="details" className="mt-5 space-y-5">
             {/* Parties + document */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {selfPricing ? 'Billed to (you)' : 'Billed to'}
-                </Label>
-                {!selfPricing && (
+            <FormSection title={selfPricing ? 'Billed to (you)' : 'Billed to'}>
+              {!selfPricing && (
+                <div className="flex justify-end">
                   <button type="button" className="text-xs text-primary hover:underline" onClick={() => setClientDialogOpen(true)}>+ Add new client</button>
-                )}
-              </div>
+                </div>
+              )}
               {selfPricing ? (
                 <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                   This is a self-billed document, so the counterpart is your own business — there is no
@@ -1491,12 +1489,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   )}
                 </div>
               )}
-            </section>
+            </FormSection>
 
-            <section className="grid grid-cols-2 gap-3">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Invoice details</Label>
-              <div className="space-y-1.5 col-span-2">
-                <Label className="text-xs">Document type</Label>
+            <FormSection title="Document">
+            <FormGrid>
+              <FormField label="Document type" className="sm:col-span-2">
                 {/* One control: common types as chips + the long myDATA tail in a "More types" dropdown.
                     For a private individual (no VAT) only retail receipts (11.x) + movement docs (9.x)
                     are offered — AADE rejects an invoice (1.x/2.x) issued to a VAT-less buyer.
@@ -1570,51 +1567,50 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <p className="text-[11px] text-muted-foreground">
                   {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series — auto-numbered (set series in Settings → Documents)'}
                 </p>
-              </div>
-              <div className="space-y-1 col-span-2">
-                <Label className="text-xs">Related document (optional)</Label>
-                <Input className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="e.g. related invoice no. or myDATA MARK" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Date issued</Label>
-                <Input type="date" className="h-9" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Payment terms (days)</Label>
-                <Input type="number" min="0" className="h-9" value={paymentTermsDays} onChange={(e) => setPaymentTermsDays(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Currency</Label>
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="EUR">EUR (€)</SelectItem><SelectItem value="USD">USD ($)</SelectItem><SelectItem value="GBP">GBP (£)</SelectItem></SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Default VAT %</Label>
-                <Input type="text" inputMode="decimal" className="h-9" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Category</Label>
-                <Select value={categoryId || 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? '' : v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="None" /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">None</SelectItem>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              </FormField>
+              <FormField label="Date issued" htmlFor="ni-issue-date">
+                <Input id="ni-issue-date" type="date" className="h-9" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+              </FormField>
+              <FormField label="Related document" htmlFor="ni-related" optional>
+                <Input id="ni-related" className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="e.g. related invoice no. or myDATA MARK" />
+              </FormField>
               {/* Document language selector deferred until translations launch — invoices are English-only for now. */}
               {branches.length > 1 && (
-                <div className="space-y-1 col-span-2">
-                  <Label className="text-xs">Establishment</Label>
+                <FormField label="Establishment" htmlFor="ni-branch" className="sm:col-span-2">
                   <Select value={branchCode} onValueChange={setBranchCode}>
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="ni-branch" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}</SelectContent>
                   </Select>
-                </div>
+                </FormField>
               )}
-            </section>
+            </FormGrid>
+            </FormSection>
+
+            <FormSection title="Terms">
+            <FormGrid>
+              <FormField label="Payment terms (days)" htmlFor="ni-terms">
+                <Input id="ni-terms" type="number" min="0" className="h-9" value={paymentTermsDays} onChange={(e) => setPaymentTermsDays(e.target.value)} />
+              </FormField>
+              <FormField label="Currency" htmlFor="ni-currency">
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger id="ni-currency" className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="EUR">EUR (€)</SelectItem><SelectItem value="USD">USD ($)</SelectItem><SelectItem value="GBP">GBP (£)</SelectItem></SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Default VAT %" htmlFor="ni-vat-rate">
+                <Input id="ni-vat-rate" type="text" inputMode="decimal" className="h-9" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
+              </FormField>
+              <FormField label="Category" htmlFor="ni-category" optional>
+                <Select value={categoryId || 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? '' : v)}>
+                  <SelectTrigger id="ni-category" className="h-9"><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">None</SelectItem>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+            </FormGrid>
+            </FormSection>
 
             {/* Shipping — combined invoice + delivery note (document-level, kept high near the doc type) */}
-            <section className="border-t border-border/40 pt-4 space-y-3">
+            <FormSection title="Shipping">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium">Invoice with shipping</div>
@@ -1623,47 +1619,43 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Switch checked={hasShipping} onCheckedChange={setHasShipping} />
               </div>
               {hasShipping && (
-                <div className="space-y-2">
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs">Loading place</Label>
-                        <button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline" onClick={useHqAddress}><MapPin className="h-3 w-3" /> Use HQ details</button>
-                      </div>
-                      <Input className="h-8 text-xs" value={shipFrom} onChange={(e) => setShipFrom(e.target.value)} placeholder="Loading address" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs">Delivery place</Label>
-                        <button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-40" disabled={!customerAddr} onClick={useCustomerDelivery}><MapPin className="h-3 w-3" /> Customer delivery address</button>
-                      </div>
-                      <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Date</Label><Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Time</Label><Input type="time" className="h-8 text-xs" value={transportTime} onChange={(e) => setTransportTime(e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Vehicle</Label><Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" /></div>
-                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Responsible</Label><Input className="h-8 text-xs" value={responsible} onChange={(e) => setResponsible(e.target.value)} /></div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Purpose</Label>
+                <FormGrid cols={4}>
+                  <FormField
+                    label="Loading place"
+                    htmlFor="ni-ship-from"
+                    className="sm:col-span-2"
+                    hint={<button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline" onClick={useHqAddress}><MapPin className="h-3 w-3" /> Use HQ details</button>}
+                  >
+                    <Input id="ni-ship-from" className="h-8 text-xs" value={shipFrom} onChange={(e) => setShipFrom(e.target.value)} placeholder="Loading address" />
+                  </FormField>
+                  <FormField
+                    label="Delivery place"
+                    htmlFor="ni-ship-to"
+                    className="sm:col-span-2"
+                    hint={<button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-40" disabled={!customerAddr} onClick={useCustomerDelivery}><MapPin className="h-3 w-3" /> Customer delivery address</button>}
+                  >
+                    <Input id="ni-ship-to" className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
+                  </FormField>
+                  <FormField label="Date" htmlFor="ni-transport-date"><Input id="ni-transport-date" type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} /></FormField>
+                  <FormField label="Time" htmlFor="ni-transport-time"><Input id="ni-transport-time" type="time" className="h-8 text-xs" value={transportTime} onChange={(e) => setTransportTime(e.target.value)} /></FormField>
+                  <FormField label="Vehicle" htmlFor="ni-vehicle"><Input id="ni-vehicle" className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" /></FormField>
+                  <FormField label="Responsible" htmlFor="ni-responsible"><Input id="ni-responsible" className="h-8 text-xs" value={responsible} onChange={(e) => setResponsible(e.target.value)} /></FormField>
+                  <FormField label="Purpose" htmlFor="ni-move-purpose" className="sm:col-span-2 md:col-span-4">
                     <Select value={movePurpose} onValueChange={setMovePurpose}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="ni-move-purpose" className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>{SELECTABLE_MOVE_PURPOSES.map((p) => <SelectItem key={p.code} value={String(p.code)}>{p.code} — {p.en}</SelectItem>)}</SelectContent>
                     </Select>
-                  </div>
-                </div>
+                  </FormField>
+                </FormGrid>
               )}
-            </section>
+            </FormSection>
               </TabsContent>
 
               <TabsContent value="items" className="mt-5 space-y-5">
             {/* Line items */}
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Items / Services</Label>
-                <div className="flex items-center gap-3">
+            <FormSection title="Items / Services">
+              <div className="flex items-center justify-end">
+                <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
                     <Checkbox className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onCheckedChange={(v) => setPricesIncludeVat(v === true)} />
                     Prices include VAT
@@ -1749,7 +1741,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       </div>
                       {l.expanded && (
                         <div className="grid grid-cols-2 gap-2 border-t border-border/40 bg-muted/20 p-3 sm:grid-cols-3">
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">SKU</Label><Input className="h-7 text-xs" value={l.sku} onChange={(e) => update(idx, { sku: e.target.value })} /></div>
+                          <div className="space-y-1"><Label className="text-xs text-muted-foreground">SKU</Label><Input className="h-7 text-xs" value={l.sku} onChange={(e) => update(idx, { sku: e.target.value })} /></div>
                           {l.product_id ? (
                             /* #374 Phase 5 — a catalog line picks its variant from the field
                                registry, exactly like the quote and order lines do, so an invoice
@@ -1757,7 +1749,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                two axes these free-text boxes allowed. A line with NO catalog
                                product has no registry to consult and keeps the text inputs. */
                             <div className="space-y-1 sm:col-span-2">
-                              <Label className="text-[10px] text-muted-foreground">Variant</Label>
+                              <Label className="text-xs text-muted-foreground">Variant</Label>
                               <LineIdentityPicker
                                 productId={l.product_id}
                                 value={l.selected_attributes ?? {}}
@@ -1770,28 +1762,28 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             </div>
                           ) : (
                             <>
-                              <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Color</Label><Input className="h-7 text-xs" value={l.color} onChange={(e) => update(idx, { color: e.target.value })} /></div>
-                              <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Size / Format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
+                              <div className="space-y-1"><Label className="text-xs text-muted-foreground">Color</Label><Input className="h-7 text-xs" value={l.color} onChange={(e) => update(idx, { color: e.target.value })} /></div>
+                              <div className="space-y-1"><Label className="text-xs text-muted-foreground">Size / Format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
                             </>
                           )}
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">Measurement unit</Label>
+                            <Label className="text-xs text-muted-foreground">Measurement unit</Label>
                             <Select value={l.measurement_unit_code || 'none'} onValueChange={(v) => update(idx, { measurement_unit_code: v === 'none' ? '' : v })}>
                               <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
                               <SelectContent><SelectItem value="none">—</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">VAT category</Label>
+                            <Label className="text-xs text-muted-foreground">VAT category</Label>
                             <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
                               <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Default" /></SelectTrigger>
                               <SelectContent><SelectItem value="none">Default ({vatRate}%)</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Discount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" /></div>
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Unit cost (COGS)</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.unit_cost} onChange={(e) => update(idx, { unit_cost: e.target.value })} placeholder="—" /></div>
+                          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Discount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" /></div>
+                          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit cost (COGS)</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.unit_cost} onChange={(e) => update(idx, { unit_cost: e.target.value })} placeholder="—" /></div>
                           <div className="space-y-1 sm:col-span-2">
-                            <Label className="text-[10px] text-muted-foreground">Kind of expense (income classification)</Label>
+                            <Label className="text-xs text-muted-foreground">Kind of expense (income classification)</Label>
                             <div className="grid grid-cols-2 gap-2">
                               <Select value={l.income_classification_type || 'none'} onValueChange={(v) => update(idx, { income_classification_type: v === 'none' ? '' : v })}>
                                 <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
@@ -1805,8 +1797,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                           </div>
                           {vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0)) === 0 && (
                             <div className="space-y-1">
-                              <Label className="text-[10px] text-muted-foreground">VAT exemption category (1–31)</Label>
-                              <Input className="h-7 text-xs" type="number" min="1" max="31" value={l.vat_exemption} onChange={(e) => update(idx, { vat_exemption: e.target.value })} placeholder="Required for 0% VAT" />
+                              <Label className="text-xs text-muted-foreground">VAT exemption category (1–31)</Label>
+                              <Input className="h-7 text-xs" type="number" min="1" max="31" value={l.vat_exemption} onChange={(e) => update(idx, { vat_exemption: e.target.value })} placeholder="e.g. 14" />
+                              <p className="text-xs text-muted-foreground">Required on a 0% line.</p>
                             </div>
                           )}
                           {/* A 1.5 document carries clearance lines and commission-fee lines together;
@@ -1814,7 +1807,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               only type that accepts invoiceDetailType. */}
                           {DETAIL_TYPE_DOC_CODES.has(documentType) && (
                             <div className="space-y-1">
-                              <Label className="text-[10px] text-muted-foreground">Line kind (third-party sales)</Label>
+                              <Label className="text-xs text-muted-foreground">Line kind (third-party sales)</Label>
                               <Select value={l.invoice_detail_type || 'none'} onValueChange={(v) => update(idx, { invoice_detail_type: v === 'none' ? '' : v })}>
                                 <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
                                 <SelectContent>
@@ -1825,7 +1818,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             </div>
                           )}
                           <div className="space-y-1 sm:col-span-2">
-                            <Label className="text-[10px] text-muted-foreground">Line comments</Label>
+                            <Label className="text-xs text-muted-foreground">Line comments</Label>
                             <Input className="h-7 text-xs" value={l.line_comments} onChange={(e) => update(idx, { line_comments: e.target.value })} placeholder="Shown on this line of the invoice" />
                           </div>
                           <div className="sm:col-span-3">
@@ -1846,14 +1839,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                   return (
                                     <div key={b.key} className="grid grid-cols-[1fr_7rem] gap-2">
                                       <div className="space-y-1">
-                                        <Label className="text-[10px] text-muted-foreground">{b.label}</Label>
+                                        <Label className="text-xs text-muted-foreground">{b.label}</Label>
                                         <Select value={b.cat || 'none'} onValueChange={(v) => b.setCat(v === 'none' ? '' : v)}>
                                           <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
                                           <SelectContent><SelectItem value="none">None</SelectItem>{b.refs.map((r) => <SelectItem key={r.code} value={r.code}>{taxOptionLabel(r)}</SelectItem>)}</SelectContent>
                                         </Select>
                                       </div>
                                       <div className="space-y-1">
-                                        <Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label>
+                                        <Label className="text-xs text-muted-foreground">Amount ({currency})</Label>
                                         <Input className="h-7 text-xs text-right" type="text" inputMode="decimal"
                                           value={pctCat ? computed.toFixed(2) : b.amt}
                                           readOnly={!b.cat || pctCat}
@@ -1864,8 +1857,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                   );
                                 })}
                                 <div className="grid grid-cols-[1fr_7rem] gap-2">
-                                  <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Deductions</Label><p className="pt-1.5 text-[10px] text-muted-foreground">Retained amount (no myDATA category).</p></div>
-                                  <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
+                                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Deductions</Label><p className="pt-1.5 text-[10px] text-muted-foreground">Retained amount (no myDATA category).</p></div>
+                                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Amount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
                                 </div>
                                 {/* AADE recType 3. A levy billed on to the customer as its own
                                     VAT-bearing line has to say so, or myDATA reads it as goods. */}
@@ -1890,44 +1883,44 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   );
                 })}
               </div>
-            </section>
+            </FormSection>
               </TabsContent>
 
               <TabsContent value="taxes" className="mt-5 space-y-5">
             {/* Document taxes */}
-            <section className="grid grid-cols-2 gap-3">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Taxes</Label>
+            <FormSection title="Withholding & fees">
+            <FormGrid>
               {isServiceDoc ? (
-                <div className="space-y-1">
-                  <Label className="text-xs">Withholding tax</Label>
+                <FormField label="Withholding tax" htmlFor="ni-withholding">
                   <Select value={withholdingCode || 'none'} onValueChange={(v) => { setWithholdingCode(v === 'none' ? '' : v); setWithholdingAmount(''); }}>
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="ni-withholding" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="none">None</SelectItem>{withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{taxOptionLabel(w)}</SelectItem>)}</SelectContent>
                   </Select>
                   {/* 'amount'-kind withholding (wage/solidarity/termination/…) has no rate to compute from. */}
                   {withholdingCode && !isDerivedCat(withholdings, withholdingCode) && (
                     <Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={withholdingAmount} onChange={(e) => setWithholdingAmount(e.target.value)} placeholder={`Withholding amount (${currency})`} />
                   )}
-                </div>
+                </FormField>
               ) : (
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Withholding tax</Label>
-                  <p className="text-[11px] text-muted-foreground">Available on service invoices (document type 2.x). Switch the document type to a service invoice to apply a withholding rate.</p>
-                </div>
+                <FormField
+                  label="Withholding tax"
+                  hint="Available on service invoices (document type 2.x). Switch the document type to a service invoice to apply a withholding rate."
+                >
+                  {null}
+                </FormField>
               )}
-              <div className="space-y-1">
-                <Label className="text-xs">Digital transaction fee</Label>
-                <Input className="h-9 text-right" type="text" inputMode="decimal" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />
-              </div>
-            </section>
+              <FormField label="Digital transaction fee" htmlFor="ni-digital-fee">
+                <Input id="ni-digital-fee" className="h-9 text-right" type="text" inputMode="decimal" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />
+              </FormField>
+            </FormGrid>
+            </FormSection>
 
             {/* -- Document-level charges (myDATA taxesTotals) -----------------------------
                 The declaration a per-line box cannot make: SEVERAL rows of the same bucket,
                 each named. A recycling levy is one AADE code (fees 17) charged at a different
                 rate per AHHE appliance class, so the class lives in the row's own label. */}
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Charges &amp; levies (document level)</Label>
+            <FormSection title="Charges & levies (document level)">
+              <div className="flex items-center justify-end">
                 <Button
                   type="button" size="sm" variant="outline" className="h-7 text-xs"
                   onClick={() => setDocTaxes((rows) => [...rows, {
@@ -1963,7 +1956,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       return (
                         <div key={i} className="grid grid-cols-1 gap-2 rounded-sm border border-hairline p-2 sm:grid-cols-[8rem_1fr_1fr_7rem_auto]">
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">Bucket</Label>
+                            <Label className="text-xs text-muted-foreground">Bucket</Label>
                             <Select
                               value={r.tax_type}
                               onValueChange={(v) => patch({
@@ -1982,7 +1975,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             </Select>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">AADE category</Label>
+                            <Label className="text-xs text-muted-foreground">AADE category</Label>
                             {MYDATA_TAX_TYPE_REF_CATEGORY[parseInt(r.tax_type, 10)] === null ? (
                               <p className="pt-1.5 text-[10px] text-muted-foreground">AADE publishes no table for deductions.</p>
                             ) : (
@@ -1996,7 +1989,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             )}
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">Label on the document</Label>
+                            <Label className="text-xs text-muted-foreground">Label on the document</Label>
                             <Input
                               className="h-7 text-xs" value={r.label}
                               onChange={(e) => patch({ label: e.target.value })}
@@ -2004,7 +1997,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">
+                            <Label className="text-xs text-muted-foreground">
                               {perUnit ? `Units x ${ref?.rate}` : `Amount (${currency})`}
                             </Label>
                             {perUnit ? (
@@ -2051,28 +2044,24 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </p>
                 </>
               )}
-            </section>
+            </FormSection>
 
             {/* Payment */}
-            <section className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Payment</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Payment method (myDATA)</Label>
+            <FormSection title="Payment">
+              <FormGrid>
+                <FormField label="Payment method (myDATA)" htmlFor="ni-payment-method">
                   <Select value={paymentMethodCode} onValueChange={setPaymentMethodCode}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Payment method…" /></SelectTrigger>
+                    <SelectTrigger id="ni-payment-method" className="h-9"><SelectValue placeholder="Payment method…" /></SelectTrigger>
                     <SelectContent>{paymentMethods.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} — {p.description}</SelectItem>)}</SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Payment note</Label>
-                  <Input className="h-9" value={paymentMethodInfo} onChange={(e) => setPaymentMethodInfo(e.target.value)} placeholder="e.g. IBAN, card ref, “on credit”" />
-                </div>
+                </FormField>
+                <FormField label="Payment note" htmlFor="ni-payment-note" optional>
+                  <Input id="ni-payment-note" className="h-9" value={paymentMethodInfo} onChange={(e) => setPaymentMethodInfo(e.target.value)} placeholder="e.g. IBAN, card ref, “on credit”" />
+                </FormField>
                 {currency !== 'EUR' && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Exchange rate → EUR</Label>
-                    <Input className="h-9" type="text" inputMode="decimal" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder="e.g. 1.0850" />
-                  </div>
+                  <FormField label="Exchange rate → EUR" htmlFor="ni-exchange-rate">
+                    <Input id="ni-exchange-rate" className="h-9" type="text" inputMode="decimal" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder="e.g. 1.0850" />
+                  </FormField>
                 )}
                 <label className="flex items-center gap-2 self-end text-xs">
                   <Checkbox className="h-4 w-4 rounded" checked={vatSuspension} onCheckedChange={(v) => setVatSuspension(v === true)} />
@@ -2091,16 +2080,21 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   />
                   Self-billed (αυτοτιμολόγηση)
                 </label>
-              </div>
+              </FormGrid>
               {/* The document is issued in the SUPPLIER's name — their ΑΦΜ, their income, their VAT —
                   and we are the counterpart. Only suppliers with a signed agreement and an ΑΦΜ
                   authorized on the provider account are offered. */}
               {selfPricing && (
-                <div className="mt-3 space-y-2 rounded-sm border border-hairline bg-surface-sunken p-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Supplier this invoice is issued for</Label>
+                <div className="rounded-sm border border-hairline bg-surface-sunken p-3">
+                  <FormField
+                    label="Supplier this invoice is issued for"
+                    htmlFor="ni-selfbill-supplier"
+                    hint={selfBillSuppliers.length
+                      ? 'The supplier is the ISSUER on this document and your business is the counterpart. It is booked as a purchase, not as revenue, and a supplier bill is raised with it.'
+                      : 'A supplier becomes available here once their written self-billing agreement and their ΑΦΜ authorization on the e-invoicing provider are recorded under Finance → Settings → e-Invoicing.'}
+                  >
                     <Select value={selfBillSupplierId} onValueChange={setSelfBillSupplierId}>
-                      <SelectTrigger className="h-9">
+                      <SelectTrigger id="ni-selfbill-supplier" className="h-9">
                         <SelectValue placeholder={selfBillSuppliers.length ? 'Pick the supplier…' : 'No supplier is set up for self-billing'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -2109,12 +2103,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {selfBillSuppliers.length
-                      ? 'The supplier is the ISSUER on this document and your business is the counterpart. It is booked as a purchase, not as revenue, and a supplier bill is raised with it.'
-                      : 'A supplier becomes available here once their written self-billing agreement and their ΑΦΜ authorization on the e-invoicing provider are recorded under Finance → Settings → e-Invoicing.'}
-                  </p>
+                  </FormField>
                 </div>
               )}
               {/* A Τίτλος Κτήσης records what WE paid someone not obliged to invoice us, so AADE
@@ -2123,68 +2112,64 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   operator knows, so it is asked here rather than guessed; without it the document
                   cannot be transmitted. */}
               {isExpenseDoc && (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Expense category (myDATA)</Label>
+                <FormGrid>
+                  <FormField label="Expense category (myDATA)" htmlFor="ni-expense-category" hint="Required for a proof of expenditure.">
                     <Select value={expenseCategory} onValueChange={setExpenseCategory}>
-                      <SelectTrigger><SelectValue placeholder="Required for a proof of expenditure" /></SelectTrigger>
+                      <SelectTrigger id="ni-expense-category"><SelectValue placeholder="Choose a category…" /></SelectTrigger>
                       <SelectContent>
                         {expCats.map((c) => (
                           <SelectItem key={c.code} value={c.code}>{c.code} — {c.description}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Expense type (myDATA)</Label>
+                  </FormField>
+                  <FormField label="Expense type (myDATA)" htmlFor="ni-expense-type" hint="Required for a proof of expenditure.">
                     <Select value={expenseType} onValueChange={setExpenseType}>
-                      <SelectTrigger><SelectValue placeholder="Required for a proof of expenditure" /></SelectTrigger>
+                      <SelectTrigger id="ni-expense-type"><SelectValue placeholder="Choose a type…" /></SelectTrigger>
                       <SelectContent>
                         {expTypes.map((t) => (
                           <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
+                  </FormField>
+                </FormGrid>
               )}
-            </section>
+            </FormSection>
               </TabsContent>
 
               <TabsContent value="options" className="mt-5 space-y-5">
-            <section className="space-y-1">
-              <Label className="text-xs">Notes</Label>
-              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
-            </section>
+            <FormField label="Notes" htmlFor="ni-notes" optional>
+              <Textarea id="ni-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
+            </FormField>
 
             {/* B2G (public-sector e-invoicing). Hidden for retail (11.x) docs. */}
             {!documentType.startsWith('11') && (
-              <section className="border-t border-border/40 pt-4 space-y-2">
-                <label htmlFor="newinvoice-b2g" className="flex items-center justify-between cursor-pointer">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">B2G — public-sector invoice</span>
+              <FormSection title="Public sector (B2G)">
+                <label htmlFor="newinvoice-b2g" className="flex items-center justify-between cursor-pointer text-xs">
+                  <span>B2G — public-sector invoice</span>
                   <Checkbox id="newinvoice-b2g" className="h-4 w-4 rounded" checked={isB2g} onCheckedChange={(v) => setIsB2g(v === true)} />
                 </label>
                 {isB2g && (
                   <>
                     <p className="text-[11px] text-muted-foreground">Transmitted on the same myDATA envelope with the public-buyer reference block. Fill the references provided by the contracting authority.</p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Contract reference (ΑΔΑΜ)</Label><Input className="h-8 text-xs" value={b2gContractRef} onChange={(e) => setB2gContractRef(e.target.value)} placeholder="e.g. 20SYMV006467658" /></div>
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer reference</Label><Input className="h-8 text-xs" value={b2gBuyerRef} onChange={(e) => setB2gBuyerRef(e.target.value)} placeholder="contracting authority" /></div>
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer legal registration id</Label><Input className="h-8 text-xs" value={b2gBuyerReg} onChange={(e) => setB2gBuyerReg(e.target.value)} placeholder="defaults to buyer VAT" /></div>
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer identifier (ΚΗΜΔΗΣ/KAE)</Label><Input className="h-8 text-xs" value={b2gBuyerIdentifier} onChange={(e) => setB2gBuyerIdentifier(e.target.value)} placeholder="e.g. 1007.909.0001" /></div>
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Budget identifier</Label><Input className="h-8 text-xs" value={b2gBudgetIdentifier} onChange={(e) => setB2gBudgetIdentifier(e.target.value)} placeholder="ΚΑΕ / budget code" /></div>
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Payment due date</Label><Input type="date" className="h-8 text-xs" value={b2gDueDate} onChange={(e) => setB2gDueDate(e.target.value)} /></div>
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">CPV code (lines whose product has none)</Label><Input className="h-8 text-xs" value={b2gCpv} onChange={(e) => setB2gCpv(e.target.value)} placeholder="e.g. 44111000-4" /></div>
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Purchase order reference</Label><Input className="h-8 text-xs" value={b2gPoRef} onChange={(e) => setB2gPoRef(e.target.value)} placeholder="optional" /></div>
-                    </div>
+                    <FormGrid>
+                      <FormField label="Contract reference (ΑΔΑΜ)" htmlFor="ni-b2g-contract"><Input id="ni-b2g-contract" className="h-8 text-xs" value={b2gContractRef} onChange={(e) => setB2gContractRef(e.target.value)} placeholder="e.g. 20SYMV006467658" /></FormField>
+                      <FormField label="Buyer reference" htmlFor="ni-b2g-buyer-ref"><Input id="ni-b2g-buyer-ref" className="h-8 text-xs" value={b2gBuyerRef} onChange={(e) => setB2gBuyerRef(e.target.value)} placeholder="contracting authority" /></FormField>
+                      <FormField label="Buyer legal registration id" htmlFor="ni-b2g-buyer-reg" optional hint="Defaults to the buyer's VAT number."><Input id="ni-b2g-buyer-reg" className="h-8 text-xs" value={b2gBuyerReg} onChange={(e) => setB2gBuyerReg(e.target.value)} /></FormField>
+                      <FormField label="Buyer identifier (ΚΗΜΔΗΣ/KAE)" htmlFor="ni-b2g-buyer-id"><Input id="ni-b2g-buyer-id" className="h-8 text-xs" value={b2gBuyerIdentifier} onChange={(e) => setB2gBuyerIdentifier(e.target.value)} placeholder="e.g. 1007.909.0001" /></FormField>
+                      <FormField label="Budget identifier" htmlFor="ni-b2g-budget"><Input id="ni-b2g-budget" className="h-8 text-xs" value={b2gBudgetIdentifier} onChange={(e) => setB2gBudgetIdentifier(e.target.value)} placeholder="ΚΑΕ / budget code" /></FormField>
+                      <FormField label="Payment due date" htmlFor="ni-b2g-due"><Input id="ni-b2g-due" type="date" className="h-8 text-xs" value={b2gDueDate} onChange={(e) => setB2gDueDate(e.target.value)} /></FormField>
+                      <FormField label="CPV code" htmlFor="ni-b2g-cpv" hint="Used on lines whose product has none."><Input id="ni-b2g-cpv" className="h-8 text-xs" value={b2gCpv} onChange={(e) => setB2gCpv(e.target.value)} placeholder="e.g. 44111000-4" /></FormField>
+                      <FormField label="Purchase order reference" htmlFor="ni-b2g-po" optional><Input id="ni-b2g-po" className="h-8 text-xs" value={b2gPoRef} onChange={(e) => setB2gPoRef(e.target.value)} /></FormField>
+                    </FormGrid>
                   </>
                 )}
-              </section>
+              </FormSection>
             )}
 
             {/* Document & delivery options (Ρυθμίσεις Παραστατικού) */}
-            <section className="border-t border-border/40 pt-4 space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Document &amp; delivery options</Label>
+            <FormSection title="Document & delivery options">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                 {/* Disabled unless "Issue now" is on, because the save path runs this only when
                     BOTH are true (`if (submitNow && issueNow)`). The two checkboxes live in
@@ -2212,11 +2197,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </Select>
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Info box (printed, ≤250 chars)</Label>
-                <Input className="h-8 text-xs" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="Extra printed note, e.g. warranty / delivery terms" />
-              </div>
-            </section>
+              <FormField label="Info box" htmlFor="ni-info-box" optional hint="Printed on the document, up to 250 characters.">
+                <Input id="ni-info-box" className="h-8 text-xs" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="Extra printed note, e.g. warranty / delivery terms" />
+              </FormField>
+            </FormSection>
               </TabsContent>
             </Tabs>
           </div>

@@ -161,7 +161,7 @@ export const TaxDepreciationCard: React.FC<Props> = ({ workspaceId, canManage = 
             {canManage && (
               <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
                 <div>
-                  <Label htmlFor="tax-cat" className="text-[11px]">Category</Label>
+                  <Label htmlFor="tax-cat" className="text-xs">Category</Label>
                   <Select value={draft.code} onValueChange={(v) => setDraft((d) => ({ ...d, code: v }))}>
                     <SelectTrigger id="tax-cat" className="mt-1 h-8 w-64 text-xs">
                       <SelectValue placeholder="Pick a statutory category" />
@@ -174,7 +174,7 @@ export const TaxDepreciationCard: React.FC<Props> = ({ workspaceId, canManage = 
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="tax-pct" className="text-[11px]">Rate %</Label>
+                  <Label htmlFor="tax-pct" className="text-xs">Rate %</Label>
                   <Input
                     id="tax-pct" type="number" step="0.001" min="0" max="100"
                     className="mt-1 h-8 w-24 text-xs" value={draft.percent}
@@ -182,14 +182,14 @@ export const TaxDepreciationCard: React.FC<Props> = ({ workspaceId, canManage = 
                   />
                 </div>
                 <div>
-                  <Label htmlFor="tax-from" className="text-[11px]">Effective from</Label>
+                  <Label htmlFor="tax-from" className="text-xs">Effective from</Label>
                   <Input
                     id="tax-from" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.from}
                     onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="tax-src" className="text-[11px]">Confirmed against</Label>
+                  <Label htmlFor="tax-src" className="text-xs">Confirmed against</Label>
                   <Input
                     id="tax-src" className="mt-1 h-8 w-56 text-xs" placeholder="who confirmed it, and from what"
                     value={draft.note}

@@ -264,7 +264,7 @@ export const OfferDisclosureCard: React.FC<{
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-[11px]">Warnings and safety information, in Greek (d)</Label>
+        <Label className="text-xs">Warnings and safety information, in Greek (d)</Label>
         {el.length === 0 && (
           <p className="text-[11px] text-muted-foreground">
             None recorded. Art 19(d) wants these on the offer itself — the carton is read after the
@@ -305,7 +305,7 @@ export const OfferDisclosureCard: React.FC<{
 const Field: React.FC<{ label: string; className?: string; children: React.ReactNode }> =
   ({ label, className, children }) => (
     <div className={className}>
-      <Label className="text-[11px]">{label}</Label>
+      <Label className="text-xs">{label}</Label>
       <div className="mt-1">{children}</div>
     </div>
   );

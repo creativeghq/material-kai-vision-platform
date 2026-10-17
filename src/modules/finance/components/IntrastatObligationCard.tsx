@@ -142,7 +142,7 @@ export const IntrastatObligationCard: React.FC<Props> = ({
         {!loading && !failed && obligationIsUnknown(v) && canManage && (
           <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
             <div>
-              <Label htmlFor={`intr-amt-${flow}`} className="text-[11px]">Threshold (EUR)</Label>
+              <Label htmlFor={`intr-amt-${flow}`} className="text-xs">Threshold (EUR)</Label>
               <Input
                 id={`intr-amt-${flow}`} type="number" min="1" className="mt-1 h-8 w-36 text-xs"
                 value={draft.amount}
@@ -150,7 +150,7 @@ export const IntrastatObligationCard: React.FC<Props> = ({
               />
             </div>
             <div>
-              <Label htmlFor={`intr-from-${flow}`} className="text-[11px]">Effective from</Label>
+              <Label htmlFor={`intr-from-${flow}`} className="text-xs">Effective from</Label>
               <Input
                 id={`intr-from-${flow}`} type="date" className="mt-1 h-8 w-40 text-xs"
                 value={draft.from}

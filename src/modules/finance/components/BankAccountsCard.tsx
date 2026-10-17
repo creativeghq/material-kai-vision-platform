@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -222,57 +222,55 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
           <DialogHeader>
             <DialogTitle>{editing?.id ? 'Edit account' : 'New account'}</DialogTitle><DialogDescription className="sr-only">Add or edit a bank or cash account.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Name</Label>
-              <Input className="h-9 text-sm" value={form.name} onChange={(e) => patch('name', e.target.value)} placeholder="e.g. Piraeus business, Cash register" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Type</Label>
-                <Select value={form.kind} onValueChange={(v: any) => patch('kind', v)}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(KIND_META) as BankAccountKind[]).map((k) => <SelectItem key={k} value={k}>{KIND_META[k].label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Currency</Label>
-                <Input className="h-9 text-sm uppercase" value={form.currency} onChange={(e) => patch('currency', e.target.value)} maxLength={3} />
-              </div>
-            </div>
+          <div className="space-y-5">
+            <FormSection title="Account">
+              <FormGrid>
+                <FormField label="Name" className="sm:col-span-2">
+                  <Input className="h-9 text-sm" value={form.name} onChange={(e) => patch('name', e.target.value)} placeholder="e.g. Piraeus business, Cash register" />
+                </FormField>
+                <FormField label="Type">
+                  <Select value={form.kind} onValueChange={(v: any) => patch('kind', v)}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(KIND_META) as BankAccountKind[]).map((k) => <SelectItem key={k} value={k}>{KIND_META[k].label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Currency">
+                  <Input className="h-9 text-sm uppercase" value={form.currency} onChange={(e) => patch('currency', e.target.value)} maxLength={3} />
+                </FormField>
+              </FormGrid>
+            </FormSection>
             {/* IBAN only for a bank account; a reference for anything but cash. A cash account is
                 just a name + balance — no bank numbers to fill in. */}
-            {form.kind === 'bank' && (
-              <div className="space-y-1">
-                <Label className="text-xs">IBAN</Label>
-                <Input className="h-9 text-sm" value={form.iban} onChange={(e) => patch('iban', normalizeIban(e.target.value))} placeholder="GR00 0000 0000 0000 0000 0000 000" />
-              </div>
-            )}
-            {form.kind === 'bank' && (
-              <div className="space-y-1">
-                <Label className="text-xs">BIC / SWIFT</Label>
-                <Input className="h-9 text-sm uppercase" value={form.bic} onChange={(e) => patch('bic', e.target.value.replace(/\s+/g, ''))} maxLength={11} placeholder="PIRBGRAA" />
-              </div>
-            )}
             {form.kind !== 'cash' && (
-              <div className="space-y-1">
-                <Label className="text-xs">{refLabelFor(form.kind)}</Label>
-                <Input className="h-9 text-sm" value={form.accountRef} onChange={(e) => patch('accountRef', e.target.value)}
-                  placeholder={form.kind === 'card' ? 'Last 4 or full card number' : 'Account number / Reference'} />
-              </div>
+              <FormSection title="Bank details">
+                <FormGrid>
+                  {form.kind === 'bank' && (
+                    <FormField label="IBAN" className="sm:col-span-2">
+                      <Input className="h-9 text-sm" value={form.iban} onChange={(e) => patch('iban', normalizeIban(e.target.value))} placeholder="GR00 0000 0000 0000 0000 0000 000" />
+                    </FormField>
+                  )}
+                  {form.kind === 'bank' && (
+                    <FormField label="BIC / SWIFT">
+                      <Input className="h-9 text-sm uppercase" value={form.bic} onChange={(e) => patch('bic', e.target.value.replace(/\s+/g, ''))} maxLength={11} placeholder="PIRBGRAA" />
+                    </FormField>
+                  )}
+                  <FormField label={refLabelFor(form.kind)}>
+                    <Input className="h-9 text-sm" value={form.accountRef} onChange={(e) => patch('accountRef', e.target.value)}
+                      placeholder={form.kind === 'card' ? 'Last 4 or full card number' : 'Account number / Reference'} />
+                  </FormField>
+                </FormGrid>
+              </FormSection>
             )}
-            <div className="space-y-1">
-              <Label className="text-xs">Opening balance</Label>
+            <FormSection title="Balance and display">
+            <FormField label="Opening balance" hint="Balance before any platform-recorded movements. Money in/out is added on top.">
               <Input className="h-9 text-sm text-right" type="text" inputMode="decimal" value={form.openingBalance}
                 onChange={(e) => patch('openingBalance', e.target.value)} placeholder="0.00" />
-              <p className="text-[11px] text-muted-foreground">Balance before any platform-recorded movements. Money in/out is added on top.</p>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Notes</Label>
-              <Textarea rows={2} className="text-sm" value={form.notes} onChange={(e) => patch('notes', e.target.value)} placeholder="Optional" />
-            </div>
+            </FormField>
+            <FormField label="Notes" optional>
+              <Textarea rows={2} className="text-sm" value={form.notes} onChange={(e) => patch('notes', e.target.value)} />
+            </FormField>
             <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2">
               <span className="text-xs">Show on invoice <span className="text-muted-foreground">— prints this account's name &amp; IBAN in the payment details on your invoices</span></span>
               <Switch checked={form.showOnInvoice} onCheckedChange={(v) => patch('showOnInvoice', v)} />
@@ -283,6 +281,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                 <Switch checked={form.isActive} onCheckedChange={(v) => patch('isActive', v)} />
               </label>
             )}
+            </FormSection>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditing(null)} disabled={busy}>Cancel</Button>

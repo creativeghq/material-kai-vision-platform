@@ -3,7 +3,7 @@ import { FilePlus2, Loader2, Send, ShieldQuestion } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { todayLocalISO } from '@/utils/datetime';
@@ -16,13 +16,6 @@ const VAT_CATEGORIES: Array<{ code: number; label: string }> = [
   { code: 7, label: 'Without VAT' }, { code: 8, label: 'No VAT clause (art. 43b)' },
 ];
 const VAT_RATE: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <section className="space-y-2">
-    <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
-    {children}
-  </section>
-);
 
 interface Props {
   workspaceId: string;
@@ -158,120 +151,109 @@ export const RecordExpenseDocumentDialog: React.FC<Props> = ({ workspaceId, onRe
           </DialogHeader>
 
           <div className="space-y-5">
-            <Section title="Document">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="sm:col-span-3">
-                  <Label htmlFor="xd-type" className="text-[11px]">Document type</Label>
+            <FormSection title="Document">
+              <FormGrid cols={3}>
+                <FormField label="Document type" htmlFor="xd-type" className="sm:col-span-3">
                   <Select value={form.docType} onValueChange={(v) => set('docType', v)}>
-                    <SelectTrigger id="xd-type" className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="xd-type" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {types.map((t) => (
                         <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label htmlFor="xd-series" className="text-[11px]">Series</Label>
-                  <Input id="xd-series" className="mt-1 h-9" value={form.series} onChange={(e) => set('series', e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="xd-aa" className="text-[11px]">Number</Label>
-                  <Input id="xd-aa" className="mt-1 h-9" value={form.aa} onChange={(e) => set('aa', e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="xd-date" className="text-[11px]">Issue date</Label>
-                  <Input id="xd-date" type="date" className="mt-1 h-9" value={form.issueDate} onChange={(e) => set('issueDate', e.target.value)} />
-                </div>
-              </div>
-            </Section>
+                </FormField>
+                <FormField label="Series" htmlFor="xd-series">
+                  <Input id="xd-series" className="h-9" value={form.series} onChange={(e) => set('series', e.target.value)} />
+                </FormField>
+                <FormField label="Number" htmlFor="xd-aa">
+                  <Input id="xd-aa" className="h-9" value={form.aa} onChange={(e) => set('aa', e.target.value)} />
+                </FormField>
+                <FormField label="Issue date" htmlFor="xd-date">
+                  <Input id="xd-date" type="date" className="h-9" value={form.issueDate} onChange={(e) => set('issueDate', e.target.value)} />
+                </FormField>
+              </FormGrid>
+            </FormSection>
 
             {!isEntity && (
-              <Section title="Supplier">
-                <div className="grid gap-3 sm:grid-cols-6">
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="xd-vat" className="text-[11px]">ΑΦΜ / VAT number</Label>
-                    <Input id="xd-vat" className="mt-1 h-9" value={form.issuerVat} onChange={(e) => set('issuerVat', e.target.value)} />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <Label htmlFor="xd-name" className="text-[11px]">Name</Label>
-                    <Input id="xd-name" className="mt-1 h-9" value={form.issuerName} onChange={(e) => set('issuerName', e.target.value)} />
-                  </div>
-                  <div>
-                    <Label htmlFor="xd-country" className="text-[11px]">Country</Label>
-                    <Input id="xd-country" maxLength={2} className="mt-1 h-9 uppercase" value={form.issuerCountry} onChange={(e) => set('issuerCountry', e.target.value)} />
-                  </div>
-                </div>
-              </Section>
+              <FormSection title="Supplier">
+                <FormGrid cols={6}>
+                  <FormField label="ΑΦΜ / VAT number" htmlFor="xd-vat" className="sm:col-span-2">
+                    <Input id="xd-vat" className="h-9" value={form.issuerVat} onChange={(e) => set('issuerVat', e.target.value)} />
+                  </FormField>
+                  <FormField label="Name" htmlFor="xd-name" className="sm:col-span-3">
+                    <Input id="xd-name" className="h-9" value={form.issuerName} onChange={(e) => set('issuerName', e.target.value)} />
+                  </FormField>
+                  <FormField label="Country" htmlFor="xd-country">
+                    <Input id="xd-country" maxLength={2} className="h-9 uppercase" value={form.issuerCountry} onChange={(e) => set('issuerCountry', e.target.value)} />
+                  </FormField>
+                </FormGrid>
+              </FormSection>
             )}
 
-            <Section title="Amounts">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <Label htmlFor="xd-net" className="text-[11px]">Net amount</Label>
-                  <Input id="xd-net" type="number" step="0.01" inputMode="decimal" className="mt-1 h-9 text-right tabular-nums" value={form.net} onChange={(e) => set('net', e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="xd-vatcat" className="text-[11px]">VAT category</Label>
+            <FormSection title="Amounts">
+              <FormGrid cols={3}>
+                <FormField label="Net amount" htmlFor="xd-net">
+                  <Input id="xd-net" type="number" step="0.01" inputMode="decimal" className="h-9 text-right tabular-nums" value={form.net} onChange={(e) => set('net', e.target.value)} />
+                </FormField>
+                <FormField label="VAT category" htmlFor="xd-vatcat">
                   <Select value={form.vatCategory} onValueChange={(v) => set('vatCategory', v)}>
-                    <SelectTrigger id="xd-vatcat" className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="xd-vatcat" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {VAT_CATEGORIES.map((c) => <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label htmlFor="xd-vatamt" className="text-[11px]">VAT amount</Label>
-                  <Input id="xd-vatamt" type="number" step="0.01" inputMode="decimal" className="mt-1 h-9 text-right tabular-nums" value={form.vatAmount} disabled={zeroRated} onChange={(e) => set('vatAmount', e.target.value)} />
-                </div>
+                </FormField>
+                <FormField label="VAT amount" htmlFor="xd-vatamt">
+                  <Input id="xd-vatamt" type="number" step="0.01" inputMode="decimal" className="h-9 text-right tabular-nums" value={form.vatAmount} disabled={zeroRated} onChange={(e) => set('vatAmount', e.target.value)} />
+                </FormField>
 
                 {needsExemption && (
-                  <div className="sm:col-span-3">
-                    <Label htmlFor="xd-exempt" className="text-[11px]">Exemption article</Label>
+                  <FormField
+                    label="Exemption article"
+                    htmlFor="xd-exempt"
+                    hint="ΑΑΔΕ refuses a 0% line that does not state one."
+                    className="sm:col-span-3"
+                  >
                     <Select value={form.vatExemption} onValueChange={(v) => set('vatExemption', v)}>
-                      <SelectTrigger id="xd-exempt" className="mt-1 h-9"><SelectValue placeholder="Choose the article…" /></SelectTrigger>
+                      <SelectTrigger id="xd-exempt" className="h-9"><SelectValue placeholder="Choose the article…" /></SelectTrigger>
                       <SelectContent>
                         {exemptions.map((e) => <SelectItem key={e.code} value={e.code}>{e.code} — {e.description}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <p className="mt-1 text-[11px] text-muted-foreground">ΑΑΔΕ refuses a 0% line that does not state one.</p>
-                  </div>
+                  </FormField>
                 )}
 
                 <div className="flex items-baseline justify-between border-t border-hairline pt-2 sm:col-span-3">
                   <span className="text-xs text-muted-foreground">Total</span>
                   <span className="text-sm font-semibold tabular-nums">{total.toFixed(2)}</span>
                 </div>
-              </div>
-            </Section>
+              </FormGrid>
+            </FormSection>
 
-            <Section title="Classification">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="xd-ecls-type" className="text-[11px]">
-                    Type <span className="font-normal text-muted-foreground">(optional)</span>
-                  </Label>
+            <FormSection title="Classification">
+              <FormGrid>
+                <FormField label="Type" htmlFor="xd-ecls-type" optional>
                   <Select value={form.classificationType} onValueChange={(v) => set('classificationType', v)}>
-                    <SelectTrigger id="xd-ecls-type" className="mt-1 h-9"><SelectValue placeholder="Choose a type…" /></SelectTrigger>
+                    <SelectTrigger id="xd-ecls-type" className="h-9"><SelectValue placeholder="Choose a type…" /></SelectTrigger>
                     <SelectContent>
                       {expTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label htmlFor="xd-ecls-cat" className="text-[11px]">Category</Label>
+                </FormField>
+                <FormField label="Category" htmlFor="xd-ecls-cat">
                   <Select value={form.classificationCategory} onValueChange={(v) => set('classificationCategory', v)}>
-                    <SelectTrigger id="xd-ecls-cat" className="mt-1 h-9"><SelectValue placeholder="Choose a category…" /></SelectTrigger>
+                    <SelectTrigger id="xd-ecls-cat" className="h-9"><SelectValue placeholder="Choose a category…" /></SelectTrigger>
                     <SelectContent>
                       {expCats.map((c) => <SelectItem key={c.code} value={c.code}>{c.code} — {c.description}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-            </Section>
+                </FormField>
+              </FormGrid>
+            </FormSection>
           </div>
 
-          <DialogFooter className="flex-wrap gap-2 border-t border-hairline pt-4 sm:space-x-0">
+          <DialogFooter className="border-t border-hairline pt-4">
             <Button variant="ghost" onClick={checkRights} disabled={busy} className="sm:mr-auto">
               <ShieldQuestion className="mr-1 h-3.5 w-3.5" /> Check my ΑΑΔΕ rights
             </Button>

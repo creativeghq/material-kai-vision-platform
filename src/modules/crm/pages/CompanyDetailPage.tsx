@@ -966,7 +966,7 @@ export const CompanyDetailPage: React.FC = () => {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
                             <InlineSelect alwaysEdit={isNew} label="VAT Country" value={company.country_code ?? undefined} placeholder="Not set" options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span className="flex items-center gap-2"><span className="font-mono text-[10px] w-7">{o.code}</span>{o.name}{o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}</span> }))} displayValue={company.country_code ? <span className="font-mono">{company.country_code}</span> : undefined} onSave={(v) => patchInline({ country_code: v })} />
                             <InlineText alwaysEdit={isNew} label="VAT Number" value={company.vat_number} onSave={(v) => patchInline({ vat_number: v })} placeholder="123456789" />
-                            <InlineText alwaysEdit={isNew} label="Tax Office" value={company.tax_office} onSave={(v) => patchInline({ tax_office: v })} placeholder="Optional" />
+                            <InlineText alwaysEdit={isNew} label="Tax Office" value={company.tax_office} onSave={(v) => patchInline({ tax_office: v })} placeholder="Not set" />
                             <InlineText alwaysEdit={isNew} label="Γ.Ε.ΜΗ. (GEMI) Number" value={company.gemi_number} onSave={(v) => patchInline({ gemi_number: v })} placeholder="Auto-filled from ΓΕΜΗ" />
                           </div>
                           <div className="flex flex-wrap items-center gap-3">

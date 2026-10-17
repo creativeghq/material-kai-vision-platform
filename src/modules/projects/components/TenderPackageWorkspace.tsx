@@ -466,15 +466,15 @@ const NewPackageItem: React.FC<{
   return (
     <div className="grid grid-cols-6 gap-2 rounded-sm border border-hairline bg-surface-sunken p-3">
       <div className="space-y-1">
-        <Label className="text-[11px]">Ref</Label>
+        <Label className="text-xs">Ref</Label>
         <Input value={itemRef} onChange={(e) => setItemRef(e.target.value)} placeholder="1.1" className="h-9" />
       </div>
       <div className="col-span-2 space-y-1">
-        <Label className="text-[11px]">Description</Label>
+        <Label className="text-xs">Description</Label>
         <Input value={description} onChange={(e) => setDescription(e.target.value)} className="h-9" />
       </div>
       <div className="space-y-1">
-        <Label className="text-[11px]">Unit</Label>
+        <Label className="text-xs">Unit</Label>
         <Select value={unit || 'none'} onValueChange={(v) => setUnit(v === 'none' ? '' : v)}>
           <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
@@ -484,11 +484,11 @@ const NewPackageItem: React.FC<{
         </Select>
       </div>
       <div className="space-y-1">
-        <Label className="text-[11px]">Qty</Label>
+        <Label className="text-xs">Qty</Label>
         <Input inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-9" />
       </div>
       <div className="space-y-1">
-        <Label className="text-[11px]">Cost code</Label>
+        <Label className="text-xs">Cost code</Label>
         <CostCodePicker value={costCodeId} onChange={setCostCodeId} className="h-9" />
       </div>
       <div className="col-span-6 flex justify-end gap-2">

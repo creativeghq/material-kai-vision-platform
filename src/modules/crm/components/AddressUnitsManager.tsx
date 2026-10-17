@@ -4,6 +4,7 @@ import { MapPin, Plus, Pencil, Trash2, Star } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
@@ -178,48 +179,48 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
           <DialogHeader>
             <DialogTitle>{editingId ? 'Edit address' : 'Add address'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="su-label">Name *</Label>
-              <Input id="su-label" value={form.label || ''} onChange={(e) => setField('label', e.target.value)} placeholder="Warehouse / Branch A" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="su-street">Street</Label>
-              <Input id="su-street" value={form.street || ''} onChange={(e) => setField('street', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="su-num">Number</Label>
-              <Input id="su-num" value={form.street_number || ''} onChange={(e) => setField('street_number', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="su-postal">Postal Code</Label>
-              <Input id="su-postal" value={form.postal_code || ''} onChange={(e) => setField('postal_code', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="su-city">City</Label>
-              <Input id="su-city" value={form.city || ''} onChange={(e) => setField('city', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="su-state">State/Region</Label>
-              <Input id="su-state" value={form.state || ''} onChange={(e) => setField('state', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="su-country">Country</Label>
-              <Input id="su-country" value={form.country || ''} onChange={(e) => setField('country', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="su-branch">ΑΑΔΕ Branch # (optional)</Label>
-              <Input
-                id="su-branch" type="number" inputMode="numeric"
-                value={form.branch_number ?? ''}
-                onChange={(e) => setField('branch_number', e.target.value === '' ? null : Number(e.target.value))}
-                placeholder="e.g. 1 (myDATA establishment)"
-              />
-            </div>
-            <div className="flex items-center gap-2 md:col-span-2">
-              <Switch id="su-default" checked={!!form.is_default} onCheckedChange={(v) => setField('is_default', v)} />
-              <Label htmlFor="su-default">Pre-select this address on new documents for this party</Label>
-            </div>
+          <div className="space-y-5 py-2">
+            <FormSection title="Unit">
+              <FormGrid>
+                <FormField label="Name *" htmlFor="su-label">
+                  <Input id="su-label" value={form.label || ''} onChange={(e) => setField('label', e.target.value)} placeholder="Warehouse / Branch A" />
+                </FormField>
+                <FormField label="ΑΑΔΕ Branch #" htmlFor="su-branch" optional>
+                  <Input
+                    id="su-branch" type="number" inputMode="numeric"
+                    value={form.branch_number ?? ''}
+                    onChange={(e) => setField('branch_number', e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="e.g. 1 (myDATA establishment)"
+                  />
+                </FormField>
+                <div className="flex items-center gap-2 sm:col-span-2">
+                  <Switch id="su-default" checked={!!form.is_default} onCheckedChange={(v) => setField('is_default', v)} />
+                  <Label htmlFor="su-default">Pre-select this address on new documents for this party</Label>
+                </div>
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Address">
+              <FormGrid cols={3}>
+                <FormField label="Street" htmlFor="su-street" className="sm:col-span-2">
+                  <Input id="su-street" value={form.street || ''} onChange={(e) => setField('street', e.target.value)} />
+                </FormField>
+                <FormField label="Number" htmlFor="su-num">
+                  <Input id="su-num" value={form.street_number || ''} onChange={(e) => setField('street_number', e.target.value)} />
+                </FormField>
+                <FormField label="Postal Code" htmlFor="su-postal">
+                  <Input id="su-postal" value={form.postal_code || ''} onChange={(e) => setField('postal_code', e.target.value)} />
+                </FormField>
+                <FormField label="City" htmlFor="su-city" className="sm:col-span-2">
+                  <Input id="su-city" value={form.city || ''} onChange={(e) => setField('city', e.target.value)} />
+                </FormField>
+                <FormField label="State/Region" htmlFor="su-state">
+                  <Input id="su-state" value={form.state || ''} onChange={(e) => setField('state', e.target.value)} />
+                </FormField>
+                <FormField label="Country" htmlFor="su-country" className="sm:col-span-2">
+                  <Input id="su-country" value={form.country || ''} onChange={(e) => setField('country', e.target.value)} />
+                </FormField>
+              </FormGrid>
+            </FormSection>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>

@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import {
@@ -479,63 +480,60 @@ const AddUnitDialog: React.FC<{
             the register existed.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          {saleLines.length > 0 && (
-            <div>
-              <Label htmlFor="eq-order">From an order</Label>
-              <Select value={linkedLineId || 'none'} onValueChange={(v) => setLinkedLineId(v === 'none' ? '' : v)}>
-                <SelectTrigger id="eq-order"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Not from an order</SelectItem>
-                  {saleLines.map((o) => o.items.map((it) => (
-                    <SelectItem key={it.id} value={it.id} disabled={takenLineIds.has(it.id)}>
-                      {(o.order_number || 'Order')} · {it.description}
-                      {takenLineIds.has(it.id) ? ' — already registered' : ''}
-                    </SelectItem>
-                  )))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Links the unit to the sale it came off, so the order can show its cover and this
-                row can point back at the order.
-              </p>
-            </div>
-          )}
-          <div>
-            <Label htmlFor="eq-name">Name</Label>
-            <Input id="eq-name" value={form.name} placeholder="Split air conditioner, living room"
-              onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="eq-brand">Brand</Label>
-              <Input id="eq-brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
-            </div>
-            <div>
-              <Label htmlFor="eq-model">Model</Label>
-              <Input id="eq-model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="eq-serial">Serial number</Label>
-              <Input id="eq-serial" value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} />
-            </div>
-            <div>
-              <Label htmlFor="eq-installed">Installed on</Label>
-              <Input id="eq-installed" type="date" value={form.installed_on}
-                onChange={(e) => setForm({ ...form, installed_on: e.target.value })} />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="eq-location">Location</Label>
-            <Input id="eq-location" value={form.location_note} placeholder="Second floor, north wall"
-              onChange={(e) => setForm({ ...form, location_note: e.target.value })} />
-          </div>
-          <div>
-            <Label htmlFor="eq-notes">Notes</Label>
-            <Textarea id="eq-notes" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </div>
+        <div className="space-y-5">
+          <FormSection title="Unit">
+            <FormGrid>
+              {saleLines.length > 0 && (
+                <FormField
+                  label="From an order"
+                  htmlFor="eq-order"
+                  hint="Links the unit to the sale it came off, so the order can show its cover and this row can point back at the order."
+                  className="sm:col-span-2"
+                >
+                  <Select value={linkedLineId || 'none'} onValueChange={(v) => setLinkedLineId(v === 'none' ? '' : v)}>
+                    <SelectTrigger id="eq-order"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not from an order</SelectItem>
+                      {saleLines.map((o) => o.items.map((it) => (
+                        <SelectItem key={it.id} value={it.id} disabled={takenLineIds.has(it.id)}>
+                          {(o.order_number || 'Order')} · {it.description}
+                          {takenLineIds.has(it.id) ? ' — already registered' : ''}
+                        </SelectItem>
+                      )))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              )}
+              <FormField label="Name" htmlFor="eq-name" className="sm:col-span-2">
+                <Input id="eq-name" value={form.name} placeholder="Split air conditioner, living room"
+                  onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </FormField>
+              <FormField label="Brand" htmlFor="eq-brand">
+                <Input id="eq-brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+              </FormField>
+              <FormField label="Model" htmlFor="eq-model">
+                <Input id="eq-model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+              </FormField>
+              <FormField label="Serial number" htmlFor="eq-serial">
+                <Input id="eq-serial" value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
+          <FormSection title="Installation">
+            <FormGrid>
+              <FormField label="Installed on" htmlFor="eq-installed">
+                <Input id="eq-installed" type="date" value={form.installed_on}
+                  onChange={(e) => setForm({ ...form, installed_on: e.target.value })} />
+              </FormField>
+              <FormField label="Location" htmlFor="eq-location">
+                <Input id="eq-location" value={form.location_note} placeholder="Second floor, north wall"
+                  onChange={(e) => setForm({ ...form, location_note: e.target.value })} />
+              </FormField>
+              <FormField label="Notes" htmlFor="eq-notes" className="sm:col-span-2">
+                <Textarea id="eq-notes" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -687,27 +685,23 @@ const AssetDetailDialog: React.FC<{
             </Table>
           )}
           <div className="flex flex-wrap items-end gap-2 pt-1">
-            <div className="w-40">
-              <Label className="text-xs">Kind</Label>
+            <FormField label="Kind" htmlFor="wr-kind" className="w-40">
               <Select value={warranty.kind} onValueChange={(v) => setWarranty({ ...warranty, kind: v as WarrantyKind })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="wr-kind"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {WARRANTY_KINDS.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Starts</Label>
-              <Input type="date" value={warranty.starts_on} onChange={(e) => setWarranty({ ...warranty, starts_on: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Ends</Label>
-              <Input type="date" value={warranty.ends_on} onChange={(e) => setWarranty({ ...warranty, ends_on: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Policy no.</Label>
-              <Input value={warranty.policy_number} onChange={(e) => setWarranty({ ...warranty, policy_number: e.target.value })} />
-            </div>
+            </FormField>
+            <FormField label="Starts" htmlFor="wr-starts">
+              <Input id="wr-starts" type="date" value={warranty.starts_on} onChange={(e) => setWarranty({ ...warranty, starts_on: e.target.value })} />
+            </FormField>
+            <FormField label="Ends" htmlFor="wr-ends">
+              <Input id="wr-ends" type="date" value={warranty.ends_on} onChange={(e) => setWarranty({ ...warranty, ends_on: e.target.value })} />
+            </FormField>
+            <FormField label="Policy no." htmlFor="wr-policy" optional>
+              <Input id="wr-policy" value={warranty.policy_number} onChange={(e) => setWarranty({ ...warranty, policy_number: e.target.value })} />
+            </FormField>
             <Button variant="outline" disabled={busy || !warranty.ends_on} onClick={() => void addWarranty()}>
               <Plus className="h-4 w-4 mr-1" />Add
             </Button>
@@ -754,20 +748,17 @@ const AssetDetailDialog: React.FC<{
             </Table>
           )}
           <div className="flex flex-wrap items-end gap-2 pt-1">
-            <div className="min-w-48 flex-1">
-              <Label className="text-xs">What needs doing</Label>
-              <Input value={plan.title} placeholder="Clean the filters" onChange={(e) => setPlan({ ...plan, title: e.target.value })} />
-            </div>
-            <div className="w-28">
-              <Label className="text-xs">Every (months)</Label>
-              <Input type="number" min={1} value={plan.interval_months}
+            <FormField label="What needs doing" htmlFor="sp-title" className="min-w-48 flex-1">
+              <Input id="sp-title" value={plan.title} placeholder="Clean the filters" onChange={(e) => setPlan({ ...plan, title: e.target.value })} />
+            </FormField>
+            <FormField label="Every (months)" htmlFor="sp-interval" className="w-28">
+              <Input id="sp-interval" type="number" min={1} value={plan.interval_months}
                 onChange={(e) => setPlan({ ...plan, interval_months: e.target.value })} />
-            </div>
-            <div className="w-28">
-              <Label className="text-xs">Remind (days)</Label>
-              <Input type="number" min={0} value={plan.lead_days}
+            </FormField>
+            <FormField label="Remind (days)" htmlFor="sp-lead" className="w-28">
+              <Input id="sp-lead" type="number" min={0} value={plan.lead_days}
                 onChange={(e) => setPlan({ ...plan, lead_days: e.target.value })} />
-            </div>
+            </FormField>
             <div className="flex items-center gap-2 pb-2">
               <Switch id="notify-customer" checked={plan.notify_customer}
                 onCheckedChange={(v) => setPlan({ ...plan, notify_customer: v })} />

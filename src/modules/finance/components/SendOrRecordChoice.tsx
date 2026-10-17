@@ -211,7 +211,7 @@ export const SendOrRecordChoice: React.FC<Props> = ({
                         checked={value.forceVop}
                         onCheckedChange={(v) => patch({ forceVop: v === true })}
                       />
-                      <Label htmlFor="sorc-force" className="text-[11px] font-normal text-destructive">
+                      <Label htmlFor="sorc-force" className="text-xs font-normal text-destructive">
                         The holder name does NOT match this IBAN — tick to proceed anyway
                       </Label>
                     </div>
@@ -233,7 +233,7 @@ export const SendOrRecordChoice: React.FC<Props> = ({
                     disabled={disabled}
                     onCheckedChange={(v) => patch({ sendMode: v === true ? 'payment' : 'draft' })}
                   />
-                  <Label htmlFor="sorc-direct" className="text-[11px] font-normal text-muted-foreground">
+                  <Label htmlFor="sorc-direct" className="text-xs font-normal text-muted-foreground">
                     Send immediately (skip the approval step in the Revolut app)
                   </Label>
                 </div>

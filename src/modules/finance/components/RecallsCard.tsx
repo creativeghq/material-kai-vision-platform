@@ -264,7 +264,7 @@ export const RecallsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
 
             {RECALL_REQUIRED_FIELDS.map((f) => (
               <div key={String(f.key)}>
-                <Label className="text-[11px]">{f.label}</Label>
+                <Label className="text-xs">{f.label}</Label>
                 <Textarea
                   className="mt-1 text-xs" rows={2}
                   value={String(editing[f.key] ?? '')}
@@ -274,7 +274,7 @@ export const RecallsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             ))}
 
             <div>
-              <Label className="text-[11px]">Safety Business Gateway reference (art. 20)</Label>
+              <Label className="text-xs">Safety Business Gateway reference (art. 20)</Label>
               <Input
                 className="mt-1 h-8 text-xs" value={editing.gateway_reference ?? ''}
                 onChange={(e) => setEditing((r) => ({ ...r, gateway_reference: e.target.value || null }))}

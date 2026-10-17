@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Badge } from '@/components/core/ui/badge';
@@ -323,102 +324,91 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
             </TabsList>
 
             {/* Details Tab */}
-            <TabsContent value="details" className="space-y-4">
-          {/* Campaign Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name">Campaign Name *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Summer Sale 2025"
-              required
-            />
-          </div>
+            <TabsContent value="details" className="space-y-5">
+          <FormSection title="Campaign">
+            <FormGrid cols={1}>
+              <FormField label="Campaign name" htmlFor="name">
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Summer Sale 2025"
+                  required
+                />
+              </FormField>
+              <FormField label="Description" htmlFor="description" optional>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Brief description of this campaign"
+                  rows={3}
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Brief description of this campaign"
-              rows={3}
-            />
-          </div>
+          <FormSection title="Message">
+            <FormGrid cols={1}>
+              <FormField label="Email template" htmlFor="template">
+                <Select value={formData.template_id || undefined} onValueChange={(v) => setFormData({ ...formData, template_id: v })}>
+                  <SelectTrigger id="template"><SelectValue placeholder="Select a template" /></SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Subject line" htmlFor="subject" optional>
+                <Input
+                  id="subject"
+                  value={formData.subject_line}
+                  onChange={(e) => setFormData({ ...formData, subject_line: e.target.value })}
+                  placeholder="Email subject line"
+                />
+              </FormField>
+              <FormField label="Preview text" htmlFor="preview" optional>
+                <Input
+                  id="preview"
+                  value={formData.preview_text}
+                  onChange={(e) => setFormData({ ...formData, preview_text: e.target.value })}
+                  placeholder="Preview text shown in inbox"
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          {/* Template Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="template">Email Template *</Label>
-            <Select value={formData.template_id || undefined} onValueChange={(v) => setFormData({ ...formData, template_id: v })}>
-              <SelectTrigger id="template"><SelectValue placeholder="Select a template" /></SelectTrigger>
-              <SelectContent>
-                {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Subject Line */}
-          <div className="space-y-2">
-            <Label htmlFor="subject">Subject Line</Label>
-            <Input
-              id="subject"
-              value={formData.subject_line}
-              onChange={(e) => setFormData({ ...formData, subject_line: e.target.value })}
-              placeholder="Email subject line"
-            />
-          </div>
-
-          {/* Preview Text */}
-          <div className="space-y-2">
-            <Label htmlFor="preview">Preview Text</Label>
-            <Input
-              id="preview"
-              value={formData.preview_text}
-              onChange={(e) => setFormData({ ...formData, preview_text: e.target.value })}
-              placeholder="Preview text shown in inbox"
-            />
-          </div>
-
-          {/* From Name */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="from_name">From Name</Label>
-              <Input
-                id="from_name"
-                value={formData.from_name}
-                onChange={(e) => setFormData({ ...formData, from_name: e.target.value })}
-                placeholder="Materials Hub"
-              />
-            </div>
-
-            {/* From Email */}
-            <div className="space-y-2">
-              <Label htmlFor="from_email">From Email</Label>
-              <Input
-                id="from_email"
-                type="email"
-                value={formData.from_email}
-                onChange={(e) => setFormData({ ...formData, from_email: e.target.value })}
-                placeholder="noreply@example.com"
-              />
-            </div>
-          </div>
-
-          {/* Reply To */}
-          <div className="space-y-2">
-            <Label htmlFor="reply_to">Reply To</Label>
-            <Input
-              id="reply_to"
-              type="email"
-              value={formData.reply_to}
-              onChange={(e) => setFormData({ ...formData, reply_to: e.target.value })}
-              placeholder="support@example.com"
-            />
-          </div>
+          <FormSection title="Sender">
+            <FormGrid>
+              <FormField label="From name" htmlFor="from_name" optional>
+                <Input
+                  id="from_name"
+                  value={formData.from_name}
+                  onChange={(e) => setFormData({ ...formData, from_name: e.target.value })}
+                  placeholder="Materials Hub"
+                />
+              </FormField>
+              <FormField label="From email" htmlFor="from_email" optional>
+                <Input
+                  id="from_email"
+                  type="email"
+                  value={formData.from_email}
+                  onChange={(e) => setFormData({ ...formData, from_email: e.target.value })}
+                  placeholder="noreply@example.com"
+                />
+              </FormField>
+              <FormField label="Reply to" htmlFor="reply_to" optional className="sm:col-span-2">
+                <Input
+                  id="reply_to"
+                  type="email"
+                  value={formData.reply_to}
+                  onChange={(e) => setFormData({ ...formData, reply_to: e.target.value })}
+                  placeholder="support@example.com"
+                />
+              </FormField>
+            </FormGrid>
+          </FormSection>
         </TabsContent>
 
         {/* Audience Tab */}

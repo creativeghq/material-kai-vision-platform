@@ -177,7 +177,7 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
 
             <div className="flex flex-wrap items-end gap-3 border-b border-hairline px-5 py-3">
               <div>
-                <Label htmlFor="tp-vis" className="text-[11px]">Stock they see</Label>
+                <Label htmlFor="tp-vis" className="text-xs">Stock they see</Label>
                 <Select
                   value={account.stock_visibility}
                   disabled={busy}
@@ -195,7 +195,7 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
                 </Select>
               </div>
               <div>
-                <Label htmlFor="tp-thr" className="text-[11px]">Approval above</Label>
+                <Label htmlFor="tp-thr" className="text-xs">Approval above</Label>
                 <Input
                   id="tp-thr" type="number" min="0" className="mt-1 h-8 w-28 text-xs"
                   defaultValue={account.approval_threshold ?? ''}

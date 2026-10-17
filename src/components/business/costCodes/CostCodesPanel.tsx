@@ -104,7 +104,7 @@ export const CostCodesPanel: React.FC<Props> = ({ workspaceId }) => {
   const DraftRow: React.FC<{ depth: number }> = ({ depth }) => (
     <div className="flex items-end gap-2 py-2" style={{ paddingLeft: `${depth * 20}px` }}>
       <div className="w-28">
-        <Label className="text-[11px] text-muted-foreground">Number</Label>
+        <Label className="text-xs text-muted-foreground">Number</Label>
         <Input
           autoFocus
           value={draft?.code ?? ''}
@@ -114,7 +114,7 @@ export const CostCodesPanel: React.FC<Props> = ({ workspaceId }) => {
         />
       </div>
       <div className="flex-1">
-        <Label className="text-[11px] text-muted-foreground">Name</Label>
+        <Label className="text-xs text-muted-foreground">Name</Label>
         <Input
           value={draft?.name ?? ''}
           onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}

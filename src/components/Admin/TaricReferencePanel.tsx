@@ -105,7 +105,7 @@ export const TaricReferencePanel: React.FC = () => {
         </div>
         <div className="flex items-end gap-2 shrink-0">
           <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">Source</Label>
+            <Label className="text-xs text-muted-foreground">Source</Label>
             <Select value={source} onValueChange={(v) => setSource(v as 'taric_eu' | 'gr_national')}>
               <SelectTrigger className="h-9 text-xs w-[190px]"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -130,7 +130,7 @@ export const TaricReferencePanel: React.FC = () => {
           download-and-upload round trip — and, remembered, it is the same URL the monthly cron
           re-fetches, which is what turns this from a chore into a one-time setup. */}
       <CardContent className="pt-0 pb-3 space-y-2">
-        <Label htmlFor="taric-url" className="text-[11px] text-muted-foreground">
+        <Label htmlFor="taric-url" className="text-xs text-muted-foreground">
           Import from a link (right-click the file in CIRCABC → copy link)
         </Label>
         <div className="flex flex-wrap items-center gap-2">

@@ -177,28 +177,28 @@ export const ErpDeclarationCard: React.FC<{ workspaceId: string }> = ({ workspac
 
             <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
               <div>
-                <Label htmlFor="erp-name" className="text-[11px]">Commercial name</Label>
+                <Label htmlFor="erp-name" className="text-xs">Commercial name</Label>
                 <Input
                   id="erp-name" className="mt-1 h-8 w-48 text-xs" value={draft.name}
                   onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 />
               </div>
               <div>
-                <Label htmlFor="erp-ver" className="text-[11px]">Version</Label>
+                <Label htmlFor="erp-ver" className="text-xs">Version</Label>
                 <Input
                   id="erp-ver" className="mt-1 h-8 w-28 text-xs" value={draft.version}
                   onChange={(e) => setDraft((d) => ({ ...d, version: e.target.value }))}
                 />
               </div>
               <div>
-                <Label htmlFor="erp-rel" className="text-[11px]">First released</Label>
+                <Label htmlFor="erp-rel" className="text-xs">First released</Label>
                 <Input
                   id="erp-rel" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.released}
                   onChange={(e) => setDraft((d) => ({ ...d, released: e.target.value }))}
                 />
               </div>
               <div>
-                <Label htmlFor="erp-filed" className="text-[11px]">Filed with AADE</Label>
+                <Label htmlFor="erp-filed" className="text-xs">Filed with AADE</Label>
                 <Input
                   id="erp-filed" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.filed}
                   onChange={(e) => setDraft((d) => ({ ...d, filed: e.target.value }))}

@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
@@ -248,53 +249,52 @@ function AddEmployeeDialog({ workspaceId, departments, onDone, departmentId, emp
           <DialogTitle>Add Employee</DialogTitle>
           <DialogDescription>Create a new employee record with role, employment type and compensation.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1"><Label>Full name *</Label><Input value={f.name} onChange={(e) => upd('name', e.target.value)} placeholder="Jane Doe" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Email</Label><Input type="email" value={f.email} onChange={(e) => upd('email', e.target.value)} /></div>
-            <div className="space-y-1"><Label>Position</Label><Input value={f.position} onChange={(e) => upd('position', e.target.value)} placeholder="Designer" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Department</Label>
-              <Select value={f.department_id || 'none'} onValueChange={(v) => upd('department_id', v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Employment type</Label>
-              <Select value={f.employment_type} onValueChange={(v) => upd('employment_type', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => <SelectItem key={t} value={t}>{EMPLOYMENT_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Start date</Label><Input type="date" value={f.start_date} onChange={(e) => upd('start_date', e.target.value)} /></div>
-            <div className="space-y-1"><Label>Leave (days)</Label><Input type="number" min={0} value={f.allowance} onChange={(e) => upd('allowance', e.target.value)} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>VAT number <span className="text-muted-foreground text-xs">(for Ergani)</span></Label><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
-            <div className="space-y-1"><Label>AMKA <span className="text-muted-foreground text-xs">(social security no. — for Ergani)</span></Label><Input value={f.amka} onChange={(e) => upd('amka', e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
-          </div>
-          <WorkingTimeFields start={f.workStart} end={f.workEnd} days={workDays} onStart={(v) => upd('workStart', v)} onEnd={(v) => upd('workEnd', v)} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Pay basis</Label>
-              <Select value={f.pay_basis} onValueChange={(v) => upd('pay_basis', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(PAY_BASIS_LABELS) as PayBasis[]).map((b) => <SelectItem key={b} value={b}>{PAY_BASIS_LABELS[b]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            {f.pay_basis === 'monthly'
-              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="text" inputMode="decimal" value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></div>
-              : <>
-                  <div className="space-y-1"><Label>Hourly rate</Label><Input type="text" inputMode="decimal" value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></div>
-                  <div className="space-y-1"><Label>Weekly hours <span className="text-muted-foreground text-xs">(→ hours/day)</span></Label><Input type="text" inputMode="decimal" value={f.weekly} onChange={(e) => upd('weekly', e.target.value)} placeholder="40" /></div>
-                </>}
-          </div>
-          <div className="space-y-1 w-1/2"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></div>
+        <div className="space-y-5">
+          <FormSection title="Person">
+            <FormGrid>
+              <FormField label="Full name *" className="sm:col-span-2"><Input value={f.name} onChange={(e) => upd('name', e.target.value)} placeholder="Jane Doe" /></FormField>
+              <FormField label="Email" optional><Input type="email" value={f.email} onChange={(e) => upd('email', e.target.value)} /></FormField>
+              <FormField label="Position" optional><Input value={f.position} onChange={(e) => upd('position', e.target.value)} placeholder="Designer" /></FormField>
+              <FormField label="VAT number" optional hint="For Ergani."><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></FormField>
+              <FormField label="AMKA" optional hint="Social security no. — for Ergani."><Input value={f.amka} onChange={(e) => upd('amka', e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></FormField>
+            </FormGrid>
+          </FormSection>
+          <FormSection title="Employment">
+            <FormGrid>
+              <FormField label="Department" optional>
+                <Select value={f.department_id || 'none'} onValueChange={(v) => upd('department_id', v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Employment type">
+                <Select value={f.employment_type} onValueChange={(v) => upd('employment_type', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => <SelectItem key={t} value={t}>{EMPLOYMENT_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Start date" optional><Input type="date" value={f.start_date} onChange={(e) => upd('start_date', e.target.value)} /></FormField>
+              <FormField label="Leave (days)"><Input type="number" min={0} value={f.allowance} onChange={(e) => upd('allowance', e.target.value)} /></FormField>
+            </FormGrid>
+            <WorkingTimeFields start={f.workStart} end={f.workEnd} days={workDays} onStart={(v) => upd('workStart', v)} onEnd={(v) => upd('workEnd', v)} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
+          </FormSection>
+          <FormSection title="Pay">
+            <FormGrid>
+              <FormField label="Pay basis">
+                <Select value={f.pay_basis} onValueChange={(v) => upd('pay_basis', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.keys(PAY_BASIS_LABELS) as PayBasis[]).map((b) => <SelectItem key={b} value={b}>{PAY_BASIS_LABELS[b]}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              {f.pay_basis === 'monthly'
+                ? <FormField label="Monthly salary"><Input type="text" inputMode="decimal" value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></FormField>
+                : <>
+                    <FormField label="Hourly rate"><Input type="text" inputMode="decimal" value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></FormField>
+                    <FormField label="Weekly hours" hint="→ hours/day"><Input type="text" inputMode="decimal" value={f.weekly} onChange={(e) => upd('weekly', e.target.value)} placeholder="40" /></FormField>
+                  </>}
+              <FormField label="Dependent children" hint="Tax credit."><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></FormField>
+            </FormGrid>
+          </FormSection>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
@@ -381,50 +381,49 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{empName(employee)}</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as EmployeeStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(EMPLOYEE_STATUS_LABELS) as EmployeeStatus[]).map((s) => <SelectItem key={s} value={s}>{EMPLOYEE_STATUS_LABELS[s]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Department</Label>
-              <Select value={deptId || 'none'} onValueChange={(v) => setDeptId(v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Pay basis</Label>
-              <Select value={payBasis} onValueChange={(v) => setPayBasis(v as PayBasis)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(PAY_BASIS_LABELS) as PayBasis[]).map((b) => <SelectItem key={b} value={b}>{PAY_BASIS_LABELS[b]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            {payBasis === 'monthly'
-              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="text" inputMode="decimal" value={salary} onChange={(e) => setSalary(e.target.value)} /></div>
-              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="text" inputMode="decimal" value={hourly} onChange={(e) => setHourly(e.target.value)} /></div>}
-          </div>
-          {payBasis === 'hourly' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Weekly hours <span className="text-muted-foreground text-xs">(→ hours/day)</span></Label><Input type="text" inputMode="decimal" value={weekly} onChange={(e) => setWeekly(e.target.value)} placeholder="40" /></div>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>VAT number <span className="text-muted-foreground text-xs">(for Ergani)</span></Label><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
-            <div className="space-y-1"><Label>AMKA <span className="text-muted-foreground text-xs">(social security no. — for Ergani)</span></Label><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
-          </div>
-          <WorkingTimeFields start={workStart} end={workEnd} days={workDays} onStart={setWorkStart} onEnd={setWorkEnd} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
-          <div className="space-y-1"><Label>Kiosk PIN <span className="text-muted-foreground text-xs">(optional 4–8 digits; blank = unchanged)</span></Label><Input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} className="font-mono" maxLength={8} placeholder="••••" inputMode="numeric" /></div>
+        <div className="space-y-5">
+          <FormSection title="Employment">
+            <FormGrid>
+              <FormField label="Status">
+                <Select value={status} onValueChange={(v) => setStatus(v as EmployeeStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.keys(EMPLOYEE_STATUS_LABELS) as EmployeeStatus[]).map((s) => <SelectItem key={s} value={s}>{EMPLOYEE_STATUS_LABELS[s]}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Department" optional>
+                <Select value={deptId || 'none'} onValueChange={(v) => setDeptId(v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Annual leave (days)"><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></FormField>
+            </FormGrid>
+            <WorkingTimeFields start={workStart} end={workEnd} days={workDays} onStart={setWorkStart} onEnd={setWorkEnd} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
+          </FormSection>
+          <FormSection title="Pay">
+            <FormGrid>
+              <FormField label="Pay basis">
+                <Select value={payBasis} onValueChange={(v) => setPayBasis(v as PayBasis)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.keys(PAY_BASIS_LABELS) as PayBasis[]).map((b) => <SelectItem key={b} value={b}>{PAY_BASIS_LABELS[b]}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              {payBasis === 'monthly'
+                ? <FormField label="Monthly salary"><Input type="text" inputMode="decimal" value={salary} onChange={(e) => setSalary(e.target.value)} /></FormField>
+                : <FormField label="Hourly rate"><Input type="text" inputMode="decimal" value={hourly} onChange={(e) => setHourly(e.target.value)} /></FormField>}
+              {payBasis === 'hourly' && (
+                <FormField label="Weekly hours" hint="→ hours/day"><Input type="text" inputMode="decimal" value={weekly} onChange={(e) => setWeekly(e.target.value)} placeholder="40" /></FormField>
+              )}
+              <FormField label="Dependent children" hint="Tax credit."><Input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} /></FormField>
+            </FormGrid>
+          </FormSection>
+          <FormSection title="Ergani and kiosk">
+            <FormGrid>
+              <FormField label="VAT number" optional hint="For Ergani."><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></FormField>
+              <FormField label="AMKA" optional hint="Social security no. — for Ergani."><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></FormField>
+              <FormField label="Kiosk PIN" optional hint="4–8 digits; blank = unchanged."><Input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} className="font-mono" maxLength={8} placeholder="••••" inputMode="numeric" /></FormField>
+            </FormGrid>
+          </FormSection>
         </div>
         {/* Employment contracts for this employee (HR context — admin-only via RLS). */}
         <div className="border-t border-border/60 mt-4 pt-4">
@@ -446,10 +445,10 @@ function WorkingTimeFields({ start, end, days, onStart, onEnd, onToggleDay }: {
   return (
     <div className="space-y-2 rounded-md border border-border/60 p-3">
       <Label className="text-xs text-muted-foreground">Working time <span className="normal-case">(drives lateness alerts + kiosk)</span></Label>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1"><Label className="text-xs">Start</Label><Input type="time" value={start} onChange={(e) => onStart(e.target.value)} /></div>
-        <div className="space-y-1"><Label className="text-xs">End</Label><Input type="time" value={end} onChange={(e) => onEnd(e.target.value)} /></div>
-      </div>
+      <FormGrid>
+        <FormField label="Start"><Input type="time" value={start} onChange={(e) => onStart(e.target.value)} /></FormField>
+        <FormField label="End"><Input type="time" value={end} onChange={(e) => onEnd(e.target.value)} /></FormField>
+      </FormGrid>
       <div className="flex gap-1 flex-wrap">
         {WEEKDAYS.map(([lbl, n]) => (
           <button type="button" key={n} onClick={() => onToggleDay(n)}

@@ -15,6 +15,7 @@ import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDraw
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { OrderWorklistPanel } from './OrderWorklistPanel';
@@ -1226,9 +1227,10 @@ export const NewOrderModal: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{preset.draft ? 'New pre-order' : isSales ? 'New sales order' : 'New purchase order'}</DialogTitle><DialogDescription className="sr-only">Order form.</DialogDescription></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>{isSales ? 'Customer *' : 'Supplier *'}</Label>
+        <div className="space-y-5">
+          <FormSection title="Order">
+          <FormGrid>
+          <FormField label={isSales ? 'Customer' : 'Supplier'} htmlFor="neworder-party" className="sm:col-span-2">
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.name}{party.sub ? <span className="text-xs text-muted-foreground"> · {party.sub}</span> : null}</span>
@@ -1238,7 +1240,7 @@ export const NewOrderModal: React.FC<{
             ) : (
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input className="pl-7" placeholder={`Search ${isSales ? 'customers' : 'suppliers'} by name, VAT or email…`} value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
+                <Input id="neworder-party" className="pl-7" placeholder={`Search ${isSales ? 'customers' : 'suppliers'} by name, VAT or email…`} value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
                 {partyOpts.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
                     {partyOpts.map((o) => (
@@ -1251,9 +1253,8 @@ export const NewOrderModal: React.FC<{
                 )}
               </div>
             )}
-          </div>
+          </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
             {/*
               * One field for "what is this for?". A project, a customer (raising or attaching their
               * order), an existing order of the same kind to merge these lines into, or — for a
@@ -1282,35 +1283,30 @@ export const NewOrderModal: React.FC<{
                 </p>
               ) : undefined}
             />
-            <div className="space-y-1">
-              <Label>Currency</Label>
+            <FormField label="Currency" htmlFor="neworder-currency">
               <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="neworder-currency"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EUR">EUR</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="GBP">GBP</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
+            </FormField>
 
           {/* Classify + set when we expect to be paid — so the order shows a category and can AGE in
               Receivables/Payables even before it's invoiced (both carry onto the invoice/bill). */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Category</Label>
+            <FormField label="Category" htmlFor="neworder-category" optional>
               <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder="No category" /></SelectTrigger>
+                <SelectTrigger id="neworder-category"><SelectValue placeholder="No category" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No category</SelectItem>
                   {catOptions.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Expected payment date</Label>
-              <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
+            </FormField>
+            <FormField label="Expected payment date" htmlFor="neworder-expected">
+              <Input id="neworder-expected" type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
               {/* A pre-order stays out of Receivables/Payables until a deposit is recorded, so the
                   expected date won't age until then — flag it so the operator isn't surprised. */}
               {/* A PURCHASE pre-order ages in Payables, not Receivables — this named Receivables
@@ -1318,8 +1314,9 @@ export const NewOrderModal: React.FC<{
               {preset.draft && expectedDate && (
                 <p className="text-[11px] text-amber-600">Pre-orders age in {orderType === 'purchase' ? 'Payables' : 'Receivables'} only after a deposit is recorded.</p>
               )}
-            </div>
-          </div>
+            </FormField>
+          </FormGrid>
+          </FormSection>
 
           {/* Ordering again: the copy carries today's prices by default, and this puts the source
               order's prices one click away. Shown only when the two actually differ — an unchanged
@@ -1339,15 +1336,14 @@ export const NewOrderModal: React.FC<{
             </div>
           )}
 
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <Label>Items</Label>
+          <FormSection title="Lines">
               {/* No "add a product" when the document defines the order — anything typed in here
                   was not on the supplier's document and does not belong on this order. */}
               {!locked && (
-                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New product</Button>
+                <div className="flex justify-end">
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New product</Button>
+                </div>
               )}
-            </div>
             <div className="rounded-md border border-border/60 overflow-x-auto">
               {/* Sales shows a separate Cost column (for margin); a purchase order's price IS the cost. */}
               <div className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[640px]`}>
@@ -1496,7 +1492,7 @@ export const NewOrderModal: React.FC<{
             ) : (
               <p className="text-[11px] text-muted-foreground">{isSales ? 'Pick a catalog product to auto-fill the customer’s price, cost & unit (this customer’s discount is applied). Editable.' : 'A purchase order’s unit price is what we pay the supplier (= our cost). Pick a catalog product to auto-fill it.'} Catalog lines link to the warehouse — delivery moves stock.</p>
             )}
-          </div>
+          </FormSection>
 
           {/* ── Into the warehouse ──────────────────────────────────────────────────────────
               A received document means the goods ALREADY arrived (this is often a ΤΔΑ, a delivery
@@ -1511,8 +1507,7 @@ export const NewOrderModal: React.FC<{
                 <span className="font-medium">Receive these goods into the warehouse now</span>
               </label>
               {receiveNow && warehouses.length > 1 && (
-                <div className="space-y-1">
-                  <Label htmlFor="orderspanel-receive-warehouse" className="text-[10px] text-muted-foreground">Warehouse</Label>
+                <FormField label="Warehouse" htmlFor="orderspanel-receive-warehouse">
                   <Select value={warehouseId} onValueChange={setWarehouseId}>
                     <SelectTrigger id="orderspanel-receive-warehouse" className="h-8 text-xs"><SelectValue placeholder="Pick a warehouse" /></SelectTrigger>
                     <SelectContent>
@@ -1521,7 +1516,7 @@ export const NewOrderModal: React.FC<{
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </FormField>
               )}
               {receiveNow && (() => {
                 const unlinked = items.filter((l) => !l.product_id).length;
@@ -1568,25 +1563,29 @@ export const NewOrderModal: React.FC<{
             </div>
           )}
 
-          <div className="space-y-1">
-            <Label>Order note (optional)</Label>
+          <FormSection title="Note & totals">
+          <FormField
+            label="Order note"
+            htmlFor="neworder-notes"
+            optional
+            hint="Prints on the invoice and the payment receipt, and stays visible on the order here."
+          >
             <Textarea
+              id="neworder-notes"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={isSales ? 'e.g. Customer will pick up today — call on arrival.' : 'e.g. Deliver to the back entrance before noon.'}
             />
-            <p className="text-[11px] text-muted-foreground">Prints on the invoice and the payment receipt, and stays visible on the order here.</p>
-          </div>
+          </FormField>
 
           <div className="flex flex-wrap items-start justify-between gap-4">
             {/* Order-level discount off the net (sales only): a % or a flat cash amount. */}
             {isSales ? (
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Discount (optional)</Label>
+              <FormField label="Discount" htmlFor="neworder-discount-type" optional>
                 <div className="flex items-center gap-1.5">
                   <Select value={discountType} onValueChange={(v: any) => setDiscountType(v)}>
-                    <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="neworder-discount-type" className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="percent">%</SelectItem>
                       <SelectItem value="amount">{currency}</SelectItem>
@@ -1597,7 +1596,7 @@ export const NewOrderModal: React.FC<{
                     <span className="text-[11px] text-muted-foreground">≈ {effDiscountPct.toFixed(effDiscountPct < 10 ? 1 : 0)}% off</span>
                   )}
                 </div>
-              </div>
+              </FormField>
             ) : <div />}
             <div className="flex flex-col items-end gap-0.5 text-sm">
               {discountAmount > 0 && (
@@ -1624,6 +1623,7 @@ export const NewOrderModal: React.FC<{
               }))}
             />
           )}
+          </FormSection>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
@@ -3228,7 +3228,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 a category and ages in Receivables/Payables (both carry onto the invoice/bill). */}
             <div className="flex flex-wrap items-end gap-4 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Category</Label>
+                <Label className="text-xs text-muted-foreground">Category</Label>
                 <Select value={order.category_id ?? 'none'} onValueChange={(v) => void saveMeta({ categoryId: v === 'none' ? null : v })} disabled={saving}>
                   <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="No category" /></SelectTrigger>
                   <SelectContent>
@@ -3244,7 +3244,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Expected payment date</Label>
+                <Label className="text-xs text-muted-foreground">Expected payment date</Label>
                 <Input type="date" className="h-8 w-44 text-xs" value={order.expected_payment_date ?? ''} disabled={saving}
                   onChange={(e) => void saveMeta({ expectedPaymentDate: e.target.value || null })} />
               </div>
@@ -3825,7 +3825,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 else — a field belonging to the record reading as one belonging to whichever tab you
                 were on. Captured when the order is placed; prints on the invoice and the receipt. */}
             <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-              <Label className="text-[10px] text-muted-foreground">Order note</Label>
+              <Label className="text-xs text-muted-foreground">Order note</Label>
               <Textarea
                 key={order.id}
                 rows={2}
@@ -4869,9 +4869,8 @@ const LineWarrantyDialog: React.FC<{
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="wr-kind">Type</Label>
+          <FormGrid>
+            <FormField label="Type" htmlFor="wr-kind">
               <Select value={kind} onValueChange={(v) => setKind(v as WarrantyKind)}>
                 <SelectTrigger id="wr-kind" className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -4881,29 +4880,24 @@ const LineWarrantyDialog: React.FC<{
                   <SelectItem value="insurance">Insurance</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <Label htmlFor="wr-months">Cover (months)</Label>
+            </FormField>
+            <FormField label="Cover (months)" htmlFor="wr-months">
               <Input id="wr-months" type="number" min="1" step="1" className="h-9" value={months}
                 placeholder="24"
                 onChange={(e) => setMonths(e.target.value)}
                 onBlur={(e) => void applyMonths(e.target.value, startsOn)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="wr-start">Starts on</Label>
+            </FormField>
+            <FormField label="Starts on" htmlFor="wr-start">
               <Input id="wr-start" type="date" className="h-9" value={startsOn}
                 onChange={(e) => setStartsOn(e.target.value)}
                 onBlur={(e) => void applyMonths(months, e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="wr-end">Ends on</Label>
+            </FormField>
+            <FormField label="Ends on" htmlFor="wr-end">
               <Input id="wr-end" type="date" className="h-9" value={endsOn}
                 disabled={resolving}
                 onChange={(e) => setEndsOn(e.target.value)} />
-            </div>
-          </div>
+            </FormField>
+          </FormGrid>
           <p className="text-xs text-muted-foreground">
             Enter a month count to fill the end date, or set the end date directly — that date is
             what gets stored.
@@ -5004,19 +4998,18 @@ const VatExemptionDialog: React.FC<{
               the customer’s record. Set one here only to override it for this line.
             </p>
           )}
-          <div className="space-y-1">
-            <Label className="text-xs">Exemption cause</Label>
+          <FormField label="Exemption cause" htmlFor="vat-exemption-cause">
             <Select value={code} onValueChange={setCode} disabled={busy}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Pick the governing article…" /></SelectTrigger>
+              <SelectTrigger id="vat-exemption-cause" className="w-full"><SelectValue placeholder="Pick the governing article…" /></SelectTrigger>
               <SelectContent className="max-h-72">
                 {MYDATA_EXEMPTION_CATEGORIES.map((c) => (
                   <SelectItem key={c.code} value={String(c.code)}>{c.code} · {c.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </FormField>
         </div>
-        <DialogFooter className="gap-2">
+        <DialogFooter>
           {current != null && (
             <Button variant="ghost" disabled={busy} onClick={() => onApply(null)}>Clear</Button>
           )}

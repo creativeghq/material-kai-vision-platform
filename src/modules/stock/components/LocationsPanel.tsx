@@ -212,7 +212,7 @@ export const LocationsPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
 
         <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
           <div>
-            <Label htmlFor="loc-wh" className="text-[11px]">Warehouse</Label>
+            <Label htmlFor="loc-wh" className="text-xs">Warehouse</Label>
             <Select value={draft.warehouse_id} onValueChange={(v) => setDraft((d) => ({ ...d, warehouse_id: v }))}>
               <SelectTrigger id="loc-wh" className="mt-1 h-8 w-44 text-xs">
                 <SelectValue placeholder="Choose" />
@@ -223,28 +223,28 @@ export const LocationsPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
             </Select>
           </div>
           <div>
-            <Label htmlFor="loc-code" className="text-[11px]">Code</Label>
+            <Label htmlFor="loc-code" className="text-xs">Code</Label>
             <Input
               id="loc-code" className="mt-1 h-8 w-32 text-xs" value={draft.code}
               onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))} placeholder="A-01-02"
             />
           </div>
           <div>
-            <Label htmlFor="loc-barcode" className="text-[11px]">Location barcode</Label>
+            <Label htmlFor="loc-barcode" className="text-xs">Location barcode</Label>
             <Input
               id="loc-barcode" className="mt-1 h-8 w-40 text-xs" value={draft.barcode}
               onChange={(e) => setDraft((d) => ({ ...d, barcode: e.target.value }))}
             />
           </div>
           <div>
-            <Label htmlFor="loc-path" className="text-[11px]">Walking path</Label>
+            <Label htmlFor="loc-path" className="text-xs">Walking path</Label>
             <Input
               id="loc-path" className="mt-1 h-8 w-32 text-xs" value={draft.path}
               onChange={(e) => setDraft((d) => ({ ...d, path: e.target.value }))} placeholder="A/01/02"
             />
           </div>
           <div>
-            <Label htmlFor="loc-kind" className="text-[11px]">Kind</Label>
+            <Label htmlFor="loc-kind" className="text-xs">Kind</Label>
             <Select value={draft.kind} onValueChange={(v) => setDraft((d) => ({ ...d, kind: v as LocationKind }))}>
               <SelectTrigger id="loc-kind" className="mt-1 h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -261,7 +261,7 @@ export const LocationsPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <p className="text-sm font-medium">Where does this go?</p>
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <Label htmlFor="rule-item" className="text-[11px]">Item</Label>
+              <Label htmlFor="rule-item" className="text-xs">Item</Label>
               <Select value={ruleDraft.item_id} onValueChange={preview}>
                 <SelectTrigger id="rule-item" className="mt-1 h-8 w-56 text-xs">
                   <SelectValue placeholder="Choose an item" />
@@ -272,7 +272,7 @@ export const LocationsPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
               </Select>
             </div>
             <div>
-              <Label htmlFor="rule-loc" className="text-[11px]">Send it to</Label>
+              <Label htmlFor="rule-loc" className="text-xs">Send it to</Label>
               <Select
                 value={ruleDraft.location_id}
                 onValueChange={(v) => setRuleDraft((r) => ({ ...r, location_id: v }))}

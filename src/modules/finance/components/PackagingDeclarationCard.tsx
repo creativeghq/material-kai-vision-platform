@@ -108,7 +108,7 @@ export const PackagingDeclarationCard: React.FC<{ workspaceId: string }> = ({ wo
       <CardContent className="space-y-3 text-xs">
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <Label htmlFor="pkg-year" className="text-[11px]">Declaration year</Label>
+            <Label htmlFor="pkg-year" className="text-xs">Declaration year</Label>
             <Input
               id="pkg-year" type="number" className="mt-1 h-8 w-28 text-xs" value={year}
               onChange={(e) => setYear(Number(e.target.value) || year)}
@@ -216,7 +216,7 @@ export const PackagingDeclarationCard: React.FC<{ workspaceId: string }> = ({ wo
               ))}
               <div className="flex flex-wrap items-end gap-2">
                 <div>
-                  <Label htmlFor="pkg-mat" className="text-[11px]">Material</Label>
+                  <Label htmlFor="pkg-mat" className="text-xs">Material</Label>
                   <Select value={draft.material} onValueChange={(v) => setDraft((d) => ({ ...d, material: v }))}>
                     <SelectTrigger id="pkg-mat" className="mt-1 h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -227,32 +227,32 @@ export const PackagingDeclarationCard: React.FC<{ workspaceId: string }> = ({ wo
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="pkg-name" className="text-[11px]">Asset</Label>
+                  <Label htmlFor="pkg-name" className="text-xs">Asset</Label>
                   <Input id="pkg-name" className="mt-1 h-8 w-36 text-xs" value={draft.name}
                     onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
                 </div>
                 <div>
-                  <Label htmlFor="pkg-new" className="text-[11px]">New</Label>
+                  <Label htmlFor="pkg-new" className="text-xs">New</Label>
                   <Input id="pkg-new" type="number" min="0" className="mt-1 h-8 w-20 text-xs" value={draft.acquiredNew}
                     onChange={(e) => setDraft((d) => ({ ...d, acquiredNew: e.target.value }))} />
                 </div>
                 <div>
-                  <Label htmlFor="pkg-used" className="text-[11px]">Used</Label>
+                  <Label htmlFor="pkg-used" className="text-xs">Used</Label>
                   <Input id="pkg-used" type="number" min="0" className="mt-1 h-8 w-20 text-xs" value={draft.acquiredUsed}
                     onChange={(e) => setDraft((d) => ({ ...d, acquiredUsed: e.target.value }))} />
                 </div>
                 <div>
-                  <Label htmlFor="pkg-held" className="text-[11px]">Held</Label>
+                  <Label htmlFor="pkg-held" className="text-xs">Held</Label>
                   <Input id="pkg-held" type="number" min="0" className="mt-1 h-8 w-20 text-xs" value={draft.held}
                     onChange={(e) => setDraft((d) => ({ ...d, held: e.target.value }))} />
                 </div>
                 <div>
-                  <Label htmlFor="pkg-cycles" className="text-[11px]">Cycles</Label>
+                  <Label htmlFor="pkg-cycles" className="text-xs">Cycles</Label>
                   <Input id="pkg-cycles" type="number" min="0" className="mt-1 h-8 w-20 text-xs" value={draft.cycles}
                     onChange={(e) => setDraft((d) => ({ ...d, cycles: e.target.value }))} />
                 </div>
                 <div>
-                  <Label htmlFor="pkg-kg" className="text-[11px]">kg each</Label>
+                  <Label htmlFor="pkg-kg" className="text-xs">kg each</Label>
                   <Input id="pkg-kg" type="number" min="0" className="mt-1 h-8 w-20 text-xs" value={draft.kg}
                     onChange={(e) => setDraft((d) => ({ ...d, kg: e.target.value }))} />
                 </div>

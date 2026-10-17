@@ -874,8 +874,8 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             <Input value={cfg.add_labels || ''} onChange={(e) => onChange({ ...cfg, add_labels: e.target.value })} placeholder="Suppliers, Orders" />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Remove labels</Label>
-            <Input value={cfg.remove_labels || ''} onChange={(e) => onChange({ ...cfg, remove_labels: e.target.value })} placeholder="Optional" />
+            <Label className="text-xs">Remove labels (optional)</Label>
+            <Input value={cfg.remove_labels || ''} onChange={(e) => onChange({ ...cfg, remove_labels: e.target.value })} placeholder="Inbox, Unread" />
           </div>
           {flag('archive', 'Archive (skip the inbox)')}
           {flag('mark_read', 'Mark as read')}
@@ -909,11 +909,11 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Description</Label>
+            <Label className="text-xs">Description (optional)</Label>
             <Input
               value={cfg.description || ''}
               onChange={(e) => onChange({ ...cfg, description: e.target.value })}
-              placeholder="Optional"
+              placeholder="Details for whoever picks it up"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">

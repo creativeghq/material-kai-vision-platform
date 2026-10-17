@@ -198,14 +198,14 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
 
         <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
           <div>
-            <Label htmlFor="folder-ref" className="text-[11px]">New folder reference</Label>
+            <Label htmlFor="folder-ref" className="text-xs">New folder reference</Label>
             <Input
               id="folder-ref" className="mt-1 h-8 w-48 text-xs" value={newRef}
               onChange={(e) => setNewRef(e.target.value)} placeholder="CNT-2026-01"
             />
           </div>
           <div>
-            <Label htmlFor="folder-basis" className="text-[11px]">Apportion by</Label>
+            <Label htmlFor="folder-basis" className="text-xs">Apportion by</Label>
             <Select value={newBasis} onValueChange={(v) => setNewBasis(v as AllocationBasis)}>
               <SelectTrigger id="folder-basis" className="mt-1 h-8 w-64 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -243,7 +243,7 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
                 rather than reporting a confident zero. */}
             <div className="flex flex-wrap items-end gap-2">
               <div>
-                <Label htmlFor="attach-order" className="text-[11px]">Purchase order in this container</Label>
+                <Label htmlFor="attach-order" className="text-xs">Purchase order in this container</Label>
                 <Select value={attachId} onValueChange={setAttachId}>
                   <SelectTrigger id="attach-order" className="mt-1 h-8 w-56 text-xs">
                     <SelectValue placeholder="Choose an order" />
@@ -264,7 +264,7 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
 
             <div className="flex flex-wrap items-end gap-2">
               <div>
-                <Label htmlFor="cost-kind" className="text-[11px]">Cost</Label>
+                <Label htmlFor="cost-kind" className="text-xs">Cost</Label>
                 <Select value={cost.kind} onValueChange={(v) => setCost((c) => ({ ...c, kind: v }))}>
                   <SelectTrigger id="cost-kind" className="mt-1 h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -273,7 +273,7 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
                 </Select>
               </div>
               <div>
-                <Label htmlFor="cost-stage" className="text-[11px]">Stage</Label>
+                <Label htmlFor="cost-stage" className="text-xs">Stage</Label>
                 <Select
                   value={cost.stage}
                   onValueChange={(v) => setCost((c) => ({ ...c, stage: v as 'forecast' | 'actual' }))}
@@ -286,7 +286,7 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
                 </Select>
               </div>
               <div>
-                <Label htmlFor="cost-amount" className="text-[11px]">Amount</Label>
+                <Label htmlFor="cost-amount" className="text-xs">Amount</Label>
                 <Input
                   id="cost-amount" type="number" className="mt-1 h-8 w-32 text-xs"
                   value={cost.amount} onChange={(e) => setCost((c) => ({ ...c, amount: e.target.value }))}

@@ -46,6 +46,7 @@ as the new thing, or as an inert no-op. Nothing needs a find-and-replace to keep
 5. [Primitives](#5-primitives)
 6. [Patterns (the `hub/` library)](#6-patterns-the-hub-library)
 6b. [Empty states](#6b-empty-states)
+6c. [Forms](#6c-forms)
 7. [The three screen archetypes](#7-the-three-screen-archetypes)
 8. [Navigation](#8-navigation)
 9. [Do / Don't](#9-do--dont)
@@ -394,6 +395,35 @@ could not read off the button.
 Ratcheted by [tests/unit/emptyStates.test.ts](../tests/unit/emptyStates.test.ts) against
 `.github/empty-state-baseline.json`. A new actionless empty state fails the build; the recorded
 count may only go down.
+
+---
+
+## 6c. Forms
+
+A form is three primitives from `src/components/core/ui/form-layout.tsx`, and the reference is
+`RecordExpenseDocumentDialog`:
+
+- **`FormSection`** — a titled group ("Document", "Supplier", "Amounts", "Classification"). A dialog
+  with **8 or more fields** is split into 2–5 of them; a flat grid of twelve inputs gives the reader
+  no way to see where one subject ends and the next begins.
+- **`FormGrid`** — the columns (1/2/3/4/6). Width follows content: a two-letter country code takes one
+  column of six, a name takes three. Never leave a lone field orphaned beside an unrelated one.
+- **`FormField`** — label ABOVE the control at the 12px caption size, `hint` below it. A long
+  explanation goes in `hint`, never in the label.
+
+Rules:
+
+- **"Optional" is said in the label** (`optional` prop), never as placeholder text. A placeholder
+  reading "Optional" or "Required" looks like a value that was already chosen.
+- **Labels are `text-xs`.** No `text-[10px]`/`text-[11px]` on a `Label`.
+- **Derive what can be derived.** VAT from net × rate, totals from their parts — editable where a
+  document can legitimately differ, disabled where it cannot (0% categories).
+- **The footer wraps.** `DialogFooter`/`AlertDialogFooter`/`SheetFooter` carry `gap-2 sm:flex-wrap`,
+  so four buttons on a narrow dialog wrap instead of pushing the first one off the left edge. A
+  secondary utility action (e.g. "Check my ΑΑΔΕ rights") is a `ghost` button with `sm:mr-auto`.
+
+Guarded by [tests/unit/formLayout.test.ts](../tests/unit/formLayout.test.ts); its unsectioned-dialog
+allowlist is shrink-only with a reason per entry.
 
 ---
 

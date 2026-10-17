@@ -276,7 +276,7 @@ export const DictateSiteWalkDialog: React.FC<Props> = ({ projectId, onClose, onS
                       </p>
                     )}
                     <div className="mt-2 flex items-center gap-2">
-                      <Label className="text-[11px] text-muted-foreground">Date</Label>
+                      <Label className="text-xs text-muted-foreground">Date</Label>
                       <Input
                         type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)}
                         className="h-8 w-40"

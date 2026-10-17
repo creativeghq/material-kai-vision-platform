@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -176,16 +177,15 @@ export const NewSupplierCreditNoteDialog: React.FC<{
         <div className="space-y-3">
           {/* Bill link OR standalone supplier */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Against supplier bill</Label>
+            <FormField label="Against supplier bill" optional>
               <Select value={billId || '__none'} onValueChange={(v) => { setBillId(v === '__none' ? '' : v); if (v !== '__none') setSupplier(null); }} disabled={!!supplierBillId}>
-                <SelectTrigger><SelectValue placeholder="Optional — link a recorded bill" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Link a recorded bill…" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">— Standalone (no bill) —</SelectItem>
                   {bills.map((b) => <SelectItem key={b.id} value={b.id}>{b.supplier_bill_number ?? b.id.slice(0, 8)} — {formatMoney(b.total, b.currency)}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
             <div className="space-y-1">
               <Label>{billId ? 'Supplier' : 'Supplier *'}</Label>
               {billId ? (
@@ -216,20 +216,18 @@ export const NewSupplierCreditNoteDialog: React.FC<{
               <Label>Issue date</Label>
               <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <Label>Category</Label>
+            <FormField label="Category" optional>
               <Select value={categoryId || '__none'} onValueChange={(v) => setCategoryId(v === '__none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Choose a category…" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">— None —</SelectItem>
                   {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Supplier MARK</Label>
-              <Input value={externalMark} onChange={(e) => setExternalMark(e.target.value)} placeholder="myDATA MARK (optional)" />
-            </div>
+            </FormField>
+            <FormField label="Supplier MARK" optional>
+              <Input value={externalMark} onChange={(e) => setExternalMark(e.target.value)} placeholder="myDATA MARK" />
+            </FormField>
           </div>
 
           {/* Line items */}

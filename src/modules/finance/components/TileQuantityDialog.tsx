@@ -105,28 +105,28 @@ export const TileQuantityDialog: React.FC<{
           {rooms.map((r, i) => (
             <div key={i} className="flex flex-wrap items-end gap-2">
               <div className="w-28">
-                <Label htmlFor={`room-label-${i}`} className="text-[11px]">Room</Label>
+                <Label htmlFor={`room-label-${i}`} className="text-xs">Room</Label>
                 <Input
                   id={`room-label-${i}`} className="mt-1 h-8 text-xs" value={r.label ?? ''}
                   onChange={(e) => set(i, { label: e.target.value })} placeholder="kitchen"
                 />
               </div>
               <div className="w-20">
-                <Label htmlFor={`room-len-${i}`} className="text-[11px]">Length</Label>
+                <Label htmlFor={`room-len-${i}`} className="text-xs">Length</Label>
                 <Input
                   id={`room-len-${i}`} type="number" className="mt-1 h-8 text-xs"
                   value={r.length || ''} onChange={(e) => set(i, { length: Number(e.target.value) })}
                 />
               </div>
               <div className="w-20">
-                <Label htmlFor={`room-wid-${i}`} className="text-[11px]">Width</Label>
+                <Label htmlFor={`room-wid-${i}`} className="text-xs">Width</Label>
                 <Input
                   id={`room-wid-${i}`} type="number" className="mt-1 h-8 text-xs"
                   value={r.width || ''} onChange={(e) => set(i, { width: Number(e.target.value) })}
                 />
               </div>
               <div className="w-20">
-                <Label htmlFor={`room-unit-${i}`} className="text-[11px]">Unit</Label>
+                <Label htmlFor={`room-unit-${i}`} className="text-xs">Unit</Label>
                 <Select value={r.unit ?? 'm'} onValueChange={(v) => set(i, { unit: v as LengthUnit })}>
                   <SelectTrigger id={`room-unit-${i}`} className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -137,7 +137,7 @@ export const TileQuantityDialog: React.FC<{
                 </Select>
               </div>
               <div className="w-16">
-                <Label htmlFor={`room-count-${i}`} className="text-[11px]">×</Label>
+                <Label htmlFor={`room-count-${i}`} className="text-xs">×</Label>
                 <Input
                   id={`room-count-${i}`} type="number" className="mt-1 h-8 text-xs"
                   value={r.count ?? 1} onChange={(e) => set(i, { count: Number(e.target.value) })}
@@ -164,7 +164,7 @@ export const TileQuantityDialog: React.FC<{
 
         <div className="flex items-end gap-2">
           <div className="w-28">
-            <Label htmlFor="tile-wastage" className="text-[11px]">Cut allowance %</Label>
+            <Label htmlFor="tile-wastage" className="text-xs">Cut allowance %</Label>
             <Input
               id="tile-wastage" type="number" className="mt-1 h-8 text-xs" value={wastage}
               onChange={(e) => setWastage(e.target.value)}

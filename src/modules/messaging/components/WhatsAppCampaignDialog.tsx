@@ -173,7 +173,7 @@ export const WhatsAppCampaignDialog: React.FC<{ workspaceId: string; onClose: ()
                 </div>
               ))}
               <div className="space-y-1.5">
-                <Label htmlFor="wa-campaign-tags" className="text-[11px] font-normal text-muted-foreground">CRM contacts tagged (comma-separated)</Label>
+                <Label htmlFor="wa-campaign-tags" className="text-xs font-normal text-muted-foreground">CRM contacts tagged (comma-separated)</Label>
                 <Input id="wa-campaign-tags" value={tagText} onChange={(e) => setTagText(e.target.value)} placeholder="vip, architect" className="h-8 text-sm" />
               </div>
             </div>

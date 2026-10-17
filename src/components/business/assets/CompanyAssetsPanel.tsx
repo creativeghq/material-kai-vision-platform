@@ -6,7 +6,7 @@ import { Loader2, Plus, Trash2, Pencil, UserCheck, Undo2, Car, Smartphone, Lapto
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -373,110 +373,112 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
             <DialogTitle>{editing ? 'Edit asset' : 'Add asset'}</DialogTitle>
             <DialogDescription>Company property tracked across Finance and HR.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Category</Label>
-              <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v as AssetCategory }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{ASSET_CATEGORY_LABEL[c]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v as AssetStatus }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{ASSET_STATUS_LABEL[s]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 col-span-2">
-              <Label>Name</Label>
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Ford Transit / iPhone 15 — Sales" />
-            </div>
-            <div className="space-y-1 col-span-2">
-              <Label>Identifier <span className="text-muted-foreground font-normal">(plate / IMEI / card last-4 / serial)</span></Label>
-              <Input value={form.identifier || ''} onChange={(e) => setForm((f) => ({ ...f, identifier: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Acquisition</Label>
-              <Select value={form.acquisition_type} onValueChange={(v) => setForm((f) => ({ ...f, acquisition_type: v as AcquisitionType }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{ACQ_TYPES.map((t) => <SelectItem key={t} value={t}>{ACQUISITION_LABEL[t]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Cost</Label>
-              <div className="flex gap-1">
-                <Input value={costText} onChange={(e) => setCostText(e.target.value)} placeholder="0,00" className="flex-1" />
-                <Input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} className="w-16" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Acquired</Label>
-              <Input type="date" value={form.acquired_at || ''} onChange={(e) => setForm((f) => ({ ...f, acquired_at: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Supplier / lessor</Label>
-              <Select value={form.supplier_company_id || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, supplier_company_id: v === 'none' ? null : v }))}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— None —</SelectItem>
-                  {companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {showLease && (
-              <div className="space-y-1 col-span-2">
-                <Label>Recurring cost <span className="text-muted-foreground font-normal">(links the monthly lease/plan expense)</span></Label>
-                <Select value={form.recurring_expense_id || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, recurring_expense_id: v === 'none' ? null : v }))}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Not linked —</SelectItem>
-                    {recurring.map((r) => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {recurring.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No recurring expenses yet — create one under Finance → Expenses to link the lease cost.</p>
-                )}
-              </div>
-            )}
-            {form.acquisition_type === 'owned' && (
-              <div className="col-span-2 rounded-md border border-border/60 p-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Depreciation</Label>
-                  <Select value={form.depreciation_method || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, depreciation_method: v as DepreciationMethod }))}>
-                    <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+          <div className="space-y-5">
+            <FormSection title="Asset">
+              <FormGrid>
+                <FormField label="Category">
+                  <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v as AssetCategory }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{ASSET_CATEGORY_LABEL[c]}</SelectItem>)}</SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Status">
+                  <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v as AssetStatus }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{ASSET_STATUS_LABEL[s]}</SelectItem>)}</SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Name" className="sm:col-span-2">
+                  <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Ford Transit / iPhone 15 — Sales" />
+                </FormField>
+                <FormField label="Identifier" optional hint="Plate, IMEI, card last-4 or serial." className="sm:col-span-2">
+                  <Input value={form.identifier || ''} onChange={(e) => setForm((f) => ({ ...f, identifier: e.target.value }))} />
+                </FormField>
+              </FormGrid>
+            </FormSection>
+
+            <FormSection title="Acquisition">
+              <FormGrid>
+                <FormField label="Acquisition">
+                  <Select value={form.acquisition_type} onValueChange={(v) => setForm((f) => ({ ...f, acquisition_type: v as AcquisitionType }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{ACQ_TYPES.map((t) => <SelectItem key={t} value={t}>{ACQUISITION_LABEL[t]}</SelectItem>)}</SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Cost">
+                  <div className="flex gap-1">
+                    <Input value={costText} onChange={(e) => setCostText(e.target.value)} placeholder="0,00" className="flex-1" />
+                    <Input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} className="w-16" />
+                  </div>
+                </FormField>
+                <FormField label="Acquired">
+                  <Input type="date" value={form.acquired_at || ''} onChange={(e) => setForm((f) => ({ ...f, acquired_at: e.target.value }))} />
+                </FormField>
+                <FormField label="Supplier / lessor" optional>
+                  <Select value={form.supplier_company_id || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, supplier_company_id: v === 'none' ? null : v }))}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="straight_line">Straight-line</SelectItem>
-                      <SelectItem value="declining_balance">Declining balance</SelectItem>
+                      <SelectItem value="none">— None —</SelectItem>
+                      {companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                </div>
-                {depreciates(form.depreciation_method) && (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <Label>Useful life (months)</Label>
-                      <Input type="number" min="1" value={form.useful_life_months ?? ''} onChange={(e) => setForm((f) => ({ ...f, useful_life_months: e.target.value ? parseInt(e.target.value, 10) : null }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Salvage value</Label>
-                      <Input value={salvageText} onChange={(e) => setSalvageText(e.target.value)} placeholder="0,00" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Start</Label>
-                      <Input type="date" value={form.depreciation_start || ''} onChange={(e) => setForm((f) => ({ ...f, depreciation_start: e.target.value }))} />
-                    </div>
-                    <p className="col-span-3 text-xs text-muted-foreground">Book value = cost − straight-line depreciation since start (defaults to the acquired date).</p>
-                  </div>
+                </FormField>
+                {showLease && (
+                  <FormField
+                    label="Recurring cost"
+                    optional
+                    hint={recurring.length === 0
+                      ? 'Links the monthly lease/plan expense. No recurring expenses yet — create one under Finance → Expenses to link the lease cost.'
+                      : 'Links the monthly lease/plan expense.'}
+                    className="sm:col-span-2"
+                  >
+                    <Select value={form.recurring_expense_id || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, recurring_expense_id: v === 'none' ? null : v }))}>
+                      <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Not linked —</SelectItem>
+                        {recurring.map((r) => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
                 )}
-                <div className="grid grid-cols-2 gap-3 border-t border-border/60 pt-3">
-                  <div className="space-y-1">
-                    <Label>Tax category (άρθρο 24)</Label>
+              </FormGrid>
+            </FormSection>
+
+            {form.acquisition_type === 'owned' && (
+              <FormSection title="Depreciation">
+                <FormGrid cols={3}>
+                  <FormField label="Book method">
+                    <Select value={form.depreciation_method || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, depreciation_method: v as DepreciationMethod }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="straight_line">Straight-line</SelectItem>
+                        <SelectItem value="declining_balance">Declining balance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                  {depreciates(form.depreciation_method) && (
+                    <>
+                      <FormField label="Useful life (months)" className="sm:col-start-1">
+                        <Input type="number" min="1" value={form.useful_life_months ?? ''} onChange={(e) => setForm((f) => ({ ...f, useful_life_months: e.target.value ? parseInt(e.target.value, 10) : null }))} />
+                      </FormField>
+                      <FormField label="Salvage value">
+                        <Input value={salvageText} onChange={(e) => setSalvageText(e.target.value)} placeholder="0,00" />
+                      </FormField>
+                      <FormField label="Start">
+                        <Input type="date" value={form.depreciation_start || ''} onChange={(e) => setForm((f) => ({ ...f, depreciation_start: e.target.value }))} />
+                      </FormField>
+                      <p className="text-xs text-muted-foreground sm:col-span-3">Book value = cost − straight-line depreciation since start (defaults to the acquired date).</p>
+                    </>
+                  )}
+                </FormGrid>
+                <FormGrid className="border-t border-hairline pt-3">
+                  <FormField label="Tax category (άρθρο 24)">
                     <Select
                       value={form.tax_category_code || 'none'}
                       onValueChange={(v) => setForm((f) => ({ ...f, tax_category_code: v === 'none' ? null : v }))}
                     >
-                      <SelectTrigger className="h-8"><SelectValue placeholder="Not set" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Not set" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Not set</SelectItem>
                         {taxCategories.map((c) => (
@@ -484,25 +486,24 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Put into use on</Label>
+                  </FormField>
+                  <FormField label="Put into use on">
                     <Input
                       type="date" value={form.tax_placed_in_service_on || ''}
                       onChange={(e) => setForm((f) => ({ ...f, tax_placed_in_service_on: e.target.value }))}
                     />
-                  </div>
-                  <p className="col-span-2 text-xs text-muted-foreground">
+                  </FormField>
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
                     Tax depreciation is a statutory percentage of cost and runs from the month AFTER
                     the asset was put into use — which is why this is not the book start date.
                   </p>
-                </div>
-              </div>
+                </FormGrid>
+              </FormSection>
             )}
-            <div className="space-y-1 col-span-2">
-              <Label>Notes</Label>
+
+            <FormField label="Notes" optional>
               <Textarea value={form.notes || ''} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} />
-            </div>
+            </FormField>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFormOpen(false)} disabled={busy}>Cancel</Button>
@@ -519,8 +520,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
             <DialogDescription>Hand this asset to an employee or a contact. Any current holder is released.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Assign to</Label>
+            <FormField label="Assign to">
               <Select value={assignKind} onValueChange={(v) => { setAssignKind(v as any); setAssignId(''); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -528,9 +528,8 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                   <SelectItem value="contact">Contact</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>{assignKind === 'employee' ? 'Employee' : 'Contact'}</Label>
+            </FormField>
+            <FormField label={assignKind === 'employee' ? 'Employee' : 'Contact'}>
               <Select value={assignId} onValueChange={setAssignId}>
                 <SelectTrigger><SelectValue placeholder={`Pick a ${assignKind}`} /></SelectTrigger>
                 <SelectContent>
@@ -539,11 +538,10 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                     : assignOptions.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Note <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            </FormField>
+            <FormField label="Note" optional>
               <Input value={assignNote} onChange={(e) => setAssignNote(e.target.value)} placeholder="e.g. handed over 2026-07-26" />
-            </div>
+            </FormField>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignOpen(false)} disabled={busy}>Cancel</Button>

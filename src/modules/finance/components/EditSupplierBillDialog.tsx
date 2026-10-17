@@ -8,7 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { CostCodePicker } from '@/components/business/costCodes/CostCodePicker';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -194,34 +194,36 @@ export const EditSupplierBillDialog: React.FC<{
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Reference / Bill #</Label>
-              <Input value={billNumber} onChange={(e) => setBillNumber(e.target.value)} placeholder="the supplier's invoice number — e.g. ΤΔΑ-2026/184" />
-              {bill?.inbox && (
-                <p className="text-[11px] text-muted-foreground">
+          <div className="space-y-5">
+            <FormSection title="Document">
+            <FormField
+              label="Reference / Bill #"
+              hint={bill?.inbox ? (
+                <>
                   From myDATA (MARK {bill.inbox.mark}
                   {bill.inbox.series ? ` · ${bill.inbox.series} ${bill.inbox.aa ?? ''}`.trimEnd() : ''}) — replacing the
                   auto number with the supplier's own series is fine; the MARK stays on the inbox document.
-                </p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Issue date</Label>
+                </>
+              ) : undefined}
+            >
+              <Input value={billNumber} onChange={(e) => setBillNumber(e.target.value)} placeholder="the supplier's invoice number — e.g. ΤΔΑ-2026/184" />
+            </FormField>
+            <FormGrid>
+              <FormField label="Issue date">
                 <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Due date</Label>
+              </FormField>
+              <FormField label="Due date">
                 <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                {/* #444 -- the day it reached US, which from 1 July 2030 starts a five-day
-                    statutory clock and cannot be reconstructed from the issue date. */}
-                <Label>Received on</Label>
+              </FormField>
+              {/* #444 -- the day it reached US, which from 1 July 2030 starts a five-day
+                  statutory clock and cannot be reconstructed from the issue date. */}
+              <FormField label="Received on">
                 <Input type="date" value={receivedOn} onChange={(e) => setReceivedOn(e.target.value)} />
-              </div>
-            </div>
+              </FormField>
+            </FormGrid>
+            </FormSection>
+
+            <FormSection title="Attribution">
             {/* What the cost is FOR. Merging is off (a bill has no lines to merge into an order)
                 and so is raising a new customer order (this dialog edits one document; it does
                 not create a second one) — both from the New expense form, which is where a cost
@@ -245,33 +247,34 @@ export const EditSupplierBillDialog: React.FC<{
                 </p>
               }
             />
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder="No category" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_CATEGORY}>No category</SelectItem>
-                  {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Cost code</Label>
-              <CostCodePicker value={costCodeId} onChange={setCostCodeId} />
-              <p className="text-[11px] text-muted-foreground">
-                How this cost is classified on the job. Separate from the accounting category —
-                the project cost report groups by this.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Notes</Label>
+            <FormGrid>
+              <FormField label="Category" optional>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger><SelectValue placeholder="No category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CATEGORY}>No category</SelectItem>
+                    {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField
+                label="Cost code"
+                optional
+                hint="How this cost is classified on the job. Separate from the accounting category — the project cost report groups by this."
+              >
+                <CostCodePicker value={costCodeId} onChange={setCostCodeId} />
+              </FormField>
+            </FormGrid>
+            </FormSection>
+
+            <FormSection title="Notes and receipt">
+            <FormField label="Notes" optional>
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-            </div>
+            </FormField>
             {/* The receipt. Attaching one here is also how a cost booked before the paper arrived
                 gets its evidence — the bucket is private, so the link is signed on each open and
                 never stored. */}
-            <div className="space-y-1.5">
-              <Label>Receipt</Label>
+            <FormField label="Receipt" optional>
               <input
                 ref={receiptInput}
                 type="file" accept={RECEIPT_ACCEPT} className="hidden"
@@ -306,7 +309,8 @@ export const EditSupplierBillDialog: React.FC<{
                   {receiptName ? 'Replace' : 'Attach a receipt'}
                 </Button>
               </div>
-            </div>
+            </FormField>
+            </FormSection>
           </div>
         )}
         <DialogFooter>

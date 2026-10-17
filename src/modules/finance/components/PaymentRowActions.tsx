@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , Dialog
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { Pencil, Trash2, Loader2, AlertTriangle } from 'lucide-react';
@@ -123,10 +124,9 @@ export const PaymentRowActions: React.FC<{
               <Label className="text-xs">Reference</Label>
               <Input className="h-9 text-sm" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Transaction ref, cheque no…" />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Notes</Label>
-              <Textarea rows={2} className="text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
-            </div>
+            <FormField label="Notes" optional>
+              <Textarea rows={2} className="text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </FormField>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditOpen(false)} disabled={busy}>Cancel</Button>

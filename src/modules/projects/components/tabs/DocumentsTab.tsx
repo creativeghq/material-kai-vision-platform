@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Badge } from '@/components/core/ui/badge';
 import {
@@ -563,35 +564,29 @@ const UploadRevisionDialog: React.FC<{
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle className="truncate">New revision — {doc.title}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Revision</Label>
-            <Input value={rev} onChange={(e) => setRev(e.target.value)} placeholder="A, B, C… or 1, 2, 3" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">File</Label>
-            <input type="file" className="text-xs" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label className="text-xs">Issued on</Label>
-              <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground">The date printed on the sheet.</p>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Issued for</Label>
+          <FormField label="Revision" htmlFor="rev-label">
+            <Input id="rev-label" value={rev} onChange={(e) => setRev(e.target.value)} placeholder="A, B, C… or 1, 2, 3" />
+          </FormField>
+          <FormField label="File" htmlFor="rev-file">
+            <input id="rev-file" type="file" className="text-xs" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </FormField>
+          <FormGrid>
+            <FormField label="Issued on" htmlFor="rev-issued" hint="The date printed on the sheet.">
+              <Input id="rev-issued" type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+            </FormField>
+            <FormField label="Issued for" htmlFor="rev-purpose">
               <Select value={purpose || 'none'} onValueChange={(v) => setPurpose(v === 'none' ? '' : v as DrawingPurpose)}>
-                <SelectTrigger><SelectValue placeholder="Not stated" /></SelectTrigger>
+                <SelectTrigger id="rev-purpose"><SelectValue placeholder="Not stated" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Not stated</SelectItem>
                   {DRAWING_PURPOSES.map((pp) => <SelectItem key={pp} value={pp}>{humanizeLabel(pp)}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">What changed</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
-          </div>
+            </FormField>
+          </FormGrid>
+          <FormField label="What changed" htmlFor="rev-notes" optional>
+            <Input id="rev-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Door widths revised" />
+          </FormField>
           <p className="text-[11px] text-muted-foreground">
             This becomes the current revision. The previous one is kept and stays viewable.
           </p>

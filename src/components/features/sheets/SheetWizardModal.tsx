@@ -6,7 +6,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
@@ -347,32 +347,31 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
 
         {/* STEP: moodboard */}
         {step === 'moodboard' && (
-          <div className="space-y-2">
-            <Label className="text-xs">Which moodboard?</Label>
+          <FormField
+            label="Which moodboard?"
+            hint={moodboards.length === 0 ? 'No moodboards yet — create one first.' : undefined}
+          >
             <Select value={moodboardId} onValueChange={setMoodboardId}>
               <SelectTrigger><SelectValue placeholder="Select a moodboard…" /></SelectTrigger>
               <SelectContent>
                 {moodboards.map((m) => <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>)}
               </SelectContent>
             </Select>
-            {moodboards.length === 0 && <p className="text-xs text-muted-foreground">No moodboards yet — create one first.</p>}
-          </div>
+          </FormField>
         )}
 
         {/* STEP: details */}
         {step === 'details' && type && (
           <div className="space-y-4">
-            <div>
-              <Label className="text-xs">Sheet title</Label>
+            <FormField label="Sheet title">
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={SHEET_TYPE_LABELS[type]} />
-            </div>
+            </FormField>
 
             {loadingData && <div className="py-4 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>}
 
             {!loadingData && type === 'material_board' && (
-              <div>
-                <Label className="text-xs">Products to feature ({productIds.length}/8)</Label>
-                <div className="mt-1 max-h-56 overflow-y-auto space-y-1 rounded-md border border-border p-1">
+              <FormField label={`Products to feature (${productIds.length}/8)`}>
+                <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border border-border p-1">
                   {items.filter((i) => i.product_id).length === 0 && <p className="p-2 text-xs text-muted-foreground">No products in this moodboard.</p>}
                   {items.filter((i) => i.product_id).map((i) => (
                     <button key={i.id} onClick={() => toggle(productIds, setProductIds, i.product_id!, 8)}
@@ -383,7 +382,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                     </button>
                   ))}
                 </div>
-              </div>
+              </FormField>
             )}
 
             {!loadingData && type === 'color_palette' && (
@@ -391,9 +390,11 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
             )}
 
             {!loadingData && type === 'concept_board' && (
-              <div>
-                <Label className="text-xs">Images ({imageUrls.length}/6)</Label>
-                <div className="mt-1 grid grid-cols-4 gap-2 max-h-56 overflow-y-auto">
+              <FormField
+                label={`Images (${imageUrls.length}/6)`}
+                hint={items.filter((i) => i.image_url).length === 0 ? 'No images in this moodboard.' : undefined}
+              >
+                <div className="grid grid-cols-4 gap-2 max-h-56 overflow-y-auto">
                   {items.filter((i) => i.image_url).map((i) => (
                     <button key={i.id} onClick={() => toggle(imageUrls, setImageUrls, i.image_url!, 6)}
                       className={`relative aspect-square rounded overflow-hidden border-2 ${imageUrls.includes(i.image_url!) ? 'border-primary' : 'border-transparent'}`}>
@@ -402,27 +403,26 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                     </button>
                   ))}
                 </div>
-                {items.filter((i) => i.image_url).length === 0 && <p className="text-xs text-muted-foreground">No images in this moodboard.</p>}
-              </div>
+              </FormField>
             )}
 
             {!loadingData && type === 'ffe_schedule' && (
-              <div>
-                <Label className="text-xs">Quote</Label>
+              <FormField label="Quote" hint={quotes.length === 0 ? 'No quotes found.' : undefined}>
                 <Select value={quoteId} onValueChange={setQuoteId}>
                   <SelectTrigger><SelectValue placeholder="Pick a quote…" /></SelectTrigger>
                   <SelectContent>{quotes.map((q) => <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>)}</SelectContent>
                 </Select>
-                {quotes.length === 0 && <p className="text-xs text-muted-foreground mt-1">No quotes found.</p>}
-              </div>
+              </FormField>
             )}
 
             {!loadingData && type === 'area_breakdown' && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <ImagePick label="Hero render" value={heroUrl} onChange={setHeroUrl} items={items} onUpload={uploadImage} />
-                <ImagePick label="Dimensioned plan (optional)" value={planUrl} onChange={setPlanUrl} items={items} onUpload={uploadImage} />
-                <ImagePick label="Elevation (optional)" value={elevationUrl} onChange={setElevationUrl} items={items} onUpload={uploadImage} />
-                <div><Label className="text-xs">Subtitle (optional)</Label><Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g. Modern Bathroom Design" /></div>
+                <ImagePick label="Dimensioned plan" optional value={planUrl} onChange={setPlanUrl} items={items} onUpload={uploadImage} />
+                <ImagePick label="Elevation" optional value={elevationUrl} onChange={setElevationUrl} items={items} onUpload={uploadImage} />
+                <FormField label="Subtitle" optional>
+                  <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g. Modern Bathroom Design" />
+                </FormField>
               </div>
             )}
 
@@ -432,8 +432,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                     available: it carries a real scale, which is what makes run
                     lengths and the voltage-drop checks computable at all. */}
                 {sizedRooms.length > 0 && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Use a project room</Label>
+                  <FormField label="Use a project room">
                     <div className="flex flex-wrap gap-1">
                       {sizedRooms.map((r) => (
                         <button
@@ -453,7 +452,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </FormField>
                 )}
                 <div className="flex gap-2">
                   <Button type="button" size="sm" variant={backdropKind === 'upload' ? 'default' : 'outline'} onClick={() => { setBackdropKind('upload'); setRoomId(null); }}>Floor-plan image</Button>
@@ -461,10 +460,10 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                 </div>
                 {backdropKind === 'upload'
                   ? <ImagePick label="Floor plan" value={backdropUrl} onChange={setBackdropUrl} items={items} onUpload={uploadImage} />
-                  : <div className="grid grid-cols-2 gap-2">
-                      <div><Label className="text-xs">Width (mm)</Label><Input type="number" value={rectW} onChange={(e) => { setRectW(e.target.value); setRoomId(null); }} placeholder="e.g. 3000" /></div>
-                      <div><Label className="text-xs">Height (mm)</Label><Input type="number" value={rectH} onChange={(e) => { setRectH(e.target.value); setRoomId(null); }} placeholder="e.g. 2400" /></div>
-                    </div>}
+                  : <FormGrid>
+                      <FormField label="Width (mm)"><Input type="number" value={rectW} onChange={(e) => { setRectW(e.target.value); setRoomId(null); }} placeholder="e.g. 3000" /></FormField>
+                      <FormField label="Height (mm)"><Input type="number" value={rectH} onChange={(e) => { setRectH(e.target.value); setRoomId(null); }} placeholder="e.g. 2400" /></FormField>
+                    </FormGrid>}
                 <p className="text-[11px] text-muted-foreground">
                   You'll place the symbols on the canvas after this.
                   {backdropKind === 'upload'
@@ -489,9 +488,11 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
             )}
 
             {!loadingData && type === 'full_deck' && (
-              <div>
-                <Label className="text-xs">Sheets to include ({includedSheetIds.length})</Label>
-                <div className="mt-1 max-h-56 overflow-y-auto space-y-1 rounded-md border border-border p-1">
+              <FormField
+                label={`Sheets to include (${includedSheetIds.length})`}
+                hint="You can reorder + add a cover on the canvas after this."
+              >
+                <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border border-border p-1">
                   {existingSheets.length === 0 && <p className="p-2 text-xs text-muted-foreground">No other sheets on this moodboard yet — create some first.</p>}
                   {existingSheets.map((s) => (
                     <button key={s.id} onClick={() => toggle(includedSheetIds, setIncludedSheetIds, s.id)}
@@ -501,8 +502,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1">You can reorder + add a cover on the canvas after this.</p>
-              </div>
+              </FormField>
             )}
           </div>
         )}
@@ -526,18 +526,18 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
 /** Pick an image from the moodboard's items or upload a new one. */
 const ImagePick: React.FC<{
   label: string;
+  optional?: boolean;
   value: string;
   onChange: (url: string) => void;
   items: Item[];
   onUpload: (file: File) => Promise<string | null>;
-}> = ({ label, value, onChange, items, onUpload }) => {
+}> = ({ label, optional, value, onChange, items, onUpload }) => {
   const [uploading, setUploading] = useState(false);
   const withImages = items.filter((i) => i.image_url);
   return (
-    <div>
-      <Label className="text-xs">{label}</Label>
-      {value && <img src={value} className="mt-1 max-h-32 rounded border border-border object-contain" alt="" />}
-      <div className="mt-1 grid grid-cols-5 gap-1.5">
+    <FormField label={label} optional={optional}>
+      {value && <img src={value} className="max-h-32 rounded border border-border object-contain" alt="" />}
+      <div className="grid grid-cols-5 gap-1.5">
         {withImages.map((i) => (
           <button key={i.id} onClick={() => onChange(i.image_url!)} aria-label={`Use image ${i.id}`}
             className={`relative aspect-square rounded overflow-hidden border-2 ${value === i.image_url ? 'border-primary' : 'border-transparent'}`}>
@@ -555,7 +555,7 @@ const ImagePick: React.FC<{
           }} />
         </label>
       </div>
-    </div>
+    </FormField>
   );
 };
 

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { MoneyInput } from '@/components/core/ui/money-input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
@@ -149,84 +149,78 @@ export const PromptTemplateEditorModal: React.FC<{
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit prompt template' : 'New prompt template'}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Name</Label>
-              <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Tiles discovery (Greek catalogs)" />
-            </div>
-            <div className="space-y-1">
-              <Label>Model</Label>
-              <Select value={form.model_preference ?? 'auto'} onValueChange={(v) => set('model_preference', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{MODELS.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div className="space-y-5">
+          <FormSection title="Template">
+            <FormGrid cols={3}>
+              <FormField label="Name" className="sm:col-span-3">
+                <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Tiles discovery (Greek catalogs)" />
+              </FormField>
+              {/* Stage + industry are immutable after creation (the backend update contract omits them). */}
+              {!isEdit && (
+                <>
+                  <FormField label="Stage">
+                    <Select value={form.stage} onValueChange={(v) => set('stage', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{STAGES.map((s) => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </FormField>
+                  <FormField label="Industry">
+                    <Select value={form.industry ?? 'general'} onValueChange={(v) => set('industry', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{INDUSTRIES.map((i) => <SelectItem key={i.v} value={i.v}>{i.l}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </FormField>
+                  <FormField label="Category" optional>
+                    <Input value={form.category ?? ''} onChange={(e) => set('category', e.target.value)} placeholder="products / certificates…" />
+                  </FormField>
+                </>
+              )}
+              <FormField label="Description" optional className="sm:col-span-3">
+                <Input value={form.description ?? ''} onChange={(e) => set('description', e.target.value)} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          {/* Stage + industry are immutable after creation (the backend update contract omits them). */}
-          {!isEdit && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="space-y-1">
-                <Label>Stage</Label>
-                <Select value={form.stage} onValueChange={(v) => set('stage', v)}>
+          <FormSection title="Prompt">
+            <FormGrid cols={1}>
+              <FormField label="System prompt" optional>
+                <Textarea rows={3} value={form.system_prompt ?? ''} onChange={(e) => set('system_prompt', e.target.value)} />
+              </FormField>
+              <FormField label="Prompt template">
+                <Textarea rows={8} value={form.prompt_template} onChange={(e) => set('prompt_template', e.target.value)} placeholder="The prompt body. Use {{variables}} where supported." className="font-mono text-xs" />
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Model">
+            <FormGrid cols={3}>
+              <FormField label="Model">
+                <Select value={form.model_preference ?? 'auto'} onValueChange={(v) => set('model_preference', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{STAGES.map((s) => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}</SelectContent>
+                  <SelectContent>{MODELS.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}</SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Industry</Label>
-                <Select value={form.industry ?? 'general'} onValueChange={(v) => set('industry', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{INDUSTRIES.map((i) => <SelectItem key={i.v} value={i.v}>{i.l}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Category (optional)</Label>
-                <Input value={form.category ?? ''} onChange={(e) => set('category', e.target.value)} placeholder="products / certificates…" />
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <Label>Description (optional)</Label>
-            <Input value={form.description ?? ''} onChange={(e) => set('description', e.target.value)} />
-          </div>
-
-          <div className="space-y-1">
-            <Label>System prompt (optional)</Label>
-            <Textarea rows={3} value={form.system_prompt ?? ''} onChange={(e) => set('system_prompt', e.target.value)} />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Prompt template</Label>
-            <Textarea rows={8} value={form.prompt_template} onChange={(e) => set('prompt_template', e.target.value)} placeholder="The prompt body. Use {{variables}} where supported." className="font-mono text-xs" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="space-y-1">
-              <Label>Temperature</Label>
-              <MoneyInput value={form.temperature} displayDecimals={null}
-                onValueChange={(v) => set('temperature', Math.min(2, Math.max(0, v ?? 0)))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Max tokens</Label>
-              <Input type="number" step="256" min="256" max="16384" value={form.max_tokens}
-                onChange={(e) => set('max_tokens', Math.min(16384, Math.max(256, parseInt(e.target.value, 10) || 4096)))} />
-            </div>
-            {isEdit && (
-              <div className="flex items-end gap-2 pb-1">
-                <Switch checked={form.is_active ?? true} onCheckedChange={(v) => set('is_active', v)} />
-                <span className="text-sm">Active</span>
-              </div>
-            )}
-          </div>
+              </FormField>
+              <FormField label="Temperature">
+                <MoneyInput value={form.temperature} displayDecimals={null}
+                  onValueChange={(v) => set('temperature', Math.min(2, Math.max(0, v ?? 0)))} />
+              </FormField>
+              <FormField label="Max tokens">
+                <Input type="number" step="256" min="256" max="16384" value={form.max_tokens}
+                  onChange={(e) => set('max_tokens', Math.min(16384, Math.max(256, parseInt(e.target.value, 10) || 4096)))} />
+              </FormField>
+              {isEdit && (
+                <div className="flex items-center gap-2 sm:col-span-3">
+                  <Switch checked={form.is_active ?? true} onCheckedChange={(v) => set('is_active', v)} />
+                  <span className="text-sm">Active</span>
+                </div>
+              )}
+            </FormGrid>
+          </FormSection>
 
           {isEdit && (
-            <div className="space-y-1">
-              <Label>Change reason (optional)</Label>
+            <FormField label="Change reason" optional>
               <Input value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Logged in the template's history" />
-            </div>
+            </FormField>
           )}
         </div>
         <DialogFooter>

@@ -108,14 +108,14 @@ export const StockValuationSection: React.FC<{ workspaceId: string }> = ({ works
 
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <Label htmlFor="cogs-from" className="text-[11px]">From</Label>
+            <Label htmlFor="cogs-from" className="text-xs">From</Label>
             <Input
               id="cogs-from" type="date" className="mt-1 h-8 w-40 text-xs" value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
           </div>
           <div>
-            <Label htmlFor="cogs-to" className="text-[11px]">To</Label>
+            <Label htmlFor="cogs-to" className="text-xs">To</Label>
             <Input
               id="cogs-to" type="date" className="mt-1 h-8 w-40 text-xs" value={to}
               onChange={(e) => setTo(e.target.value)}
@@ -141,7 +141,7 @@ export const StockValuationSection: React.FC<{ workspaceId: string }> = ({ works
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <Label htmlFor="method" className="text-[11px]">Method</Label>
+              <Label htmlFor="method" className="text-xs">Method</Label>
               <Select value={nextMethod} onValueChange={(v) => setNextMethod(v as ValuationMethod)}>
                 <SelectTrigger id="method" className="mt-1 h-8 w-64 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -150,7 +150,7 @@ export const StockValuationSection: React.FC<{ workspaceId: string }> = ({ works
               </Select>
             </div>
             <div>
-              <Label htmlFor="method-from" className="text-[11px]">In force from</Label>
+              <Label htmlFor="method-from" className="text-xs">In force from</Label>
               <Input
                 id="method-from" type="date" className="mt-1 h-8 w-40 text-xs" value={effectiveFrom}
                 onChange={(e) => setEffectiveFrom(e.target.value)}

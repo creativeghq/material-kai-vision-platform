@@ -205,7 +205,7 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
               </div>
 
               <div className="w-[120px]">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Sold</Label>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Sold</Label>
                 <Input
                   type="number" min="0" step="0.01" defaultValue={r.sold_price ?? ''}
                   className="h-8" placeholder="—"

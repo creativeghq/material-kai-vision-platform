@@ -159,14 +159,14 @@ export const EInvoicingMandateCard: React.FC<{ workspaceId: string }> = ({ works
               ) : (
                 <div className="flex flex-wrap items-end gap-2">
                   <div>
-                    <Label htmlFor="ein-filed" className="text-[11px]">Filed on</Label>
+                    <Label htmlFor="ein-filed" className="text-xs">Filed on</Label>
                     <Input
                       id="ein-filed" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.filedOn}
                       onChange={(e) => setDraft((d) => ({ ...d, filedOn: e.target.value }))}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="ein-start" className="text-[11px]">Declared start date</Label>
+                    <Label htmlFor="ein-start" className="text-xs">Declared start date</Label>
                     <Input
                       id="ein-start" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.startDate}
                       onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}

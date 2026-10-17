@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { useToast } from '@/hooks/use-toast';
 import { companiesAPI, contactsAPI } from '@/services/crm.service';
 
@@ -98,8 +98,7 @@ export const QuickCreatePartyDialog: React.FC<Props> = ({ kind, initialName = ''
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="quick-party-name">Name</Label>
+          <FormField label="Name" htmlFor="quick-party-name">
             <Input
               id="quick-party-name"
               value={name}
@@ -108,28 +107,26 @@ export const QuickCreatePartyDialog: React.FC<Props> = ({ kind, initialName = ''
               onKeyDown={(e) => { if (e.key === 'Enter' && !busy) void submit(); }}
               placeholder={kind === 'contact' ? 'Elena Papadopoulou' : 'Aegean Interiors'}
             />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="quick-party-email">Email</Label>
+          </FormField>
+          <FormGrid>
+            <FormField label="Email" htmlFor="quick-party-email" optional>
               <Input
                 id="quick-party-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Optional"
+                placeholder="name@example.com"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="quick-party-phone">Phone</Label>
+            </FormField>
+            <FormField label="Phone" htmlFor="quick-party-phone" optional>
               <Input
                 id="quick-party-phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Optional"
+                placeholder="+30 210 000 0000"
               />
-            </div>
-          </div>
+            </FormField>
+          </FormGrid>
 
           {duplicate && (
             <div className="rounded-sm border border-hairline bg-surface-sunken p-2.5 text-xs">

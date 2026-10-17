@@ -824,14 +824,13 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="price-discount">Discount %</Label>
+                <Label htmlFor="price-discount">Discount %<span className="ml-1 font-normal text-muted-foreground">(optional)</span></Label>
                 <Input
                   id="price-discount"
                   type="number"
                   step="0.01"
                   value={finalDiscount}
                   onChange={(e) => setFinalDiscount(e.target.value)}
-                  placeholder="optional"
                 />
               </div>
               <div className="space-y-1.5">

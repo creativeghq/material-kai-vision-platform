@@ -219,12 +219,12 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
 
             <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
               <div>
-                <Label htmlFor="alw-label" className="text-[11px]">Allowance</Label>
+                <Label htmlFor="alw-label" className="text-xs">Allowance</Label>
                 <Input id="alw-label" className="mt-1 h-8 w-44 text-xs" value={allowance.label}
                   onChange={(e) => setAllowance((a) => ({ ...a, label: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="alw-room" className="text-[11px]">Room</Label>
+                <Label htmlFor="alw-room" className="text-xs">Room</Label>
                 <Select value={allowance.roomId || 'none'} onValueChange={(v) => setAllowance((a) => ({ ...a, roomId: v === 'none' ? '' : v }))}>
                   <SelectTrigger id="alw-room" className="mt-1 h-8 w-40 text-xs">
                     <SelectValue placeholder="Whole project" />
@@ -236,7 +236,7 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
                 </Select>
               </div>
               <div>
-                <Label htmlFor="alw-amount" className="text-[11px]">Amount</Label>
+                <Label htmlFor="alw-amount" className="text-xs">Amount</Label>
                 <Input id="alw-amount" type="number" min="0" className="mt-1 h-8 w-28 text-xs"
                   value={allowance.amount}
                   onChange={(e) => setAllowance((a) => ({ ...a, amount: e.target.value }))} />
@@ -288,7 +288,7 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
 
             <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
               <div>
-                <Label htmlFor="sel-alw" className="text-[11px]">Against</Label>
+                <Label htmlFor="sel-alw" className="text-xs">Against</Label>
                 <Select value={pick.allowanceId || 'none'} onValueChange={(v) => setPick((p) => ({ ...p, allowanceId: v === 'none' ? '' : v }))}>
                   <SelectTrigger id="sel-alw" className="mt-1 h-8 w-48 text-xs">
                     <SelectValue placeholder="No allowance" />
@@ -302,17 +302,17 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
                 </Select>
               </div>
               <div>
-                <Label htmlFor="sel-desc" className="text-[11px]">What they picked</Label>
+                <Label htmlFor="sel-desc" className="text-xs">What they picked</Label>
                 <Input id="sel-desc" className="mt-1 h-8 w-52 text-xs" value={pick.description}
                   onChange={(e) => setPick((p) => ({ ...p, description: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="sel-qty" className="text-[11px]">Qty</Label>
+                <Label htmlFor="sel-qty" className="text-xs">Qty</Label>
                 <Input id="sel-qty" type="number" min="0" className="mt-1 h-8 w-20 text-xs" value={pick.quantity}
                   onChange={(e) => setPick((p) => ({ ...p, quantity: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="sel-price" className="text-[11px]">Unit price</Label>
+                <Label htmlFor="sel-price" className="text-xs">Unit price</Label>
                 <Input id="sel-price" type="number" min="0" className="mt-1 h-8 w-24 text-xs" value={pick.price}
                   onChange={(e) => setPick((p) => ({ ...p, price: e.target.value }))} />
               </div>
