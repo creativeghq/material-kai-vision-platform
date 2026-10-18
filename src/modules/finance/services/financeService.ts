@@ -3477,6 +3477,11 @@ export interface PartyLedgerRow {
   doc_id: string | null;
   /** What it settles/credits: a credit note's invoice, a supplier credit note's bill. */
   related_id: string | null;
+  /** False when the entry is dated on or before the party's opening balance, which already includes it. */
+  counted: boolean;
+  /** Debts only: what is still open after explicit allocations, then oldest-first. */
+  open_amount: number | null;
+  note: string | null;
 }
 export type MyDataBucket = 'accepted' | 'offline_pending' | 'rejected' | 'failed' | 'not_transmitted';
 export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'delivery_note'; doc_id: string; doc_number: string | null; issued_at: string | null; total: number | null; currency: string | null; fiscal_status: string | null; fiscal_mark: string | null; bucket: MyDataBucket }
@@ -3686,14 +3691,24 @@ const _financeServiceV2 = {
     role?: 'customer' | 'supplier' | 'both' | 'all';
     search?: string;
   }): Promise<PartyRow[]> {
-    let q = supabase.from('vw_finance_parties').select('*').eq('workspace_id', opts.workspaceId);
-    if (opts.role === 'customer') q = q.eq('is_customer', true);
-    if (opts.role === 'supplier') q = q.eq('is_supplier', true);
-    if (opts.role === 'both') q = q.eq('is_customer', true).eq('is_supplier', true);
-    if (opts.search) q = q.ilike('display_name', `%${opts.search}%`);
-    const { data, error } = await q.order('receivable_outstanding', { ascending: false }).limit(500);
-    if (error) throw error;
-    return (data ?? []) as PartyRow[];
+    // Paged to the end: a fixed cap silently dropped every party past it from the list and its totals.
+    const PAGE = 1000;
+    const out: PartyRow[] = [];
+    for (let from = 0; ; from += PAGE) {
+      let q = supabase.from('vw_finance_parties').select('*').eq('workspace_id', opts.workspaceId);
+      if (opts.role === 'customer') q = q.eq('is_customer', true);
+      if (opts.role === 'supplier') q = q.eq('is_supplier', true);
+      if (opts.role === 'both') q = q.eq('is_customer', true).eq('is_supplier', true);
+      if (opts.search) q = q.ilike('display_name', `%${opts.search}%`);
+      const { data, error } = await q
+        .order('receivable_outstanding', { ascending: false })
+        .order('party_id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      out.push(...((data ?? []) as PartyRow[]));
+      if ((data ?? []).length < PAGE) break;
+    }
+    return out;
   },
 
   /**

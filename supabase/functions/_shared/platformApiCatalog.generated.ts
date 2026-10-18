@@ -3802,6 +3802,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "confirm-bill-match",
           "plan-candidates",
           "confirm-plan-match",
+          "confirm-party-payment",
           "ignore-transaction",
           "validate-account-name",
           "create-counterparty",
@@ -3889,6 +3890,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "plan_id": {
         "type": "string",
         "description": "planned_payments.id (uuid)"
+      },
+      "company_id": {
+        "type": "string",
+        "description": "crm_companies.id in this workspace (or contact_id) (uuid)"
+      },
+      "contact_id": {
+        "type": "string",
+        "description": "crm_contacts.id in this workspace, when there is no company (uuid)"
       },
       "ignore": {
         "type": "boolean",

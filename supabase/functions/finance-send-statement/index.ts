@@ -52,6 +52,9 @@ const LABELS: Record<Lang, Record<string, string>> = {
     payByCard: 'Πληρωμή με κάρτα', noTx: 'Καμία κίνηση στην περίοδο.',
     kind_invoice: 'Τιμολόγιο', kind_credit_note: 'Πιστωτικό', kind_payment: 'Είσπραξη/Πληρωμή',
     kind_supplier_bill: 'Τιμολόγιο προμηθευτή', kind_supplier_credit_note: 'Πιστωτικό προμηθευτή',
+    kind_opening_balance: 'Από μεταφορά', kind_inbound_invoice: 'Τιμολόγιο προμηθευτή',
+    kind_inbound_credit_note: 'Πιστωτικό προμηθευτή', kind_paid_at_issue: 'Εξόφληση κατά την έκδοση',
+    kind_settled_outside: 'Εξόφληση',
     statementDate: 'Ημ/νία έκδοσης', footer: 'Παρακαλούμε απαντήστε σε αυτό το email για οποιαδήποτε διευκρίνιση.',
     payByBank: 'Πληρωμή με τραπεζική κατάθεση', bankName: 'Τράπεζα', bankRef: 'Αρ. λογαριασμού',
   },
@@ -66,6 +69,9 @@ const LABELS: Record<Lang, Record<string, string>> = {
     payByCard: 'Pay by card', noTx: 'No transactions in this period.',
     kind_invoice: 'Invoice', kind_credit_note: 'Credit note', kind_payment: 'Payment',
     kind_supplier_bill: 'Supplier bill', kind_supplier_credit_note: 'Supplier credit note',
+    kind_opening_balance: 'Balance brought forward', kind_inbound_invoice: 'Supplier invoice',
+    kind_inbound_credit_note: 'Supplier credit note', kind_paid_at_issue: 'Paid at issue',
+    kind_settled_outside: 'Settled',
     statementDate: 'Statement date', footer: 'Please reply to this email with any questions or to confirm settlement.',
     payByBank: 'Pay by bank transfer', bankName: 'Bank', bankRef: 'Account',
   },
@@ -114,80 +120,38 @@ async function loadBackdrop(url: string): Promise<Uint8Array | null> {
 interface LedgerEntry { date: string | null; kind: string; doc: string | null; debit: number; credit: number; currency: string | null }
 interface LedgerData { opening: number; rows: LedgerEntry[]; currency: string }
 
-// Build the chronological debit/credit ledger for a party + the opening balance
-// carried forward from before `from`. Runs under the service role (RLS bypassed),
-// scoped explicitly by workspace_id + party so there is no cross-tenant leak.
+/** The party's ledger and carry-forward from SQL — the same derivation the in-app statement reads. */
 async function loadLedger(
   supabase: DbClient, workspaceId: string, side: Side, partyType: 'company' | 'contact', partyId: string,
   from: string, to: string, baseCurrency: string,
 ): Promise<LedgerData> {
-  const all: LedgerEntry[] = [];
-  const compCol = partyType === 'company';
+  const party = {
+    p_workspace_id: workspaceId,
+    p_side: side,
+    p_company_id: partyType === 'company' ? partyId : null,
+    p_contact_id: partyType === 'contact' ? partyId : null,
+    p_include_orders: false,
+  };
+  const [rowsRes, openRes] = await Promise.all([
+    supabase.rpc('_finance_party_ledger_rows', { ...party, p_from: from, p_to: to }),
+    supabase.rpc('_finance_party_carry_forward', { ...party, p_before: from }),
+  ]);
+  if (rowsRes.error) throw new Error(`Could not read the ledger: ${rowsRes.error.message}`);
+  if (openRes.error) throw new Error(`Could not read the opening balance: ${openRes.error.message}`);
 
-  if (side === 'customer') {
-    const invQ = supabase.from('invoices')
-      .select('id, issued_at, internal_number, total, currency, status')
-      .eq('workspace_id', workspaceId)
-      .eq(compCol ? 'customer_company_id' : 'customer_contact_id', partyId);
-    const { data: invs } = await invQ;
-    const invoices = (invs ?? []).filter((i: any) => i.status !== 'draft' && i.status !== 'void');
-    for (const i of invoices) all.push({ date: i.issued_at, kind: 'invoice', doc: i.internal_number, debit: Number(i.total || 0), credit: 0, currency: i.currency });
-
-    const invoiceIds = invoices.map((i: any) => i.id);
-    if (invoiceIds.length > 0) {
-      const { data: cns } = await supabase.from('credit_notes')
-        .select('issued_at, credit_note_number, total, currency, status, invoice_id')
-        .eq('workspace_id', workspaceId).in('invoice_id', invoiceIds);
-      for (const c of (cns ?? [])) {
-        if ((c.status ?? 'issued') === 'void') continue;
-        all.push({ date: c.issued_at, kind: 'credit_note', doc: c.credit_note_number, debit: 0, credit: Number(c.total || 0), currency: c.currency });
-      }
-    }
-
-    const { data: pays } = await supabase.from('payments')
-      .select('paid_at, reference, amount, currency, direction')
-      .eq('workspace_id', workspaceId).eq('direction', 'in')
-      .eq(compCol ? 'counterparty_company_id' : 'counterparty_contact_id', partyId);
-    for (const p of (pays ?? [])) all.push({ date: p.paid_at, kind: 'payment', doc: p.reference, debit: 0, credit: Number(p.amount || 0), currency: p.currency });
-  } else {
-    const { data: bills } = await supabase.from('supplier_bills')
-      .select('issued_at, supplier_bill_number, total, currency, status')
-      .eq('workspace_id', workspaceId)
-      .eq(compCol ? 'supplier_company_id' : 'supplier_contact_id', partyId);
-    for (const b of (bills ?? [])) {
-      if (b.status === 'void') continue;
-      all.push({ date: b.issued_at, kind: 'supplier_bill', doc: b.supplier_bill_number, debit: 0, credit: Number(b.total || 0), currency: b.currency });
-    }
-
-    const { data: scns } = await supabase.from('supplier_credit_notes')
-      .select('issued_at, supplier_credit_note_number, total, currency, status')
-      .eq('workspace_id', workspaceId)
-      .eq(compCol ? 'supplier_company_id' : 'supplier_contact_id', partyId);
-    for (const s of (scns ?? [])) {
-      if (s.status === 'void') continue;
-      all.push({ date: s.issued_at, kind: 'supplier_credit_note', doc: s.supplier_credit_note_number, debit: Number(s.total || 0), credit: 0, currency: s.currency });
-    }
-
-    const { data: pays } = await supabase.from('payments')
-      .select('paid_at, reference, amount, currency, direction')
-      .eq('workspace_id', workspaceId).eq('direction', 'out')
-      .eq(compCol ? 'counterparty_company_id' : 'counterparty_contact_id', partyId);
-    for (const p of (pays ?? [])) all.push({ date: p.paid_at, kind: 'payment', doc: p.reference, debit: Number(p.amount || 0), credit: 0, currency: p.currency });
-  }
-
-  const fromD = from, toD = to;
-  const dateOf = (e: LedgerEntry) => (e.date ? e.date.slice(0, 10) : null);
-  let opening = 0;
-  const rows: LedgerEntry[] = [];
-  for (const e of all) {
-    const d = dateOf(e);
-    if (d && d < fromD) opening += e.debit - e.credit;
-    else if (d && d >= fromD && d <= toD) rows.push(e);
-    else if (!d) rows.push(e); // undated entries surface in-period rather than vanish
-  }
-  rows.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
-  const currency = all.find((e) => e.currency)?.currency ?? baseCurrency ?? 'EUR';
-  return { opening, rows, currency };
+  // An uncounted entry is already inside the opening balance, so the counterparty's copy omits it.
+  const rows: LedgerEntry[] = ((rowsRes.data ?? []) as Array<Record<string, unknown>>)
+    .filter((e) => e.counted !== false)
+    .map((e) => ({
+      date: (e.entry_date as string | null) ?? null,
+      kind: String(e.doc_kind),
+      doc: (e.doc_number as string | null) ?? null,
+      debit: Number(e.debit ?? 0),
+      credit: Number(e.credit ?? 0),
+      currency: (e.currency as string | null) ?? null,
+    }));
+  const currency = rows.find((e) => e.currency)?.currency ?? baseCurrency ?? 'EUR';
+  return { opening: Number(openRes.data ?? 0), rows, currency };
 }
 
 async function fetchPartyDetails(supabase: DbClient, partyType: 'company' | 'contact', partyId: string): Promise<any> {

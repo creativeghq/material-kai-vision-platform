@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
 import { ImportStatementDialog } from '@/modules/finance/components/ImportStatementDialog';
 import { formatDate } from '@/utils/datetime';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 // One source (#391).
 import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVocabulary';
 
@@ -40,6 +41,7 @@ interface FeedRow {
 interface InvoiceLite { id: string; internal_number: string; amount_due: number; currency: string }
 interface BillLite { id: string; supplier_bill_number: string | null; supplier_name: string | null; amount_due: number; currency: string }
 interface OrderLite { id: string; order_number: string | null }
+interface PartyLite { id: string; name: string; vat_number: string | null }
 interface PlanCandidate {
   plan_id: string; title: string; amount: number; currency: string;
   scheduled_for: string; day_gap?: number; party_matches?: boolean; score: number;
@@ -106,9 +108,10 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [to, setTo] = React.useState('');
 
   // Pickers
-  const [picking, setPicking] = React.useState<{ row: FeedRow; kind: 'invoice' | 'bill' | 'order' | 'plan' } | null>(null);
+  const [picking, setPicking] = React.useState<{ row: FeedRow; kind: 'invoice' | 'bill' | 'order' | 'plan' | 'party' } | null>(null);
   const [pickQuery, setPickQuery] = React.useState('');
   const [pickInvoices, setPickInvoices] = React.useState<InvoiceLite[]>([]);
+  const [pickParties, setPickParties] = React.useState<PartyLite[]>([]);
   const [pickBills, setPickBills] = React.useState<BillLite[]>([]);
   const [pickPlans, setPickPlans] = React.useState<PlanCandidate[] | null>(null);
   const [planHints, setPlanHints] = React.useState<Map<string, PlanHint>>(new Map());
@@ -212,6 +215,13 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         : `"${plan.title}" is paid, and the transfer is reconciled against it.`,
     });
   });
+  const bookToParty = (row: FeedRow, party: PartyLite) => act('Book payment', async () => {
+    const what = row.direction === 'in' ? `received from ${party.name}` : `paid to ${party.name}`;
+    if (!window.confirm(`Record ${Number(row.amount).toFixed(2)} ${row.currency} as ${what}, on account? It lowers their balance and clears their oldest open items first.`)) return;
+    await callRevolutApi('confirm-party-payment', workspaceId, { transaction_row_id: row.id, company_id: party.id });
+    setPicking(null);
+    toast({ title: 'Payment booked on account', description: `Shown on ${party.name}'s statement in Finance → Parties.` });
+  });
   const ignore = (row: FeedRow, ig: boolean) => act('Update', async () => {
     await callRevolutApi('ignore-transaction', workspaceId, { transaction_row_id: row.id, ignore: ig });
   });
@@ -225,6 +235,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       if (picking.kind === 'plan') {
         const { data } = await supabase.rpc('bank_tx_plan_candidates', { p_tx_id: picking.row.id, p_limit: 5 });
         setPickPlans((data ?? []) as PlanCandidate[]);
+        return;
+      }
+      if (picking.kind === 'party') {
+        let pq = supabase.from('crm_companies').select('id, name, vat_number')
+          .eq('workspace_id', workspaceId).order('name').limit(10);
+        if (term) pq = pq.ilike(CRM_SEARCH_COLUMN, foldedLike(term));
+        const { data } = await pq;
+        setPickParties((data ?? []) as PartyLite[]);
         return;
       }
       if (picking.kind === 'bill') {
@@ -350,12 +368,13 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
               const matched = r.matched_invoice_id ? invoices.get(r.matched_invoice_id) : null;
               const suggestions = (r.suggested_invoice_ids ?? []).map((id) => invoices.get(id)).filter(Boolean) as InvoiceLite[];
               const revolut = r.provider === 'revolut';
+              const bankLine = revolut || r.provider === 'statement';
               return (
                 <div key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
                   {r.direction === 'in'
                     ? <ArrowDownLeft className="h-4 w-4 shrink-0 text-success" />
                     : <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                  <span className="w-20 shrink-0 text-xs text-muted-foreground">{PROVIDER_LABEL[r.provider] ?? r.provider}</span>
+                  <span className="w-20 shrink-0 text-xs text-muted-foreground">{PROVIDER_LABEL[r.provider as PaymentProviderSlug] ?? (r.provider === 'statement' ? 'Statement' : r.provider)}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium">{r.counterparty_name || r.type || '—'}</span>
@@ -394,7 +413,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" aria-label="Transaction actions"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel className="text-xs">{Number(r.amount).toFixed(2)} {r.currency} · {PROVIDER_LABEL[r.provider] ?? r.provider}</DropdownMenuLabel>
+                      <DropdownMenuLabel className="text-xs">{Number(r.amount).toFixed(2)} {r.currency} · {PROVIDER_LABEL[r.provider as PaymentProviderSlug] ?? (r.provider === 'statement' ? 'Statement' : r.provider)}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       {/*
                         * `ignored` is how the auto-matcher stamps BOTH legs of an internal pocket
@@ -416,6 +435,11 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                           <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>Match to a planned payment…</DropdownMenuItem>
                         </>
                       )}
+                      {bankLine && (r.direction === 'in' || r.direction === 'out') && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
+                        <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'party' }); setPickQuery((r.counterparty_name ?? '').split(/\s+/)[0] ?? ''); }}>
+                          {r.direction === 'in' ? 'Received from a customer, on account…' : 'Paid to a supplier, on account…'}
+                        </DropdownMenuItem>
+                      )}
                       {revolut && r.match_status !== 'matched' && (
                         r.match_status === 'ignored'
                           ? <DropdownMenuItem onClick={() => ignore(r, false)}>Unignore</DropdownMenuItem>
@@ -424,7 +448,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(r.reference ?? r.id); toast({ title: 'Reference copied' }); }}>
                         Copy reference
                       </DropdownMenuItem>
-                      {!revolut && (
+                      {!bankLine && (
                         <DropdownMenuItem disabled>
                           Settled by {PROVIDER_LABEL[r.provider]} — informational
                         </DropdownMenuItem>
@@ -454,6 +478,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           <DialogHeader>
             <DialogTitle>
               {picking?.kind === 'bill' ? 'Match to a Supplier Bill'
+                : picking?.kind === 'party' ? (picking.row.direction === 'in' ? 'Received From — On Account' : 'Paid To — On Account')
                 : picking?.kind === 'plan' ? 'Close a Planned Payment'
                 : picking?.kind === 'order' ? 'Attach to an Order (Settles Its Open Invoice)'
                 : 'Match to an Invoice'}
@@ -462,10 +487,21 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           </DialogHeader>
           {picking?.kind !== 'plan' && (
             <Input autoFocus value={pickQuery} onChange={(e) => setPickQuery(e.target.value)}
-              placeholder={picking?.kind === 'bill' ? 'Bill number or supplier…' : picking?.kind === 'order' ? 'Order number…' : 'Invoice number…'} />
+              placeholder={picking?.kind === 'bill' ? 'Bill number or supplier…' : picking?.kind === 'party' ? 'Company name or VAT…' : picking?.kind === 'order' ? 'Order number…' : 'Invoice number…'} />
           )}
           <div className="max-h-64 space-y-1 overflow-y-auto">
-            {picking?.kind === 'plan'
+            {picking?.kind === 'party' ? (
+              pickParties.length === 0
+                ? <p className="px-3 py-2 text-xs text-muted-foreground">No CRM company matches. Search by another part of the name, or by VAT number.</p>
+                : pickParties.map((p) => (
+                  <button key={p.id} type="button" disabled={busy}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                    onClick={() => picking && bookToParty(picking.row, p)}>
+                    <span className="min-w-0 truncate font-medium">{p.name}</span>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">{p.vat_number ?? ''}</span>
+                  </button>
+                ))
+            ) : picking?.kind === 'plan'
               ? (pickPlans ?? []).map((p) => (
                 <button key={p.plan_id} type="button" disabled={busy}
                   className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
@@ -497,7 +533,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                   <span className="text-xs text-muted-foreground">due {Number(inv.amount_due).toFixed(2)} {inv.currency}</span>
                 </button>
               ))}
-            {picking?.kind === 'plan' ? (
+            {picking?.kind === 'party' ? null : picking?.kind === 'plan' ? (
               pickPlans === null
                 ? <p className="px-3 py-2 text-xs text-muted-foreground">Looking for open plans of this amount…</p>
                 : pickPlans.length === 0 && (

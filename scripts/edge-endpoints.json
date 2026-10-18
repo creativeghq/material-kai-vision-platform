@@ -16445,6 +16445,31 @@
         "response": "{ok, outcome}"
       },
       {
+        "name": "confirm-party-payment",
+        "summary": "Book an unmatched bank line (Revolut or an imported statement) as an on-account payment from a customer (money in) or to a supplier (money out). It lowers the party's balance and clears their oldest open items first. Retrying is safe: the bank reference is unique.",
+        "params": [
+          {
+            "name": "transaction_row_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "revolut_bank_transactions.id"
+          },
+          {
+            "name": "company_id",
+            "type": "uuid",
+            "required": false,
+            "desc": "crm_companies.id in this workspace (or contact_id)"
+          },
+          {
+            "name": "contact_id",
+            "type": "uuid",
+            "required": false,
+            "desc": "crm_contacts.id in this workspace, when there is no company"
+          }
+        ],
+        "response": "{ok, payment_id}"
+      },
+      {
         "name": "ignore-transaction",
         "summary": "Park a line (or un-park it with ignore=false). A matched line cannot be ignored.",
         "params": [

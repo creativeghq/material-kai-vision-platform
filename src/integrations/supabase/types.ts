@@ -8557,6 +8557,54 @@ export type Database = {
           },
         ]
       }
+      finance_party_opening_balances: {
+        Row: {
+          amount: number
+          as_of: string
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          note: string | null
+          side: string
+          source: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          as_of: string
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          note?: string | null
+          side: string
+          source: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          as_of?: string
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          note?: string | null
+          side?: string
+          source?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       finance_recurring_expenses: {
         Row: {
           auto_pay: boolean
@@ -37041,6 +37089,7 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: {
+          counted: boolean
           credit: number
           currency: string
           debit: number
@@ -37048,6 +37097,8 @@ export type Database = {
           doc_kind: string
           doc_number: string
           entry_date: string
+          note: string | null
+          open_amount: number | null
           related_id: string
         }[]
       }
@@ -37061,6 +37112,68 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: number
+      }
+      finance_party_balances: {
+        Args: { p_company_id?: string | null; p_contact_id?: string | null; p_include_orders?: boolean; p_workspace_id: string }
+        Returns: {
+          aade_documents: number
+          currency: string
+          customer_open_items: number
+          customer_opening_as_of: string | null
+          net: number
+          oldest_open_date: string | null
+          party_id: string
+          party_type: string
+          payable: number
+          receivable: number
+          supplier_open_items: number
+          supplier_opening_as_of: string | null
+        }[]
+      }
+      finance_unlinked_inbound_issuers: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          balance: number
+          currency: string
+          documents: number
+          first_date: string
+          issuer_name: string | null
+          issuer_vat: string
+          last_date: string
+          matching_companies: number
+        }[]
+      }
+      set_party_opening_balance: {
+        Args: {
+          p_amount: number
+          p_as_of: string
+          p_company_id: string | null
+          p_contact_id: string | null
+          p_currency?: string
+          p_note?: string | null
+          p_side: string
+          p_source?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      delete_party_opening_balance: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      import_party_opening_balances: {
+        Args: { p_commit?: boolean; p_rows: Json; p_side: string; p_workspace_id: string }
+        Returns: {
+          amount: number | null
+          as_of: string | null
+          company_id: string | null
+          company_name: string | null
+          currency: string
+          message: string | null
+          row_no: number
+          status: string
+          vat: string | null
+        }[]
       }
       finance_vat_by_code: {
         Args: { p_from: string; p_to: string; p_workspace_id: string }

@@ -35,6 +35,37 @@ import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/compone
 import { FilterBar, NONE_VALUE, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { useCompanyResearch } from '@/modules/crm/components/RefreshResearchButton';
 import { formatDate } from '@/utils/datetime';
+import {
+  partyBalancesService, partyKey, type PartyBalance, type UnlinkedInboundIssuer,
+} from '@/modules/finance/services/partyBalancesService';
+import { OpeningBalanceCard } from '@/modules/finance/components/OpeningBalanceCard';
+import { ImportOpeningBalancesDialog } from '@/modules/finance/components/ImportOpeningBalancesDialog';
+import { UnlinkedInboundIssuersCard } from '@/modules/finance/components/UnlinkedInboundIssuersCard';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { HubEmptyState } from '@/components/core/hub';
+
+/** A list row: the CRM party plus its account from the party ledger (null when that read failed). */
+type PartyListRow = PartyRow & {
+  acct_receivable: number | null;
+  acct_payable: number | null;
+  acct_net: number | null;
+  acct_currency: string | null;
+  acct_other_currencies: number;
+};
+
+function withAccount(r: PartyRow, balances: Map<string, PartyBalance[]> | null): PartyListRow {
+  const mine = balances?.get(partyKey(r.party_type, r.party_id)) ?? [];
+  const pick = mine.find((b) => b.currency === 'EUR') ?? mine[0];
+  const none = balances === null;
+  return {
+    ...r,
+    acct_receivable: none ? null : (pick?.receivable ?? 0),
+    acct_payable: none ? null : (pick?.payable ?? 0),
+    acct_net: none ? null : (pick?.net ?? 0),
+    acct_currency: pick?.currency ?? null,
+    acct_other_currencies: Math.max(mine.length - 1, 0),
+  };
+}
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
@@ -43,12 +74,18 @@ const LEDGER_KIND_LABEL: Record<string, string> = {
   // Καρτέλα. (`manual_receivable`/`manual_payable` used to sit here; nothing has ever emitted
   // them, so they were two labels for rows that do not exist.)
   order: 'Order (un-invoiced)',
+  opening_balance: 'Opening balance', inbound_invoice: 'Supplier invoice (AADE)',
+  inbound_credit_note: 'Supplier credit note (AADE)', paid_at_issue: 'Paid at issue',
+  settled_outside: 'Settled outside',
 };
 /** Greek labels for the printed Καρτέλα — the print is the surface an accountant reads. */
 const LEDGER_KIND_LABEL_EL: Record<string, string> = {
   invoice: 'Τιμολόγιο', credit_note: 'Πιστωτικό', payment: 'Πληρωμή', receipt: 'Απόδειξη',
   supplier_bill: 'Τιμολόγιο προμηθευτή', supplier_credit_note: 'Πιστωτικό προμηθευτή',
   order: 'Παραγγελία (χωρίς τιμολόγιο)',
+  opening_balance: 'Από μεταφορά', inbound_invoice: 'Τιμολόγιο προμηθευτή',
+  inbound_credit_note: 'Πιστωτικό προμηθευτή', paid_at_issue: 'Εξόφληση κατά την έκδοση',
+  settled_outside: 'Εξόφληση',
 };
 
 const SEGMENT_LABELS: Record<string, string> = {
@@ -62,13 +99,14 @@ type PartyRole = 'customer' | 'supplier' | 'both';
  * re-fetches, so `applyFilters` must pass it through instead of matching it again in memory.
  * Everything else narrows the loaded page client-side.
  */
-function buildPartyFilters(rows: PartyRow[]): FilterGroupDef[] {
-  const bound = (pick: (r: PartyRow) => number) => {
+function buildPartyFilters(rows: PartyListRow[]): FilterGroupDef[] {
+  const bound = (pick: (r: PartyListRow) => number) => {
     const max = rows.reduce((m, r) => Math.max(m, Number(pick(r)) || 0), 0);
     return { min: 0, max: Math.max(Math.ceil(max / 10) * 10, 10) };
   };
   const receivable = bound((r) => r.receivable_outstanding);
   const payable = bound((r) => r.payable_outstanding);
+  const statementPayable = bound((r) => r.acct_payable ?? 0);
   const onAccount = bound((r) => r.on_account_credit);
 
   return [
@@ -117,11 +155,15 @@ function buildPartyFilters(rows: PartyRow[]): FilterGroupDef[] {
       fields: [
         {
           key: 'receivable_outstanding', type: 'range', label: 'Receivable',
-          min: receivable.min, max: receivable.max, accessor: (r: PartyRow) => r.receivable_outstanding,
+          min: receivable.min, max: receivable.max, accessor: (r: PartyListRow) => r.receivable_outstanding,
         },
         {
           key: 'payable_outstanding', type: 'range', label: 'Payable',
-          min: payable.min, max: payable.max, accessor: (r: PartyRow) => r.payable_outstanding,
+          min: payable.min, max: payable.max, accessor: (r: PartyListRow) => r.payable_outstanding,
+        },
+        {
+          key: 'statement_payable', type: 'range', label: 'Due to supplier (statement)',
+          min: statementPayable.min, max: statementPayable.max, accessor: (r: PartyListRow) => r.acct_payable ?? 0,
         },
         {
           key: 'on_account_credit', type: 'range', label: 'On account',
@@ -136,15 +178,20 @@ interface Props { workspaceId: string; statementsEnabled: boolean; autoOpenParty
 
 export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, autoOpenParty, financeBase }) => {
   const { toast } = useToast();
-  const [rows, setRows] = useState<PartyRow[]>([]);
+  const [partyRows, setPartyRows] = useState<PartyRow[]>([]);
+  const [balances, setBalances] = useState<Map<string, PartyBalance[]> | null>(null);
+  const [balancesError, setBalancesError] = useState<string | null>(null);
+  const [unlinked, setUnlinked] = useState<UnlinkedInboundIssuer[]>([]);
+  const [importSide, setImportSide] = useState<'supplier' | 'customer' | null>(null);
   const [agingMap, setAgingMap] = useState<Record<string, CustomerAgingBuckets>>({});
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<PartyRow | null>(null);
+  const [selected, setSelected] = useState<PartyListRow | null>(null);
   const [page, setPage] = useState(1);
 
+  const rows = useMemo(() => partyRows.map((r) => withAccount(r, balances)), [partyRows, balances]);
   const filterGroups = useMemo(() => buildPartyFilters(rows), [rows]);
   const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
-    useFilters<PartyRow>(rows, filterGroups);
+    useFilters<PartyListRow>(rows, filterGroups);
   // The only server-side dimension: it changes what we fetch, not how we filter what we hold.
   const role = (filterValues.role as PartyRole | undefined) ?? 'all';
 
@@ -166,11 +213,26 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
   const load = async () => {
     try {
       setLoading(true);
-      const [r, aging] = await Promise.all([
+      const [r, aging, bal, unl] = await Promise.all([
         financeService.listParties({ workspaceId, role }),
         financeService.getCustomerAgingBuckets({ workspaceId }),
+        partyBalancesService.listBalances(workspaceId).catch((e: Error) => e),
+        partyBalancesService.listUnlinkedIssuers(workspaceId).catch(() => [] as UnlinkedInboundIssuer[]),
       ]);
-      setRows(r);
+      setPartyRows(r);
+      if (bal instanceof Error) {
+        setBalances(null);
+        setBalancesError(bal.message);
+      } else {
+        const m = new Map<string, PartyBalance[]>();
+        for (const b of bal) {
+          const k = partyKey(b.party_type, b.party_id);
+          m.set(k, [...(m.get(k) ?? []), b]);
+        }
+        setBalances(m);
+        setBalancesError(null);
+      }
+      setUnlinked(unl);
       // One row per (customer, CURRENCY) since audit #287 T2-8. A plain `map[key] = a` was
       // LAST-WRITE-WINS across currencies, so a customer holding EUR and USD balances showed
       // whichever row the view happened to return last — nondeterministic, and silently dropping
@@ -202,7 +264,8 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
     let rcv = 0, pay = 0, due_0_30 = 0, due_31_90 = 0, due_90_plus = 0;
     for (const r of filtered) {
       rcv += Number(r.receivable_outstanding || 0);
-      pay += Number(r.payable_outstanding || 0);
+      // The statement figure, EUR rows only: summing another currency into a euro total is not a total.
+      if (r.acct_currency === 'EUR' || r.acct_currency == null) pay += Math.max(r.acct_payable ?? 0, 0);
       const a = agingMap[`${r.party_type}:${r.party_id}`];
       if (a) { due_0_30 += Number(a.due_0_30); due_31_90 += Number(a.due_31_90); due_90_plus += Number(a.due_90_plus); }
     }
@@ -214,7 +277,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
       <PartyAccount
         party={selected}
         aging={agingMap[`${selected.party_type}:${selected.party_id}`] ?? null}
-        onClose={() => setSelected(null)}
+        onClose={(changed) => { setSelected(null); if (changed) void load(); }}
         statementsEnabled={statementsEnabled}
         financeBase={financeBase ?? '/finance'}
       />
@@ -223,6 +286,11 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
 
   return (
     <div className="space-y-4">
+      {balancesError && (
+        <div className="rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          Statement balances could not be loaded ({balancesError}). The Statement column and “We owe suppliers” show “—” until they can.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Card className="dashboard-card border-0"><CardContent className="p-3">
           <div className="text-xs text-muted-foreground">Total customers owe</div>
@@ -240,31 +308,53 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
           <div className="text-xs text-muted-foreground">Overdue 90+ days</div>
           <div className={`text-lg font-semibold ${totals.due_90_plus > 0 ? 'text-destructive' : ''}`}>{formatMoney(totals.due_90_plus)}</div>
         </CardContent></Card>
-        <Card className="dashboard-card border-0"><CardContent className="p-3">
-          <div className="text-xs text-muted-foreground">We owe suppliers</div>
-          <div className="text-lg font-semibold">{formatMoney(totals.pay)}</div>
-        </CardContent></Card>
+        <Card className="dashboard-card border-0" title="Per supplier statement: bills, AADE documents not yet booked and opening balances, less payments. EUR only.">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground">We owe suppliers · statement</div>
+            <div className="text-lg font-semibold">{balancesError ? '—' : formatMoney(totals.pay)}</div>
+          </CardContent>
+        </Card>
       </div>
+
+      <UnlinkedInboundIssuersCard issuers={unlinked} />
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-4 w-4" /> Customers &amp; Suppliers
           </CardTitle>
-          <FilterBar
-            groups={filterGroups}
-            values={filterValues}
-            onChange={setFilterValues}
-            previewCount={previewCount}
-            searchPlaceholder="Name or email"
-            title="Filter parties"
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">Import opening balances <ChevronDown className="ml-1 h-3.5 w-3.5" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setImportSide('supplier')}>Supplier balances (CSV)</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setImportSide('customer')}>Customer balances (CSV)</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <FilterBar
+              groups={filterGroups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              searchPlaceholder="Name or email"
+              title="Filter parties"
+            />
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">No parties match.</div>
+            rows.length > 0 || Object.values(filterValues).some((v) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0)) ? (
+              <HubEmptyState variant="filtered" icon={Users} title="No parties match these filters"
+                action={<Button variant="outline" size="sm" onClick={() => setFilterValues({})}>Clear filters</Button>} />
+            ) : (
+              <HubEmptyState icon={Users} title="No customers or suppliers yet"
+                description="Parties appear once a CRM company or contact is a customer or supplier, or has a document."
+                action={<Button asChild size="sm"><Link to="/crm?new=company">Add company</Link></Button>} />
+            )
           ) : (
             <>
             <div className="table-scroll">
@@ -283,6 +373,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                       on this table and could sit for a year without anyone noticing. */}
                   <th className="px-4 py-2 text-right">On account</th>
                   <th className="px-4 py-2 text-right">Net</th>
+                  <th className="px-4 py-2 text-right" title="The party's statement: documents, AADE documents not yet booked, opening balance and payments, incl. un-invoiced orders">Statement</th>
                 </tr>
               </thead>
               <tbody>
@@ -346,6 +437,16 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                         thing, and the only one that cost a column. Keyboard/AT reach the party
                         through that name button, which is why this can go. */}
                     <td className={`px-4 py-2 text-right font-medium ${Number(r.net_position) < 0 ? 'text-destructive' : ''}`}>{formatMoney(Number(r.net_position || 0))}</td>
+                    <td className="px-4 py-2 text-right">
+                      {r.acct_net == null ? '—' : (
+                        <>
+                          <span className="font-medium tabular-nums">{formatMoney(Math.abs(r.acct_net), r.acct_currency ?? undefined)}</span>
+                          <div className="text-[9px] font-normal text-muted-foreground">
+                            {netPositionDirection(r.acct_net)}{r.acct_other_currencies > 0 ? ` · + ${r.acct_other_currencies} other currency` : ''}
+                          </div>
+                        </>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -357,15 +458,26 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
         </CardContent>
       </Card>
 
+      {importSide && (
+        <ImportOpeningBalancesDialog
+          workspaceId={workspaceId}
+          side={importSide}
+          open
+          onOpenChange={(v) => { if (!v) setImportSide(null); }}
+          onImported={() => { void load(); }}
+        />
+      )}
+
     </div>
   );
 };
 
 
 interface DetailProps {
-  party: PartyRow;
+  party: PartyListRow;
   aging: CustomerAgingBuckets | null;
-  onClose: () => void;
+  /** `changed` = something here moved the party's money, so the list must re-read it. */
+  onClose: (changed: boolean) => void;
   statementsEnabled: boolean;
   /** Always `FINANCE_BASE` — every in-app document link is built off it. */
   financeBase: string;
@@ -437,6 +549,9 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
   const [ledger, setLedger] = useState<PartyLedgerRow[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [opening, setOpening] = useState(0);
+  const [openingAsOf, setOpeningAsOf] = useState<string | null>(null);
+  const [payOnAccount, setPayOnAccount] = useState(false);
+  const [ledgerKey, setLedgerKey] = useState(0);
   const thisYear = new Date().getFullYear();
   const [fromDate, setFromDate] = useState(`${thisYear}-01-01`);
   const [toDate, setToDate] = useState(`${thisYear}-12-31`);
@@ -446,7 +561,7 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
   // a party whose role flag was never set but who has documents anyway; the list-length terms
   // catch documents the totals exclude (drafts), so nothing loaded is unreachable.
   const showCustomer = !!party && (party.is_customer || Number(party.invoiced_total) > 0 || Number(party.receivable_outstanding) > 0 || invoices.length > 0);
-  const showSupplier = !!party && (party.is_supplier || Number(party.billed_total) > 0 || Number(party.payable_outstanding) > 0 || bills.length > 0);
+  const showSupplier = !!party && (party.is_supplier || Number(party.billed_total) > 0 || Number(party.payable_outstanding) > 0 || (party.acct_payable ?? 0) > 0.005 || bills.length > 0);
 
   // Default the ledger side to whichever role the party holds.
   useEffect(() => {
@@ -487,14 +602,15 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
         setLedger([]); setOpening(0);
       } finally { setLedgerLoading(false); }
     })();
-  }, [party, ledgerSide, fromDate, toDate, includeOrders, toast]);
+  }, [party, ledgerSide, fromDate, toDate, includeOrders, toast, ledgerKey]);
 
   // Chronological entries with progressive debit/credit totals + a running balance
   // seeded from the opening (carry-forward) balance — full Καρτέλα shape.
   const ledgerWithBalance = useMemo(() => {
     let pd = 0, pc = 0;
+    // An uncounted row is already inside the opening balance, so it is shown but moves nothing.
     return ledger.map((r) => {
-      pd += Number(r.debit || 0); pc += Number(r.credit || 0);
+      if (r.counted !== false) { pd += Number(r.debit || 0); pc += Number(r.credit || 0); }
       return { ...r, progrDebit: pd, progrCredit: pc, balance: opening + pd - pc };
     });
   }, [ledger, opening]);
@@ -553,7 +669,7 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
     }
     const esc = escapeHtml; // shared canonical escaper (was an identical local copy)
     const sideLabel = ledgerSide === 'customer' ? 'Πελάτης / Customer' : 'Προμηθευτής / Supplier';
-    const rowsHtml = ledgerWithBalance.map((r) => `
+    const rowsHtml = ledgerWithBalance.filter((r) => r.counted !== false).map((r) => `
       <tr>
         <td>${r.entry_date ? formatDate(r.entry_date) : ''}</td>
         <td>${esc(LEDGER_KIND_LABEL_EL[r.doc_kind] ?? LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind)}</td>
@@ -674,7 +790,7 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
   return (
     <div className="space-y-4">
       <div>
-        <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={onClose}>
+        <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={() => onClose(ledgerKey > 0 || reloadKey > 0)}>
           <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> All parties
         </Button>
         <div className="space-y-1">
@@ -773,6 +889,16 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
 
         {!party ? null : (
           <div className="space-y-4">
+            <OpeningBalanceCard
+              workspaceId={party.workspace_id}
+              partyType={party.party_type}
+              partyId={party.party_id}
+              side={ledgerSide}
+              refreshKey={ledgerKey}
+              onChanged={() => setLedgerKey((k) => k + 1)}
+              onRecordPayment={() => setPayOnAccount(true)}
+              onOpeningLoaded={(ob) => setOpeningAsOf(ob?.as_of ?? null)}
+            />
             {/* The money position stays ABOVE the tabs. It is three tiles, not a tab's worth of
                 content, and behind one it meant every list opened without the balance it is
                 supposed to be read against. */}
@@ -1048,9 +1174,10 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
                           with nothing on the debit side, reading as "we owe them". Say which
                           documents it holds and where the missing half lives. */}
                       <p className="text-[11px] text-muted-foreground">
-                        Every movement in the period with a running balance — invoices, credit notes and payments, plus
-                        orders nobody has invoiced yet when that box is ticked. Positive is due to us; negative sits in
-                        their favour.
+                        Every movement in the period with a running balance — invoices, credit notes, payments, supplier
+                        documents received through AADE and the opening balance, plus orders nobody has invoiced yet when
+                        that box is ticked. Positive is due to us; negative sits in their favour. Payments clear the
+                        oldest open items first unless they were paid against a specific document.
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1114,9 +1241,18 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
                             return (
                             // Key on the ABSOLUTE row index — a per-page index collides across
                             // pages and lets React reuse the previous page's rows.
-                            <tr key={(ledgerPage - 1) * TABLE_PAGE_SIZE + idx} className="border-b border-border/30">
+                            <tr key={(ledgerPage - 1) * TABLE_PAGE_SIZE + idx}
+                              className={`border-b border-border/30 ${r.counted === false ? 'text-muted-foreground' : ''} ${r.doc_kind === 'opening_balance' ? 'bg-muted/30 font-medium' : ''}`}>
                               <td className="px-3 py-1.5">{r.entry_date ? formatDate(r.entry_date) : '—'}</td>
-                              <td className="px-3 py-1.5">{LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
+                              <td className="px-3 py-1.5">
+                                {LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}
+                                {r.counted === false && (
+                                  <div className="text-[10px] font-normal" title="The opening balance already includes this entry">Before opening — not counted</div>
+                                )}
+                                {r.doc_kind === 'opening_balance' && r.note && (
+                                  <div className="text-[10px] font-normal text-muted-foreground">{r.note}</div>
+                                )}
+                              </td>
                               <td className="px-3 py-1.5 font-mono">
                                 {href ? (
                                   <Link to={href} className="text-primary hover:underline">{docLabel}</Link>
@@ -1126,6 +1262,11 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
                                     {docLabel}
                                   </button>
                                 ) : docLabel}
+                                {r.open_amount != null && r.counted !== false && (
+                                  <div className="font-sans text-[10px] text-muted-foreground">
+                                    {r.open_amount > 0.005 ? `open ${mr(r.open_amount, r.currency)}` : 'cleared'}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? mr(Number(r.debit), r.currency) : ''}</td>
                               <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.credit) ? mr(Number(r.credit), r.currency) : ''}</td>
@@ -1180,6 +1321,24 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
         {/* Stop holding their leftover money and keep it as income. Same action, same dialog, as
             the CRM Account tab — this drill-down shows the same balance. Mounted outside the tabs
             so switching tab mid-flow cannot unmount it. */}
+        {party && payOnAccount && (
+          <RecordPaymentDialog
+            workspaceId={party.workspace_id}
+            open
+            onOpenChange={(v) => { if (!v) setPayOnAccount(false); }}
+            onSaved={() => { setPayOnAccount(false); setLedgerKey((k) => k + 1); reload(); }}
+            side={ledgerSide}
+            initialCounterparty={party.party_type === 'company'
+              ? { companyId: party.party_id, contactId: null }
+              : { contactId: party.party_id, companyId: null }}
+            payableBills={ledgerSide === 'supplier'
+              ? bills.filter((b) => Number(b.amount_due) > 0.005).map((b) => ({
+                id: b.id, supplier_bill_number: b.supplier_bill_number ?? null, amount_due: Number(b.amount_due), currency: b.currency ?? 'EUR',
+              }))
+              : []}
+            openingAsOf={openingAsOf}
+          />
+        )}
         {party && (
           <ReleaseCreditDialog
             workspaceId={party.workspace_id}

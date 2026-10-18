@@ -27,7 +27,7 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';
 import { parseDecimal } from '@/utils/decimal';
-import { todayLocalISO } from '@/utils/datetime';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 
 // 'supplier' = money OUT to the counterparty of a PURCHASE order, and the ONLY direction a
 // purchase order offers. You do not receive money from someone you are buying from, so the
@@ -78,7 +78,9 @@ export const RecordPaymentDialog: React.FC<{
   /** Currency of the ORDER this payment is being recorded against. */
   orderCurrency?: string;
   initialCategoryId?: string;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, initialIntent = 'record', side = 'customer', payableBills = [], orderCurrency, initialCategoryId }) => {
+  /** The party's opening-balance date: a payment on or before it is already inside that balance. */
+  openingAsOf?: string | null;
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, initialIntent = 'record', side = 'customer', payableBills = [], orderCurrency, initialCategoryId, openingAsOf }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -678,7 +680,7 @@ export const RecordPaymentDialog: React.FC<{
                 // A purchase order goes one way: we pay the supplier. There is deliberately no
                 // money-in option here — you do not get paid by someone you are buying from.
                 <div className="flex h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm">
-                  Paid to supplier
+                  {orderId ? 'Paid to supplier' : 'Paid to supplier (on account)'}
                 </div>
               ) : (
                 <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); setExpenseId(''); }}>
@@ -763,13 +765,15 @@ export const RecordPaymentDialog: React.FC<{
               optional
               hint={selectedBill
                 ? 'Settling this bill will mark it paid when fully covered.'
-                : 'Leave empty to log the money against the order without settling a specific bill.'}
+                : orderId
+                  ? 'Leave empty to log the money against the order without settling a specific bill.'
+                  : 'Leave empty to pay on account: it lowers the balance and clears the oldest open items first.'}
             >
               <Select value={billId} onValueChange={setBillId}>
-                <SelectTrigger><SelectValue placeholder="None — just money paid on this order" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={orderId ? 'None — just money paid on this order' : 'None — on account'} /></SelectTrigger>
                 <SelectContent>
                   {payableBills.length === 0
-                    ? <div className="px-2 py-1 text-xs text-muted-foreground">No open supplier bill on this order</div>
+                    ? <div className="px-2 py-1 text-xs text-muted-foreground">{orderId ? 'No open supplier bill on this order' : 'No open supplier bill'}</div>
                     : payableBills.map((b) => (
                       <SelectItem key={b.id} value={b.id}>
                         {b.supplier_bill_number ?? b.id.slice(0, 8)} — {formatMoney(Number(b.amount_due), b.currency)} due
@@ -945,6 +949,12 @@ export const RecordPaymentDialog: React.FC<{
             <FormGrid>
               <FormField label="Date">
                 <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+                {openingAsOf && paidAt && paidAt <= openingAsOf && (
+                  <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                    This is on or before the opening balance of {formatDate(openingAsOf)}, which already includes it.
+                    It will be recorded and shown, but it will not lower the balance again.
+                  </p>
+                )}
               </FormField>
               <FormField label="Category" optional>
                 <Select value={categoryId} onValueChange={setCategoryId}>

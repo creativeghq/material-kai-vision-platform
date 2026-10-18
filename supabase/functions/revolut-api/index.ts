@@ -8,6 +8,7 @@ import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
+import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import {
   createCard,
   createCounterparty,
@@ -68,10 +69,11 @@ async function paymentFromFeedRow(
   categoryId: string | null = null,
 ): Promise<string> {
   const ccy = String(tx.currency ?? 'EUR').toUpperCase();
+  const provider = tx.provider === 'statement' ? 'statement' : 'revolut';
   const { data: pay, error: payErr } = await service.from('payments').insert({
     workspace_id: workspaceId,
-    direction: 'out',
-    amount: Number(tx.amount),
+    direction: tx.direction === 'in' ? 'in' : 'out',
+    amount: Math.abs(Number(tx.amount)),
     currency: ccy,
     method: 'bank_transfer',
     paid_at: tx.booked_at ?? new Date().toISOString(),
@@ -79,16 +81,16 @@ async function paymentFromFeedRow(
     counterparty_contact_id: party.contactId,
     category_id: categoryId,
     bank_account_id: tx.bank_account_id ?? null,
-    reference: `Bank transfer (Revolut) ${tx.provider_ref}`,
+    reference: `Bank transfer (${provider === 'revolut' ? 'Revolut' : 'imported statement'}) ${tx.provider_ref}`,
     notes,
-    provider: 'revolut',
+    provider,
     provider_ref: tx.provider_ref,
   }).select('id').single();
   if (payErr && !/duplicate|unique/i.test(payErr.message ?? '')) throw new HttpError(500, payErr.message);
   let payId = pay?.id as string | undefined;
   if (!payId) {
     const { data: existing } = await service.from('payments')
-      .select('id').eq('provider', 'revolut').eq('provider_ref', tx.provider_ref).maybeSingle();
+      .select('id').eq('workspace_id', workspaceId).eq('provider', provider).eq('provider_ref', tx.provider_ref).maybeSingle();
     payId = existing?.id;
   }
   if (!payId) throw new HttpError(500, 'payment row could not be created');
@@ -139,8 +141,10 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
     .rpc('is_workspace_finance_manager', { p_workspace_id: workspaceId });
   if (!isMgr) throw new HttpError(404, 'not found');
 
-  // Entitlement gate (the real security line; nav/route guards are UX only).
-  if (!(await isWorkspaceEntitled(service, workspaceId, 'banking-revolut'))) {
+  // Entitlement gate (the real security line; nav/route guards are UX only). An imported-statement
+  // line needs no Revolut module, so confirm-party-payment applies the gate per line below.
+  const revolutEntitled = await isWorkspaceEntitled(service, workspaceId, 'banking-revolut');
+  if (!revolutEntitled && action !== 'confirm-party-payment') {
     throw new HttpError(402, 'Revolut Business module is not enabled for this workspace');
   }
 
@@ -518,6 +522,41 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
 
       await markFeedRowMatched(service, rowId, payId);
       return jsonResponse({ ok: true, outcome: (settled ?? [])[0]?.outcome ?? 'paid' });
+    }
+
+    case 'confirm-party-payment': {
+      // A bank line that pays (or is paid by) a party with no document to match: it lands on
+      // their account as an on-account payment and clears their oldest open items.
+      const rowId = String(body?.transaction_row_id ?? '');
+      const companyId = body?.company_id ? String(body.company_id) : null;
+      const contactId = companyId ? null : (body?.contact_id ? String(body.contact_id) : null);
+      if (!rowId || (!companyId && !contactId)) throw new HttpError(400, 'transaction_row_id and a company_id or contact_id are required');
+
+      const { data: tx } = await service
+        .from('revolut_bank_transactions')
+        .select('*')
+        .eq('id', rowId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!tx) throw new HttpError(404, 'not found');
+      if (tx.provider !== 'revolut' && tx.provider !== 'statement') {
+        throw new HttpError(400, 'only bank lines (Revolut or an imported statement) can be booked to a party');
+      }
+      if (tx.provider === 'revolut' && !revolutEntitled) {
+        throw new HttpError(402, 'Revolut Business module is not enabled for this workspace');
+      }
+      if (tx.match_status === 'matched' || tx.reconciled_payment_id) throw new HttpError(400, 'line is already matched');
+      if (tx.direction !== 'in' && tx.direction !== 'out') throw new HttpError(400, 'line has no direction');
+      if (tx.provider === 'revolut') await assertNotInternalLeg(service, workspaceId, tx);
+
+      await assertSameWorkspace(service, companyId ? 'crm_companies' : 'crm_contacts', companyId ?? contactId, workspaceId, 'party');
+
+      const payId = await paymentFromFeedRow(
+        service, workspaceId, tx, { companyId, contactId },
+        `On account, from the bank feed${tx.counterparty_name ? ` (${tx.counterparty_name})` : ''}`,
+      );
+      await markFeedRowMatched(service, rowId, payId);
+      return jsonResponse({ ok: true, payment_id: payId });
     }
 
     case 'ignore-transaction': {
