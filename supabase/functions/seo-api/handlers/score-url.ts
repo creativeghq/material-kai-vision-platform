@@ -13,6 +13,7 @@ import { scrapeMarkdown } from '../../_shared/scrape-markdown.ts';
 import { chargeCronWorkspace, chargeCronUser, refundCronWorkspace, refundCronUser } from '../../_shared/cron-billing.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { analyzeContent } from './analyze.ts';
+import { findWorkspacePage, recordPageContentScores } from '../../_shared/seo/page-audit-store.ts';
 import type { ArticlePlan } from '../../_shared/seo-types.ts';
 
 const supabaseUrl = () => Deno.env.get('SUPABASE_URL') || '';
@@ -156,8 +157,19 @@ export async function handleScoreUrl(req: Request, body: any): Promise<Response>
 
     const plan = planFromPage(keyword, page.title, page.description, url);
     const analysis = analyzeContent(page.markdown, plan);
+    const ours = await findWorkspacePage(supabase, workspaceId, url);
+    if (ours) {
+      await recordPageContentScores(supabase, ours, userId, {
+        keyword,
+        keyword_source: supplied ? 'caller_supplied' : fromGsc.source,
+        overall_score: analysis.overallScore,
+        readability_score: analysis.readabilityScore,
+        geo_score: analysis.geoScore?.overall ?? null,
+      });
+    }
 
     return jsonResponse({
+      saved_to_page: ours ? { page_id: ours.id, website_id: ours.website_id } : null,
       success: true,
       url,
       fetched: {

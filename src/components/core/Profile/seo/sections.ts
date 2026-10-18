@@ -82,6 +82,7 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
     value: 'health', label: 'Site health', icon: Gauge, group: 'technical',
     views: [
       { value: 'crawl', label: 'Site crawl' },
+      { value: 'pages', label: 'Pages' },
       { value: 'homepage', label: 'Page health' },
       { value: 'llms', label: 'llms.txt' },
     ],

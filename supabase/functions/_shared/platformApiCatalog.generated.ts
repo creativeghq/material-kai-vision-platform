@@ -4155,7 +4155,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "revert_fix",
           "reanalyze",
           "add_faq",
-          "score_url"
+          "score_url",
+          "page_review"
         ],
         "required": true,
         "description": "Which operation to run."
@@ -4174,7 +4175,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "action": {
         "type": "string",
         "enum": [
-          "cron-sweep"
+          "cron-sweep",
+          "page-review-sweep"
         ],
         "required": true,
         "description": "Which operation to run"

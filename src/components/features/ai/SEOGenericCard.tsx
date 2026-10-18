@@ -5,6 +5,7 @@ import { safeHref } from '@/utils/safeUrl';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { SeoMetricTile } from '@/components/core/Profile/seo/SeoMetricTile';
 import { formatCount, metricDescriptor, statusPresentation, type SeoMetric } from '@/components/core/Profile/seo/seoMetrics';
+import { PAGE_RECOMMENDATION_KIND_LABELS, PAGE_REVIEW_VERDICT_LABELS } from '@/services/seo/pageReviewVocabulary';
 
 export interface SEOGenericCardData {
   type: string;
@@ -56,6 +57,7 @@ const SEO_CARD_TITLES: Record<string, string> = {
   seo_referring_domains_card: 'Referring domains',
   seo_related_keywords_card: 'Related keywords',
   seo_relevant_pages_card: 'Top pages',
+  seo_page_review_card: 'Page review',
   seo_score_url_card: 'Page score',
   seo_search_volume_card: 'Search volume & CPC',
   seo_serp_content_card: 'Ranking page ranges',
@@ -663,7 +665,66 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             {ip.meta.images_count != null && <Stat label="Images" value={fmtNum(ip.meta.images_count)} />}
           </div>
         )}
+        {data.content_scores?.overall_score != null && (
+          <div className="text-[11px] text-muted-foreground">
+            Content score {Math.round(data.content_scores.overall_score)}/100
+            {data.content_scores.keyword ? ` for "${data.content_scores.keyword}"` : ''} (from Page score).
+          </div>
+        )}
+        {data.saved_to_page && (
+          <a className="text-[11px] text-primary underline" href={`/websites/${data.saved_to_page.website_id}?section=health&view=pages`}>
+            Saved on this page under Site health → Pages
+          </a>
+        )}
         <FailedChecksAccordion checks={ip?.page_metrics?.checks ?? ip?.checks} label="On-page issues" />
+      </Card>
+    );
+  }
+
+  // ── Review one of our pages (#399) ────────────────────
+  if (t === 'seo_page_review_card') {
+    if (data.status !== 'ok') {
+      return (
+        <Card className="space-y-2">
+          <Header icon="📝" title="Page not reviewed" subtitle={data.url} />
+          <Primer>{data.error || 'The review did not run. Nothing was charged.'}</Primer>
+        </Card>
+      );
+    }
+    const recs: any[] = data.recommendations || [];
+    const KIND = PAGE_RECOMMENDATION_KIND_LABELS as Record<string, string>;
+    const TONE: Record<string, 'green' | 'amber' | 'red'> = { fine: 'green', improve: 'amber', rewrite: 'red' };
+    const verdictLabel = (PAGE_REVIEW_VERDICT_LABELS as Record<string, string>)[data.verdict] ?? String(data.verdict);
+    const verdictTone = TONE[data.verdict] ?? 'amber';
+    return (
+      <Card className="space-y-3">
+        <Header icon="📝" title="Page review" subtitle={data.url} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Pill tone={verdictTone}>{verdictLabel}</Pill>
+          <span className="text-[11px] text-muted-foreground">
+            {data.inputs?.queries ?? 0} search queries · {data.inputs?.audited ? `${data.inputs.failing_checks} failing checks` : 'no on-page audit'} · {data.credits_used} credits
+          </span>
+        </div>
+        {data.summary && <div className="text-sm">{data.summary}</div>}
+        {recs.length === 0 ? <Empty>No change worth making was found.</Empty> : (
+          <div className="space-y-2">
+            {recs.map((r, i) => (
+              <div key={i} className="border border-border rounded p-2 bg-muted/30">
+                <div className="text-[10px] text-muted-foreground">{KIND[r.kind] || r.kind}</div>
+                <div className="text-sm font-medium break-words">
+                  {r.kind === 'internal_link' ? `Link "${r.evidence?.anchor ?? ''}" → ${r.proposed_value}` : r.proposed_value}
+                </div>
+                {r.current_value && <div className="text-[11px] text-muted-foreground">Now: {r.current_value}</div>}
+                {r.rationale && <div className="text-[11px] text-muted-foreground">{r.rationale}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        {data.website_id && (
+          <a className="text-[11px] text-primary underline" href={`/websites/${data.website_id}?section=health&view=pages`}>
+            Open in Site health → Pages
+          </a>
+        )}
       </Card>
     );
   }
@@ -767,8 +828,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
       );
     }
     const scores: Array<[string, number | null | undefined]> = [
-      ['Overall', data.overall_score], ['SEO', data.seo_score],
-      ['Readability', data.readability_score], ['AI citation', data.geo_score],
+      ['Overall', data.overall_score], ['Readability', data.readability_score], ['AI citation', data.geo_score],
     ];
     const critical = (data.fixes || []).filter((f: any) => f.severity === 'critical').length;
     return (
@@ -780,7 +840,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           <strong>{data.keyword || '—'}</strong>
           {data.keyword_source === 'gsc_top_query' ? ' (its top Search Console query).' : '.'}
         </Primer>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {scores.map(([label, v]) => {
             const tone: any = v == null ? undefined : v >= 90 ? 'green' : v >= 70 ? 'amber' : 'red';
             return (

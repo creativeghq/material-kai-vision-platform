@@ -570,6 +570,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'seo_page_review', name: 'Page Review', category: 'SEO Research',
+    credits: 10,
+    desc: 'Review one page of your own website: what the crawl read, what Google shows it for and its on-page audit, then a proposed title, meta description, H1, content gaps and internal links. Saved on the page; the next crawl marks a proposal applied when it sees it live.',
+    examples: [
+      'Review https://materialshub.gr/materials/porcelain-tiles',
+      'What should I change on our bathroom tiles page?',
+    ],
+  },
+  {
     id: 'seo_audit_url', name: 'URL Audit', category: 'SEO Research',
     desc: 'Audit any public URL — Lighthouse (perf / a11y / best-practices / SEO scores) + on-page issues + content parsing. Works on competitor pages too.',
     examples: [
@@ -3567,6 +3576,25 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'seo-pages',
+    capability: 'marketing.seo',
+    moduleSlug: 'seo-toolkit',
+    name: 'SEO Page Review',
+    description: 'Review the pages of your own site one at a time: facts, Search Console queries, on-page audit and copy-ready proposals that the crawl verifies.',
+    icon: 'FileSearch',
+    tool_ids: ['seo_page_review', 'seo_audit_url', 'seo_score_url'],
+    quick_starts: [
+      {
+        label: 'Review a page', description: 'Proposed title, description, H1, gaps and links', icon: 'FileSearch',
+        prompt: 'Review one page of my website and propose what to change.',
+        done: 'I\'ve reviewed the page. The proposals are saved under Website → Site health → Pages.',
+        promptTemplate: 'Review the page {{url}} and propose what to change.',
+        run: { tool: 'seo_page_review' },
+        autoFields: true,
+      },
+    ],
+  },
+  {
     // AI-search visibility had no home. `check_llm_visibility` sat in the `mentions`
     // cluster and in none of the nine SEO ones, so somebody doing SEO work never saw
     // the one tool that measures how the brand shows up in AI answers — while three
@@ -3865,7 +3893,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   'email-marketing': 'marketing', messaging: 'service', inbox: 'service', mail: 'service', reviews: 'service',
   'price-monitoring': 'sales',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
-  'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',
+  'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-pages': 'marketing', 'seo-article': 'marketing',
   // The newest SEO cluster and the only one that was missing from both maps: unmapped toolkits
   // fall into the picker's "Other" group beside core and admin-misc, so AI Search Visibility sat
   // apart from the seven siblings it belongs with — findable only by someone already scrolling.
@@ -4007,7 +4035,7 @@ export function renderPromptTemplate(
 export const TOOLKIT_AGENTS: Record<string, string[]> = {
   // Marketing → Edith
   'seo-research': ['marketing'], 'seo-domain': ['marketing'], 'seo-backlinks': ['marketing'],
-  'seo-content': ['marketing'], 'seo-multi-engine': ['marketing'], 'seo-composite': ['marketing'],
+  'seo-content': ['marketing'], 'seo-multi-engine': ['marketing'], 'seo-composite': ['marketing'], 'seo-pages': ['marketing'],
   'seo-article': ['marketing'], mentions: ['marketing'], 'email-marketing': ['marketing'],
   // Same omission, worse consequence: with no owning agent the picker cannot scope this cluster
   // to Edith, so selecting her hid the one toolkit that answers "do LLMs mention us at all".

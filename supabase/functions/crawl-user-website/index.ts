@@ -313,6 +313,10 @@ interface ScrapeResult {
   /** Direct read only, like `images`: absent = not read, null = read and the page states none. */
   specs?: PageSpecs | null;
   links_to?: string[];
+  /** Absent = this read could not see it, so the stored value is kept. */
+  h1?: string | null;
+  canonical_url?: string | null;
+  lang?: string | null;
 }
 
 /**
@@ -330,8 +334,15 @@ async function firecrawlScrape(url: string): Promise<ScrapeResult> {
     http_status: page.http_status,
     error: page.error,
     fetch_method: 'firecrawl',
+    ...markdownH1(page.markdown),
     ...(page.rate_limited ? { rate_limited: true, retry_after_ms: page.retry_after_ms } : {}),
   };
+}
+
+function markdownH1(markdown: string | null): { h1?: string } {
+  const raw = markdown ? /^#\s+(.+)$/m.exec(markdown)?.[1] : null;
+  const h1 = raw?.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`]/g, '').trim();
+  return h1 ? { h1 } : {};
 }
 
 function decodeEntities(s: string): string {
@@ -394,6 +405,9 @@ async function directScrape(url: string): Promise<ScrapeResult> {
     images: extractContentImages(html, url),
     specs: extractSpecs(html, url),
     links_to: extractContentLinks(html, url),
+    h1: textFromHtml(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1] || '').replace(/\s+/g, ' ').trim() || null,
+    canonical_url: /<link[^>]+rel\s*=\s*["']canonical["'][^>]*>/i.exec(html)?.[0].match(/href\s*=\s*["']([^"']+)["']/i)?.[1] ?? null,
+    lang: /<html[^>]*\blang\s*=\s*["']([^"']+)["']/i.exec(html)?.[1]?.toLowerCase() ?? null,
   };
 }
 
@@ -537,6 +551,7 @@ interface CrawlPlan {
   writes: number;
   writeFailures: number;
   firstWriteError: string | null;
+  manual?: boolean;
 }
 
 /**
@@ -689,6 +704,25 @@ async function planCrawl(
   };
 }
 
+/** Re-read named pages of this website now (Website → Pages → Refetch); billed per page like any read. */
+async function refetchPlan(
+  supabase: DbClient, website: { id: string; sitemap_url: string | null }, pageIds: unknown[],
+): Promise<CrawlPlan | { error: string }> {
+  const ids = pageIds.map(String).filter(Boolean).slice(0, 10);
+  const { data, error } = await supabase.from('user_website_pages').select('url')
+    .eq('website_id', website.id).in('id', ids);
+  if (error) return { error: `page lookup failed: ${error.message}` };
+  if (!data?.length) return { error: 'none of those pages belong to this website' };
+  const queue: QueueEntry[] = (data as { url: string }[]).map((r) => ({
+    url: r.url, reason: 'manual', keywords: null, best_position: null, impressions: null, clicks: null,
+  }));
+  return {
+    sitemapUrl: website.sitemap_url ?? '', seenAt: new Date().toISOString(),
+    discovered: queue.length, cap: queue.length, capped: false, queue,
+    writes: 0, writeFailures: 0, firstWriteError: null, manual: true,
+  };
+}
+
 async function executeCrawl(
   supabase: DbClient,
   website: { id: string; user_id: string; workspace_id: string | null },
@@ -736,7 +770,7 @@ async function executeCrawl(
       // A failed backfill is stamped regardless so the hourly run does not retry it every hour.
       const { error } = await supabase.from('user_website_pages').upsert({
         website_id: websiteId, user_id: userId, url: entry.url,
-        last_seen_in_sitemap: plan.seenAt, is_active: true,
+        ...(plan.manual ? {} : { last_seen_in_sitemap: plan.seenAt, is_active: true }),
         ...(s.http_status ? { http_status: s.http_status } : {}),
         ...(s.http_status || isBackfill ? { fetched_at: now } : {}),
       }, { onConflict: 'website_id,url' });
@@ -753,7 +787,7 @@ async function executeCrawl(
     const kwList = (entry.keywords ?? [])
       .map((k) => (k?.keyword ?? '').trim()).filter(Boolean);
 
-    const { error } = await supabase.from('user_website_pages').upsert({
+    const { data: written, error } = await supabase.from('user_website_pages').upsert({
       website_id: websiteId, user_id: userId, url: entry.url,
       title: s.title, description: s.description,
       content_excerpt: s.content_excerpt,
@@ -763,19 +797,29 @@ async function executeCrawl(
       fetch_method: s.fetch_method ?? null,
       ...(s.images ? { images: s.images, images_fetched_at: now } : {}),
       ...(s.links_to ? { specs: s.specs ?? null, links_to: s.links_to, specs_checked_at: now } : {}),
-      demand_snapshot: entry.reason === 'seed' || entry.reason === 'topic' || isBackfill ? null : {
-        keywords: entry.keywords,
-        best_position: entry.best_position,
-        impressions: entry.impressions,
-        clicks: entry.clicks,
-        captured_at: now,
-      },
+      ...(s.h1 !== undefined ? { h1: s.h1 } : {}),
+      ...(s.canonical_url !== undefined ? { canonical_url: s.canonical_url } : {}),
+      ...(s.lang !== undefined ? { lang: s.lang } : {}),
+      ...(entry.reason === 'manual' ? {} : {
+        demand_snapshot: entry.reason === 'seed' || entry.reason === 'topic' || isBackfill ? null : {
+          keywords: entry.keywords,
+          best_position: entry.best_position,
+          impressions: entry.impressions,
+          clicks: entry.clicks,
+          captured_at: now,
+        },
+      }),
       embedding: embedding as unknown,
       http_status: s.http_status,
-      last_seen_in_sitemap: plan.seenAt, fetched_at: now, is_active: true,
-    }, { onConflict: 'website_id,url' });
+      ...(plan.manual ? {} : { last_seen_in_sitemap: plan.seenAt, is_active: true }),
+      fetched_at: now,
+    }, { onConflict: 'website_id,url' }).select('id').maybeSingle();
     recordWrite(error);
     if (embedding && !error) indexed += 1;
+    if (written?.id) {
+      const { error: outcomeErr } = await supabase.rpc('apply_page_recommendation_outcomes', { p_page_id: written.id });
+      if (outcomeErr) console.warn(`[crawl-user-website] recommendation outcomes for ${entry.url}: ${outcomeErr.message}`);
+    }
   }
 
   const allWritesFailed = writes > 0 && writeFailures === writes;
@@ -790,11 +834,13 @@ async function executeCrawl(
     ? `${writeFailures}/${writes} page writes failed: ${firstWriteError}`
     : null;
 
-  await supabase.from('user_websites').update({
-    last_crawled_at: new Date().toISOString(),
-    last_crawl_error: writeError,
-    page_count: withContent ?? indexed,
-  }).eq('id', websiteId);
+  if (!plan.manual) {
+    await supabase.from('user_websites').update({
+      last_crawled_at: new Date().toISOString(),
+      last_crawl_error: writeError,
+      page_count: withContent ?? indexed,
+    }).eq('id', websiteId);
+  }
 
   if (writeError) console.error(`[crawl-user-website] ${websiteId}: ${writeError}`);
   console.log(
@@ -1008,7 +1054,12 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
 
   // Planning is free; READING is what costs. The flat fee per invocation this replaces billed
   // 240 credits across two days on which zero pages were read, and refunded none of it.
-  const plan = await planCrawl(supabase, website, focusTerms(body.focus));
+  const plan = Array.isArray(body.page_ids) && body.page_ids.length
+    ? await refetchPlan(supabase, website, body.page_ids)
+    : await planCrawl(supabase, website, focusTerms(body.focus));
+  if ('error' in plan && Array.isArray(body.page_ids) && body.page_ids.length) {
+    return jsonResponse({ success: false, mode: 'refetch', error: plan.error }, 404);
+  }
   if ('error' in plan) {
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),

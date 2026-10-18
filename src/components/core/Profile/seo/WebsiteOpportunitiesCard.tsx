@@ -41,7 +41,7 @@ export const OPPORTUNITY_TAB: Record<string, string> = {
   new_page: 'articles',
   not_crawled: 'health/crawl',
   crawled_not_indexed: 'health/crawl',
-  fix_page: 'health/crawl',
+  fix_page: 'health/pages',
 };
 
 const ACTION_LABEL: Record<string, string> = {
@@ -51,7 +51,7 @@ const ACTION_LABEL: Record<string, string> = {
   new_page: 'Write it',
   not_crawled: 'Crawl',
   crawled_not_indexed: 'Crawl',
-  fix_page: 'Crawl',
+  fix_page: 'Pages',
 };
 
 /** Websites → Overview: the top of get_website_opportunities, one action per row. */

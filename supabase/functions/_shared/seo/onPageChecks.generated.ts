@@ -1,0 +1,199 @@
+// GENERATED MIRROR of src/components/core/Profile/seo/onPageChecks.ts — do not edit here.
+// Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
+// tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
+
+/** The on-page check catalogue. */
+
+export type CheckGroup = 'indexing' | 'content' | 'speed' | 'security' | 'markup' | 'links';
+
+export interface OnPageCheck {
+  key: string;
+  label: string;
+  group: CheckGroup;
+  /** True when a `true` value is the DESIRED state. */
+  goodWhenTrue: boolean;
+  /** What the failing state costs. Shown only when the check fails. */
+  cost?: string;
+}
+
+export const CHECK_GROUPS: Record<CheckGroup, string> = {
+  indexing: 'Indexing & crawlability',
+  content: 'Content',
+  speed: 'Speed',
+  security: 'Security',
+  markup: 'Markup & metadata',
+  links: 'Links & resources',
+};
+
+export const ON_PAGE_CHECKS: OnPageCheck[] = [
+  // ── Indexing ──────────────────────────────────────────────────────────────
+  { key: 'is_4xx_code', label: 'No 4xx error', group: 'indexing', goodWhenTrue: false, cost: 'The page returns a client error, so it cannot rank and visitors hit a dead end.' },
+  { key: 'is_5xx_code', label: 'No 5xx error', group: 'indexing', goodWhenTrue: false, cost: 'The server is failing on this URL. Google backs off crawling a site that does this.' },
+  { key: 'is_broken', label: 'Page loads', group: 'indexing', goodWhenTrue: false, cost: 'The page could not be fetched at all.' },
+  { key: 'is_redirect', label: 'Not a redirect', group: 'indexing', goodWhenTrue: false, cost: 'This URL redirects, so link equity passes through an extra hop.' },
+  { key: 'has_meta_refresh_redirect', label: 'No meta-refresh redirect', group: 'indexing', goodWhenTrue: false, cost: 'Meta-refresh redirects are not reliably followed and pass signal poorly. Use a 301.' },
+  { key: 'canonical', label: 'Canonical tag present', group: 'indexing', goodWhenTrue: true, cost: 'Without one, duplicate URLs of this page compete with each other.' },
+  { key: 'from_sitemap', label: 'Listed in sitemap', group: 'indexing', goodWhenTrue: true, cost: 'Not in the sitemap, so discovery relies entirely on internal links.' },
+  { key: 'seo_friendly_url', label: 'SEO-friendly URL', group: 'indexing', goodWhenTrue: true, cost: 'The URL is hard to read, which costs click-through and shareability.' },
+  { key: 'seo_friendly_url_characters_check', label: 'URL characters are clean', group: 'indexing', goodWhenTrue: true },
+  { key: 'seo_friendly_url_dynamic_check', label: 'URL is not query-driven', group: 'indexing', goodWhenTrue: true },
+  { key: 'seo_friendly_url_keywords_check', label: 'URL carries keywords', group: 'indexing', goodWhenTrue: true },
+  { key: 'seo_friendly_url_relative_length_check', label: 'URL length is reasonable', group: 'indexing', goodWhenTrue: true },
+  { key: 'is_www', label: 'www / non-www consistent', group: 'indexing', goodWhenTrue: true },
+
+  // ── Content ───────────────────────────────────────────────────────────────
+  { key: 'no_title', label: 'Has a title tag', group: 'content', goodWhenTrue: false, cost: 'The title is the single biggest on-page ranking and click-through factor. Without one Google invents its own.' },
+  { key: 'title_too_long', label: 'Title length is right', group: 'content', goodWhenTrue: false, cost: 'The title is truncated in results, so the end of your message never gets read.' },
+  { key: 'title_too_short', label: 'Title is not too short', group: 'content', goodWhenTrue: false, cost: 'A very short title wastes the most valuable line you get in the results page.' },
+  { key: 'no_description', label: 'Has a meta description', group: 'content', goodWhenTrue: false, cost: 'Google writes its own snippet instead, usually less persuasive than one you control.' },
+  { key: 'no_h1_tag', label: 'Has an H1 heading', group: 'content', goodWhenTrue: false, cost: 'No H1 leaves the page without a stated subject for either readers or crawlers.' },
+  { key: 'has_meta_title', label: 'Meta title present', group: 'content', goodWhenTrue: true },
+  { key: 'irrelevant_title', label: 'Title matches the content', group: 'content', goodWhenTrue: false, cost: 'The title promises something the page does not deliver, which reads as a bounce to Google.' },
+  { key: 'irrelevant_description', label: 'Description matches the content', group: 'content', goodWhenTrue: false, cost: 'The snippet sets an expectation the page breaks.' },
+  { key: 'irrelevant_meta_keywords', label: 'Meta keywords are relevant', group: 'content', goodWhenTrue: false },
+  { key: 'low_content_rate', label: 'Enough text vs markup', group: 'content', goodWhenTrue: false, cost: 'Very little readable text for the amount of HTML — thin pages struggle to rank for anything specific.' },
+  { key: 'high_content_rate', label: 'Text-to-markup not extreme', group: 'content', goodWhenTrue: false },
+  { key: 'low_character_count', label: 'Enough content', group: 'content', goodWhenTrue: false, cost: 'Too little content to answer a query fully.' },
+  { key: 'high_character_count', label: 'Content not excessive', group: 'content', goodWhenTrue: false },
+  { key: 'low_readability_rate', label: 'Readable', group: 'content', goodWhenTrue: false, cost: 'Dense writing loses the reader before the call to action.' },
+  { key: 'lorem_ipsum', label: 'No placeholder text', group: 'content', goodWhenTrue: false, cost: 'Placeholder text is live on the page.' },
+  { key: 'no_image_alt', label: 'Images have alt text', group: 'content', goodWhenTrue: false, cost: 'Alt text is how image search and screen readers understand your pictures.' },
+  { key: 'no_image_title', label: 'Images have title attributes', group: 'content', goodWhenTrue: false, cost: 'Minor, but a free extra signal about what the image shows.' },
+  { key: 'duplicate_title_tag', label: 'Title is unique', group: 'content', goodWhenTrue: false, cost: 'Two pages claiming the same title compete with each other, and Google picks one.' },
+  { key: 'duplicate_description', label: 'Description is unique', group: 'content', goodWhenTrue: false },
+  { key: 'duplicate_meta_tags', label: 'No duplicate meta tags', group: 'content', goodWhenTrue: false },
+
+  // ── Speed ─────────────────────────────────────────────────────────────────
+  { key: 'high_loading_time', label: 'Loads quickly', group: 'speed', goodWhenTrue: false, cost: 'Slow pages lose visitors before they render, and speed is a confirmed ranking factor on mobile.' },
+  { key: 'high_waiting_time', label: 'Server responds quickly', group: 'speed', goodWhenTrue: false, cost: 'The server is slow to respond before anything can even start rendering.' },
+  { key: 'has_render_blocking_resources', label: 'No render-blocking resources', group: 'speed', goodWhenTrue: false, cost: 'Scripts or stylesheets are holding up the first paint. Defer or inline the critical ones.' },
+  { key: 'large_page_size', label: 'Page size is reasonable', group: 'speed', goodWhenTrue: false, cost: 'A heavy page is slow on mobile data, which is where most traffic is.' },
+  { key: 'size_greater_than_3mb', label: 'Under 3 MB', group: 'speed', goodWhenTrue: false, cost: 'Over 3 MB. Almost always uncompressed images.' },
+  { key: 'small_page_size', label: 'Not suspiciously small', group: 'speed', goodWhenTrue: false, cost: 'So small it may be an error page or a shell that renders entirely in JavaScript.' },
+  { key: 'no_content_encoding', label: 'Compression enabled', group: 'speed', goodWhenTrue: false, cost: 'Gzip or Brotli is off, so every visitor downloads several times more bytes than necessary.' },
+
+  // ── Security ──────────────────────────────────────────────────────────────
+  { key: 'is_https', label: 'Served over HTTPS', group: 'security', goodWhenTrue: true, cost: 'Browsers mark plain HTTP as “Not secure”, and it is a ranking signal.' },
+  { key: 'is_http', label: 'Not plain HTTP', group: 'security', goodWhenTrue: false, cost: 'Served insecurely.' },
+  { key: 'https_to_http_links', label: 'No insecure links', group: 'security', goodWhenTrue: false, cost: 'A secure page linking to insecure resources triggers mixed-content warnings.' },
+
+  // ── Markup ────────────────────────────────────────────────────────────────
+  { key: 'has_html_doctype', label: 'Has a doctype', group: 'markup', goodWhenTrue: true },
+  { key: 'no_doctype', label: 'Doctype declared', group: 'markup', goodWhenTrue: false, cost: 'Without a doctype browsers fall back to quirks mode.' },
+  { key: 'has_micromarkup', label: 'Structured data present', group: 'markup', goodWhenTrue: true, cost: 'No schema markup, so no rich results — no stars, prices, FAQs or breadcrumbs in search.' },
+  { key: 'has_micromarkup_errors', label: 'Structured data is valid', group: 'markup', goodWhenTrue: false, cost: 'The schema markup has errors, so Google ignores it and you get no rich results anyway.' },
+  { key: 'no_favicon', label: 'Has a favicon', group: 'markup', goodWhenTrue: false, cost: 'The favicon appears next to your result on mobile.' },
+  { key: 'no_encoding_meta_tag', label: 'Charset declared', group: 'markup', goodWhenTrue: false, cost: 'Without a declared charset, accented and Greek characters can render as mojibake.' },
+  { key: 'meta_charset_consistency', label: 'Charset is consistent', group: 'markup', goodWhenTrue: true },
+  { key: 'deprecated_html_tags', label: 'No deprecated tags', group: 'markup', goodWhenTrue: false },
+  { key: 'flash', label: 'No Flash', group: 'markup', goodWhenTrue: false, cost: 'Flash does not run in any current browser.' },
+  { key: 'frame', label: 'No frames', group: 'markup', goodWhenTrue: false, cost: 'Content inside frames is poorly indexed.' },
+
+  // ── Links ─────────────────────────────────────────────────────────────────
+  { key: 'broken_links', label: 'No broken links', group: 'links', goodWhenTrue: false, cost: 'Dead links waste crawl budget and strand visitors.' },
+  { key: 'broken_resources', label: 'No broken resources', group: 'links', goodWhenTrue: false, cost: 'Images, scripts or styles that fail to load — the page renders wrong for everyone.' },
+];
+
+/**
+ * What to DO about a failing check. `cost` says why it matters; this says what to
+ * change. The provider returns a boolean and nothing else, so the remedy has to be
+ * stated here — a list of red rows with no next step is a list nobody works through.
+ * One sentence, concrete, aimed at whoever edits the site.
+ */
+export const CHECK_FIXES: Record<string, string> = {
+  is_4xx_code: 'Restore the page or 301-redirect the URL to its replacement, and remove links pointing at it.',
+  is_5xx_code: 'Check the server or application logs for this URL; a 5xx is a crash, not a content problem.',
+  is_broken: 'Open the URL in a browser: if it fails, fix hosting or DNS; if it loads, the crawler was blocked — check robots.txt and firewall rules.',
+  is_redirect: 'Link to the final URL directly, and make the redirect a single 301 hop.',
+  has_meta_refresh_redirect: 'Replace the <meta http-equiv="refresh"> with a server-side 301 redirect.',
+  canonical: 'Add <link rel="canonical" href="…"> in <head> pointing at the URL you want indexed.',
+  from_sitemap: 'Add the URL to sitemap.xml (or make sure the CMS includes it) and resubmit in Search Console.',
+  seo_friendly_url: 'Use short, lowercase, hyphen-separated words that describe the page; redirect the old URL.',
+  seo_friendly_url_characters_check: 'Remove spaces, uppercase and special characters from the slug; use hyphens between words.',
+  seo_friendly_url_dynamic_check: 'Serve the page at a clean path instead of ?query parameters, or canonicalise the parameterised versions.',
+  seo_friendly_url_keywords_check: 'Put the page’s main term in the slug (e.g. /plakakia-mpaniou), not an id or a date.',
+  seo_friendly_url_relative_length_check: 'Shorten the slug to the words that matter; drop stop-words and repeated folders.',
+  is_www: 'Pick www or non-www, 301 the other to it, and use the chosen host everywhere (links, sitemap, canonical).',
+  no_title: 'Add a <title> of 50–60 characters naming the page’s subject and the site.',
+  title_too_long: 'Trim the <title> to about 60 characters so it is not cut off in results.',
+  title_too_short: 'Extend the <title> to say what the page is about and for whom; aim for 50–60 characters.',
+  no_description: 'Add a <meta name="description"> of 120–155 characters that says what the reader gets on this page.',
+  no_h1_tag: 'Add one <h1> stating the page’s subject; keep other headings at h2–h4.',
+  has_meta_title: 'Add a <title> element in <head>.',
+  irrelevant_title: 'Rewrite the <title> to describe what is actually on the page, using the terms in the body copy.',
+  irrelevant_description: 'Rewrite the meta description to summarise this page’s content, not the site in general.',
+  irrelevant_meta_keywords: 'Remove the meta keywords tag or make it match the page; search engines ignore it either way.',
+  low_content_rate: 'Add real body text; trim boilerplate markup, inline scripts and hidden blocks.',
+  high_content_rate: 'Usually nothing — check that the page is not a raw text dump without structure.',
+  low_character_count: 'Write enough to answer the query fully: specs, sizes, prices, use cases, FAQs.',
+  high_character_count: 'Split the page by subject if it covers several; long is fine if it is one topic.',
+  low_readability_rate: 'Shorter sentences, subheadings every few paragraphs, lists for specs.',
+  lorem_ipsum: 'Replace the placeholder text with the final copy before this page is linked or indexed.',
+  no_image_alt: 'Give every meaningful image an alt attribute describing what it shows (product, material, finish).',
+  no_image_title: 'Optional: add title attributes to images where a hover caption helps.',
+  duplicate_title_tag: 'Give each page its own <title>; if two pages are the same thing, canonicalise or merge them.',
+  duplicate_description: 'Write a distinct meta description per page, or drop it on the one that should not rank.',
+  duplicate_meta_tags: 'Remove the repeated meta tag so each appears once in <head>.',
+  high_loading_time: 'Compress and resize images, defer non-critical scripts, and enable caching and a CDN.',
+  high_waiting_time: 'Reduce server time to first byte: caching, a faster host, or fewer database calls on this route.',
+  has_render_blocking_resources: 'Add defer/async to scripts, inline critical CSS and load the rest asynchronously.',
+  large_page_size: 'Resize images to their displayed size, serve WebP/AVIF, and remove unused scripts and fonts.',
+  size_greater_than_3mb: 'Find the images over ~300 KB and re-export them; that is almost always the whole 3 MB.',
+  small_page_size: 'Make sure the HTML contains the content; if it only loads via JavaScript, pre-render or server-render it.',
+  no_content_encoding: 'Enable gzip or Brotli compression on the web server or CDN for HTML, CSS and JS.',
+  is_https: 'Install a TLS certificate, serve the site on https://, and 301 every http:// URL to it.',
+  is_http: 'Serve the page over HTTPS and redirect the HTTP version.',
+  https_to_http_links: 'Change links and embedded resources to https:// URLs, or remove the ones that have no secure version.',
+  has_html_doctype: 'Add <!DOCTYPE html> as the first line of the document.',
+  no_doctype: 'Add <!DOCTYPE html> as the first line of the document.',
+  has_micromarkup: 'Add JSON-LD schema (Organization, Product, LocalBusiness, BreadcrumbList) in <head>.',
+  has_micromarkup_errors: 'Validate the schema at validator.schema.org or Google’s Rich Results Test and fix the flagged fields.',
+  no_favicon: 'Add a favicon (a 48×48 PNG or SVG) and reference it with <link rel="icon">.',
+  no_encoding_meta_tag: 'Add <meta charset="utf-8"> as the first element in <head>.',
+  meta_charset_consistency: 'Make the meta charset and the Content-Type header agree (utf-8 for both).',
+  deprecated_html_tags: 'Replace <font>, <center>, <marquee> and similar with CSS.',
+  flash: 'Remove the Flash embed; replace with HTML5 video or an image.',
+  frame: 'Replace the frame or iframe layout with normal page content so it can be indexed.',
+  broken_links: 'Fix or remove the dead links; the full crawl lists each one with its target.',
+  broken_resources: 'Fix the paths of the images, scripts or stylesheets that 404; the full crawl lists them.',
+};
+
+const BY_KEY = new Map(ON_PAGE_CHECKS.map((c) => [c.key, c]));
+
+export interface CheckVerdict {
+  check: OnPageCheck;
+  /** True = the desired state. */
+  passed: boolean;
+}
+
+/**
+ * Turn the raw boolean map into verdicts.
+ *
+ * An unrecognised key goes to `unclassified` rather than being assumed good or bad:
+ * the provider adds checks over time, and guessing the polarity of one we have never
+ * seen is how a dashboard states the opposite of the truth with full confidence.
+ */
+export function buildCheckInventory(checks: Record<string, unknown> | null | undefined): {
+  verdicts: CheckVerdict[];
+  unclassified: string[];
+  passed: number;
+  failed: number;
+} {
+  const raw = checks ?? {};
+  const verdicts: CheckVerdict[] = [];
+  const unclassified: string[] = [];
+
+  for (const [key, value] of Object.entries(raw)) {
+    const check = BY_KEY.get(key);
+    if (!check) { unclassified.push(key); continue; }
+    if (typeof value !== 'boolean') { unclassified.push(key); continue; }
+    verdicts.push({ check, passed: value === check.goodWhenTrue });
+  }
+
+  return {
+    verdicts,
+    unclassified: unclassified.sort(),
+    passed: verdicts.filter((v) => v.passed).length,
+    failed: verdicts.filter((v) => !v.passed).length,
+  };
+}

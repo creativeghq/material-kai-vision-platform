@@ -18,6 +18,9 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   ) => any;
 };
 const { z } = await import('npm:zod@3.25.76');
+import { moduleGate } from './module-gate.ts';
+import { findWorkspacePage } from '../seo/page-audit-store.ts';
+import { serviceClient } from '../supabase-client.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -187,6 +190,49 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
   );
 };
 
+/** SEO Tool: review one existing page of the workspace's own site and propose what to change (#399). */
+export const createSEOPageReviewTool = (userId: string, workspaceId: string | null, onChunk?: ChunkSink) => {
+  return tool(
+    async ({ url }) => {
+      const denied = await moduleGate(workspaceId, 'seo-toolkit');
+      if (denied) {
+        onChunk?.({ type: 'seo_page_review_card', status: 'failed', url, error: JSON.parse(denied).error, timestamp: Date.now() });
+        return denied;
+      }
+      const page = await findWorkspacePage(serviceClient(), workspaceId, url);
+      if (!page) {
+        const error = 'That URL is not a crawled page of any website in this workspace. Connect the site and crawl it, or review a page it lists.';
+        onChunk?.({ type: 'seo_page_review_card', status: 'failed', url, error, timestamp: Date.now() });
+        return JSON.stringify({ success: false, status: 'not_ours', error });
+      }
+      const result = await callSEOFunction('seo-page-review', { page_id: page.id, user_id: userId }, 140_000);
+      if (!result?.success) {
+        onChunk?.({ type: 'seo_page_review_card', status: 'failed', url: page.url, error: result?.error || 'The review failed.', timestamp: Date.now() });
+        return JSON.stringify({ success: false, error: result?.error });
+      }
+      const d = result.data;
+      onChunk?.({
+        type: 'seo_page_review_card', status: 'ok',
+        url: d.url, page_id: d.page_id, website_id: d.website_id,
+        verdict: d.verdict, summary: d.summary, recommendations: d.recommendations,
+        inputs: d.inputs, credits_used: d.credits_used, timestamp: Date.now(),
+      });
+      return JSON.stringify({
+        success: true, url: d.url, verdict: d.verdict, summary: d.summary,
+        proposals: (d.recommendations ?? []).map((r: { kind: string; proposed_value: string }) => `${r.kind}: ${r.proposed_value}`),
+        note: 'Saved under Website → Site health → Pages. The next crawl marks a proposal applied when it sees it live.',
+      });
+    },
+    {
+      name: 'seo_page_review',
+      description: 'Review one existing page of the user\'s OWN website: reads what the crawl stored, its Search Console queries and its on-page audit, then proposes a new title, meta description, H1, content gaps and internal links to sibling pages. Saves the proposals on the page. Charged at the real model cost (up to 10 credits). Only for pages of a connected website; for any other URL use seo_score_url or seo_audit_url.',
+      schema: z.object({
+        url: z.string().url().describe('Full URL of a page on one of the workspace\'s connected websites.'),
+      }),
+    },
+  );
+};
+
 /**
  * SEO Tool: score a page that ALREADY EXISTS on the web (#401 G4).
  *
@@ -222,9 +268,8 @@ export const createSEOScoreUrlTool = (userId: string, onProgress?: (status: stri
           keyword: result.keyword,
           keyword_source: result.keyword_source,
           overall_score: a?.overallScore,
-          seo_score: a?.seoScore,
           readability_score: a?.readabilityScore,
-          geo_score: a?.geoScore,
+          geo_score: a?.geoScore?.overall ?? null,
           fixes: a?.fixes || [],
           section_scores: a?.sectionScores,
           checks_skipped: result.checks_skipped || [],
@@ -238,8 +283,7 @@ export const createSEOScoreUrlTool = (userId: string, onProgress?: (status: stri
           keyword: result.keyword,
           keyword_source: result.keyword_source,
           overall_score: a?.overallScore,
-          seo_score: a?.seoScore,
-          geo_score: a?.geoScore,
+          geo_score: a?.geoScore?.overall ?? null,
           issues_count: a?.fixes?.length || 0,
           critical_issues: a?.fixes?.filter((f: any) => f.severity === 'critical')?.length || 0,
           fixes: a?.fixes?.slice(0, 10),

@@ -206,6 +206,10 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     capability: ['marketing.seo'],
     tool_ids: ['seo_site_review', 'seo_brand_search_audit'],
   },
+  'seo-pages': {
+    capability: ['marketing.seo'],
+    tool_ids: ['seo_page_review', 'seo_audit_url', 'seo_score_url'],
+  },
   'ai-visibility': {
     capability: ['marketing.seo'],
     tool_ids: ['check_llm_visibility', 'seo_brand_search_audit', 'seo_llm_mentions_search', 'seo_ai_keyword_volume', 'propose_brand_change'],

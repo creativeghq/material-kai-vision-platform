@@ -8,6 +8,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { findWorkspacePage, recordPageAudit, type StoredPage } from '../_shared/seo/page-audit-store.ts';
 import { callSEOAgentRoute, gatedGatewayPost } from '../_shared/tools/dataforseo-dispatch.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -426,9 +427,18 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
 
   // ── Audit ONE page of this site, metered through the shared DataForSEO dispatcher ──
   if (action === 'page') {
+    let requested = String(body?.url || '');
+    let knownPage: StoredPage | null = null;
+    if (body?.page_id) {
+      const { data: pageRow } = await supabase.from('user_website_pages')
+        .select('id, url').eq('id', String(body.page_id)).eq('website_id', website.id).maybeSingle();
+      if (!pageRow) return json({ ok: false, error: 'Page not found' }, 404);
+      requested = pageRow.url;
+      knownPage = { id: pageRow.id, url: pageRow.url, website_id: website.id, workspace_id: website.workspace_id };
+    }
     let url: string;
     try {
-      url = await assertSafeUrl(String(body?.url || ''), { allowSchemes: ['https:'] });
+      url = await assertSafeUrl(requested, { allowSchemes: ['https:'] });
     } catch (e) {
       return json({ ok: false, error: `That URL cannot be audited: ${e instanceof Error ? e.message : 'invalid address'}` }, 400);
     }
@@ -450,8 +460,10 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
     const issues = Object.entries(BAD_CHECKS)
       .filter(([k]) => checks[k] === true || ip[k] === true)
       .map(([, title]) => title);
+    const page = knownPage ?? await findWorkspacePage(supabase, website.workspace_id, url, website.id);
+    const auditId = page ? await recordPageAudit(supabase, page, auth.userId, sections, r.data?.errors) : null;
     return json({
-      ok: true, url,
+      ok: true, url, page_id: page?.id ?? null, audit_id: auditId,
       seo_score: pct(cats.seo?.score) ?? (typeof ip.onpage_score === 'number' ? Math.round(ip.onpage_score) : null),
       perf_score: pct(cats.performance?.score), a11y_score: pct(cats.accessibility?.score),
       bp_score: pct(cats['best-practices']?.score),

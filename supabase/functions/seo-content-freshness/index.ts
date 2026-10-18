@@ -58,6 +58,34 @@ async function draftRefreshes(supabase: any, due: FreshnessRow[]): Promise<{ att
   return { attempted, dispatched, errors };
 }
 
+/** The opt-in weekly page reviews (#399): each is its own seo-api call, billed at its token cost there. */
+async function sweepPageReviews(supabase: any): Promise<Response> {
+  const { data, error } = await supabase.rpc('select_pages_for_weekly_review', { p_limit: 25 });
+  if (error) return json({ ok: false, error: `page selection failed: ${error.message}` }, 500);
+  const picked = (data ?? []) as Array<{ website_id: string; user_id: string; page_id: string; rule: string }>;
+  let dispatched = 0;
+  const errors: string[] = [];
+  const rules: Record<string, number> = {};
+  for (const row of picked) {
+    rules[row.rule] = (rules[row.rule] ?? 0) + 1;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/seo-api`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
+        body: JSON.stringify({ action: 'page_review', page_id: row.page_id, user_id: row.user_id, background: true }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const out = await res.json().catch(() => null);
+      if (!out?.success) errors.push(`${row.page_id}: ${out?.error ?? `HTTP ${res.status}`}`);
+      else dispatched += 1;
+    } catch (e) {
+      errors.push(`${row.page_id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  console.log(`[seo-content-freshness] page reviews picked=${picked.length} dispatched=${dispatched} failed=${errors.length}`);
+  return json({ ok: errors.length === 0 || dispatched > 0, picked: picked.length, picked_by_rule: rules, dispatched, errors: errors.slice(0, 10) });
+}
+
 interface FreshnessRow {
   article_id: string;
   user_id: string;
@@ -106,12 +134,13 @@ Deno.serve(withApiLogging('seo-content-freshness', async (req: Request) => {
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body is fine */ }
   const action = String(body?.action || 'cron-sweep');
-  if (action !== 'cron-sweep') {
-    return json({ error: `Unknown action '${action}'. Available: cron-sweep` }, 400);
+  if (action !== 'cron-sweep' && action !== 'page-review-sweep') {
+    return json({ error: `Unknown action '${action}'. Available: cron-sweep, page-review-sweep` }, 400);
   }
   if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  if (action === 'page-review-sweep') return sweepPageReviews(supabase);
 
   const { data, error } = await supabase
     .from('seo_article_freshness')

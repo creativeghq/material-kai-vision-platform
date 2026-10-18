@@ -8,6 +8,7 @@ import { callDataForSEO, callSEOAgentRoute } from './dataforseo-dispatch.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
 // Invariant 7 — a model-supplied URL that OUR infrastructure will fetch (#352 A19).
 import { assertSafeUrl } from '../ssrf-guard.ts';
+import { findWorkspacePage, recordPageAudit } from '../seo/page-audit-store.ts';
 // Invariant 9 — third-party text inside a structured result (#352 A17).
 import { UNTRUSTED_FIELDS_NOTE } from '../untrusted.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -1055,7 +1056,7 @@ export const createSEOSerpAuditTool = (
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createSEOAuditUrlTool = (
-  _userId: string, onChunk?: (chunk: any) => void,
+  _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
 ) => {
   return tool(
     async ({ url, for_mobile }) => {
@@ -1077,11 +1078,22 @@ export const createSEOAuditUrlTool = (
         url, for_mobile: !!for_mobile, attribution: { user_id: _userId },
       });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const page = ctx?.supabase ? await findWorkspacePage(ctx.supabase, ctx.workspaceId, url) : null;
+      let contentScores: Record<string, unknown> | null = null;
+      if (page) {
+        await recordPageAudit(ctx!.supabase, page, _userId, r.data?.sections || {}, r.data?.errors);
+        const { data: scored } = await ctx!.supabase.from('website_page_audits')
+          .select('content_scores').eq('page_id', page.id).not('content_scores', 'is', null)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        contentScores = scored?.content_scores ?? null;
+      }
       onChunk?.({
         type: 'seo_url_audit_card',
         url, for_mobile: !!for_mobile,
         sections: r.data?.sections || {},
         errors: r.data?.errors || {},
+        saved_to_page: page ? { page_id: page.id, website_id: page.website_id } : null,
+        content_scores: contentScores,
         timestamp: Date.now(),
       });
       // Pull the Lighthouse summary for the LLM

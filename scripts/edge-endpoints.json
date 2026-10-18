@@ -3159,6 +3159,12 @@
         "description": "x-cron-secret only — notify the author of every article past its refresh due date.",
         "params": [],
         "response": "{ ok, due_count, already_notified, emitted, failed, errors, truncated }"
+      },
+      {
+        "action": "page-review-sweep",
+        "description": "x-cron-secret only — for workspaces that opted in (workspace_seo_settings.weekly_page_review), dispatch up to 25 background page reviews per site, picked by select_pages_for_weekly_review (most impressions in 28 days, or most internal links without Search Console; none reviewed in 30 days).",
+        "params": [],
+        "response": "{ ok, picked, picked_by_rule, dispatched, errors }"
       }
     ]
   },
@@ -7031,6 +7037,31 @@
         "response": "{success: boolean, url: string, fetched: {title, description, http_status, word_count}, keyword: string, keyword_source: string, analysis: ContentAnalysisResult, checks_skipped: string[], credits_charged: number}"
       },
       {
+        "name": "page_review",
+        "summary": "Review one crawled page of a workspace website (#399): the stored text, its Search Console queries (90 days), its latest on-page audit and its 8 nearest sibling pages go to one Claude turn (prompt row seo_page_reviewer), which proposes a title, meta description, H1, content gaps and internal links. Proposals are saved by save_page_review and closed by the crawler (apply_page_recommendation_outcomes) when the change is seen live. Requires marketing.seo on the website's workspace and the seo-toolkit module; reserves up to 10 credits before the call and settles at the real token cost. A link to a page outside the sibling set is dropped. A page never read returns 409 status not_fetched.",
+        "params": [
+          {
+            "name": "page_id",
+            "type": "string",
+            "required": true,
+            "desc": "user_website_pages.id of the page to review."
+          },
+          {
+            "name": "user_id",
+            "type": "string",
+            "required": false,
+            "desc": "Honoured only for secret-level callers; a JWT caller is pinned to its own verified id."
+          },
+          {
+            "name": "background",
+            "type": "boolean",
+            "required": false,
+            "desc": "Secret-level callers only: accept with 202 and run the review in the background (the weekly sweep)."
+          }
+        ],
+        "response": "{success: boolean, data: {review_id, page_id, website_id, url, verdict: 'fine'|'improve'|'rewrite', summary, recommendations: [{kind, current_value, proposed_value, rationale, evidence}], dropped_links: number, inputs: {queries, failing_checks, siblings, audited}, credits_used: number}}"
+      },
+      {
         "name": "citability",
         "summary": "Score the page that should have answered a buyer question, on the eight extraction dimensions. Reads the page on demand through the SSRF guard and stores the result.",
         "params": [
@@ -7231,7 +7262,8 @@
             "revert_fix",
             "reanalyze",
             "add_faq",
-            "score_url"
+            "score_url",
+            "page_review"
           ],
           "description": "Which operation to run."
         }

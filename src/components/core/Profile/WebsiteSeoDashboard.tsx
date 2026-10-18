@@ -15,6 +15,7 @@ import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTr
 import { WebsiteSerpFeaturesPanel } from '@/components/core/Profile/WebsiteSerpFeaturesPanel';
 import { WebsiteReportsPanel } from '@/components/core/Profile/WebsiteReportsPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
+import { WebsitePagesPanel } from '@/components/core/Profile/seo/WebsitePagesPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
 import { WebsiteAnalyticsPagesPanel } from '@/components/core/Profile/WebsiteAnalyticsPagesPanel';
 import { WebsiteAnalyticsGeoPanel } from '@/components/core/Profile/WebsiteAnalyticsGeoPanel';
@@ -239,6 +240,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
         <TabsContent value="health" className="space-y-4">
           {viewStrip('health')}
           {view === 'crawl' && <WebsiteCrawlPanel website={website} />}
+          {view === 'pages' && <WebsitePagesPanel website={website} />}
           {view === 'homepage' && <WebsiteHealthPanel website={website} />}
           {view === 'llms' && <WebsiteLlmsTxtPanel website={website} />}
         </TabsContent>

@@ -2246,6 +2246,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'seo_page_review',
+    file: 'supabase/functions/_shared/tools/seo-tools.ts',
+    factory: 'createSEOPageReviewTool',
+    description: 'Review one existing page of the user\'s OWN website: reads what the crawl stored, its Search Console queries and its on-page audit, then proposes a new title, meta description, H1, content gaps and internal links to si…',
+    params: [
+      { name: 'url', type: 'string', optional: false, description: 'Full URL of a page on one of the workspace\'s connected websites.' },
+    ],
+  },
+  {
     name: 'seo_pinterest_search',
     file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
     factory: 'createSEOPinterestSearchTool',
