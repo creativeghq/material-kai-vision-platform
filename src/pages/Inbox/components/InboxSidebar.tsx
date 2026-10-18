@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlarmClock, Inbox as InboxIcon, Plus, Mail, Tag, MessagesSquare, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText, Phone, Globe } from 'lucide-react';
+import { AlarmClock, Inbox as InboxIcon, Plus, Mail, Tag, Archive, Star, Send, FilePen, CalendarClock, TextSearch, UserRound, UserX, Copy, FileText, Phone, Globe } from 'lucide-react';
 import { whatsAppNumberLabel } from '@/modules/messaging/services/messagingService';
 import { threadWhatsAppAccount } from '../inboxFilters';
 import { useToast } from '@/hooks/use-toast';
 import { inboxApi } from '@/services/inboxApi';
-import { visibleModes, modeSources } from '../inboxModes';
+import { visibleModes } from '../inboxModes';
 import { Button } from '@/components/core/ui/button';
-import { inboxSourceMeta, SOURCE_FILTER_ORDER } from '../inboxSource';
 import { initials, labelDot } from '../inboxFormat';
 import { NavRow, SidebarHeading } from './InboxPrimitives';
 import { LabelManagerPopover, LabelSidebarRow } from './InboxLabels';
@@ -37,7 +36,6 @@ export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'dra
     myUserId,
     nextCursor,
     sourceFilter,
-    setSourceFilter,
     waNumbers,
     waNumberFilter,
     setWaNumberFilter,
@@ -46,7 +44,6 @@ export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'dra
     loadThreads,
     loadLabels,
     inboxUnread,
-    sourceCounts,
     threadTotal,
     query,
     setShowMailbox,
@@ -78,8 +75,6 @@ export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'dra
       .catch(() => { if (!cancelled) setAddress(null); });
     return () => { cancelled = true; };
   }, [mode, activeWorkspaceId]);
-  const allowedSources = modeSources(mode);
-  const sources = allowedSources ? SOURCE_FILTER_ORDER.filter((k) => allowedSources.includes(k)) : SOURCE_FILTER_ORDER;
   return (
     <aside ref={asideRef} className={drawer ? 'h-full flex flex-col overflow-hidden bg-card' : 'dashboard-card md:col-span-3 lg:col-span-2 hidden md:flex flex-col overflow-hidden p-0'}>
       {/* Workspace header. Flat: the ladder is bg-background → bg-card → bg-surface-sunken,
@@ -176,42 +171,6 @@ export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'dra
             </nav>
           </>
         )}
-
-        {/*
-          Sources — the door each conversation came through, which is the axis this inbox is
-          actually organised on since the profile-enquiry merge. It was reachable only from
-          inside the filter modal, so the one thing that distinguishes a "Hire me" enquiry
-          from cold mail took two clicks and a read to find.
-        */}
-        {sources.length > 0 && (<>
-        <SidebarHeading>Sources</SidebarHeading>
-        <nav className="px-2 pb-1 space-y-0.5">
-          <NavRow
-            icon={<MessagesSquare className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
-            label="Every source"
-            dense
-            active={!sourceFilter}
-            onClick={() => setSourceFilter(null)}
-          />
-          {sources.map((key) => {
-            const meta = inboxSourceMeta(key);
-            const n = sourceCounts?.get(key) ?? null;
-            // An empty source is hidden only when every page is loaded; the row you are on never vanishes.
-            if (sourceCounts && !n && !nextCursor && sourceFilter !== key) return null;
-            return (
-              <NavRow
-                key={key}
-                icon={<span className={`w-2 h-2 rounded-full shrink-0 ${meta.tone.dot}`} />}
-                label={meta.label}
-                dense
-                active={sourceFilter === key}
-                count={n != null ? `${n}${nextCursor ? '+' : ''}` : null}
-                onClick={() => setSourceFilter(sourceFilter === key ? null : key)}
-              />
-            );
-          })}
-        </nav>
-        </>)}
 
         {mode === 'whatsapp' && waNumbers.length > 1 && (<>
         <SidebarHeading>Numbers</SidebarHeading>

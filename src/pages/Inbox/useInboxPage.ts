@@ -12,7 +12,7 @@ import { undoToastAction } from './undoToast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
-import { channelForSource, inboxSourceKey, inboxThreadSource, type InboxSourceKey } from './inboxSource';
+import { channelForSource, inboxThreadSource } from './inboxSource';
 import { inboxApi, signInboxAttachment, type InboxThread, type InboxMessage, type InboxParticipant, type WhatsAppWindow, type InboxThreadContext, type InboxLabel, type InboxThreadStatus, type InboxCatalogItem } from '@/services/inboxApi';
 import { applyPlatformPlan, describePlan, type SendFollowUpPlan } from './components/FollowUpOnSend';
 import { dayBucket } from './inboxFormat';
@@ -1195,20 +1195,6 @@ export function useInboxPage() {
     [threads, showArchived],
   );
 
-  /**
-   * How many conversations each source is carrying — the number that makes the Sources nav
-   * worth having rather than a second copy of the filter modal.
-   */
-  const sourceCounts = useMemo(() => {
-    if (sourceFilter) return null;
-    const counts = new Map<InboxSourceKey, number>();
-    for (const t of threads) {
-      const k = inboxSourceKey(t);
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-    }
-    return counts;
-  }, [threads, sourceFilter]);
-
   const threadTotal = nextCursor ? `${threads.length}+` : String(threads.length);
 
   const isCommentThread = activeThread?.channel === 'social'
@@ -1445,7 +1431,6 @@ export function useInboxPage() {
     groupedThreads,
     activeThreadLabels,
     inboxUnread,
-    sourceCounts,
     threadTotal,
     isCommentThread,
     handlePrivateReply,
