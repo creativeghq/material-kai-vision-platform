@@ -852,6 +852,67 @@ jobs:
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: npm run capabilities:sync
 
+  # A red gate SKIPS the deploy and raises nothing, and the suite no longer runs locally. This opens
+  # one `deploy-blocked` issue assigned to the pusher naming the failing jobs and lines, comments on
+  # it while main stays red, and closes it on the first run whose gates are all green.
+  gate-alert:
+    needs: [typecheck, unit-tests, lint, a11y]
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      NEEDS: ${{ toJSON(needs) }}
+      COMMIT_MSG: ${{ github.event.head_commit.message }}
+      ACTOR: ${{ github.actor }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: 🚨 Open, update or close the deploy-blocked issue
+        run: |
+          failed=$(echo "$NEEDS" | jq -r 'to_entries[] | select(.value.result=="failure") | .key')
+          allgreen=$(echo "$NEEDS" | jq -r '[.[] | .result=="success"] | all')
+          open=$(gh issue list --label deploy-blocked --state open --json number --jq '.[0].number // empty')
+          short=${GITHUB_SHA::9}
+          if [ -z "$failed" ]; then
+            if [ "$allgreen" = "true" ] && [ -n "$open" ]; then
+              gh issue close "$open" --comment "Gates green again at $short — deploys resume. $RUN_URL"
+            fi
+            exit 0
+          fi
+          {
+            echo "**Main is not deploying.** A gate failed, so \`deploy-frontend\` / \`deploy-functions\` were skipped for this push and will be for every push until it is fixed."
+            echo
+            echo "- Commit: \`$short\` $(printf '%s' "$COMMIT_MSG" | head -1)"
+            echo "- Pushed by: @$ACTOR"
+            echo "- Run: $RUN_URL"
+            echo "- Failed: $(echo $failed | tr ' ' ',')"
+            echo
+            gh api "repos/$GH_REPO/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs" --paginate \
+              --jq '.jobs[] | select(.conclusion=="failure") | "\(.id)\t\(.name)"' |
+            while IFS=$'\t' read -r id name; do
+              echo "### $name"
+              echo '```'
+              gh api "repos/$GH_REPO/actions/jobs/$id/logs" 2>/dev/null |
+                sed -E 's/^[0-9T:.-]+Z //; s/\x1b\[[0-9;]*m//g' |
+                grep -E ' FAIL |error TS|[0-9]+:[0-9]+ +error |AssertionError|Tests? +.*failed|##\[error\]' |
+                grep -v 'Process completed with exit code' | awk '!seen[$0]++' | head -40
+              echo '```'
+            done
+            echo
+            echo "Fix forward on main. This issue closes itself on the next run where every gate is green."
+          } > body.md
+          gh label create deploy-blocked --color B60205 --description "A Deploy gate is red; nothing ships until fixed" --force
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file body.md
+          else
+            gh issue create --title "🚨 Deploy blocked: gate failed on $short" --label deploy-blocked \
+              --assignee "$ACTOR" --body-file body.md
+          fi
+
   # ────────────────────────────────────────────────────────────────────────────
   # Post-deploy smoke gate — verify the critical prod flows are actually alive right
   # after a deploy. A FAIL here turns this run red so breakage is caught in seconds,

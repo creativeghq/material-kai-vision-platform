@@ -531,7 +531,7 @@ re-implementation of either, not even in a demo page.
 5. Tables: sortable headers, right-aligned numbers, and an empty state that OFFERS something (§6b).
 6. Check it in **all four** theme combinations at `/design-system`.
 7. Check it at 375px wide — wide tables scroll, they do not clip.
-8. `npm run lint && npm run typecheck && npm test`.
+8. `npm run lint:fast && npm run typecheck`, then watch the Deploy run go green (CI runs the unit suite).
 
 ---
 
