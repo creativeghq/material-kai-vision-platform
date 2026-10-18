@@ -41,3 +41,14 @@ export function foreignWords(markdown: string, allowed: Set<string> = ALLOWED_FO
   }
   return [...words].sort();
 }
+
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '');
+const occurrences = (text: string, phrase: string) => (phrase ? text.split(phrase).length - 1 : 0);
+
+/** Times a Greek keyword that carries accents appears in `text` spelled any other way. */
+export function unaccentedKeywordUses(text: string, keyword: string): number {
+  const kw = keyword.normalize('NFC').toLowerCase().trim();
+  if (!/[Ͱ-Ͽ]/.test(kw) || fold(kw) === kw) return 0;
+  const body = text.normalize('NFC').toLowerCase();
+  return Math.max(0, occurrences(fold(body), fold(kw)) - occurrences(body, kw));
+}

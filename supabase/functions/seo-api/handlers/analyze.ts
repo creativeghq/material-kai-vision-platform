@@ -12,7 +12,7 @@ import {
 } from '../../_shared/seo/articleSections.generated.ts';
 import { normalizeContentBrief, type NormalizedBrief } from './content-brief.ts';
 import { countSiteLinks } from './site-assets.ts';
-import { ALLOWED_FOREIGN_WORDS, foreignWords, latinTerms } from './foreign-words.ts';
+import { ALLOWED_FOREIGN_WORDS, foreignWords, latinTerms, unaccentedKeywordUses } from './foreign-words.ts';
 import type {
   SEOAnalyzeRequest,
   SEOAnalyzeResponse,
@@ -611,6 +611,20 @@ export function analyzeContent(
       suggestion: "Use the article language's own term; keep a foreign word only for a brand, product or colour name, or a term searchers type that way",
       affectedSection: null,
       autoFixable: false,
+      applied: false,
+    });
+  }
+
+  // ── Check 12c: the unaccented spelling belongs in keywords, never in reader-facing text ──
+  const unaccented = unaccentedKeywordUses(`${plan.metaTitle}\n${plan.metaDescription}\n${markdown}`, plan.primaryKeyword);
+  if (unaccented > 0) {
+    fixes.push({
+      category: 'language',
+      severity: 'medium',
+      description: `"${plan.primaryKeyword}" is written without its accents ${unaccented} time(s) in the title, description or text`,
+      suggestion: 'Write the keyword with its accents wherever a reader sees it; the unaccented form is only for search keywords',
+      affectedSection: null,
+      autoFixable: true,
       applied: false,
     });
   }
