@@ -68,7 +68,7 @@ export const WebsiteToolkitRunsPanel: React.FC<{ website: UserWebsite }> = ({ we
           <CardDescription>SEO research + audit passes the agent and toolkit ran for this website.</CardDescription>
           </div>
           <Button size="sm" variant="outline" className="shrink-0"
-            onClick={() => launchQuickStart('seo-research', 'Audit a URL')}>
+            onClick={() => launchQuickStart('seo-research', 'Audit a URL', website.id)}>
             <Plus className="w-3.5 h-3.5 mr-1" />New run
           </Button>
         </CardHeader>
@@ -81,7 +81,7 @@ export const WebsiteToolkitRunsPanel: React.FC<{ website: UserWebsite }> = ({ we
               title="No toolkit runs yet"
               description="Every audit or research pass the agent runs for this site is filed here so you can re-read it later."
               action={
-                <Button size="sm" onClick={() => launchQuickStart('seo-research', 'Audit a URL')}>
+                <Button size="sm" onClick={() => launchQuickStart('seo-research', 'Audit a URL', website.id)}>
                   <Plus className="w-3.5 h-3.5 mr-1" />New run
                 </Button>
               }

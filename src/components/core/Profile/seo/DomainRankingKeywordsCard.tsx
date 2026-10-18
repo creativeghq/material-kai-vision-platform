@@ -3,12 +3,13 @@ import { ExternalLink, SearchX } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TableColumnHeader } from '@/components/core/ui/table-column-header';
 import { HubEmptyState, HubResetFilters, HubToolbar } from '@/components/core/hub';
 import { userWebsitesService, type DomainKeyword, type UserWebsite } from '@/services/userWebsitesService';
 import { formatNumber } from '@/utils/decimal';
 import { useTableSegments } from './useTableSegments';
+import { KeywordActions } from './KeywordActions';
 
 type KwSortKey = 'keyword' | 'position' | 'volume' | 'etv' | 'page';
 const POSITION_BANDS: { key: string; label: string; max: number }[] = [
@@ -100,6 +101,7 @@ export const DomainRankingKeywordsCard: React.FC<{ website: UserWebsite }> = ({ 
                   <TableColumnHeader sortKey="volume" sort={t.sort} onSort={t.onSort} align="right">Volume</TableColumnHeader>
                   <TableColumnHeader sortKey="etv" sort={t.sort} onSort={t.onSort} align="right">Est. traffic</TableColumnHeader>
                   <TableColumnHeader sortKey="page" sort={t.sort} onSort={t.onSort} segment={t.segment('page')}>Page</TableColumnHeader>
+                  <TableHead className="w-32"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -116,6 +118,7 @@ export const DomainRankingKeywordsCard: React.FC<{ website: UserWebsite }> = ({ 
                         </a>
                       ) : '—'}
                     </TableCell>
+                    <TableCell><KeywordActions className="justify-end" websiteId={website.id} keyword={k.keyword} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

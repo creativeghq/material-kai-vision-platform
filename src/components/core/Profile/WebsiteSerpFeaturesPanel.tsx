@@ -17,6 +17,7 @@ import {
 } from '@/services/userWebsitesService';
 import { captureShare, serpFeatureDescriptor, serpFeatureLabel } from './seo/serpFeatures';
 import { shortLocationName } from './seo/SerpTargetPicker';
+import { KeywordActions } from './seo/KeywordActions';
 
 /** Literal classes: Tailwind's scanner reads source text. */
 const SEGMENT = {
@@ -107,17 +108,18 @@ function CaptureStrip({ series }: { series: SerpFeatureRow['series'] }) {
   );
 }
 
-function KeywordList({ rows }: { rows: SerpFeatureMissingKeyword[] }) {
+function KeywordList({ rows, websiteId }: { rows: SerpFeatureMissingKeyword[]; websiteId: string }) {
   return (
     <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
       {rows.map((k) => (
         <li key={k.id} className="flex min-w-0 items-center justify-between gap-2 text-xs">
           <span className="truncate font-medium text-foreground">{k.keyword}</span>
-          <span className="shrink-0 tabular-nums text-muted-foreground">
+          <span className="flex shrink-0 items-center gap-1 tabular-nums text-muted-foreground">
             {k.position != null ? `#${k.position}` : '—'} · {k.device}
             {k.location_name ? (
               <> · <MapPin className="inline h-3 w-3" aria-hidden="true" /> {shortLocationName(k.location_name)}</>
             ) : null}
+            <KeywordActions websiteId={websiteId} keyword={k.keyword} />
           </span>
         </li>
       ))}
@@ -125,7 +127,7 @@ function KeywordList({ rows }: { rows: SerpFeatureMissingKeyword[] }) {
   );
 }
 
-function FeatureDetail({ f }: { f: SerpFeatureRow }) {
+function FeatureDetail({ f, websiteId }: { f: SerpFeatureRow; websiteId: string }) {
   const d = serpFeatureDescriptor(f.key);
   const close = f.missing_keywords.filter((k) => k.position != null);
   const far = f.missing_keywords.filter((k) => k.position == null);
@@ -150,7 +152,7 @@ function FeatureDetail({ f }: { f: SerpFeatureRow }) {
             <span className={cn('h-2 w-2 rounded-[2px]', SEGMENT.close.fill)} aria-hidden="true" />
             Closest wins — you already rank, the block shows someone else ({f.missing_ranking ?? close.length})
           </p>
-          <KeywordList rows={close} />
+          <KeywordList rows={close} websiteId={websiteId} />
         </div>
       )}
       {far.length > 0 && (
@@ -164,7 +166,7 @@ function FeatureDetail({ f }: { f: SerpFeatureRow }) {
               ? 'This block does not come from the website ranking, so these are reachable without one.'
               : 'Google fills this block from pages it already ranks — these need a page that ranks for the keyword first.'}
           </p>
-          <KeywordList rows={far} />
+          <KeywordList rows={far} websiteId={websiteId} />
         </div>
       )}
       {truncated && (
@@ -363,7 +365,7 @@ export const WebsiteSerpFeaturesPanel: React.FC<{ website: UserWebsite; onOpenRa
                               : <span>shows you 0</span>}
                           </span>
                         </button>
-                        {expanded && <FeatureDetail f={f} />}
+                        {expanded && <FeatureDetail f={f} websiteId={website.id} />}
                       </li>
                     );
                   })}

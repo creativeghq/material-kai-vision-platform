@@ -23,6 +23,7 @@ import {
   userWebsitesService, type UserWebsite, type GscStatus, type GscSummary, type GscQueryPageRows,
 } from '@/services/userWebsitesService';
 import { safeHref } from '@/utils/safeUrl';
+import { KeywordActions } from './seo/KeywordActions';
 
 
 const fmt = (n: number) => formatNumber((n ?? 0));
@@ -448,6 +449,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                     <TableColumnHeader align="right" sortKey="impressions" sort={sort} onSort={toggleSort}>Impr.</TableColumnHeader>
                     <TableColumnHeader align="right" sortKey="ctr" sort={sort} onSort={toggleSort}>CTR</TableColumnHeader>
                     <TableColumnHeader align="right" sortKey="position" sort={sort} onSort={toggleSort}>Pos.</TableColumnHeader>
+                    {view === 'queries' && <TableHead className="w-32"><span className="sr-only">Actions</span></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -485,6 +487,9 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                       <TableCell className="text-right tabular-nums">{fmt(r.impressions)}</TableCell>
                       <TableCell className="text-right tabular-nums">{Number(r.ctr ?? 0).toFixed(1)}%</TableCell>
                       <TableCell className="text-right tabular-nums">{r.position == null ? '—' : Number(r.position).toFixed(1)}</TableCell>
+                      {view === 'queries' && (
+                        <TableCell>{r.query ? <KeywordActions className="justify-end" websiteId={website.id} keyword={r.query} /> : null}</TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

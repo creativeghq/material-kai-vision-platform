@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, Search, SearchX, Target, Trash2 } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader2, Plus, Search, SearchX, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -22,6 +21,8 @@ import {
   type UserWebsite,
 } from '@/services/userWebsitesService';
 import { Loading, useLaunchQuickStart } from './seo/dashboardPrimitives';
+import { KeywordActions } from './seo/KeywordActions';
+import { useTrackedKeywords, useWebsiteMarket } from './seo/useWebsiteKeywords';
 import { AGE_WINDOW_LABELS, AGE_WINDOW_ORDER, ageWindowOf, timeOf, useTableSegments } from './seo/useTableSegments';
 import { safeHref } from '@/utils/safeUrl';
 
@@ -33,8 +34,9 @@ const TRACKED_LABELS: Record<string, string> = { tracked: 'In rank tracker', unt
 /** Websites -> Content -> Keyword Research. */
 export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const launchQuickStart = useLaunchQuickStart();
+  const { tracked } = useTrackedKeywords(website.id);
+  const { market } = useWebsiteMarket(website.id);
   const siteHost = website.url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
 
   const [research, setResearch] = useState<SeoKeywordResearchRow[]>([]);
@@ -45,42 +47,35 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
   // A page title is the keyword its author chose. Suggesting the ones the site neither tracks nor
   // has researched starts "what next" from what the site says it is about, not a blank box.
   const [pageTitles, setPageTitles] = useState<{ url: string; title: string }[]>([]);
-  const [tracked, setTracked] = useState<Set<string>>(new Set());
-  const [trackingKeywords, setTrackingKeywords] = useState<string | null>(null);
+  const [researchingSeed, setResearchingSeed] = useState(false);
+
+  const currentSite = useRef(website.id);
+  currentSite.current = website.id;
+  const loadResearch = useCallback(async () => {
+    const id = website.id;
+    try {
+      const rows = await userWebsitesService.keywordResearch(id, RESEARCH_LIMIT);
+      if (currentSite.current === id) setResearch(rows);
+    } catch { toast({ title: 'Could not load keyword research', variant: 'destructive' }); }
+  }, [website.id, toast]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    (async () => {
-      const [kr, titles, trackedSet] = await Promise.allSettled([
-        userWebsitesService.keywordResearch(website.id, RESEARCH_LIMIT),
-        userWebsitesService.pageTitles(website.id),
-        userWebsitesService.trackedKeywordStrings(website.id),
-      ]);
+    void Promise.allSettled([loadResearch(), userWebsitesService.pageTitles(website.id)]).then(([, titles]) => {
       if (cancelled) return;
-      if (kr.status === 'fulfilled') setResearch(kr.value);
-      else toast({ title: 'Could not load keyword research', variant: 'destructive' });
       setPageTitles(titles.status === 'fulfilled' ? titles.value : []);
-      setTracked(trackedSet.status === 'fulfilled' ? trackedSet.value : new Set());
       setLoading(false);
-    })();
+    });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [website.id]);
+  }, [website.id, loadResearch]);
 
-  // Research answers "is this keyword worth it"; the tracker answers "are we winning it". The two
-  // were separate boxes with retyping in between.
-  const trackKeywords = async (keywords: string[], origin: string) => {
-    if (!website.workspace_id) return;
-    setTrackingKeywords(origin);
+  const trackMany = async (keywords: string[]) => {
     try {
-      const n = await userWebsitesService.addTrackedKeywords(website.id, website.workspace_id, keywords, 'GR', 'el');
-      toast({ title: `Tracking ${n} keyword${n === 1 ? '' : 's'}`, description: 'Positions arrive on the next check, under Rank Tracker.' });
-      setTracked((prev) => { const next = new Set(prev); keywords.forEach((k) => next.add(k.trim().toLowerCase())); return next; });
+      const r = await userWebsitesService.trackKeywords(website.id, keywords);
+      toast({ title: `Tracking ${r.added} keyword${r.added === 1 ? '' : 's'}`, description: 'Positions arrive on the next check, under Keywords → Tracked.' });
     } catch (e: any) {
       toast({ title: 'Could not track them', description: e.message, variant: 'destructive' });
-    } finally {
-      setTrackingKeywords(null);
     }
   };
 
@@ -132,10 +127,20 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
     return out;
   })();
 
-  const researchKeyword = (keyword: string) => {
-    const prompt = `Research the keyword "${keyword}" for ${siteHost} in the Greek market (GR, el): search volume, difficulty, what the results page shows, keyword clusters and who ranks now.`;
-    navigate(`/agent-hub?agent=kai&prompt=${encodeURIComponent(prompt)}`);
+  const researchSeed = async (keyword: string) => {
+    setResearchingSeed(true);
+    try {
+      await userWebsitesService.researchKeyword(website.id, keyword);
+      toast({ title: `Research ready: "${keyword}"` });
+      await loadResearch();
+    } catch (e: any) {
+      toast({ title: 'Research failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setResearchingSeed(false);
+    }
   };
+  const afterAction = (kind: string) => { if (kind === 'research') void loadResearch(); };
+  const marketLabel = market?.country_code ? `${market.country_code} · ${market.language_code}` : 'market not set';
 
   // Two sources, in order of trust: the queries Google already shows the page for (free, from
   // Search Console rows we hold), then paid keyword ideas seeded from the title (one DataForSEO
@@ -292,19 +297,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
                     <TableCell className="text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-0.5">
-                        {tracked.has(r.target_keyword.trim().toLowerCase()) ? (
-                          <span className="text-[11px] text-muted-foreground" title="Already in the rank tracker">tracked</span>
-                        ) : (
-                          <Button size="icon" variant="ghost" className="h-7 w-7"
-                            aria-label={`Track ${r.target_keyword} in the rank tracker`}
-                            title="Track in the rank tracker"
-                            onClick={(e) => { e.stopPropagation(); void trackKeywords([r.target_keyword], r.id); }}
-                            disabled={trackingKeywords === r.id}>
-                            {trackingKeywords === r.id
-                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              : <Target className="h-3.5 w-3.5 text-primary" />}
-                          </Button>
-                        )}
+                        <KeywordActions websiteId={website.id} keyword={r.target_keyword} onDone={afterAction} />
                         <Button size="icon" variant="ghost" className="h-7 w-7"
                           aria-label={`Delete research for ${r.target_keyword}`}
                           onClick={(e) => { e.stopPropagation(); void deleteResearch(r); }}
@@ -411,17 +404,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
                               <TableCell className="text-right tabular-nums">{formatNumber(q.clicks)}</TableCell>
                               <TableCell className="text-right tabular-nums">{q.position != null ? q.position : '—'}</TableCell>
                               <TableCell>
-                                <div className="flex justify-end gap-0.5">
-                                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => researchKeyword(q.query)}>Research</Button>
-                                  {tracked.has(q.query.toLowerCase()) ? (
-                                    <span className="self-center text-[11px] text-muted-foreground">tracked</span>
-                                  ) : (
-                                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={trackingKeywords === q.query}
-                                      onClick={() => void trackKeywords([q.query], q.query)}>
-                                      {trackingKeywords === q.query ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Track'}
-                                    </Button>
-                                  )}
-                                </div>
+                                <KeywordActions className="justify-end" websiteId={website.id} keyword={q.query} onDone={afterAction} />
                               </TableCell>
                             </TableRow>
                           ))}
@@ -433,7 +416,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
 
                 <div>
                   <div className="mb-1 flex items-baseline justify-between gap-2">
-                    <p className="text-xs font-semibold text-muted-foreground">Keyword ideas around this page's title (Greek market)</p>
+                    <p className="text-xs font-semibold text-muted-foreground">Keyword ideas around this page's title ({marketLabel})</p>
                     {!pageIdeas && (
                       <Button size="sm" variant="outline" onClick={() => void fetchIdeas()} disabled={ideasBusy}>
                         {ideasBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1 h-3.5 w-3.5" />}
@@ -447,7 +430,11 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
                         variant="empty"
                         title={`The source returned no ideas for “${pageIdeas.seed}”`}
                         description="Research the seed itself instead — the full run also reads the results page and who ranks."
-                        action={<Button size="sm" onClick={() => researchKeyword(pageIdeas.seed)}>Research “{pageIdeas.seed}”</Button>}
+                        action={(
+                          <Button size="sm" disabled={researchingSeed} onClick={() => void researchSeed(pageIdeas.seed)}>
+                            {researchingSeed && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}Research “{pageIdeas.seed}”
+                          </Button>
+                        )}
                       />
                     ) : (
                       <div className="table-scroll">
@@ -469,17 +456,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
                                 <TableCell className="text-right tabular-nums">{k.cpc != null ? `$${k.cpc.toFixed(2)}` : '—'}</TableCell>
                                 <TableCell className="text-right tabular-nums">{k.competition != null ? `${Math.round(k.competition * 100)}%` : '—'}</TableCell>
                                 <TableCell>
-                                  <div className="flex justify-end gap-0.5">
-                                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => researchKeyword(k.term)}>Research</Button>
-                                    {tracked.has(k.term.toLowerCase()) ? (
-                                      <span className="self-center text-[11px] text-muted-foreground">tracked</span>
-                                    ) : (
-                                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={trackingKeywords === k.term}
-                                        onClick={() => void trackKeywords([k.term], k.term)}>
-                                        {trackingKeywords === k.term ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Track'}
-                                      </Button>
-                                    )}
-                                  </div>
+                                  <KeywordActions className="justify-end" websiteId={website.id} keyword={k.term} onDone={afterAction} />
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -501,14 +478,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
                   <a href={safeHref(sg.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-xs text-foreground hover:underline" title={sg.url}>
                     {sg.keyword}
                   </a>
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => researchKeyword(sg.keyword)}>
-                    Research
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                    onClick={() => void trackKeywords([sg.keyword], sg.keyword)}
-                    disabled={trackingKeywords === sg.keyword}>
-                    {trackingKeywords === sg.keyword ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Track'}
-                  </Button>
+                  <KeywordActions websiteId={website.id} keyword={sg.keyword} onDone={afterAction} />
                 </div>
               ))}
             </div>
@@ -525,7 +495,7 @@ export const WebsiteKeywordResearchPanel: React.FC<{ website: UserWebsite }> = (
               researchId={openResearchId}
               siteDomain={siteHost}
               tracked={tracked}
-              onTrack={(keywords) => trackKeywords(keywords, 'detail')}
+              onTrack={(keywords) => trackMany(keywords)}
             />
           )}
         </DialogContent>

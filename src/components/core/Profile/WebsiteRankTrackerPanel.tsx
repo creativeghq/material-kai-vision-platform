@@ -32,9 +32,9 @@ import { compact } from './seo/seoMetrics';
 import { KeywordDiscoveryCard } from './seo/KeywordDiscoveryCard';
 import { SerpTargetPicker, shortLocationName } from './seo/SerpTargetPicker';
 import { safeHref } from '@/utils/safeUrl';
+import { KeywordActions } from './seo/KeywordActions';
+import { refreshTrackedKeywords, useWebsiteMarket } from './seo/useWebsiteKeywords';
 
-const COUNTRY = 'GR';
-const LANGUAGE = 'el';
 const DEFAULT_TARGET: KeywordTarget = { device: 'desktop', location: null };
 const ALL = 'all';
 const COUNTRY_LEVEL = 'country';
@@ -199,6 +199,7 @@ function Change({ row }: { row: TrackedKeywordRow }) {
 
 export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
+  const { market } = useWebsiteMarket(website.id);
   const [data, setData] = useState<RankSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -234,18 +235,17 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   useEffect(() => { void load(); }, [load]);
 
   const add = async () => {
-    if (!website.workspace_id) return;
     setBusy('add');
     try {
-      // One per line OR comma-separated — people paste both, and rejecting either
-      // is a pointless argument with the clipboard.
-      const list = adding.split(/[\n,]/);
-      const n = await userWebsitesService.addTrackedKeywords(
-        website.id, website.workspace_id, list, COUNTRY, LANGUAGE, addTarget,
-      );
+      const list = adding.split(/[\n,]/).map((k) => k.trim()).filter(Boolean);
+      if (!list.length) throw new Error('Enter at least one keyword.');
+      const r = await userWebsitesService.trackKeywords(website.id, list, addTarget);
       setAdding('');
       setShowAdd(false);
-      toast({ title: `Tracking ${n} keyword${n === 1 ? '' : 's'}`, description: 'Positions arrive on the next check.' });
+      toast({
+        title: `Tracking ${r.added} keyword${r.added === 1 ? '' : 's'}`,
+        description: r.already_tracked?.length ? `${r.already_tracked.length} were already tracked.` : 'Positions arrive on the next check.',
+      });
       await load();
     } catch (e: any) {
       toast({ title: 'Could not add them', description: e?.message, variant: 'destructive' });
@@ -285,6 +285,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const remove = async (id: string) => {
     try {
       await userWebsitesService.removeTrackedKeyword(id);
+      void refreshTrackedKeywords(website.id);
       await load();
     } catch (e: any) {
       toast({ title: 'Could not remove it', description: e?.message, variant: 'destructive' });
@@ -379,7 +380,11 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const bandTotal = s ? BANDS.reduce((t, b) => t + (s.distribution[b.key] ?? 0), 0) || 1 : 1;
   const addForm = (
     <div className="space-y-2">
-      <SerpTargetPicker websiteId={website.id} countryCode={COUNTRY} value={addTarget} onChange={setAddTarget} />
+      {market?.country_code ? (
+        <SerpTargetPicker websiteId={website.id} countryCode={market.country_code} value={addTarget} onChange={setAddTarget} />
+      ) : (
+        <p className="text-xs text-amber-700 dark:text-amber-300">{market?.note ?? 'Set the website market before tracking keywords.'}</p>
+      )}
       <Textarea
         value={adding}
         onChange={(e) => setAdding(e.target.value)}
@@ -388,7 +393,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
         className="text-sm"
       />
       <div className="flex gap-2">
-        <Button size="sm" onClick={add} disabled={busy === 'add' || !adding.trim()}>
+        <Button size="sm" onClick={add} disabled={busy === 'add' || !adding.trim() || !market?.country_code}>
           {busy === 'add' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
           Track these
         </Button>
@@ -747,6 +752,8 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                           : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center">
+                        <KeywordActions websiteId={website.id} keyword={r.keyword} />
                         <Button size="icon" variant="ghost" className="h-7 w-7"
                           onClick={() => setEditing({ row: r, target: targetOf(r) })}
                           aria-label={`Change device or location for ${r.keyword}`}
@@ -758,6 +765,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                           title="Stop tracking this — and stop the discovery engine offering it back">
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

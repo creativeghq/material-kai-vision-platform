@@ -29,6 +29,7 @@ import { sourceStatusPresentation, statusPresentation } from '@/components/core/
 import {
   userWebsitesService, type KeywordCandidate, type KeywordCandidates, type UserWebsite,
 } from '@/services/userWebsitesService';
+import { refreshTrackedKeywords } from './useWebsiteKeywords';
 
 /** The verdict, in the reader's words. The engine takes the first three. */
 const REASON: Record<string, { label: string; explain: string; tone: 'success' | 'info' | 'warning' }> = {
@@ -114,6 +115,7 @@ export const KeywordDiscoveryCard: React.FC<{
     setBusy(keywords.length === 1 ? keywords[0] : 'bulk');
     try {
       const r = await userWebsitesService.promoteKeywordCandidates(website.id, keywords, undefined, days);
+      void refreshTrackedKeywords(website.id);
       toast({
         title: r.added > 0 ? `Now tracking ${r.added} keyword${r.added === 1 ? '' : 's'}` : 'Nothing added',
         description: r.added > 0 ? 'Positions arrive on the next check.' : (r.note ?? undefined),

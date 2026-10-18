@@ -75,7 +75,9 @@ export const WebsiteDomainAuditsPanel: React.FC<{ website: UserWebsite }> = ({ w
   const trackOwnDomain = async () => {
     setTrackingDomain(true);
     try {
-      const row = await userWebsitesService.trackOwnDomain(website);
+      const market = await userWebsitesService.market(website.id);
+      if (!market?.country_code || !market.language_code) throw new Error(market?.note ?? 'Set the website market first.');
+      const row = await userWebsitesService.trackOwnDomain(website, market.country_code, market.language_code);
       toast({
         title: `Tracking ${row.domain}`,
         description: 'The first rank and backlink audit runs within the hour, then weekly.',

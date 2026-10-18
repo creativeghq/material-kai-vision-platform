@@ -12,6 +12,7 @@ import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, AiReferrals
 import type { AiCrawls } from '@/components/core/Profile/seo/aiCrawlers';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
+import { KeyedStore } from './seo/websiteKeywordStore';
 
 export interface UserWebsite {
   id: string;
@@ -861,6 +862,25 @@ function normalizeUrl(raw: string): string {
   return s.replace(/\/+$/, '');
 }
 
+export interface WebsiteMarket {
+  country_code: string | null;
+  language_code: string | null;
+  source: 'website' | 'tracked_keywords' | 'search_console' | 'tracked_subject' | 'business_country' | null;
+  note: string;
+}
+
+export interface TrackKeywordsResult {
+  added: number;
+  keywords?: string[];
+  already_tracked?: string[];
+  needs_market?: boolean;
+  note?: string;
+  market?: WebsiteMarket;
+}
+
+export const trackedKeywordStore = new KeyedStore<Set<string>>(() => new Set(), (websiteId) => userWebsitesService.trackedKeywordStrings(websiteId));
+export const websiteMarketStore = new KeyedStore<WebsiteMarket | null>(() => null, (websiteId) => userWebsitesService.market(websiteId));
+
 export const userWebsitesService = {
   /** List connected websites for a workspace (default first). Pass the active
    *  workspace id so multi-workspace users only see the current tenant's sites. */
@@ -1145,10 +1165,10 @@ export const userWebsitesService = {
    * Track THIS website's own domain in the SEO toolkit (weekly rank + backlink
    * audit). The domain comes from the website's URL, never from a text box: the tab
    * that offers this reads "tracking for this website's domain", and a free-text
-   * form is how a competitor ends up filed under the wrong site. Locale matches
-   * the rank tracker's (Greek results).
+   * form is how a competitor ends up filed under the wrong site. The locale is the
+   * website's market, passed by the caller.
    */
-  async trackOwnDomain(website: UserWebsite, countryCode = 'GR', languageCode = 'el'): Promise<SeoTrackedDomainRow> {
+  async trackOwnDomain(website: UserWebsite, countryCode: string, languageCode: string): Promise<SeoTrackedDomainRow> {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('Not authenticated');
     const domain = website.url
@@ -1463,30 +1483,55 @@ export const userWebsitesService = {
     return (data as RankSummary) ?? null;
   },
 
-  async addTrackedKeywords(
-    websiteId: string, workspaceId: string, keywords: string[],
-    countryCode: string, languageCode: string,
-    target: KeywordTarget = { device: 'desktop', location: null },
-  ): Promise<number> {
-    // De-duplicated and trimmed here so a pasted list with blank lines and repeats
-    // does not become N-1 unique-violation round trips.
-    const clean = [...new Set(
-      keywords.map((k) => k.trim().toLowerCase()).filter((k) => k.length > 1),
-    )].slice(0, 200);
-    if (clean.length === 0) throw new Error('Enter at least one keyword.');
-    const { error } = await supabase.from('seo_tracked_keywords' as any).upsert(
-      clean.map((keyword) => ({
-        website_id: websiteId, workspace_id: workspaceId, keyword,
-        country_code: countryCode, language_code: languageCode,
-        device: target.device,
-        location_code: target.location?.location_code ?? null,
-        location_name: target.location?.location_name ?? null,
-        is_active: true,
-      })) as any,
-      { onConflict: 'website_id,keyword,country_code,device,location_code', ignoreDuplicates: true },
-    );
+  /** The one way a person tracks keywords; the market comes from `website_market`, never from the caller. */
+  async trackKeywords(
+    websiteId: string, keywords: string[], target: KeywordTarget = { device: 'desktop', location: null },
+  ): Promise<TrackKeywordsResult> {
+    const clean = [...new Set(keywords.map((k) => k.replace(/\s+/g, ' ').trim().toLowerCase()).filter((k) => k.length > 1))];
+    if (!clean.length) throw new Error('Enter at least one keyword of two characters or more.');
+    if (clean.length > 200) throw new Error(`That is ${clean.length} keywords; track at most 200 at a time.`);
+    const { data, error } = await supabase.rpc('seo_track_keywords' as never, {
+      p_website_id: websiteId, p_keywords: clean, p_device: target.device,
+      p_location_code: target.location?.location_code ?? null, p_location_name: target.location?.location_name ?? null,
+    } as never);
     if (error) throw error;
-    return clean.length;
+    const result = data as TrackKeywordsResult;
+    if (result.needs_market) throw new Error(result.note ?? 'Set the website market first.');
+    trackedKeywordStore.set(websiteId, (prev) => new Set([...prev, ...clean]));
+    return result;
+  },
+
+  async market(websiteId: string): Promise<WebsiteMarket | null> {
+    const { data, error } = await supabase.rpc('website_market' as never, { p_website_id: websiteId } as never);
+    if (error) throw error;
+    return (data as WebsiteMarket | null) ?? null;
+  },
+
+  async setMarket(websiteId: string, countryCode: string | null, languageCode: string | null): Promise<void> {
+    const { data, error } = await supabase.from('user_websites')
+      .update({ market_country_code: countryCode, market_language_code: languageCode } as never).eq('id', websiteId).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('Only a workspace owner or admin, or whoever added the website, can change its market.');
+    await websiteMarketStore.refresh(websiteId);
+  },
+
+  /** Keyword research on the page: synchronous, reuses a 30-day cache, lands in Keywords → Research. */
+  async researchKeyword(websiteId: string, keyword: string): Promise<{ research_id: string; credits_used: number }> {
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'research', topic: keyword, target_keyword: keyword, website_id: websiteId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Research failed'));
+    if (data?.success === false) throw new Error(String(data.error ?? 'Research failed'));
+    return data.data;
+  },
+
+  async writeArticle(websiteId: string, keyword: string): Promise<{ article_id: string; status: string }> {
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'pipeline', topic: keyword, target_keyword: keyword, website_id: websiteId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not start the article'));
+    if (data?.success === false) throw new Error(String(data.error ?? 'Could not start the article'));
+    return data.data;
   },
 
   /**

@@ -23,9 +23,9 @@ describe('a tracked keyword is checked for its own device and city', () => {
   });
 
   it('the add path writes device and location, and conflicts on the full target', () => {
-    expect(SERVICE).toMatch(/device: target\.device,/);
-    expect(SERVICE).toMatch(/location_code: target\.location\?\.location_code \?\? null/);
-    expect(SERVICE).toMatch(/onConflict: 'website_id,keyword,country_code,device,location_code'/);
+    expect(SERVICE).toMatch(/p_device: target\.device,/);
+    expect(SERVICE).toMatch(/p_location_code: target\.location\?\.location_code \?\? null/);
+    expect(SERVICE).toMatch(/rpc\('seo_track_keywords'/);
   });
 });
 

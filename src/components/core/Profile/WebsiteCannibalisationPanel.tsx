@@ -15,6 +15,7 @@ import {
 import { compact } from './seo/seoMetrics';
 import { useTableSegments } from './seo/useTableSegments';
 import { safeHref } from '@/utils/safeUrl';
+import { KeywordActions } from './seo/KeywordActions';
 
 type SortKey = 'impressions' | 'pages' | 'position' | 'severity' | 'query';
 const SORT_OPTIONS: { value: SortKey; label: string; dir: 'asc' | 'desc' }[] = [
@@ -91,7 +92,7 @@ function ConsolidateDialog({ item, onClose }: { item: CannibalItem; onClose: () 
   );
 }
 
-function Row({ item }: { item: CannibalItem }) {
+function Row({ item, websiteId }: { item: CannibalItem; websiteId: string }) {
   // Google's preferred page is the one it shows most; the best converter is the one
   // that earns clicks. When they differ, the split is not just theoretical — it is
   // actively sending people to the weaker page.
@@ -109,6 +110,7 @@ function Row({ item }: { item: CannibalItem }) {
         <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums text-muted-foreground">
           {compact(item.impressions)} impressions · {item.page_count} pages
           {item.best_position != null ? ` · best #${item.best_position}` : ''}
+          <KeywordActions websiteId={websiteId} keyword={item.query} />
           <Button size="sm" variant="outline" className="h-7" onClick={() => setConsolidating(true)}>Consolidate</Button>
         </span>
       </div>
@@ -243,7 +245,7 @@ export const WebsiteCannibalisationPanel: React.FC<{ website: UserWebsite }> = (
             action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
           />
         )}
-        {t.visible.map((it) => <Row key={it.query} item={it} />)}
+        {t.visible.map((it) => <Row key={it.query} item={it} websiteId={website.id} />)}
       </CardContent>
     </Card>
   );

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/integrations/supabase/client';
 import { formatNumber } from '@/utils/decimal';
 import { useLaunchQuickStart } from './dashboardPrimitives';
+import { KeywordActions } from './KeywordActions';
 
 export interface WebsiteOpportunity {
   kind: string;
@@ -104,6 +105,7 @@ export const WebsiteOpportunitiesCard: React.FC<{ websiteId: string; onOpenTab?:
                   </div>
                   <p className="text-xs text-muted-foreground">{o.reason}</p>
                 </div>
+                {o.subject_kind === 'query' && <KeywordActions websiteId={websiteId} keyword={o.subject} />}
                 {o.kind === 'new_page' ? (
                   <Button size="sm" variant="ghost" className="shrink-0"
                     onClick={() => launchQuickStart('seo-article', 'Generate full article', websiteId, o.subject)}>

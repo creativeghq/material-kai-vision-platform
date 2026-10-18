@@ -11,6 +11,7 @@ import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOve
 import { TopicPlanCard } from '@/components/core/Profile/seo/TopicPlanCard';
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
 import { PresencePlanCard } from '@/components/core/Profile/seo/PresencePlanCard';
+import { WebsiteMarketControl } from '@/components/core/Profile/seo/WebsiteMarketControl';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
 import { WebsiteSerpFeaturesPanel } from '@/components/core/Profile/WebsiteSerpFeaturesPanel';
@@ -145,6 +146,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
       />
 
       <div className="p-3 sm:p-6 space-y-6">
+      <WebsiteMarketControl websiteId={website.id} />
       {website.last_crawl_error && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-[hsl(var(--error-bg))] border border-[hsl(var(--error)/0.25)] text-xs">
           <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--error))] mt-0.5 flex-shrink-0" />
