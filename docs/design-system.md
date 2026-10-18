@@ -58,9 +58,9 @@ as the new thing, or as an inert no-op. Nothing needs a find-and-replace to keep
 
 ## 1. Colour
 
-Two **modes** (`html.light` / `html.dark`) × two **accents** (`html[data-accent='green'|'blue']`),
-both owned by `ThemeContext` and persisted per user. Four combinations; every surface must work in
-all four. The specimen page has the switcher for exactly this reason.
+Two **modes** (`html.light` / `html.dark`) × three **accents** (`html[data-accent='green'|'blue'|'orange']`),
+both owned by `ThemeContext` and persisted per user. Six combinations; every surface must work in
+all six. The specimen page has the switcher for exactly this reason.
 
 ### Core tokens
 

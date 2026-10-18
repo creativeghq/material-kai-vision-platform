@@ -88,6 +88,8 @@ const THEMES: Theme[] = [
   { name: 'light · green', dark: false, card: cardColour('html.light {') },
   { name: 'dark · blue', dark: true, card: cardColour(':root {', "html.dark[data-accent='blue'] {") },
   { name: 'light · blue', dark: false, card: cardColour('html.light {', "html.light[data-accent='blue'] {") },
+  { name: 'dark · orange', dark: true, card: cardColour(':root {', "html.dark[data-accent='orange'] {") },
+  { name: 'light · orange', dark: false, card: cardColour('html.light {', "html.light[data-accent='orange'] {") },
 ];
 
 // ── the palettes under guard ────────────────────────────────────────────────
@@ -249,7 +251,7 @@ describe('inbox chips are legible in all four themes', () => {
       expect(strings.length, `no class strings found for ${what} — the guard has lost its target`)
         .toBeGreaterThan(0);
     }
-    expect(THEMES).toHaveLength(4);
+    expect(THEMES).toHaveLength(6);
     // The two light cards are near-white and the two dark ones near-black; if that inverts,
     // the block parser has grabbed the wrong rule and every ratio below is measured on sand.
     for (const t of THEMES) {

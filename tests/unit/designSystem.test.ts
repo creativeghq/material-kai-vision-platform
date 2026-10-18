@@ -115,7 +115,12 @@ describe('design system — every theme defines every surface token', () => {
 
   // An accent block that restyles the neutral surfaces (it overrides --card and --border) must
   // also carry --hairline, or every rule in the app keeps the OTHER accent's edge colour.
-  for (const sel of ["html.light[data-accent='blue'] {", "html.dark[data-accent='blue'] {"]) {
+  for (const sel of [
+    "html.light[data-accent='blue'] {",
+    "html.dark[data-accent='blue'] {",
+    "html.light[data-accent='orange'] {",
+    "html.dark[data-accent='orange'] {",
+  ]) {
     it(`${sel.trim()} retints the hairline along with the surfaces`, () => {
       const body = block(sel);
       if (!/--(card|border):/.test(body)) return;

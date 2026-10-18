@@ -4,7 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 export type Theme = 'light' | 'dark';
-export type Accent = 'green' | 'blue';
+/** Mirrors user_profiles_accent_preference_check. */
+export const ACCENTS = ['green', 'blue', 'orange'] as const;
+export type Accent = (typeof ACCENTS)[number];
+const isAccent = (v: unknown): v is Accent => (ACCENTS as readonly unknown[]).includes(v);
 
 const STORAGE_KEY = 'mk-theme';
 const ACCENT_STORAGE_KEY = 'mk-accent';
@@ -46,7 +49,7 @@ function readStoredAccent(): Accent {
   if (typeof window === 'undefined') return DEFAULT_ACCENT;
   try {
     const stored = window.localStorage.getItem(ACCENT_STORAGE_KEY);
-    if (stored === 'green' || stored === 'blue') return stored;
+    if (isAccent(stored)) return stored;
   } catch {
     /* localStorage unavailable — fall through */
   }
@@ -80,7 +83,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     applyThemeClass(theme);
   }, [theme]);
 
-  // Keep the <html> data-accent attribute in sync with state.
   useEffect(() => {
     applyAccentAttr(accent);
   }, [accent]);
@@ -159,7 +161,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           /* ignore */
         }
       }
-      if (row.accent_preference === 'green' || row.accent_preference === 'blue') {
+      if (isAccent(row.accent_preference)) {
         setAccentState(row.accent_preference);
         try {
           window.localStorage.setItem(ACCENT_STORAGE_KEY, row.accent_preference);

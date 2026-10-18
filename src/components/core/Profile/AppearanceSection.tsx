@@ -37,6 +37,15 @@ const ACCENT_OPTIONS: {
       dark: 'linear-gradient(135deg, #13243a 0%, #3a6aa3 46%, #6da7ec 100%)',
     },
   },
+  {
+    value: 'orange',
+    label: { light: 'Orange', dark: 'Orange' },
+    description: 'Warm terracotta orange — on cream in light, on charcoal in dark.',
+    gradient: {
+      light: 'linear-gradient(135deg, #5c2414 0%, #8f3a20 46%, #b74d2a 100%)',
+      dark: 'linear-gradient(135deg, #4a2418 0%, #a3553b 46%, #d97757 100%)',
+    },
+  },
 ];
 
 /**

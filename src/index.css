@@ -640,6 +640,62 @@ All colors MUST be HSL.
     --ring: 213 77% 68%;
     --sidebar-accent: 213 77% 68%;
   }
+
+  /* Orange — LIGHT theme. claude.ai's cream ramp; the brand orange is deepened
+     from #c96442 (3.9:1 with white text) to #b74d2a (5.1:1). */
+  html.light[data-accent='orange'] {
+    --background: 48 33% 97%;         /* #faf9f5 — cream page */
+    --page-background: 48 33% 97%;
+    --surface-hover: 50 22% 92%;
+    --foreground: 60 3% 23%;          /* #3d3d3a — warm ink */
+
+    --card: 0 0% 100%;
+    --card-foreground: 60 3% 23%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 60 3% 23%;
+
+    --primary: 15 63% 44%;            /* #b74d2a */
+    --primary-foreground: 0 0% 100%;
+    --highlight: 15 63% 44%;
+    --destructive: 350 70% 40%;       /* #ad1f36 — crimson, apart from the orange */
+
+    --secondary: 50 22% 91%;
+    --secondary-foreground: 60 3% 23%;
+    --muted: 50 22% 93%;
+    --muted-foreground: 53 3% 40%;    /* #6b6a64 — 5.2:1 on the page */
+    --accent: 50 22% 91%;
+    --accent-foreground: 60 3% 23%;
+
+    --border: 50 18% 87%;             /* #e5e3da */
+    --input: 50 18% 87%;
+    --ring: 15 63% 44%;
+    --hairline: 50 18% 87%;
+    --surface-sunken: 50 30% 95%;
+
+    --sidebar-background: 50 26% 95%; /* #f5f4ed */
+    --sidebar-foreground: 53 3% 40%;
+    --sidebar-accent: 15 63% 44%;
+    --sidebar-border: 50 18% 87%;
+
+    --hero-background: 0 0% 100%;
+    --card-gradient-start: 0 0% 100%;
+    --card-gradient-end: 50 30% 95%;
+
+    --brand-gradient: linear-gradient(135deg, #5c2414 0%, #8f3a20 46%, #b74d2a 100%);
+  }
+
+  /* Orange — DARK theme. claude.ai's orange as primary (dark ink on fills, 5.9:1);
+     the olive takes over as the second colour. */
+  html.dark[data-accent='orange'] {
+    --primary: 15 63% 60%;            /* #d97757 */
+    --primary-foreground: 0 0% 8%;
+    --highlight: 56 30% 55%;          /* #afaa6a */
+    --brand-blue: 15 45% 26%;
+    --brand-red: 15 63% 60%;
+    --brand-gradient: linear-gradient(135deg, #4a2418 0%, #a3553b 46%, #d97757 100%);
+    --ring: 15 63% 60%;
+    --sidebar-accent: 15 63% 60%;
+  }
 }
 
 @layer base {

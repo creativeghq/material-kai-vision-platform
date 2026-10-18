@@ -69,7 +69,7 @@ import {
   useHubTable,
 } from '@/components/core/hub';
 import type { HubColumn, HubTableField } from '@/components/core/hub';
-import { useTheme } from '@/contexts/ThemeContext';
+import { ACCENTS, useTheme } from '@/contexts/ThemeContext';
 import { formatMoney } from '@/utils/decimal';
 
 /** SPECIMEN SHEET — every surface of the design system on one page. */
@@ -191,7 +191,7 @@ export default function DesignSystemPage() {
           <CardHeader>
             <CardTitle>Theme</CardTitle>
             <CardDescription>
-              Two modes × two accents. Every surface below has to hold up in all four — check them
+              Two modes × three accents. Every surface below has to hold up in all six — check them
               here rather than trusting a screenshot of one.
             </CardDescription>
           </CardHeader>
@@ -214,7 +214,7 @@ export default function DesignSystemPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-muted-foreground">Accent</span>
               <div className="flex gap-1">
-                {(['green', 'blue'] as const).map((a) => (
+                {ACCENTS.map((a) => (
                   <Button
                     key={a}
                     size="sm"
