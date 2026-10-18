@@ -569,7 +569,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "ignore_finding",
           "reopen_finding",
           "set_autoheal",
-          "toggle_check"
+          "toggle_check",
+          "run_kb_eval"
         ],
         "required": true,
         "description": "Which operation to run"

@@ -22,7 +22,8 @@ interface RequestBody {
     | 'ignore_finding'   // mark a finding as ignored (accepted / won't-fix)
     | 'reopen_finding'   // un-ignore a finding
     | 'set_autoheal'     // toggle a check's autoheal_enabled
-    | 'toggle_check';    // enable/disable a check
+    | 'toggle_check'     // enable/disable a check
+    | 'run_kb_eval';     // run the KB retrieval golden set once (paid: Voyage)
   autoheal?: boolean;
   domains?: string[] | null;
   key?: string;
@@ -199,6 +200,30 @@ Deno.serve(withApiLogging('data-integrity-runner', async (req) => {
           .update({ is_enabled: body.enabled === true }).eq('key', body.key);
         if (error) return json({ error: error.message }, 500);
         return json({ ok: true });
+      }
+      case 'run_kb_eval': {
+        // Spends Voyage calls, so it runs only when an operator presses the button — never on a schedule.
+        const secret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
+        if (!secret) return json({ error: 'CRON_SECRET is not configured' }, 503);
+        const gateway = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const resp = await fetch(`${gateway}/api/rag/kb-eval/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
+          body: JSON.stringify({}),
+          signal: AbortSignal.timeout(140_000),
+        });
+        const result = await resp.json().catch(() => null);
+        if (!resp.ok || !result) {
+          return json({ error: `KB eval failed: HTTP ${resp.status} ${JSON.stringify(result?.detail ?? result ?? '').slice(0, 300)}` }, 502);
+        }
+        const { error } = await supabase.rpc('run_data_integrity_checks', {
+          p_autoheal: false, p_domains: ['kb'], p_triggered_by: auth.userId ?? 'admin',
+        });
+        return json({
+          ok: true, batch_id: result.batch_id, cases: result.cases,
+          embed_failures: result.embed_failures ?? [], summary: result.summary ?? [],
+          checks_refreshed: !error,
+        });
       }
       default:
         return json({ error: `Unknown action: ${action}` }, 400);

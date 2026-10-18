@@ -86,4 +86,5 @@ export const dataIntegrityService = {
   reopenFinding: (findingId: string) => invoke({ action: 'reopen_finding', findingId }),
   setAutoheal: (key: string, enabled: boolean) => invoke({ action: 'set_autoheal', key, enabled }),
   toggleCheck: (key: string, enabled: boolean) => invoke({ action: 'toggle_check', key, enabled }),
+  runKbEval: () => invoke<{ ok: boolean; batch_id: string; cases: number; embed_failures: string[]; summary: Record<string, unknown>[] }>({ action: 'run_kb_eval' }),
 };

@@ -22565,7 +22565,7 @@
         ],
         "summary": "Run the platform data-integrity check battery + manage checks/findings",
         "operationId": "post_data_integrity_runner",
-        "description": "Auth boundary + thin dispatcher over the run_data_integrity_checks / heal_data_integrity_check Postgres RPCs. Cron path (x-cron-secret / service-role via isCronAuthorized) runs the full battery with auto-heal, no body. Admin path (session JWT; admin/super_admin/owner) runs on demand and manages checks/findings.\n\n**Actions** (`action` in the body):\n- `run` — Run the check battery (admin path), optionally with autoheal and a domain filter. → `{ ok, run_id }`\n- `heal_check` — Run a single check's heal function on demand. → `{ ok, healed }`\n- `ignore_finding` — Mark a finding as ignored (accepted / won't-fix). → `{ ok }`\n- `reopen_finding` — Un-ignore a finding (back to open). → `{ ok }`\n- `set_autoheal` — Toggle a check's autoheal_enabled flag. → `{ ok }`\n- `toggle_check` — Enable/disable a check (is_enabled). → `{ ok }`\n\n**Response:** `{}`",
+        "description": "Auth boundary + thin dispatcher over the run_data_integrity_checks / heal_data_integrity_check Postgres RPCs. Cron path (x-cron-secret / service-role via isCronAuthorized) runs the full battery with auto-heal, no body. Admin path (session JWT; admin/super_admin/owner) runs on demand and manages checks/findings.\n\n**Actions** (`action` in the body):\n- `run` — Run the check battery (admin path), optionally with autoheal and a domain filter. → `{ ok, run_id }`\n- `heal_check` — Run a single check's heal function on demand. → `{ ok, healed }`\n- `ignore_finding` — Mark a finding as ignored (accepted / won't-fix). → `{ ok }`\n- `reopen_finding` — Un-ignore a finding (back to open). → `{ ok }`\n- `set_autoheal` — Toggle a check's autoheal_enabled flag. → `{ ok }`\n- `toggle_check` — Enable/disable a check (is_enabled). → `{ ok }`\n- `run_kb_eval` — Platform operator: score the knowledge-base retriever against its golden questions once (vector and hybrid), then refresh the kb checks. Spends Voyage calls, so it is never scheduled. → `{ok:boolean, batch_id:string, cases:number, embed_failures:string[], summary:object[]}`\n\n**Response:** `{}`",
         "security": [
           {
             "cronSecret": []
@@ -22771,6 +22771,22 @@
                       }
                     },
                     "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "run_kb_eval"
+                        ],
+                        "description": "Platform operator: score the knowledge-base retriever against its golden questions once (vector and hybrid), then refresh the kb checks. Spends Voyage calls, so it is never scheduled."
+                      }
+                    },
+                    "description": "Returns: {ok:boolean, batch_id:string, cases:number, embed_failures:string[], summary:object[]}"
                   }
                 ],
                 "discriminator": {

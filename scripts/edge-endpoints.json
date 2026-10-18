@@ -12588,6 +12588,12 @@
           }
         ],
         "response": "{ ok }"
+      },
+      {
+        "name": "run_kb_eval",
+        "summary": "Platform operator: score the knowledge-base retriever against its golden questions once (vector and hybrid), then refresh the kb checks. Spends Voyage calls, so it is never scheduled.",
+        "params": [],
+        "response": "{ok:boolean, batch_id:string, cases:number, embed_failures:string[], summary:object[]}"
       }
     ],
     "request": [],

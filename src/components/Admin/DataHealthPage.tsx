@@ -149,6 +149,20 @@ export default function DataHealthPage() {
     } finally { setRunning(false); }
   };
 
+  const runKbEval = async () => {
+    setRunning(true);
+    try {
+      const r = await svc.runKbEval();
+      toast({
+        title: `KB eval: ${r.cases} question(s) scored`,
+        description: r.embed_failures.length ? `${r.embed_failures.length} could not be embedded: ${r.embed_failures.join(', ')}` : undefined,
+      });
+      await load();
+    } catch (err: any) {
+      toast({ title: 'KB eval failed', description: err?.message, variant: 'destructive' });
+    } finally { setRunning(false); }
+  };
+
   const healCheck = async (key: string) => {
     setBusyKey(key);
     try {
@@ -205,6 +219,9 @@ export default function DataHealthPage() {
               </Button>
               <Button size="sm" onClick={() => runNow(true)} disabled={running}>
                 <Wrench className="h-4 w-4 mr-1" /> Run + auto-heal
+              </Button>
+              <Button variant="outline" size="sm" onClick={runKbEval} disabled={running} title="Scores the knowledge-base retriever against its golden questions. Uses Voyage embeddings.">
+                <RefreshCw className="h-4 w-4 mr-1" /> Run KB eval
               </Button>
             </div>
           </CardHeader>
