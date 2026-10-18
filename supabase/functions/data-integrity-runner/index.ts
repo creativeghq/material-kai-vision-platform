@@ -114,7 +114,9 @@ async function resolveHealedInSentry(supabase: ReturnType<typeof svc>): Promise<
     console.warn('[data-integrity-runner] could not read healed findings:', error.message);
     return;
   }
-  const base = `https://sentry.io/api/0/organizations/${encodeURIComponent(org.value)}/issues/`;
+  // The org lives in Sentry's EU region (our DSNs are ingest.de.sentry.io); its API is region-hosted.
+  const apiHost = (await resolveSecret(supabase, 'SENTRY_API_URL')).value || 'https://de.sentry.io';
+  const base = `${apiHost.replace(/\/+$/, '')}/api/0/organizations/${encodeURIComponent(org.value)}/issues/`;
   const headers = { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/json' };
   for (const f of healed ?? []) {
     const title = `Data integrity CRITICAL: ${f.check_key} — ${f.entity_id}`;
