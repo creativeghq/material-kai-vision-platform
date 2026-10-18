@@ -595,14 +595,10 @@ async function planCrawl(
   let writes = 0;
   let writeFailures = 0;
   let firstWriteError: string | null = null;
-  for (let i = 0; i < urls.length; i += 200) {
-    const { error } = await supabase.from('user_website_pages').upsert(
-      urls.slice(i, i + 200).map((url) => ({
-        website_id: websiteId, user_id: userId, url,
-        last_seen_in_sitemap: seenAt, is_active: true,
-      })),
-      { onConflict: 'website_id,url' },
-    );
+  {
+    const { error } = await supabase.rpc('sync_sitemap_urls', {
+      p_website_id: websiteId, p_user_id: userId, p_urls: urls, p_seen_at: seenAt,
+    });
     writes += 1;
     if (error) { writeFailures += 1; firstWriteError ??= error.message; }
   }
@@ -795,15 +791,7 @@ async function executeCrawl(
     recordWrite(error);
   }
 
-  // Retiring pages that vanished is only correct if this run's stamps actually landed.
   const allWritesFailed = writes > 0 && writeFailures === writes;
-  if (!allWritesFailed) {
-    await supabase.from('user_website_pages')
-      .update({ is_active: false })
-      .eq('website_id', websiteId)
-      .lt('last_seen_in_sitemap', plan.seenAt);
-  }
-
   const { count: withContent } = await supabase
     .from('user_website_pages')
     .select('id', { count: 'exact', head: true })
