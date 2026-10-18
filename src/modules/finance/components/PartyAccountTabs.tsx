@@ -11,6 +11,9 @@ import {
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { PartyInboundDocsCard } from '@/modules/finance/components/PartyInboundDocsCard';
+import { OpeningBalanceCard } from '@/modules/finance/components/OpeningBalanceCard';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import type { PartySide } from '@/modules/finance/services/partyBalancesService';
 
 interface Props {
   workspaceId: string;
@@ -44,6 +47,15 @@ export const PartyAccountTabs: React.FC<Props> = ({
   showCommercial = true, ledgerHref, vatNumber, inboxHref = '/finance?tab=doc_expenses',
 }) => {
   const [tab, setTab] = React.useState('orders');
+  const [payingSide, setPayingSide] = React.useState<PartySide | null>(null);
+  const [openingAsOf, setOpeningAsOf] = React.useState<Partial<Record<PartySide, string | null>>>({});
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  const sides: PartySide[] = [
+    ...(roles.supplier ? ['supplier' as const] : []),
+    ...(roles.customer || !roles.supplier ? ['customer' as const] : []),
+  ];
+  const partyType = companyId ? 'company' : 'contact';
+  const partyId = companyId ?? contactId;
 
   const sections: Section[] = [
     {
@@ -121,6 +133,31 @@ export const PartyAccountTabs: React.FC<Props> = ({
         isSupplier={!!roles.supplier}
         ledgerHref={ledgerHref}
       />
+
+      {partyId && sides.map((side) => (
+        <OpeningBalanceCard
+          key={side}
+          workspaceId={workspaceId}
+          partyType={partyType}
+          partyId={partyId}
+          side={side}
+          refreshKey={refreshKey}
+          onChanged={() => setRefreshKey((k) => k + 1)}
+          onRecordPayment={() => setPayingSide(side)}
+          onOpeningLoaded={(ob) => setOpeningAsOf((m) => ({ ...m, [side]: ob?.as_of ?? null }))}
+        />
+      ))}
+      {partyId && payingSide && (
+        <RecordPaymentDialog
+          workspaceId={workspaceId}
+          open
+          onOpenChange={(v) => { if (!v) setPayingSide(null); }}
+          onSaved={() => { setPayingSide(null); setRefreshKey((k) => k + 1); }}
+          side={payingSide}
+          initialCounterparty={companyId ? { companyId, contactId: null } : { contactId: contactId ?? null, companyId: null }}
+          openingAsOf={openingAsOf[payingSide] ?? null}
+        />
+      )}
 
       <Tabs value={active} onValueChange={setTab} className="space-y-4">
         <TabsList>
