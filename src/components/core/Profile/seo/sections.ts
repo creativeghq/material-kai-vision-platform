@@ -90,7 +90,7 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
 
   {
     value: 'reports', label: 'Reports', icon: FileBarChart, group: 'activity',
-    views: [{ value: 'reports', label: 'Reports' }, { value: 'runs', label: 'Toolkit runs' }],
+    views: [{ value: 'reports', label: 'Reports' }, { value: 'runs', label: 'Toolkit runs' }, { value: 'schedules', label: 'Schedules' }],
   },
 ];
 

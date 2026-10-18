@@ -4223,7 +4223,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "add_faq",
           "score_url",
           "page_review",
-          "presence_plan"
+          "presence_plan",
+          "collector_estimates"
         ],
         "required": true,
         "description": "Which operation to run."

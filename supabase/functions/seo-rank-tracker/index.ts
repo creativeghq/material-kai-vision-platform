@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
-import { assertEntitled, isWorkspaceEntitled } from '../_shared/entitlement.ts';
+import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
@@ -530,38 +530,48 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
   if (action === 'cron-run') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
     const deadline = Date.now() + RUN_DEADLINE_MS;
-    // One list for the whole platform, ordered failed-first then stalest-first, so the
-    // cap falls on the freshest work rather than on whichever site sorts last. Reading
-    // it per site with a per-site cap is how one large site starves a small one every
-    // single leg — the site order never changes.
-    const { data: due, error: dueErr } = await supabase.rpc('seo_keywords_due', {
-      p_website_id: null, p_limit: MAX_PER_RUN, p_only_stale: true,
-    });
-    if (dueErr) return json({ error: dueErr.message }, 500);
-    const rows = ((due as DueKeyword[] | null) || []);
-
-    // The SERP calls ARE the spend, so the module gate is asked before them (invariant
-    // 10) — once per workspace, and again here rather than only in `seo_keywords_due`
-    // because a gate that lives in one place is a gate that moves with a refactor.
-    // A "no" here that the queue disagreed with can only be a transient RPC error (both
-    // ask the same `is_workspace_entitled`), and it costs that workspace one leg: the
-    // rows are dropped unstamped, so they are still the stalest and lead the next one.
+    // Only sites whose owner scheduled rank tracking (or the platform's own site) are read, and
+    // each site's checks are billed to whoever turned its schedule on.
+    const { data: dueSites, error: siteErr } = await supabase.rpc('website_collectors_due', { p_collector: 'rank_tracking', p_limit: 500 });
+    if (siteErr) return json({ error: siteErr.message }, 500);
     const sites = new Map<string, { id: string; workspace_id: string; url: string }>();
-    const entitled = new Map<string, boolean>();
-    const work: DueKeyword[] = [];
-    let skipped = 0;
-    for (const k of rows) {
-      let ok = entitled.get(k.workspace_id);
-      if (ok === undefined) {
-        ok = await isWorkspaceEntitled(supabase, k.workspace_id, 'seo-toolkit');
-        entitled.set(k.workspace_id, ok);
-      }
-      if (!ok) { skipped++; continue; }
-      if (!sites.has(k.website_id)) sites.set(k.website_id, { id: k.website_id, workspace_id: k.workspace_id, url: k.url });
-      work.push(k);
+    const payerOf = new Map<string, string | null>();
+    const rows: DueKeyword[] = [];
+    const due = (dueSites ?? []) as { website_id: string; workspace_id: string; url: string; payer_user_id: string | null }[];
+    const share = Math.max(10, Math.floor(MAX_PER_RUN / Math.max(due.length, 1)));
+    for (const site of due) {
+      if (rows.length >= MAX_PER_RUN) break;
+      const { data: due, error: dueErr } = await supabase.rpc('seo_keywords_due', {
+        p_website_id: site.website_id, p_limit: Math.min(share, MAX_PER_RUN - rows.length), p_only_stale: true,
+      });
+      if (dueErr) return json({ error: dueErr.message }, 500);
+      sites.set(site.website_id, { id: site.website_id, workspace_id: site.workspace_id, url: site.url });
+      payerOf.set(site.website_id, site.payer_user_id);
+      rows.push(...((due as DueKeyword[] | null) || []));
     }
-
-    const r = await trackKeywords(supabase, work, null, deadline);
+    const work = rows;
+    const byPayer = new Map<string | null, DueKeyword[]>();
+    for (const k of work) {
+      const payer = payerOf.get(k.website_id) ?? null;
+      const list = byPayer.get(payer) ?? [];
+      list.push(k);
+      byPayer.set(payer, list);
+    }
+    const r = { checked: 0, ranking: 0, failed: 0, writeFailed: 0, advanceFailed: 0, notReached: 0, doneIdsBySite: new Map<string, string[]>() };
+    for (const [payer, batch] of byPayer) {
+      const part = await trackKeywords(supabase, batch, payer, deadline);
+      r.checked += part.checked; r.ranking += part.ranking; r.failed += part.failed;
+      r.writeFailed += part.writeFailed; r.advanceFailed += part.advanceFailed; r.notReached += part.notReached;
+      for (const [site, ids] of part.doneIdsBySite) r.doneIdsBySite.set(site, [...(r.doneIdsBySite.get(site) ?? []), ...ids]);
+    }
+    // A site is done for this cadence once every keyword was attempted today, answered or failed.
+    for (const siteId of sites.keys()) {
+      const { data: complete } = await supabase.rpc('website_rank_run_complete', { p_website_id: siteId });
+      if (complete === true) {
+        const { error: markErr } = await supabase.rpc('mark_collector_run', { p_website_id: siteId, p_collector: 'rank_tracking' });
+        if (markErr) console.error('[seo-rank-tracker] could not record the run:', markErr.message);
+      }
+    }
     const checked = r.checked, failed = r.failed;
     // Work was bought and none of it was stored — a 200 here would let the sweep
     // re-buy the same calls on every leg with nothing to show and nothing raised.
@@ -577,7 +587,7 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
       .delete().lt('captured_at', new Date(Date.now() - 760 * 86400000).toISOString().slice(0, 10));
     if (pruneErr) console.error('[seo-rank-tracker] retention sweep failed:', pruneErr.message);
     return json({
-      ok: true, due: rows.length, checked, failed, skipped, write_failed: r.writeFailed,
+      ok: true, due: rows.length, checked, failed, write_failed: r.writeFailed,
       advance_failed: r.advanceFailed, not_reached: r.notReached, retention_error: pruneErr?.message ?? null,
     });
   }

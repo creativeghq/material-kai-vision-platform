@@ -58,7 +58,7 @@ describe('the reader is ours; Firecrawl is the fallback', () => {
 
 describe('the charge follows the pages actually read', () => {
   it('debits before the read, never after', () => {
-    const charge = crawler.indexOf("chargeCronUser(supabase, website.user_id as string, 'seo-website-crawl'");
+    const charge = crawler.indexOf("chargeCronUser(supabase, payer, 'seo-website-crawl'");
     const execute = crawler.indexOf('const result = await executeCrawl(supabase, website, plan)', charge);
     expect(charge, 'the cron path must charge').toBeGreaterThan(-1);
     expect(execute, 'and the charge must precede the reading (invariant 10)').toBeGreaterThan(charge);

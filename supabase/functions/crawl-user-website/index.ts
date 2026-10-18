@@ -704,6 +704,11 @@ async function planCrawl(
   };
 }
 
+async function markCrawlRun(supabase: DbClient, websiteId: string) {
+  const { error } = await supabase.rpc('mark_collector_run', { p_website_id: websiteId, p_collector: 'page_crawl' });
+  if (error) console.error('[crawl-user-website] could not record the run:', error.message);
+}
+
 /** Re-read named pages of this website now (Website → Pages → Refetch); billed per page like any read. */
 async function refetchPlan(
   supabase: DbClient, website: { id: string; sitemap_url: string | null }, pageIds: unknown[],
@@ -1054,6 +1059,7 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
 
   // Planning is free; READING is what costs. The flat fee per invocation this replaces billed
   // 240 credits across two days on which zero pages were read, and refunded none of it.
+  const scheduled = isCron && Object.prototype.hasOwnProperty.call(body, 'payer_user_id');
   const plan = Array.isArray(body.page_ids) && body.page_ids.length
     ? await refetchPlan(supabase, website, body.page_ids)
     : await planCrawl(supabase, website, focusTerms(body.focus));
@@ -1073,20 +1079,24 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
     // Still run it: with nothing to read this only refreshes the liveness stamps and recounts,
     // and it reports the REAL page total rather than a zero that reads as an empty site.
     const result = await executeCrawl(supabase, website, plan);
+    if (scheduled && result.ok) await markCrawlRun(supabase, website.id);
     return jsonResponse({ success: result.ok, mode: 'full', data: result });
   }
 
   // Invariant 10: debit before the upstream read, never after.
   let billedUserId: string | null = null;
   let billedAmount = 0;
-  if (isCron) {
-    const r = await chargeCronUser(supabase, website.user_id as string, 'seo-website-crawl', {
+  if (isCron && scheduled && !body.payer_user_id) {
+    // The platform's own site on its default schedule: platform overhead, not billed to anyone.
+  } else if (isCron) {
+    const payer = typeof body.payer_user_id === 'string' && body.payer_user_id ? body.payer_user_id : website.user_id as string;
+    const r = await chargeCronUser(supabase, payer, 'seo-website-crawl', {
       units: queued, description: `crawl ${website.url} (${queued} pages)`,
     });
     if (!r.allowed) {
       return jsonResponse({ success: false, error: 'insufficient_credits', skipped: true }, 200);
     }
-    if (r.charged > 0) { billedUserId = website.user_id as string; billedAmount = r.charged; }
+    if (r.charged > 0) { billedUserId = payer; billedAmount = r.charged; }
   } else {
     const amount = queued * PER_PAGE_CREDIT_COST;
     const { data: dd, error: de } = await supabase.rpc('debit_credits', {
@@ -1107,6 +1117,7 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
 
   try {
     const result = await executeCrawl(supabase, website, plan);
+    if (scheduled && result.ok) await markCrawlRun(supabase, website.id);
     // Paying for a queued page the budget never reached is the flat-fee defect one layer down.
     const unread = queued - result.pages_fetched;
     if (unread > 0 && billedUserId && billedAmount > 0) {

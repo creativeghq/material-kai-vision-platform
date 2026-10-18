@@ -297,18 +297,23 @@ Deno.serve(withApiLogging('seo-domain-tracker', async (req: Request) => {
 
   if (action === 'cron-run') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: sites, error: sitesErr } = await supabase.from('user_websites')
-      .select('id, workspace_id, url').eq('is_active', true).order('id');
+    const { data: due, error: sitesErr } = await supabase.rpc('website_collectors_due', { p_collector: 'domain_tracking', p_limit: 100 });
     if (sitesErr) return json({ ok: false, error: `Could not read the websites to track: ${sitesErr.message}` }, 500);
+    const sites = ((due ?? []) as { website_id: string; workspace_id: string; url: string; payer_user_id: string | null }[])
+      .map((d) => ({ id: d.website_id, workspace_id: d.workspace_id, url: d.url, payer: d.payer_user_id }));
     const deadline = Date.now() + RUN_DEADLINE_MS;
     let ok = 0, failed = 0, competitorsNotReached = 0, competitorReadsFailed = 0;
     const notReached: string[] = [];
     for (const s of sites || []) {
       if (Date.now() > deadline) { notReached.push(s.id); continue; }
       const r = await trackWebsite(supabase, s, {
-        competitorKeywords: true, attribution: { workspace_id: s.workspace_id }, deadline,
+        competitorKeywords: true, attribution: { workspace_id: s.workspace_id, ...(s.payer ? { user_id: s.payer } : {}) }, deadline,
       });
-      if (r.ok) ok++; else failed++;
+      if (r.ok) {
+        ok++;
+        const { error: markErr } = await supabase.rpc('mark_collector_run', { p_website_id: s.id, p_collector: 'domain_tracking' });
+        if (markErr) console.error('[seo-domain-tracker] could not record the run:', markErr.message);
+      } else failed++;
       competitorsNotReached += r.competitors_not_reached ?? 0;
       if (r.competitors_error) competitorReadsFailed++;
     }

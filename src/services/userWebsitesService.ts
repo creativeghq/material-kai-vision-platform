@@ -13,6 +13,7 @@ import type { AiCrawls } from '@/components/core/Profile/seo/aiCrawlers';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 import { KeyedStore } from './seo/websiteKeywordStore';
+import type { CollectorCadence, CollectorKind } from './seo/collectorSchedules';
 
 export interface UserWebsite {
   id: string;
@@ -869,6 +870,25 @@ export interface WebsiteMarket {
   note: string;
 }
 
+export interface WebsiteDomainHistoryRow {
+  captured_at: string; source: 'domain_tracker' | 'toolkit_audit'; domain_rank: number | null; ranking_keywords: number | null;
+  organic_traffic: number | null; referring_domains: number | null; backlinks: number | null; spam_score: number | null; error: string | null;
+}
+
+export type { CollectorKind, CollectorCadence } from './seo/collectorSchedules';
+
+export interface CollectorSchedule {
+  collector: CollectorKind; cadence: CollectorCadence; platform_default: boolean; payer_user_id: string | null;
+  enabled_at: string | null; last_run_at: string | null; next_due_at: string | null;
+}
+
+export interface CollectorEstimate {
+  collector: CollectorKind; cadences: CollectorCadence[]; per_run_max_credits: number | null;
+  /** One-off cost on top of the cadence, e.g. a crawl's backlog of unread pages. */
+  backlog_max_credits: number | null;
+  basis: string;
+}
+
 export interface TrackKeywordsResult {
   added: number;
   keywords?: string[];
@@ -1149,63 +1169,6 @@ export const userWebsitesService = {
       .limit(limit);
     if (error) throw error;
     return (data as SeoResearchRunRow[]) || [];
-  },
-
-  async trackedDomains(websiteId: string): Promise<SeoTrackedDomainRow[]> {
-    const { data, error } = await supabase
-      .from('seo_tracked_domains')
-      .select('id, domain, display_label, country_code, is_active, current_domain_rank, current_organic_traffic, last_audited_at')
-      .eq('website_id', websiteId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return (data as SeoTrackedDomainRow[]) || [];
-  },
-
-  /**
-   * Track THIS website's own domain in the SEO toolkit (weekly rank + backlink
-   * audit). The domain comes from the website's URL, never from a text box: the tab
-   * that offers this reads "tracking for this website's domain", and a free-text
-   * form is how a competitor ends up filed under the wrong site. The locale is the
-   * website's market, passed by the caller.
-   */
-  async trackOwnDomain(website: UserWebsite, countryCode: string, languageCode: string): Promise<SeoTrackedDomainRow> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('Not authenticated');
-    const domain = website.url
-      .replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/.*$/, '').trim().toLowerCase();
-    if (!domain) throw new Error('This website has no usable domain.');
-    const cols = 'id, domain, display_label, country_code, is_active, current_domain_rank, current_organic_traffic, last_audited_at';
-    const { data, error } = await supabase
-      .from('seo_tracked_domains')
-      .insert({
-        user_id: userData.user.id,
-        workspace_id: website.workspace_id,
-        website_id: website.id,
-        domain,
-        display_label: website.display_name || null,
-        country_code: countryCode,
-        language_code: languageCode,
-        audit_cadence_hours: 168,
-      })
-      .select(cols)
-      .single();
-    if (!error) return data as SeoTrackedDomainRow;
-    if (error.code !== '23505') throw error;
-    const { data: existing, error: selErr } = await supabase
-      .from('seo_tracked_domains')
-      .select(`${cols}, website_id`)
-      .eq('user_id', userData.user.id).eq('domain', domain).eq('country_code', countryCode)
-      .maybeSingle();
-    if (selErr) throw selErr;
-    if (!existing) throw error;
-    if (!existing.website_id) {
-      const { error: upErr } = await supabase
-        .from('seo_tracked_domains')
-        .update({ website_id: website.id, workspace_id: website.workspace_id })
-        .eq('id', existing.id);
-      if (upErr) throw upErr;
-    }
-    return existing as SeoTrackedDomainRow;
   },
 
   /** Read one website by id (RLS lets any workspace member read it). */
@@ -1864,6 +1827,30 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as AiAnswers) ?? null;
+  },
+
+  async domainHistory(websiteId: string, limit = 60): Promise<WebsiteDomainHistoryRow[]> {
+    const { data, error } = await supabase.rpc('get_website_domain_history' as never, { p_website_id: websiteId, p_limit: limit } as never);
+    if (error) throw error;
+    return (data as WebsiteDomainHistoryRow[] | null) ?? [];
+  },
+
+  async schedules(websiteId: string): Promise<CollectorSchedule[]> {
+    const { data, error } = await supabase.rpc('get_website_collector_schedules' as never, { p_website_id: websiteId } as never);
+    if (error) throw error;
+    return (data as CollectorSchedule[] | null) ?? [];
+  },
+
+  async setSchedule(websiteId: string, collector: CollectorKind, cadence: CollectorCadence): Promise<void> {
+    const { error } = await supabase.rpc('set_website_collector_schedule' as never, { p_website_id: websiteId, p_collector: collector, p_cadence: cadence } as never);
+    if (error) throw error;
+  },
+
+  async scheduleEstimates(websiteId: string): Promise<CollectorEstimate[]> {
+    const { data, error } = await supabase.functions.invoke('seo-api', { body: { action: 'collector_estimates', website_id: websiteId } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not price the schedules'));
+    if (data?.success === false) throw new Error(String(data.error ?? 'Could not price the schedules'));
+    return data.data.collectors as CollectorEstimate[];
   },
 
   async domainTrackRun(websiteId: string): Promise<void> {

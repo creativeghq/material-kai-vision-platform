@@ -18,6 +18,7 @@ import { handlePageIdeas } from './handlers/page-ideas.ts';
 import { handleScoreUrl } from './handlers/score-url.ts';
 import { handlePageReview } from './handlers/page-review.ts';
 import { handlePresencePlan } from './handlers/presence-plan.ts';
+import { handleCollectorEstimates } from './handlers/collector-estimates.ts';
 import { handleCitability } from './handlers/citability.ts';
 import { handleLlmMentions } from './handlers/llm-mentions.ts';
 import { handleAiKeywordVolume } from './handlers/ai-keyword-volume.ts';
@@ -43,6 +44,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   score_url: handleScoreUrl,
   page_review: handlePageReview,
   presence_plan: handlePresencePlan,
+  collector_estimates: handleCollectorEstimates,
   citability: handleCitability,
   llm_mentions: handleLlmMentions,
   ai_keyword_volume: handleAiKeywordVolume,

@@ -315,19 +315,22 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
   try { body = await req.json(); } catch { /* empty */ }
   const action = String(body?.action || '');
 
-  // ── Cron: weekly audit of every active connected website ──
+  // ── Cron: the homepage audit of every website whose owner scheduled one ──
   if (action === 'cron-run') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: sites, error: sitesErr } = await supabase.from('user_websites')
-      .select('id, workspace_id, url').eq('is_active', true).order('id');
+    const { data: due, error: sitesErr } = await supabase.rpc('website_collectors_due', { p_collector: 'site_audit', p_limit: 100 });
     if (sitesErr) return json({ ok: false, error: `Could not read the websites to audit: ${sitesErr.message}` }, 500);
     const deadline = Date.now() + RUN_DEADLINE_MS;
     let ok = 0, failed = 0;
     const notReached: string[] = [];
-    for (const s of sites || []) {
-      if (Date.now() > deadline) { notReached.push(s.id); continue; }
-      const r = await auditWebsite(supabase, s, null);
-      if (r.ok) ok++; else failed++;
+    for (const d of (due ?? []) as { website_id: string; workspace_id: string; url: string; payer_user_id: string | null }[]) {
+      if (Date.now() > deadline) { notReached.push(d.website_id); continue; }
+      const r = await auditWebsite(supabase, { id: d.website_id, workspace_id: d.workspace_id, url: d.url }, d.payer_user_id);
+      if (r.ok) {
+        ok++;
+        const { error: markErr } = await supabase.rpc('mark_collector_run', { p_website_id: d.website_id, p_collector: 'site_audit' });
+        if (markErr) console.error('[seo-site-audit] could not record the run:', markErr.message);
+      } else failed++;
     }
     // Retention: keep 180 days of audit history.
     const { error: pruneErr } = await supabase.from('website_health_audits')

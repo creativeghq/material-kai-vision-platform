@@ -261,7 +261,7 @@ export const WebsiteCompetitorsPanel: React.FC<{ website: UserWebsite }> = ({ we
         <CardHeader>
           <CardTitle className="text-base">Tracked domains</CardTitle>
           <CardDescription>
-            Each one is measured on the same weekly run as your site, in the same market — a rival
+            Each one is measured on the same domain-tracking run as your site, in the same market — a rival
             measured in a different country is a different question on the same axis.
           </CardDescription>
         </CardHeader>

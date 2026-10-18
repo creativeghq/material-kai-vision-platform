@@ -12,6 +12,7 @@ import { TopicPlanCard } from '@/components/core/Profile/seo/TopicPlanCard';
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
 import { PresencePlanCard } from '@/components/core/Profile/seo/PresencePlanCard';
 import { WebsiteMarketControl } from '@/components/core/Profile/seo/WebsiteMarketControl';
+import { WebsiteSchedulesPanel } from '@/components/core/Profile/seo/WebsiteSchedulesPanel';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
 import { WebsiteSerpFeaturesPanel } from '@/components/core/Profile/WebsiteSerpFeaturesPanel';
@@ -252,7 +253,9 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
         {/* Reports are the same derivations, frozen per build so an old report keeps its own period. */}
         <TabsContent value="reports" className="space-y-4">
           {viewStrip('reports')}
-          {view === 'runs' ? <WebsiteToolkitRunsPanel website={website} /> : <WebsiteReportsPanel website={website} />}
+          {view === 'runs' ? <WebsiteToolkitRunsPanel website={website} />
+            : view === 'schedules' ? <WebsiteSchedulesPanel website={website} />
+            : <WebsiteReportsPanel website={website} />}
         </TabsContent>
         </div>
       </Tabs>

@@ -402,7 +402,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        One per line or comma-separated. Checked daily in Greek results on the device above, for all of Greece or one city.
+        One per line or comma-separated. Checked in the website's market, on the device above, for the whole country or one city, on the schedule set under Reports → Schedules.
       </p>
     </div>
   );
@@ -460,7 +460,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
               title={data.tracked ? 'No positions captured yet' : 'No keywords tracked yet'}
               description={
                 data.tracked
-                  ? 'The daily check fills these in overnight, or run one now.'
+                  ? 'The scheduled check fills these in (Reports → Schedules), or run one now.'
                   : 'Add the keywords you actually want to win. Ten you chose beat a thousand you happen to rank for.'
               }
               action={

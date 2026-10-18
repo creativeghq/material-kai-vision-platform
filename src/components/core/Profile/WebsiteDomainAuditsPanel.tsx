@@ -1,215 +1,99 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { History, Loader2, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
-import { formatDate, timeAgo } from '@/utils/datetime';
+import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
-import { userWebsitesService, type SeoTrackedDomainRow, type UserWebsite } from '@/services/userWebsitesService';
-import { listAuditHistory, triggerAuditNow, type SeoDomainAuditSnapshot } from '@/services/seoToolkitApi';
+import { userWebsitesService, type UserWebsite, type WebsiteDomainHistoryRow } from '@/services/userWebsitesService';
 import { Loading } from './seo/dashboardPrimitives';
 
-/** Websites -> Visibility -> Domain Audits. */
+const SOURCE_LABEL: Record<string, string> = { domain_tracker: 'Snapshot', toolkit_audit: 'Earlier audit' };
+
+/** Websites → Authority → history: the own domain's one series, newest first. */
 export const WebsiteDomainAuditsPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
-  const [domains, setDomains] = useState<SeoTrackedDomainRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [trackingDomain, setTrackingDomain] = useState(false);
-  const [openDomain, setOpenDomain] = useState<SeoTrackedDomainRow | null>(null);
-  const [domainHistory, setDomainHistory] = useState<SeoDomainAuditSnapshot[] | null>(null);
-  const [auditingDomain, setAuditingDomain] = useState(false);
+  const [rows, setRows] = useState<WebsiteDomainHistoryRow[] | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      try {
-        const d = await userWebsitesService.trackedDomains(website.id);
-        if (!cancelled) setDomains(d);
-      } catch (e: any) {
-        if (!cancelled) toast({ title: 'Could not load tracked domains', description: e?.message, variant: 'destructive' });
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [website.id]);
+  const load = useCallback(async () => {
+    try { setRows(await userWebsitesService.domainHistory(website.id)); }
+    catch (e: any) { toast({ title: 'Could not load the history', description: e?.message, variant: 'destructive' }); setRows([]); }
+  }, [website.id, toast]);
+  useEffect(() => { void load(); }, [load]);
 
-  const openDomainHistory = async (d: SeoTrackedDomainRow) => {
-    setOpenDomain(d);
-    setDomainHistory(null);
+  const collect = async () => {
+    setBusy(true);
     try {
-      setDomainHistory(await listAuditHistory(d.id, 30));
+      await userWebsitesService.domainTrackRun(website.id);
+      toast({ title: 'Snapshot taken' });
+      await load();
     } catch (e: any) {
-      toast({ title: 'Could not load the audit history', description: e.message, variant: 'destructive' });
-      setDomainHistory([]);
-    }
+      toast({ title: 'Snapshot failed', description: e.message, variant: 'destructive' });
+    } finally { setBusy(false); }
   };
 
-  const auditDomainNow = async () => {
-    if (!openDomain) return;
-    setAuditingDomain(true);
-    try {
-      const r = await triggerAuditNow(openDomain.id);
-      if (!r.ok) throw new Error(r.error || 'Audit failed');
-      toast({ title: 'Audit complete', description: `${openDomain.domain} audited.` });
-      setDomainHistory(await listAuditHistory(openDomain.id, 30));
-      setDomains(await userWebsitesService.trackedDomains(website.id));
-    } catch (e: any) {
-      toast({ title: 'Audit failed', description: e.message, variant: 'destructive' });
-    } finally {
-      setAuditingDomain(false);
-    }
-  };
-
-  /**
-   * This pane is about THIS website, so the button tracks exactly its domain. It used to open the
-   * agent quick-start, which asked the operator to type the domain they were already standing on
-   * and left the row unattached to the website -- so this pane stayed empty after they had done it.
-   */
-  const trackOwnDomain = async () => {
-    setTrackingDomain(true);
-    try {
-      const market = await userWebsitesService.market(website.id);
-      if (!market?.country_code || !market.language_code) throw new Error(market?.note ?? 'Set the website market first.');
-      const row = await userWebsitesService.trackOwnDomain(website, market.country_code, market.language_code);
-      toast({
-        title: `Tracking ${row.domain}`,
-        description: 'The first rank and backlink audit runs within the hour, then weekly.',
-      });
-      setDomains(await userWebsitesService.trackedDomains(website.id));
-    } catch (e: any) {
-      toast({ title: 'Could not track the domain', description: e.message, variant: 'destructive' });
-    } finally {
-      setTrackingDomain(false);
-    }
-  };
+  const button = (
+    <Button size="sm" variant="outline" disabled={busy} onClick={() => void collect()}>
+      {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Take a snapshot now
+    </Button>
+  );
 
   return (
-    <div className="space-y-4">
-      <Card className="dashboard-card">
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div>
-          <CardTitle>Domain Audits</CardTitle>
+    <Card className="dashboard-card">
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle>Domain history</CardTitle>
           <CardDescription>
-            Scheduled domain-rank tracking for this website's own domain. Rival domains are followed
-            under the Competitors tab, measured on the same weekly run in the same market.
+            Rank, keywords, traffic and backlinks for this website's own domain, one row per snapshot. Snapshots run on
+            the schedule set under Reports → Schedules; a manual snapshot is charged like any lookup.
           </CardDescription>
-          </div>
-          {!loading && domains.length === 0 && (
-            <Button size="sm" variant="outline" className="shrink-0"
-              onClick={trackOwnDomain} disabled={trackingDomain}>
-              {trackingDomain
-                ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                : <Plus className="w-3.5 h-3.5 mr-1" />}
-              Track this domain
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <Loading />
-          ) : domains.length === 0 ? (
-            <HubEmptyState
-              variant="empty"
-              title="This domain is not tracked yet"
-              description="Tracking takes a weekly rank and backlink snapshot so movement shows up as a trend rather than a surprise."
-              action={
-                <Button size="sm" onClick={trackOwnDomain} disabled={trackingDomain}>
-                  {trackingDomain
-                    ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                    : <Plus className="w-3.5 h-3.5 mr-1" />}
-                  Track this domain
-                </Button>
-              }
-            />
-          ) : (
+        </div>
+        {rows && rows.length > 0 && button}
+      </CardHeader>
+      <CardContent className="p-0">
+        {rows == null ? <Loading /> : rows.length === 0 ? (
+          <HubEmptyState variant="empty" icon={History} title="No snapshot yet"
+            description="Take one now, or turn on domain tracking under Reports → Schedules so it runs on its own." action={button} />
+        ) : (
+          <div className="table-scroll">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Domain</TableHead>
+                  <TableHead>Captured</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead className="text-right">Rank</TableHead>
-                  <TableHead className="text-right">Organic traffic</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last audit</TableHead>
+                  <TableHead className="text-right">Keywords</TableHead>
+                  <TableHead className="text-right">Traffic</TableHead>
+                  <TableHead className="text-right">Ref. domains</TableHead>
+                  <TableHead className="text-right">Backlinks</TableHead>
+                  <TableHead className="text-right">Spam</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {domains.map((d) => (
-                  <TableRow key={d.id} className="cursor-pointer" onClick={() => void openDomainHistory(d)}>
-                    <TableCell className="font-medium">{d.display_label || d.domain}</TableCell>
-                    <TableCell className="text-right">{d.current_domain_rank ?? '—'}</TableCell>
-                    <TableCell className="text-right">{formatNumber(d.current_organic_traffic)}</TableCell>
-                    <TableCell className={d.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}>
-                      {d.is_active ? 'active' : 'paused'}
+                {rows.map((h, i) => (
+                  <TableRow key={`${h.source}-${h.captured_at}-${i}`}>
+                    <TableCell className="text-muted-foreground">{formatDate(h.captured_at)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {SOURCE_LABEL[h.source] ?? h.source}{h.error ? <span className="ml-1 text-amber-700 dark:text-amber-300">· {h.error}</span> : null}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{timeAgo(d.last_audited_at)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{h.domain_rank ?? '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{h.ranking_keywords == null ? '—' : formatNumber(h.ranking_keywords)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{h.organic_traffic == null ? '—' : formatNumber(h.organic_traffic)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{h.referring_domains == null ? '—' : formatNumber(h.referring_domains)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{h.backlinks == null ? '—' : formatNumber(h.backlinks)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{h.spam_score ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Every weekly audit for one tracked domain. */}
-      <Dialog open={!!openDomain} onOpenChange={(o) => { if (!o) setOpenDomain(null); }}>
-        <DialogContent className="max-w-3xl">
-          <DialogTitle>{openDomain?.display_label || openDomain?.domain} · audit history</DialogTitle>
-          {domainHistory == null ? (
-            <Loading />
-          ) : domainHistory.length === 0 ? (
-            <HubEmptyState
-              variant="empty"
-              title="No audits recorded yet"
-              description="The first runs within the hour of tracking, then weekly. History is visible to the person who added the domain."
-              action={
-                <Button size="sm" disabled={auditingDomain} onClick={() => void auditDomainNow()}>
-                  {auditingDomain ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
-                  Audit now
-                </Button>
-              }
-            />
-          ) : (
-            <div className="table-scroll">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Audited</TableHead>
-                    <TableHead className="text-right">Rank</TableHead>
-                    <TableHead className="text-right">Keywords</TableHead>
-                    <TableHead className="text-right">Traffic</TableHead>
-                    <TableHead className="text-right">Ref. domains</TableHead>
-                    <TableHead className="text-right">Backlinks</TableHead>
-                    <TableHead className="text-right">Spam</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {domainHistory.map((h) => (
-                    <TableRow key={h.id}>
-                      <TableCell className="text-muted-foreground">{formatDate(h.audited_at, { withTime: true })}</TableCell>
-                      <TableCell className="text-right tabular-nums">{h.domain_rank ?? '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(h.ranking_keywords)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(h.organic_traffic)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(h.referring_domains)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(h.backlinks)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{h.spam_score ?? '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">${Number(h.cost_usd ?? 0).toFixed(4)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

@@ -7157,6 +7157,14 @@
         "response": "{success: boolean, url: string, fetched: {title, description, http_status, word_count}, keyword: string, keyword_source: string, analysis: ContentAnalysisResult, checks_skipped: string[], credits_charged: number}"
       },
       {
+        "name": "collector_estimates",
+        "summary": "The most one run of each scheduled collector (rank tracking, domain tracking, homepage audit, page crawl) can cost for a website, priced by the same formula the spend gate reserves with (the crawl from cron_billing_registry), with the cadences each collector offers. Shown before a schedule is switched on. Needs marketing.seo.",
+        "params": [
+          {"name": "website_id", "type": "string", "required": true, "desc": "Website"}
+        ],
+        "response": "{success: boolean, data: {collectors: [{collector, cadences: string[], per_run_max_credits: number|null, basis: string}]}}"
+      },
+      {
         "name": "presence_plan",
         "summary": "Presence plan for a website (#487 C3): its top non-branded Search Console queries (tracked keywords when it has none) are searched on YouTube (live YouTube SERP) and in Google as site:reddit.com / site:pinterest.com queries, and the brand as site:trustpilot.com, in the site's own market: what ranks in Google is also what assistants cite. Each platform gets a verdict present / absent / collector_failed (a failed lookup is unknown, never absent) and concrete actions. Saved to seo_presence_plans. Needs marketing.seo and seo-toolkit; every lookup passes the DataForSEO spend gate. estimate=true returns the queries and the credit ceiling without spending.",
         "params": [
@@ -7394,7 +7402,8 @@
             "add_faq",
             "score_url",
             "page_review",
-            "presence_plan"
+            "presence_plan",
+            "collector_estimates"
           ],
           "description": "Which operation to run."
         }

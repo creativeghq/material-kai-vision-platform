@@ -29,8 +29,6 @@ const SKIP_DIRS = new Set(['node_modules', '__pycache__', '.git', 'dist', 'build
  * SHRINK-ONLY.
  */
 const DB_ONLY: Record<string, string> = {
-  cron_billing_registry:
-    'read by 4 SQL functions (the per-workspace cron billing path); no client ever touches it',
   product_edge_rebuilds:
     'read by 3 SQL functions; the edge-rebuild queue is driven entirely in-database',
   taric_leaf_rules:
