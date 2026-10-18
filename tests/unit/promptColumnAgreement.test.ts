@@ -17,7 +17,8 @@ function readers(): Array<{ columns: string; promptType: string }> {
   const re = /\.select\('([^']+)'\)([\s\S]{0,200}?)\.eq\('prompt_type',\s*(?:'([a-z_]+)'|([A-Za-z]\w*))\)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(SRC))) {
-    out.push({ columns: m[1].replace(/\s+/g, ' ').trim(), promptType: m[3] ?? 'dynamic' });
+    const content = m[1].split(',').map((c) => c.trim()).filter((c) => c && c !== 'id').join(', ');
+    out.push({ columns: content, promptType: m[3] ?? 'dynamic' });
   }
   return out;
 }

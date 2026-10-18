@@ -3,7 +3,7 @@
  * Loads prompts from the `prompts` table so all prompts are DB-driven
  * and editable via /admin/ai-configs.
  */
-import type { DbClient } from './supabase-client.ts';
+import { serviceClient, type DbClient } from './supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /** The store answered and has no such prompt. Add it; retrying will not help. */
@@ -31,6 +31,16 @@ function getCachedPrompt(key: string): string | null {
 
 function setCachedPrompt(key: string, prompt: string): void {
   promptCache.set(key, { prompt, cachedAt: Date.now() });
+}
+
+/** Feeds ops.prompt_never_read. Service client, because the caller's may be a user's; never awaited, never throws. */
+function stampRead(id: unknown): void {
+  if (typeof id !== 'string') return;
+  try {
+    Promise.resolve(serviceClient().rpc('stamp_prompt_read', { p_prompt_id: id }))
+      .then(({ error }) => { if (error) console.warn(`[prompt-utils] stamp_prompt_read: ${error.message}`); })
+      .catch(() => {});
+  } catch { /* no service env: nothing to stamp */ }
 }
 
 /**
@@ -63,7 +73,7 @@ export async function getAgentSystemPrompt(
 
   const { data, error } = await supabase
     .from('prompts')
-    .select('system_prompt')
+    .select('id, system_prompt')
     .eq('prompt_type', 'agent')
     .eq('category', agentType)
     .eq('is_active', true)
@@ -75,6 +85,7 @@ export async function getAgentSystemPrompt(
     throw new Error(`Agent prompt not found in database: ${agentType}. Please add it via /admin/ai-configs.`);
   }
 
+  stampRead(data.id);
   setCachedPrompt(cacheKey, data.system_prompt);
   return data.system_prompt;
 }
@@ -87,7 +98,7 @@ export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<st
 
   const { data, error } = await supabase
     .from('prompts')
-    .select('system_prompt')
+    .select('id, system_prompt')
     .eq('prompt_type', 'system')
     .eq('category', 'shared_operating_doctrine')
     .eq('is_active', true)
@@ -99,6 +110,7 @@ export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<st
     return '';
   }
 
+  stampRead(data.id);
   setCachedPrompt(cacheKey, data.system_prompt);
   return data.system_prompt;
 }
@@ -117,7 +129,7 @@ export async function getToolPrompt(
 
   const { data, error } = await supabase
     .from('prompts')
-    .select('prompt_text, system_prompt')
+    .select('id, prompt_text, system_prompt')
     .eq('prompt_type', 'tool')
     .eq('category', toolName)
     .eq('is_active', true)
@@ -130,6 +142,7 @@ export async function getToolPrompt(
     throw new Error(`Tool prompt not found in database: ${toolName}. Please add it via /admin/ai-configs.`);
   }
 
+  stampRead(data?.id);
   setCachedPrompt(cacheKey, text);
   return text;
 }
@@ -154,7 +167,7 @@ export async function loadPrompt(
 
   let query = supabase
     .from('prompts')
-    .select('prompt_text, system_prompt')
+    .select('id, prompt_text, system_prompt')
     .eq('prompt_type', promptType)
     .eq('category', category)
     .eq('is_active', true)
@@ -181,6 +194,7 @@ export async function loadPrompt(
     );
   }
 
+  stampRead(data?.[0]?.id);
   setCachedPrompt(cacheKey, text);
   return text;
 }
