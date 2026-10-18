@@ -778,19 +778,6 @@ async function executeCrawl(
     if (embedding && !error) indexed += 1;
   }
 
-  // A queued page the budget did not reach is still live — stamp it, or the sweep below retires
-  // a page that search is ranking right now.
-  for (let i = 0; i < pending.length; i += 200) {
-    const { error } = await supabase.from('user_website_pages').upsert(
-      pending.slice(i, i + 200).map((url) => ({
-        website_id: websiteId, user_id: userId, url,
-        last_seen_in_sitemap: plan.seenAt, is_active: true,
-      })),
-      { onConflict: 'website_id,url' },
-    );
-    recordWrite(error);
-  }
-
   const allWritesFailed = writes > 0 && writeFailures === writes;
   const { count: withContent } = await supabase
     .from('user_website_pages')

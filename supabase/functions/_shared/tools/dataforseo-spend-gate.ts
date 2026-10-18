@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getServicePricing, debitOrRefuseTracked, recordExternalServiceOutcome } from '../credit-utils.ts';
 import { settleCredits } from '../credit-reserve.ts';
 import { resolveEntitledWorkspace } from '../entitlement.ts';
+import { keyWorkspaceFence } from '../request-context.ts';
 
 /** `ai_model_pricing.model_key` for DataForSEO spend. One unit = $0.001 of provider cost. */
 export const DATAFORSEO_SERVICE = 'dataforseo-request';
@@ -41,6 +42,9 @@ const WS_CACHE_TTL_MS = 60_000;
 const _wsCache = new Map<string, { workspaceId: string | null; expiresAt: number }>();
 
 async function resolveWorkspace(sb: Sb, userId: string): Promise<string | null> {
+  // A kai_ key's workspace is per REQUEST; a cache keyed by user would hand it to the next caller.
+  const fenced = keyWorkspaceFence();
+  if (fenced) return fenced;
   const hit = _wsCache.get(userId);
   if (hit && hit.expiresAt > Date.now()) return hit.workspaceId;
   let workspaceId: string | null = null;

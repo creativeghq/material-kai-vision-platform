@@ -63,7 +63,7 @@ export function parseIngestBody(body: unknown): CrawlerEvent[] {
     const path = typeof r.path === 'string' ? r.path.slice(0, 2000) : '';
     const ts = typeof r.ts === 'string' || typeof r.ts === 'number' ? new Date(r.ts) : null;
     if (!ua || !path || !ts || Number.isNaN(ts.getTime())) continue;
-    const ip = typeof r.ip === 'string' && /^[0-9a-fA-F:.]{3,45}$/.test(r.ip) ? r.ip : null;
+    const ip = typeof r.ip === 'string' && isIpAddress(r.ip) ? r.ip : null;
     const status = Number.isInteger(r.status) && (r.status as number) >= 100 && (r.status as number) <= 599 ? r.status as number : null;
     out.push({ ts: ts.toISOString(), path, ua, ip, status });
   }
@@ -119,6 +119,11 @@ function ipv6ToBigInt(ip: string): bigint | null {
   return n;
 }
 
+/** A literal Postgres `inet` accepts: one bad address must not abort a whole delivery. */
+export function isIpAddress(ip: string): boolean {
+  return ip.includes(':') ? ipv6ToBigInt(ip) != null : ipv4ToBigInt(ip) != null;
+}
+
 /** Is `ip` inside `cidr`? Families never cross-match. */
 export function ipInCidr(ip: string, cidr: string): boolean {
   const [base, bitsRaw] = cidr.split('/');
@@ -143,24 +148,33 @@ export function prefixesFromRangeFile(body: unknown): string[] {
 }
 
 const RANGE_TTL_MS = 6 * 3600_000;
+const RANGE_FAILURE_TTL_MS = 5 * 60_000;
 const rangeCache = new Map<string, { at: number; prefixes: string[] | null }>();
+const rangeInFlight = new Map<string, Promise<string[] | null>>();
 
-/** The vendor's prefixes, cached per worker; `null` when the list could not be fetched (verdict unknown). */
-export async function vendorPrefixes(url: string, fetcher: typeof fetch = fetch): Promise<string[] | null> {
+/** The vendor's prefixes, cached per worker and fetched once at a time; `null` when unavailable (verdict unknown). */
+export function vendorPrefixes(url: string, fetcher: typeof fetch = fetch): Promise<string[] | null> {
   const hit = rangeCache.get(url);
-  if (hit && Date.now() - hit.at < RANGE_TTL_MS) return hit.prefixes;
-  let prefixes: string[] | null = null;
-  try {
-    const resp = await fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(5000) });
-    if (resp.ok) {
-      const list = prefixesFromRangeFile(await resp.json());
-      prefixes = list.length ? list : null;
+  if (hit && Date.now() - hit.at < (hit.prefixes ? RANGE_TTL_MS : RANGE_FAILURE_TTL_MS)) return Promise.resolve(hit.prefixes);
+  const pending = rangeInFlight.get(url);
+  if (pending) return pending;
+  const load = (async () => {
+    let prefixes: string[] | null = null;
+    try {
+      const resp = await fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(5000) });
+      if (resp.ok) {
+        const list = prefixesFromRangeFile(await resp.json());
+        prefixes = list.length ? list : null;
+      }
+    } catch {
+      prefixes = null;
     }
-  } catch {
-    prefixes = null;
-  }
-  rangeCache.set(url, { at: Date.now(), prefixes });
-  return prefixes;
+    rangeCache.set(url, { at: Date.now(), prefixes });
+    rangeInFlight.delete(url);
+    return prefixes;
+  })();
+  rangeInFlight.set(url, load);
+  return load;
 }
 
 /** true / false against the vendor's published ranges; null when the vendor publishes none or the list is unavailable. */

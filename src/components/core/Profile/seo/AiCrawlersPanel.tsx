@@ -137,16 +137,14 @@ export const AiCrawlersPanel: React.FC<{ websiteId: string }> = ({ websiteId }) 
                 description={data.note ?? statusPresentation(data.status).explain}
               />
             )}
-            {(data.status !== 'ok' || secret) && (
-              <Setup
-                websiteId={websiteId}
-                secret={secret}
-                connected={!!data.source}
-                busy={busy}
-                onConnect={connect}
-                onDisconnect={disconnect}
-              />
-            )}
+            <Setup
+              websiteId={websiteId}
+              secret={secret}
+              connected={!!data.source}
+              busy={busy}
+              onConnect={connect}
+              onDisconnect={disconnect}
+            />
             {ok && (
               <>
                 {points.length >= 2 && <Sparkline points={points} className="h-10 w-full" ariaLabel="AI crawler requests per day" />}

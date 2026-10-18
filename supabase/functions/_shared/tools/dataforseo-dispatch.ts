@@ -129,6 +129,7 @@ export async function gatedGatewayPost(
   const gate = await openSpendGate(kind, attr?.user_id, payload, attr?.workspace_id);
   if (!gate.ok) throw new SpendRefused(gate.message);
   let resp: Response;
+  let text: string;
   try {
     resp = await fetch(`${gatewayUrl()}${path}`, {
       method: 'POST',
@@ -136,11 +137,11 @@ export async function gatedGatewayPost(
       signal: opts.signal,
       body: JSON.stringify({ ...payload, attribution: meteredAttribution(gate, attr as DataForSeoAttribution | undefined) }),
     });
+    text = await resp.text();
   } catch (e) {
     await gate.settle(0);
     throw e;
   }
-  const text = await resp.text();
   // deno-lint-ignore no-explicit-any
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { parsed = text; }

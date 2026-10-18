@@ -42,13 +42,23 @@ export function foreignWords(markdown: string, allowed: Set<string> = ALLOWED_FO
   return [...words].sort();
 }
 
-const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '');
-const occurrences = (text: string, phrase: string) => (phrase ? text.split(phrase).length - 1 : 0);
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
-/** Times a Greek keyword that carries accents appears in `text` spelled any other way. */
+/**
+ * Times a Greek keyword that carries accents appears in `text`, as whole words, spelled any other way.
+ * All-caps text is skipped: Greek capitals are written without accents by convention.
+ */
 export function unaccentedKeywordUses(text: string, keyword: string): number {
-  const kw = keyword.normalize('NFC').toLowerCase().trim();
-  if (!/[Ͱ-Ͽ]/.test(kw) || fold(kw) === kw) return 0;
-  const body = text.normalize('NFC').toLowerCase();
-  return Math.max(0, occurrences(fold(body), fold(kw)) - occurrences(body, kw));
+  const kw = keyword.normalize('NFC').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (!kw.length || !/[Ͱ-Ͽ]/.test(kw.join(' ')) || kw.every((w) => fold(w) === w)) return 0;
+  const words = text.normalize('NFC').match(/[\p{L}\p{M}]+/gu) ?? [];
+  const target = kw.map(fold);
+  let count = 0;
+  for (let i = 0; i + kw.length <= words.length; i++) {
+    const window = words.slice(i, i + kw.length);
+    if (!window.every((w, j) => fold(w) === target[j])) continue;
+    if (window.every((w) => w === w.toUpperCase())) continue;
+    if (window.some((w, j) => w.toLowerCase() !== kw[j])) count++;
+  }
+  return count;
 }

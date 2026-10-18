@@ -16,6 +16,11 @@ describe('an unaccented keyword is for search, never for the reader (#477 R5)', 
     expect(unaccentedKeywordUses('porcelain tiles', 'porcelain tiles')).toBe(0);
   });
 
+  it('matches whole words only, and leaves all-caps Greek alone', () => {
+    expect(unaccentedKeywordUses('Τα πλακάκια μας', 'πλάκα')).toBe(0);
+    expect(unaccentedKeywordUses('## ΕΠΙΠΛΑ ΜΠΑΝΙΟΥ\nΔείτε επιπλα μπανιου.', 'έπιπλα μπάνιου')).toBe(1);
+  });
+
   it('accepts a decomposed (NFD) article as the same spelling', () => {
     expect(unaccentedKeywordUses('έπιπλα μπάνιου'.normalize('NFD'), 'έπιπλα μπάνιου')).toBe(0);
   });

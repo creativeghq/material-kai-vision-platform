@@ -44,17 +44,29 @@ describe('ingest payload', () => {
         { ts: 'not a date', path: '/b', ua: 'GPTBot' },
         { ts: '2026-10-17T10:00:00Z', ua: 'GPTBot' },
         { ts: '2026-10-17T10:00:00Z', path: '/c', ua: 'ClaudeBot', ip: '1.2.3.4; drop', status: 999 },
+        { ts: '2026-10-17T10:00:00Z', path: '/d', ua: 'ClaudeBot', ip: '999.1.1.1' },
+        { ts: '2026-10-17T10:00:00Z', path: '/e', ua: 'ClaudeBot', ip: '1.2.3' },
         'junk',
       ],
     });
     expect(rows).toEqual([
       { ts: '2026-10-17T10:00:00.000Z', path: '/a', ua: 'GPTBot/1.2', ip: '20.171.1.1', status: 200 },
       { ts: '2026-10-17T10:00:00.000Z', path: '/c', ua: 'ClaudeBot', ip: null, status: null },
+      { ts: '2026-10-17T10:00:00.000Z', path: '/d', ua: 'ClaudeBot', ip: null, status: null },
+      { ts: '2026-10-17T10:00:00.000Z', path: '/e', ua: 'ClaudeBot', ip: null, status: null },
     ]);
   });
 });
 
 describe('vendor IP-range verification', () => {
+  it('a cold worker fetches a vendor list once, however many events arrive together', async () => {
+    let calls = 0;
+    const counting = (async () => { calls++; return new Response(JSON.stringify({ prefixes: [{ ipv4Prefix: '9.9.9.0/24' }] })); }) as unknown as typeof fetch;
+    const verdicts = await Promise.all(Array.from({ length: 50 }, () => verifyCrawlerIp('OAI-SearchBot/1.0', '9.9.9.9', counting)));
+    expect(verdicts.every((v) => v === true)).toBe(true);
+    expect(calls).toBe(1);
+  });
+
   it('matches v4, v6 and v4-mapped v6, and never across families', () => {
     expect(ipInCidr('20.171.206.5', '20.171.206.0/24')).toBe(true);
     expect(ipInCidr('20.171.207.5', '20.171.206.0/24')).toBe(false);
