@@ -33,6 +33,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { cn } from '@/lib/utils';
 import { formatDate, timeAgo } from '@/utils/datetime';
 import { AiEngineCard, engineGridCols } from './seo/AiEngineCard';
@@ -151,6 +152,7 @@ const PROBE_LIMIT = 12;
 
 export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
+  const { isPlatformOperator } = useWorkspace();
   const [data, setData] = useState<AiVisibility | null>(null);
   const [report, setReport] = useState<AiCitationReport | null>(null);
   const [citability, setCitability] = useState<CitabilityReport | null>(null);
@@ -510,7 +512,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       </Card>
       {corpusPanel}
       <AiReferralsPanel websiteId={website.id} />
-      <AiCrawlersPanel websiteId={website.id} />
+      {isPlatformOperator && <AiCrawlersPanel websiteId={website.id} />}
       </div>
     );
   }
@@ -726,7 +728,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
 
       {corpusPanel}
       <AiReferralsPanel websiteId={website.id} />
-      <AiCrawlersPanel websiteId={website.id} />
+      {isPlatformOperator && <AiCrawlersPanel websiteId={website.id} />}
 
       <AiQuestionsPanel
         report={questions}

@@ -126,3 +126,13 @@ describe('GA4 assistant pre-filter', () => {
     ]) expect(re.test(host), host).toBe(true);
   });
 });
+
+describe('server-log crawler ingest is an operator feature', () => {
+  it('the crawler card renders only for the platform operator', () => {
+    const src = readFileSync('src/components/core/Profile/WebsiteAiVisibilityPanel.tsx', 'utf8');
+    const mounts = src.match(/<AiCrawlersPanel/g) ?? [];
+    const gated = src.match(/isPlatformOperator && <AiCrawlersPanel/g) ?? [];
+    expect(mounts.length).toBeGreaterThan(0);
+    expect(gated.length, 'every mount is behind isPlatformOperator').toBe(mounts.length);
+  });
+});
