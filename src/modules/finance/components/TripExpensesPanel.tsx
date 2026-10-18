@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
-  ShoppingCart, Receipt, ScanLine, BadgeCheck,
+  ShoppingCart, Receipt, ScanLine, BadgeCheck, Plane,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
@@ -34,6 +34,8 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 import { OptionalTag } from '@/components/core/ui/form-layout';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import { receiptScanService, splitForForm, RECEIPT_ACCEPT, ReceiptTooLargeError } from '@/services/receiptScanService';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { FlightSearchPanel } from '@/modules/travel/components/FlightSearchPanel';
 interface Props {
   workspaceId: string;
   /** Finance reviewers see every card and can approve/reject lines. Reps see only their own. */
@@ -228,6 +230,8 @@ const TripCardDetail: React.FC<{
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [flightOpen, setFlightOpen] = useState(false);
+  const travelAvailable = useEntitlements().isModuleAvailable('travel');
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
   /** What has been FILED against this card — see `tripExpenseService.cardLinks`. */
   const [links, setLinks] = useState<TripCardLinks | null>(null);
@@ -281,6 +285,25 @@ const TripCardDetail: React.FC<{
       await refreshAll();
     } catch (err: any) {
       toast({ title: 'Review failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  /** The rep booked an approved planned line: enter what was actually paid. */
+  const bookPlanned = async (item: TripExpenseItem) => {
+    const typed = window.prompt(`What did you pay for this, in ${item.currency}? The approved estimate was ${formatMoney(Number(item.amount), item.currency)}.`);
+    if (typed == null) return;
+    const amount = parseDecimal(typed) ?? 0;
+    if (!(amount > 0)) { toast({ title: 'Enter the amount you paid', variant: 'destructive' }); return; }
+    try {
+      setBusy(true);
+      await tripExpenseService.bookPlanned(item.id, amount);
+      toast({
+        title: 'Booked',
+        description: `${amount > Number(item.amount) ? 'Above the approved estimate. ' : ''}Attach the receipt on the line; finance reviews the price you paid before it is reimbursed.`,
+      });
+      await refreshAll();
+    } catch (err: any) {
+      toast({ title: 'Could not record the booking', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
   };
 
@@ -349,7 +372,7 @@ const TripCardDetail: React.FC<{
 
   // Approved, billable, not-yet-billed lines that can be on-charged to a client.
   const billableEligible = useMemo(
-    () => items.filter((i) => i.billable && i.approval_status === 'approved' && !i.billed_invoice_id),
+    () => items.filter((i) => i.billable && i.commitment !== 'planned' && i.approval_status === 'approved' && !i.billed_invoice_id),
     [items],
   );
 
@@ -468,6 +491,9 @@ const TripCardDetail: React.FC<{
               </>
             )}
             {canEditItems && <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Expense</Button>}
+            {canEditItems && travelAvailable && (
+              <Button size="sm" variant="outline" onClick={() => setFlightOpen(true)}><Plane className="h-3.5 w-3.5 mr-1" /> Flight</Button>
+            )}
             {canReview && billableEligible.length > 0 && (
               <Button size="sm" variant="outline" disabled={busy} onClick={billToClient} title="Create a draft customer invoice from the approved billable expenses">
                 <FileText className="h-3.5 w-3.5 mr-1" /> Bill to client ({billableEligible.length})
@@ -490,6 +516,13 @@ const TripCardDetail: React.FC<{
           <Totals label="Rejected" value={report.rejected_amount} currency={report.currency} tone="red" />
           <Totals label="Pending" value={report.pending_amount} currency={report.currency} tone="amber" />
         </div>
+        {Number(report.planned_amount) > 0 && (
+          <div className="text-[11px] text-muted-foreground">
+            Planned, not yet booked: {formatMoney(Number(report.planned_amount), report.currency)}
+            {Number(report.planned_approved_amount) > 0 && <> · approved to book {formatMoney(Number(report.planned_approved_amount), report.currency)}</>}.
+            Planned lines are estimates and are not part of the totals above.
+          </div>
+        )}
         {report.assigned_by && report.request_note && (
           <div className="text-[11px] text-muted-foreground rounded-md border border-border/50 px-2 py-1.5">
             <span className="font-medium text-foreground">Requested by finance:</span> {report.request_note}
@@ -566,16 +599,24 @@ const TripCardDetail: React.FC<{
                       {it.needs_review && (
                         <Badge variant="warning" className="shrink-0 text-[9px]">Check</Badge>
                       )}
+                      {it.commitment === 'planned' && <Badge variant="info" className="shrink-0 text-[9px]">Planned</Badge>}
                     </div>
                     {it.vendor && <div className="max-w-[16rem] truncate text-[10px] text-muted-foreground" title={it.vendor}>{it.vendor}</div>}
                     {it.review_notes && it.approval_status === 'rejected' && <div className="max-w-[20rem] break-words text-[10px] text-destructive">Rejected: {it.review_notes}</div>}
                     <div className="text-[10px] text-muted-foreground sm:hidden">{it.expense_date}</div>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatMoney(Number(it.amount), it.currency)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
+                    {formatMoney(Number(it.amount), it.currency)}
+                    {it.variance_amount != null && Number(it.variance_amount) !== 0 && (
+                      <div className={`text-[10px] font-normal ${Number(it.variance_amount) > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
+                        est. {formatMoney(Number(it.estimated_amount), it.currency)} ({Number(it.variance_amount) > 0 ? '+' : ''}{formatMoney(Number(it.variance_amount), it.currency)})
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center">
                     {it.receipt_path ? (
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openReceipt(it)} title={it.receipt_name || 'Open receipt'}><ExternalLink className="h-3.5 w-3.5" /></Button>
-                    ) : canEditItems ? (
+                    ) : canEditItems || (isOwner && it.commitment === 'actual' && it.estimated_amount != null && it.approval_status !== 'approved') ? (
                       <>
                         <input
                           ref={(el) => { fileInputs.current[it.id] = el; }}
@@ -590,7 +631,11 @@ const TripCardDetail: React.FC<{
                     <Badge variant={APPROVAL_VARIANT[it.approval_status] ?? 'neutral'}>{capitalize(it.approval_status)}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {canReviewNow ? (
+                    {isOwner && it.commitment === 'planned' && it.approval_status === 'approved' ? (
+                      <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => void bookPlanned(it)}>
+                        <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Booked it
+                      </Button>
+                    ) : canReviewNow ? (
                       <div className="flex justify-end gap-1">
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-500" disabled={busy || it.approval_status === 'approved'} onClick={() => review(it.id, 'approved')} title="Approve"><Check className="h-3.5 w-3.5" /></Button>
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" disabled={busy || it.approval_status === 'rejected'} onClick={() => review(it.id, 'rejected')} title="Reject"><X className="h-3.5 w-3.5" /></Button>
@@ -619,6 +664,24 @@ const TripCardDetail: React.FC<{
           </>
         )}
       </CardContent>
+
+      <Dialog open={flightOpen} onOpenChange={setFlightOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Add a flight to {report.title}</DialogTitle>
+            <DialogDescription>The fare goes on this card as a planned cost. Submit the card to ask finance before you book.</DialogDescription>
+          </DialogHeader>
+          <FlightSearchPanel
+            workspaceId={report.workspace_id}
+            targetCardId={reportId}
+            prefill={{
+              destination: /^[A-Za-z]{3}$/.test(report.destination ?? '') ? report.destination : null,
+              departure: report.trip_start, return: report.trip_end,
+            }}
+            onAdded={() => { setFlightOpen(false); void refreshAll(); }}
+          />
+        </DialogContent>
+      </Dialog>
 
       <AddExpenseDialog
         reportId={reportId}

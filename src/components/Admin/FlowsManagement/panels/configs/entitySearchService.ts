@@ -81,6 +81,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'finance-send-invoice-email', label: 'finance-send-invoice-email', sublabel: 'Email an invoice to its customer with optional PDF attachment' },
   { id: 'finance-send-statement', label: 'finance-send-statement', sublabel: 'Render and email a party account-statement PDF (ledger / Καρτέλα)' },
   { id: 'finance-storefront', label: 'finance-storefront', sublabel: 'Public online storefront: browse products and submit cart checkout' },
+  { id: 'flight-search', label: 'flight-search', sublabel: 'Google Flights fares via Bright Data, costed onto trip cards' },
   { id: 'flow-engine', label: 'flow-engine', sublabel: 'Execute, test, or event-trigger workflow automations by walking the xyflow graph.' },
   { id: 'flow-scheduler-cron', label: 'flow-scheduler-cron', sublabel: 'Per-minute cron that fires scheduled flows whose cron expression matches current UTC time.' },
   { id: 'flow-webhook', label: 'flow-webhook', sublabel: 'Receives external HTTP requests and routes them to the matching webhook-triggered flow.' },

@@ -15,6 +15,7 @@ export const VOCABULARIES = [
   ['src/config/b2bCompanyTypes.ts', 'supabase/functions/_shared/b2bCompanyTypes.generated.ts'],
   ['src/modules/messaging/whatsappForms.ts', 'supabase/functions/_shared/whatsappForms.generated.ts'],
   ['src/services/seo/pageReviewVocabulary.ts', 'supabase/functions/_shared/seo/pageReviewVocabulary.generated.ts'],
+  ['src/modules/travel/travelVocabulary.ts', 'supabase/functions/_shared/travel/travelVocabulary.generated.ts'],
   ['src/components/core/Profile/seo/onPageChecks.ts', 'supabase/functions/_shared/seo/onPageChecks.generated.ts'],
   [
     'src/lib/vatCountries.ts',

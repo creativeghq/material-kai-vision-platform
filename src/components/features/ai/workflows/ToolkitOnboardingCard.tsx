@@ -1,7 +1,7 @@
 /** ToolkitOnboardingCard — the "now what?" card. */
 import React from 'react';
 import {
-  Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
+  Plane, Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle, ArrowRight,
   Briefcase, FolderKanban,
@@ -21,6 +21,7 @@ import type { ToolkitDefinition, ToolkitQuickStart } from '../agentToolsCatalog'
 // Wallet, …) rendered identically for months. Held to the catalog by
 // tests/unit/toolkitCoverage.test.ts, which used to check only the PICKER's map.
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Plane,
   Factory,
   Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,

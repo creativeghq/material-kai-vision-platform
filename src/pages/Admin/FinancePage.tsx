@@ -109,6 +109,7 @@ import { buildExpensePrefill, buildInvoicePrefill, type ExpensePrefill, type Inv
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
+import { FlightSearchPanel } from '@/modules/travel/components/FlightSearchPanel';
 /**
  * The rail below and the App Launcher's Finance chips are ONE list — `FINANCE_SECTIONS`, in
  * src/modules/finance/sections.ts. The document panes are the subset carrying a `docType`.
@@ -630,6 +631,12 @@ const FinancePage: React.FC = () => {
 
           <div className="min-w-0 flex-1 space-y-4">
           {/* ─────────── AI ASSESSMENT ─────────── */}
+          <TabsContent value="travel" className="space-y-4">
+            <ModuleTabGate moduleSlug="travel" moduleName="Travel" blurb="Find flight fares and cost them onto trip cards before anyone books.">
+              {activeWorkspaceId && <FlightSearchPanel workspaceId={activeWorkspaceId} />}
+            </ModuleTabGate>
+          </TabsContent>
+
           <TabsContent value="assessment" className="space-y-4">
             <ModuleTabGate
               moduleSlug="finance-assessment"

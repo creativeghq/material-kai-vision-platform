@@ -87,6 +87,10 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'trip-expenses': {
     tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
   },
+  'travel': {
+    capability: ['workspace.read'],
+    tool_ids: ['search_flights', 'add_flight_to_trip_card'],
+  },
   'expenses': {
     capability: ['finance.manage'],
     tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'],

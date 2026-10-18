@@ -1163,6 +1163,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_video',
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
+      // Travel (#398): fares only, never a booking; free allowance or the workspace's own key
+      'search_flights', 'add_flight_to_trip_card',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
       'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'pay_bill_via_revolut',
       // The myDATA/ΑΑΔΕ expenses feed itself — a much larger set than what we have booked.
@@ -3008,6 +3010,15 @@ async function executeAgent(
       if (config.tools.includes('submit_trip_card')) tools.push(tripMod.createSubmitTripCardTool(userId, workspaceId, onChunk));
     } catch (tripErr) {
       console.warn('⚠️ Could not register trip-expense tools:', tripErr);
+    }
+  }
+  if (config.tools.some((t: string) => ['search_flights', 'add_flight_to_trip_card'].includes(t))) {
+    try {
+      const travelMod = await import('../_shared/tools/travel-tools.ts');
+      if (config.tools.includes('search_flights')) tools.push(travelMod.createSearchFlightsTool(userId, workspaceId, clock.today, onChunk));
+      if (config.tools.includes('add_flight_to_trip_card')) tools.push(travelMod.createAddFlightToTripCardTool(userId, workspaceId, onChunk));
+    } catch (travelErr) {
+      console.warn('⚠️ Could not register travel tools:', travelErr);
     }
   }
 

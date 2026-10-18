@@ -29,6 +29,7 @@ export type { ExpenseCardType } from '../tripExpenseVocabulary';
 
 import { EXPENSE_CARD_TYPES as CARD_TYPE_VALUES } from '../tripExpenseVocabulary';
 import type { ExpenseCardType } from '../tripExpenseVocabulary';
+import type { TripLineCommitment } from '@/modules/travel/travelVocabulary';
 
 /** Every card type with its label. Keyed by the vocabulary, so a new value is a compile
  *  error here rather than an option that silently never appears in the picker. */
@@ -79,6 +80,9 @@ export interface TripExpenseReport {
   approved_amount: number;
   rejected_amount: number;
   pending_amount: number;
+  /** Estimates on PLANNED lines; never part of the spend totals above. */
+  planned_amount: number;
+  planned_approved_amount: number;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -126,6 +130,12 @@ export interface TripExpenseItem {
   /** Set once the billable line has been on-charged to a customer as a draft invoice. */
   billed_invoice_id: string | null;
   billed_at: string | null;
+  /** `planned` = an estimate asking "may I book this"; only `actual` lines are spend. */
+  commitment: TripLineCommitment;
+  estimated_amount: number | null;
+  /** Derived in SQL: booked price minus the approved estimate. */
+  variance_amount: number | null;
+  flight_search_id: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -187,6 +197,9 @@ export interface CreateItemInput {
   extraction_status?: 'pending' | 'extracted' | 'failed' | null;
   extracted?: Record<string, unknown> | null;
   needs_review?: boolean;
+  commitment?: TripLineCommitment;
+  estimated_amount?: number | null;
+  flight_search_id?: string | null;
 }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -314,7 +327,10 @@ export const tripExpenseService = {
         extraction_status: input.extraction_status ?? null,
         extracted: input.extracted ?? null,
         needs_review: input.needs_review ?? false,
-      })
+        commitment: input.commitment ?? 'actual',
+        estimated_amount: input.estimated_amount ?? null,
+        flight_search_id: input.flight_search_id ?? null,
+      } as never)
       .select('*')
       .single();
     if (error) throw error;
@@ -422,6 +438,13 @@ export const tripExpenseService = {
 
   // -------- Workflow (RPCs) --------
 
+  /** The rep booked an approved planned line: it becomes spend at the real price. */
+  async bookPlanned(itemId: string, amount: number): Promise<TripExpenseReport> {
+    const { data, error } = await supabase.rpc('trip_expense_book_planned_item' as never, { p_item_id: itemId, p_amount: amount } as never);
+    if (error) throw error;
+    return data as TripExpenseReport;
+  },
+
   async submit(reportId: string): Promise<TripExpenseReport> {
     const { data, error } = await supabase.rpc('trip_expense_submit', { p_report_id: reportId });
     if (error) throw error;
@@ -437,7 +460,9 @@ export const tripExpenseService = {
         reviewer_ids: (reviewers || []).map((m: any) => m.user_id),
         type: 'expense_card_submitted',
         title: `Expense card submitted: ${report.title}`,
-        body: `An expense card (${EXPENSE_CARD_TYPE_LABEL[report.card_type] ?? report.card_type}) totalling ${formatMoney(Number(report.total_amount), report.currency)} is waiting for your review.`,
+        body: Number(report.planned_amount) > 0
+          ? `An expense card (${EXPENSE_CARD_TYPE_LABEL[report.card_type] ?? report.card_type}) asks approval to book ${formatMoney(Number(report.planned_amount), report.currency)} of planned costs${Number(report.total_amount) > 0 ? `, plus ${formatMoney(Number(report.total_amount), report.currency)} already spent` : ''}.`
+          : `An expense card (${EXPENSE_CARD_TYPE_LABEL[report.card_type] ?? report.card_type}) totalling ${formatMoney(Number(report.total_amount), report.currency)} is waiting for your review.`,
         action_url: '/finance?tab=trip_cards',
       });
     } catch { /* fire-and-forget */ }

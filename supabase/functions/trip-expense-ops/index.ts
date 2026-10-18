@@ -64,7 +64,8 @@ async function uploadReceipt(body: Body, reader: any, admin: any, uid: string): 
   if (!body.item_id || !body.data_base64) throw new HttpError(400, 'item_id and data_base64 required');
 
   // RLS read confirms the caller can see this line at all (owner or finance).
-  const { data: item } = await reader.from('trip_expense_items').select('id, report_id').eq('id', body.item_id).maybeSingle();
+  const { data: item } = await reader.from('trip_expense_items')
+    .select('id, report_id, commitment, estimated_amount, approval_status').eq('id', body.item_id).maybeSingle();
   if (!item) throw new HttpError(403, 'Expense line not found or not accessible');
 
   const { data: report } = await reader.from('trip_expense_reports')
@@ -72,7 +73,9 @@ async function uploadReceipt(body: Body, reader: any, admin: any, uid: string): 
   if (!report) throw new HttpError(403, 'Trip card not accessible');
 
   const isOwnerDraft = report.user_id === uid && report.status === 'draft';
-  let allowed = isOwnerDraft;
+  const isOwnerBookedPlan = report.user_id === uid && item.commitment === 'actual'
+    && item.estimated_amount != null && item.approval_status !== 'approved';
+  let allowed = isOwnerDraft || isOwnerBookedPlan;
   if (!allowed) {
     const { data: fin } = await reader.rpc('is_workspace_finance_manager', { p_workspace_id: report.workspace_id });
     allowed = fin === true;

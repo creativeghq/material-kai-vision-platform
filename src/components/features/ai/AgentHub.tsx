@@ -62,6 +62,7 @@ import { transcribeRecording } from '@/services/voiceDictationService';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard, primaryListCount } from './AgentResultCard';
+import { FlightOffersCard } from './FlightOffersCard';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import {
@@ -516,6 +517,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   purchase_sheet_ready: 'Purchase sheet ready',
   // Trip / expense cards
   trip_card_created: 'Trip card created',
+  flight_offers_card: 'Flight fares',
   trip_expense_added: 'Expense added',
   trip_cards_list: 'Trip cards',
   trip_card_submitted: 'Trip card submitted',
@@ -5716,6 +5718,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // `hideTitle`: the modal header already renders this exact string — the artifact title comes
     // from `agentResultData.title` — and the sub-tab renders it a second time. Three copies of
     // "Records found" above three rows of data.
+    if (message.agentResultData?.resultType === 'flight_offers_card') return <FlightOffersCard data={message.agentResultData.data} />;
     if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} access={recordLinkAccess} hideTitle />;
     return renderDataCardBody(message);
   };

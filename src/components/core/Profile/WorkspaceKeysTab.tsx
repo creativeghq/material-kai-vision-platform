@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Share2, MessageCircle, ArrowRight,
-  FileImage, Landmark, Mail, Users, Truck, Code2, KeyRound, Globe,
+  FileImage, Landmark, Mail, Users, Truck, Code2, KeyRound, Globe, Database,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +25,8 @@ import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentials
 import { ShippingCredentialsCard } from '@/modules/stock/components/ShippingCredentialsCard';
 import { EmbedKeysCard } from '@/components/core/Profile/EmbedKeysCard';
 import { WordPressConnectionCard } from '@/components/core/Profile/WordPressConnectionCard';
+import { BrightDataKeyCard } from '@/modules/travel/components/BrightDataKeyCard';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { useModule } from '@/modules/_core';
 import { isAdmin } from '@/auth/roles';
 import { HubTabNav } from '@/components/core/hub';
@@ -58,8 +60,8 @@ const ConnectionRow: React.FC<{
 const ByokRuleNote: React.FC = () => (
   <div className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs leading-relaxed text-muted-foreground">
     <span className="font-medium text-foreground">These are your own accounts.</span>{' '}
-    Nothing here falls back to ours: a connection you leave blank is simply <em>off</em> for this
-    workspace — tax submissions, email and payouts that need it will refuse rather than run on
+    Tax, email, payout and messaging connections never fall back to ours: one you leave blank is
+    simply <em>off</em> for this workspace — tax submissions, email and payouts that need it will refuse rather than run on
     someone else&apos;s credentials. That is deliberate, and it is what keeps your sending
     reputation, your settlement and your tax filings yours.
   </div>
@@ -77,17 +79,19 @@ const SectionHead: React.FC<{ icon: React.ElementType; title: string; descriptio
   </div>
 );
 
-type SectionId = 'finance' | 'email' | 'documents' | 'hr' | 'shipping' | 'social' | 'publishing' | 'embed';
+type SectionId = 'finance' | 'email' | 'documents' | 'hr' | 'shipping' | 'social' | 'publishing' | 'data' | 'embed';
 
 export const WorkspaceKeysTab: React.FC = () => {
   const { activeWorkspaceId, workspaceRole } = useWorkspace();
   const stockModule = useModule('stock');
   const hrModule = useModule('hr');
+  const { isModuleAvailable } = useEntitlements();
+  const travelEntitled = isModuleAvailable('travel');
   const [conn, setConn] = useState<ConnState>({ social: 0 });
   const [searchParams, setSearchParams] = useSearchParams();
   // Deep-linkable: `/profile?tab=keys&section=email` lands on the right card (cross-module
   // "configure your key here" links target it). Falls back to finance.
-  const VALID_SECTIONS: SectionId[] = ['finance', 'email', 'documents', 'hr', 'shipping', 'social', 'publishing', 'embed'];
+  const VALID_SECTIONS: SectionId[] = ['finance', 'email', 'documents', 'hr', 'shipping', 'social', 'publishing', 'data', 'embed'];
   const paramSection = searchParams.get('section') as SectionId | null;
   const [active, setActive] = useState<SectionId>(
     paramSection && VALID_SECTIONS.includes(paramSection) ? paramSection : 'finance',
@@ -123,9 +127,10 @@ export const WorkspaceKeysTab: React.FC = () => {
       { id: 'shipping' as const, label: 'Shipping', icon: Truck, available: stockModule.enabled },
       { id: 'social' as const, label: 'Social & Messaging', icon: Share2, available: true },
       { id: 'publishing' as const, label: 'Publishing', icon: Globe, available: true },
+      { id: 'data' as const, label: 'Data & Research', icon: Database, available: travelEntitled },
       { id: 'embed' as const, label: 'Website Embed', icon: Code2, available: true },
     ].filter((s) => s.available)),
-    [hrModule.enabled, stockModule.enabled],
+    [hrModule.enabled, stockModule.enabled, travelEntitled],
   );
 
   // Keep the active section valid if a module toggles off underneath us.
@@ -274,6 +279,17 @@ export const WorkspaceKeysTab: React.FC = () => {
               description="Your own website, so finished SEO articles go out as a draft or a live post without copy and paste."
             />
             <WordPressConnectionCard workspaceId={activeWorkspaceId} />
+          </>
+        );
+      case 'data':
+        return (
+          <>
+            <SectionHead
+              icon={Database}
+              title="Data & Research"
+              description="Read-only data sources. Unlike the connections above, these can run on ours within a free allowance, because a fare looked up on anyone's key is the same fare."
+            />
+            <BrightDataKeyCard workspaceId={activeWorkspaceId} />
           </>
         );
       case 'embed':

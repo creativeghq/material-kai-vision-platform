@@ -383,31 +383,19 @@ const PageDrawer: React.FC<{ websiteId: string; pageId: string | null; onClose: 
               ) : queries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No Search Console queries recorded for this page.</p>
               ) : (
-                <div className="table-scroll">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-hairline text-[11px] font-semibold text-muted-foreground">
-                        <th className="py-1.5 text-left">Query</th>
-                        <th className="py-1.5 text-right">Impressions</th>
-                        <th className="py-1.5 text-right">Clicks</th>
-                        <th className="py-1.5 text-right">Position</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {queries.slice(0, 15).map((q) => (
-                        <tr key={q.query} className="border-b border-hairline last:border-0">
-                          <td className="py-1.5 pr-2">
-                            {q.query}
-                            {q.position != null && q.position >= 4 && q.position <= 20 && <Badge variant="info" className="ml-2">Striking distance</Badge>}
-                          </td>
-                          <td className="py-1.5 text-right tabular-nums">{formatNumber(q.impressions)}</td>
-                          <td className="py-1.5 text-right tabular-nums">{formatNumber(q.clicks)}</td>
-                          <td className="py-1.5 text-right tabular-nums">{q.position ?? '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ul className="divide-y divide-hairline rounded-sm border border-hairline text-sm">
+                  {queries.slice(0, 15).map((q) => (
+                    <li key={q.query} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-2 py-1.5">
+                      <span className="min-w-0 flex-1">
+                        {q.query}
+                        {q.position != null && q.position >= 4 && q.position <= 20 && <Badge variant="info" className="ml-2">Striking distance</Badge>}
+                      </span>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {formatNumber(q.impressions)} impr · {formatNumber(q.clicks)} clicks · pos {q.position ?? '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </section>
 

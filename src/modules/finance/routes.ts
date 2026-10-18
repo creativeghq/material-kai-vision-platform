@@ -46,6 +46,8 @@ export const FINANCE_TAB = {
   settings: 'settings',
   /** The AI Assessment pane — its own paid module (`finance-assessment`). */
   assessment: 'assessment',
+  /** Flight search — its own paid module (`travel`). */
+  travel: 'travel',
 } as const;
 
 /** `?<key>=` params the finance lists read their filter bag out of (see `filterUrl`). */

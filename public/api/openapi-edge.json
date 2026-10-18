@@ -3777,6 +3777,199 @@
         }
       }
     },
+    "/flight-search": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Google Flights fares via Bright Data, costed onto trip cards (Travel module)",
+        "operationId": "post_flight_search",
+        "description": "Read-only fare search (#398). Requires the `travel` module and `workspace.read` on the workspace. Key resolution: the workspace's own Bright Data token (Profile → Keys → Data & Research, stored in Vault), else the platform key for the root workspace (unlimited) or the free allowance of 2 successful searches per calendar month. The allowance is derived once in `workspace_flight_search_quota`; `claim_flight_search` dedupes the same route/dates/party/cabin for 24 hours and claims a slot atomically, and a failed search never counts. Nothing is ever booked.\n\n**Actions** (`action` in the body):\n- `search` — Search fares. The same search within 24 hours returns the stored result and does not count again. 402 code=quota_exhausted when the free allowance is used up. → `{success: boolean, data: {cached: boolean, still_collecting?: boolean, search: {id, status, origin, destination, departure_date, return_date, trip_type, adults, cabin, key_source, offers: [{airline, flight_number, departure_time, arrival_time, duration_minutes, stops, price, currency}], offer_count, error}}}`\n- `quota` — The workspace's search allowance for this month: mode root | byok | free, with used / allowance / remaining and a sentence. → `{success: boolean, data: {mode, used, allowance, remaining, reason}}`\n- `credentials` — Connect, replace or disconnect the workspace's own Bright Data API token (owner or admin). The token is verified against Bright Data before it is stored in Vault. → `{success: boolean, data: {connected: boolean}}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "origin",
+                      "destination",
+                      "departure",
+                      "local_month"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "search"
+                        ],
+                        "description": "Search fares. The same search within 24 hours returns the stored result and does not count again. 402 code=quota_exhausted when the free allowance is used up."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Workspace"
+                      },
+                      "origin": {
+                        "type": "string",
+                        "description": "3-letter IATA airport code"
+                      },
+                      "destination": {
+                        "type": "string",
+                        "description": "3-letter IATA airport code"
+                      },
+                      "departure": {
+                        "type": "string",
+                        "description": "Outbound date YYYY-MM-DD"
+                      },
+                      "return": {
+                        "type": "string",
+                        "description": "Return date YYYY-MM-DD; empty for one way"
+                      },
+                      "adults": {
+                        "type": "number",
+                        "description": "1 to 9 (default 1)"
+                      },
+                      "cabin": {
+                        "type": "string",
+                        "description": "economy | premium_economy | business | first"
+                      },
+                      "local_month": {
+                        "type": "string",
+                        "description": "The caller's calendar month YYYY-MM; must be the current month give or take a day"
+                      },
+                      "today": {
+                        "type": "string",
+                        "description": "The caller's local date YYYY-MM-DD"
+                      }
+                    },
+                    "description": "Returns: {success: boolean, data: {cached: boolean, still_collecting?: boolean, search: {id, status, origin, destination, departure_date, return_date, trip_type, adults, cabin, key_source, offers: [{airline, flight_number, departure_time, arrival_time, duration_minutes, stops, price, currency}], offer_count, error}}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "local_month"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "quota"
+                        ],
+                        "description": "The workspace's search allowance for this month: mode root | byok | free, with used / allowance / remaining and a sentence."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Workspace"
+                      },
+                      "local_month": {
+                        "type": "string",
+                        "description": "YYYY-MM"
+                      }
+                    },
+                    "description": "Returns: {success: boolean, data: {mode, used, allowance, remaining, reason}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "credentials"
+                        ],
+                        "description": "Connect, replace or disconnect the workspace's own Bright Data API token (owner or admin). The token is verified against Bright Data before it is stored in Vault."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Workspace"
+                      },
+                      "api_key": {
+                        "type": "string",
+                        "description": "Bright Data API token"
+                      },
+                      "disconnect": {
+                        "type": "boolean",
+                        "description": "Remove the token"
+                      }
+                    },
+                    "description": "Returns: {success: boolean, data: {connected: boolean}}"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/finance-pay-invoice": {
       "post": {
         "tags": [

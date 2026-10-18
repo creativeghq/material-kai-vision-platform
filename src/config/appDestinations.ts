@@ -110,6 +110,8 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   { id: 'finance-orders', breadcrumb: 'Finance → Orders', route: `${FINANCE_BASE}?tab=${FINANCE_TAB.orders}` },
   // Where a supplier invoice that arrived in the Inbox is booked. The attachment card links here.
   { id: 'finance-expenses', breadcrumb: 'Finance → Expenses', route: `${FINANCE_BASE}?tab=${FINANCE_TAB.expenses}`, aliases: ['Finance → Bills'] },
+  { id: 'finance-travel', breadcrumb: 'Finance → Travel', route: `${FINANCE_BASE}?tab=${FINANCE_TAB.travel}` },
+  { id: 'finance-trip-cards', breadcrumb: 'Finance → Expense Cards', route: `${FINANCE_BASE}?tab=${FINANCE_TAB.tripCards}`, aliases: ['Finance → Trip Cards'] },
   { id: 'marketing-email', breadcrumb: 'Marketing → Email', route: '/marketing/email' },
   { id: 'automations', breadcrumb: 'Marketing → Automations', route: '/automations' },
 

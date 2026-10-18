@@ -71,6 +71,7 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
 
   { value: FINANCE_TAB.planning, label: 'Planning', icon: CalendarClock, group: 'tools' },
   { value: FINANCE_TAB.tripCards, label: 'Expense Cards', icon: Plane, group: 'tools' },
+  { value: FINANCE_TAB.travel, label: 'Travel', icon: Plane, group: 'tools', hideForAccountant: true },
   { value: FINANCE_TAB.assets, label: 'Assets', icon: Boxes, group: 'tools' },
   { value: FINANCE_TAB.time, label: 'Time & Billing', icon: Clock, group: 'tools', hideForAccountant: true },
   // AI Assessment sits above Reports on purpose: everything below is a number you read yourself,

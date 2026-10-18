@@ -1928,6 +1928,25 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'travel',
+    capability: 'workspace.read',
+    moduleSlug: 'travel',
+    name: 'Travel',
+    description: 'Find flight fares and cost one onto your trip card as a planned line for finance to approve. Never books.',
+    icon: 'Plane',
+    tool_ids: ['search_flights', 'add_flight_to_trip_card'],
+    quick_starts: [
+      {
+        label: 'Find a flight', description: 'Fares for a route and dates', icon: 'Plane',
+        prompt: 'Find me a flight.',
+        done: 'Here are the fares Google Flights shows now. Nothing is booked.',
+        promptTemplate: 'Find flights from {{origin}} to {{destination}} on {{departure}}.',
+        run: { tool: 'search_flights' },
+        autoFields: true,
+      },
+    ],
+  },
+  {
     id: 'expenses',
     capability: 'finance.manage',
     name: 'Expenses',
@@ -3911,7 +3930,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   'web-research': 'sales',
   // Finance
   stock: 'finance', finance: 'finance', contracts: 'finance',
-  'trip-expenses': 'finance', expenses: 'finance', 'company-assets': 'finance',
+  'trip-expenses': 'finance', travel: 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
   catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
   'project-assessment': 'studio',

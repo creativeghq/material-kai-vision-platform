@@ -119,7 +119,7 @@ describe('#360 CB-1/CB-2 — the Keys panel tells the truth', () => {
   it('the rule is stated once, above every section', () => {
     expect(keysTab).toMatch(/const ByokRuleNote/);
     expect(keysTab).toMatch(/<ByokRuleNote \/>/);
-    expect(raw('src/components/core/Profile/WorkspaceKeysTab.tsx')).toMatch(/Nothing here falls back to ours/);
+    expect(raw('src/components/core/Profile/WorkspaceKeysTab.tsx')).toMatch(/never fall back to ours/);
   });
 
   it('the email section says what blank actually means', () => {

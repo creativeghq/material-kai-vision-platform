@@ -1620,6 +1620,126 @@
     ]
   },
   {
+    "name": "flight-search",
+    "tag": "Finance",
+    "summary": "Google Flights fares via Bright Data, costed onto trip cards (Travel module)",
+    "description": "Read-only fare search (#398). Requires the `travel` module and `workspace.read` on the workspace. Key resolution: the workspace's own Bright Data token (Profile → Keys → Data & Research, stored in Vault), else the platform key for the root workspace (unlimited) or the free allowance of 2 successful searches per calendar month. The allowance is derived once in `workspace_flight_search_quota`; `claim_flight_search` dedupes the same route/dates/party/cabin for 24 hours and claims a slot atomically, and a failed search never counts. Nothing is ever booked.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "search",
+        "summary": "Search fares. The same search within 24 hours returns the stored result and does not count again. 402 code=quota_exhausted when the free allowance is used up.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace"
+          },
+          {
+            "name": "origin",
+            "type": "string",
+            "required": true,
+            "desc": "3-letter IATA airport code"
+          },
+          {
+            "name": "destination",
+            "type": "string",
+            "required": true,
+            "desc": "3-letter IATA airport code"
+          },
+          {
+            "name": "departure",
+            "type": "string",
+            "required": true,
+            "desc": "Outbound date YYYY-MM-DD"
+          },
+          {
+            "name": "return",
+            "type": "string",
+            "required": false,
+            "desc": "Return date YYYY-MM-DD; empty for one way"
+          },
+          {
+            "name": "adults",
+            "type": "number",
+            "required": false,
+            "desc": "1 to 9 (default 1)"
+          },
+          {
+            "name": "cabin",
+            "type": "string",
+            "required": false,
+            "desc": "economy | premium_economy | business | first"
+          },
+          {
+            "name": "local_month",
+            "type": "string",
+            "required": true,
+            "desc": "The caller's calendar month YYYY-MM; must be the current month give or take a day"
+          },
+          {
+            "name": "today",
+            "type": "string",
+            "required": false,
+            "desc": "The caller's local date YYYY-MM-DD"
+          }
+        ],
+        "response": "{success: boolean, data: {cached: boolean, still_collecting?: boolean, search: {id, status, origin, destination, departure_date, return_date, trip_type, adults, cabin, key_source, offers: [{airline, flight_number, departure_time, arrival_time, duration_minutes, stops, price, currency}], offer_count, error}}}"
+      },
+      {
+        "name": "quota",
+        "summary": "The workspace's search allowance for this month: mode root | byok | free, with used / allowance / remaining and a sentence.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace"
+          },
+          {
+            "name": "local_month",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM"
+          }
+        ],
+        "response": "{success: boolean, data: {mode, used, allowance, remaining, reason}}"
+      },
+      {
+        "name": "credentials",
+        "summary": "Connect, replace or disconnect the workspace's own Bright Data API token (owner or admin). The token is verified against Bright Data before it is stored in Vault.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace"
+          },
+          {
+            "name": "api_key",
+            "type": "string",
+            "required": false,
+            "desc": "Bright Data API token"
+          },
+          {
+            "name": "disconnect",
+            "type": "boolean",
+            "required": false,
+            "desc": "Remove the token"
+          }
+        ],
+        "response": "{success: boolean, data: {connected: boolean}}"
+      }
+    ]
+  },
+  {
     "name": "finance-pay-invoice",
     "tag": "Finance",
     "summary": "Create a Stripe Checkout session or pay-link for an invoice",

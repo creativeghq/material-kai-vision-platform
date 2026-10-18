@@ -61,6 +61,7 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // one above because each is separately SOLD, has its own toolkit and its own agent owner —
   // and because `moduleSlug` here is what tells `toolModuleGates` the agent catalog is not
   // inventing a module no page-gating surface knows.
+  { id: 'travel', label: 'Travel', hub: 'finance', openInLabel: 'Finance', pageRoute: '/finance?tab=travel', agentId: 'kai', agentTool: 'search_flights', toolkitId: 'travel', recordTable: 'flight_searches', moduleSlug: 'travel' },
   { id: 'finance-assessment', label: 'AI Assessment — Finance', hub: 'finance', openInLabel: 'Finance', pageRoute: '/finance?tab=assessment', agentId: 'erp', agentTool: 'assess_finance', toolkitId: 'finance-assessment', recordTable: 'assessments', moduleSlug: 'finance-assessment' },
   { id: 'real-estate-assessment', label: 'AI Assessment — Real Estate', hub: 'sales', openInLabel: 'Real Estate', pageRoute: '/properties', agentId: 'property-advisor', agentTool: 'assess_property', toolkitId: 'real-estate-assessment', recordTable: 'assessments', moduleSlug: 'real-estate-assessment' },
   { id: 'catalog', label: 'Catalogs', hub: 'studio', pageRoute: '/catalogs', agentId: 'product-business', agentTool: 'create_catalog', toolkitId: 'catalogs', recordTable: 'presentation_catalogs', canvasKind: 'catalog', moduleSlug: 'presentation-catalogs' },

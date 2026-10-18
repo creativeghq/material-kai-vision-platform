@@ -1154,6 +1154,72 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "flight-search",
+    "tag": "Finance",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Google Flights fares via Bright Data, costed onto trip cards (Travel module)",
+    "description": "Read-only fare search (#398). Requires the `travel` module and `workspace.read` on the workspace. Key resolution: the workspace's own Bright Data token (Profile → Keys → Data & Research, stored in Vault), else the platform key for the root workspace (unlimited) or the free allowance of 2 successful searches per calendar month. The allowance is derived once in `workspace_flight_search_quota`; `clai",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "search",
+          "quota",
+          "credentials"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      },
+      "workspace_id": {
+        "type": "string",
+        "required": true,
+        "description": "Workspace"
+      },
+      "origin": {
+        "type": "string",
+        "description": "3-letter IATA airport code"
+      },
+      "destination": {
+        "type": "string",
+        "description": "3-letter IATA airport code"
+      },
+      "departure": {
+        "type": "string",
+        "description": "Outbound date YYYY-MM-DD"
+      },
+      "return": {
+        "type": "string",
+        "description": "Return date YYYY-MM-DD; empty for one way"
+      },
+      "adults": {
+        "type": "number",
+        "description": "1 to 9 (default 1)"
+      },
+      "cabin": {
+        "type": "string",
+        "description": "economy | premium_economy | business | first"
+      },
+      "local_month": {
+        "type": "string",
+        "description": "The caller's calendar month YYYY-MM; must be the current month give or take a day"
+      },
+      "today": {
+        "type": "string",
+        "description": "The caller's local date YYYY-MM-DD"
+      },
+      "api_key": {
+        "type": "string",
+        "description": "Bright Data API token"
+      },
+      "disconnect": {
+        "type": "boolean",
+        "description": "Remove the token"
+      }
+    }
+  },
+  {
     "name": "flow-engine",
     "tag": "Flows",
     "methods": [

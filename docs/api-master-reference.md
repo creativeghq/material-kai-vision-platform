@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (171)
+## 1. Supabase Edge Functions (172)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -117,6 +117,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `finance-send-payment` | JWT / kai_* | Instruct a real bank transfer from a workspace account to a counterparty |
 | `finance-send-statement` | JWT / kai_* / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |
 | `finance-storefront` | public | Public online storefront: browse products and submit cart checkout |
+| `flight-search` | JWT | Google Flights fares via Bright Data, costed onto trip cards (Travel module) |
 | `generate-contract-pdf` | JWT / kai_* | Render a signed/draft contract to PDF |
 | `generate-purchase-sheet-pdf` | JWT / secret | Render a project purchase sheet (doors/windows + other purchase items) to PDF |
 | `novus-onboarding` | JWT / kai_* | Register a workspace's VAT with Novus so it can transmit to myDATA |

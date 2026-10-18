@@ -43,6 +43,17 @@ export interface ToolManifestEntry {
 
 export const TOOL_MANIFEST: ToolManifestEntry[] = [
   {
+    name: 'add_flight_to_trip_card',
+    file: 'supabase/functions/_shared/tools/travel-tools.ts',
+    factory: 'createAddFlightToTripCardTool',
+    description: 'Put one fare from a search_flights result onto the user\'s draft trip card as a PLANNED line, so finance can approve it before anyone books.',
+    params: [
+      { name: 'search_id', type: 'string', optional: false, description: 'search_id returned by search_flights' },
+      { name: 'offer_index', type: 'number', optional: false, description: 'Index of the offer in that search (0 = cheapest)' },
+      { name: 'card_id', type: 'string', optional: true, description: 'Draft trip card id; defaults to the user\'s latest draft card' },
+    ],
+  },
+  {
     name: 'add_material_to_catalog',
     file: 'supabase/functions/_shared/tools/catalog-tools.ts',
     factory: 'createAddMaterialToCatalogTool',
@@ -1808,6 +1819,20 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'kad', type: 'string', optional: false, description: 'The ΚΑΔ activity code to search for, e.g. "46.73.10" or sector "46".' },
       { name: 'match', type: 'enum', enum: ['exact', 'prefix'], optional: true, description: 'Force exact or prefix matching; inferred when omitted.' },
+    ],
+  },
+  {
+    name: 'search_flights',
+    file: 'supabase/functions/_shared/tools/travel-tools.ts',
+    factory: 'createSearchFlightsTool',
+    description: 'Search Google Flights fares for a route and dates (3-letter IATA airport codes).',
+    params: [
+      { name: 'origin', type: 'string', optional: false, description: 'Origin airport, 3-letter IATA code, e.g. ATH' },
+      { name: 'destination', type: 'string', optional: false, description: 'Destination airport, 3-letter IATA code, e.g. FCO' },
+      { name: 'departure', type: 'string', optional: false, description: 'Outbound date, YYYY-MM-DD' },
+      { name: 'return_date', type: 'string', optional: true, description: 'Return date, YYYY-MM-DD. Leave out for one way.' },
+      { name: 'adults', type: 'number', optional: true, description: 'Passengers, 1 to 9 (default 1)' },
+      { name: 'cabin', type: 'enum', enum: ['economy', 'premium_economy', 'business', 'first'], optional: true, description: 'Cabin class (default economy)' },
     ],
   },
   {
