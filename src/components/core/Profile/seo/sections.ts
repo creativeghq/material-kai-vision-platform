@@ -71,7 +71,10 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
     value: 'authority', label: 'Authority', icon: Radar, group: 'visibility',
     views: [{ value: 'summary', label: 'Backlinks & authority' }, { value: 'history', label: 'Audit history' }],
   },
-  { value: 'competitors', label: 'Competitors', icon: Swords, group: 'visibility' },
+  {
+    value: 'competitors', label: 'Competitors', icon: Swords, group: 'visibility',
+    views: [{ value: 'domains', label: 'Competitors' }, { value: 'gap', label: 'Keyword gap' }],
+  },
 
   {
     value: 'articles', label: 'Articles', icon: FileText, group: 'content',

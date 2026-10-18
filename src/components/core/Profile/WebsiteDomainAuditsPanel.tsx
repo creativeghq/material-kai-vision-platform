@@ -10,6 +10,7 @@ import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 import { userWebsitesService, type UserWebsite, type WebsiteDomainHistoryRow } from '@/services/userWebsitesService';
 import { Loading } from './seo/dashboardPrimitives';
+import { RunPrice } from './seo/RunPrice';
 
 const SOURCE_LABEL: Record<string, string> = { domain_tracker: 'Snapshot', toolkit_audit: 'Earlier audit' };
 
@@ -38,7 +39,7 @@ export const WebsiteDomainAuditsPanel: React.FC<{ website: UserWebsite }> = ({ w
 
   const button = (
     <Button size="sm" variant="outline" disabled={busy} onClick={() => void collect()}>
-      {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Take a snapshot now
+      {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Take a snapshot now<RunPrice websiteId={website.id} collector="domain_tracking" />
     </Button>
   );
 

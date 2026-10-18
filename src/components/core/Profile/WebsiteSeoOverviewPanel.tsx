@@ -17,6 +17,7 @@ import { timeAgo } from '@/utils/datetime';
 import { SeoMetricTile } from './seo/SeoMetricTile';
 import { DomainRankingKeywordsCard } from './seo/DomainRankingKeywordsCard';
 import { WebsiteOpportunitiesCard } from './seo/WebsiteOpportunitiesCard';
+import { WebsiteSetupChecklist } from './seo/WebsiteSetupChecklist';
 import {
   DOMAIN_METRICS,
   GSC_METRICS,
@@ -171,6 +172,7 @@ export const WebsiteSeoOverviewPanel: React.FC<{
 
   return (
     <div className="space-y-4">
+      {onOpenTab && <WebsiteSetupChecklist websiteId={website.id} onOpenTab={onOpenTab} />}
       <WebsiteOpportunitiesCard websiteId={website.id} onOpenTab={onOpenTab} />
       {/* ── Search presence ─────────────────────────────────────────────── */}
       <Card className="dashboard-card">

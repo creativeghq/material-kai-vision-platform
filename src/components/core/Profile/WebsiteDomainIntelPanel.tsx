@@ -13,6 +13,7 @@ import { timeAgo } from '@/utils/datetime';
 import { safeHref } from '@/utils/safeUrl';
 import { sourceStatusPresentation, statusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import { useTableSegments } from './seo/useTableSegments';
+import { RunPrice } from './seo/RunPrice';
 
 type LinkSortKey = 'domain' | 'rank' | 'anchor' | 'first_seen';
 const fmt = (n: number | null | undefined) => (n == null ? '—' : formatNumber(Math.round(n)));
@@ -109,7 +110,7 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
           </div>
           <Button variant="outline" size="sm" onClick={run} disabled={running}>
             {running ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-            {s ? 'Refresh' : 'Snapshot now'}
+            {s ? 'Refresh' : 'Snapshot now'}<RunPrice websiteId={website.id} collector="domain_tracking" />
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">

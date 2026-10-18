@@ -8,6 +8,7 @@ import { userWebsitesService, type UserWebsite, type WebsiteHealth } from '@/ser
 import { buildCheckInventory } from './seo/onPageChecks';
 import { CheckInventoryList } from './seo/CheckInventoryList';
 import { Link } from 'react-router-dom';
+import { RunPrice } from './seo/RunPrice';
 
 
 const scoreColor = (s: number | null) =>
@@ -80,7 +81,7 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
           </div>
           <Button variant="outline" size="sm" onClick={run} disabled={running}>
             {running ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-            {health ? 'Re-check' : 'Run check'}
+            {health ? 'Re-check' : 'Run check'}<RunPrice websiteId={website.id} collector="site_audit" />
           </Button>
         </CardHeader>
         <CardContent>

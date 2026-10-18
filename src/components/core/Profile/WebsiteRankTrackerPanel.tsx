@@ -34,6 +34,7 @@ import { SerpTargetPicker, shortLocationName } from './seo/SerpTargetPicker';
 import { safeHref } from '@/utils/safeUrl';
 import { KeywordActions } from './seo/KeywordActions';
 import { refreshTrackedKeywords, useWebsiteMarket } from './seo/useWebsiteKeywords';
+import { RunPrice } from './seo/RunPrice';
 
 const DEFAULT_TARGET: KeywordTarget = { device: 'desktop', location: null };
 const ALL = 'all';
@@ -427,7 +428,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
             {data?.tracked ? (
               <Button size="sm" variant="outline" onClick={check} disabled={!!busy}>
                 {busy === 'check' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
-                Check now
+                Check now<RunPrice websiteId={website.id} collector="rank_tracking" />
               </Button>
             ) : null}
             {!showAdd && (
@@ -465,7 +466,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
               }
               action={
                 <Button size="sm" onClick={() => (data.tracked ? check() : setShowAdd(true))} disabled={!!busy}>
-                  {data.tracked ? 'Check now' : 'Add keywords'}
+                  {data.tracked ? <>Check now<RunPrice websiteId={website.id} collector="rank_tracking" /></> : 'Add keywords'}
                 </Button>
               }
             />

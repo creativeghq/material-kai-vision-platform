@@ -44,4 +44,13 @@ describe('paid collectors run on the customer schedule (#475)', () => {
   it('the price shown before a schedule comes from the spend gate formula', () => {
     expect(strippedSource('supabase/functions/seo-api/handlers/collector-estimates.ts')).toContain('ceilingCreditsFor(');
   });
+  it('a manual run states its price, and setup and the competitor gap are derived, not stored', () => {
+    for (const f of ['WebsiteRankTrackerPanel', 'WebsiteHealthPanel', 'WebsiteDomainIntelPanel', 'WebsiteDomainAuditsPanel']) {
+      expect(strippedSource(`src/components/core/Profile/${f}.tsx`), f).toContain('<RunPrice');
+    }
+    expect(strippedSource('src/components/core/Profile/seo/WebsiteSetupChecklist.tsx')).toContain("'get_website_setup'");
+    const gap = strippedSource('src/components/core/Profile/seo/CompetitorGapPanel.tsx');
+    expect(gap).toContain("'get_competitor_keyword_gap'");
+    expect(gap).toContain('<KeywordActions');
+  });
 });

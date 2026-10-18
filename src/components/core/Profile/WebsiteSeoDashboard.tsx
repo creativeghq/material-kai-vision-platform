@@ -13,6 +13,7 @@ import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVis
 import { PresencePlanCard } from '@/components/core/Profile/seo/PresencePlanCard';
 import { WebsiteMarketControl } from '@/components/core/Profile/seo/WebsiteMarketControl';
 import { WebsiteSchedulesPanel } from '@/components/core/Profile/seo/WebsiteSchedulesPanel';
+import { CompetitorGapPanel } from '@/components/core/Profile/seo/CompetitorGapPanel';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
 import { WebsiteSerpFeaturesPanel } from '@/components/core/Profile/WebsiteSerpFeaturesPanel';
@@ -226,8 +227,9 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
           {view === 'history' ? <WebsiteDomainAuditsPanel website={website} /> : <WebsiteDomainIntelPanel website={website} />}
         </TabsContent>
 
-        <TabsContent value="competitors">
-          <WebsiteCompetitorsPanel website={website} />
+        <TabsContent value="competitors" className="space-y-4">
+          {viewStrip('competitors')}
+          {view === 'gap' ? <CompetitorGapPanel websiteId={website.id} /> : <WebsiteCompetitorsPanel website={website} />}
         </TabsContent>
 
         <TabsContent value="articles" className="space-y-4">

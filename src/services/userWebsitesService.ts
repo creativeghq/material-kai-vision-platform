@@ -900,6 +900,7 @@ export interface TrackKeywordsResult {
 
 export const trackedKeywordStore = new KeyedStore<Set<string>>(() => new Set(), (websiteId) => userWebsitesService.trackedKeywordStrings(websiteId));
 export const websiteMarketStore = new KeyedStore<WebsiteMarket | null>(() => null, (websiteId) => userWebsitesService.market(websiteId));
+export const collectorEstimateStore = new KeyedStore<CollectorEstimate[] | null>(() => null, (websiteId) => userWebsitesService.scheduleEstimates(websiteId));
 
 export const userWebsitesService = {
   /** List connected websites for a workspace (default first). Pass the active
