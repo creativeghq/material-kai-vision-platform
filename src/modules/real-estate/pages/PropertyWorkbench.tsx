@@ -1539,7 +1539,7 @@ const InvestmentTab: React.FC<{ ws: string | null; propertyId: string; canManage
 const InvStat: React.FC<{ label: string; value: string; accent?: boolean; tone?: 'pos' | 'neg' }> = ({ label, value, accent, tone }) => (
   <div className={`dashboard-card p-3 ${accent ? 'ring-1 ring-primary/30' : ''}`}>
     <div className="text-[11px] text-muted-foreground">{label}</div>
-    <div className={`mt-0.5 text-base font-semibold ${tone === 'pos' ? 'text-emerald-700 dark:text-emerald-500' : tone === 'neg' ? 'text-red-700 dark:text-red-500' : accent ? 'text-primary' : ''}`}>{value}</div>
+    <div className={`mt-0.5 text-base font-semibold ${tone === 'pos' ? 'text-emerald-700 dark:text-emerald-500' : tone === 'neg' ? 'text-red-700 dark:text-red-400' : accent ? 'text-primary' : ''}`}>{value}</div>
   </div>
 );
 const Detail: React.FC<{ label: string; value: string }> = ({ label, value }) => (

@@ -118,6 +118,7 @@ describe('design system — every theme defines every surface token', () => {
   for (const sel of ["html.light[data-accent='blue'] {", "html.dark[data-accent='blue'] {"]) {
     it(`${sel.trim()} retints the hairline along with the surfaces`, () => {
       const body = block(sel);
+      if (!/--(card|border):/.test(body)) return;
       expect(
         body.includes('--hairline:'),
         `${sel} overrides the neutral surfaces but not --hairline, so every border in the app ` +

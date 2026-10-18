@@ -223,41 +223,41 @@ All colors MUST be HSL.
 
     /* ===== DARK THEME COLOR SYSTEM ===== */
     /* Main Background - Near black */
-    --background: 258 22% 5%;   /* #0a090e — deep plum-black command center */
-    --foreground: 280 15% 93%;  /* warm near-white ink */
+    --background: 0 0% 8%;      /* #151515 — neutral charcoal */
+    --foreground: 45 12% 93%;   /* #f0efec — warm near-white ink */
 
     /* Page container */
-    --page-background: 258 22% 5%;
+    --page-background: 0 0% 8%;
 
     /* Content sections/cards — elevation ladder step 1 */
-    --card: 266 22% 8%;         /* #141019 */
-    --card-foreground: 280 15% 93%;
+    --card: 60 1% 12%;          /* #1f1f1e */
+    --card-foreground: 45 12% 93%;
 
-    --popover: 262 24% 12%;     /* #1b1626 — elevated */
-    --popover-foreground: 280 15% 93%;
+    --popover: 60 1% 15%;       /* #272726 — elevated */
+    --popover-foreground: 45 12% 93%;
 
-    /* Primary — brightened magenta-plum (flat brand accent) */
-    --primary: 335 74% 60%;     /* #e64c8c */
-    --primary-foreground: 0 0% 100%;
+    /* Primary — the light theme's olive, lifted for dark: 7.6:1 on the page, so fills take DARK text */
+    --primary: 56 30% 55%;      /* #afaa6a */
+    --primary-foreground: 0 0% 8%;
 
     /* Brand gradient (plum) — reserved for IDENTITY surfaces only (PageHeader,
        logo, hero). No longer painted on every bg-primary fill; buttons, active
        tabs and nav now use the flat --primary accent. */
-    --brand-blue: 300 45% 30%;
-    --brand-red: 335 74% 60%;
-    --brand-gradient: linear-gradient(135deg, #3a1230 0%, #7a2456 46%, #c93d84 100%);
+    --brand-blue: 56 28% 25%;
+    --brand-red: 56 30% 55%;
+    --brand-gradient: linear-gradient(135deg, #4a4726 0%, #65623c 46%, #8f8c5a 100%);
 
     /* Secondary — elevation ladder step 3 (recessed) */
-    --secondary: 262 24% 15%;  /* #241d31 */
+    --secondary: 60 1% 18%;    /* #2e2e2d */
     --secondary-foreground: 0 0% 85%;
 
     /* Muted */
-    --muted: 262 24% 15%;
-    --muted-foreground: 258 14% 60%;  /* violet-grey */
+    --muted: 60 1% 18%;
+    --muted-foreground: 48 4% 62%;  /* warm grey */
 
-    /* Accent — subtle plum-tinted hover surface */
-    --accent: 280 22% 16%;
-    --accent-foreground: 300 40% 88%;
+    /* Accent — subtle neutral hover surface */
+    --accent: 60 1% 18%;
+    --accent-foreground: 45 12% 90%;
 
     /* Amber - Vibrant warm highlight */
     --amber: 32 100% 65%;       /* Slightly toned amber */
@@ -269,31 +269,31 @@ All colors MUST be HSL.
     --destructive-foreground: 0 0% 100%;  /* White text */
 
     /* Borders - Subtle white borders */
-    --border: 260 16% 18%;
-    --input: 260 16% 18%;
-    --ring: 335 74% 60%;  /* Focus ring — magenta accent */
+    --border: 60 2% 21%;
+    --input: 60 2% 21%;
+    --ring: 56 30% 55%;  /* Focus ring — olive accent */
 
     /* Row / list / card hover. Dark had no --surface-hover at all (only light
        defined one), so every "hover tint" in the app was a hand-picked
        white/NN. One token, both themes. */
-    --surface-hover: 264 20% 12%;
+    --surface-hover: 60 1% 15%;
     /* The line under a table header, between list rows, around a card. One
        hairline value everywhere is most of what makes a dense UI read as tidy. */
-    --hairline: 260 16% 18%;
+    --hairline: 60 2% 21%;
     /* Table header strip + any "sunken" sub-surface (toolbars, filter rows). */
-    --surface-sunken: 262 22% 10%;
+    --surface-sunken: 60 1% 10%;
 
     --radius: 0.375rem;  /* 6px — see the radius scale above */
 
     /* Sidebar/TopNav - Dark theme */
-    --sidebar-background: 264 22% 7%;  /* rail — slightly lifted from bg */
-    --sidebar-foreground: 258 12% 60%;
-    --sidebar-accent: 335 74% 60%;  /* magenta active */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 260 16% 18%;
+    --sidebar-background: 0 0% 7%;  /* #111111 rail — a step below the page */
+    --sidebar-foreground: 48 4% 62%;
+    --sidebar-accent: 56 30% 55%;  /* olive active */
+    --sidebar-accent-foreground: 0 0% 8%;
+    --sidebar-border: 0 0% 16%;
 
     /* Hero section background */
-    --hero-background: 0 0% 11%;  /* Same as card */
+    --hero-background: 60 1% 12%;  /* Same as card */
 
     /* ===== STAT BUBBLE COLORS (Dark Theme) ===== */
     --bubble-sage: 95 25% 30%;       /* Dark sage */
@@ -625,44 +625,16 @@ All colors MUST be HSL.
     --brand-gradient: linear-gradient(135deg, #0f2547 0%, #1c5091 46%, #2f6fed 100%);
   }
 
-  /* Blue — DARK theme. Shifts the plum-black command center to a deep navy-black
-     with a brightened blue accent + deep-navy identity gradient. */
+  /* Blue — DARK theme. Same neutral charcoal ramp as the default dark; only the
+     accent changes, to claude.ai's link blue (dark text on fills, 7.3:1). */
   html.dark[data-accent='blue'] {
-    --background: 220 40% 6%;        /* deep navy-black */
-    --page-background: 220 40% 6%;
-    --foreground: 210 20% 93%;
-
-    --card: 220 34% 9%;
-    --card-foreground: 210 20% 93%;
-    --popover: 220 30% 12%;
-    --popover-foreground: 210 20% 93%;
-
-    --primary: 212 74% 54%;          /* #2f80d6 */
-    --primary-foreground: 0 0% 100%;
-    --brand-blue: 216 60% 28%;
-    --brand-red: 212 74% 54%;
-    --brand-gradient: linear-gradient(135deg, #0c1e3d 0%, #1a4a86 46%, #3a86e0 100%);
-
-    --secondary: 218 30% 15%;
-    --secondary-foreground: 0 0% 85%;
-    --muted: 218 30% 15%;
-    --muted-foreground: 215 16% 62%;
-    --accent: 217 30% 16%;
-    --accent-foreground: 210 40% 88%;
-
-    --border: 217 25% 18%;
-    --input: 217 25% 18%;
-    --ring: 212 74% 54%;
-    --hairline: 217 25% 18%;
-    --surface-hover: 220 30% 13%;
-    --surface-sunken: 220 32% 11%;
-
-    --sidebar-background: 220 34% 8%;
-    --sidebar-foreground: 215 14% 60%;
-    --sidebar-accent: 212 74% 54%;
-    --sidebar-border: 217 25% 18%;
-
-    --hero-background: 220 34% 9%;
+    --primary: 213 77% 68%;          /* #6da7ec */
+    --primary-foreground: 0 0% 8%;
+    --brand-blue: 214 45% 26%;
+    --brand-red: 213 77% 68%;
+    --brand-gradient: linear-gradient(135deg, #13243a 0%, #24538a 46%, #4a86cc 100%);
+    --ring: 213 77% 68%;
+    --sidebar-accent: 213 77% 68%;
   }
 }
 

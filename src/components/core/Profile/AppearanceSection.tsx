@@ -21,20 +21,20 @@ const ACCENT_OPTIONS: {
 }[] = [
   {
     value: 'green',
-    label: { light: 'Olive', dark: 'Magenta' },
-    description: 'The platform default — green surfaces with an olive accent in light, magenta in dark.',
+    label: { light: 'Olive', dark: 'Olive' },
+    description: 'The platform default — an olive accent, on green surfaces in light and charcoal in dark.',
     gradient: {
       light: 'linear-gradient(135deg, #4a4726 0%, #65623c 46%, #8f8c5a 100%)',
-      dark: 'linear-gradient(135deg, #3a1230 0%, #7a2456 46%, #c93d84 100%)',
+      dark: 'linear-gradient(135deg, #4a4726 0%, #7d7948 46%, #afaa6a 100%)',
     },
   },
   {
     value: 'blue',
     label: { light: 'Blue', dark: 'Blue' },
-    description: 'Cool B2B navy-to-blue in both light and dark.',
+    description: 'Cool B2B blue — on slate in light, on charcoal in dark.',
     gradient: {
       light: 'linear-gradient(135deg, #0f2547 0%, #1c5091 46%, #2f6fed 100%)',
-      dark: 'linear-gradient(135deg, #0c1e3d 0%, #1a4a86 46%, #3a86e0 100%)',
+      dark: 'linear-gradient(135deg, #13243a 0%, #3a6aa3 46%, #6da7ec 100%)',
     },
   },
 ];

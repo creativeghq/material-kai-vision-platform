@@ -66,17 +66,17 @@ all four. The specimen page has the switcher for exactly this reason.
 
 | Token | Dark (green) | Light (green) | Meaning |
 |---|---|---|---|
-| `--background` | `258 22% 5%` | `42 27% 93%` | The page. One flat colour, no gradient. |
-| `--card` | `266 22% 8%` | `48 30% 97%` | A panel. One step up from the page. |
-| `--surface-sunken` | `262 22% 10%` | `44 24% 91%` | Table headers, toolbars, footers — one step *down*. |
-| `--surface-hover` | `264 20% 12%` | `44 24% 90%` | Row / list-item / interactive-panel hover. |
-| `--hairline` | `260 16% 18%` | `46 18% 82%` | **Every** rule, border and separator in the app. |
-| `--primary` | `335 74% 60%` | `56 24% 37%` | The accent. Fills, links, active states, focus. |
-| `--foreground` | `280 15% 93%` | `46 14% 21%` | Body ink. |
-| `--muted-foreground` | `258 14% 60%` | `48 16% 38%` | Labels, captions, table headers, empty values. |
+| `--background` | `0 0% 8%` | `42 27% 93%` | The page. One flat colour, no gradient. |
+| `--card` | `60 1% 12%` | `48 30% 97%` | A panel. One step up from the page. |
+| `--surface-sunken` | `60 1% 10%` | `44 24% 91%` | Table headers, toolbars, footers — one step *down*. |
+| `--surface-hover` | `60 1% 15%` | `44 24% 90%` | Row / list-item / interactive-panel hover. |
+| `--hairline` | `60 2% 21%` | `46 18% 82%` | **Every** rule, border and separator in the app. |
+| `--primary` | `56 30% 55%` | `56 24% 37%` | The accent. Fills, links, active states, focus. |
+| `--foreground` | `45 12% 93%` | `46 14% 21%` | Body ink. |
+| `--muted-foreground` | `48 4% 62%` | `48 16% 38%` | Labels, captions, table headers, empty values. |
 
 The **blue** accent retints the same set (`html.light[data-accent='blue']`, `html.dark[data-accent='blue']`):
-a cool slate page with white cards on light, a navy-black command centre on dark.
+a cool slate page with white cards on light; on dark only the accent changes (blue `213 77% 68%` on the same charcoal). Both dark accents are light enough that `--primary-foreground` is DARK ink, not white.
 
 ### Semantic colour
 

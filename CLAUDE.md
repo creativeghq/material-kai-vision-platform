@@ -656,7 +656,7 @@ controls, underline tabs, one accent. It replaced a marketing language (glass pa
 aurora behind every page, pill buttons that lifted on hover) that was being applied to screens
 whose job is showing tables of money.
 
-- **Colour is unchanged**: dark/light modes × green/blue accents, owned by `ThemeContext`. Dark = plum-black + magenta; light = olive/cream (green) or slate + blue. **Every surface must work in all four** — check at `/design-system`, which has the switcher.
+- **Colour is unchanged**: dark/light modes × green/blue accents, owned by `ThemeContext`. Dark = neutral charcoal + olive (green) or blue, both with dark ink on primary fills; light = olive/cream (green) or slate + blue. **Every surface must work in all four** — check at `/design-system`, which has the switcher.
 - **Three surfaces, and that is the whole ladder**: `bg-background` (page, FLAT — no gradient, no aurora) → `bg-card` + `border-hairline` (panel) → `bg-surface-sunken` (toolbar / table header / footer). `--hairline` is the ONE rule colour in the app.
 - **A panel is separated by a hairline, not a shadow, and does not move on hover.** Shadow (`shadow-overlay`) is only for things that genuinely float: dropdown, popover, dialog, toast. A panel that is itself a click target gets `panel-interactive`.
 - **`.dashboard-card` / `<Card>` are the panel.** Never recreate one inline. The `--glass-*` tokens kept their names and now hold opaque values, which is why retiring glass did not need a 400-file sweep.

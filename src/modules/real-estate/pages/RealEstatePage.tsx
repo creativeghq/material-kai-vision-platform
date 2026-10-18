@@ -679,7 +679,7 @@ const DeleteIconButton: React.FC<{ title: string; confirmText: string; onDelete:
   const go = async () => { setBusy(true); try { await onDelete(); setOpen(false); } finally { setBusy(false); } };
   return (
     <>
-      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-red-700 dark:text-red-500 hover:bg-red-500/10 hover:text-red-600" title={title} onClick={(e) => { e.stopPropagation(); setOpen(true); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-red-700 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600" title={title} onClick={(e) => { e.stopPropagation(); setOpen(true); }}><Trash2 className="h-3.5 w-3.5" /></Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{title}?</DialogTitle></DialogHeader>
@@ -1079,7 +1079,7 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
                 <div className="font-medium">{iv.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· {money(iv.metrics?.total_investment ?? 0, iv.currency)} in</span></div>
                 <div className="mt-0.5 text-xs text-muted-foreground">net yield {iv.metrics?.net_yield_pct ?? 0}% · cap {iv.metrics?.cap_rate_pct ?? 0}% · CoC {iv.metrics?.cash_on_cash_pct ?? 0}%</div>
               </div>
-              <div className={`shrink-0 text-sm font-semibold ${(iv.metrics?.monthly_cash_flow ?? 0) >= 0 ? 'text-emerald-700 dark:text-emerald-500' : 'text-red-700 dark:text-red-500'}`}>{money(iv.metrics?.monthly_cash_flow ?? 0, iv.currency)}/mo</div>
+              <div className={`shrink-0 text-sm font-semibold ${(iv.metrics?.monthly_cash_flow ?? 0) >= 0 ? 'text-emerald-700 dark:text-emerald-500' : 'text-red-700 dark:text-red-400'}`}>{money(iv.metrics?.monthly_cash_flow ?? 0, iv.currency)}/mo</div>
             </button>
             <div className="pr-3"><DeleteIconButton title="Delete investment analysis" confirmText={`Remove the investment analysis for ${iv.property?.title || 'this property'}? The listing itself is not affected.`} onDelete={() => realEstateService.deleteInvestment(ws as string, iv.property_id).then(load)} /></div>
           </div>

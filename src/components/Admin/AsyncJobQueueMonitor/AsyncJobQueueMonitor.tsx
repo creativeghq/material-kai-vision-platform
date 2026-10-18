@@ -1653,7 +1653,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     onClick={() => setAutoRefresh(!autoRefresh)}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
                       autoRefresh
-                        ? 'bg-primary text-white hover:bg-primary/90 shadow-sm'
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
                         : 'bg-white/10 text-foreground hover:bg-white/15 border border-white/10'
                     }`}
                   >
