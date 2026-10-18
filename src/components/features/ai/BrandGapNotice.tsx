@@ -23,7 +23,7 @@ export const BrandGapNotice: React.FC<{ analysis: unknown; websiteId: string | n
       <span>
         Not a writing problem: the article has nothing on {gaps.map((g) => BRAND_CATEGORIES[g]).join(' or ')}.{' '}
         {websiteId ? (
-          <Link className="text-primary underline" to={`/websites/${websiteId}?section=brand`}>Set it once under Brand</Link>
+          <Link className="text-primary underline" to={`/websites/${websiteId}?section=articles&view=brand`}>Set it once under Brand</Link>
         ) : 'Set it once under the website’s Brand settings'}
         {' '}and every article written after that carries it.
       </span>

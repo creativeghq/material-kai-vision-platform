@@ -28,8 +28,8 @@ import { WebsiteToolkitRunsPanel } from '@/components/core/Profile/WebsiteToolki
 import { WebsiteDomainAuditsPanel } from '@/components/core/Profile/WebsiteDomainAuditsPanel';
 import { WebsiteCannibalisationPanel } from '@/components/core/Profile/WebsiteCannibalisationPanel';
 import { WebsiteBrandProfilePanel } from '@/components/core/Profile/WebsiteBrandProfilePanel';
-import { HubRailSectionLabel, HubStatGrid, HubStatTile } from '@/components/core/hub';
-import { resolveSeoSection, seoRailRows, type SeoSectionId } from '@/components/core/Profile/seo/sections';
+import { HubRailSectionLabel, HubStatGrid, HubStatTile, HubTabNav } from '@/components/core/hub';
+import { resolveSeoTarget, seoRailRows, seoSectionViews, type SeoSectionId } from '@/components/core/Profile/seo/sections';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -47,23 +47,35 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
   // neither had an address: a reload dropped you at the site list and no pane could be linked to.
   const [params, setParams] = useSearchParams();
   const rawSection = params.get('section');
-  const tab = resolveSeoSection(rawSection);
+  const rawView = params.get('view');
+  const { section: tab, view } = resolveSeoTarget(rawSection, rawView);
+
+  const writeTarget = (section: SeoSectionId, nextView: string | null) => {
+    const next = new URLSearchParams(params);
+    next.set('section', section);
+    if (nextView) next.set('view', nextView); else next.delete('view');
+    setParams(next, { replace: true });
+  };
 
   // Normalise only when `?section=` was SET — its absence is the default, not a stale bookmark.
   useEffect(() => {
-    if (rawSection && rawSection !== tab) {
-      const next = new URLSearchParams(params);
-      next.set('section', tab);
-      setParams(next, { replace: true });
-    }
+    if (rawSection && (rawSection !== tab || (rawView ?? null) !== view)) writeTarget(tab, view);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawSection, tab]);
+  }, [rawSection, rawView, tab, view]);
 
+  /** A section id, a legacy id, or `section/view`. */
   const setTab = (id: string) => {
-    const next = new URLSearchParams(params);
-    next.set('section', id as SeoSectionId);
-    setParams(next, { replace: true });
+    const target = resolveSeoTarget(id);
+    writeTarget(target.section, target.view);
   };
+  const viewStrip = (section: SeoSectionId) => (
+    <HubTabNav
+      items={seoSectionViews(section).map((v) => ({ id: v.value, label: v.label }))}
+      activeId={view ?? undefined}
+      onSelect={(id) => writeTarget(section, id)}
+      aria-label="Views"
+    />
+  );
   const [overview, setOverview] = useState<WebsiteSeoOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [recrawling, setRecrawling] = useState(false);
@@ -144,9 +156,9 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
           down the page instead of read one at a time. */}
       <HubStatGrid>
         <HubStatTile label="Articles" value={loading || !overview ? '—' : overview.articles.total} onClick={() => setTab('articles')} />
-        <HubStatTile label="Keyword research" value={loading || !overview ? '—' : overview.keyword_research.total} onClick={() => setTab('research')} />
-        <HubStatTile label="Toolkit runs" value={loading || !overview ? '—' : overview.toolkit_runs.total} onClick={() => setTab('runs')} />
-        <HubStatTile label="Tracked domains" value={loading || !overview ? '—' : overview.tracked_domains.total} onClick={() => setTab('domains')} />
+        <HubStatTile label="Keyword research" value={loading || !overview ? '—' : overview.keyword_research.total} onClick={() => setTab('keywords/research')} />
+        <HubStatTile label="Toolkit runs" value={loading || !overview ? '—' : overview.toolkit_runs.total} onClick={() => setTab('reports/runs')} />
+        <HubStatTile label="Domain audits" value={loading || !overview ? '—' : overview.tracked_domains.total} onClick={() => setTab('authority/history')} />
       </HubStatGrid>
 
       {/* Rendered from `SEO_SECTIONS` — seo/sections.ts. `HubRailSectionLabel` is how a group
@@ -179,95 +191,62 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
           <WebsiteAiVisibilityPanel website={website} />
         </TabsContent>
 
-        {/* The keywords the operator CHOSE. Every other pane here is discovery. */}
-        <TabsContent value="ranks">
-          <WebsiteRankTrackerPanel website={website} />
+        <TabsContent value="gsc" className="space-y-4">
+          {viewStrip('gsc')}
+          {view === 'cannibalisation' ? <WebsiteCannibalisationPanel website={website} /> : <WebsiteGscPanel website={website} />}
         </TabsContent>
 
-        <TabsContent value="serp-features">
-          <WebsiteSerpFeaturesPanel website={website} onOpenRanks={() => setTab('ranks')} />
+        {/* Tracked = the keywords the operator CHOSE. Every other view here is discovery. */}
+        <TabsContent value="keywords" className="space-y-4">
+          {viewStrip('keywords')}
+          {view === 'serp' && <WebsiteSerpFeaturesPanel website={website} onOpenRanks={() => setTab('keywords/tracked')} />}
+          {view === 'research' && <WebsiteKeywordResearchPanel website={website} />}
+          {view === 'tracked' && <WebsiteRankTrackerPanel website={website} />}
         </TabsContent>
 
-        {/* The same derivations, frozen per build so an old report keeps its own period. */}
-        <TabsContent value="reports">
-          <WebsiteReportsPanel website={website} />
+        <TabsContent value="analytics" className="space-y-4">
+          {viewStrip('analytics')}
+          {view === 'overview' && <WebsiteAnalyticsPanel website={website} />}
+          {view === 'pages' && <WebsiteAnalyticsPagesPanel website={website} />}
+          {view === 'geo' && <WebsiteAnalyticsGeoPanel website={website} />}
+          {view === 'tech' && <WebsiteAnalyticsTechPanel website={website} />}
+          {view === 'commerce' && <WebsiteAnalyticsCommercePanel website={website} />}
+          {view === 'funnel' && <WebsiteAnalyticsFunnelPanel website={website} />}
+          {view === 'retention' && <WebsiteAnalyticsRetentionPanel website={website} />}
+        </TabsContent>
+
+        <TabsContent value="authority" className="space-y-4">
+          {viewStrip('authority')}
+          {view === 'history' ? <WebsiteDomainAuditsPanel website={website} /> : <WebsiteDomainIntelPanel website={website} />}
         </TabsContent>
 
         <TabsContent value="competitors">
           <WebsiteCompetitorsPanel website={website} />
         </TabsContent>
 
-        <TabsContent value="brand" className="space-y-4">
-          <WebsiteBrandProfilePanel websiteId={website.id} onOpenCompetitors={() => setTab('competitors')} />
-        </TabsContent>
-
         <TabsContent value="articles" className="space-y-4">
-          <WebsiteArticlesPanel website={website} />
-          <TopicPlanCard websiteId={website.id} onOpenResearch={() => setTab('research')} />
-        </TabsContent>
-
-        <TabsContent value="research">
-          <WebsiteKeywordResearchPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="runs">
-          <WebsiteToolkitRunsPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="domains">
-          <WebsiteDomainAuditsPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="gsc" className="space-y-4">
-          <WebsiteGscPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4">
-          <WebsiteAnalyticsPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="analytics-pages" className="space-y-4">
-          <WebsiteAnalyticsPagesPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="analytics-geo" className="space-y-4">
-          <WebsiteAnalyticsGeoPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="analytics-tech" className="space-y-4">
-          <WebsiteAnalyticsTechPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="analytics-commerce" className="space-y-4">
-          <WebsiteAnalyticsCommercePanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="analytics-funnel" className="space-y-4">
-          <WebsiteAnalyticsFunnelPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="analytics-retention" className="space-y-4">
-          <WebsiteAnalyticsRetentionPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="cannibalisation" className="space-y-4">
-          <WebsiteCannibalisationPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="rankings">
-          <WebsiteDomainIntelPanel website={website} />
-        </TabsContent>
-
-        <TabsContent value="crawl" className="space-y-4">
-          <WebsiteCrawlPanel website={website} />
+          {viewStrip('articles')}
+          {view === 'brand' ? (
+            <WebsiteBrandProfilePanel websiteId={website.id} onOpenCompetitors={() => setTab('competitors')} />
+          ) : (
+            <>
+              <WebsiteArticlesPanel website={website} />
+              <TopicPlanCard websiteId={website.id} onOpenResearch={() => setTab('keywords/research')} />
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="health" className="space-y-4">
-          <WebsiteHealthPanel website={website} />
+          {viewStrip('health')}
+          {view === 'crawl' && <WebsiteCrawlPanel website={website} />}
+          {view === 'homepage' && <WebsiteHealthPanel website={website} />}
+          {view === 'llms' && <WebsiteLlmsTxtPanel website={website} />}
         </TabsContent>
 
-        <TabsContent value="llms">
-          <WebsiteLlmsTxtPanel website={website} />
+        {/* Reports are the same derivations, frozen per build so an old report keeps its own period. */}
+        <TabsContent value="reports" className="space-y-4">
+          {viewStrip('reports')}
+          {view === 'runs' ? <WebsiteToolkitRunsPanel website={website} /> : <WebsiteReportsPanel website={website} />}
         </TabsContent>
         </div>
       </Tabs>

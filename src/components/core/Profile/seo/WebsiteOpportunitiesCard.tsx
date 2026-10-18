@@ -37,11 +37,11 @@ const KIND_TONE: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {
 export const OPPORTUNITY_TAB: Record<string, string> = {
   quick_win: 'gsc',
   refresh: 'articles',
-  consolidate: 'cannibalisation',
+  consolidate: 'gsc/cannibalisation',
   new_page: 'articles',
-  not_crawled: 'crawl',
-  crawled_not_indexed: 'crawl',
-  fix_page: 'crawl',
+  not_crawled: 'health/crawl',
+  crawled_not_indexed: 'health/crawl',
+  fix_page: 'health/crawl',
 };
 
 const ACTION_LABEL: Record<string, string> = {

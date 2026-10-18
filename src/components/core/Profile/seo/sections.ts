@@ -1,23 +1,20 @@
 /** The per-website SEO rail — ONE declaration, read by the dashboard that renders it. */
 import {
-  Bot, FileBarChart, FileStack, FileText, Filter, FlaskConical, Gauge, Globe, Globe2, LayoutDashboard, Link2,
-  LayoutList, LineChart, MonitorSmartphone, Radar, Repeat, Scissors, Search, ShieldCheck, ShoppingBag, Sparkles,
-  Spline, Swords,
-  Target,
+  FileBarChart, FileText, Gauge, KeyRound, LayoutDashboard, LineChart, Radar, Sparkles, Spline, Swords,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type SeoSectionId =
-  | 'overview'
-  | 'gsc' | 'cannibalisation' | 'ranks' | 'serp-features'
-  | 'analytics' | 'analytics-pages' | 'analytics-geo' | 'analytics-tech' | 'analytics-commerce'
-  | 'analytics-funnel' | 'analytics-retention'
-  | 'ai' | 'rankings' | 'competitors' | 'domains'
-  | 'articles' | 'research' | 'brand'
-  | 'crawl' | 'health' | 'llms'
-  | 'runs' | 'reports';
+  | 'overview' | 'gsc' | 'keywords' | 'analytics'
+  | 'ai' | 'authority' | 'competitors'
+  | 'articles' | 'health' | 'reports';
 
 export type SeoGroupId = 'search' | 'audience' | 'visibility' | 'content' | 'technical' | 'activity';
+
+export interface SeoView {
+  value: string;
+  label: string;
+}
 
 export interface SeoSection {
   /** The `?section=` key — the external contract. Labels are free to change; this is not. */
@@ -27,6 +24,8 @@ export interface SeoSection {
   group?: SeoGroupId;
   /** The pane opened when `?section=` is absent. Exactly one section carries it. */
   landing?: boolean;
+  /** `&view=` tabs inside the section, rendered as a strip, never a second rail. The first is the default. */
+  views?: readonly SeoView[];
 }
 
 export const SEO_SECTION_GROUPS = {
@@ -38,51 +37,108 @@ export const SEO_SECTION_GROUPS = {
   activity: 'Activity',
 } as const;
 
-/**
- * Seventeen panes in five groups, ONE pane per row. A row stacking several panels has no way to
- * address the second one, so it stops being reviewable while still looking complete.
- */
 export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard, landing: true },
 
-  { value: 'gsc', label: 'Search Console', icon: LineChart, group: 'search' },
-  { value: 'cannibalisation', label: 'Cannibalisation', icon: Scissors, group: 'search' },
-  { value: 'ranks', label: 'Rank Tracker', icon: Target, group: 'search' },
-  { value: 'serp-features', label: 'SERP Features', icon: LayoutList, group: 'search' },
+  {
+    value: 'gsc', label: 'Search performance', icon: LineChart, group: 'search',
+    views: [{ value: 'queries', label: 'Queries' }, { value: 'cannibalisation', label: 'Cannibalisation' }],
+  },
+  {
+    value: 'keywords', label: 'Keywords', icon: KeyRound, group: 'search',
+    views: [
+      { value: 'tracked', label: 'Tracked' },
+      { value: 'serp', label: 'SERP features' },
+      { value: 'research', label: 'Research' },
+    ],
+  },
 
-  { value: 'analytics', label: 'Overview', icon: Spline, group: 'audience' },
-  { value: 'analytics-pages', label: 'Pages', icon: FileStack, group: 'audience' },
-  { value: 'analytics-geo', label: 'Geography', icon: Globe2, group: 'audience' },
-  { value: 'analytics-tech', label: 'Devices & events', icon: MonitorSmartphone, group: 'audience' },
-  { value: 'analytics-commerce', label: 'Products & ads', icon: ShoppingBag, group: 'audience' },
-  { value: 'analytics-funnel', label: 'Funnel', icon: Filter, group: 'audience' },
-  { value: 'analytics-retention', label: 'Retention', icon: Repeat, group: 'audience' },
+  {
+    value: 'analytics', label: 'Audience', icon: Spline, group: 'audience',
+    views: [
+      { value: 'overview', label: 'Overview' },
+      { value: 'pages', label: 'Pages' },
+      { value: 'geo', label: 'Geography' },
+      { value: 'tech', label: 'Devices & events' },
+      { value: 'commerce', label: 'Products & ads' },
+      { value: 'funnel', label: 'Funnel' },
+      { value: 'retention', label: 'Retention' },
+    ],
+  },
 
   { value: 'ai', label: 'AI Citations', icon: Sparkles, group: 'visibility' },
-  { value: 'rankings', label: 'Backlinks', icon: Link2, group: 'visibility' },
+  {
+    value: 'authority', label: 'Authority', icon: Radar, group: 'visibility',
+    views: [{ value: 'summary', label: 'Backlinks & authority' }, { value: 'history', label: 'Audit history' }],
+  },
   { value: 'competitors', label: 'Competitors', icon: Swords, group: 'visibility' },
-  { value: 'domains', label: 'Domain Audits', icon: Radar, group: 'visibility' },
 
-  { value: 'articles', label: 'Articles', icon: FileText, group: 'content' },
-  { value: 'research', label: 'Keyword Research', icon: Search, group: 'content' },
-  { value: 'brand', label: 'Brand Profile', icon: ShieldCheck, group: 'content' },
+  {
+    value: 'articles', label: 'Articles', icon: FileText, group: 'content',
+    views: [{ value: 'articles', label: 'Articles' }, { value: 'brand', label: 'Brand profile' }],
+  },
 
-  { value: 'crawl', label: 'Site Crawl', icon: Globe, group: 'technical' },
-  { value: 'health', label: 'Page Health', icon: Gauge, group: 'technical' },
-  { value: 'llms', label: 'llms.txt', icon: Bot, group: 'technical' },
+  {
+    value: 'health', label: 'Site health', icon: Gauge, group: 'technical',
+    views: [
+      { value: 'crawl', label: 'Site crawl' },
+      { value: 'homepage', label: 'Page health' },
+      { value: 'llms', label: 'llms.txt' },
+    ],
+  },
 
-  { value: 'runs', label: 'Toolkit Runs', icon: FlaskConical, group: 'activity' },
-  { value: 'reports', label: 'Reports', icon: FileBarChart, group: 'activity' },
+  {
+    value: 'reports', label: 'Reports', icon: FileBarChart, group: 'activity',
+    views: [{ value: 'reports', label: 'Reports' }, { value: 'runs', label: 'Toolkit runs' }],
+  },
 ];
 
 export const DEFAULT_SEO_SECTION: SeoSectionId = 'overview';
 export const SEO_SECTION_IDS: readonly SeoSectionId[] = SEO_SECTIONS.map((s) => s.value);
 
-const OFFERED = new Set<string>(SEO_SECTION_IDS);
+/** Every `?section=` id that existed before the 10-section rail (#475), and where it lives now. Old links must keep landing. */
+export const LEGACY_SECTION_ALIASES: Readonly<Record<string, { section: SeoSectionId; view: string }>> = {
+  cannibalisation: { section: 'gsc', view: 'cannibalisation' },
+  ranks: { section: 'keywords', view: 'tracked' },
+  'serp-features': { section: 'keywords', view: 'serp' },
+  research: { section: 'keywords', view: 'research' },
+  'analytics-pages': { section: 'analytics', view: 'pages' },
+  'analytics-geo': { section: 'analytics', view: 'geo' },
+  'analytics-tech': { section: 'analytics', view: 'tech' },
+  'analytics-commerce': { section: 'analytics', view: 'commerce' },
+  'analytics-funnel': { section: 'analytics', view: 'funnel' },
+  'analytics-retention': { section: 'analytics', view: 'retention' },
+  rankings: { section: 'authority', view: 'summary' },
+  domains: { section: 'authority', view: 'history' },
+  brand: { section: 'articles', view: 'brand' },
+  crawl: { section: 'health', view: 'crawl' },
+  llms: { section: 'health', view: 'llms' },
+  runs: { section: 'reports', view: 'runs' },
+};
 
-/** The pane to render: the one asked for, or the landing pane. */
-export function resolveSeoSection(raw: string | null | undefined): SeoSectionId {
-  return raw && OFFERED.has(raw) ? (raw as SeoSectionId) : DEFAULT_SEO_SECTION;
+const BY_ID = new Map<string, SeoSection>(SEO_SECTIONS.map((s) => [s.value, s]));
+
+export interface SeoTarget {
+  section: SeoSectionId;
+  /** Null for a section with no views. */
+  view: string | null;
+}
+
+/** The pane to render for `?section=&view=`. Accepts a legacy id, and a `section/view` pair in `section`. */
+export function resolveSeoTarget(rawSection: string | null | undefined, rawView?: string | null): SeoTarget {
+  let sectionId = rawSection ?? '';
+  let viewId = rawView ?? null;
+  if (sectionId.includes('/')) [sectionId, viewId] = sectionId.split('/', 2);
+  const legacy = LEGACY_SECTION_ALIASES[sectionId];
+  if (legacy) return legacy;
+  const section = BY_ID.get(sectionId) ?? BY_ID.get(DEFAULT_SEO_SECTION)!;
+  if (!section.views?.length) return { section: section.value, view: null };
+  const view = section.views.find((v) => v.value === viewId) ?? section.views[0];
+  return { section: section.value, view: view.value };
+}
+
+export function seoSectionViews(section: SeoSectionId): readonly SeoView[] {
+  return BY_ID.get(section)?.views ?? [];
 }
 
 export type SeoRailRow =

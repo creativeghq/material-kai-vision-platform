@@ -421,7 +421,7 @@ export const WebsiteSeoOverviewPanel: React.FC<{
             </CardDescription>
           </div>
           {onOpenTab && (
-            <Button variant="ghost" size="sm" onClick={() => onOpenTab('health')}>
+            <Button variant="ghost" size="sm" onClick={() => onOpenTab('health/homepage')}>
               Issues
             </Button>
           )}

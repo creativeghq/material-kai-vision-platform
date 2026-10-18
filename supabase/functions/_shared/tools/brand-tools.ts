@@ -54,7 +54,7 @@ export const createProposeBrandChangeTool = (
         type: 'brand_change_proposed',
         proposal_id: data.id,
         field, op, value, rationale,
-        open_url: website_id ? `/websites/${website_id}?section=brand` : '/profile?tab=websites',
+        open_url: website_id ? `/websites/${website_id}?section=articles&view=brand` : '/profile?tab=websites',
         timestamp: Date.now(),
       });
       return JSON.stringify({

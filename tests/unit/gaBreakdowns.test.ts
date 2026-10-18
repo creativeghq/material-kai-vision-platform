@@ -185,10 +185,10 @@ describe('drilling and segmenting a breakdown', () => {
 
 describe('the Audience rail', () => {
   it('offers a pane for each Analytics surface', () => {
-    const audience = SEO_SECTIONS.filter((s) => s.group === 'audience').map((s) => s.value);
-    expect(audience).toEqual([
-      'analytics', 'analytics-pages', 'analytics-geo', 'analytics-tech', 'analytics-commerce',
-      'analytics-funnel', 'analytics-retention',
+    const audience = SEO_SECTIONS.filter((s) => s.group === 'audience');
+    expect(audience.map((s) => s.value)).toEqual(['analytics']);
+    expect(audience[0].views?.map((v) => v.value)).toEqual([
+      'overview', 'pages', 'geo', 'tech', 'commerce', 'funnel', 'retention',
     ]);
   });
 
