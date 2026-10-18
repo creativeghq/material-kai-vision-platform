@@ -38,6 +38,7 @@ import { formatDate, timeAgo } from '@/utils/datetime';
 import { AiEngineCard, engineGridCols } from './seo/AiEngineCard';
 import { AiQuestionsPanel } from './seo/AiQuestionsPanel';
 import { AiReferralsPanel } from './seo/AiReferralsPanel';
+import { AiCrawlersPanel } from './seo/AiCrawlersPanel';
 import { CitabilityPanel } from './seo/CitabilityPanel';
 import { LlmMentionsPanel } from './seo/LlmMentionsPanel';
 import { Sparkline } from './seo/Sparkline';
@@ -509,6 +510,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       </Card>
       {corpusPanel}
       <AiReferralsPanel websiteId={website.id} />
+      <AiCrawlersPanel websiteId={website.id} />
       </div>
     );
   }
@@ -724,6 +726,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
 
       {corpusPanel}
       <AiReferralsPanel websiteId={website.id} />
+      <AiCrawlersPanel websiteId={website.id} />
 
       <AiQuestionsPanel
         report={questions}

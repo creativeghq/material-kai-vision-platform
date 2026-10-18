@@ -170,6 +170,35 @@
     "response": "{ success, checked, triggered, results: [{ agent_id, name, triggered, run_id?, error? }] }"
   },
   {
+    "name": "ai-crawler-ingest",
+    "tag": "SEO",
+    "summary": "Receive AI-crawler request lines from a connected website's edge (Cloudflare Worker or any log shipper)",
+    "description": "#487 B1. A website's edge forwards bot requests here; only user agents ai_crawler_bot() recognises (GPTBot, ClaudeBot, PerplexityBot, ...) are stored, in ai_crawler_hits. Each website has its own secret, minted once by connect_website_crawler_source. SECURITY: x-kai-signature is hex HMAC-SHA256 of `${x-kai-timestamp}.${rawBody}` with that secret, checked before the body is parsed; a timestamp more than 300s off, a missing header or an unknown website is refused (fails closed). The caller's IP is checked against the vendor's published IP ranges where the vendor publishes them (OpenAI, Perplexity). Every accepted delivery is the source's heartbeat, so a source that stops sending reads as collector_failed, never as zero crawls.",
+    "security": [
+      "crawlerSignature"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "query": [
+      {
+        "name": "website",
+        "type": "string",
+        "required": true,
+        "desc": "The connected website's id"
+      }
+    ],
+    "request": [
+      {
+        "name": "events",
+        "type": "object[]",
+        "required": true,
+        "desc": "{ts, path, ua, ip?, status?} per crawler request; max 1000 per delivery, 1 MB. The website id goes in the ?website= query parameter."
+      }
+    ],
+    "response": "{received:number, stored:number}"
+  },
+  {
     "name": "ai-pricing-updater",
     "tag": "Crons",
     "summary": "Weekly cron (Sunday 00:00 UTC): sync AI model prices from hardcoded reference tables",

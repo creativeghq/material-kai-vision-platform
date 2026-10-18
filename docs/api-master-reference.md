@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (170)
+## 1. Supabase Edge Functions (171)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -262,6 +262,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `ai-crawler-ingest` | sig | Receive AI-crawler request lines from a connected website's edge (Cloudflare Worker or any log shipper) |
 | `gsc-api` _(GET + POST)_ | JWT / kai_* / public | Google Search Console for connected websites (OAuth + performance sync) |
 | `seo-api` | JWT / kai_* / cron | Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit. |
 | `seo-content-freshness` | JWT | Content decay — raise generated articles that are past their own refresh cadence |

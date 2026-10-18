@@ -9,6 +9,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, AiReferrals, CitabilityReport, CitedPageComparison, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
+import type { AiCrawls } from '@/components/core/Profile/seo/aiCrawlers';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
 
@@ -1780,6 +1781,25 @@ export const userWebsitesService = {
     const { data, error } = await supabase.rpc('get_website_ai_referrals' as any, { p_website_id: websiteId } as any);
     if (error) throw error;
     return (data as AiReferrals) ?? null;
+  },
+
+  async aiCrawls(websiteId: string, days = 30): Promise<AiCrawls | null> {
+    const { data, error } = await supabase.rpc('get_website_ai_crawls' as any, { p_website_id: websiteId, p_days: days } as any);
+    if (error) throw error;
+    return (data as AiCrawls) ?? null;
+  },
+
+  async connectCrawlerSource(websiteId: string): Promise<string> {
+    const { data, error } = await supabase.rpc('connect_website_crawler_source' as any, { p_website_id: websiteId, p_kind: 'worker' } as any);
+    if (error) throw error;
+    const secret = (data as { secret?: string } | null)?.secret;
+    if (!secret) throw new Error('The server did not return a secret.');
+    return secret;
+  },
+
+  async disconnectCrawlerSource(websiteId: string): Promise<void> {
+    const { error } = await supabase.rpc('disconnect_website_crawler_source' as any, { p_website_id: websiteId } as any);
+    if (error) throw error;
   },
 
   /** Score the page an assistant cited instead of us, beside our own score for the question. */

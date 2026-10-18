@@ -26,6 +26,7 @@ const securitySchemes = {
   zernioSignature: { type: 'apiKey', in: 'header', name: 'X-Zernio-Signature', description: 'Zernio webhook HMAC-SHA256 signature.' },
   svixSignature: { type: 'apiKey', in: 'header', name: 'svix-signature', description: 'Svix/Resend webhook signature.' },
   snsSignature: { type: 'apiKey', in: 'header', name: 'x-amz-sns-message-type', description: 'AWS SNS message (Amazon SES notifications).' },
+  crawlerSignature: { type: 'apiKey', in: 'header', name: 'x-kai-signature', description: 'Hex HMAC-SHA256 of `${x-kai-timestamp}.${rawBody}` with the crawler-log secret of the website.' },
   queryToken: { type: 'apiKey', in: 'query', name: 'token', description: 'Public share / session token (sent in body or query depending on the function).' },
 };
 const SCHEME_KEYS = new Set(Object.keys(securitySchemes));
@@ -476,7 +477,7 @@ console.log(`  functions: ${fns.length}  database resources: ${rest.resources.le
 // The index in docs/api-master-reference.md is generated from the same source, between two markers.
 const AUTH_LABEL = {
   supabaseJwt: 'JWT', apiKeyPartner: 'kai_*', apiKeySecret: 'secret', cronSecret: 'cron',
-  queryToken: 'token', stripeSignature: 'sig', zernioSignature: 'sig', svixSignature: 'sig', snsSignature: 'sig',
+  queryToken: 'token', stripeSignature: 'sig', zernioSignature: 'sig', svixSignature: 'sig', snsSignature: 'sig', crawlerSignature: 'sig',
 };
 const authCell = (fn) => {
   const labels = [...new Set((fn.security || []).map((k) => AUTH_LABEL[k] || (k === 'public' ? 'public' : k)))];

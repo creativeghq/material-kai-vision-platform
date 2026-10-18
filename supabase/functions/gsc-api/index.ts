@@ -5,6 +5,7 @@ import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { inspectSiteUrls, buildInspectionQueue, INSPECT_QUOTA_PER_DAY } from './urlInspection.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { AI_REFERRAL_SOURCE_REGEX } from '../_shared/ai-crawler.ts';
 import {
   GA_BREAKDOWNS, GA_COHORT, GA_FUNNELS, GA_FUNNEL_MIN_STEPS, GA_REALTIME,
   type GaBreakdownSpec,
@@ -554,6 +555,59 @@ async function syncGaBreakdowns(
   return { ok, failed, unsupported, rows, capabilities: !!caps, events };
 }
 
+/** Landing page x assistant source, for the crawl -> referral join (#487 B3). */
+async function syncGaAiLanding(
+  supabase: any, websiteId: string, property: string, token: string,
+  startDate: string, endDate: string, windowDays: number,
+): Promise<string> {
+  let status = 'ok';
+  let error: string | null = null;
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const caps = await gaCapabilities(token, property);
+    const conv = !caps || caps.metrics.has('conversions') ? 'conversions' : 'keyEvents';
+    const resp = await fetch(GA_DATA_URL(property), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: 'landingPage' }, { name: 'sessionSource' }, { name: 'sessionMedium' }],
+        metrics: [{ name: 'sessions' }, { name: 'engagedSessions' }, { name: conv }],
+        dimensionFilter: {
+          orGroup: {
+            expressions: [
+              { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'PARTIAL_REGEXP', value: AI_REFERRAL_SOURCE_REGEX, caseSensitive: false } } },
+              gaExact('sessionMedium', 'ai-assistant'),
+            ],
+          },
+        },
+        orderBys: [{ desc: true, metric: { metricName: 'sessions' } }],
+        limit: 1000,
+      }),
+    });
+    const body = await resp.json().catch(() => null);
+    if (!resp.ok) throw new Error(body?.error?.message || `HTTP ${resp.status}`);
+    if (!body) throw new Error('Analytics returned 200 with an unreadable body.');
+    rows = (body.rows || []).map((r: any) => {
+      const d = r.dimensionValues || [];
+      const m = r.metricValues || [];
+      return {
+        value: d[0]?.value ?? '', label: d[1]?.value ?? '', medium: d[2]?.value ?? '',
+        sessions: gaNum(m[0]?.value), engaged_sessions: gaNum(m[1]?.value), conversions: gaNum(m[2]?.value),
+      };
+    });
+    if (!rows.length) status = 'no_data';
+  } catch (e) {
+    status = 'collector_failed';
+    error = String(e instanceof Error ? e.message : e).slice(0, 900);
+  }
+  const { error: rpcErr } = await supabase.rpc('ga_replace_ai_landing', {
+    p_website_id: websiteId, p_window_days: windowDays, p_period_start: startDate, p_period_end: endDate,
+    p_rows: rows, p_status: status, p_error: error,
+  });
+  return rpcErr ? `store_failed: ${rpcErr.message}` : status;
+}
+
 async function syncGaFunnel(
   supabase: any, websiteId: string, property: string, token: string,
   startDate: string, endDate: string, windowDays: number, presentEvents: Set<string>,
@@ -889,10 +943,11 @@ async function syncGaConnection(supabase: any, conn: any, days: number) {
       supabase, websiteId, conn.ga_property_id, token, start, end, days, bd.events,
     );
     const cohorts = await syncGaCohorts(supabase, websiteId, conn.ga_property_id, token, days);
+    const aiLanding = await syncGaAiLanding(supabase, websiteId, conn.ga_property_id, token, start, end, days);
     await supabase.from('website_gsc_connections')
       .update({ ga_last_sync_at: new Date().toISOString(), ga_last_sync_error: null })
       .eq('website_id', websiteId);
-    return { rows: n, days, breakdowns: { ...bd, events: bd.events.size }, funnel, cohorts };
+    return { rows: n, days, breakdowns: { ...bd, events: bd.events.size }, funnel, cohorts, ai_landing: aiLanding };
   } catch (e) {
     // Recorded, not swallowed: an Analytics panel that is empty because the
     // sync failed must not look like an Analytics panel with no traffic.

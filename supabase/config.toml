@@ -343,3 +343,6 @@ verify_jwt = false
 
 [functions.mail-track]
 verify_jwt = false
+
+[functions.ai-crawler-ingest]
+verify_jwt = false

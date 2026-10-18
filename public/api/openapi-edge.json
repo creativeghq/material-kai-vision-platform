@@ -402,6 +402,95 @@
         }
       }
     },
+    "/ai-crawler-ingest": {
+      "post": {
+        "tags": [
+          "SEO"
+        ],
+        "summary": "Receive AI-crawler request lines from a connected website's edge (Cloudflare Worker or any log shipper)",
+        "operationId": "post_ai_crawler_ingest",
+        "description": "#487 B1. A website's edge forwards bot requests here; only user agents ai_crawler_bot() recognises (GPTBot, ClaudeBot, PerplexityBot, ...) are stored, in ai_crawler_hits. Each website has its own secret, minted once by connect_website_crawler_source. SECURITY: x-kai-signature is hex HMAC-SHA256 of `${x-kai-timestamp}.${rawBody}` with that secret, checked before the body is parsed; a timestamp more than 300s off, a missing header or an unknown website is refused (fails closed). The caller's IP is checked against the vendor's published IP ranges where the vendor publishes them (OpenAI, Perplexity). Every accepted delivery is the source's heartbeat, so a source that stops sending reads as collector_failed, never as zero crawls.\n\n**Response:** `{received:number, stored:number}`",
+        "security": [
+          {
+            "crawlerSignature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    },
+                    "description": "{ts, path, ua, ip?, status?} per crawler request; max 1000 per delivery, 1 MB. The website id goes in the ?website= query parameter."
+                  }
+                },
+                "required": [
+                  "events"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/ai-pricing-updater": {
       "post": {
         "tags": [
@@ -36964,6 +37053,12 @@
         "in": "header",
         "name": "x-amz-sns-message-type",
         "description": "AWS SNS message (Amazon SES notifications)."
+      },
+      "crawlerSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-kai-signature",
+        "description": "Hex HMAC-SHA256 of `${x-kai-timestamp}.${rawBody}` with the crawler-log secret of the website."
       },
       "queryToken": {
         "type": "apiKey",
