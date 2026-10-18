@@ -11,7 +11,7 @@ const SERVICE = read('src/services/userWebsitesService.ts');
 
 describe('a tracked keyword is checked for its own device and city', () => {
   it('the tracker sends device and a city location_code to the SERP call', () => {
-    const params = TRACKER.match(/params: \{([\s\S]*?)\n\s{6}\},/);
+    const params = TRACKER.match(/params: \{([\s\S]*?)\n\s*\},/);
     expect(params, 'serp params block').not.toBeNull();
     expect(params![1]).toMatch(/device: kw\.device/);
     expect(params![1]).toMatch(/location_code: kw\.location_code/);

@@ -8,12 +8,10 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
-import { callSEOAgentRoute } from '../_shared/tools/dataforseo-dispatch.ts';
+import { callSEOAgentRoute, gatedGatewayPost } from '../_shared/tools/dataforseo-dispatch.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,15 +47,10 @@ const BAD_CHECKS: Record<string, string> = {
 
 /** Call MIVAA's quick-page audit for one URL (instant on-page + Lighthouse). */
 async function quickPage(url: string, attribution: Attribution): Promise<any> {
-  const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/onpage/quick-page`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
-    body: JSON.stringify({ url, for_mobile: false, attribution }),
-  });
-  const text = await resp.text();
-  let parsed: any = null;
-  try { parsed = JSON.parse(text); } catch { parsed = text; }
-  if (!resp.ok) throw new Error(`quick-page ${describeUpstreamError(resp.status, parsed)}`);
+  const { ok, status, parsed } = await gatedGatewayPost(
+    'composite_onpage/quick-page', '/api/v1/seo-agent/onpage/quick-page', { url, for_mobile: false }, attribution, { composite: true },
+  );
+  if (!ok) throw new Error(`quick-page ${describeUpstreamError(status, parsed)}`);
   if (parsed?.success !== true) {
     throw new Error(`quick-page ${String(parsed?.data?.error || parsed?.error || 'the audit source reported an error inside a successful HTTP response').slice(0, 300)}`);
   }
@@ -68,15 +61,8 @@ async function quickPage(url: string, attribution: Attribution): Promise<any> {
 
 /** Call the DataForSEO dispatcher for one `kind`. Throws on transport failure. */
 async function dfs(kind: string, params: Record<string, unknown>, attribution: Attribution): Promise<any> {
-  const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
-    body: JSON.stringify({ params, attribution }),
-  });
-  const text = await resp.text();
-  let parsed: any = null;
-  try { parsed = JSON.parse(text); } catch { parsed = text; }
-  if (!resp.ok) throw new Error(`${kind} ${describeUpstreamError(resp.status, parsed)}`);
+  const { ok, status, parsed } = await gatedGatewayPost(kind, `/api/v1/seo-agent/dataforseo/${kind}`, { params }, attribution);
+  if (!ok) throw new Error(`${kind} ${describeUpstreamError(status, parsed)}`);
   // MIVAA answers 200 with `success:false` when DataForSEO refused (402, task error) and `raw: {}`.
   if (parsed?.success === false) throw new Error(`${kind} ${String(parsed?.data?.error || 'upstream refused the call').slice(0, 300)}`);
   return parsed?.data ?? {};

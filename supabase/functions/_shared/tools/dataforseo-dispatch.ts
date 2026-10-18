@@ -111,6 +111,45 @@ export function sumSectionCost(data: any): number | undefined {
   return seen ? total : undefined;
 }
 
+export class SpendRefused extends Error {}
+
+/**
+ * A raw MIVAA DataForSEO POST behind the spend gate, for a caller that parses the reply itself.
+ * A refused or failed call settles to 0; a composite settles to the sum of its sections.
+ */
+export async function gatedGatewayPost(
+  kind: string,
+  path: string,
+  payload: Record<string, unknown>,
+  attribution: { user_id?: string | null; workspace_id?: string | null } | undefined,
+  opts: { signal?: AbortSignal; composite?: boolean } = {},
+  // deno-lint-ignore no-explicit-any
+): Promise<{ ok: boolean; status: number; parsed: any }> {
+  const attr = attribution ? { ...attribution, user_id: attribution.user_id ?? undefined, workspace_id: attribution.workspace_id ?? undefined } : undefined;
+  const gate = await openSpendGate(kind, attr?.user_id, payload, attr?.workspace_id);
+  if (!gate.ok) throw new SpendRefused(gate.message);
+  let resp: Response;
+  try {
+    resp = await fetch(`${gatewayUrl()}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': cronSecret() },
+      signal: opts.signal,
+      body: JSON.stringify({ ...payload, attribution: meteredAttribution(gate, attr as DataForSeoAttribution | undefined) }),
+    });
+  } catch (e) {
+    await gate.settle(0);
+    throw e;
+  }
+  const text = await resp.text();
+  // deno-lint-ignore no-explicit-any
+  let parsed: any = null;
+  try { parsed = JSON.parse(text); } catch { parsed = text; }
+  const data = parsed?.data;
+  const reported = opts.composite ? sumSectionCost(data) : (typeof data?.cost_usd === 'number' ? data.cost_usd : undefined);
+  await gate.settle(!resp.ok ? 0 : reported ?? (parsed?.success === false ? 0 : undefined));
+  return { ok: resp.ok, status: resp.status, parsed };
+}
+
 /** Composite-audit dispatcher (site-review, brand-search, keyword-gap, quick-page). */
 export async function callSEOAgentRoute(
   path: string,

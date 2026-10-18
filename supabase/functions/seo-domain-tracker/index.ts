@@ -9,11 +9,10 @@ import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { agentReviewLink } from '../_shared/agent-handoff.ts';
 
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
+import { gatedGatewayPost } from '../_shared/tools/dataforseo-dispatch.ts';
 import { resolveSeoMarket } from '../_shared/seo-market.ts';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 const KEYWORD_LIMIT = 100;
 const BACKLINK_LIMIT = 100;
 /** Stop starting work here; the gateway cuts the request at 150s. */
@@ -38,13 +37,8 @@ type Attribution = { workspace_id: string; user_id?: string };
 
 /** Throws when the source did not answer. A refusal arrives as HTTP 200 + `success:false` + `raw: {}`. */
 async function dfs(kind: string, params: Record<string, unknown>, attribution: Attribution): Promise<{ items: any[] }> {
-  const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
-    body: JSON.stringify({ params, attribution }),
-  });
-  const text = await resp.text();
-  let parsed: any = null; try { parsed = JSON.parse(text); } catch { parsed = text; }
-  if (!resp.ok) throw new Error(`${kind} ${describeUpstreamError(resp.status, parsed, 160)}`);
+  const { ok, status, parsed } = await gatedGatewayPost(kind, `/api/v1/seo-agent/dataforseo/${kind}`, { params }, attribution);
+  if (!ok) throw new Error(`${kind} ${describeUpstreamError(status, parsed, 160)}`);
   if (parsed?.success !== true) {
     throw new Error(String(parsed?.data?.error || 'the source reported an error inside a successful HTTP response').slice(0, 300));
   }

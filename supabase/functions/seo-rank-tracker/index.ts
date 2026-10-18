@@ -8,12 +8,10 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 import { agentReviewLink } from '../_shared/agent-handoff.ts';
-import { callDataForSEO } from '../_shared/tools/dataforseo-dispatch.ts';
+import { callDataForSEO, gatedGatewayPost } from '../_shared/tools/dataforseo-dispatch.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 /** Per invocation. A run that would exceed this rotates instead of billing for it. */
 const MAX_PER_RUN = 60;
@@ -108,9 +106,14 @@ function hostOf(url: string): string {
  * The abort reads back as `Signal timed out.` — a browser's words for our own decision,
  * and the note prints the message as what "the source said". Say what actually happened.
  */
-async function fetchSerp(budget: number, init: RequestInit): Promise<Response> {
+async function fetchSerp(
+  budget: number, payload: { params: Record<string, unknown> }, attribution: { user_id: string | null; workspace_id: string },
+): Promise<{ ok: boolean; status: number; parsed: any }> {
   try {
-    return await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/serp_google_organic`, init);
+    return await gatedGatewayPost(
+      'serp_google_organic', '/api/v1/seo-agent/dataforseo/serp_google_organic', payload, attribution,
+      { signal: AbortSignal.timeout(budget) },
+    );
   } catch (e) {
     if ((e as { name?: string })?.name === 'TimeoutError') {
       throw new Error(`the SERP source did not answer within ${Math.round(budget / 1000)}s`);
@@ -132,24 +135,15 @@ async function serp(
   const remaining = deadline - Date.now();
   if (remaining < MIN_CALL_BUDGET_MS) throw new OutOfTime();
   const budget = Math.min(SERP_TIMEOUT_MS, remaining);
-  const resp = await fetchSerp(budget, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
-    signal: AbortSignal.timeout(budget),
-    // `location_code` only for a city: the client maps `country_code` itself.
-    body: JSON.stringify({
-      params: {
-        keyword: kw.keyword, country_code: kw.country_code, language_code: kw.language_code, depth,
-        device: kw.device === 'mobile' ? 'mobile' : 'desktop',
-        ...(kw.location_code ? { location_code: kw.location_code } : {}),
-      },
-      attribution: { user_id: userId, workspace_id: kw.workspace_id },
-    }),
-  });
-  const text = await resp.text();
-  let parsed: any = null;
-  try { parsed = JSON.parse(text); } catch { parsed = text; }
-  if (!resp.ok) throw new Error(describeUpstreamError(resp.status, parsed, 200));
+  // `location_code` only for a city: the client maps `country_code` itself.
+  const { ok, status, parsed } = await fetchSerp(budget, {
+    params: {
+      keyword: kw.keyword, country_code: kw.country_code, language_code: kw.language_code, depth,
+      device: kw.device === 'mobile' ? 'mobile' : 'desktop',
+      ...(kw.location_code ? { location_code: kw.location_code } : {}),
+    },
+  }, { user_id: userId, workspace_id: kw.workspace_id });
+  if (!ok) throw new Error(describeUpstreamError(status, parsed, 200));
   // MIVAA answers HTTP 200 with `success:false` when DataForSEO itself failed —
   // task 40106 "partial results", zero items. That is UNKNOWN, not "not in the top
   // 100": on 2026-09-05 three such calls were stored as unranked with no error and

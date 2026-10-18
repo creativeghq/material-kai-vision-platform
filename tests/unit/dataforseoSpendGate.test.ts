@@ -70,7 +70,7 @@ describe('DataForSEO spend gate', () => {
   it('every dispatcher refuses when the gate says no', () => {
     for (const fn of dispatchers()) {
       expect(
-        /if \(!gate\.ok\) return/.test(fn.body),
+        /if \(!gate\.ok\) (return|throw)/.test(fn.body),
         `${fn.name} opens a gate and ignores the answer — a debit nobody reads is a log line, not a debit`,
       ).toBe(true);
     }
