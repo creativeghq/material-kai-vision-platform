@@ -874,7 +874,7 @@ jobs:
       - name: 🚨 Open, update or close the deploy-blocked issue
         run: |
           failed=$(echo "$NEEDS" | jq -r 'to_entries[] | select(.value.result=="failure") | .key')
-          allgreen=$(echo "$NEEDS" | jq -r '[.[] | .result=="success"] | all')
+          allgreen=$(echo "$NEEDS" | jq -r '[.[] | .result=="success" or .result=="skipped"] | all')
           open=$(gh issue list --label deploy-blocked --state open --json number --jq '.[0].number // empty')
           short=${GITHUB_SHA::9}
           if [ -z "$failed" ]; then
