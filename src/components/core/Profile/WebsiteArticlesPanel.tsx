@@ -25,6 +25,7 @@ import {
 import { Loading, STATUS_COLOR, useLaunchQuickStart } from './seo/dashboardPrimitives';
 import { AGE_WINDOW_LABELS, AGE_WINDOW_ORDER, ageWindowOf, timeOf, useTableSegments } from './seo/useTableSegments';
 import { dueReasonText } from '@/services/seo/dueReason';
+import { useSearchParams } from 'react-router-dom';
 
 const ARTICLE_LIMIT = 500;
 type SortKey = 'title' | 'keyword' | 'seo' | 'words' | 'status' | 'created' | 'age';
@@ -38,7 +39,8 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
   const [freshness, setFreshness] = useState<SeoArticleFreshnessRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState<string | null>(null);
-  const [openArticleId, setOpenArticleId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [openArticleId, setOpenArticleId] = useState<string | null>(searchParams.get('article'));
   const [deleting, setDeleting] = useState<SeoArticleRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 

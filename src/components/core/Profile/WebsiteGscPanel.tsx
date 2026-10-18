@@ -24,6 +24,7 @@ import {
 } from '@/services/userWebsitesService';
 import { safeHref } from '@/utils/safeUrl';
 import { KeywordActions } from './seo/KeywordActions';
+import { GscQueryLens, GSC_LENS_LABELS, type GscLens } from './seo/GscQueryLens';
 
 
 const fmt = (n: number) => formatNumber((n ?? 0));
@@ -92,6 +93,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   const [server, setServer] = useState<GscQueryPageRows | null>(null);
   const [serverLoading, setServerLoading] = useState(false);
   const [drill, setDrill] = useState<{ kind: 'page' | 'query'; value: string } | null>(null);
+  const [lens, setLens] = useState<GscLens>('all');
 
   useEffect(() => {
     const h = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -428,6 +430,13 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                       onChange={(v) => { setSegment(v); if (v !== ALL_PAGES) setPageFilter(ALL_PAGES); setPage(1); }}
                       className="max-w-[220px] [&>span]:truncate"
                     />
+                    <HubFilterSelect
+                      label="Lens"
+                      value={lens}
+                      allValue="all"
+                      options={(Object.keys(GSC_LENS_LABELS) as GscLens[]).map((k) => ({ value: k, label: GSC_LENS_LABELS[k] }))}
+                      onChange={(v) => setLens(v as GscLens)}
+                    />
                     <HubResetFilters count={filterCount} onReset={clearFilters} />
                   </>
                 ) : listView ? <HubResetFilters count={filterCount} onReset={clearFilters} /> : undefined}
@@ -441,6 +450,10 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                   Showing the top {server.rows.length} of {fmt(server.total)} {firstColLabel.toLowerCase()}s by clicks.
                 </p>
               )}
+              {view === 'queries' && lens !== 'all' ? (
+                <GscQueryLens websiteId={website.id} days={days} lens={lens} />
+              ) : (
+              <>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -510,6 +523,8 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                 page={currentPage} total={rows.length} onPageChange={setPage}
                 label={`${firstColLabel.toLowerCase()}s`}
               />
+              </>
+              )}
             </>
           )}
         </CardContent>

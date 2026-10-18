@@ -1829,6 +1829,33 @@ export const userWebsitesService = {
     return (data as AiAnswers) ?? null;
   },
 
+  async cannibalisationDecisions(websiteId: string): Promise<Map<string, string>> {
+    const { data, error } = await supabase.from('seo_cannibalisation_decisions' as never)
+      .select('query, main_page').eq('website_id', websiteId);
+    if (error) throw error;
+    return new Map(((data as { query: string; main_page: string }[] | null) ?? []).map((d) => [d.query, d.main_page]));
+  },
+
+  async setCannibalisationMainPage(websiteId: string, query: string, mainPage: string): Promise<void> {
+    const { error } = await supabase.rpc('set_cannibalisation_main_page' as never, { p_website_id: websiteId, p_query: query, p_main_page: mainPage } as never);
+    if (error) throw error;
+  },
+
+  /** Our published articles on this site, keyed by URL without a trailing slash. */
+  async publishedArticleUrls(websiteId: string): Promise<Map<string, { id: string; title: string | null }>> {
+    const { data, error } = await supabase.from('seo_articles').select('id, title, published_url')
+      .eq('website_id', websiteId).not('published_url', 'is', null);
+    if (error) throw error;
+    return new Map(((data as { id: string; title: string | null; published_url: string }[] | null) ?? [])
+      .map((a) => [a.published_url.replace(/\/+$/, ''), { id: a.id, title: a.title }]));
+  },
+
+  async refreshArticle(articleId: string, reason: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('seo-api', { body: { action: 'refresh', article_id: articleId, reason } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not refresh the article'));
+    if (data?.success === false) throw new Error(String(data.error ?? 'Could not refresh the article'));
+  },
+
   async domainHistory(websiteId: string, limit = 60): Promise<WebsiteDomainHistoryRow[]> {
     const { data, error } = await supabase.rpc('get_website_domain_history' as never, { p_website_id: websiteId, p_limit: limit } as never);
     if (error) throw error;

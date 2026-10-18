@@ -10,6 +10,14 @@ import { timeAgo } from '@/utils/datetime';
 import { userWebsitesService, type CrawlIssueDetail, type CrawlReport, type UserWebsite } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
 import { safeHref } from '@/utils/safeUrl';
+import { Link } from 'react-router-dom';
+
+/** The agent gets the website, the page and the issue code pinned, never a paraphrase of them. */
+function fixWithAgent(website: UserWebsite, url: string, issueType: string, label?: string): string {
+  const prompt = `On website ${website.url} (website_id ${website.id}), the page ${url} has the crawl issue "${issueType}"${label ? ` (${label})` : ''}. `
+    + 'Read the page, explain what is wrong in one paragraph, and draft the exact change to make.';
+  return `/agent-hub?agent=kai&prompt=${encodeURIComponent(prompt)}`;
+}
 
 /** Websites → Site Health → the full crawl. */
 
@@ -122,6 +130,11 @@ function IssueDetailLine({ type, detail }: { type: string; detail: CrawlIssueDet
 }
 
 export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
+  const [articles, setArticles] = useState<Map<string, { id: string }>>(new Map());
+  useEffect(() => {
+    void userWebsitesService.publishedArticleUrls(website.id).then(setArticles).catch(() => setArticles(new Map()));
+  }, [website.id]);
+  const articleFor = (url: string) => articles.get(url.replace(/\/+$/, ''))?.id ?? null;
   const { toast } = useToast();
   const [report, setReport] = useState<CrawlReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -325,6 +338,14 @@ export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website 
                                     </a>
                                   ) : null}
                                   <IssueDetailLine type={g.issue_type} detail={sm.detail} />
+                                  {sm.url && (
+                                    <span className="mt-0.5 flex flex-wrap gap-3">
+                                      <Link className="text-primary hover:underline" to={fixWithAgent(website, sm.url, g.issue_type, copy?.label)}>Ask JARVIS to fix</Link>
+                                      {articleFor(sm.url) && (
+                                        <Link className="text-primary hover:underline" to={`/websites/${website.id}?section=articles&article=${articleFor(sm.url)}`}>Open article</Link>
+                                      )}
+                                    </span>
+                                  )}
                                 </li>
                               ))}
                             </ul>

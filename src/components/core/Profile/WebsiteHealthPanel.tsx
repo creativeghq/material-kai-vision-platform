@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { userWebsitesService, type UserWebsite, type WebsiteHealth } from '@/services/userWebsitesService';
 import { buildCheckInventory } from './seo/onPageChecks';
 import { CheckInventoryList } from './seo/CheckInventoryList';
+import { Link } from 'react-router-dom';
 
 
 const scoreColor = (s: number | null) =>
@@ -131,8 +132,14 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
                 group, with what the problem costs.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <CheckInventoryList checks={health.onpage?.checks} />
+              {inv.failed > 0 && (
+                <Link className="text-xs text-primary hover:underline"
+                  to={`/agent-hub?agent=kai&prompt=${encodeURIComponent(`On website ${website.url} (website_id ${website.id}), the homepage fails these on-page checks: ${inv.verdicts.filter((v) => !v.passed).map((v) => v.check.key).join(', ')}. Explain what to change and draft the exact fixes.`)}`}>
+                  Ask JARVIS to fix the {inv.failed} failing check{inv.failed === 1 ? '' : 's'}
+                </Link>
+              )}
             </CardContent>
           </Card>
         );

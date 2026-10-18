@@ -16,6 +16,7 @@ import { compact } from './seo/seoMetrics';
 import { useTableSegments } from './seo/useTableSegments';
 import { safeHref } from '@/utils/safeUrl';
 import { KeywordActions } from './seo/KeywordActions';
+import { useToast } from '@/hooks/use-toast';
 
 type SortKey = 'impressions' | 'pages' | 'position' | 'severity' | 'query';
 const SORT_OPTIONS: { value: SortKey; label: string; dir: 'asc' | 'desc' }[] = [
@@ -44,10 +45,47 @@ function pathOf(url: string): string {
 }
 
 /** Pick the page that keeps the query; every other competing page 301s to it. */
-function ConsolidateDialog({ item, onClose }: { item: CannibalItem; onClose: () => void }) {
+interface ConsolidateCtx {
+  websiteId: string;
+  mainPage: string | null;
+  articles: Map<string, { id: string; title: string | null }>;
+  onDecided: () => void;
+}
+
+function ConsolidateDialog({ item, onClose, ctx }: { item: CannibalItem; onClose: () => void; ctx: ConsolidateCtx }) {
+  const { toast } = useToast();
   const bestConverter = [...item.pages].sort((a, b) => b.clicks - a.clicks)[0];
-  const [canonical, setCanonical] = useState((item.leader_is_best_converter ? item.pages[0] : bestConverter)?.page ?? '');
+  const [canonical, setCanonical] = useState(ctx.mainPage ?? (item.leader_is_best_converter ? item.pages[0] : bestConverter)?.page ?? '');
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState<string | null>(null);
+  const competingArticles = item.pages
+    .filter((p) => p.page !== canonical)
+    .map((p) => ({ page: p.page, article: ctx.articles.get(p.page.replace(/\/+$/, '')) }))
+    .filter((x): x is { page: string; article: { id: string; title: string | null } } => !!x.article);
+
+  const choose = async () => {
+    setSaving(true);
+    try {
+      await userWebsitesService.setCannibalisationMainPage(ctx.websiteId, item.query, canonical);
+      toast({ title: `Main page for "${item.query}" saved`, description: pathOf(canonical) });
+      ctx.onDecided();
+    } catch (e: any) {
+      toast({ title: 'Not saved', description: e.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  const refresh = async (articleId: string, page: string) => {
+    if (!window.confirm('Draft a refresh of this article so it stops competing for the query? It is charged at the real model cost; the changes are proposals you approve.')) return;
+    setRefreshing(articleId);
+    try {
+      await userWebsitesService.refreshArticle(articleId,
+        `cannibalisation: "${item.query}" now belongs to ${canonical}. Shift ${pathOf(page)} to a different intent or hand the overlapping part to the main page, and link to it.`);
+      toast({ title: 'Refresh drafted', description: 'Review the proposals in the article.' });
+    } catch (e: any) {
+      toast({ title: 'Refresh failed', description: e.message, variant: 'destructive' });
+    } finally { setRefreshing(null); }
+  };
   const others = item.pages.filter((p) => p.page !== canonical);
   const lines = others.map((p) => `Redirect 301 ${pathOf(p.page)} ${canonical}`).join('\n');
 
@@ -87,12 +125,24 @@ function ConsolidateDialog({ item, onClose }: { item: CannibalItem; onClose: () 
             On WordPress, the Redirection plugin takes the same pairs. Update internal links to the kept page too, or each one costs a hop.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
+          <Button size="sm" disabled={saving || !canonical || canonical === ctx.mainPage} onClick={() => void choose()}>
+            {saving && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+            {canonical === ctx.mainPage ? 'This is the main page' : 'Make this the main page'}
+          </Button>
+          {competingArticles.map(({ page, article }) => (
+            <Button key={article.id} size="sm" variant="outline" disabled={refreshing !== null} onClick={() => void refresh(article.id, page)}>
+              {refreshing === article.id && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+              Refresh {article.title ? `“${article.title}”` : pathOf(page)}
+            </Button>
+          ))}
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function Row({ item, websiteId }: { item: CannibalItem; websiteId: string }) {
+function Row({ item, websiteId, ctx }: { item: CannibalItem; websiteId: string; ctx: ConsolidateCtx }) {
   // Google's preferred page is the one it shows most; the best converter is the one
   // that earns clicks. When they differ, the split is not just theoretical — it is
   // actively sending people to the weaker page.
@@ -106,6 +156,7 @@ function Row({ item, websiteId }: { item: CannibalItem; websiteId: string }) {
         <div className="flex items-center gap-2 min-w-0">
           <Badge variant={severityVariant(item.severity)}>{item.severity}</Badge>
           <span className="truncate text-sm font-medium text-foreground">{item.query}</span>
+          {ctx.mainPage && <Badge variant="success" className="shrink-0">Main page: {pathOf(ctx.mainPage)}</Badge>}
         </div>
         <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums text-muted-foreground">
           {compact(item.impressions)} impressions · {item.page_count} pages
@@ -114,7 +165,7 @@ function Row({ item, websiteId }: { item: CannibalItem; websiteId: string }) {
           <Button size="sm" variant="outline" className="h-7" onClick={() => setConsolidating(true)}>Consolidate</Button>
         </span>
       </div>
-      {consolidating && <ConsolidateDialog item={item} onClose={() => setConsolidating(false)} />}
+      {consolidating && <ConsolidateDialog item={item} ctx={ctx} onClose={() => setConsolidating(false)} />}
 
       {!item.leader_is_best_converter && bestConverter && leader && (
         <p className="mt-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-300">
@@ -147,6 +198,15 @@ function Row({ item, websiteId }: { item: CannibalItem; websiteId: string }) {
 export const WebsiteCannibalisationPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const [report, setReport] = useState<CannibalReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [decisions, setDecisions] = useState<Map<string, string>>(new Map());
+  const [articles, setArticles] = useState<Map<string, { id: string; title: string | null }>>(new Map());
+  const loadDecisions = useCallback(() => {
+    void userWebsitesService.cannibalisationDecisions(website.id).then(setDecisions).catch(() => setDecisions(new Map()));
+  }, [website.id]);
+  useEffect(() => {
+    loadDecisions();
+    void userWebsitesService.publishedArticleUrls(website.id).then(setArticles).catch(() => setArticles(new Map()));
+  }, [website.id, loadDecisions]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -245,7 +305,10 @@ export const WebsiteCannibalisationPanel: React.FC<{ website: UserWebsite }> = (
             action={<Button size="sm" variant="outline" onClick={t.clear}>Clear filters</Button>}
           />
         )}
-        {t.visible.map((it) => <Row key={it.query} item={it} websiteId={website.id} />)}
+        {t.visible.map((it) => (
+          <Row key={it.query} item={it} websiteId={website.id}
+            ctx={{ websiteId: website.id, mainPage: decisions.get(it.query) ?? null, articles, onDecided: loadDecisions }} />
+        ))}
       </CardContent>
     </Card>
   );
