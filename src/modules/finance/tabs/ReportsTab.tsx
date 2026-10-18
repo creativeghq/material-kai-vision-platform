@@ -712,7 +712,7 @@ function renderReport(
   if (report === 'vat_return') {
     const body = sortVatReturnLines(rows as VatRateRow[]).map((r) => [
       vatReturnLineLabel(r.section, r.vat_rate),
-      formatMoney(Number(r.net || 0)), formatMoney(Number(r.vat || 0)), String(r.doc_count ?? 0),
+      r.net == null ? '—' : formatMoney(Number(r.net)), r.vat == null ? '—' : formatMoney(Number(r.vat)), String(r.doc_count ?? 0),
     ]);
     return <Table headers={['Line', 'Net', 'VAT', 'Docs']} totals={totals} rows={body} />;
   }

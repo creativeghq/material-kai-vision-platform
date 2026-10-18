@@ -286,6 +286,13 @@ export const VatReturnPanel: React.FC<{ workspaceId: string; filingFrequency: Va
 
             <div>
               <h3 className="mb-2 text-sm font-semibold">Your return, line by line</h3>
+              {(snap.ours.unconverted_docs ?? 0) > 0 && (
+                <p className="mb-2 flex items-start gap-2 text-xs text-destructive">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {snap.ours.unconverted_docs} foreign-currency document(s) have no exchange rate, so they are left out of
+                  every figure here. Your figure is incomplete until each has its rate.
+                </p>
+              )}
               {lines.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No invoice, bill or credit note in this workspace falls in this period. That is a
@@ -306,8 +313,8 @@ export const VatReturnPanel: React.FC<{ workspaceId: string; filingFrequency: Va
                       {lines.map((r) => (
                         <TableRow key={`${r.section}-${r.vat_rate ?? 'x'}`}>
                           <TableCell className="break-words">{vatReturnLineLabel(r.section, r.vat_rate)}</TableCell>
-                          <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(Number(r.net || 0))}</TableCell>
-                          <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(Number(r.vat || 0))}</TableCell>
+                          <TableCell className="whitespace-nowrap text-right tabular-nums">{r.net == null ? '—' : formatMoney(Number(r.net))}</TableCell>
+                          <TableCell className="whitespace-nowrap text-right tabular-nums">{r.vat == null ? '—' : formatMoney(Number(r.vat))}</TableCell>
                           <TableCell className="hidden text-right tabular-nums sm:table-cell">{r.doc_count ?? 0}</TableCell>
                         </TableRow>
                       ))}

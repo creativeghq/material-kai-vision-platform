@@ -3,8 +3,8 @@
 export interface VatRateRow {
   section: string;
   vat_rate: number | null;
-  net: number;
-  vat: number;
+  net: number | null;
+  vat: number | null;
   doc_count: number;
 }
 
@@ -16,6 +16,7 @@ export interface VatReturnSnapshot {
     rates: VatRateRow[];
     output_vat: number; input_vat: number; payable: number;
     income_net: number; expense_net: number; doc_count: number;
+    unconverted_docs?: number;
     status: string;
   };
   aade: {
@@ -61,13 +62,14 @@ export function vatReturnLineLabel(section: string, rate: number | null): string
     case 'input_credit': return 'Less: supplier credit notes';
     case 'reverse_charge_output': return 'Intra-EU acquisitions — VAT self-assessed';
     case 'reverse_charge_input': return 'Intra-EU acquisitions — VAT reclaimed';
+    case 'unconverted': return 'Not included: foreign-currency documents with no exchange rate';
     default: return section;
   }
 }
 
 const SECTION_ORDER = [
   'output', 'output_credit', 'input', 'input_credit',
-  'reverse_charge_output', 'reverse_charge_input',
+  'reverse_charge_output', 'reverse_charge_input', 'unconverted',
 ];
 
 export function sortVatReturnLines(rows: VatRateRow[]): VatRateRow[] {

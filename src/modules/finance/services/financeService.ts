@@ -3466,8 +3466,8 @@ export interface PnlPerCategoryRow { category_id: string | null; category_name: 
  */
 export interface VatReportRow {
   section: 'output' | 'output_credit' | 'input' | 'input_credit'
-    | 'reverse_charge_output' | 'reverse_charge_input';
-  vat_rate: number | null; net: number; vat: number; doc_count: number;
+    | 'reverse_charge_output' | 'reverse_charge_input' | 'unconverted';
+  vat_rate: number | null; net: number | null; vat: number | null; doc_count: number;
 }
 export interface VatByCodeRow { side: 'income' | 'expense'; vat_category: number | null; vat_rate: number | null; classification_type: string; classification_category: string; net: number; vat: number; line_count: number }
 export interface PartyLedgerRow {
