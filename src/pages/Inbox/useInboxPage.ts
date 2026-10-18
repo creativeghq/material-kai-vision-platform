@@ -174,8 +174,10 @@ export function useInboxPage() {
       .catch(() => { if (!cancelled) setWaNumbers([]); });
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
+  // The groups are built before useFilters returns the values, so the active source arrives from the last render.
+  const activeSourceRef = useRef<string | null>(null);
   const filterGroups = useMemo(
-    () => buildInboxFilters(wsLabels, threads, myUserId ?? undefined, waNumbers),
+    () => buildInboxFilters(wsLabels, threads, myUserId ?? undefined, waNumbers, activeSourceRef.current),
     [wsLabels, threads, myUserId, waNumbers],
   );
   const { values: filterValues, setValues: setFilterValues, filtered: matchedThreads, previewCount } =
@@ -196,16 +198,13 @@ export function useInboxPage() {
     (id: string | null) => setFilterValues({ ...filterValues, label: id ? [id] : undefined }),
     [filterValues, setFilterValues],
   );
-  // The sidebar's Sources list and the modal's Source select are the same constraint, the same
-  // way Unread already is. The sidebar is where you MOVE around a mailbox; the modal is where
-  // you stack conditions on it — but there is only one filter, so picking a source in either
-  // place puts it in `?f=` and the mailbox is a link either way.
   const waNumberFilter = (filterValues.wa_number as string) || null;
   const setWaNumberFilter = useCallback(
     (accountId: string | null) => setFilterValues({ ...filterValues, wa_number: accountId ?? undefined }),
     [filterValues, setFilterValues],
   );
   const sourceFilter = (filterValues.source as string) || null;
+  activeSourceRef.current = sourceFilter;
   const setSourceFilter = useCallback(
     (key: string | null) => setFilterValues({ ...filterValues, source: key ?? undefined }),
     [filterValues, setFilterValues],

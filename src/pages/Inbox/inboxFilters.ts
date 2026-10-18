@@ -10,19 +10,23 @@ export const threadWhatsAppAccount = (t: InboxThread) =>
 
 export function buildInboxFilters(
   labels: InboxLabel[], threads: InboxThread[] = [], myUserId?: string, waNumbers: WhatsAppNumber[] = [],
+  activeSource: string | null = null,
 ): FilterGroupDef[] {
   const labelOptions: FilterOption[] = labels.map((l) => ({ value: l.id, label: l.name }));
+  // A source filter narrows the loaded threads to itself, so the active one is kept on top of what is present.
+  const present = new Set(threads.map(inboxSourceKey));
+  const sourceOptions = inboxSourceOptions().filter((o) => present.has(o.value as never) || o.value === activeSource);
   return [
     {
       key: 'conversation', label: 'Conversation', icon: MessagesSquare,
       fields: [
-        {
-          key: 'source', type: 'select', label: 'Source',
+        ...(sourceOptions.length > 1 || activeSource ? [{
+          key: 'source', type: 'select' as const, label: 'Source',
           description: 'Where the conversation reached you — the door it came through, not just the app it replies on.',
           placeholder: 'All sources',
-          options: inboxSourceOptions(),
+          options: sourceOptions,
           accessor: (t: InboxThread) => inboxSourceKey(t),
-        },
+        }] : []),
         ...(waNumbers.length > 1 ? [{
           key: 'wa_number', type: 'select' as const, label: 'WhatsApp number',
           description: 'The business number the conversation is on.',
