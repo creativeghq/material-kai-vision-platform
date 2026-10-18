@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
 
 export type IntegritySeverity = 'info' | 'warning' | 'critical';
-export type FindingStatus = 'open' | 'healed' | 'ignored';
+export type FindingStatus = 'open' | 'cleared' | 'healed' | 'ignored';
 
 export interface IntegrityCheck {
   key: string;

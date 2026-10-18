@@ -107,7 +107,7 @@ async function resolveHealedInSentry(supabase: ReturnType<typeof svc>): Promise<
   }
   const { data: healed, error } = await supabase.from('data_integrity_findings')
     .select('check_key, entity_id')
-    .eq('status', 'healed').eq('severity', 'critical')
+    .in('status', ['healed', 'cleared']).eq('severity', 'critical')
     .gt('healed_at', new Date(Date.now() - 2 * 86_400_000).toISOString());
   if (error) {
     console.warn('[data-integrity-runner] could not read healed findings:', error.message);
