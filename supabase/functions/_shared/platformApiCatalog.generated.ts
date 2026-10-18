@@ -4222,7 +4222,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "reanalyze",
           "add_faq",
           "score_url",
-          "page_review"
+          "page_review",
+          "presence_plan"
         ],
         "required": true,
         "description": "Which operation to run."

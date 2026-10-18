@@ -2290,6 +2290,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'seo_presence_plan',
+    file: 'supabase/functions/_shared/tools/seo-tools.ts',
+    factory: 'createSEOPresencePlanTool',
+    description: 'Build a presence plan for the workspace website: searches its top non-branded queries on YouTube and in Google on Reddit and Pinterest, and the brand on Trustpilot, says on each platform whether the brand appears, and…',
+    params: [
+      { name: 'website_id', type: 'string', optional: true, description: 'Website id; defaults to the workspace default website.' },
+    ],
+  },
+  {
     name: 'seo_ranked_keywords',
     file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
     factory: 'createSEORankedKeywordsTool',

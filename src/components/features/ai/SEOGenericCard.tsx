@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { SeoMetricTile } from '@/components/core/Profile/seo/SeoMetricTile';
 import { formatCount, metricDescriptor, statusPresentation, type SeoMetric } from '@/components/core/Profile/seo/seoMetrics';
 import { PAGE_RECOMMENDATION_KIND_LABELS, PAGE_REVIEW_VERDICT_LABELS } from '@/services/seo/pageReviewVocabulary';
+import { PresencePlatforms } from '@/components/core/Profile/seo/PresencePlatforms';
 
 export interface SEOGenericCardData {
   type: string;
@@ -58,6 +59,7 @@ const SEO_CARD_TITLES: Record<string, string> = {
   seo_related_keywords_card: 'Related keywords',
   seo_relevant_pages_card: 'Top pages',
   seo_page_review_card: 'Page review',
+  seo_presence_plan_card: 'Presence plan',
   seo_score_url_card: 'Page score',
   seo_search_volume_card: 'Search volume & CPC',
   seo_serp_content_card: 'Ranking page ranges',
@@ -677,6 +679,27 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           </a>
         )}
         <FailedChecksAccordion checks={ip?.page_metrics?.checks ?? ip?.checks} label="On-page issues" />
+      </Card>
+    );
+  }
+
+  // ── Presence on other platforms (#487 C3) ────────────
+  if (t === 'seo_presence_plan_card') {
+    if (data.status !== 'ok') {
+      return (
+        <Card className="space-y-2">
+          <Header icon="🧭" title="No presence plan" subtitle={data.website} />
+          <Primer>{data.error || 'The plan could not be built.'}</Primer>
+        </Card>
+      );
+    }
+    return (
+      <Card className="space-y-3">
+        <Header icon="🧭" title={`Presence plan: ${data.brand}`} subtitle={`${(data.keywords || []).join(' · ')}`} />
+        <PresencePlatforms platforms={data.platforms || []} />
+        {data.website_id && (
+          <a className="text-[11px] text-primary underline" href={`/websites/${data.website_id}?section=ai`}>Open in Website → AI Citations</a>
+        )}
       </Card>
     );
   }

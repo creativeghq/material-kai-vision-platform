@@ -7157,6 +7157,16 @@
         "response": "{success: boolean, url: string, fetched: {title, description, http_status, word_count}, keyword: string, keyword_source: string, analysis: ContentAnalysisResult, checks_skipped: string[], credits_charged: number}"
       },
       {
+        "name": "presence_plan",
+        "summary": "Presence plan for a website (#487 C3): its top non-branded Search Console queries (tracked keywords when it has none) are searched on YouTube (live YouTube SERP) and in Google as site:reddit.com / site:pinterest.com queries, and the brand as site:trustpilot.com, in the site's own market: what ranks in Google is also what assistants cite. Each platform gets a verdict present / absent / collector_failed (a failed lookup is unknown, never absent) and concrete actions. Saved to seo_presence_plans. Needs marketing.seo and seo-toolkit; every lookup passes the DataForSEO spend gate. estimate=true returns the queries and the credit ceiling without spending.",
+        "params": [
+          {"name": "website_id", "type": "string", "required": true, "desc": "Website"},
+          {"name": "estimate", "type": "boolean", "required": false, "desc": "Return the planned lookups and the credit ceiling only"},
+          {"name": "user_id", "type": "string", "required": false, "desc": "Honoured only for secret-level callers."}
+        ],
+        "response": "{success: boolean, data: {plan_id, created_at, website_id, brand, keywords: string[], market, platforms: [{platform, status, note, matches, actions: [{text, url?, keyword?}], errors}]}}"
+      },
+      {
         "name": "page_review",
         "summary": "Review one crawled page of a workspace website (#399): the stored text, its Search Console queries (90 days), its latest on-page audit and its 8 nearest sibling pages go to one Claude turn (prompt row seo_page_reviewer), which proposes a title, meta description, H1, content gaps and internal links. Proposals are saved by save_page_review and closed by the crawler (apply_page_recommendation_outcomes) when the change is seen live. Requires marketing.seo on the website's workspace and the seo-toolkit module; reserves up to 10 credits before the call and settles at the real token cost. A link to a page outside the sibling set is dropped. A page never read returns 409 status not_fetched.",
         "params": [
@@ -7383,7 +7393,8 @@
             "reanalyze",
             "add_faq",
             "score_url",
-            "page_review"
+            "page_review",
+            "presence_plan"
           ],
           "description": "Which operation to run."
         }

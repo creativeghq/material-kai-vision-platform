@@ -88,6 +88,18 @@ const DEFAULT_CEILING_UNITS = 30; // Labs (keywords, domain, competitors, inters
 /** OnPage is billed per crawled page upstream; reserve for the cap the caller actually asked for. */
 const ONPAGE_UNITS_PER_PAGE = 0.2;
 
+/** Credits reserved for `units` at the DataForSEO price: the one formula the gate and any estimate share. */
+export function reservedCreditsFor(units: number, pricing: { cost_per_unit: number; markup_multiplier?: number | null }): number {
+  return Math.round(units * pricing.cost_per_unit * (pricing.markup_multiplier || FALLBACK_MARKUP) * 100 * 100) / 100;
+}
+
+/** The most a set of calls can reserve before running them, or null when DataForSEO has no price row. */
+export async function ceilingCreditsFor(sb: Sb, calls: { kind: string; params?: Record<string, unknown> }[]): Promise<number | null> {
+  const pricing = await getServicePricing(sb, DATAFORSEO_SERVICE).catch(() => null);
+  if (!pricing) return null;
+  return Math.round(calls.reduce((n, c) => n + reservedCreditsFor(ceilingUnitsFor(c.kind, c.params), pricing), 0) * 100) / 100;
+}
+
 export function ceilingUnitsFor(kind: string, params?: Record<string, unknown>): number {
   const base = CEILING_UNITS.find((c) => c.match.test(kind))?.units ?? DEFAULT_CEILING_UNITS;
   if (/^(composite_)?onpage/.test(kind)) {
@@ -161,8 +173,7 @@ export async function openSpendGate(
     return PASS_THROUGH;
   }
 
-  const creditsPerUnit = pricing.cost_per_unit * (pricing.markup_multiplier || FALLBACK_MARKUP) * 100;
-  const reservedCredits = Math.round(units * creditsPerUnit * 100) / 100;
+  const reservedCredits = reservedCreditsFor(units, pricing);
 
   const { refusal, usageLogId } = await debitOrRefuseTracked(
     sb, userId, DATAFORSEO_SERVICE, opType, units,
@@ -199,7 +210,7 @@ export async function openSpendGate(
         return;
       }
       const actualUnits = Math.ceil((costUsd as number) / USD_PER_UNIT);
-      const actualCredits = Math.round(actualUnits * creditsPerUnit * 100) / 100;
+      const actualCredits = reservedCreditsFor(actualUnits, pricing);
       await settleCredits(sb, userId, workspaceId ?? undefined, reservedCredits, actualCredits, opType, {
         kind, cost_usd: costUsd, actual_units: actualUnits, ceiling_units: units,
       });

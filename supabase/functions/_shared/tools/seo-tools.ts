@@ -21,6 +21,7 @@ const { z } = await import('npm:zod@3.25.76');
 import { moduleGate } from './module-gate.ts';
 import { findWorkspacePage } from '../seo/page-audit-store.ts';
 import { serviceClient } from '../supabase-client.ts';
+import { resolveWebsite } from '../seo-website.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -187,6 +188,60 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         article_id: z.string().optional().describe('Id of the stored seo_articles row, when re-analyzing an existing article. Lets the freshness signal read the real review date instead of scoring every article as brand new.'),
       }),
     }
+  );
+};
+
+/** `callSEOFunction` reports a refusal as `<fn> failed (409): {json}`; the handler's own sentence is the useful part. */
+function refusalSentence(raw: unknown): string | null {
+  const s = typeof raw === 'string' ? raw : null;
+  if (!s) return null;
+  const i = s.indexOf('{');
+  if (i >= 0) {
+    try { const j = JSON.parse(s.slice(i)); if (typeof j?.error === 'string') return j.error; } catch { /* not JSON */ }
+  }
+  return s;
+}
+
+/** SEO Tool: where the brand shows up on YouTube, Reddit, Pinterest and Trustpilot, and what to do there (#487 C3). */
+export const createSEOPresencePlanTool = (userId: string, workspaceId: string | null, onChunk?: ChunkSink) => {
+  return tool(
+    async ({ website_id }) => {
+      const denied = await moduleGate(workspaceId, 'seo-toolkit');
+      if (denied) {
+        onChunk?.({ type: 'seo_presence_plan_card', status: 'failed', error: JSON.parse(denied).error, timestamp: Date.now() });
+        return denied;
+      }
+      const site = await resolveWebsite(serviceClient(), { workspaceId, explicitWebsiteId: website_id ?? null });
+      if (!site) {
+        const error = website_id
+          ? 'That website id is not one of this workspace\'s websites. Leave it out to use the default website.'
+          : 'No website is connected to this workspace, so there is no brand to look for. Connect one under Profile → Websites.';
+        onChunk?.({ type: 'seo_presence_plan_card', status: 'failed', error, timestamp: Date.now() });
+        return JSON.stringify({ success: false, error });
+      }
+      const result = await callSEOFunction('seo-presence-plan', { website_id: site.id, user_id: userId }, 140_000);
+      if (!result?.success) {
+        const error = refusalSentence(result?.error) || 'The plan could not be built.';
+        onChunk?.({ type: 'seo_presence_plan_card', status: 'failed', website: site.domain, error, timestamp: Date.now() });
+        return JSON.stringify({ success: false, error });
+      }
+      const d = result.data;
+      onChunk?.({ type: 'seo_presence_plan_card', status: 'ok', website: site.domain, ...d, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true, brand: d.brand, keywords: d.keywords,
+        platforms: (d.platforms ?? []).map((p: { platform: string; status: string; note: string; actions: { text: string }[] }) => ({
+          platform: p.platform, status: p.status, note: p.note, actions: p.actions.slice(0, 3).map((a) => a.text),
+        })),
+        note: 'Saved under Website → AI Citations. A platform marked collector_failed is unknown, not absent.',
+      });
+    },
+    {
+      name: 'seo_presence_plan',
+      description: 'Build a presence plan for the workspace website: searches its top non-branded queries on YouTube and in Google on Reddit and Pinterest, and the brand on Trustpilot, says on each platform whether the brand appears, and lists concrete actions (threads to answer, videos to make, a Trustpilot profile to claim). Paid DataForSEO lookups, about 10 per plan.',
+      schema: z.object({
+        website_id: z.string().optional().describe('Website id; defaults to the workspace default website.'),
+      }),
+    },
   );
 };
 

@@ -570,6 +570,14 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'seo_presence_plan', name: 'Presence Plan', category: 'SEO Research',
+    desc: 'Where the brand shows up on YouTube, Reddit, Pinterest and Trustpilot for the site\'s top queries, and what to do on each: threads to answer, videos to make, a profile to claim. Saved under Website → AI Citations.',
+    examples: [
+      'Where are we on YouTube, Reddit and Trustpilot?',
+      'Build a presence plan for our website',
+    ],
+  },
+  {
     id: 'seo_page_review', name: 'Page Review', category: 'SEO Research',
     credits: 10,
     desc: 'Review one page of your own website: what the crawl read, what Google shows it for and its on-page audit, then a proposed title, meta description, H1, content gaps and internal links. Saved on the page; the next crawl marks a proposal applied when it sees it live.',
@@ -3515,7 +3523,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search',
       'seo_pinterest_search', 'seo_reddit_search',
-      'seo_google_maps', 'seo_gbp_info',
+      'seo_google_maps', 'seo_gbp_info', 'seo_presence_plan',
     ],
     quick_starts: [
       {

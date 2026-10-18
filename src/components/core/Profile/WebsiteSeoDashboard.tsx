@@ -10,6 +10,7 @@ import { WebsiteDomainIntelPanel } from '@/components/core/Profile/WebsiteDomain
 import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOverviewPanel';
 import { TopicPlanCard } from '@/components/core/Profile/seo/TopicPlanCard';
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
+import { PresencePlanCard } from '@/components/core/Profile/seo/PresencePlanCard';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
 import { WebsiteSerpFeaturesPanel } from '@/components/core/Profile/WebsiteSerpFeaturesPanel';
@@ -188,8 +189,9 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
           <WebsiteSeoOverviewPanel website={website} onOpenTab={setTab} />
         </TabsContent>
 
-        <TabsContent value="ai">
+        <TabsContent value="ai" className="space-y-4">
           <WebsiteAiVisibilityPanel website={website} />
+          <PresencePlanCard websiteId={website.id} />
         </TabsContent>
 
         <TabsContent value="gsc" className="space-y-4">

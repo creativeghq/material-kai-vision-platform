@@ -23,6 +23,9 @@ const read = (p: string) => readFileSync(p, 'utf8').split('\r\n').join('\n');
  * findings hide, which is why the reasons are themselves asserted below.
  */
 const EXEMPT: Record<string, string> = {
+  'seo-api/handlers/presence-plan.ts':
+    'website_id is read back as a row first, userHasWorkspaceCapability(..., site.workspace_id, '
+    + "'marketing.seo') must pass, and the stored workspace_id is that row's. The two cannot disagree.",
   'seo-api/handlers/citability.ts':
     'website_id is read back as a row FIRST, then userCanAccessWorkspace(db, auth.userId, '
     + "site.workspace_id) must pass, and the stored workspace_id is site.workspace_id — the "

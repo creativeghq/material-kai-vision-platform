@@ -1041,7 +1041,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // SEO toolkit — Wave 1B+ (all users; 0 user credits, internal DataForSEO routing)
       'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
       'seo_keyword_overview', 'seo_ai_keyword_volume',
-      'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url', 'seo_page_review',
+      'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url', 'seo_page_review', 'seo_presence_plan',
       // Domain intel
       'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
       'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
@@ -1340,7 +1340,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
-      'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url', 'seo_page_review',
+      'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url', 'seo_page_review', 'seo_presence_plan',
       'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors', 'seo_keyword_gap',
       'seo_traffic_estimation', 'seo_subdomains', 'seo_relevant_pages', 'seo_categories_for_domain',
       'seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
@@ -2138,7 +2138,7 @@ async function executeAgent(
   const needsB2b = config.tools.some((t: string) => ['b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
   const needsWebResearch = config.tools.some((t: string) => ['web_search', 'web_fetch', 'web_research_validate'].includes(t));
-  const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_content_analyzer', 'seo_score_url', 'seo_page_review', 'create_seo_article'].includes(t));
+  const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_content_analyzer', 'seo_score_url', 'seo_page_review', 'seo_presence_plan', 'create_seo_article'].includes(t));
   // SEO agent toolkit (conversational research surface — separate from the article pipeline)
   const SEO_AGENT_TOOL_NAMES = [
     'seo_research_keyword',
@@ -2288,6 +2288,7 @@ async function executeAgent(
   const createSEOContentAnalyzerTool = seoMod?.createSEOContentAnalyzerTool;
   const createSEOScoreUrlTool = seoMod?.createSEOScoreUrlTool;
   const createSEOPageReviewTool = seoMod?.createSEOPageReviewTool;
+  const createSEOPresencePlanTool = seoMod?.createSEOPresencePlanTool;
   const createSEOPipelineTool = seoMod?.createSEOPipelineTool;
   const createSEOResearchKeywordTool = seoAgentMod?.createSEOResearchKeywordTool;
   // Wave 1B+ SEO agent toolkit
@@ -3165,6 +3166,9 @@ async function executeAgent(
   }
   if (config.tools.includes('seo_page_review')) {
     tools.push(createSEOPageReviewTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('seo_presence_plan')) {
+    tools.push(createSEOPresencePlanTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('create_seo_article')) {
     tools.push(createSEOPipelineTool(userId, onChunk));

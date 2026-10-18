@@ -204,7 +204,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'seo-multi-engine': {
     capability: ['marketing.seo'],
-    tool_ids: ['seo_youtube_search', 'seo_local_pack', 'seo_google_trends', 'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search', 'seo_google_maps', 'seo_gbp_info'],
+    tool_ids: ['seo_youtube_search', 'seo_local_pack', 'seo_google_trends', 'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search', 'seo_google_maps', 'seo_gbp_info', 'seo_presence_plan'],
   },
   'seo-composite': {
     capability: ['marketing.seo'],
