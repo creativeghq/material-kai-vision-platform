@@ -14,9 +14,9 @@ const buttonVariants = cva(
           'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80',
-        // Accent outline — the canonical "second action" next to a primary.
+        // Highlight outline — the canonical "second action" next to a primary.
         secondary:
-          'bg-transparent text-primary border border-primary hover:bg-primary/[0.08] active:bg-primary/[0.14]',
+          'bg-transparent text-highlight border border-highlight hover:bg-highlight/[0.08] active:bg-highlight/[0.14]',
         // Neutral outline — tertiary actions, toolbars, filter triggers.
         outline:
           'bg-card text-foreground border border-hairline hover:bg-surface-hover hover:border-muted-foreground/50',

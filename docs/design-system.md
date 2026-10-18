@@ -71,6 +71,7 @@ all four. The specimen page has the switcher for exactly this reason.
 | `--surface-sunken` | `60 1% 10%` | `44 24% 91%` | Table headers, toolbars, footers — one step *down*. |
 | `--surface-hover` | `60 1% 15%` | `44 24% 90%` | Row / list-item / interactive-panel hover. |
 | `--hairline` | `60 2% 21%` | `46 18% 82%` | **Every** rule, border and separator in the app. |
+| `--highlight` | `15 63% 60%` | = `--primary` | Second brand colour (claude.ai orange in dark). The Secondary button's outline. |
 | `--primary` | `56 30% 55%` | `56 24% 37%` | The accent. Fills, links, active states, focus. |
 | `--foreground` | `45 12% 93%` | `46 14% 21%` | Body ink. |
 | `--muted-foreground` | `48 4% 62%` | `48 16% 38%` | Labels, captions, table headers, empty values. |

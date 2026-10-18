@@ -239,6 +239,8 @@ All colors MUST be HSL.
     /* Primary — the light theme's olive, lifted for dark: 7.6:1 on the page, so fills take DARK text */
     --primary: 56 30% 55%;      /* #afaa6a */
     --primary-foreground: 0 0% 8%;
+    /* Second brand colour — claude.ai's orange; the Secondary button and highlights. */
+    --highlight: 15 63% 60%;    /* #d97757 — 5.3:1 on --card */
 
     /* Brand gradient (plum) — reserved for IDENTITY surfaces only (PageHeader,
        logo, hero). No longer painted on every bg-primary fill; buttons, active
@@ -442,6 +444,7 @@ All colors MUST be HSL.
        clears WCAG AA (≥4.5:1) in fills and the assistant chat bubble. */
     --primary: 56 24% 37%;           /* #6b6842 — white text 5.70:1 (AA) */
     --primary-foreground: 0 0% 100%;
+    --highlight: 56 24% 37%;         /* light keeps one accent */
 
     /* Secondary — deeper green, below cards (active-nav pill tone) */
     --secondary: 78 22% 89%;         /* #e5e9dd */
@@ -599,6 +602,7 @@ All colors MUST be HSL.
 
     --primary: 218 74% 46%;          /* #1e5ecc — deep AA-safe blue */
     --primary-foreground: 0 0% 100%;
+    --highlight: 218 74% 46%;
 
     --secondary: 214 32% 91%;        /* #e2e8f0 — cool sand replacement */
     --secondary-foreground: 217 28% 27%;
