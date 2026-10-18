@@ -27,18 +27,38 @@ export const PresencePlanCard: React.FC<{ websiteId: string }> = ({ websiteId })
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const loadPlan = useCallback(async () => {
-    const { data } = await supabase.from('seo_presence_plans' as never)
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const fetchPlan = useCallback(async () => {
+    const { data, error } = await supabase.from('seo_presence_plans' as never)
       .select('id, brand, keywords, platforms, created_at').eq('website_id', websiteId)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
-    setPlan((data as Plan | null) ?? null);
+    if (error) throw new Error(error.message);
+    return (data as Plan | null) ?? null;
   }, [websiteId]);
+  const loadPlan = useCallback(async () => {
+    try {
+      setPlan(await fetchPlan());
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [fetchPlan]);
   useEffect(() => {
-    void Promise.all([
-      loadPlan(),
-      callPlan<Estimate>({ website_id: websiteId, estimate: true }).then(setEstimate).catch(() => setEstimate(null)),
-    ]);
-  }, [loadPlan, websiteId]);
+    let cancelled = false;
+    setPlan(undefined);
+    setEstimate(null);
+    setLoadError(null);
+    fetchPlan().then(
+      (p) => { if (!cancelled) setPlan(p); },
+      (e: unknown) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e)); },
+    );
+    callPlan<Estimate>({ website_id: websiteId, estimate: true }).then(
+      (est) => { if (!cancelled) setEstimate(est); },
+      () => { if (!cancelled) setEstimate(null); },
+    );
+    return () => { cancelled = true; };
+  }, [fetchPlan, websiteId]);
 
   const build = async () => {
     setBusy(true);
@@ -77,7 +97,9 @@ export const PresencePlanCard: React.FC<{ websiteId: string }> = ({ websiteId })
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {plan === undefined ? (
+        {loadError ? (
+          <p className="text-sm text-destructive">Could not load the saved plan: {loadError}</p>
+        ) : plan === undefined ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : plan ? (
           <>

@@ -159,7 +159,7 @@ async function runRefresh(req: Request, body: any, userId: string): Promise<Resp
     const plan = storedArticlePlan(article) as ArticlePlan | null;
     if (!plan?.primaryKeyword) return jsonResponse({ success: false, error: 'This article has no stored plan, so it cannot be refreshed.' }, 409);
 
-    const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId, article.workspace_id ?? null);
     if (entResponse) return entResponse;
 
     const { data: row, error: rowErr } = await supabase.from('seo_articles')
@@ -311,9 +311,9 @@ async function maybeAutoApplyMeta(
   const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/seo-publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
-    body: JSON.stringify({ action: 'publish', article_id: ctx.articleId, status: 'publish', user_id: ctx.userId }),
+    body: JSON.stringify({ action: 'publish', article_id: ctx.articleId, status: 'publish', meta_only: true, user_id: ctx.userId }),
   }).catch(() => null);
   const out = res ? await res.json().catch(() => null) : null;
   if (!out?.success) console.warn('[seo-refresh] meta applied to the article but not republished:', out?.error ?? 'no response');
-  return true;
+  return out?.success === true;
 }

@@ -451,7 +451,12 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                 </p>
               )}
               {view === 'queries' && lens !== 'all' ? (
-                <GscQueryLens websiteId={website.id} days={days} lens={lens} />
+                <>
+                  <p className="px-3 py-1.5 text-xs text-muted-foreground border-b border-hairline">
+                    Lenses cover the whole site: the search, page and segment filters do not apply to them.
+                  </p>
+                  <GscQueryLens websiteId={website.id} days={days} lens={lens} />
+                </>
               ) : (
               <>
               <Table>

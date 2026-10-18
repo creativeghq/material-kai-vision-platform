@@ -14,5 +14,5 @@ export const COLLECTOR_CADENCES: Record<CollectorKind, readonly CollectorCadence
 
 export const RUNS_PER_MONTH: Record<CollectorCadence, number> = { off: 0, daily: 30, weekly: 4.3, monthly: 1 };
 
-/** Worst case per tracked keyword: three full-depth attempts, then a shallower one. */
-export const RANK_SERP_CALLS_PER_KEYWORD_MAX = 4;
+/** Worst case per tracked keyword: three full-depth attempts, a shallower one, then two re-reads of a drop. */
+export const RANK_SERP_CALLS_PER_KEYWORD_MAX = 6;

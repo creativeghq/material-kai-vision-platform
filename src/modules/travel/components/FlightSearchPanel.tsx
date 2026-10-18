@@ -50,6 +50,11 @@ export const FlightSearchPanel: React.FC<{
 
   useEffect(() => { loadQuota(); }, [loadQuota]);
   useEffect(() => {
+    setResult(null);
+    setError(null);
+    setCardId(targetCardId ?? '');
+  }, [workspaceId, targetCardId]);
+  useEffect(() => {
     if (targetCardId) return;
     tripExpenseService.listReports({ workspaceId, mine: true, status: ['draft'] })
       .then((r) => { setCards(r); setCardId((c) => c || r[0]?.id || NEW_CARD); })
@@ -173,7 +178,7 @@ export const FlightSearchPanel: React.FC<{
           </FormField>
         </FormGrid>
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => void search()} disabled={!valid || busy || exhausted}>
+          <Button onClick={() => void search()} disabled={!valid || busy}>
             {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />} Search fares
           </Button>
           {!targetCardId && offers.length > 0 && (

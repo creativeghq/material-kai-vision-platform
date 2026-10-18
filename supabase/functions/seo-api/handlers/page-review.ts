@@ -105,13 +105,15 @@ export async function runPageReview(supabase: DbClient, body: any, userId: strin
       }, 409);
     }
 
-    const [{ data: queries }, { data: audit }, siblings] = await Promise.all([
+    const [{ data: queries, error: queriesErr }, { data: audit, error: auditErr }, siblings] = await Promise.all([
       supabase.rpc('get_page_gsc_queries', { p_website_id: page.website_id, p_page: page.url, p_days: 90 }),
       supabase.from('website_page_audits').select('checks, onpage_score, created_at')
         .eq('page_id', page.id).not('onpage_score', 'is', null)
         .order('created_at', { ascending: false }).limit(1).maybeSingle(),
       siblingPages(supabase, page, website.user_id),
     ]);
+    if (queriesErr) throw new Error(`Could not read the page's Search Console queries: ${queriesErr.message}`);
+    if (auditErr) throw new Error(`Could not read the page's last audit: ${auditErr.message}`);
     const gsc = ((queries ?? []) as { query: string; impressions: number; clicks: number; position: number | null }[]).slice(0, 25);
     const failing = audit?.checks
       ? buildCheckInventory(audit.checks as Record<string, unknown>).verdicts.filter((v) => !v.passed).map((v) => v.check.label)

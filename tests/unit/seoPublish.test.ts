@@ -43,7 +43,7 @@ describe('#401 W3.1 — publishing is one post, however often it is retried', ()
   const publish = fn.slice(fn.indexOf('async function handlePublish('));
 
   it('claims the article before creating a post, and records the post id straight after', () => {
-    const claim = publish.indexOf(".is('publish_external_id', null)");
+    const claim = publish.indexOf(".filter('publish_external_id', sameSite ? 'is' : 'not.is', null)");
     const create = publish.indexOf("wp(creds, 'POST', '/wp/v2/posts', payload)");
     const record = publish.indexOf('.update({ publish_external_id: externalId');
     expect(claim).toBeGreaterThan(-1);
@@ -53,8 +53,14 @@ describe('#401 W3.1 — publishing is one post, however often it is retried', ()
   });
 
   it('never turns a live post back into a draft, and keeps the claim until the post id is recorded', () => {
-    expect(publish).toMatch(/if \(status === 'draft' && row\.publish_external_id && row\.published_at\)/);
+    expect(publish).toMatch(/if \(status === 'draft' && sameSite && row\.publish_external_id && row\.published_at\)/);
     expect(publish).toContain('...(idRecorded ? { publish_started_at: null } : {})');
+  });
+
+  it('a post id is reused only against the site that issued it', () => {
+    expect(publish).toContain('const sameSite = !row.publish_site_url || row.publish_site_url === creds.site_url;');
+    expect(publish).toContain('row.publish_external_id && sameSite ? String(row.publish_external_id) : null');
+    expect(publish).toContain('publish_site_url: creds.site_url');
   });
 
   it('caps the size of what a site may send back', () => {

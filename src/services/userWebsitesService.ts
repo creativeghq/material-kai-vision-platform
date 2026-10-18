@@ -1851,10 +1851,11 @@ export const userWebsitesService = {
       .map((a) => [a.published_url.replace(/\/+$/, ''), { id: a.id, title: a.title }]));
   },
 
-  async refreshArticle(articleId: string, reason: string): Promise<void> {
+  async refreshArticle(articleId: string, reason: string): Promise<{ proposed: number; meta_proposed?: boolean; message?: string }> {
     const { data, error } = await supabase.functions.invoke('seo-api', { body: { action: 'refresh', article_id: articleId, reason } });
     if (error) throw new Error(await edgeErrorMessage(error, 'Could not refresh the article'));
     if (data?.success === false) throw new Error(String(data.error ?? 'Could not refresh the article'));
+    return { proposed: Number(data?.data?.proposed ?? 0), meta_proposed: data?.data?.meta_proposed, message: data?.data?.message };
   },
 
   async domainHistory(websiteId: string, limit = 60): Promise<WebsiteDomainHistoryRow[]> {

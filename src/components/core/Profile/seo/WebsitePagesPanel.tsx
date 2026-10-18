@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, FileSearch, Loader2, RefreshCw, Sparkles, X } from 'lucide-react';
 
 import {
@@ -219,17 +219,29 @@ const PageDrawer: React.FC<{ websiteId: string; pageId: string | null; onClose: 
   const { toast } = useToast();
   const [detail, setDetail] = useState<WebsitePageDetail | null>(null);
   const [queries, setQueries] = useState<PageGscQuery[] | null>(null);
+  const [queriesError, setQueriesError] = useState<string | null>(null);
+  const requestSeq = useRef(0);
   const [busy, setBusy] = useState<'review' | 'audit' | 'refetch' | null>(null);
 
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
     if (!pageId) return;
     setDetail(null);
     setQueries(null);
+    setQueriesError(null);
     try {
       const d = await pageReviewService.detail(pageId);
+      if (seq !== requestSeq.current) return;
       setDetail(d);
-      if (d) setQueries(await userWebsitesService.pageGscQueries(websiteId, d.page.url, 90).catch(() => []));
+      if (!d) return;
+      try {
+        const q = await userWebsitesService.pageGscQueries(websiteId, d.page.url, 90);
+        if (seq === requestSeq.current) setQueries(q);
+      } catch (e) {
+        if (seq === requestSeq.current) setQueriesError(errorText(e));
+      }
     } catch (e) {
+      if (seq !== requestSeq.current) return;
       toast({ title: 'Could not open the page', description: errorText(e), variant: 'destructive' });
     }
   }, [pageId, websiteId, toast]);
@@ -378,7 +390,9 @@ const PageDrawer: React.FC<{ websiteId: string; pageId: string | null; onClose: 
 
             <section>
               <h3 className="mb-2 text-sm font-semibold">What Google shows it for (90 days)</h3>
-              {queries === null ? (
+              {queriesError ? (
+                <p className="text-sm text-destructive">Could not load Search Console queries: {queriesError}</p>
+              ) : queries === null ? (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               ) : queries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No Search Console queries recorded for this page.</p>

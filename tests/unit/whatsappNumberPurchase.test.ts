@@ -32,17 +32,14 @@ describe('#369 a workspace buys its own WhatsApp number and pays for it in credi
     expect(purchase).toContain('claimFirstMonth(supabaseClient, wsId, [outcome.numberId], month)');
     expect(purchase).toContain('!outcome.alreadyPurchased');
     expect(purchase).toMatch(/if \(!claimed\.length\) \{\s*await refund\(/);
-    const claim = billing.slice(billing.indexOf('export async function claimFirstMonth('), billing.indexOf('export async function unclaimFirstMonth('));
+    const claim = billing.slice(billing.indexOf('export async function claimFirstMonth('), billing.indexOf('export const firstMonthCredits'));
     expect(claim).toContain('prepaid_through.is.null,prepaid_through.lt.');
   });
 
-  it('the activation webhook claims before it debits, and gives the claim back when the debit fails', () => {
-    const charge = billing.slice(billing.indexOf('export async function chargeFirstMonth('));
-    const claim = charge.indexOf('await claimFirstMonth(');
-    const debit = charge.indexOf("rpc('debit_credits'");
-    expect(claim).toBeGreaterThan(-1);
-    expect(claim).toBeLessThan(debit);
-    expect(charge.slice(debit)).toMatch(/if \(debitErr \|\| !row\?\.success\) \{\s*await unclaimFirstMonth\(/);
+  it('the activation webhook claims and debits in ONE transaction, so a refused debit leaves nothing paid', () => {
+    const charge = billing.slice(billing.indexOf('export async function chargeFirstMonth('), billing.indexOf('export const FIRST_MONTH_HOLD'));
+    expect(charge).toContain("rpc('charge_phone_numbers_first_month'");
+    expect(charge).not.toContain("rpc('debit_credits'");
     expect(billing).toMatch(/!\(n\.prepaid_through && n\.prepaid_through >= month\)/);
   });
 

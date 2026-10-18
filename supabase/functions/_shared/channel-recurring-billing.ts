@@ -176,39 +176,25 @@ export async function claimFirstMonth(
   return { claimed: (data ?? []) as ClaimedNumber[] };
 }
 
-export async function unclaimFirstMonth(supabase: SupabaseLike, claimed: ClaimedNumber[]): Promise<void> {
-  if (!claimed.length) return;
-  const { error } = await supabase.from('workspace_phone_numbers')
-    .update({ prepaid_through: null }).in('id', claimed.map((r) => r.id));
-  if (error) console.error('[channel-billing] first-month claim NOT released; the number reads as paid', claimed.map((r) => r.id), error.message);
-}
-
 export const firstMonthCredits = (claimed: ClaimedNumber[]) =>
   recurringCredits(claimed.reduce((sum, r) => sum + r.monthly_cents / 100, 0), 1);
 
+/** Claim the unpaid first months and debit them in ONE transaction: a refused debit leaves nothing marked paid. */
 export async function chargeFirstMonth(
   supabase: SupabaseLike,
   params: { workspaceId: string; billingUserId: string; zernioNumberIds: string[]; now?: Date },
 ): Promise<{ ok: boolean; credits: number; error?: string }> {
-  const month = periodMonth(params.now ?? new Date());
-  const { claimed, error: claimErr } = await claimFirstMonth(supabase, params.workspaceId, params.zernioNumberIds, month);
-  if (claimErr) return { ok: false, credits: 0, error: claimErr };
-  if (!claimed.length) return { ok: true, credits: 0 };
-  const credits = firstMonthCredits(claimed);
-  const { data: debit, error: debitErr } = await supabase.rpc('debit_credits', {
-    p_user_id: params.billingUserId,
-    p_amount: credits,
-    p_operation_type: 'phone_number_first_month',
-    p_description: `WhatsApp number ${claimed.map((r) => r.phone_number).join(', ')}: ${month.slice(0, 7)}`,
-    p_metadata: { numbers: claimed.map((r) => r.phone_number), month },
+  if (!params.zernioNumberIds.length) return { ok: true, credits: 0 };
+  const { data, error } = await supabase.rpc('charge_phone_numbers_first_month', {
     p_workspace_id: params.workspaceId,
+    p_billing_user: params.billingUserId,
+    p_zernio_ids: params.zernioNumberIds,
+    p_month: periodMonth(params.now ?? new Date()),
+    p_credits_per_cent: MARKUP_MULTIPLIER / CREDIT_SALE_PRICE_USD / 100,
   });
-  const row = Array.isArray(debit) ? debit[0] : debit;
-  if (debitErr || !row?.success) {
-    await unclaimFirstMonth(supabase, claimed);
-    return { ok: false, credits, error: row?.error_message ?? debitErr?.message ?? 'Insufficient credits' };
-  }
-  return { ok: true, credits };
+  const out = data as { success?: boolean; credits?: number; error?: string } | null;
+  if (error || !out?.success) return { ok: false, credits: Number(out?.credits ?? 0), error: out?.error ?? error?.message ?? 'refused' };
+  return { ok: true, credits: Number(out.credits ?? 0) };
 }
 
 export const FIRST_MONTH_HOLD = 'first month unpaid';

@@ -212,7 +212,7 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
   }
 
   const { data: row, error: rowErr } = await supabase.from('seo_articles')
-    .select('title, meta_description, slug, markdown_content, publish_external_id, publish_started_at, published_url, published_at, target_keyword, publish_media')
+    .select('title, meta_description, slug, markdown_content, publish_external_id, publish_site_url, publish_started_at, published_url, published_at, target_keyword, publish_media')
     .eq('id', articleId).single();
   if (rowErr || !row) return jsonResponse({ success: false, error: 'Could not read the article.' }, 500);
   let markdown = String(row.markdown_content ?? '');
@@ -231,7 +231,8 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
     return jsonResponse({ success: false, error: 'Connect your WordPress site first: Profile → Keys → Publishing.' }, 409);
   }
 
-  if (status === 'draft' && row.publish_external_id && row.published_at) {
+  const sameSite = !row.publish_site_url || row.publish_site_url === creds.site_url;
+  if (status === 'draft' && sameSite && row.publish_external_id && row.published_at) {
     return jsonResponse({
       success: false,
       error: 'This article is live on your site. Saving it as a draft would take the page down; use Publish to update it.',
@@ -240,14 +241,26 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
 
   const title = String(row.title || row.target_keyword || 'Untitled');
   const slug = row.slug ? slugify(String(row.slug)) : slugify(title);
-  let externalId = row.publish_external_id ? String(row.publish_external_id) : null;
+  let externalId = row.publish_external_id && sameSite ? String(row.publish_external_id) : null;
   let idRecorded = !!externalId;
+  if (body.meta_only === true) {
+    if (!externalId || !row.published_at) return jsonResponse({ success: false, error: 'Only a live article can have its title and description updated on its own.' }, 409);
+    try {
+      const post = await wp(creds, 'POST', `/wp/v2/posts/${encodeURIComponent(externalId)}`, {
+        title, ...(row.meta_description ? { excerpt: String(row.meta_description) } : {}),
+      });
+      return jsonResponse({ success: true, external_id: externalId, status: post?.status ?? null, url: post?.link ?? null });
+    } catch (e) {
+      const err = e instanceof WpError ? e : null;
+      return jsonResponse({ success: false, error: e instanceof Error ? e.message : String(e) }, err?.status ?? 502);
+    }
+  }
 
   if (!externalId) {
     const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
     const { data: claimed } = await supabase.from('seo_articles')
       .update({ publish_started_at: new Date().toISOString(), publish_target: 'wordpress' })
-      .eq('id', articleId).is('publish_external_id', null)
+      .eq('id', articleId).filter('publish_external_id', sameSite ? 'is' : 'not.is', null)
       .or(`publish_started_at.is.null,publish_started_at.lt.${staleBefore}`)
       .select('id');
     if (!claimed?.length) return jsonResponse({ success: false, error: 'This article is already being published. Try again in a minute.' }, 409);
@@ -258,7 +271,7 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
       const found = await wp(creds, 'GET', `/wp/v2/posts?slug=${encodeURIComponent(slug)}&status=any&context=edit`);
       if (Array.isArray(found) && found[0]?.id) externalId = String(found[0].id);
     }
-    const media: Record<string, string> = { ...((row.publish_media ?? {}) as Record<string, string>) };
+    const media: Record<string, string> = sameSite ? { ...((row.publish_media ?? {}) as Record<string, string>) } : {};
     for (const ours of new Set([...markdown.matchAll(OUR_IMAGE)].map((m) => m[1]))) {
       if (!media[ours]) {
         media[ours] = await uploadImage(creds, ours);
@@ -280,7 +293,7 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
       externalId = String(post?.id ?? '');
       if (!externalId) throw new WpError('WordPress did not return a post id.');
       const { error: idErr } = await supabase.from('seo_articles')
-        .update({ publish_external_id: externalId, publish_target: 'wordpress' }).eq('id', articleId);
+        .update({ publish_external_id: externalId, publish_site_url: creds.site_url, publish_target: 'wordpress', publish_media: media, published_url: null }).eq('id', articleId);
       if (idErr) console.error('[seo-publish] post created on WordPress but its id was NOT recorded', articleId, externalId, idErr.message);
       else idRecorded = true;
     }
@@ -296,7 +309,7 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
     const err = e instanceof WpError ? e : null;
     if (err && !externalId) {
       const { error: releaseErr } = await supabase.from('seo_articles')
-        .update({ publish_started_at: null }).eq('id', articleId).is('publish_external_id', null);
+        .update({ publish_started_at: null }).eq('id', articleId).filter('publish_external_id', sameSite ? 'is' : 'not.is', null);
       if (releaseErr) console.error('[seo-publish] publish claim not released; a retry waits 2 minutes', articleId, releaseErr.message);
     }
     return jsonResponse({ success: false, error: e instanceof Error ? e.message : String(e) }, err?.status ?? 502);

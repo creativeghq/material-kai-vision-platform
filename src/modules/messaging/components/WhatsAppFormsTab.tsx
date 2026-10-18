@@ -66,6 +66,7 @@ export const WhatsAppFormsTab: React.FC = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [loadErrors, setLoadErrors] = useState<{ responses?: string; channels?: string }>({});
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
@@ -80,9 +81,11 @@ export const WhatsAppFormsTab: React.FC = () => {
     setForms((f.data ?? []) as FormRow[]);
     setResponses((r.data ?? []) as ResponseRow[]);
     setChannels((c.data ?? []) as Channel[]);
+    setLoadErrors({ responses: r.error?.message, channels: c.error?.message });
   }, [activeWorkspaceId, toast]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { setDraft(null); }, [activeWorkspaceId]);
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -153,6 +156,8 @@ export const WhatsAppFormsTab: React.FC = () => {
         <CardContent>
           {forms === null ? (
             <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : forms.length === 0 && loadErrors.channels ? (
+            <p className="text-sm text-destructive">Could not load this workspace's WhatsApp numbers: {loadErrors.channels}</p>
           ) : forms.length === 0 ? (
             <HubEmptyState
               icon={ClipboardList}
@@ -224,7 +229,9 @@ export const WhatsAppFormsTab: React.FC = () => {
           <CardDescription>The last 50 submissions. Each one is also a message in its conversation.</CardDescription>
         </CardHeader>
         <CardContent>
-          {responses.length === 0 ? (
+          {loadErrors.responses ? (
+            <p className="text-sm text-destructive">Could not load the answers: {loadErrors.responses}</p>
+          ) : responses.length === 0 ? (
             <HubEmptyState
               icon={Send}
               title="No answers yet"

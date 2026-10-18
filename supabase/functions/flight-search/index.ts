@@ -62,7 +62,7 @@ async function pollSnapshot(key: string, snapshotId: string, budgetMs: number): 
   return null;
 }
 
-/** Records when the provider answered inside the budget; null with a snapshot id when it is still collecting. */
+/** Records when the provider answered at once; otherwise the snapshot it is collecting into. */
 async function runSearch(key: string, p: ReturnType<typeof validateFlightParams> & object): Promise<{ records: unknown[] | null; snapshotId: string | null }> {
   const url = `${API}/scrape?dataset_id=${DATASET_ID}&type=discover_new&discover_by=input_filters&include_errors=true&format=json`;
   const res = await fetch(url, {
@@ -91,7 +91,7 @@ async function runSearch(key: string, p: ReturnType<typeof validateFlightParams>
     const ack = await res.json().catch(() => null);
     const snapshotId = typeof ack?.snapshot_id === 'string' ? ack.snapshot_id : null;
     if (!snapshotId) throw new ProviderError('The provider accepted the search but gave no snapshot to collect.');
-    return { records: await pollSnapshot(key, snapshotId, POLL_AFTER_POST_MS), snapshotId };
+    return { records: null, snapshotId };
   }
   if (res.status === 401 || res.status === 403) throw new ProviderError('The Bright Data key was refused. Check it under Profile → Keys (or Admin → Platform secrets for the platform key).');
   throw new ProviderError(`The provider refused the search (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
@@ -181,10 +181,17 @@ async function handleSearch(supabase: DbClient, c: Caller, body: any): Promise<R
     if (!key) throw new ProviderError(source === 'byok'
       ? 'The workspace Bright Data key could not be read. Connect it again under Profile → Keys.'
       : 'Flight search is not configured on this platform yet (no Bright Data key).');
-    const { records, snapshotId } = await runSearch(key, p);
-    if (!records) {
+    let { records, snapshotId } = await runSearch(key, p);
+    if (!records && snapshotId) {
       const { error: snapErr } = await supabase.from('flight_searches').update({ snapshot_id: snapshotId }).eq('id', searchId);
       if (snapErr) throw new Error(`Could not record the pending search: ${snapErr.message}`);
+      records = await pollSnapshot(key, snapshotId, POLL_AFTER_POST_MS).catch((e) => {
+        if (e instanceof ProviderError) throw e;
+        console.warn('[flight-search] snapshot poll interrupted; the next request collects it', snapshotId, e);
+        return null;
+      });
+    }
+    if (!records) {
       return jsonResponse({ success: true, data: { cached: false, still_collecting: true, search: await readSearch(supabase, searchId) } }, 202);
     }
     await settle(supabase, c, searchId, source, records, snapshotId);

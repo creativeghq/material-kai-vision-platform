@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarClock, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -33,16 +33,24 @@ export const WebsiteSchedulesPanel: React.FC<{ website: UserWebsite }> = ({ webs
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<{ collector: CollectorKind; cadence: CollectorCadence } | null>(null);
   const [busy, setBusy] = useState(false);
+  const currentId = useRef(website.id);
 
   const load = useCallback(async () => {
     setError(null);
     const [s, e] = await Promise.allSettled([userWebsitesService.schedules(website.id), userWebsitesService.scheduleEstimates(website.id)]);
+    if (currentId.current !== website.id) return;
     if (s.status === 'fulfilled') setSchedules(s.value);
     else { setSchedules((v) => v ?? []); setError(`Could not read the schedules: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`); }
     if (e.status === 'fulfilled') setEstimates(e.value);
     else setError(`Prices are unavailable right now: ${e.reason instanceof Error ? e.reason.message : String(e.reason)}`);
   }, [website.id]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    currentId.current = website.id;
+    setSchedules(null);
+    setEstimates(null);
+    setPending(null);
+    void load();
+  }, [load, website.id]);
 
   const apply = async (collector: CollectorKind, cadence: CollectorCadence) => {
     setBusy(true);

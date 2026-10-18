@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
-import { resolveAndAssertSeoEntitled } from './entitlement.ts';
+import { resolveAndAssertSeoEntitled, websiteWorkspaceFor } from './entitlement.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import type { KeywordResearchResult, SEOResearchRequest, SEOResearchResponse } from '../../_shared/seo-types.ts';
 import { fetchOpportunitiesStateless } from '../../_shared/mention-opportunities-client.ts';
@@ -139,7 +139,9 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     const readPages = body.read_ranking_pages !== false;
 
     // Entitlement gate BEFORE the debit and the upstream calls (#212 + invariant 10); resolves the workspace.
-    const { workspaceId: resolvedWs, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    const siteWs = await websiteWorkspaceFor(supabase, userId, body.website_id);
+    if (siteWs === null) return jsonResponse({ success: false, error: 'Website not found' }, 404);
+    const { workspaceId: resolvedWs, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId, siteWs);
     workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
@@ -167,7 +169,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       const ranking = await findExistingPage(supabase, {
         userId, workspaceId, websiteId: website?.id ?? null, keyword: String(body.target_keyword), searchConsoleOnly: true,
       });
-      if (ranking) reused.research.existingPage = ranking;
+      reused.research.existingPage = ranking ?? null;
       console.log(`[seo-research] reused research ${reused.id} for "${body.target_keyword}" (30-day cache)`);
       const cachedResponse: SEOResearchResponse = {
         success: true,

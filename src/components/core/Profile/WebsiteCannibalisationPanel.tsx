@@ -79,9 +79,11 @@ function ConsolidateDialog({ item, onClose, ctx }: { item: CannibalItem; onClose
     if (!window.confirm('Draft a refresh of this article so it stops competing for the query? It is charged at the real model cost; the changes are proposals you approve.')) return;
     setRefreshing(articleId);
     try {
-      await userWebsitesService.refreshArticle(articleId,
+      const r = await userWebsitesService.refreshArticle(articleId,
         `cannibalisation: "${item.query}" now belongs to ${canonical}. Shift ${pathOf(page)} to a different intent or hand the overlapping part to the main page, and link to it.`);
-      toast({ title: 'Refresh drafted', description: 'Review the proposals in the article.' });
+      toast(r.proposed > 0 || r.meta_proposed
+        ? { title: 'Refresh drafted', description: `${r.proposed} change${r.proposed === 1 ? '' : 's'} proposed. Review them in the article.` }
+        : { title: 'Nothing to change', description: r.message ?? 'The refresh found nothing to propose for this article.' });
     } catch (e: any) {
       toast({ title: 'Refresh failed', description: e.message, variant: 'destructive' });
     } finally { setRefreshing(null); }

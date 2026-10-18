@@ -1516,7 +1516,7 @@ async function recordActivatedNumber(supabase: any, num: any): Promise<string | 
   const workspaceId = (prof as { workspace_id?: string } | null)?.workspace_id;
   if (!workspaceId) return `no workspace for profile ${profileId}`;
   const { errors } = await attributeProfileNumbers(supabase, workspaceId, profileId, null);
-  if (errors.length) console.error('[zernio-webhook] number attribution errors', workspaceId, errors);
+  if (errors.length) throw new Error(`number ${numberId} not recorded for ${workspaceId}, so it cannot be billed: ${errors.join('; ')}`);
   const owner = await resolveWorkspaceOwner(supabase, workspaceId);
   if (!owner) return `no owner or admin to bill in ${workspaceId}`;
   const charge = await chargeFirstMonth(supabase, { workspaceId, billingUserId: owner, zernioNumberIds: [numberId] });
@@ -2076,8 +2076,13 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       }
 
       if (event === 'whatsapp.number.activated') {
-        const activation = await recordActivatedNumber(supabase, (payload as any).number);
-        if (activation) console.log(`[zernio-webhook] number activation: ${activation}`);
+        try {
+          const activation = await recordActivatedNumber(supabase, (payload as any).number);
+          if (activation) console.log(`[zernio-webhook] number activation: ${activation}`);
+        } catch (e) {
+          console.error('[zernio-webhook] activated number not recorded or billed', e);
+          void captureException(e instanceof Error ? e : new Error(String(e)), { tags: { function: 'zernio-webhook-handler', area: 'whatsapp_number_billing' } });
+        }
       }
 
       // The single highest-value alert on this whole surface: a declined or suspended number

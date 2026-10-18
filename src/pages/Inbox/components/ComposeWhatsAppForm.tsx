@@ -19,17 +19,21 @@ export const ComposeWhatsAppForm: React.FC<{
   const [busy, setBusy] = useState(false);
   const [numbers, setNumbers] = useState<WhatsAppNumber[]>([]);
   const [channelId, setChannelId] = useState('');
+  const [numbersState, setNumbersState] = useState<'loading' | 'ready' | 'failed'>('loading');
   useEffect(() => {
     let cancelled = false;
+    setNumbers([]);
+    setChannelId('');
+    setNumbersState('loading');
     messagingService.whatsAppNumbers(workspaceId)
-      .then((rows) => { if (!cancelled) { setNumbers(rows); setChannelId((cur) => cur || rows[0]?.id || ''); } })
-      .catch(() => { if (!cancelled) setNumbers([]); });
+      .then((rows) => { if (!cancelled) { setNumbers(rows); setChannelId(rows[0]?.id ?? ''); setNumbersState('ready'); } })
+      .catch(() => { if (!cancelled) { setNumbers([]); setNumbersState('failed'); } });
     return () => { cancelled = true; };
   }, [workspaceId]);
   const valid = /^\s*(\+|00)\d[\d\s().-]{6,}$/.test(phone);
 
   const open = async () => {
-    if (!valid) return;
+    if (!valid || numbersState !== 'ready') return;
     setBusy(true);
     try {
       const res = await messagingService.openWhatsAppThread({
@@ -45,6 +49,9 @@ export const ComposeWhatsAppForm: React.FC<{
   return (
     <>
       <div className="space-y-2.5">
+        {numbersState === 'failed' && (
+          <p className="text-xs text-destructive">Could not load this workspace&apos;s WhatsApp numbers. Close and try again.</p>
+        )}
         {numbers.length > 1 && (
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">From</Label>
@@ -70,7 +77,7 @@ export const ComposeWhatsAppForm: React.FC<{
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={open} disabled={busy || !valid}>
+        <Button onClick={open} disabled={busy || !valid || numbersState !== 'ready'}>
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Open conversation'}
         </Button>
       </DialogFooter>
