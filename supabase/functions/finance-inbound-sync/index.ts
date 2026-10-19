@@ -48,6 +48,9 @@ const SELF_TRANSMITTED_EXPENSE_FAMILIES = new Set(['13', '14', '16', '17']);
  *  list is indistinguishable from a complete one. */
 const MAX_PAGES = 40;
 
+/** How far back each nightly run re-reads received documents for late cancellations. */
+const CANCELLATION_RECHECK_DAYS = 30;
+
 interface DocFetch {
   ok: boolean;
   status: number;
@@ -266,6 +269,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     const ingest = async (blocks: string[], source: 'mydata' | 'mydata_self', fromMark: string) => {
       let maxMark = fromMark;
       let inserted = 0;
+      let cancellationsRecorded = 0;
       /** Counted, not silently dropped: on the transmitted endpoint most documents are our own
        *  sales and skipping them is correct, but the number has to be visible. */
       const skippedByFamily: Record<string, number> = {};
@@ -421,6 +425,17 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           .select('id');
         if (error) console.error('[inbound-sync] upsert failed', source, mark, error.message);
         const newId = (ins as Array<{ id: string }> | null)?.[0]?.id;
+        // Already held, and AADE now says it was cancelled after we first read it.
+        if (!error && !newId && row.cancelled_by_mark) {
+          const { data: upd, error: cErr } = await supabase
+            .from('inbound_documents')
+            .update({ cancelled_by_mark: row.cancelled_by_mark })
+            .eq('workspace_id', workspaceId).eq('source', source).eq('mark', mark)
+            .is('cancelled_by_mark', null)
+            .select('id');
+          if (cErr) console.error('[inbound-sync] cancellation update failed', source, mark, cErr.message);
+          else cancellationsRecorded += (upd ?? []).length;
+        }
         // `inserted` counts rows that were ACTUALLY WRITTEN, which is the only thing a reader
         // means by "new documents". It used to increment once per non-error upsert — and with
         // `ignoreDuplicates: true` an already-held document is not an error, so the counter was
@@ -430,13 +445,33 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         if (Number(mark) > Number(maxMark)) maxMark = mark;
       }
 
-      return { found: blocks.length, inserted, maxMark, skippedByFamily };
+      return { found: blocks.length, inserted, maxMark, skippedByFamily, cancellationsRecorded };
     };
 
     const receivedResult = await ingest(received.blocks, 'mydata', watermark);
     const transmittedResult = transmitted.ok
       ? await ingest(transmitted.blocks, 'mydata_self', transmittedWatermark)
       : null;
+
+    // A cancellation lands on the ORIGINAL document's record, whose MARK is already behind the
+    // watermark, so the watermark pull never sees it. Re-read a trailing window by issue date.
+    let recheck: { days: number; found: number; cancellations_recorded: number } | { error: string } | null = null;
+    if (cronOk && !dated) {
+      const to = new Date();
+      const from = new Date(to.getTime());
+      from.setUTCDate(from.getUTCDate() - CANCELLATION_RECHECK_DAYS);
+      const params = new URLSearchParams({ mark: '0' });
+      params.set('dateFrom', toAadeDate(from.toISOString().slice(0, 10))!);
+      params.set('dateTo', toAadeDate(to.toISOString().slice(0, 10))!);
+      const r = await fetchAllDocPages(baseUrl, 'RequestDocs', c, params);
+      if (!r.ok) {
+        console.error('[inbound-sync] cancellation recheck failed', workspaceId, r.error);
+        recheck = { error: r.error ?? 'RequestDocs recheck failed' };
+      } else {
+        const res = await ingest(r.blocks, 'mydata', watermark);
+        recheck = { days: CANCELLATION_RECHECK_DAYS, found: res.found, cancellations_recorded: res.cancellationsRecorded };
+      }
+    }
 
     const marks: Record<string, string> = {};
     if (receivedResult.maxMark !== watermark) marks.inbound_last_mark = receivedResult.maxMark;
@@ -709,6 +744,8 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
             ...(transmitted.capped ? { truncated_at_pages: MAX_PAGES } : {}),
           }
         : { error: transmitted.error ?? 'RequestTransmittedDocs failed' },
+      cancellations_recorded: receivedResult.cancellationsRecorded + (transmittedResult?.cancellationsRecorded ?? 0),
+      ...(recheck ? { cancellation_recheck: recheck } : {}),
       auto_billed: autoBilled,
       // Reported separately because they are different claims: `aade` is the issuer's own
       // statement and needs nobody, `suggested` is ours and is waiting on an operator. One

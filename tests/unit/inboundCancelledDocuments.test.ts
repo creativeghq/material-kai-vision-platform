@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { blankComments } from '../helpers/stripComments';
-import { isCancelledDocument } from '../../src/modules/finance/utils/inboundProvenance';
+import { isCancelledDocument, isDuplicateTransmission } from '../../src/modules/finance/utils/inboundProvenance';
 import { inboundOutcomes } from '../../src/modules/finance/components/inboundStatus';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -74,6 +74,32 @@ describe('a cancelled inbound document', () => {
       // 12 lines here carry two. `pickAllTagBlocks` is the only reader that returns both;
       // a `pickTag` would silently keep one and drop the other.
       expect(src).toMatch(/pickAllTagBlocks\(lb, 'expensesClassification'\)/);
+    });
+  });
+
+  describe('a duplicate AADE transmission (same UID, second MARK)', () => {
+    it('is read from the duplicate MARK and named as a duplicate, not a cancellation', () => {
+      expect(isDuplicateTransmission({ duplicate_of_mark: '400014627209961' })).toBe(true);
+      expect(isDuplicateTransmission({ duplicate_of_mark: '  ' })).toBe(false);
+      expect(inboundOutcomes({ status: 'new', duplicate_of_mark: '400014627209961' }).map((o) => o.label))
+        .toEqual(['Duplicate at AADE']);
+    });
+
+    it('is gated by the same flag as a cancellation in the actions menu', () => {
+      expect(code(MENU)).toMatch(/const isCancelled = isCancelledDocument\(doc\) \|\| isDuplicate/);
+    });
+
+    it('is selected, or every client reads undefined and offers the action', () => {
+      expect(code(SERVICE)).toContain("'duplicate_of_mark'");
+    });
+  });
+
+  describe('a cancellation that arrives after the document was synced', () => {
+    it('is written onto the row already held, and a trailing window is re-read', () => {
+      const src = code(SYNC);
+      expect(src).toMatch(/\.update\(\{ cancelled_by_mark: row\.cancelled_by_mark \}\)/);
+      expect(src).toMatch(/\.is\('cancelled_by_mark', null\)/);
+      expect(src).toContain('CANCELLATION_RECHECK_DAYS');
     });
   });
 

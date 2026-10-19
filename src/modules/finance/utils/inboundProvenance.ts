@@ -53,6 +53,10 @@ export const needsLineDetail = (doc: { lines_source?: string | null }): boolean 
 export const isCancelledDocument = (doc: { cancelled_by_mark?: string | null }): boolean =>
   String(doc.cancelled_by_mark ?? '').trim() !== '';
 
+/** AADE issued a second MARK for a document it already holds (same UID) and counts the pair once. */
+export const isDuplicateTransmission = (doc: { duplicate_of_mark?: string | null }): boolean =>
+  String(doc.duplicate_of_mark ?? '').trim() !== '';
+
 /** myDATA `invoiceType` family — the part before the dot. `'14.1'` -> `'14'`. */
 export const docFamily = (docType: string | null | undefined): string =>
   String(docType ?? '').split('.')[0];

@@ -18,7 +18,7 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { AddIssuerToCrmDialog } from '@/modules/finance/components/AddIssuerToCrmDialog';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
-import { docFamily, isCancelledDocument, isPayrollDocument, needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
+import { docFamily, isCancelledDocument, isDuplicateTransmission, isPayrollDocument, needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
 interface Props {
@@ -78,7 +78,12 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   const isPayroll = isPayrollDocument(doc.doc_type);
   // AADE voided it. Nothing arrived, nothing is owed, and nothing may be itemised — the only
   // thing left to do with it is dismiss it.
-  const isCancelled = isCancelledDocument(doc);
+  const isDuplicate = isDuplicateTransmission(doc);
+  const isCancelled = isCancelledDocument(doc) || isDuplicate;
+  const voidLabel = isDuplicate ? 'Duplicate at AADE' : 'Cancelled at AADE';
+  const voidWhy = isDuplicate
+    ? `Duplicate at AADE — the same document as MARK ${doc.duplicate_of_mark}; act on that one.`
+    : 'Cancelled at AADE — a void document cannot become an expense.';
   // And nothing was delivered, so there is nothing to receive either.
   const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder && !isPayroll && !isCancelled;
   const canDismiss = doc.status === 'new';
@@ -101,7 +106,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
    * delivery notes all reach it.
    */
   const settleBlockedReason = isCancelled
-    ? 'Cancelled at AADE — a void document was never payable.'
+    ? (isDuplicate ? voidWhy : 'Cancelled at AADE — a void document was never payable.')
     : doc.status === 'dismissed'
       ? 'Dismissed. Undismiss it first.'
       : isPayroll
@@ -242,11 +247,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             onClick={onCreateOrder}
             disabled={hasOrder || isPayroll || isCancelled || unconfirmed || doc.status === 'dismissed' || !onCreateOrder}
             title={unconfirmed ? 'Confirm the document first — it was read from a file, not filed with AADE.' : isCancelled
-              ? 'Cancelled at AADE — a void document cannot become an expense.'
+              ? voidWhy
               : isPayroll ? 'Payroll is recorded in HR, never as a supplier bill — this document is here for visibility.' : undefined}
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            {isCancelled ? 'Cancelled at AADE' : isPayroll ? 'Payroll — recorded in HR' : hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
+            {isCancelled ? voidLabel : isPayroll ? 'Payroll — recorded in HR' : hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
           </DropdownMenuItem>
           {/* The other half of the same question. "Add to Expenses" raises a new order, which is
               right when the purchase was never recorded; when the PO exists it made a SECOND one
