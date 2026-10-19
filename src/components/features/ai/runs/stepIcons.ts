@@ -53,6 +53,7 @@ const CATEGORY_ICON: Record<string, string> = {
   'Real Estate': 'Building2',
   'Reviews': 'Star',
   'Search': 'Search',
+  'Signals': 'Radar',
   'Sub-Agents': 'Bot',
 };
 

@@ -368,6 +368,50 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Signals (#462; module-gated per toolkit) ──────────────────────────
+  {
+    id: 'find_hiring_companies', name: 'Who Is Hiring', category: 'Signals',
+    moduleSlug: 'signals-hiring',
+    desc: 'Companies that opened postings for a role, skill or keyword, read from their own public job boards.',
+    examples: [
+      'Who started hiring an export manager this month?',
+      'Which companies in my CRM are hiring for their showroom?',
+    ],
+  },
+  {
+    id: 'find_companies_using_technology', name: 'Who Uses a Technology', category: 'Signals',
+    moduleSlug: 'signals-technographics',
+    desc: 'Companies running a technology (ERP, e-commerce, CAD/BIM, CRM, analytics), detected from job ads and homepages.',
+    examples: [
+      'Which companies run SoftOne or Entersoft?',
+      'Who adopted Shopify in the last 90 days?',
+    ],
+  },
+  {
+    id: 'find_companies_in_market', name: 'Who Is In Market', category: 'Signals',
+    moduleSlug: 'signals-intent',
+    desc: 'Companies whose own hiring says they are in market for a use case: ERP change, e-invoicing, PIM, e-commerce, showrooms, export.',
+    examples: [
+      'Who is changing ERP right now?',
+      'Which companies are building an e-shop?',
+    ],
+  },
+  {
+    id: 'company_signals', name: 'Company Signals', category: 'Signals',
+    desc: 'Everything known about one company by domain: open roles, detected technologies, intent signals and its careers page.',
+    examples: [
+      'What signals do we have on refin.it?',
+    ],
+  },
+  {
+    id: 'manage_signal', name: 'Saved Signals', category: 'Signals',
+    desc: 'Save a standing hiring, technology or intent signal that is checked hourly, list them, pause them, or read their new matches.',
+    examples: [
+      'Alert me when a company starts hiring a BIM manager',
+      'Show the new matches on my signals',
+    ],
+  },
+
   // ── Projects (all users) ──────────────────────────────────────────────
   {
     id: 'create_project', name: 'Create Project', category: 'Projects',
@@ -2312,6 +2356,95 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'signals-hiring',
+    name: 'Hiring Signals',
+    description: 'Who started hiring for a role or skill, read from public company job boards, with standing alerts.',
+    icon: 'UserPlus',
+    moduleSlug: 'signals-hiring',
+    capability: 'crm.view',
+    tool_ids: ['find_hiring_companies', 'company_signals', 'manage_signal'],
+    quick_starts: [
+      {
+        label: 'Who is hiring?', description: 'Companies hiring for a role or skill', icon: 'Search',
+        prompt: 'Which companies are hiring right now?',
+        promptTemplate: 'Which companies started hiring for "{{keywords}}" in the last 30 days? Say how many companies were read.',
+        form: [
+          { key: 'keywords', label: 'Role / skill', kind: 'text', required: true, placeholder: 'export manager, showroom' },
+        ],
+      },
+      {
+        label: 'My signals', description: 'Your saved signals', icon: 'ListChecks',
+        prompt: 'List my saved signals.',
+        done: 'Here are the signals you are watching.',
+        run: { tool: 'manage_signal', fixedArgs: { action: 'list' } },
+      },
+      {
+        label: 'New matches', description: 'What your signals found', icon: 'Building2',
+        prompt: 'Show the new matches on my signals.',
+        done: 'Here is what your signals found lately.',
+        run: { tool: 'manage_signal', fixedArgs: { action: 'matches' } },
+      },
+      {
+        label: 'Save a signal', description: 'Watch the market continuously', icon: 'Plus',
+        prompt: 'Save a new standing signal for me.',
+        done: 'Your signal is saved and will be checked every hour.',
+        autoFields: true,
+        run: { tool: 'manage_signal', fixedArgs: { action: 'create' } },
+      },
+    ],
+  },
+  {
+    id: 'signals-technographics',
+    name: 'Technology Signals',
+    description: 'Who runs which ERP, e-commerce, CAD/BIM or marketing stack, detected from job ads and company homepages.',
+    icon: 'Layers',
+    moduleSlug: 'signals-technographics',
+    capability: 'crm.view',
+    tool_ids: ['find_companies_using_technology', 'company_signals', 'manage_signal'],
+    quick_starts: [
+      {
+        label: 'Who uses it?', description: 'Companies running a technology', icon: 'Search',
+        prompt: 'Find companies that use a technology.',
+        done: 'Here are the companies where that technology was detected.',
+        autoFields: true,
+        run: { tool: 'find_companies_using_technology' },
+      },
+      {
+        label: 'Company stack', description: 'One company, everything we know', icon: 'Building2',
+        prompt: 'What signals do we have on a company?',
+        promptTemplate: 'What signals do we have on {{domain}}? Include its technologies and open roles.',
+        form: [
+          { key: 'domain', label: 'Website', kind: 'text', required: true, placeholder: 'refin.it' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'signals-intent',
+    name: 'Intent Signals',
+    description: 'Companies whose own hiring says they are in market: changing ERP, e-invoicing, PIM, e-commerce, showrooms, export.',
+    icon: 'Radar',
+    moduleSlug: 'signals-intent',
+    capability: 'crm.view',
+    tool_ids: ['find_companies_in_market', 'company_signals', 'manage_signal'],
+    quick_starts: [
+      {
+        label: 'Who is in market?', description: 'Companies showing a buying signal', icon: 'Search',
+        prompt: 'Which companies are in market right now?',
+        promptTemplate: 'Which companies are in market for "{{use_case}}" in the last 90 days? Quote the evidence.',
+        form: [
+          { key: 'use_case', label: 'Use case', kind: 'text', required: true, placeholder: 'ERP, e-commerce, PIM' },
+        ],
+      },
+      {
+        label: 'Intent matches', description: 'New matches on your signals', icon: 'ListChecks',
+        prompt: 'Show the new matches on my signals.',
+        done: 'Here is what your signals found lately.',
+        run: { tool: 'manage_signal', fixedArgs: { action: 'matches' } },
+      },
+    ],
+  },
+  {
     // Employee self-service counterpart of the `hr` toolkit below. NOT adminOnly — this is for the
     // hr.self persona (an invited employee with no hr.view/hr.manage). Every action is hard-scoped
     // server-side to the caller's own hr_employees row, so it can never read a colleague.
@@ -3919,6 +4052,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
   'email-marketing': 'marketing', messaging: 'service', inbox: 'service', mail: 'service', reviews: 'service',
   'price-monitoring': 'sales',
+  'signals-hiring': 'sales', 'signals-technographics': 'sales', 'signals-intent': 'sales',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-pages': 'marketing', 'seo-article': 'marketing',
   // The newest SEO cluster and the only one that was missing from both maps: unmapped toolkits
@@ -4074,6 +4208,7 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   // Product & business → Pepper
   catalogs: ['product-business'], b2b: ['product-business'], 'tech-radar': ['product-business'],
   'job-research': ['product-business'], 'price-monitoring': ['product-business'], crm: ['product-business'],
+  'signals-hiring': ['product-business'], 'signals-technographics': ['product-business'], 'signals-intent': ['product-business'],
   // Studio / interior → Vision
   generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
   projects: ['interior-designer', 'erp'],

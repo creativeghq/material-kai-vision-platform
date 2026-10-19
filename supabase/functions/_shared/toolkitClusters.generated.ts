@@ -122,6 +122,18 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'job-research': {
     tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
   },
+  'signals-hiring': {
+    capability: ['crm.view'],
+    tool_ids: ['find_hiring_companies', 'company_signals', 'manage_signal'],
+  },
+  'signals-technographics': {
+    capability: ['crm.view'],
+    tool_ids: ['find_companies_using_technology', 'company_signals', 'manage_signal'],
+  },
+  'signals-intent': {
+    capability: ['crm.view'],
+    tool_ids: ['find_companies_in_market', 'company_signals', 'manage_signal'],
+  },
   'my-hr': {
     tool_ids: ['manage_my_hr'],
   },

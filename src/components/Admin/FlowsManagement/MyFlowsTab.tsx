@@ -265,6 +265,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'asset.service_due': Wrench,
   'asset.service_overdue': AlarmClock,
   'asset.warranty_expiring': ShieldCheck,
+  'signal.matched': Briefcase,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -426,6 +427,7 @@ const triggerLabels: Record<TriggerType, string> = {
   'asset.service_due': 'Service Due',
   'asset.service_overdue': 'Service Overdue',
   'asset.warranty_expiring': 'Warranty Expiring',
+  'signal.matched': 'Signal Matched',
 };
 
 const statusColors: Record<FlowStatus, string> = {

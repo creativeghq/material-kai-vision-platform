@@ -408,6 +408,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'company_signals',
+    file: 'supabase/functions/_shared/tools/signals-tools.ts',
+    factory: 'createCompanySignalsTool',
+    description: 'Everything the signals corpus knows about ONE company by its website domain: open roles, detected technologies, intent signals, its careers page and whether we could read it.',
+    params: [
+      { name: 'domain', type: 'string', optional: false, description: 'The company website or domain, e.g. "refin.it"' },
+    ],
+  },
+  {
     name: 'company_website_scrape',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createCompanyWebsiteScrapeTool',
@@ -660,6 +669,44 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'query', type: 'string', optional: false, description: 'Free-form description of what to extract, e.g. "white porcelain tiles, large format"' },
       { name: 'max_results', type: 'number', optional: true, description: 'Max candidates returned. Default 12.' },
       { name: 'auto_add', type: 'boolean', optional: true, description: 'If true, every candidate is added to a new section in the catalog body without approval. Default false.' },
+    ],
+  },
+  {
+    name: 'find_companies_in_market',
+    file: 'supabase/functions/_shared/tools/signals-tools.ts',
+    factory: 'createFindCompaniesInMarketTool',
+    description: 'Companies whose own hiring says they are in market for a use case: changing ERP, myDATA / e-invoicing, a PIM, e-commerce, new showrooms, export, BIM, warehouse systems, CRM.',
+    params: [
+      { name: 'intents', type: 'string', optional: false, description: 'Comma-separated use cases by name or key, e.g. "ERP, e-commerce"' },
+      { name: 'days', type: 'number', optional: true },
+      { name: 'crm_only', type: 'boolean', optional: true, description: 'Only companies already in this workspace\'s CRM' },
+      { name: 'limit', type: 'number', optional: true },
+    ],
+  },
+  {
+    name: 'find_companies_using_technology',
+    file: 'supabase/functions/_shared/tools/signals-tools.ts',
+    factory: 'createFindCompaniesUsingTechnologyTool',
+    description: 'Companies that use a technology (an ERP, e-commerce platform, CAD/BIM tool, CRM, analytics…), detected from their job ads or their homepage.',
+    params: [
+      { name: 'technologies', type: 'string', optional: false, description: 'Comma-separated technology names or slugs, e.g. "SoftOne, Entersoft"' },
+      { name: 'evidence', type: 'enum', enum: ['any', 'job_posting', 'website_html'], optional: true, description: 'Where the technology was seen' },
+      { name: 'days', type: 'number', optional: true, description: 'Only detections first seen in this many days' },
+      { name: 'crm_only', type: 'boolean', optional: true, description: 'Only companies already in this workspace\'s CRM' },
+      { name: 'limit', type: 'number', optional: true },
+    ],
+  },
+  {
+    name: 'find_hiring_companies',
+    file: 'supabase/functions/_shared/tools/signals-tools.ts',
+    factory: 'createFindHiringCompaniesTool',
+    description: 'Companies that opened job postings matching a role, skill or keyword, read from their own public job boards.',
+    params: [
+      { name: 'keywords', type: 'string', optional: false, description: 'Comma-separated roles, skills or words to find in the posting title or body, e.g. "export manager, showroom"' },
+      { name: 'days', type: 'number', optional: true, description: 'Only postings first seen in this many days' },
+      { name: 'location', type: 'string', optional: true, description: 'Only postings whose location contains this text, e.g. "Athens"' },
+      { name: 'crm_only', type: 'boolean', optional: true, description: 'Only companies already in this workspace\'s CRM' },
+      { name: 'limit', type: 'number', optional: true },
     ],
   },
   {
@@ -1451,6 +1498,22 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'review_id', type: 'string', optional: true, description: 'reply: the review UUID.' },
       { name: 'reply', type: 'string', optional: true, description: 'reply: your public response text.' },
       { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
+    name: 'manage_signal',
+    file: 'supabase/functions/_shared/tools/signals-tools.ts',
+    factory: 'createManageSignalTool',
+    description: 'Save, list, pause, resume or delete a standing signal, or list its new matches.',
+    params: [
+      { name: 'action', type: 'enum', enum: ['list', 'matches', 'create', 'update', 'pause', 'resume', 'delete'], optional: false },
+      { name: 'signal_id', type: 'string', optional: true, description: 'Required for update / pause / resume / delete; optional for matches' },
+      { name: 'kind', type: 'enum', enum: ['hiring', 'technology', 'intent'], optional: true, description: 'Required for create / update' },
+      { name: 'name', type: 'string', optional: true },
+      { name: 'values', type: 'string', optional: true, description: 'Comma-separated keywords, technologies or use cases' },
+      { name: 'crm_only', type: 'boolean', optional: true },
+      { name: 'location', type: 'string', optional: true, description: 'Hiring only: location must contain this text' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Delete only — true after the user explicitly agreed' },
     ],
   },
   {

@@ -35,6 +35,7 @@ import {
   ScanLine,
   Store,
   Globe,
+  UserPlus,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -208,6 +209,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Page Monitoring (#331) — watch a page you do NOT control and report the diff. Shipped with NO
   // surface linking it at all; the route existed and the only way in was typing the URL.
   { id: 'page-monitoring', label: 'Page Monitoring', path: '/monitoring/pages', icon: FileSearch, surface: 'app', hub: 'finance', description: 'Watch a page you do not control — a supplier price list, a competitor spec — and see what changed.' },
+  // Signals (#462): one page, one entry per module, so each kind appears only where it is held.
+  { id: 'signals-hiring', label: 'Hiring Signals', path: '/signals?tab=explore&kind=hiring', icon: UserPlus, requireCapability: 'crm.view', moduleSlug: 'signals-hiring', surface: 'app', hub: 'sales', description: 'Companies that start hiring for a role or skill, from their own job boards.' },
+  { id: 'signals-technographics', label: 'Technology Signals', path: '/signals?tab=explore&kind=technology', icon: Layers, requireCapability: 'crm.view', moduleSlug: 'signals-technographics', surface: 'app', hub: 'sales', description: 'Who runs which ERP, e-commerce, CAD/BIM or marketing stack.' },
+  { id: 'signals-intent', label: 'Intent Signals', path: '/signals?tab=explore&kind=intent', icon: Radar, requireCapability: 'crm.view', moduleSlug: 'signals-intent', surface: 'app', hub: 'sales', description: 'Companies whose hiring says they are in market for a use case.' },
   // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
   { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
   // HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
@@ -400,4 +405,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   // actually watches is a supplier's terms page, and it is niche enough never to earn a slot
   // in the visible bottom four.
   'page-monitoring',
+  'signals-hiring',
+  'signals-technographics',
+  'signals-intent',
 ];

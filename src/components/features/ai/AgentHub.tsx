@@ -532,6 +532,13 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // "the agent's prose summarizes it" assumption these used to rely on is false: they were
   // logged to console.debug and the user got a bare "Done!" with the data thrown away.
   job_sites_list: 'Job boards searched',
+  signals_hiring_results: 'Companies hiring',
+  signals_technology_results: 'Companies using the technology',
+  signals_intent_results: 'Companies in market',
+  company_signals: 'Company signals',
+  signals_list: 'Saved signals',
+  signal_matches_list: 'Signal matches',
+  signal_saved: 'Signal saved',
   flows_list: 'Workspace flows',
   flow_suggestions: 'Suggested automations',
   tech_radar_list: 'Tech radar',

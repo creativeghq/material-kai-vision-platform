@@ -119,6 +119,7 @@ const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));
 const MasterCatalogPage = lazy(() => import('./pages/Admin/MasterCatalogPage'));
 const PageWatchesPage = lazy(() => import('./pages/PageWatchesPage'));
+const SignalsPage = lazy(() => import('./pages/SignalsPage'));
 const FreightQuoteRequestsPage = lazy(() => import('./pages/Admin/FreightQuoteRequestsPage'));
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
@@ -965,6 +966,18 @@ const App = () => (
                       <Layout>
                         <PageWatchesPage />
                       </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/signals"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="crm.view">
+                        <Layout>
+                          <SignalsPage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />

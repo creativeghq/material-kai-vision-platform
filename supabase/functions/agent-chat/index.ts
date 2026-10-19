@@ -1104,6 +1104,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
       'manage_job_sites',
+      // Signals (#462): hiring / technographics / intent, module-gated inside each tool
+      'find_hiring_companies', 'find_companies_using_technology', 'find_companies_in_market', 'company_signals', 'manage_signal',
       // Flows toolkit (module-gated flows-toolkit + workspace entitlement; workspace-scoped)
       'manage_flows',
       // HR toolkit (module-gated hr + workspace entitlement; owner/admin RBAC enforced in hr-api)
@@ -1322,6 +1324,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'research_analysis', 'analytics_analysis',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
+      'find_hiring_companies', 'find_companies_using_technology', 'find_companies_in_market', 'company_signals', 'manage_signal',
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
       // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
       'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health',
@@ -2177,6 +2180,7 @@ async function executeAgent(
   const needsInbox = config.tools.includes('manage_inbox');
   const needsReviews = config.tools.includes('manage_reviews');
   const needsAppointments = config.tools.includes('manage_appointments');
+  const needsSignals = config.tools.some((t: string) => ['find_hiring_companies', 'find_companies_using_technology', 'find_companies_in_market', 'company_signals', 'manage_signal'].includes(t));
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task',
       'project_cvr', 'project_applications', 'list_variations', 'tender_status',
@@ -2203,7 +2207,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod, constructionMod, platformApiMod, platformRpcMod, brandToolsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod, constructionMod, platformApiMod, platformRpcMod, brandToolsMod, signalsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -2245,6 +2249,7 @@ async function executeAgent(
     needsPlatformApi ? import('../_shared/tools/platform-api-tools.ts') : null,
     needsPlatformRpc ? import('../_shared/tools/platform-rpc-tools.ts') : null,
     needsBrand ? import('../_shared/tools/brand-tools.ts') : null,
+    needsSignals ? import('../_shared/tools/signals-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -2381,6 +2386,11 @@ async function executeAgent(
   const createFindJobsTool = jobResearchMod?.createFindJobsTool;
   const createGetJobDigestPreviewTool = jobResearchMod?.createGetJobDigestPreviewTool;
   const createManageJobSitesTool = jobResearchMod?.createManageJobSitesTool;
+  const createFindHiringCompaniesTool = signalsMod?.createFindHiringCompaniesTool;
+  const createFindCompaniesUsingTechnologyTool = signalsMod?.createFindCompaniesUsingTechnologyTool;
+  const createFindCompaniesInMarketTool = signalsMod?.createFindCompaniesInMarketTool;
+  const createCompanySignalsTool = signalsMod?.createCompanySignalsTool;
+  const createManageSignalTool = signalsMod?.createManageSignalTool;
   const createSourceProductTool = sourcingMod?.createSourceProductTool;
   const createCreatePurchaseOrderTool = sourcingMod?.createCreatePurchaseOrderTool;
   const createSendPurchaseOrderTool = sourcingMod?.createSendPurchaseOrderTool;
@@ -2841,6 +2851,21 @@ async function executeAgent(
   }
   if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
     tools.push(createManageJobSitesTool(userId, workspaceId ?? null, userJwt, onChunk));
+  }
+  if (config.tools.includes('find_hiring_companies') && createFindHiringCompaniesTool) {
+    tools.push(createFindHiringCompaniesTool(userId, workspaceId ?? null, userJwt, onChunk));
+  }
+  if (config.tools.includes('find_companies_using_technology') && createFindCompaniesUsingTechnologyTool) {
+    tools.push(createFindCompaniesUsingTechnologyTool(userId, workspaceId ?? null, userJwt, onChunk));
+  }
+  if (config.tools.includes('find_companies_in_market') && createFindCompaniesInMarketTool) {
+    tools.push(createFindCompaniesInMarketTool(userId, workspaceId ?? null, userJwt, onChunk));
+  }
+  if (config.tools.includes('company_signals') && createCompanySignalsTool) {
+    tools.push(createCompanySignalsTool(userId, workspaceId ?? null, userJwt, onChunk));
+  }
+  if (config.tools.includes('manage_signal') && createManageSignalTool) {
+    tools.push(createManageSignalTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   // Flows toolkit (module-gated flows-toolkit + workspace entitlement enforced inside the tool)
   if (config.tools.includes('manage_flows') && createManageFlowsTool) {

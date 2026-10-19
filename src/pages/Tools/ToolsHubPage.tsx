@@ -141,6 +141,15 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
     icon: FileSearch,
     badge: 'Signed in · workspace',
   },
+  {
+    slug: 'signals',
+    to: '/signals',
+    title: 'Signals',
+    description:
+      'Watch the market: companies that start hiring for a role, run or adopt a technology, or show buying intent — with hourly alerts.',
+    icon: Radar,
+    badge: 'Signed in · workspace',
+  },
 ];
 
 /**

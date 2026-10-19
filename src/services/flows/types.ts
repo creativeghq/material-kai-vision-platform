@@ -262,7 +262,8 @@ export type TriggerType =
   // recipient and the customer's email so one flow can serve either audience.
   | 'asset.service_due'
   | 'asset.service_overdue'
-  | 'asset.warranty_expiring';
+  | 'asset.warranty_expiring'
+  | 'signal.matched';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
@@ -349,6 +350,8 @@ export interface QuoteSentTriggerConfig {}
 export interface PriceAlertTriggeredTriggerConfig {}
 export interface MentionAlertTriggeredTriggerConfig {}
 export interface JobAlertTriggeredTriggerConfig {}
+/** Payload-only: a saved signal found new companies (emitted by evaluate_signals in SQL). */
+export interface SignalMatchedTriggerConfig {}
 export interface RfqLinesRequestedTriggerConfig {}
 export interface RfqLinesPricedTriggerConfig {}
 export interface UpstreamOrderCreatedTriggerConfig {}
@@ -698,6 +701,7 @@ export type TriggerConfigMap = {
   'asset.service_due': AssetServiceDueTriggerConfig;
   'asset.service_overdue': AssetServiceOverdueTriggerConfig;
   'asset.warranty_expiring': AssetWarrantyExpiringTriggerConfig;
+  'signal.matched': SignalMatchedTriggerConfig;
 };
 
 // =====================================================

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench, Kanban, PackageOpen } from 'lucide-react';
+import { CompanySignalsPanel } from '@/components/signals/CompanySignalsPanel';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench, Kanban, PackageOpen, Radar } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
 import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
@@ -904,6 +905,9 @@ export const CompanyDetailPage: React.FC = () => {
                   <TabsTrigger value="market" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><TrendingUp className="h-4 w-4 mr-2"/>Market</TabsTrigger>
                 )}
                 <TabsTrigger value="social" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Globe className="h-4 w-4 mr-2"/>Social &amp; Web</TabsTrigger>
+                {!isNew && (
+                  <TabsTrigger value="signals" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Radar className="h-4 w-4 mr-2"/>Signals</TabsTrigger>
+                )}
               </TabsList>
 
               {/* Details — section nav (left) + property panel (right). */}
@@ -1182,6 +1186,12 @@ export const CompanyDetailPage: React.FC = () => {
                   website: company.website,
                 }}
               />
+            </TabsContent>
+          )}
+
+          {!isNew && (
+            <TabsContent value="signals" className="space-y-4">
+              <CompanySignalsPanel website={company.website} />
             </TabsContent>
           )}
 

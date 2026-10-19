@@ -181,6 +181,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'asset.service_due': Wrench,
   'asset.service_overdue': AlarmClock,
   'asset.warranty_expiring': ShieldCheck,
+  'signal.matched': Briefcase,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {
