@@ -4,6 +4,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, rowInScope, type CrmScope } from './_scope.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
+import { runInBackground } from '../../_shared/background.ts';
 import { foldForSearch, escapeLike } from '../../_shared/searchFold.ts';
 import { guardDuplicateParty } from './_partyDedupe.ts';
 import { noteMatchedTargetIds } from './_noteSearch.ts';
@@ -228,14 +229,14 @@ export async function handleContacts(req: Request): Promise<Response> {
       const created = data?.[0];
       if (created) {
         try {
-          await emitFlowEvent('crm_contact_created', {
+          void runInBackground(emitFlowEvent('crm_contact_created', {
             type: 'crm_contact_created', workspace_id: targetWs, user_id: userId || undefined,
             contact_id: created.id, contact_name: created.name, email: created.email ?? null,
             lead_source: created.lead_source ?? null, lead_status: created.lead_status ?? null,
             title: `New contact: ${created.name}`,
             body: `${created.name}${created.lead_source ? ` (${created.lead_source})` : ''} was added to your CRM.`,
             action_url: `/crm/contacts/${created.id}`,
-          });
+          }), 'crm-flow-event');
         } catch { /* best-effort */ }
       }
       return new Response(

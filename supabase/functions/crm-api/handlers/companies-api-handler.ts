@@ -6,6 +6,7 @@ import { getCrmScope, scopeAllows, rowInScope, isUuid, type CrmScope } from './_
 import { pickContactFields, stripContactCommercialTerms, escapeLike, parseIdsParam, quoteOrValue, MAX_FILTER_IDS } from './contacts-api-handler.ts';
 import { noteMatchedTargetIds } from './_noteSearch.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
+import { runInBackground } from '../../_shared/background.ts';
 import { foldForSearch } from '../../_shared/searchFold.ts';
 // Generated mirror of src/services/crm/vatNormalize.ts — the receipt key (#353 CRM-7).
 import { normalizeVat } from '../../_shared/crm/vatNormalize.generated.ts';
@@ -297,13 +298,13 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const created = data?.[0];
       if (created) {
         try {
-          await emitFlowEvent('crm_company_created', {
+          void runInBackground(emitFlowEvent('crm_company_created', {
             type: 'crm_company_created', workspace_id: targetWs, user_id: auth.userId,
             company_id: created.id, company_name: created.name, email: created.email ?? null,
             title: `New company: ${created.name}`,
             body: `${created.name} was added to your CRM.`,
             action_url: `/crm/companies/${created.id}`,
-          });
+          }), 'crm-flow-event');
         } catch { /* best-effort */ }
       }
       return new Response(
@@ -776,7 +777,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
       if (createdContactId) {
         try {
           const name = typeof newContact?.name === 'string' ? newContact.name.trim() : '';
-          await emitFlowEvent('crm_contact_created', {
+          void runInBackground(emitFlowEvent('crm_contact_created', {
             type: 'crm_contact_created', workspace_id: companyWs, user_id: userId || undefined,
             contact_id: createdContactId, contact_name: name,
             email: (newContact?.email as string | undefined) ?? null,
@@ -785,7 +786,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
             title: `New contact: ${name}`,
             body: `${name} was added to your CRM.`,
             action_url: `/crm/contacts/${createdContactId}`,
-          });
+          }), 'crm-flow-event');
         } catch { /* best-effort */ }
       }
 
