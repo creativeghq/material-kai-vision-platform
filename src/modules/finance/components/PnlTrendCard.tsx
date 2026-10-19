@@ -194,7 +194,7 @@ export const PnlTrendCard: React.FC<Props> = ({ rows, days, currency, loading })
                       </div>
                     ) : (
                       <div
-                        className="flex w-full flex-1 items-end justify-center gap-px rounded-sm group-hover:bg-muted/50"
+                        className="flex w-full flex-1 items-end justify-center gap-px"
                         title={[
                           c.range,
                           c.income != null ? `Income ${formatMoney(c.income, c.currency)}` : null,
