@@ -81,7 +81,7 @@ import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 import { SourcingBoardPanel } from '@/modules/finance/components/SourcingBoardPanel';
 import { CompanyAssetsPanel } from '@/components/business/assets/CompanyAssetsPanel';
-import type { FinanceSettings, PnlOverview, PnlMonthRow } from '@/modules/finance/services/financeService';
+import type { FinanceSettings, PnlOverview, PnlMonthRow, PnlDayRow } from '@/modules/finance/services/financeService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -99,7 +99,7 @@ import { ExpenseKindsTab } from '@/modules/finance/tabs/ExpenseKindsTab';
 import { CategoriseExpensesPanel } from '@/modules/finance/components/CategoriseExpensesPanel';
 import { FinanceHealthStrip } from '@/modules/finance/components/FinanceHealthStrip';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
-import { PnlTrendCard } from '@/modules/finance/components/PnlTrendCard';
+import { PnlTrendCard, pnlBucketDays } from '@/modules/finance/components/PnlTrendCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { AssessmentPanel } from '@/components/features/assessment/AssessmentPanel';
@@ -229,6 +229,7 @@ const FinancePage: React.FC = () => {
   const [pnlOverview, setPnlOverview] = useState<PnlOverview | null>(null);
   const [pnlMonths, setPnlMonths] = useState<PnlMonthRow[]>([]);
   const [pnlSegments, setPnlSegments] = useState<ExpenseSegmentRow[] | null>(null);
+  const [pnlDays, setPnlDays] = useState<PnlDayRow[] | null>(null);
   const [dashView, setDashView] = useState<DashView>('position');
   // Its OWN flag: loadInsights catches to [] and settles first, so sharing its flag showed the
   // cards as loaded - every tile "Unknown" - while these two reads were still in flight.
@@ -331,15 +332,18 @@ const FinancePage: React.FC = () => {
     // so leaving the last one's figures up puts one period's money under another's label.
     setPnlOverview(null);
     setPnlMonths([]);
+    setPnlDays(null);
     try {
-      const [overview, months, segments] = await Promise.all([
+      const [overview, months, segments, days] = await Promise.all([
         financeService.getPnlOverview(wsId, from, to),
         financeService.getPnlMonthly(wsId, from, to),
         inboundService.expenseSegments(wsId, from, to).catch(() => null),
+        financeService.getPnlDaily(wsId, from, to, pnlBucketDays(from, to)).catch(() => null),
       ]);
       setPnlOverview(overview);
       setPnlMonths(months);
       setPnlSegments(segments);
+      setPnlDays(days);
       setPnlError(null);
     } catch (err) {
       console.error('[finance] P&L unavailable', err);
@@ -740,6 +744,7 @@ const FinancePage: React.FC = () => {
 
             <PnlTrendCard
               rows={pnlMonths}
+              days={pnlDays}
               currency={pnlOverview?.currency && pnlOverview.currency !== 'MIXED' ? pnlOverview.currency : 'EUR'}
               loading={pnlLoading}
             />

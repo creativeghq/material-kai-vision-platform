@@ -551,6 +551,31 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_finance_pnl_daily",
+    "subject": "finance pnl daily",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_bucket_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "get_finance_pnl_monthly",
     "subject": "finance pnl monthly",
     "args": [

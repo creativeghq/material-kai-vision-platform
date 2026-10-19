@@ -789,6 +789,19 @@ export interface PnlMonthRow {
   unbooked_vat: number;
 }
 
+export interface PnlDayRow {
+  bucket_start: string;
+  bucket_end: string;
+  books_status: PnlBooksStatus;
+  books_currency: string | null;
+  books_income: number | null;
+  books_expenses: number | null;
+  /** Documents received at ΑΑΔΕ, net, by issue date. ΑΑΔΕ has no per-day income. */
+  received_net: number;
+  received_docs: number;
+  received_status: PnlAadeStatus | null;
+}
+
 export interface CashFlowRow {
   workspace_id: string;
   expected_date: string;
@@ -3094,6 +3107,14 @@ const _financeServiceCore = {
     });
     if (error) throw error;
     return (data ?? []) as PnlMonthRow[];
+  },
+
+  async getPnlDaily(workspaceId: string, from: string, to: string, bucketDays: number): Promise<PnlDayRow[]> {
+    const { data, error } = await (supabase as any).rpc('get_finance_pnl_daily', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to, p_bucket_days: bucketDays,
+    });
+    if (error) throw error;
+    return (data ?? []) as PnlDayRow[];
   },
 
   async getCashFlowForecast(workspaceId: string, daysAhead = 90): Promise<CashFlowRow[]> {
