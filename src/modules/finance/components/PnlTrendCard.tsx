@@ -124,9 +124,9 @@ export const PnlTrendCard: React.FC<Props> = ({ rows, currency, loading }) => {
                     : 'No figures read from ΑΑΔΕ for these months.'}
                 </p>
               )}
-              <div className="flex h-32 items-end gap-2">
+              <div className="flex h-32 justify-center gap-2">
                 {data.map((c) => (
-                  <div key={c.month} className="group flex flex-1 flex-col items-center justify-end gap-1">
+                  <div key={c.month} className="group flex min-w-0 max-w-20 flex-1 flex-col items-center gap-1">
                     {c.missing ? (
                       <div
                         className="flex w-full flex-1 items-end justify-center border-b border-dashed border-border pb-1 text-[9px] text-muted-foreground"
@@ -193,8 +193,8 @@ export const PnlTrendCard: React.FC<Props> = ({ rows, currency, loading }) => {
                       )}
                       <TableCell className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">
                         {c.unbookedDocs > 0
-                          ? `${c.unbookedDocs} � ${formatMoney(c.unbookedNet, 'EUR')}`
-                          : '�'}
+                          ? `${c.unbookedDocs} · ${formatMoney(c.unbookedNet, 'EUR')}`
+                          : '—'}
                       </TableCell>
                     </TableRow>
                   ))}
