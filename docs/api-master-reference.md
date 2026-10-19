@@ -291,7 +291,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `monitoring-cron` | cron | Unified monitoring dispatcher — one function behind all five price / mention / job cron tasks |
+| `monitoring-cron` | cron | Unified monitoring dispatcher — price / mention / job cron tasks and the signals corpus sweep |
 | `page-watches` | JWT / kai_* | CRUD for watched pages, mirrored to Firecrawl monitors. |
 
 **Background Agents**
