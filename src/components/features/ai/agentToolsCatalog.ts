@@ -4052,7 +4052,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
   'email-marketing': 'marketing', messaging: 'service', inbox: 'service', mail: 'service', reviews: 'service',
   'price-monitoring': 'sales',
-  'signals-hiring': 'sales', 'signals-technographics': 'sales', 'signals-intent': 'sales',
+  'signals-hiring': 'marketing', 'signals-technographics': 'marketing', 'signals-intent': 'marketing',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-pages': 'marketing', 'seo-article': 'marketing',
   // The newest SEO cluster and the only one that was missing from both maps: unmapped toolkits
