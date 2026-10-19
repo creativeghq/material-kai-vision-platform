@@ -71,6 +71,10 @@ const TASKS: Record<string, TaskSpec> = {
     // MIVAA sends each user's consolidated digest whose digest_hour_utc == this hour.
     path: () => `/api/v1/job-research/cron-digest?current_hour_utc=${new Date().getUTCHours()}`,
   },
+  'signals-corpus': {
+    module: 'signals-core',
+    path: () => '/api/v1/signals/cron-corpus?resolve_limit=8&enumerate_limit=10',
+  },
 };
 
 const json = (body: unknown, status = 200) =>

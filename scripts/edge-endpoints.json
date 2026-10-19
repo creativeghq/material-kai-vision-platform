@@ -16200,7 +16200,7 @@
   {
     "name": "monitoring-cron",
     "tag": "Monitoring Crons",
-    "summary": "Unified monitoring dispatcher — one function behind all five price / mention / job cron tasks",
+    "summary": "Unified monitoring dispatcher — price / mention / job cron tasks and the signals corpus sweep",
     "description": "Replaces the five near-identical monitoring crons (`price-monitoring-cron`, `mention-monitoring-cron`, `llm-mention-probe-cron`, `job-research-cron`, `job-research-digest-cron`). Each was the same boilerplate — cron-secret check → module gate → POST to a MIVAA cron endpoint — differing only in module slug and path.\n\npg_cron passes `?task=<task>`. The task gates on its own module toggle (a disabled module returns `{skipped:'module_disabled'}` rather than running a paid refresh) and then delegates to MIVAA, which selects the due rows and processes them in batch. Auth is the shared cron gate: `x-cron-secret` **or** a service-role bearer, so a vault/env secret-name drift can no longer 401 all five tasks at once.\n\nExternal API consumers (`api_key_id IS NOT NULL`) are intentionally never touched by the refresh tasks — they pay per call and control their own cadence.",
     "security": [
       "cronSecret"
@@ -16213,7 +16213,7 @@
     "query": [
       {
         "name": "task",
-        "type": "price-refresh | mention-refresh | mention-probe | job-refresh | job-digest",
+        "type": "price-refresh | mention-refresh | mention-probe | job-refresh | job-digest | signals-corpus",
         "required": true,
         "desc": "Which monitoring sweep to dispatch. Unknown values return 400 with the known list."
       }
