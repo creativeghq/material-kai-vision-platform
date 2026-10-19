@@ -496,6 +496,17 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // separate from the 400s wall clock: at 150s the gateway hands the caller a 504 while the
     // worker runs happily on and finishes.
     const enrich = async () => {
+    // ── Resolve the issuer names AADE omits ──────────────────────────────────────────
+    // RequestDocs identifies the issuer by ΑΦΜ only, so ~2/3 of received documents would show a
+    // bare VAT number. ΓΕΜΗ first, then — opt-in only — ΑΑΔΕ, which notifies the looked-up
+    // business (see resolve-issuer-names.ts). Runs BEFORE extraction: the page is waiting on names.
+    let issuers: unknown = null;
+    try {
+      issuers = await resolveInboundIssuerNames(supabase, workspaceId, gemiApiKey, {
+        aadeFallback: !!(fs as any)?.resolve_issuer_names_via_aade,
+      });
+    } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
+
     // ── Background AI product extraction → pending-products queue (credit-gated) ──
     // For each not-yet-extracted inbound doc with line detail, run the cheapest model to
     // turn raw supplier lines into clean products and queue them for the operator's ✓/✗.
@@ -653,28 +664,26 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       }
     } catch (e) { console.error('[inbound-sync] product extraction failed', String(e)); }
 
-    // ── Resolve the issuer names AADE omits ──────────────────────────────────────────
-    // RequestDocs identifies the issuer by ΑΦΜ only — there is no <name> in the feed — so
-    // ~2/3 of received documents would otherwise show a bare VAT number. Resolved from the
-    // ΓΕΜΗ public registry, then — only for the ΑΦΜ ΓΕΜΗ has no record of, and only when the
-    // workspace opted in — from ΑΑΔΕ, which notifies the looked-up business (see
-    // resolve-issuer-names.ts).
-    let issuers: unknown = null;
-    try {
-      issuers = await resolveInboundIssuerNames(supabase, workspaceId, gemiApiKey, {
-        aadeFallback: !!(fs as any)?.resolve_issuer_names_via_aade,
-      });
-    } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
-
       return { extraction_batch: extractionBatch, extracted, auto_stocked: autoStocked, issuers };
     };
 
     // The cron reports its enrichment counts; the interactive caller is told the work is
     // running rather than handed a zero, because "0 extracted" and "not finished yet" are
     // different facts and only one of them means something is wrong.
+    // Names already known (registry cache, CRM) cost no network call, so the interactive caller
+    // gets them BEFORE the response; only live ΓΕΜΗ/ΑΑΔΕ lookups wait for the background.
+    let issuersNow: unknown = null;
+    if (!cronOk) {
+      try {
+        issuersNow = await resolveInboundIssuerNames(supabase, workspaceId, null, { maxLookups: 0 });
+      } catch (e) { console.error('[inbound-sync] cached issuer names failed', String(e)); }
+    }
     const enrichment = cronOk
       ? await enrich()
-      : (deferredEnrichment.push(enrich()), { follow_up: 'extraction and issuer names are running in the background' });
+      : (deferredEnrichment.push(enrich()), {
+          issuers_now: issuersNow,
+          follow_up: 'extraction and issuer names are running in the background',
+        });
 
     summary.push({
       workspaceId,

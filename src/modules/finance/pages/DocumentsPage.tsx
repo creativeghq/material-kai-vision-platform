@@ -190,6 +190,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [categoryKind, setCategoryKind] = useState<'income' | 'expense' | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [namePollUntil, setNamePollUntil] = useState<number | null>(null);
   // The pull is always date-bounded from the UI — the dialog asks for the window first so a
   // sync never drags in years of AADE history.
   const syncInbound = async (range: { dateFrom: string; dateTo: string }) => {
@@ -228,6 +229,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       });
       setSyncDialogOpen(false);
       await load();
+      if (results.some((r: any) => r?.follow_up)) setNamePollUntil(Date.now() + 3 * 60_000);
     } catch (err: any) {
       toast({ title: 'Sync failed', description: err?.message, variant: 'destructive' });
     } finally { setSyncing(false); }
@@ -331,6 +333,22 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     } finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [activeWorkspaceId]);
+
+  // A manual sync resolves registry names in the background (ΓΕΜΗ allows 8 lookups a minute),
+  // so re-read while any synced row is still name-less instead of waiting for a manual refresh.
+  useEffect(() => {
+    if (namePollUntil == null) return;
+    const unnamed = inbound.some((d) => d.issuer_vat && !d.issuer_name);
+    if (!unnamed || Date.now() > namePollUntil) { setNamePollUntil(null); return; }
+    const t = setTimeout(() => {
+      if (!activeWorkspaceId) return;
+      const seq = ++inboundFetchSeq.current;
+      void inboundService.list(activeWorkspaceId, inboundRangeRef.current)
+        .then((r) => { if (seq === inboundFetchSeq.current) { setInbound(r.rows); setInboundTotal(r.total); } })
+        .catch(() => setNamePollUntil(null));
+    }, 12_000);
+    return () => clearTimeout(t);
+  }, [namePollUntil, inbound]);
 
   /** Supplier scope for the Expenses Inbox, set when arriving from a company's CRM record. */
   const issuerVatParam = searchParams.get('issuer_vat');
