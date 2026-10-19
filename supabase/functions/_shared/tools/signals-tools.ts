@@ -112,7 +112,7 @@ export const createFindCompaniesUsingTechnologyTool = (
       const db = callerDbClient(jwt, userId, workspaceId);
       const { keys, unknown } = await resolveDictionary(db, 'technology', list(technologies));
       if (!keys.length) {
-        return JSON.stringify({ success: false, error: `None of these are in the technology dictionary: ${unknown.join(', ')}.` });
+        return JSON.stringify({ success: false, error: `None of these are in the technology dictionary: ${unknown.join(', ')}. Search the job-ad text for them with find_hiring_companies instead, and tell the user it is a text search, not a detection.` });
       }
       const res = await runSearch(jwt, userId, workspaceId!, 'technology',
         { technology_slugs: keys, evidence: evidence === 'any' ? undefined : evidence, crm_only }, days, limit);
@@ -153,7 +153,7 @@ export const createFindCompaniesInMarketTool = (
       if (!keys.length) {
         const { data } = await db.rpc('signals_dictionary');
         const offered = (data?.intents ?? []).map((i: any) => i.label).join('; ');
-        return JSON.stringify({ success: false, error: `Unknown use case. Available: ${offered}.` });
+        return JSON.stringify({ success: false, error: `Not a defined use case. Defined: ${offered}. For anything else, search the job-ad text with find_hiring_companies (or save a hiring signal with those words), and say it is a text search.` });
       }
       const res = await runSearch(jwt, userId, workspaceId!, 'intent', { intent_keys: keys, crm_only }, days, limit);
       if (res.error) return JSON.stringify({ success: false, error: res.error });
