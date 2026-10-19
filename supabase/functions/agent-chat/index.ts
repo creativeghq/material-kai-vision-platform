@@ -1510,13 +1510,15 @@ async function recoverAssistantMessage(
   // final chunk), short enough that the isolate is not held open for nothing on every turn.
   await new Promise((resolve) => setTimeout(resolve, 10_000));
 
-  // "Did ANYTHING get written for this turn" — not "was my stamp written".
+  // The client's REPLY carries a top-level `turn_id`; the result cards it saves mid-turn do not,
+  // so "any assistant row since the turn started" read a turn's cards as its reply and dropped it.
   const { data: existing, error: readErr } = await supabase
     .from('agent_chat_messages')
     .select('id')
     .eq('conversation_id', conversationId)
     .eq('role', 'assistant')
     .gte('created_at', turnStartedAt)
+    .eq('metadata->>turn_id', turnId)
     .limit(1);
 
   // Fail CLOSED on a read error: writing a message we cannot prove is missing is how a

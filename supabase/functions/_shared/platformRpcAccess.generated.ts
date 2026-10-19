@@ -31,6 +31,11 @@ export const PLATFORM_RPC_WITHHELD: readonly WithheldRpc[] = [
   { name: 'get_buyer_finance_limits', reason: 'A counterparty credit limit and exposure.' },
   { name: 'get_package_bid_comparison', reason: 'Competing supplier bid prices side by side.' },
   { name: 'get_tender_bid_analysis', reason: 'Competing tender bid prices side by side.' },
+  { name: 'get_finance_pnl_overview', reason: 'Workspace profit and loss over a period, books against ΑΑΔΕ.' },
+  { name: 'get_finance_pnl_monthly', reason: 'Monthly workspace profit and loss, books against ΑΑΔΕ.' },
+  { name: 'get_supplier_price_break', reason: 'What a supplier charges us per quantity break — our cost.' },
+  { name: 'get_catalog_prices_for_workspace', reason: 'Catalogue prices including the cost the workspace pays.' },
+  { name: 'get_catalog_master_price_drift', reason: 'Supplier asks against what the operator currently pays.' },
 ];
 
 const WITHHELD = new Map(PLATFORM_RPC_WITHHELD.map((e) => [e.name, e.reason]));

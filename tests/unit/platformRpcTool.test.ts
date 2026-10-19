@@ -67,10 +67,11 @@ describe('the catalogue is derived, and holds no writer', () => {
     for (const w of writers) expect(names.has(w), `${w} reached the read catalogue`).toBe(false);
   });
 
-  it('the AADE mirror is not one of our figures', () => {
+  it('the AADE mirror is not one of our figures, but the comparison against it is readable', () => {
     const names = new Set(catalog.map((e) => e.name));
     expect(names.has('get_mydata_book_aggregate')).toBe(false);
-    expect(read(CATALOG_FILE)).not.toContain('mydata_book');
+    expect(read(CATALOG_FILE)).not.toContain('"get_mydata_book_aggregate"');
+    expect(names.has('get_mydata_book_vs_ledger'), 'books-vs-ΑΑΔΕ is the question the mirror exists to answer').toBe(true);
   });
 
   it('the refresh query keeps the volatility filter', () => {

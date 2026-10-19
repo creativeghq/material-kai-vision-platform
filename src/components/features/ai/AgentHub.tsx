@@ -330,10 +330,16 @@ const STATUS_STEP_COPY: Record<string, string> = {
 /** SEOGenericCard's chunks. One predicate, so the two branches below cannot disagree. */
 // A `run:` quick-start calls its tool with no model turn, so silence is by design and the card
 // IS the answer — "No response from agent" reads as a failure on a turn that succeeded.
-const emptyTurnText = (directRun?: { quickStartLabel?: string } | null) =>
+const emptyTurnText = (directRun?: { quickStartLabel?: string; resumeAfter?: boolean } | null) =>
   directRun?.quickStartLabel
     ? `${directRun.quickStartLabel} — the result is in the card below.`
-    : 'No response from agent';
+    : directRun?.resumeAfter
+      ? 'Approved and done — reading the result now.'
+      : 'No response from agent';
+
+const INTERNAL_RESULT_TYPES = new Set([
+  'platform_api_matches', 'platform_api_result', 'platform_data_matches', 'platform_data_result',
+]);
 
 const isSeoToolkitCard = (type: unknown): type is string =>
   typeof type === 'string' && type.startsWith('seo_') && type.endsWith('_card') && type !== 'seo_research_card';
@@ -1121,7 +1127,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     toolkitId: string;
     /** Which quick-start ran, so the reply can offer its siblings and not itself. */
     quickStartLabel?: string;
+    /** An approved confirmation card: hand the result back to the model to finish the ask. */
+    resumeAfter?: boolean;
   } | null>(null);
+  // Model-only context for the NEXT send (never shown in the bubble): an approved run's result.
+  const pendingResumeContextRef = useRef<string | null>(null);
+  // This turn ended on an Approve card or a form: suggested next steps would race the user's answer.
+  const awaitingUserRef = useRef(false);
   // Toolkit IDs to force-include in the NEXT send's selected_toolkits, regardless
   // of whether the activeToolkits state update has committed yet. Set by quick-start
   // launchers (via ensureAgentAndToolkit) so a seeded prompt always sends with its
@@ -1341,6 +1353,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       say: data.title,
       done: '',
       toolkitId: data.toolkitId || '',
+      resumeAfter: true,
     };
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
   }, []);
@@ -2486,11 +2499,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // needs to attach the uploaded source PDF(s). Kept out of the visible bubble
     // so the composer/chat stay clean.
     const plural = userAttachedCatalogPdfs.length > 1;
-    const apiUserInput = userAttachedCatalogPdfs.length > 0
+    const resumeContext = directRun ? null : pendingResumeContextRef.current;
+    if (!directRun) pendingResumeContextRef.current = null;
+    const apiUserInput = (userAttachedCatalogPdfs.length > 0
       ? `${userInput}\n\n[Attached catalog source PDF${plural ? 's' : ''}: ${userAttachedCatalogPdfs.map((p) => p.filename).join(', ')}. `
         + `If we don't have a catalog yet, create one, then attach ${plural ? 'them' : 'it'} with attach_catalog_pdfs `
         + `(source_pdf_id${plural ? 's' : ''}: ${userAttachedCatalogPdfs.map((p) => p.id).join(', ')}) and extract the products.]`
-      : userInput;
+      : userInput) + (resumeContext ? `\n\n${resumeContext}` : '');
 
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
@@ -2551,6 +2566,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setRoutingTo(null);
     // Per TURN, not per conversation: a card rendered last turn must not silence this turn's reply.
     renderedResultCardRef.current = false;
+    awaitingUserRef.current = false;
     setReasoningSteps([]); // Clear reasoning steps for new message
     setStreamingText('');
 
@@ -3297,6 +3313,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (chunk.type === 'input_request') {
                 // The agent asked for specific values instead of writing three questions in prose.
                 // Rendered as a ClarifyCard and picked up by the canvas as a `clarify` artifact.
+                awaitingUserRef.current = true;
                 const askMsg: Message = {
                   id: `msg-ask-${chunk.request_id || Date.now()}`,
                   role: 'assistant',
@@ -3325,6 +3342,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (chunk.type === 'action_confirmation') {
                 // Human-in-the-loop gate: a sensitive tool previewed instead of mutating.
                 // Render an inline Approve/Decline card; Approve re-invokes the tool with confirm:true.
+                awaitingUserRef.current = true;
                 const confirmMsg: Message = {
                   id: `msg-confirm-${Date.now()}`,
                   role: 'assistant',
@@ -3531,6 +3549,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   });
                 }
               } else if (AGENT_RESULT_TITLES[chunk.type] && !isSeoToolkitCard(chunk.type)) {
+                // The model's own lookups (reader names, endpoint lists, raw JSON) are its working,
+                // not the answer — shown only when no model turn will narrate them.
+                if (INTERNAL_RESULT_TYPES.has(chunk.type) && (!directRun || directRun.resumeAfter)) continue;
                 // Generic structured render for previously-plain-text result chunks
                 const { type: _t, timestamp: _ts, ...payload } = chunk as Record<string, any>;
                 const title = AGENT_RESULT_TITLES[chunk.type];
@@ -4011,9 +4032,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // through to a placeholder and the chat said "Done — ran manage_appointments."
       // — an internal tool id, shown to a customer. The quick-start's own `done`
       // copy replaces it.
+      let resumeAfterApproval = false;
       if (directRun) {
         const toolResult = Array.isArray(data.tool_results) ? data.tool_results[0]?.result : undefined;
         const failed = toolResult && toolResult.success === false;
+        if (directRun.resumeAfter && !failed) {
+          const raw = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult ?? null);
+          pendingResumeContextRef.current = `[The action I just approved (${directRun.toolName}) ran. Its result: `
+            + `${raw.length > 4000 ? `${raw.slice(0, 4000)}… (cut)` : raw}. Carry on with my original request `
+            + 'using it — read whatever else you need and give me the answer. Do not ask me to approve this again.]';
+          resumeAfterApproval = true;
+        }
         const toolMessage = (cleanedText || '').trim();
         // Two shapes of placeholder: the current bare 'Done.', and the old
         // `Done — ran <tool>.`. Both are matched because the edge function and this
@@ -4070,10 +4099,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         generation_job: data.generation_job, // Async 3D generation job info
         geminiImageData: pendingGeminiData ?? undefined,
         searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec from material_search
-        followUps: directRun?.toolkitId
+        followUps: directRun?.toolkitId && !directRun.resumeAfter
           ? { toolkitId: directRun.toolkitId, ranLabel: directRun.quickStartLabel }
           : undefined,
         nextSteps: Array.isArray(data.next_steps) && data.next_steps.length > 0
+          && !awaitingUserRef.current && !resumeAfterApproval
           ? data.next_steps
           : undefined,
       };
@@ -4124,6 +4154,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             nextSteps: assistantMessage.nextSteps, // model-written chips — kept verbatim, they were about THIS turn
           },
         });
+      }
+      // An approval is a step inside a task, not the end of it: ending here left the original ask
+      // unanswered under a bare result card.
+      if (resumeAfterApproval) {
+        setInput('Approved — carry on with what I asked.');
+        setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
       }
     } catch (error) {
       console.error('Error executing agent:', error);

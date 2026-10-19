@@ -22,8 +22,8 @@ with fns as (
 select string_agg(name || ' :: ' || args, chr(10) order by name, length(args) desc) from fns
  where name !~ '^(admin_|get_cron_|storage_|get_query_cache|get_slowest|get_search_|get_vector|get_embedding|get_provider_health|get_ai_model|get_tool_call|get_zero_result|get_popular|get_top_cached|get_inbound_email_health|get_webhook)';`;
 
-// The myDATA book is AADE's answer, held apart so the two can DISAGREE; a figure of ours that
-// reads it removes the only thing it is for. Excluded, not withheld: the name never lands.
+// The myDATA book is AADE's answer, held apart so the two can DISAGREE; served raw it reads as a
+// figure of ours. Excluded, not withheld. `get_mydata_book_vs_ledger` stays: it labels both sides.
 const EXCLUDED = new Set(['get_mydata_book_aggregate']);
 
 /** A word a person would actually use for this reader, from its own name. */

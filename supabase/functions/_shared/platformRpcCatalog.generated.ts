@@ -156,6 +156,98 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_catalog_master_price_drift",
+    "subject": "catalog master price drift",
+    "args": [
+      {
+        "name": "p_only_needs_review",
+        "type": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "get_catalog_prices_for_workspace",
+    "subject": "catalog prices for workspace",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_channel_overview",
+    "subject": "channel overview",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_competitor_keyword_gap",
+    "subject": "competitor keyword gap",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_configured_product_price",
+    "subject": "configured product price",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_option_value_ids",
+        "type": "uuid[]"
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_contact_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_audience",
+        "type": "text"
+      },
+      {
+        "name": "p_variant_key",
+        "type": "text"
+      }
+    ]
+  },
+  {
     "name": "get_cooccurring_products",
     "subject": "cooccurring products",
     "args": [
@@ -323,6 +415,49 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_display_profiles",
+    "subject": "display profiles",
+    "args": [
+      {
+        "name": "p_user_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_distinct_factory_names",
+    "subject": "distinct factory names",
+    "args": []
+  },
+  {
+    "name": "get_document_delivery",
+    "subject": "document delivery",
+    "args": [
+      {
+        "name": "p_entity_type",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_entity_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_einvoice_onboarding",
+    "subject": "einvoice onboarding",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_embed_analytics_summary",
     "subject": "embed analytics summary",
     "args": [
@@ -334,6 +469,137 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_days",
         "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_entity_book_entries",
+    "subject": "entity book entries",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_expense_category_candidates",
+    "subject": "expense category candidates",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_expense_overview",
+    "subject": "expense overview",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_expense_segments",
+    "subject": "expense segments",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_finance_pnl_monthly",
+    "subject": "finance pnl monthly",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_finance_pnl_overview",
+    "subject": "finance pnl overview",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_gsc_connection_status",
+    "subject": "gsc connection status",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
       }
     ]
   },
@@ -353,6 +619,49 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_limit",
         "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_gsc_query_page_rows",
+    "subject": "gsc query page rows",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      },
+      {
+        "name": "p_group_by",
+        "type": "text"
+      },
+      {
+        "name": "p_page",
+        "type": "text"
+      },
+      {
+        "name": "p_query",
+        "type": "text"
+      },
+      {
+        "name": "p_search",
+        "type": "text"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      },
+      {
+        "name": "p_country",
+        "type": "text"
+      },
+      {
+        "name": "p_device",
+        "type": "text"
       }
     ]
   },
@@ -387,6 +696,28 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_days",
         "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_inbound_bookable_by_issuer",
+    "subject": "inbound bookable by issuer",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_inbound_booking_backlog",
+    "subject": "inbound booking backlog",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
       }
     ]
   },
@@ -460,6 +791,53 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_invoice_payment_proofs",
+    "subject": "invoice payment proofs",
+    "args": [
+      {
+        "name": "p_invoice_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_keyword_rank_history",
+    "subject": "keyword rank history",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_keywords",
+        "type": "text[]",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_line_identity_options",
+    "subject": "line identity options",
+    "args": [
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_manageable_workspaces",
+    "subject": "manageable workspaces",
+    "args": []
+  },
+  {
     "name": "get_monthly_pnl",
     "subject": "monthly pnl",
     "args": [
@@ -471,6 +849,48 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_from",
         "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_my_credit_spend_summary",
+    "subject": "my credit spend summary",
+    "args": [
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_mydata_book_vs_ledger",
+    "subject": "mydata book vs ledger",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_next_pending_chunk",
+    "subject": "next pending chunk",
+    "args": [
+      {
+        "name": "session_id_param",
+        "type": "text",
         "required": true
       }
     ]
@@ -535,6 +955,17 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_order_worklist_dismissed",
+    "subject": "order worklist dismissed",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_package_bid_comparison",
     "subject": "package bid comparison",
     "args": [
@@ -542,6 +973,21 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
         "name": "p_package_id",
         "type": "uuid",
         "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_page_crawl_queue",
+    "subject": "page crawl queue",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
       }
     ]
   },
@@ -622,6 +1068,17 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_product_certificate_candidates",
+    "subject": "product certificate candidates",
+    "args": [
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_product_certificates",
     "subject": "product certificates",
     "args": [
@@ -659,6 +1116,80 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_product_details",
+    "subject": "product details",
+    "args": [
+      {
+        "name": "p_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_product_document_path",
+    "subject": "product document path",
+    "args": [
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_kb_doc_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_document_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_product_embed_readiness",
+    "subject": "product embed readiness",
+    "args": [
+      {
+        "name": "p_product_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_product_price_break",
+    "subject": "product price break",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_quantity",
+        "type": "numeric",
+        "required": true
+      },
+      {
+        "name": "p_unit",
+        "type": "text"
+      },
+      {
+        "name": "p_level_key",
+        "type": "text"
+      },
+      {
+        "name": "p_variant_key",
+        "type": "text"
+      }
+    ]
+  },
+  {
     "name": "get_product_price_history",
     "subject": "product price history",
     "args": [
@@ -690,6 +1221,28 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_product_id",
         "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_product_uom",
+    "subject": "product uom",
+    "args": [
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_product_variant_images",
+    "subject": "product variant images",
+    "args": [
+      {
+        "name": "p_pairs",
+        "type": "jsonb",
         "required": true
       }
     ]
@@ -779,6 +1332,22 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_project_dashboard",
+    "subject": "project dashboard",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_today",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_project_finance_summary",
     "subject": "project finance summary",
     "args": [
@@ -845,6 +1414,32 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_project_visit_slots",
+    "subject": "project visit slots",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_tz",
+        "type": "text",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_projects_using_product",
     "subject": "projects using product",
     "args": [
@@ -894,6 +1489,55 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_public_moodboard",
+    "subject": "public moodboard",
+    "args": [
+      {
+        "name": "p_key",
+        "type": "text",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_public_pricing",
+    "subject": "public pricing",
+    "args": []
+  },
+  {
+    "name": "get_public_profile_google_reviews",
+    "subject": "public profile google reviews",
+    "args": [
+      {
+        "name": "p_user_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_public_profile_services",
+    "subject": "public profile services",
+    "args": [
+      {
+        "name": "p_user_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_public_recall",
+    "subject": "public recall",
+    "args": [
+      {
+        "name": "p_token",
+        "type": "text",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_quote_billing_progress",
     "subject": "quote billing progress",
     "args": [
@@ -911,6 +1555,22 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_quote_ids",
         "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_record_peek",
+    "subject": "record peek",
+    "args": [
+      {
+        "name": "p_kind",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_id",
+        "type": "uuid",
         "required": true
       }
     ]
@@ -962,6 +1622,17 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_shipping_creds_status",
+    "subject": "shipping creds status",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_sourcing_board",
     "subject": "sourcing board",
     "args": [
@@ -977,6 +1648,16 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_supplier_claim_queue",
+    "subject": "supplier claim queue",
+    "args": [
+      {
+        "name": "p_status",
+        "type": "text"
+      }
+    ]
+  },
+  {
     "name": "get_supplier_inbound_orders",
     "subject": "supplier inbound orders",
     "args": [
@@ -984,6 +1665,40 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
         "name": "p_workspace_id",
         "type": "uuid",
         "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_supplier_price_break",
+    "subject": "supplier price break",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_supplier_company_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_quantity",
+        "type": "numeric",
+        "required": true
+      },
+      {
+        "name": "p_unit",
+        "type": "text"
+      },
+      {
+        "name": "p_variant_key",
+        "type": "text"
       }
     ]
   },
@@ -1005,6 +1720,50 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_package_id",
         "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_trip_card_links",
+    "subject": "trip card links",
+    "args": [
+      {
+        "name": "p_report_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_user_workspaces",
+    "subject": "user workspaces",
+    "args": [
+      {
+        "name": "user_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_variant_availability",
+    "subject": "variant availability",
+    "args": [
+      {
+        "name": "p_pairs",
+        "type": "jsonb",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_variant_labels",
+    "subject": "variant labels",
+    "args": [
+      {
+        "name": "p_rows",
+        "type": "jsonb",
         "required": true
       }
     ]
@@ -1061,8 +1820,49 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_website_ai_crawls",
+    "subject": "website ai crawls",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "get_website_ai_monitoring_state",
     "subject": "website ai monitoring state",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_ai_questions",
+    "subject": "website ai questions",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_ai_referrals",
+    "subject": "website ai referrals",
     "args": [
       {
         "name": "p_website_id",
@@ -1121,6 +1921,17 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_website_collector_schedules",
+    "subject": "website collector schedules",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_website_competitor_series",
     "subject": "website competitor series",
     "args": [
@@ -1147,6 +1958,21 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
         "name": "p_website_id",
         "type": "uuid",
         "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_domain_history",
+    "subject": "website domain history",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
       }
     ]
   },
@@ -1203,6 +2029,55 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_website_page_detail",
+    "subject": "website page detail",
+    "args": [
+      {
+        "name": "p_page_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_page_review_summary",
+    "subject": "website page review summary",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_pages",
+    "subject": "website pages",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_filter",
+        "type": "text"
+      },
+      {
+        "name": "p_search",
+        "type": "text"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      },
+      {
+        "name": "p_offset",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "get_website_rank_summary",
     "subject": "website rank summary",
     "args": [
@@ -1244,6 +2119,43 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_website_serp_features",
+    "subject": "website serp features",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_captures",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_setup",
+    "subject": "website setup",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_ancestors",
+    "subject": "workspace ancestors",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_workspace_capabilities",
     "subject": "workspace capabilities",
     "args": [
@@ -1251,6 +2163,80 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
         "name": "p_workspace_id",
         "type": "uuid",
         "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_descendants",
+    "subject": "workspace descendants",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_flow_defaults",
+    "subject": "workspace flow defaults",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_integrity_findings",
+    "subject": "workspace integrity findings",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_domain",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_module_access",
+    "subject": "workspace module access",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_notify_recipients",
+    "subject": "workspace notify recipients",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_search_insights",
+    "subject": "workspace search insights",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
       }
     ]
   },
@@ -1271,6 +2257,32 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     "args": [
       {
         "name": "p_batch_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "list_brand_ambassadors_for_company",
+    "subject": "brand ambassadors for company",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_crm_categories",
+    "subject": "crm categories",
+    "args": [
+      {
+        "name": "p_workspace_id",
         "type": "uuid"
       }
     ]
@@ -1299,11 +2311,93 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "list_my_tasks",
+    "subject": "my tasks",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_pending_freight_quotes",
+    "subject": "pending freight quotes",
+    "args": []
+  },
+  {
+    "name": "list_project_task_assignees",
+    "subject": "project task assignees",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_project_visits",
+    "subject": "project visits",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_store_connections",
+    "subject": "store connections",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_store_payout_orders",
+    "subject": "store payout orders",
+    "args": [
+      {
+        "name": "p_payout_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_supplier_brand_ambassadors",
+    "subject": "supplier brand ambassadors",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "list_supplier_products",
     "subject": "supplier products",
     "args": [
       {
         "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_workspace_makers",
+    "subject": "workspace makers",
+    "args": [
+      {
+        "name": "p_workspace_id",
         "type": "uuid",
         "required": true
       }
@@ -1348,6 +2442,60 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_product_id",
         "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "search_document_chunks_fts",
+    "subject": "document chunks fts",
+    "args": [
+      {
+        "name": "search_query",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "workspace_filter",
+        "type": "uuid"
+      },
+      {
+        "name": "result_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "search_order_link_targets",
+    "subject": "order link targets",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_query",
+        "type": "text"
+      },
+      {
+        "name": "p_order_type",
+        "type": "text"
+      },
+      {
+        "name": "p_party_company_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_party_contact_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_currency",
+        "type": "text"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
       }
     ]
   },
@@ -1419,6 +2567,20 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "search_platform_brands",
+    "subject": "platform brands",
+    "args": [
+      {
+        "name": "p_query",
+        "type": "text"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
     "name": "search_products_by_specs",
     "subject": "products by specs",
     "args": [
@@ -1443,6 +2605,81 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     "args": [
       {
         "name": "search_query",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "search_rag_context_chunks",
+    "subject": "rag context chunks",
+    "args": [
+      {
+        "name": "query_embedding",
+        "type": "vector",
+        "required": true
+      },
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_document_ids",
+        "type": "uuid[]"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      },
+      {
+        "name": "p_similarity_threshold",
+        "type": "double precision"
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "search_taric_codes",
+    "subject": "taric codes",
+    "args": [
+      {
+        "name": "p_query",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_chapters",
+        "type": "text[]"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      },
+      {
+        "name": "p_declarable",
+        "type": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "search_workspace_docs_fts",
+    "subject": "workspace docs fts",
+    "args": [
+      {
+        "name": "p_query",
         "type": "text",
         "required": true
       },
@@ -1514,6 +2751,22 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_website_id",
         "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "signals_company_overview",
+    "subject": "signals company overview",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_domain",
+        "type": "text",
         "required": true
       }
     ]
