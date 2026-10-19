@@ -562,7 +562,10 @@ export const createSEOMyRankingsTool = (
           status: rank.status, note: rank.note ?? null, tracked: rank.tracked ?? 0, summary,
           // Series and SERP-feature arrays stay out of the card: 129 keywords × 28 points is
           // weight the chat message store carries forever and the card never reads.
-          keywords: rows.map((k: any) => ({
+          // Asked about named keywords → the card is about those, not all 130.
+          keywords: (wanted.length
+            ? rows.filter((k: any) => wanted.some((w) => w.toLowerCase() === String(k.keyword || '').trim().toLowerCase()))
+            : rows).map((k: any) => ({
             keyword: k.keyword, position: k.position, previous: k.previous, change: k.change,
             found: k.found, entered: k.entered, lost: k.lost, url: k.url, error: k.error,
             search_volume: k.search_volume, captured_at: k.captured_at, tags: k.tags,

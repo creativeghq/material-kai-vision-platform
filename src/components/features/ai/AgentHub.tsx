@@ -62,6 +62,7 @@ import { transcribeRecording } from '@/services/voiceDictationService';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard, primaryListCount } from './AgentResultCard';
+import { ARTIFACT_PLACEHOLDER, INTERNAL_RESULT_TYPES, isResultCardRow, layoutTurns, type TurnMessage } from './agentTurnShape';
 import { FlightOffersCard } from './FlightOffersCard';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
@@ -193,7 +194,8 @@ interface AgentDefinition {
 // are registered in agent_definitions but not offered in the chat picker.
 const AGENT_HISTORY_SENT = 40;
 
-function boundedAgentHistory<T extends { images?: unknown[]; geminiImageData?: unknown }>(all: T[]): T[] {
+function boundedAgentHistory<T extends TurnMessage & { images?: unknown[]; geminiImageData?: unknown }>(input: T[]): T[] {
+  const all = input.filter((m) => !isResultCardRow(m));
   if (all.length <= AGENT_HISTORY_SENT) return all;
   const older = all.slice(0, -AGENT_HISTORY_SENT).filter((m) => (m.images?.length ?? 0) > 0 || m.geminiImageData);
   return [...older, ...all.slice(-AGENT_HISTORY_SENT)];
@@ -336,10 +338,6 @@ const emptyTurnText = (directRun?: { quickStartLabel?: string; resumeAfter?: boo
     : directRun?.resumeAfter
       ? 'Approved and done — reading the result now.'
       : 'No response from agent';
-
-const INTERNAL_RESULT_TYPES = new Set([
-  'platform_api_matches', 'platform_api_result', 'platform_data_matches', 'platform_data_result',
-]);
 
 const isSeoToolkitCard = (type: unknown): type is string =>
   typeof type === 'string' && type.startsWith('seo_') && type.endsWith('_card') && type !== 'seo_research_card';
@@ -4742,6 +4740,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   );
 
   /**
+   * A turn reads as ONE reply. When the agent answered in prose, the result cards its tools
+   * produced on the way are attached under that reply instead of standing as rows of their own.
+   * A pending approval or question stays in place: it is waiting on the user.
+   */
+  const turnLayout = useMemo(
+    () => layoutTurns(visibleMessages, (m) => getCanvasArtifact(m)?.title ?? null),
+    [visibleMessages, getCanvasArtifact],
+  );
+
+  /**
    * The runs the canvas draws, oldest first.
    *
    * A workflow run is drawn from its own runtime — its steps are PLANNED, so the user sees
@@ -5496,7 +5504,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const artifact = getCanvasArtifact(message);
     if (!artifact) return false;
     const prose = normalizeContent(message.content).trim();
-    return prose === '' || prose === artifact.title.trim();
+    return prose === '' || prose === artifact.title.trim() || ARTIFACT_PLACEHOLDER.test(prose);
   };
 
   const renderArtifactCard = (message: Message): React.ReactNode => {
@@ -6285,7 +6293,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     })}
                 </div>
               )}
-              {visibleMessages.map((message) => (
+              {visibleMessages.filter((m) => !turnLayout.absorbed.has(m.id)).map((message) => (
                 <React.Fragment key={message.id}>
                 {/* The FINISHED run's line, under the turn it belongs to.
                     Pinning it above the stream with the live one would detach it from its turn
@@ -6494,6 +6502,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   // a width imposed here is what stretched it into a full-bleed bar.
                   return <div className="flex justify-start pl-11">{card}</div>;
                 })()}
+                {turnLayout.attached.get(message.id)?.map((cardMsg) => (
+                  <div key={cardMsg.id} className="flex justify-start pl-11">{renderArtifactCard(cardMsg)}</div>
+                ))}
                 </React.Fragment>
               ))}
 

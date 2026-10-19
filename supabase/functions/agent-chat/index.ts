@@ -612,7 +612,7 @@ function createAgentGraph(
 
         toolMessages.push({
           role: 'tool',
-          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
+          content: capToolResultForModel(toolCall.name, typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)),
           tool_call_id: toolCall.id,
           name: toolCall.name,
         });
@@ -1497,6 +1497,16 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
  * and toolResults contains all tool execution results
  * onChunk callback receives real-time progress updates
  */
+const MAX_TOOL_RESULT_CHARS = 24_000;
+
+/** Every tool result reaches the model through here; an oversized one is cut and SAYS so. */
+function capToolResultForModel(toolName: string, text: string): string {
+  if (text.length <= MAX_TOOL_RESULT_CHARS) return text;
+  console.warn(`[agent-chat] ${toolName} returned ${text.length} chars; cut to ${MAX_TOOL_RESULT_CHARS} for the model`);
+  return `${text.slice(0, MAX_TOOL_RESULT_CHARS)}…\n[Cut: the result was ${text.length} characters. `
+    + 'Do not present it as complete — narrow the request (a filter, fewer items, a shorter period) if you need the rest.]';
+}
+
 /** Write the turn's reply if — and only if — the client did not. */
 async function recoverAssistantMessage(
   supabase: any,
