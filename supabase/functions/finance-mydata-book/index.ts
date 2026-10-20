@@ -89,11 +89,11 @@ type FetchResult =
  */
 async function fetchAllPages(
   baseUrl: string,
-  endpoint: 'RequestMyIncome' | 'RequestMyExpenses' | 'RequestTransmittedDocs',
+  endpoint: 'RequestMyIncome' | 'RequestMyExpenses' | 'RequestTransmittedDocs' | 'RequestE3Info',
   creds: Creds,
   params: URLSearchParams,
 ): Promise<FetchResult> {
-  const rootTag = endpoint === 'RequestTransmittedDocs' ? 'invoice' : 'bookInfo';
+  const rootTag = endpoint === 'RequestTransmittedDocs' ? 'invoice' : endpoint === 'RequestE3Info' ? 'E3Info' : 'bookInfo';
   const blocks: string[] = [];
   let next: { pk: string; rk: string } | null = null;
 
@@ -172,6 +172,8 @@ interface CollectOk {
   /** `${month}|${direction}` -> totals. Only months AADE actually reported. */
   buckets: Map<string, BookTotals>;
   unknownSubtypes: string[];
+  /** Every document we transmitted in the window, for the per-document book. */
+  transmittedBlocks: string[];
 }
 type CollectResult = CollectOk | { ok: false; error: string; retryAfter?: number };
 
@@ -217,7 +219,66 @@ async function collectBook(baseUrl: string, creds: Creds, dateFrom: string, date
     put(month, family === '11' ? 'income' : 'expense', totalsFromInvoice(b, CREDIT_SUBTYPES.has(type) ? -1 : 1));
   }
 
-  return { ok: true, buckets, unknownSubtypes: [...unknown] };
+  return { ok: true, buckets, unknownSubtypes: [...unknown], transmittedBlocks: transmitted.blocks };
+}
+
+/** Families that are OUR expense self-entries (held in inbound_documents) or carry no money. */
+const NOT_ISSUED_SALES = new Set(['9', '13', '14', '15', '16', '17']);
+const PAYMENT_RECEIPTS = new Set(['8.4', '8.5', '8.6']);
+
+/** A sales document we transmitted, as the per-document book stores it. */
+function issuedDocFromInvoice(b: string): Record<string, unknown> | null {
+  const header = pickTag(b, 'invoiceHeader') ?? b;
+  const type = pickTag(header, 'invoiceType') ?? '';
+  if (!type || NOT_ISSUED_SALES.has(type.split('.')[0]) || PAYMENT_RECEIPTS.has(type)) return null;
+  const mark = pickTag(b, 'mark');
+  const issueDate = pickTag(header, 'issueDate');
+  if (!mark || !issueDate) return null;
+  const counterpart = pickTag(b, 'counterpart') ?? '';
+  const summary = pickTag(b, 'invoiceSummary') ?? b;
+  const classes = pickAllTagBlocks(b, 'incomeClassification').map((c) => ({
+    category: pickTag(c, 'classificationCategory'),
+    type: pickTag(c, 'classificationType'),
+    amount: num(pickTag(c, 'amount')),
+  })).filter((c) => c.category);
+  return {
+    mark,
+    uid: pickTag(b, 'uid'),
+    doc_type: type,
+    series: pickTag(header, 'series'),
+    aa: pickTag(header, 'aa'),
+    issue_date: issueDate.slice(0, 10),
+    counterpart_vat: pickTag(counterpart, 'vatNumber'),
+    counterpart_country: pickTag(counterpart, 'country'),
+    counterpart_name: pickTag(counterpart, 'name'),
+    currency: pickTag(header, 'currency'),
+    total_net: num(pickTag(summary, 'totalNetValue')),
+    total_vat: num(pickTag(summary, 'totalVatAmount')),
+    total_withheld: num(pickTag(summary, 'totalWithheldAmount')),
+    total_fees: num(pickTag(summary, 'totalFeesAmount')),
+    total_stamp_duty: num(pickTag(summary, 'totalStampDutyAmount')),
+    total_other_taxes: num(pickTag(summary, 'totalOtherTaxesAmount')),
+    total_deductions: num(pickTag(summary, 'totalDeductionsAmount')),
+    total_gross: num(pickTag(summary, 'totalGrossValue')),
+    income_classification: classes.length ? classes : null,
+    cancelled_by_mark: pickTag(b, 'cancelledByMark'),
+  };
+}
+
+/** `<E3Info>` — the classification the accountant filed for one document. AADE writes the
+ *  unclassified bucket as a Greek label rather than a category code. */
+function e3RowFromBlock(b: string): Record<string, unknown> | null {
+  const mark = pickTag(b, 'V_Mark');
+  const issueDate = pickTag(b, 'IssueDate');
+  if (!mark || !issueDate) return null;
+  const raw = pickTag(b, 'V_Class_Category') ?? '';
+  return {
+    mark,
+    issue_date: issueDate.slice(0, 10),
+    category: /^category\d+_\d+$/.test(raw) ? raw : 'unclassified',
+    class_type: pickTag(b, 'V_Class_Type') ?? '',
+    amount: num(pickTag(b, 'V_Class_Value')),
+  };
 }
 
 /** Every month between two ISO dates, as `yyyy-mm-01`. */
@@ -397,6 +458,24 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
       continue;
     }
 
+    // The per-document book: our issued sales and the accountant's E3 classifications. A
+    // failure here leaves that half as it was and is named, never stored as an empty window.
+    const docErrors: Record<string, string> = {};
+    const issued = result.transmittedBlocks.map(issuedDocFromInvoice).filter((d) => d !== null);
+    const e3 = await fetchAllPages(
+      baseUrl, 'RequestE3Info', { aade_user_id: c.aade_user_id, subscription_key: c.subscription_key },
+      new URLSearchParams({ dateFrom, dateTo, GroupedPerDay: 'false' }),
+    );
+    if (!e3.ok) docErrors.classifications = e3.error;
+    const { data: replaced, error: replaceErr } = await supabase.rpc('mydata_book_replace_documents', {
+      p_workspace_id: workspaceId,
+      p_from: String(rawFrom),
+      p_to: String(rawTo),
+      p_issued: issued,
+      p_e3: e3.ok ? e3.blocks.map(e3RowFromBlock).filter((r) => r !== null) : null,
+    });
+    if (replaceErr) docErrors.store = replaceErr.message;
+
     const stateErr = await writeSyncState({
       workspace_id: workspaceId,
       last_attempt_at: attemptAt,
@@ -405,7 +484,12 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
       covered_to: String(rawTo),
       last_status: 'ok',
       // A subtype we do not recognise is surfaced, never swallowed: its sign is a guess.
-      source_errors: result.unknownSubtypes.length ? { unknown_subtypes: result.unknownSubtypes } : null,
+      source_errors: result.unknownSubtypes.length || Object.keys(docErrors).length
+        ? {
+            ...(result.unknownSubtypes.length ? { unknown_subtypes: result.unknownSubtypes } : {}),
+            ...(Object.keys(docErrors).length ? { book_documents: docErrors } : {}),
+          }
+        : null,
       retry_after_s: null,
       updated_at: attemptAt,
     });
@@ -415,6 +499,8 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
       months: months.length,
       rows: rows.length,
       unknown_subtypes: result.unknownSubtypes,
+      book_documents: replaceErr ? { error: replaceErr.message } : replaced,
+      ...(e3.ok ? {} : { classifications_error: e3.error }),
       // The figures ARE stored; only the freshness stamp failed. Named rather than swallowed,
       // because the screen will otherwise claim the mirror has never been confirmed.
       ...(stateErr ? { warning: stateErr } : {}),
