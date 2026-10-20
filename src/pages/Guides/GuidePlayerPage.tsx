@@ -13,13 +13,12 @@ import { GuideBook } from '@/components/features/guides/GuideBook';
 import { usePageAspects } from '@/components/features/guides/usePageAspects';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { buildGuide, countsAt, partCountAt, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
+import { buildGuide, countsAt, partCountAt, partUsedTotal, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
 import type { GuideStep, InstallationGuideData } from '@/lib/installation/guideSchema';
 import { GUIDE_BUCKET, installationGuideService, type InstallationGuideRow } from '@/services/installationGuideService';
 import { supabase } from '@/integrations/supabase/client';
 
-const stepSeconds = (build: GuideBuild, s: number) =>
-  Math.min(9, Math.max(3, 2.5 + build.items.filter((it) => it.step === s).length * 0.25));
+const stepSeconds = (build: GuideBuild, s: number) => build.stepSeconds[s] ?? 4;
 
 function StepWords({ guide, build, index, x }: { guide: InstallationGuideData; build: GuideBuild; index: number; x: number }) {
   const step = guide.steps[index];
@@ -34,7 +33,7 @@ function StepWords({ guide, build, index, x }: { guide: InstallationGuideData; b
     <>
       {chunks.map((c, i) => (codes.includes(c) ? <span key={i} className="font-mono text-amber-700 dark:text-amber-300">{c}</span> : <React.Fragment key={i}>{c}</React.Fragment>))}
       {hardware.slice(0, 2).map((p) => (
-        <span key={p!.id}> <b className="tabular-nums">{partCountAt(build, p!.id, x)}</b> of {p!.quantity} {p!.name.toLowerCase()} in.</span>
+        <span key={p!.id}> <b className="tabular-nums">{partCountAt(build, p!.id, x)}</b> of {partUsedTotal(build, p!.id)} {p!.name.toLowerCase()} in.</span>
       ))}
     </>
   );
@@ -336,6 +335,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
                 onPick={onPick}
                 labels={labels}
                 atStart={x < 0.02}
+                follow={!exploded}
               />
             </Canvas>
           </Suspense>

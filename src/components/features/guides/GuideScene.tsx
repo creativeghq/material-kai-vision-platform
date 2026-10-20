@@ -4,7 +4,9 @@ import { Edges, Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 import {
+  activeItemAt,
   partCountAt,
+  partUsedTotal,
   poseAt,
   type BuildItem,
   type CameraShot,
@@ -36,6 +38,7 @@ interface Props {
   onPick: (key: string) => void;
   labels: boolean;
   atStart: boolean;
+  follow: boolean;
 }
 
 const PANEL_ROOM = '#ece5d8';
@@ -46,7 +49,7 @@ const tmp = {
   m: new THREE.Matrix4(),
   q: new THREE.Quaternion(),
   q2: new THREE.Quaternion(),
-  e: new THREE.Euler(),
+
   p: new THREE.Vector3(),
   s: new THREE.Vector3(),
   axisY: new THREE.Vector3(0, 1, 0),
@@ -55,7 +58,7 @@ const tmp = {
 function hardwareColor(name: string): string {
   if (/dowel|wood/i.test(name)) return '#c8975a';
   if (/nail|screw|bolt|pin|bracket|washer|cam|hinge|lock/i.test(name)) return '#b9bec6';
-  return '#4b4f57';
+  return '#8d939c';
 }
 
 function canvasTexture(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture | null {
@@ -85,22 +88,35 @@ function useDisposable<T extends { dispose: () => void } | null>(factory: () => 
   return ref.current.value;
 }
 
-function CameraRig({ shot, version }: { shot: CameraShot; version: number }) {
+function aimAt(goal: THREE.Vector3, target: THREE.Vector3, t: { x: number; y: number; z: number }, dist: number, yaw: number, pitch: number) {
+  target.set(t.x, t.y, t.z);
+  goal.set(
+    t.x + Math.sin(yaw) * Math.cos(pitch) * dist,
+    t.y + Math.sin(pitch) * dist,
+    t.z + Math.cos(yaw) * Math.cos(pitch) * dist,
+  );
+}
+
+function CameraRig({ shot, version, build, xRef, follow }: {
+  shot: CameraShot;
+  version: number;
+  build: GuideBuild;
+  xRef: React.MutableRefObject<number>;
+  follow: boolean;
+}) {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const following = useRef(true);
   const goal = useRef(new THREE.Vector3());
   const target = useRef(new THREE.Vector3());
+  const focus = useRef(new THREE.Vector3());
+  const focusDist = useRef(shot.dist);
 
   useEffect(() => {
     following.current = true;
-    const { target: t, yaw, pitch, dist } = shot;
-    target.current.set(t.x, t.y, t.z);
-    goal.current.set(
-      t.x + Math.sin(yaw) * Math.cos(pitch) * dist,
-      t.y + Math.sin(pitch) * dist,
-      t.z + Math.cos(yaw) * Math.cos(pitch) * dist,
-    );
+    aimAt(goal.current, target.current, shot.target, shot.dist, shot.yaw, shot.pitch);
+    focus.current.set(shot.target.x, shot.target.y, shot.target.z);
+    focusDist.current = shot.dist;
   }, [shot, version]);
 
   useEffect(() => {
@@ -112,6 +128,25 @@ function CameraRig({ shot, version }: { shot: CameraShot; version: number }) {
 
   useFrame((_, delta) => {
     if (!following.current || !controls) return;
+    const active = follow ? activeItemAt(build, xRef.current) : null;
+    if (active && active.placed) {
+      const hardware = active.kind === 'hardware';
+      const wantDist = hardware
+        ? 1.1
+        : Math.max(0.9, Math.min(shot.dist, Math.hypot(active.size.x, active.size.y, active.size.z) * 1.6 + 0.4));
+      const f = 1 - Math.exp(-delta * 3);
+      const pose = poseAt(build, active, xRef.current, 0);
+      focus.current.lerp(new THREE.Vector3(pose.destination.x, pose.destination.y, pose.destination.z), f);
+      focusDist.current += (wantDist - focusDist.current) * f;
+      const out = pose.outward;
+      const flat = Math.hypot(out.x, out.z);
+      const side = hardware && flat > 1e-4 && flat > Math.abs(out.y) * 0.5;
+      const yaw = side ? Math.atan2(out.x, out.z) : shot.yaw;
+      const pitch = hardware ? (side ? 0.5 : out.y < -1e-4 ? 0.2 : 1.05) : Math.max(shot.pitch, 0.5);
+      aimAt(goal.current, target.current, focus.current, focusDist.current, yaw, pitch);
+    } else if (!follow || !build.items.some((it) => it.t0 > xRef.current && it.t0 < Math.floor(xRef.current) + 1)) {
+      aimAt(goal.current, target.current, shot.target, shot.dist, shot.yaw, shot.pitch);
+    }
     const k = 1 - Math.exp(-delta * 2.2);
     camera.position.lerp(goal.current, k);
     controls.target.lerp(target.current, k);
@@ -286,9 +321,11 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
     panels.forEach((it, i) => {
       const mesh = refs.current[i];
       if (!mesh) return;
-      const pose = poseAt(it, xRef.current, explodeRef.current);
+      const pose = poseAt(build, it, xRef.current, explodeRef.current);
       mesh.position.set(pose.pos.x, pose.pos.y, pose.pos.z);
-      mesh.rotation.set(pose.rot.x, pose.rot.y, pose.rot.z);
+      mesh.quaternion.set(pose.quat[0], pose.quat[1], pose.quat[2], pose.quat[3]);
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      if (mat?.emissive) mat.emissive.set(pose.moving ? '#a8590f' : '#000000');
     });
   });
   return (
@@ -319,7 +356,8 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
   );
 }
 
-function HardwarePart({ items, color, xRef, explodeRef, view, onHover, onPick }: {
+function HardwarePart({ build, items, color, xRef, explodeRef, view, onHover, onPick }: {
+  build: GuideBuild;
   items: BuildItem[];
   color: string;
   xRef: React.MutableRefObject<number>;
@@ -330,25 +368,29 @@ function HardwarePart({ items, color, xRef, explodeRef, view, onHover, onPick }:
 }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const dims = items[0].size;
+  const base = useMemo(() => new THREE.Color(view === 'drawing' ? '#222222' : color), [view, color]);
+  const hot = useMemo(() => new THREE.Color('#ffb454'), []);
   useFrame(() => {
     const mesh = ref.current;
     if (!mesh) return;
     items.forEach((it, i) => {
-      const pose = poseAt(it, xRef.current, explodeRef.current);
-      tmp.e.set(pose.rot.x, pose.rot.y, pose.rot.z);
-      tmp.q.setFromEuler(tmp.e);
+      const pose = poseAt(build, it, xRef.current, explodeRef.current);
+      mesh.setColorAt(i, pose.moving ? hot : base);
+      tmp.q.set(pose.quat[0], pose.quat[1], pose.quat[2], pose.quat[3]);
       if (pose.spinAngle) tmp.q.multiply(tmp.q2.setFromAxisAngle(tmp.axisY, pose.spinAngle));
       tmp.p.set(pose.pos.x, pose.pos.y, pose.pos.z);
       tmp.s.set(1, 1, 1);
       mesh.setMatrixAt(i, tmp.m.compose(tmp.p, tmp.q, tmp.s));
     });
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   });
   return (
     <instancedMesh
       ref={ref}
       args={[undefined, undefined, items.length]}
       castShadow
+      frustumCulled={false}
       onPointerMove={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
         if (e.instanceId != null && items[e.instanceId]) onHover(items[e.instanceId].key, e.clientX, e.clientY);
@@ -360,7 +402,7 @@ function HardwarePart({ items, color, xRef, explodeRef, view, onHover, onPick }:
       }}
     >
       <cylinderGeometry args={[dims.x / 2, dims.x / 2, dims.y, 10]} />
-      <meshStandardMaterial color={view === 'drawing' ? '#222222' : color} metalness={/b9bec6/.test(color) ? 0.7 : 0.05} roughness={0.4} />
+      <meshStandardMaterial color="#ffffff" metalness={/b9bec6/.test(color) ? 0.6 : 0.05} roughness={0.4} />
     </instancedMesh>
   );
 }
@@ -379,6 +421,7 @@ function Hardware(props: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' |
       {groups.map(([partId, items]) => (
         <HardwarePart
           key={`${partId}-${items.length}`}
+          build={props.build}
           items={items}
           color={hardwareColor(props.guide.parts[items[0].partIndex]?.name ?? '')}
           xRef={props.xRef}
@@ -408,8 +451,9 @@ function Trails({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObje
       if (n >= 40) break;
       const x = xRef.current;
       if (!(x > it.t0 && x < it.ta)) continue;
-      const pose = poseAt(it, x, 0);
-      arr.set([pose.pos.x, pose.pos.y, pose.pos.z, it.target.pos.x, it.target.pos.y, it.target.pos.z], n * 6);
+      const pose = poseAt(build, it, x, 0);
+      const to = pose.destination;
+      arr.set([pose.pos.x, pose.pos.y, pose.pos.z, to.x, to.y, to.z], n * 6);
       n++;
     }
     geometry.setDrawRange(0, n * 2);
@@ -434,11 +478,11 @@ function ActiveLabel({ build, guide, xRef, labels }: { build: GuideBuild; guide:
     groupRef.current.visible = show;
     textRef.current.style.display = show ? '' : 'none';
     if (!active) return;
-    const pose = poseAt(active, x, 0);
+    const pose = poseAt(build, active, x, 0);
     groupRef.current.position.set(pose.pos.x, pose.pos.y + Math.max(active.size.y, 0.05) / 2 + 0.06, pose.pos.z);
     const part = guide.parts[active.partIndex];
     const code = part?.code ? ` · ${part.code}` : '';
-    const count = active.kind === 'hardware' ? ` · ${partCountAt(build, active.partId, x)}/${part?.quantity ?? 0}` : '';
+    const count = active.kind === 'hardware' ? ` · ${partCountAt(build, active.partId, x)}/${partUsedTotal(build, active.partId)}` : '';
     const text = `${part?.name ?? ''}${code}${count}`;
     if (textRef.current.textContent !== text) textRef.current.textContent = text;
   });
@@ -599,7 +643,7 @@ export const GuideScene: React.FC<Props> = (props) => {
   return (
     <>
       <OrbitControls makeDefault enableDamping maxPolarAngle={Math.PI / 2.02} minDistance={0.25} maxDistance={span * 5} />
-      <CameraRig shot={shot} version={shotVersion} />
+      <CameraRig shot={shot} version={shotVersion} build={build} xRef={xRef} follow={props.follow} />
       <KeyboardFly />
       {view === 'room' ? (
         <>

@@ -101,14 +101,30 @@ describe('installation guide build', () => {
 
   it('starts in the kit and ends at the target', () => {
     const side = build.items.find((it) => it.partId === 'SIDE')!;
-    expect(poseAt(side, 0, 0).pos).toEqual(side.kit.pos);
-    expect(poseAt(side, 2, 0).pos).toEqual(side.target.pos);
-    expect(poseAt(side, (side.t0 + side.ta) / 2, 0).moving).toBe(true);
+    expect(poseAt(build, side, 0, 0).pos).toEqual(side.kit.pos);
+    expect(poseAt(build, side, 2, 0).pos).toEqual(side.target.pos);
+    expect(poseAt(build, side, (side.t0 + side.ta) / 2, 0).moving).toBe(true);
+  });
+
+  it('carries fitted hardware with its panel', () => {
+    const dowel = build.items.find((it) => it.partId === 'DOWEL' && it.host !== null)!;
+    const host = build.items[dowel.host!];
+    const early = poseAt(build, dowel, host.t0 - 0.01, 0).pos;
+    const late = poseAt(build, dowel, build.steps, 0).pos;
+    const reach = Math.max(host.size.x, host.size.y, host.size.z) / 2 + 0.1;
+    expect(Math.hypot(early.x - host.kit.pos.x, early.y - host.kit.pos.y, early.z - host.kit.pos.z)).toBeLessThan(reach);
+    expect(Math.hypot(late.x - host.target.pos.x, late.y - host.target.pos.y, late.z - host.target.pos.z)).toBeLessThan(reach);
+  });
+
+  it('fits hardware on the face of a kit panel that is facing up', () => {
+    for (const it of build.items.filter((x) => x.host !== null && x.step <= build.items[x.host!].step)) {
+      expect(poseAt(build, it, it.ta, 0).outward.y).toBeGreaterThan(-1e-6);
+    }
   });
 
   it('pushes placed parts apart when exploded', () => {
     const side = build.items.find((it) => it.partId === 'SIDE')!;
-    const apart = poseAt(side, 2, 1).pos;
+    const apart = poseAt(build, side, 2, 1).pos;
     expect(Math.hypot(apart.x - side.target.pos.x, apart.y - side.target.pos.y, apart.z - side.target.pos.z)).toBeGreaterThan(0.1);
   });
 
