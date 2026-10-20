@@ -81,6 +81,10 @@ export const GuideBook: React.FC<Props> = ({
   const [spread, setSpread] = useState(() => spreadOf(steps[currentStep]?.page ?? 1));
   const [visible, setVisible] = useState<[number, number]>(() => [spread * 2, spread * 2 + 1]);
   const [busy, setBusy] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  const [single, setSingle] = useState(() => steps[currentStep]?.page ?? 1);
+  const swipeX = useRef<number | null>(null);
+  const turnSingle = (to: number) => setSingle(Math.min(Math.max(to, 1), Math.max(pages, 1)));
 
   const url = (page: number) => (page >= 1 && page <= pages ? pageUrls[page - 1] || null : null);
   const pagesOf = (sp: number): [number, number] => [sp * 2, sp * 2 + 1 <= pages ? sp * 2 + 1 : 0];
@@ -92,8 +96,10 @@ export const GuideBook: React.FC<Props> = ({
       if (!el) return;
       const h = el.clientHeight - 8;
       const w = el.clientWidth - 8;
+      const isNarrow = el.clientWidth < 560;
+      setNarrow(isNarrow);
       let pw = h / pageAspect;
-      if (pw * 2 > w) pw = w / 2;
+      if (pw * (isNarrow ? 1 : 2) > w) pw = isNarrow ? w : w / 2;
       setSize({ pw: Math.floor(pw), ph: Math.floor(pw * pageAspect) });
     };
     measure();
@@ -165,26 +171,33 @@ export const GuideBook: React.FC<Props> = ({
 
   useEffect(() => {
     turnRef.current(spreadOf(steps[currentStep]?.page ?? 1), true);
+    setSingle(steps[currentStep]?.page ?? 1);
   }, [currentStep, steps]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); turnRef.current(spread + 1, true); }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); turnRef.current(spread - 1, true); }
+      const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (narrow) setSingle((p) => Math.min(Math.max(p + step, 1), Math.max(pages, 1)));
+      else turnRef.current(spread + step, true);
     };
     addEventListener('keydown', onKey, true);
     return () => removeEventListener('keydown', onKey, true);
-  }, [open, spread]);
+  }, [open, spread, narrow, pages]);
 
   const onWheel = (e: React.WheelEvent) => {
     const now = performance.now();
     if (now - wheelAt.current < 500) return;
     wheelAt.current = now;
-    turnTo(spread + (e.deltaY > 0 || e.deltaX > 0 ? 1 : -1), true);
+    const dir = e.deltaY > 0 || e.deltaX > 0 ? 1 : -1;
+    if (narrow) turnSingle(single + dir);
+    else turnTo(spread + dir, true);
   };
 
-  const [left, right] = visible;
+  const [left, right] = narrow ? [single, 0] : visible;
   const [labelL, labelR] = pagesOf(spread);
   const hotspots = busy ? [] : steps
     .map((s, i) => ({ s, i }))
@@ -194,7 +207,7 @@ export const GuideBook: React.FC<Props> = ({
     <section
       aria-label={`${title} manual`}
       className={cn(
-        'absolute inset-y-3 left-3 z-30 flex w-[min(100vw-24px,var(--bk-w,980px))] flex-col gap-3 rounded-md border border-hairline bg-card/95 p-3 shadow-overlay transition-[opacity,transform] duration-300 lg:w-[min(62vw,calc(100vw-440px))]',
+        'absolute inset-2 z-30 flex flex-col gap-3 rounded-md border border-hairline bg-card p-3 shadow-overlay sm:inset-x-auto sm:inset-y-3 sm:left-3 sm:w-[min(100vw-24px,var(--bk-w,980px))] sm:bg-card/95 transition-[opacity,transform] duration-300 lg:w-[min(62vw,calc(100vw-440px))]',
         open ? 'pointer-events-auto translate-x-0 opacity-100' : 'pointer-events-none -translate-x-4 opacity-0',
       )}
     >
@@ -213,9 +226,20 @@ export const GuideBook: React.FC<Props> = ({
         </Button>
       </div>
 
-      <div ref={stageRef} className="grid min-h-0 flex-1 place-items-center" style={{ perspective: '2600px' }} onWheel={onWheel}>
-        <div className="relative flex" style={{ width: size.pw * 2, height: size.ph, transformStyle: 'preserve-3d' }}>
-          {[left, right].map((page, side) => (
+      <div
+        ref={stageRef}
+        className="grid min-h-0 flex-1 touch-pan-y place-items-center"
+        style={{ perspective: '2600px' }}
+        onWheel={onWheel}
+        onPointerDown={(e) => { if (narrow) swipeX.current = e.clientX; }}
+        onPointerUp={(e) => {
+          const from = swipeX.current;
+          swipeX.current = null;
+          if (narrow && from !== null && Math.abs(e.clientX - from) > 50) turnSingle(single + (e.clientX < from ? 1 : -1));
+        }}
+      >
+        <div className="relative flex" style={{ width: size.pw * (narrow ? 1 : 2), height: size.ph, transformStyle: 'preserve-3d' }}>
+          {(narrow ? [left] : [left, right]).map((page, side) => (
             <div
               key={side}
               className="relative overflow-hidden"
@@ -223,8 +247,8 @@ export const GuideBook: React.FC<Props> = ({
                 width: size.pw,
                 height: size.ph,
                 background: page ? '#ffffff' : 'transparent',
-                borderRadius: side ? '0 6px 6px 0' : '6px 0 0 6px',
-                boxShadow: page ? `inset ${side ? 18 : -18}px 0 22px -18px #0004` : 'none',
+                borderRadius: narrow ? '6px' : side ? '0 6px 6px 0' : '6px 0 0 6px',
+                boxShadow: page && !narrow ? `inset ${side ? 18 : -18}px 0 22px -18px #0004` : 'none',
               }}
             >
               {page > 0 && url(page) && (
@@ -269,17 +293,31 @@ export const GuideBook: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => turnTo(spread - 1, true)} disabled={spread === 0} aria-label="Previous pages" title="Turn back (←)">
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="w-20 text-center font-mono text-xs tabular-nums text-muted-foreground">
-          {labelL && labelR ? `pages ${labelL}–${labelR}` : `page ${labelL || labelR}`}
-        </span>
-        <Button variant="outline" size="sm" onClick={() => turnTo(spread + 1, true)} disabled={spread >= spreads - 1} aria-label="Next pages" title="Turn the page (→)">
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <div className="min-w-0 flex-1 text-sm">{footer}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        {narrow ? (
+          <>
+            <Button variant="outline" size="sm" className="h-10 w-10 p-0" onClick={() => turnSingle(single - 1)} disabled={single <= 1} aria-label="Previous page">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="flex-1 text-center font-mono text-xs tabular-nums text-muted-foreground">page {single} of {pages}</span>
+            <Button variant="outline" size="sm" className="h-10 w-10 p-0" onClick={() => turnSingle(single + 1)} disabled={single >= pages} aria-label="Next page">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" size="sm" onClick={() => turnTo(spread - 1, true)} disabled={spread === 0} aria-label="Previous pages" title="Turn back (←)">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="w-20 text-center font-mono text-xs tabular-nums text-muted-foreground">
+              {labelL && labelR ? `pages ${labelL}–${labelR}` : `page ${labelL || labelR}`}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => turnTo(spread + 1, true)} disabled={spread >= spreads - 1} aria-label="Next pages" title="Turn the page (→)">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+        <div className={cn('min-w-0 text-sm', narrow ? 'basis-full' : 'flex-1')}>{footer}</div>
       </div>
     </section>
   );

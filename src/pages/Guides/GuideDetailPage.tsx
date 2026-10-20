@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BookOpen, Loader2, Play, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, Loader2, Play, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 
 import { HubRecordPage } from '@/components/core/hub';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -71,7 +71,21 @@ function StepsEditor({ row, guide, pageUrls, onChange }: { row: InstallationGuid
   if (!step) return null;
   return (
     <div className="grid gap-3 xl:grid-cols-[16rem_minmax(0,1fr)]">
-      <Card className="h-fit">
+      <div className="flex items-center gap-2 xl:hidden">
+        <Button variant="outline" size="sm" className="h-10 w-10 shrink-0 p-0" disabled={selected <= 0} onClick={() => setSelected((n) => Math.max(0, n - 1))} aria-label="Previous step">
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Select value={String(selected)} onValueChange={(v) => setSelected(Number(v))}>
+          <SelectTrigger className="h-10 min-w-0 flex-1" aria-label="Step"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {guide.steps.map((s, i) => <SelectItem key={i} value={String(i)}>{i ? `${i}. ${s.title}` : `The kit · ${s.title}`}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-10 w-10 shrink-0 p-0" disabled={selected >= guide.steps.length - 1} onClick={() => setSelected((n) => Math.min(guide.steps.length - 1, n + 1))} aria-label="Next step">
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+      <Card className="hidden h-fit xl:block">
         <CardContent className="p-1.5">
           <ol className="space-y-0.5">
             {guide.steps.map((s, i) => (

@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import {
@@ -142,6 +142,9 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
   const [labels, setLabels] = useState(true);
   const [followCam, setFollowCam] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [wordsOpen, setWordsOpen] = useState(false);
+  const [wordsCut, setWordsCut] = useState(false);
+  const wordsRef = useRef<HTMLDivElement>(null);
   const [howOpen, setHowOpen] = useState(false);
   const [shotVersion, setShotVersion] = useState(0);
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
@@ -301,6 +304,11 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
     ? `${guide.parts[hoverItem.partIndex]?.name ?? ''}${x < hoverItem.ta - 1e-6 && Number.isFinite(hoverItem.ta) ? ` · goes in at step ${hoverItem.step}` : ''}`
     : '';
 
+  useLayoutEffect(() => {
+    const el = wordsRef.current;
+    if (el) setWordsCut(wordsOpen || el.scrollHeight > el.clientHeight + 1);
+  }, [step, wordsOpen]);
+
   const metaLine = `${row.page_count} pages · ${guide.parts.length} parts · ${K} steps`;
   const words = current ? (
     <p className="text-sm leading-snug">
@@ -339,18 +347,23 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
         </ThreeErrorBoundary>
       </main>
 
-      <aside className={cn('pointer-events-none absolute left-3 top-3 z-20 flex w-[min(340px,calc(100vw-24px))] flex-col gap-2.5 transition-opacity', bookOpen && 'lg:opacity-0')}>
-        <div className="pointer-events-auto">
+      <aside className={cn('pointer-events-none absolute inset-x-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 flex flex-col gap-1.5 transition-opacity sm:inset-x-auto sm:left-3 sm:top-3 sm:w-[340px] sm:gap-2.5', bookOpen && 'lg:opacity-0')}>
+        <div className="pointer-events-auto flex items-center gap-2 rounded-md border border-hairline bg-card/95 px-2 py-1.5 sm:block sm:border-0 sm:bg-transparent sm:p-0">
           {!shared && (
-            <Link to={`/guides/${row.id}`} className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-3.5 w-3.5" />Guide
+            <Link to={`/guides/${row.id}`} aria-label="Back to the guide" className="inline-flex h-8 w-8 shrink-0 items-center justify-center gap-1 rounded-sm text-xs text-muted-foreground hover:text-foreground sm:mb-1 sm:h-auto sm:w-auto">
+              <ArrowLeft className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline">Guide</span>
             </Link>
           )}
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Step by step</p>
-          <h1 className="font-sans text-2xl font-bold leading-tight text-amber-700 dark:text-amber-300">{guide.title}</h1>
-          {guide.summary && <p className="mt-1 hidden text-sm text-muted-foreground sm:block">{guide.summary}</p>}
+          <div className="min-w-0 flex-1">
+            <p className="hidden text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:block">Step by step</p>
+            <h1 className="truncate font-sans text-base font-bold leading-tight text-amber-700 dark:text-amber-300 sm:whitespace-normal sm:text-2xl">{guide.title}</h1>
+            {guide.summary && <p className="mt-1 hidden text-sm text-muted-foreground sm:block">{guide.summary}</p>}
+          </div>
+          <p className="shrink-0 text-right font-mono text-[10px] leading-tight tabular-nums text-muted-foreground sm:hidden">
+            <b className="text-foreground">{counts.hardware}</b>/{build.hardwareTotal} hardware<br /><b className="text-foreground">{counts.panels}</b>/{build.panelTotal} parts
+          </p>
         </div>
-        <div className="pointer-events-auto grid grid-cols-3 gap-1.5">
+        <div className="pointer-events-auto hidden grid-cols-3 gap-1.5 sm:grid">
           {[
             ['Step', step, K],
             ['Hardware in', counts.hardware, build.hardwareTotal],
@@ -362,8 +375,11 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
             </div>
           ))}
         </div>
-        <div className="pointer-events-auto rounded-sm border border-hairline bg-card/90 p-3" aria-live="polite">
-          {words}
+        <div className="pointer-events-auto rounded-sm border border-hairline bg-card/90 px-3 py-2 sm:p-3" aria-live="polite">
+          <div ref={wordsRef} className={cn(!wordsOpen && 'line-clamp-2 sm:line-clamp-none')}>{words}</div>
+          {wordsCut && <button type="button" onClick={() => setWordsOpen((o) => !o)} className="mt-0.5 text-xs font-medium text-muted-foreground underline-offset-2 hover:underline sm:hidden">
+            {wordsOpen ? 'Show less' : 'Show all'}
+          </button>}
           {current?.warning && (
             <p className="mt-2 flex gap-1.5 text-xs text-amber-800 dark:text-amber-300"><TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />{current.warning}</p>
           )}
@@ -382,21 +398,21 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
         </div>
       </aside>
 
-      <section aria-label="Controls" className="absolute bottom-3 left-3 right-3 z-20 rounded-md border border-hairline bg-card/95 p-3 shadow-overlay sm:left-auto sm:top-3 sm:bottom-auto sm:w-[370px]">
+      <section aria-label="Controls" className="absolute inset-x-0 bottom-0 z-20 rounded-t-md border-t border-hairline bg-card/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-overlay sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-3 sm:w-[370px] sm:rounded-md sm:border sm:p-3">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={prev} aria-label="Previous step" title="Previous step ([)"><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="sm" className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3" onClick={prev} aria-label="Previous step" title="Previous step ([)"><ChevronLeft className="h-4 w-4" /></Button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{current?.title}</p>
             <p className="font-mono text-[11px] text-muted-foreground">{step ? `step ${step} of ${K}` : 'before step 1'} · page {current?.page}</p>
           </div>
-          <Button size="sm" onClick={() => setCinematic(!cine)} aria-label={cine ? 'Pause' : 'Play the build'} title={cine ? 'Pause (space)' : 'Play the build (space)'}>
+          <Button size="sm" className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3" onClick={() => setCinematic(!cine)} aria-label={cine ? 'Pause' : 'Play the build'} title={cine ? 'Pause (space)' : 'Play the build (space)'}>
             {cine ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
-          <Button variant="outline" size="sm" onClick={next} aria-label="Next step" title="Next step (])"><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="outline" size="sm" className="h-10 w-10 p-0 sm:h-9 sm:w-auto sm:px-3" onClick={next} aria-label="Next step" title="Next step (])"><ChevronRight className="h-4 w-4" /></Button>
         </div>
 
-        <div className="mt-3">
-          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <div className="mt-1.5 sm:mt-3">
+          <div className="hidden items-center justify-between font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:flex">
             <span>The build</span><span>[ ] · 0–9 · space</span>
           </div>
           <div
@@ -418,7 +434,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
             {Array.from({ length: K + 1 }, (_, t) => (
               <React.Fragment key={t}>
                 <span
-                  className={cn('absolute top-0 -translate-x-1/2 font-mono text-[10px] tabular-nums', t === step ? 'font-bold text-foreground' : 'text-muted-foreground')}
+                  className={cn('absolute top-0 -translate-x-1/2 font-mono text-[10px] tabular-nums', t === step ? 'font-bold text-foreground' : 'text-muted-foreground', K > 30 && t % 10 !== 0 && 'hidden sm:inline')}
                   style={{ left: `${(t / K) * 100}%` }}
                 >
                   {K <= 30 || t % 5 === 0 ? t : ''}
@@ -432,7 +448,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-1.5 flex items-center gap-2 sm:mt-2 sm:flex-wrap">
           <div className="flex rounded-sm border border-hairline p-0.5" role="group" aria-label="View">
             {(['room', 'drawing'] as const).map((v) => (
               <button
@@ -446,7 +462,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
               </button>
             ))}
           </div>
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex gap-0.5 sm:gap-1">
             <ToolButton on={bookOpen} onClick={() => setBookOpen((o) => !o)} label="Open the manual (⇧B)"><BookOpen className="h-4 w-4" /></ToolButton>
             <ToolButton on={exploded} onClick={toggleExploded} label="Exploded (⇧X)"><Expand className="h-4 w-4" /></ToolButton>
             <ToolButton on={followCam} onClick={() => { setFollowCam((f) => !f); setShotVersion((v) => v + 1); }} label={followCam ? 'Camera follows each piece. Click to hold the step view (F)' : 'Camera holds the step view. Click to follow each piece (F)'}><Crosshair className="h-4 w-4" /></ToolButton>
@@ -556,7 +572,7 @@ function ShareGuide({ open, onOpenChange, row, toast }: {
 
 function ToolButton({ on, onClick, label, children }: { on: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
   return (
-    <Button variant={on ? 'secondary' : 'ghost'} size="sm" className="h-8 w-8 p-0" onClick={onClick} title={label} aria-label={label} aria-pressed={on}>
+    <Button variant={on ? 'secondary' : 'ghost'} size="sm" className="h-9 w-9 p-0 sm:h-8 sm:w-8" onClick={onClick} title={label} aria-label={label} aria-pressed={on}>
       {children}
     </Button>
   );

@@ -107,6 +107,7 @@ function CameraRig({ shot, version, build, xRef, follow }: {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const dom = useThree((s) => s.gl.domElement);
+  const portrait = useThree((s) => Math.min(1.9, Math.max(1, (0.8 * s.size.height) / Math.max(s.size.width, 1))));
   const following = useRef(true);
   const zoom = useRef(1);
   const goal = useRef(new THREE.Vector3());
@@ -116,10 +117,10 @@ function CameraRig({ shot, version, build, xRef, follow }: {
 
   useEffect(() => {
     following.current = true;
-    aimAt(goal.current, target.current, shot.target, shot.dist, shot.yaw, shot.pitch);
+    aimAt(goal.current, target.current, shot.target, shot.dist * portrait * zoom.current, shot.yaw, shot.pitch);
     focus.current.set(shot.target.x, shot.target.y, shot.target.z);
     focusDist.current = shot.dist;
-  }, [shot, version]);
+  }, [shot, version, portrait]);
 
   useEffect(() => {
     if (!controls) return;
@@ -198,9 +199,9 @@ function CameraRig({ shot, version, build, xRef, follow }: {
       const turn = side ? Math.atan2(Math.sin(Math.atan2(out.x, out.z) - shot.yaw), Math.cos(Math.atan2(out.x, out.z) - shot.yaw)) : 0;
       const yaw = shot.yaw + Math.max(-0.7, Math.min(0.7, turn * 0.5));
       const pitch = hardware && !side && out.y > 1e-4 ? 0.85 : Math.max(shot.pitch, 0.5);
-      aimAt(goal.current, target.current, focus.current, focusDist.current * zoom.current, yaw, pitch);
+      aimAt(goal.current, target.current, focus.current, focusDist.current * portrait * zoom.current, yaw, pitch);
     } else if (!follow || !build.items.some((it) => it.t0 > xRef.current && it.t0 < Math.floor(xRef.current) + 1)) {
-      aimAt(goal.current, target.current, shot.target, shot.dist * zoom.current, shot.yaw, shot.pitch);
+      aimAt(goal.current, target.current, shot.target, shot.dist * portrait * zoom.current, shot.yaw, shot.pitch);
     }
     const k = 1 - Math.exp(-delta * 2.2);
     camera.position.lerp(goal.current, k);
@@ -756,9 +757,13 @@ function StepTags({ build, guide, xRef, explodeRef, stepIndex }: {
     });
   }, [build.items, guide.parts, stepIndex]);
   const refs = useRef<Array<THREE.Group | null>>([]);
+  const texts = useRef<Array<HTMLDivElement | null>>([]);
   useFrame(() => {
+    const busy = activeItemAt(build, xRef.current)?.partId;
     tags.forEach(({ it }, i) => {
       const g = refs.current[i];
+      const el = texts.current[i];
+      if (el) el.style.visibility = it.partId === busy ? 'hidden' : '';
       if (!g) return;
       const p = poseAt(build, it, xRef.current, explodeRef.current).pos;
       g.position.set(p.x, p.y + Math.max(it.size.y, it.size.x, 0.04) / 2 + 0.04, p.z);
@@ -769,7 +774,7 @@ function StepTags({ build, guide, xRef, explodeRef, stepIndex }: {
       {tags.map((t, i) => (
         <group key={t.it.key} ref={(g) => { refs.current[i] = g; }}>
           <Html zIndexRange={[10, 0]} center style={{ pointerEvents: 'none' }}>
-            <div className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
+            <div ref={(el) => { texts.current[i] = el; }} className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
           </Html>
         </group>
       ))}
