@@ -23,7 +23,7 @@ import { captureException } from '../_shared/sentry.ts';
 // loaded inside initRuntime() alongside the other lazy modules.
 import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
 import { runInBackground } from '../_shared/background.ts';
-import { shapeToolResult, turnProducedWork } from '../_shared/tool-result-shape.ts';
+import { shapeForModel, shapeToolResult, turnProducedWork } from '../_shared/tool-result-shape.ts';
 // Security invariant 9 — the approval gate is enforced, not requested (#352 A1).
 import { stripModelAuthoredApproval } from '../_shared/tools/approval-gate.ts';
 import { loadVocabulary } from '../_shared/vocabularies.ts';
@@ -612,7 +612,7 @@ function createAgentGraph(
 
         toolMessages.push({
           role: 'tool',
-          content: capToolResultForModel(toolCall.name, typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)),
+          content: toolResultForModel(toolCall.name, typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)),
           tool_call_id: toolCall.id,
           name: toolCall.name,
         });
@@ -1497,14 +1497,13 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
  * and toolResults contains all tool execution results
  * onChunk callback receives real-time progress updates
  */
-const MAX_TOOL_RESULT_CHARS = 24_000;
-
-/** Every tool result reaches the model through here; an oversized one is cut and SAYS so. */
-function capToolResultForModel(toolName: string, text: string): string {
-  if (text.length <= MAX_TOOL_RESULT_CHARS) return text;
-  console.warn(`[agent-chat] ${toolName} returned ${text.length} chars; cut to ${MAX_TOOL_RESULT_CHARS} for the model`);
-  return `${text.slice(0, MAX_TOOL_RESULT_CHARS)}…\n[Cut: the result was ${text.length} characters. `
-    + 'Do not present it as complete — narrow the request (a filter, fewer items, a shorter period) if you need the rest.]';
+/** Every tool result reaches the model through here, in the one shape all toolkits share. */
+function toolResultForModel(toolName: string, text: string): string {
+  const shaped = shapeForModel(text);
+  if (shaped.length < text.length * 0.5) {
+    console.log(`[agent-chat] ${toolName}: ${text.length} → ${shaped.length} chars for the model`);
+  }
+  return shaped;
 }
 
 /** Write the turn's reply if — and only if — the client did not. */

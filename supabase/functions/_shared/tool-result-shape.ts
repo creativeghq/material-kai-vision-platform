@@ -136,3 +136,74 @@ export const shownOf = (rows: readonly unknown[], total: number, noun: string, c
     message: total > shown ? `Showing the ${shown} most recent of ${total} ${noun}s.` : `${total} ${noun}${total === 1 ? '' : 's'}.`,
   };
 };
+
+/**
+ * The ONE shape every tool result takes on its way to the model, whichever of the 100+ toolkits
+ * produced it. Cards travel separately, so this changes what the model reads and nothing on screen.
+ * A tool that needs more than these limits summarises its own data; it does not raise them.
+ */
+export const MODEL_RESULT_LIMITS = { rows: 20, text: 1500, depth: 6, budget: 24_000 } as const;
+
+const NEVER_SHAPED = new Set([
+  'success', 'error', 'message', 'note', 'status', 'count', 'total', 'shown', 'next_step',
+  'guidance', 'truncated', '_untrusted', 'reporting_instruction', 'how_to_read_this',
+]);
+const SECRET_KEY = /^token$|(^|_)(secret|password|api_key|sign_token|access_token|refresh_token|auth_token)$/i;
+const BLOB = /^data:[\w.+-]+\/[\w.+-]+;base64,|^[A-Za-z0-9+/=\r\n]{2000,}$/;
+const FENCE = /^([\s\S]*?===== BEGIN UNTRUSTED [^\n]*=====\n)([\s\S]*?)(\n===== END UNTRUSTED [^\n]*=====)$/;
+
+/** Shorten text; an untrusted block is cut INSIDE its markers so it stays fenced (invariant 9). */
+function clipForModel(s: string, n: number): string {
+  if (s.length <= n) return s;
+  const fenced = FENCE.exec(s);
+  if (fenced) {
+    const room = Math.max(n - fenced[1].length - fenced[3].length, 200);
+    return `${fenced[1]}${fenced[2].slice(0, room)}\n[… cut at ${room} of ${fenced[2].length} characters …]${fenced[3]}`;
+  }
+  return `${s.slice(0, n)}… [cut: ${s.length} characters]`;
+}
+
+/** A list of short labels (toolkit ids, tags, names) is cheap and often a menu — it keeps far more than a list of records. */
+const rowLimit = (arr: readonly unknown[], lim: { rows: number }) =>
+  arr.every((x) => typeof x === 'string' && x.length <= 120) ? Math.max(lim.rows, 200) : lim.rows;
+
+function shapeValue(v: unknown, lim: { rows: number; text: number; depth: number }, depth: number): unknown {
+  if (typeof v === 'string') return BLOB.test(v) ? `[binary data, ${v.length} characters, omitted]` : clipForModel(v, lim.text);
+  if (v === null || typeof v !== 'object') return v;
+  if (depth >= lim.depth) return Array.isArray(v) ? `[list of ${v.length}, nested too deep]` : '[details nested too deep]';
+  if (Array.isArray(v) && v.length > 64 && v.every((x) => typeof x === 'number')) return `[vector of ${v.length} numbers omitted]`;
+  if (Array.isArray(v)) return v.slice(0, rowLimit(v, lim)).map((x) => shapeValue(x, lim, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (x === undefined || x === '') continue;
+    if (SECRET_KEY.test(k)) continue;
+    if (NEVER_SHAPED.has(k) && (typeof x !== 'object' || x === null)) { out[k] = x; continue; }
+    if (Array.isArray(x) && x.length > rowLimit(x, lim) && !x.every((y) => typeof y === 'number')) out[`${k}_omitted`] = x.length - rowLimit(x, lim);
+    out[k] = shapeValue(x, lim, depth + 1);
+  }
+  return out;
+}
+
+/**
+ * Shape a raw tool result for the model: lists cut to N with the rest COUNTED, long text clipped,
+ * binary/secret fields dropped, nesting bounded; tightened until it fits the budget.
+ */
+export function shapeForModel(raw: string): string {
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return clipForModel(raw, MODEL_RESULT_LIMITS.budget); }
+  if (Array.isArray(parsed)) parsed = { items: parsed };
+  const passes = [
+    { rows: MODEL_RESULT_LIMITS.rows, text: MODEL_RESULT_LIMITS.text, depth: MODEL_RESULT_LIMITS.depth },
+    { rows: 10, text: 600, depth: 5 },
+    { rows: 5, text: 250, depth: 4 },
+  ];
+  let text = '';
+  for (const lim of passes) {
+    text = JSON.stringify(shapeValue(parsed, lim, 0));
+    if (text.length <= MODEL_RESULT_LIMITS.budget) return text;
+  }
+  return JSON.stringify({
+    truncated: `This result was too large to read whole (${raw.length} characters). Narrow the request — a filter, fewer items, a shorter period.`,
+    partial: text.slice(0, MODEL_RESULT_LIMITS.budget - 400),
+  });
+}

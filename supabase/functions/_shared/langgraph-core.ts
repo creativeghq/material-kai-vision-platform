@@ -1,6 +1,7 @@
 /** LangGraph Core — shared graph utilities */
 
 import type { LogLevel } from './agents/types.ts';
+import { shapeForModel } from './tool-result-shape.ts';
 // Type-only — erased at compile time, so the lazy `npm:` imports below still do the actual
 // loading. Without it `BaseMessage` is only the runtime binding destructured inside the
 // function, and using it as a type is an error the edge typecheck gate reports.
@@ -215,7 +216,7 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
             resultStr = String(result);
           }
         }
-        toolMsgs.push(new ToolMessage({ tool_call_id: tc.id, content: resultStr }));
+        toolMsgs.push(new ToolMessage({ tool_call_id: tc.id, content: shapeForModel(resultStr) }));
         results.push({ tool: tc.name, args: tc.args, result });
         onLog?.('debug', `Tool ${tc.name} completed`);
       } catch (err: any) {

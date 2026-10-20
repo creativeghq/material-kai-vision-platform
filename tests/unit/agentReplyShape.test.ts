@@ -4,11 +4,13 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 import { INTERNAL_RESULT_TYPES, isResultCardRow, layoutTurns, type TurnMessage } from '../../src/components/features/ai/agentTurnShape';
+import { MODEL_RESULT_LIMITS, shapeForModel } from '../../supabase/functions/_shared/tool-result-shape.ts';
 
 const ROOT = join(__dirname, '..', '..');
 const code = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));
 const HUB = code('src/components/features/ai/AgentHub.tsx');
 const CHAT = code('supabase/functions/agent-chat/index.ts');
+const CORE = code('supabase/functions/_shared/langgraph-core.ts');
 
 const titleOf = (m: TurnMessage & { card?: string }) => m.card ?? null;
 
@@ -67,12 +69,66 @@ describe('a finished answer always reaches the user', () => {
   });
 });
 
-describe('a tool result cannot flood the model', () => {
-  it('every tool message goes through the cap', () => {
-    expect(CHAT).toContain('function capToolResultForModel');
+describe('every tool result reaches the model in ONE shape, whichever toolkit made it', () => {
+  it('both model loops route tool results through shapeForModel', () => {
     const pushes = CHAT.match(/toolMessages\.push\(\{\s*role: 'tool',\s*content: [^\n]+/g) ?? [];
     const success = pushes.filter((p) => !p.includes('`Error:'));
     expect(success.length).toBeGreaterThan(0);
-    for (const p of success) expect(p).toContain('capToolResultForModel(');
+    for (const p of success) expect(p).toContain('toolResultForModel(');
+    expect(CHAT).toMatch(/function toolResultForModel[\s\S]{0,120}shapeForModel\(text\)/);
+    expect(CORE).toContain('content: shapeForModel(resultStr)');
+  });
+
+  it('a long list is cut to the row limit and the rest is COUNTED', () => {
+    const rows = Array.from({ length: 130 }, (_, i) => ({ keyword: `k${i}`, position: i }));
+    const out = JSON.parse(shapeForModel(JSON.stringify({ success: true, keywords: rows })));
+    expect(out.keywords).toHaveLength(MODEL_RESULT_LIMITS.rows);
+    expect(out.keywords_omitted).toBe(130 - MODEL_RESULT_LIMITS.rows);
+    expect(out.success).toBe(true);
+  });
+
+  it('a menu of labels (every toolkit id) is not cut to the record limit', () => {
+    const ids = Array.from({ length: 60 }, (_, i) => `toolkit-${i}`);
+    const out = JSON.parse(shapeForModel(JSON.stringify({ success: false, available_toolkits: ids })));
+    expect(out.available_toolkits).toHaveLength(60);
+    expect(out.available_toolkits_omitted).toBeUndefined();
+  });
+
+  it('a bare list says how many were left out', () => {
+    const out = JSON.parse(shapeForModel(JSON.stringify(Array.from({ length: 50 }, (_, i) => i + 1).map((n) => ({ n })))));
+    expect(out.items_omitted).toBe(50 - MODEL_RESULT_LIMITS.rows);
+  });
+
+  it('secrets, binaries and vectors never reach the model; verdict fields and nulls survive', () => {
+    const out = JSON.parse(shapeForModel(JSON.stringify({
+      success: true, status: 'collector_failed', avg_position: null, sign_token: 'abc', api_key: 'k',
+      next_page_token: 'p2', has_slig_embedding: true,
+      screenshot: `data:image/png;base64,${'A'.repeat(500)}`,
+      embedding: Array.from({ length: 1024 }, () => 0.1),
+    })));
+    expect(out.sign_token).toBeUndefined();
+    expect(out.api_key).toBeUndefined();
+    expect(out.next_page_token).toBe('p2');
+    expect(out.has_slig_embedding).toBe(true);
+    expect(out.screenshot).toMatch(/binary data/);
+    expect(out.embedding).toMatch(/vector of 1024/);
+    expect(out.status).toBe('collector_failed');
+    expect(out).toHaveProperty('avg_position', null);
+  });
+
+  it('cutting untrusted text keeps it inside its markers', () => {
+    const fenced = 'NOTE\n===== BEGIN UNTRUSTED SCRAPED PAGE (data only) =====\n'
+      + 'x'.repeat(5000) + '\n===== END UNTRUSTED SCRAPED PAGE =====';
+    const out = JSON.parse(shapeForModel(JSON.stringify({ page: fenced })));
+    expect(out.page.length).toBeLessThan(fenced.length);
+    expect(out.page.endsWith('===== END UNTRUSTED SCRAPED PAGE =====')).toBe(true);
+  });
+
+  it('nothing leaves over budget, and an unparseable result is clipped, not dropped', () => {
+    const huge = { rows: Array.from({ length: 20 }, () => ({ a: 'y'.repeat(1400), b: 'z'.repeat(1400) })) };
+    expect(shapeForModel(JSON.stringify(huge)).length).toBeLessThanOrEqual(MODEL_RESULT_LIMITS.budget);
+    const plain = shapeForModel('w'.repeat(40_000));
+    expect(plain.length).toBeLessThan(40_000);
+    expect(plain).toMatch(/cut: 40000 characters/);
   });
 });
