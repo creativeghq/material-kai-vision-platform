@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { HubEmptyState } from '@/components/core/hub';
+import { HubEmptyState, HubTabNav } from '@/components/core/hub';
+import { IncomeExpenseBook } from '@/modules/finance/components/IncomeExpenseBook';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
@@ -96,6 +97,8 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
   const [sync, setSync] = useState<BookSyncState | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [view, setView] = useState<'summary' | 'documents'>('summary');
+  const [reloadToken, setReloadToken] = useState(0);
 
   const range = period === 'custom' ? { from: customFrom, to: customTo } : rangeForPeriod(period);
 
@@ -143,6 +146,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
         toast({ title: 'Book refreshed from AADE' });
       }
       await load();
+      setReloadToken((n) => n + 1);
     } catch (err) {
       toast({ title: 'Refresh failed', description: (err as Error)?.message, variant: 'destructive' });
     } finally {
@@ -284,6 +288,27 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
         </CardContent>
       </Card>
 
+      <HubTabNav
+        aria-label="Book view"
+        activeId={view}
+        onSelect={(id) => setView(id as 'summary' | 'documents')}
+        items={[
+          { id: 'summary', label: 'Monthly summary' },
+          { id: 'documents', label: 'Income–expense book' },
+        ]}
+      />
+
+      {view === 'documents' ? (
+        <IncomeExpenseBook
+          workspaceId={workspaceId}
+          from={range.from}
+          to={range.to}
+          reloadToken={reloadToken}
+          onRefresh={() => void refresh()}
+          refreshing={refreshing}
+        />
+      ) : (
+      <>
       {/* Freshness. Stale-but-real figures stay on screen and say they are stale — blanking
           them would lose the last thing AADE actually told us. The date itself rides in the
           book's own subtitle; this band exists only when something actually went wrong, so a
@@ -483,6 +508,8 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
           </CardContent>
         )}
       </Card>
+      </>
+      )}
     </div>
   );
 };
