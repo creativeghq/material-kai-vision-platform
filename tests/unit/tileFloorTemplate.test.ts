@@ -140,3 +140,12 @@ describe('tile floor scene state', () => {
     expect(progressCounts(p, sceneStateAt(p, i, 1)).spacersPlaced).toBe(p.quantities.spacers);
   });
 });
+
+describe('tile floor rotation', () => {
+  it('orders the same tiles for a room turned a quarter as for the layout turned a quarter', () => {
+    const a = plan({ areaWidthM: 3.37, areaDepthM: 2.11, tileLengthMm: 600, tileWidthMm: 300, anchor: 'corner' });
+    const b = plan({ areaWidthM: 2.11, areaDepthM: 3.37, tileLengthMm: 600, tileWidthMm: 300, anchor: 'corner', rotationDeg: 90 });
+    expect(b.quantities.pieces).toBe(a.quantities.pieces);
+    expect(b.quantities.tilesFromLayout).toBe(a.quantities.tilesFromLayout);
+  });
+});

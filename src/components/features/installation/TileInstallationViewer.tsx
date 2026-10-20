@@ -76,7 +76,11 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors, tileImag
   const steps = plan.steps;
   const [inRoom, setInRoom] = useState(!!photo);
   const occluder = useOccluderMask(inRoom ? photo?.maskUrl : null);
-  useEffect(() => { setInRoom(!!photo); }, [photo]);
+  const hadPhoto = useRef(!!photo);
+  useEffect(() => {
+    if (!!photo !== hadPhoto.current) setInRoom(!!photo);
+    hadPhoto.current = !!photo;
+  }, [photo]);
   const [stepKey, setStepKey] = useState<TileStepKey>(steps[0]?.key ?? 'prepare');
   const [progress, setProgress] = useState(1);
   const [playing, setPlaying] = useState(false);

@@ -421,7 +421,9 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
     .filter((pc) => !pc.cut && (Math.abs(pc.cz - centreZ) <= Wd || Math.abs(pc.cx - centreX) <= Wd))
     .map((pc) => pc.index);
 
-  const tilesFromLayout = full.length + (axisAligned ? tilesForCuts(cuts.map((x) => x.visible!), L, Wd) : cuts.length);
+  const quarterTurned = (((params.rotationDeg % 180) + 180) % 180) === 90;
+  const alongLength = (c: { lx: number; lz: number }) => (quarterTurned ? { lx: c.lz, lz: c.lx } : c);
+  const tilesFromLayout = full.length + (axisAligned ? tilesForCuts(cuts.map((x) => alongLength(x.visible!)), L, Wd) : cuts.length);
   const areaM2 = params.areaWidthM * params.areaDepthM;
   const tileAreaM2 = (tl * tw) / 1e6;
   const quantities: TileQuantities = {

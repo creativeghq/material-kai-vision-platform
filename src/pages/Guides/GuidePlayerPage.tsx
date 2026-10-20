@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/c
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { GuideScene, type GuideView } from '@/components/features/guides/GuideScene';
 import { GuideBook } from '@/components/features/guides/GuideBook';
+import { usePageAspects } from '@/components/features/guides/usePageAspects';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { buildGuide, countsAt, partCountAt, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
@@ -123,6 +124,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
   toast: ReturnType<typeof useToast>['toast'];
 }) {
   const build = useMemo(() => buildGuide(guide), [guide]);
+  const pageAspects = usePageAspects(pageUrls, row.page_aspect);
   const K = build.steps;
   const xRef = useRef(0);
   const explodeRef = useRef(0);
@@ -150,8 +152,8 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
   const setCinematic = useCallback((on: boolean) => {
     cineRef.current = on;
     setCine(on);
-    if (on) phase.current = { name: xRef.current >= K - 1e-6 ? 'run' : 'run', wait: performance.now() / 1000 + 0.2 };
-  }, [K]);
+    if (on) phase.current = { name: 'run', wait: performance.now() / 1000 + 0.2 };
+  }, []);
   const halt = useCallback(() => { if (cineRef.current) setCinematic(false); }, [setCinematic]);
 
   const animateTo = useCallback((target: number) => {
@@ -377,7 +379,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
               <BookOpen className="h-3.5 w-3.5" />Open the manual
             </Button>
           </div>
-          <ManualCrop url={pageUrl} step={current} aspect={row.page_aspect} onOpen={() => setBookOpen(true)} />
+          <ManualCrop url={pageUrl} step={current} aspect={current ? pageAspects[current.page - 1] ?? row.page_aspect : row.page_aspect} onOpen={() => setBookOpen(true)} />
         </div>
       </aside>
 
@@ -462,6 +464,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
         meta={metaLine}
         pageUrls={pageUrls}
         pageAspect={row.page_aspect}
+        pageAspects={pageAspects}
         steps={guide.steps}
         currentStep={step}
         sourceUrl={sourceUrl}

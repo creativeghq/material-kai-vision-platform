@@ -119,3 +119,17 @@ describe('installation guide build', () => {
     expect(flat.items.every((it) => !it.placed)).toBe(true);
   });
 });
+
+describe('installation guide counts above the render cap', () => {
+  it('counts every screw the manual lists, not just the ones drawn', () => {
+    const many = sanitizeGuide({
+      ...raw,
+      parts: [...raw.parts.filter((p) => p.id !== 'DOWEL'), { id: 'DOWEL', name: 'Wooden dowel', code: '101351', quantity: 120, kind: 'hardware', size_cm: { x: 0.8, y: 3, z: 0.8 }, size_stated: false }],
+      steps: raw.steps.map((s, i) => (i === 1 ? { ...s, parts_used: [{ part_id: 'DOWEL', quantity: 120, fixes_to: 'TOP' }] } : s)),
+    }, 12);
+    const b = buildGuide(many);
+    expect(b.items.filter((it) => it.partId === 'DOWEL').length).toBeLessThan(120);
+    expect(countsAt(b, b.steps).hardware).toBe(120);
+    expect(b.hardwareTotal).toBe(120);
+  });
+});

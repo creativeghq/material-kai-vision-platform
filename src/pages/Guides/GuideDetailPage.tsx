@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { PART_KINDS, type InstallationGuideData, type PageBox, type PartKind } from '@/lib/installation/guideSchema';
 import { installationGuideService, type InstallationGuideRow } from '@/services/installationGuideService';
 import { GUIDE_STATUS } from './GuidesPage';
+import { usePageAspects } from '@/components/features/guides/usePageAspects';
 
 function PageBoxEditor({ url, aspect, box, onChange }: { url: string | null; aspect: number; box: PageBox; onChange: (b: PageBox) => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -64,6 +65,7 @@ function PageBoxEditor({ url, aspect, box, onChange }: { url: string | null; asp
 
 function StepsEditor({ row, guide, pageUrls, onChange }: { row: InstallationGuideRow; guide: InstallationGuideData; pageUrls: string[]; onChange: (g: InstallationGuideData) => void }) {
   const [selected, setSelected] = useState(0);
+  const aspects = usePageAspects(pageUrls, row.page_aspect);
   const step = guide.steps[Math.min(selected, guide.steps.length - 1)];
   const patch = (p: Partial<typeof step>) => onChange({ ...guide, steps: guide.steps.map((s, i) => (i === selected ? { ...s, ...p } : s)) });
   if (!step) return null;
@@ -121,7 +123,7 @@ function StepsEditor({ row, guide, pageUrls, onChange }: { row: InstallationGuid
               )}
             </div>
           </div>
-          <PageBoxEditor url={pageUrls[step.page - 1] ?? null} aspect={row.page_aspect} box={step.box} onChange={(b) => patch({ box: b })} />
+          <PageBoxEditor url={pageUrls[step.page - 1] ?? null} aspect={aspects[step.page - 1] ?? row.page_aspect} box={step.box} onChange={(b) => patch({ box: b })} />
         </CardContent>
       </Card>
     </div>
@@ -173,6 +175,7 @@ export default function GuideDetailPage() {
   const [tab, setTab] = useState('steps');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmReread, setConfirmReread] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -247,6 +250,7 @@ export default function GuideDetailPage() {
   if (!row) return <div className="flex min-h-screen items-center justify-center bg-background"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   const status = GUIDE_STATUS[row.status];
+  const stale = row.status === 'extracting' && Date.now() - new Date(row.updated_at).getTime() > 10 * 60 * 1000;
   const g = draft;
   const left = (
     <Card>
@@ -272,8 +276,10 @@ export default function GuideDetailPage() {
           {g && (
             <Button asChild className="gap-1.5"><Link to={`/guides/${row.id}/play`}><Play className="h-4 w-4" />Open the guide</Link></Button>
           )}
-          {row.status !== 'extracting' && row.page_count > 0 && (
-            <Button variant="outline" className="gap-1.5" onClick={reread}><RotateCcw className="h-4 w-4" />Read the manual again</Button>
+          {(row.status !== 'extracting' || stale) && row.page_count > 0 && (
+            <Button variant="outline" className="gap-1.5" onClick={() => (g && !stale ? setConfirmReread(true) : reread())}>
+              <RotateCcw className="h-4 w-4" />Read the manual again
+            </Button>
           )}
           <Button variant="ghost" className="gap-1.5 text-destructive" onClick={() => setConfirmDelete(true)}><Trash2 className="h-4 w-4" />Delete</Button>
         </div>
@@ -287,7 +293,9 @@ export default function GuideDetailPage() {
       <Card>
         <CardContent className="flex items-center gap-3 p-6 text-sm">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          Reading {row.page_count} pages — the parts, part numbers and every step. This usually takes one to three minutes; the page updates by itself.
+          {stale
+            ? 'This read stopped without finishing. Read the manual again to retry.'
+            : `Reading ${row.page_count} pages — the parts, part numbers and every step. This usually takes one to three minutes; the page updates by itself.`}
         </CardContent>
       </Card>
     );
@@ -344,6 +352,19 @@ export default function GuideDetailPage() {
       ) : undefined}
       left={left}
       overlays={(
+        <>
+        <AlertDialog open={confirmReread} onOpenChange={setConfirmReread}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Read the manual again?</AlertDialogTitle>
+              <AlertDialogDescription>The steps and parts are read from the pages again and replace the current guide, including any edits made here. It is charged per page.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={reread}>Read it again</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -356,6 +377,7 @@ export default function GuideDetailPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </>
       )}
     >
       {body}

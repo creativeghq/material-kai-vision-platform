@@ -5,17 +5,17 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
-import { debitOrRefuse } from '../_shared/credit-utils.ts';
+import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { captureException } from '../_shared/sentry.ts';
 import { GUIDE_OUTPUT_SCHEMA, sanitizeGuide } from '../_shared/installationGuideSchema.generated.ts';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const BUCKET = 'pdf-documents';
 const MODEL = 'claude-sonnet-5';
 const MAX_PAGES = 60;
 const MAX_PAGE_BYTES = 1_500_000;
+const STALE_READ_MS = 10 * 60 * 1000;
+const CLAIMABLE = ['draft', 'failed', 'review', 'published'];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,15 +41,34 @@ const pagePath = (workspaceId: string, guideId: string, page: number) =>
 
 type Admin = DbClient;
 
+interface Charge { credits: number; transactionId: string | null }
+
 async function readManual(
   admin: Admin,
   guide: { id: string; workspace_id: string; page_count: number; title: string },
   uid: string,
+  charge: Charge,
 ): Promise<void> {
   const fail = async (message: string) => {
-    await admin.from('installation_guides')
+    const { error } = await admin.from('installation_guides')
       .update({ status: 'failed', error: message.slice(0, 500) })
       .eq('id', guide.id);
+    if (error) console.error('[installation-guide-extract] could not mark failed:', error.message);
+    if (charge.credits > 0) {
+      const { error: refundError } = await admin.rpc('refund_credits', {
+        p_user_id: uid,
+        p_amount: charge.credits,
+        p_operation_type: 'catalog_installation_guide_refund',
+        p_description: `Installation guide read failed: ${message.slice(0, 120)}`,
+        p_metadata: { guide_id: guide.id, refunds_transaction_id: charge.transactionId },
+        p_workspace_id: guide.workspace_id,
+      });
+      if (refundError) {
+        void captureException(new Error(`Refund failed for guide ${guide.id}: ${refundError.message}`), {
+          tags: { function: 'installation-guide-extract' },
+        });
+      }
+    }
   };
   try {
     const content: Array<Record<string, unknown>> = [];
@@ -91,9 +110,10 @@ async function readManual(
     const guideData = sanitizeGuide(parsed, guide.page_count);
     if (guideData.steps.length === 0) return await fail('No assembly steps were found in this manual.');
 
-    await admin.from('installation_guides')
+    const { error: saveError } = await admin.from('installation_guides')
       .update({ status: 'review', guide: guideData, error: null, extracted_at: new Date().toISOString() })
       .eq('id', guide.id);
+    if (saveError) return await fail(`The guide could not be saved: ${saveError.message}`);
   } catch (err) {
     void captureException(err instanceof Error ? err : new Error(String(err)), { tags: { function: 'installation-guide-extract' }, extra: { guide_id: guide.id } });
     await fail(err instanceof Error ? err.message : 'Reading the manual failed.');
@@ -109,14 +129,14 @@ Deno.serve(withApiLogging('installation-guide-extract', async (req: Request) => 
   if (!auth.success || !auth.userId) throw new HttpError(401, auth.error || 'Invalid session');
   const uid = auth.userId;
   const keyWs = auth.apiKey?.workspace_id;
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
   const { guide_id } = (await req.json().catch(() => ({}))) as { guide_id?: string };
   if (!guide_id) throw new HttpError(400, 'guide_id required');
 
   const { data: guide } = await admin
     .from('installation_guides')
-    .select('id, workspace_id, page_count, title, status')
+    .select('id, workspace_id, page_count, title, status, updated_at')
     .eq('id', guide_id)
     .maybeSingle();
   if (
@@ -133,25 +153,32 @@ Deno.serve(withApiLogging('installation-guide-extract', async (req: Request) => 
     throw new HttpError(409, 'Upload the manual pages before reading it.');
   }
 
-  const previous = guide.status as string;
+  const previous = guide.status === 'extracting' ? 'failed' : (guide.status as string);
+  const staleBefore = new Date(Date.now() - STALE_READ_MS).toISOString();
   const { data: claimed } = await admin
     .from('installation_guides')
     .update({ status: 'extracting', error: null })
     .eq('id', guide.id)
-    .in('status', ['draft', 'failed', 'review'])
+    .or(`status.in.(${CLAIMABLE.join(',')}),and(status.eq.extracting,updated_at.lt.${staleBefore})`)
     .select('id');
   if (!claimed || claimed.length !== 1) throw new HttpError(409, 'This manual is already being read.');
 
-  const refusal = await debitOrRefuse(
-    admin, uid, 'installation-guide-extract', 'read_manual', guide.page_count,
+  const debit = await debitExternalServiceCredits(
+    admin, uid, 'installation-guide-extract', 'catalog_installation_guide', guide.page_count,
     { guide_id: guide.id, pages: guide.page_count }, guide.workspace_id,
   );
-  if (refusal) {
-    await admin.from('installation_guides').update({ status: previous }).eq('id', guide.id);
-    return new Response(refusal, { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  if (!debit.success) {
+    const { error: revertError } = await admin.from('installation_guides').update({ status: previous }).eq('id', guide.id);
+    if (revertError) console.error('[installation-guide-extract] could not release the claim:', revertError.message);
+    return json({
+      success: false,
+      error: debit.error ?? 'Insufficient credits',
+      credits_required: debit.credits_debited,
+      service: 'installation-guide-extract',
+    }, 402);
   }
 
-  const work = readManual(admin, guide, uid);
+  const work = readManual(admin, guide, uid, { credits: debit.credits_debited, transactionId: debit.transaction_id ?? null });
   const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
   if (runtime?.waitUntil) runtime.waitUntil(work);
   else await work;

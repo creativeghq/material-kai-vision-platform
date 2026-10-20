@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { cn } from '@/lib/utils';
 import type { GuideStep } from '@/lib/installation/guideSchema';
+import { containedRect } from './usePageAspects';
 
 interface Props {
   open: boolean;
@@ -11,6 +12,7 @@ interface Props {
   meta: string;
   pageUrls: string[];
   pageAspect: number;
+  pageAspects: number[];
   steps: GuideStep[];
   currentStep: number;
   sourceUrl: string | null;
@@ -66,7 +68,7 @@ function buildLeaf(leaf: HTMLDivElement, forward: boolean, front: string | null,
 }
 
 export const GuideBook: React.FC<Props> = ({
-  open, title, meta, pageUrls, pageAspect, steps, currentStep, sourceUrl, footer, onClose, onPlayStep,
+  open, title, meta, pageUrls, pageAspect, pageAspects, steps, currentStep, sourceUrl, footer, onClose, onPlayStep,
 }) => {
   const pages = pageUrls.length;
   const spreads = Math.floor(pages / 2) + 1;
@@ -234,6 +236,7 @@ export const GuideBook: React.FC<Props> = ({
           <div ref={leafRef} className="pointer-events-none absolute left-0 top-0 hidden h-full w-0" style={{ transformStyle: 'preserve-3d' }} />
           {hotspots.map(({ s, i }) => {
             const offset = s.page === left ? 0 : size.pw;
+            const r = containedRect(size.pw, size.ph, pageAspects[s.page - 1] ?? pageAspect);
             const on = i === currentStep;
             return (
               <button
@@ -243,10 +246,10 @@ export const GuideBook: React.FC<Props> = ({
                 title={i ? `Build step ${i}` : 'The kit'}
                 className={cn('group absolute rounded-md transition-colors', on ? 'bg-amber-400/20' : 'hover:bg-amber-400/15')}
                 style={{
-                  left: offset + s.box.x0 * size.pw,
-                  top: s.box.y0 * size.ph,
-                  width: (s.box.x1 - s.box.x0) * size.pw,
-                  height: (s.box.y1 - s.box.y0) * size.ph,
+                  left: offset + r.x + s.box.x0 * r.w,
+                  top: r.y + s.box.y0 * r.h,
+                  width: (s.box.x1 - s.box.x0) * r.w,
+                  height: (s.box.y1 - s.box.y0) * r.h,
                   mixBlendMode: 'multiply',
                 }}
               >

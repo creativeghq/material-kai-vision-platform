@@ -19,6 +19,7 @@ export interface BuildItem {
   target: BuildPose;
   spin: boolean;
   placed: boolean;
+  weight: number;
   explode: Vec3;
 }
 
@@ -189,7 +190,7 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
       items.push({
         key: `${p.id}#${k}`, partId: p.id, partIndex: i, instance: k, kind: 'panel', step, t0: 0, ta: 0,
         size, kit: { pos: add(kitPos, v(0, foot.h / 2, 0)), rot: flatRot(size) }, target, spin: false,
-        placed: !!pl, explode: v(0, 0, 0),
+        placed: !!pl, explode: v(0, 0, 0), weight: 1,
       });
     }
   }
@@ -239,7 +240,7 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
         items.push({
           key: `${p.id}#${unit}`, partId: p.id, partIndex: i, instance: unit, kind: 'hardware', step: use.step,
           t0: 0, ta: 0, size: dims, kit: { pos: kitPos, rot: v(0, 0, Math.PI / 2) }, target,
-          spin: /screw|cam|bolt|lock/i.test(p.name), placed: hasAssembly && hosts.length > 0, explode: v(0, 0, 0),
+          spin: /screw|cam|bolt|lock/i.test(p.name), placed: hasAssembly && hosts.length > 0, explode: v(0, 0, 0), weight: 1,
         });
       }
     }
@@ -250,9 +251,12 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
       items.push({
         key: `${p.id}#${unit}`, partId: p.id, partIndex: i, instance: unit, kind: 'hardware', step: stepCount + 1,
         t0: Infinity, ta: Infinity, size: dims, kit: { pos: kitPos, rot: v(0, 0, Math.PI / 2) },
-        target: { pos: kitPos, rot: v(0, 0, Math.PI / 2) }, spin: false, placed: false, explode: v(0, 0, 0),
+        target: { pos: kitPos, rot: v(0, 0, Math.PI / 2) }, spin: false, placed: false, explode: v(0, 0, 0), weight: 0,
       });
     }
+    const used = uses.reduce((n, u) => n + u.quantity, 0);
+    const rendered = items.filter((it) => it.partId === p.id && it.weight > 0);
+    for (const it of rendered) it.weight = used / rendered.length;
   });
 
   for (let s = 1; s <= stepCount; s++) {
@@ -289,7 +293,7 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
     items,
     cards,
     steps: stepCount,
-    hardwareTotal: items.filter((it) => it.kind === 'hardware' && Number.isFinite(it.ta)).length,
+    hardwareTotal: Math.round(items.filter((it) => it.kind === 'hardware').reduce((n, it) => n + it.weight, 0)),
     panelTotal: items.filter((it) => it.kind === 'panel').length,
     hasAssembly,
     product,
@@ -308,14 +312,14 @@ export function countsAt(build: GuideBuild, x: number): { hardware: number; pane
   let panels = 0;
   for (const it of build.items) {
     if (x < it.ta - 1e-6) continue;
-    if (it.kind === 'hardware') hardware++;
+    if (it.kind === 'hardware') hardware += it.weight;
     else panels++;
   }
-  return { hardware, panels };
+  return { hardware: Math.round(hardware), panels };
 }
 
 export function partCountAt(build: GuideBuild, partId: string, x: number): number {
-  return build.items.filter((it) => it.partId === partId && x >= it.ta - 1e-6).length;
+  return Math.round(build.items.filter((it) => it.partId === partId && x >= it.ta - 1e-6).reduce((n, it) => n + it.weight, 0));
 }
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
