@@ -266,7 +266,8 @@ Deno.serve(withApiLogging((req) => {
     try {
       // From the DB, with no fallback — a hardcoded prompt here would make an admin's edit save
       // and change nothing, forever, while every health signal stayed green.
-      systemPrompt = `${await loadPrompt(supabase, 'embed', 'embed_assistant_answer')}\n\n${await getSharedReplyStyle(supabase)}`;
+      const basePrompt = await loadPrompt(supabase, 'embed', 'embed_assistant_answer');
+      systemPrompt = [basePrompt, await getSharedReplyStyle(supabase)].filter(Boolean).join('\n\n');
     } catch (e) {
       console.error('[embed-agent] prompt unavailable', e instanceof Error ? e.message : e);
       return embedJson({ ok: true, available: false, reason: 'not_configured' }, 200, cors);
