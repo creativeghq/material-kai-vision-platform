@@ -203,6 +203,9 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
     ? (sync.source_errors.unknown_subtypes as string[])
     : [];
   const hasUnknownSubtypes = unknownSubtypes.length > 0;
+  const bookDocErrors = sync?.source_errors?.book_documents && typeof sync.source_errors.book_documents === 'object'
+    ? Object.values(sync.source_errors.book_documents as Record<string, unknown>).map(String)
+    : [];
 
   const exportCsv = () => {
     const head = ['month', 'direction', ...MONEY_COLUMNS.map((c) => String(c.key)), 'doc_count', 'balance', 'status'];
@@ -306,6 +309,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
           reloadToken={reloadToken}
           onRefresh={() => void refresh()}
           refreshing={refreshing}
+          updateErrors={bookDocErrors}
         />
       ) : (
       <>
@@ -313,7 +317,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
           them would lose the last thing AADE actually told us. The date itself rides in the
           book's own subtitle; this band exists only when something actually went wrong, so a
           healthy mirror costs no vertical space at all. */}
-      {sync && (sync.last_status === 'collector_failed' || hasUnknownSubtypes) && (
+      {sync && (sync.last_status === 'collector_failed' || hasUnknownSubtypes || bookDocErrors.length > 0) && (
         <Card>
           <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1 p-3 text-xs">
             {sync.last_status === 'collector_failed' && (
@@ -328,6 +332,12 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
               <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 Unrecognised AADE document type(s): {unknownSubtypes.join(', ')} — counted at face value
+              </span>
+            )}
+            {bookDocErrors.length > 0 && (
+              <span className="flex items-center gap-1 text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                The income–expense book was not updated on the last refresh: {bookDocErrors.join('; ')}
               </span>
             )}
           </CardContent>

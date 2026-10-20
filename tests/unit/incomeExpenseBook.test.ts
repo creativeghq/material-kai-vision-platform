@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { blankComments } from '../helpers/stripComments';
 import {
   bookAmount,
+  bookLines,
   buildBookPrintHtml,
-  buildBookSpreadsheetXml,
+  buildBookXlsx,
 } from '../../src/modules/finance/utils/incomeExpenseBookExport';
 import type { IncomeExpenseBook } from '../../src/modules/finance/services/incomeExpenseBookService';
 
@@ -70,19 +71,35 @@ describe('income/expense book exports', () => {
     expect(html).toContain('A &amp; B &lt;script&gt;');
   });
 
-  it('escapes a party name in the spreadsheet', () => {
-    const xml = buildBookSpreadsheetXml(BOOK, ['income', 'expense']);
-    expect(xml).not.toContain('<script>');
-    expect(xml).toContain('A &amp; B &lt;script&gt;');
-    expect(xml).toContain('<Data ss:Type="Number">12385</Data>');
+  it('writes a real .xlsx: a zip whose sheets escape a party name and hold numbers as numbers', () => {
+    const bytes = buildBookXlsx(BOOK, ['income', 'expense']);
+    expect([...bytes.slice(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    expect(view.getUint32(bytes.length - 22, true)).toBe(0x06054b50);
+    expect(view.getUint16(bytes.length - 22 + 10, true)).toBe(7);
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain('[Content_Types].xml');
+    expect(text).not.toContain('<script>');
+    expect(text).toContain('A &amp; B &lt;script&gt;');
+    expect(text).toContain('<v>12385</v>');
   });
 
   it('prints the period total the RPC derived, never a re-sum of the rows', () => {
     const html = buildBookPrintHtml(BOOK, ['expense']);
     expect(html).toContain('999,99');
     expect(html).toContain('777,77');
-    const xml = buildBookSpreadsheetXml(BOOK, ['expense']);
-    expect(xml).toContain('<Data ss:Type="Number">888.88</Data>');
+    const text = new TextDecoder().decode(buildBookXlsx(BOOK, ['expense']));
+    expect(text).toContain('<v>888.88</v>');
+  });
+
+  it('screen, PDF and Excel walk one line sequence: brought forward only before a month with rows', () => {
+    const side = {
+      ...BOOK.expense,
+      months: [BOOK.expense.months[0], { ...BOOK.expense.months[0], month: '2026-02-01', rows: [] },
+        { ...BOOK.expense.months[0], month: '2026-03-01' }],
+    };
+    expect(bookLines(side).map((l) => l.kind)).toEqual(['doc', 'month', 'month', 'carry', 'doc', 'month', 'grand']);
+    expect(code('src/modules/finance/components/IncomeExpenseBook.tsx')).toMatch(/bookLines\(side\)/);
   });
 
   it('never writes markup into a live document', () => {

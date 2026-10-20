@@ -236,7 +236,7 @@ function issuedDocFromInvoice(b: string): Record<string, unknown> | null {
   if (!mark || !issueDate) return null;
   const counterpart = pickTag(b, 'counterpart') ?? '';
   const summary = pickTag(b, 'invoiceSummary') ?? b;
-  const classes = pickAllTagBlocks(b, 'incomeClassification').map((c) => ({
+  const classes = pickAllTagBlocks(summary, 'incomeClassification').map((c) => ({
     category: pickTag(c, 'classificationCategory'),
     type: pickTag(c, 'classificationType'),
     amount: num(pickTag(c, 'amount')),
