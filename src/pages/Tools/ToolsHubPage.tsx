@@ -16,6 +16,7 @@ import {
   Columns3,
   CookingPot,
   FileSearch,
+  Grid3x3,
   Flame,
   MessageSquareText,
   ScanSearch,
@@ -75,6 +76,14 @@ const TOOLS: ToolEntry[] = [
     description:
       'Configure a kitchen — run length, cabinet finish, worktop, drawers and mechanisms — and watch the price update as you go.',
     icon: CookingPot,
+    badge: 'Free · instant',
+  },
+  {
+    slug: 'tile-installation',
+    title: 'Tile installation guide',
+    description:
+      'Enter a room and a tile and watch the floor go down step by step in 3D, with the tiles, spacers, adhesive and grout it needs.',
+    icon: Grid3x3,
     badge: 'Free · instant',
   },
   {

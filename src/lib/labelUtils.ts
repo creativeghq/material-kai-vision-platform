@@ -21,18 +21,13 @@ export function formatLabel(key: string): string {
   if (!key) return '';
 
   return key
-    // Split camelCase: "materialType" → "material Type"
     .replace(/([a-z])([A-Z])/g, '$1 $2')
-    // Replace underscores/hyphens/dots with spaces
     .replace(/[_\-\.]+/g, ' ')
-    // Trim and split into words
     .trim()
     .split(/\s+/)
     .map((word) => {
       const lower = word.toLowerCase();
-      // Acronyms get fully uppercased
       if (ACRONYMS.has(lower)) return lower.toUpperCase();
-      // Everything else gets Title Case
       return lower.charAt(0).toUpperCase() + lower.slice(1);
     })
     .join(' ');

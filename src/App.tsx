@@ -139,6 +139,7 @@ const ProjectPlanPage = lazy(() => import('./pages/Tools/ProjectPlanPage'));
 const HeatPumpToolPage = lazy(() => import('./pages/Tools/HeatPumpToolPage'));
 const HeatingCostPage = lazy(() => import('./pages/Tools/HeatingCostPage'));
 const KitchenCostPage = lazy(() => import('./pages/Tools/KitchenCostPage'));
+const TileInstallationPage = lazy(() => import('./pages/Tools/TileInstallationPage'));
 const PublicQuotePage = lazy(() => import('./pages/PublicQuotePage'));
 const PublicClientViewPage = lazy(() => import('./pages/PublicClientViewPage'));
 const EmbedPlannerPage = lazy(() => import('./pages/EmbedPlannerPage'));
@@ -234,6 +235,7 @@ const App = () => (
                 <Route path="/tools/heat-pump" element={<PageErrorBoundary name="Heat Pump Sizer"><HeatPumpToolPage /></PageErrorBoundary>} />
                 <Route path="/tools/heating-cost" element={<PageErrorBoundary name="Heating Cost Comparison"><HeatingCostPage /></PageErrorBoundary>} />
                 <Route path="/tools/kitchen-cost" element={<PageErrorBoundary name="Kitchen Cost Calculator"><KitchenCostPage /></PageErrorBoundary>} />
+                <Route path="/tools/tile-installation" element={<PageErrorBoundary name="Tile Installation Guide"><TileInstallationPage /></PageErrorBoundary>} />
                 {/* Public changelog — deliberately outside AuthGuard: a changelog you must log in to
                     read is useless to the two audiences that need it (prospects and API consumers).
                     Only published rows are reachable; the RLS policy enforces that for anon too. */}

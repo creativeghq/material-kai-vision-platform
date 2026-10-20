@@ -4,6 +4,7 @@ export const ROUTES = [
   '/auth',
   '/tools', '/tools/price-scan', '/tools/mention-scan',
   '/tools/project-plan', '/tools/heat-pump', '/tools/heating-cost',
+  '/tools/tile-installation',
   '/knowledge-base', '/brands',
   // Core authed
   '/', '/profile', '/moodboard', '/agent-hub', '/compare', '/recognition',

@@ -69,11 +69,13 @@ export function useToolsQuota(accessToken: string | null, scanType?: string) {
 export function ToolsShell({
   headerRight,
   backTo = '/tools',
+  wide = false,
   children,
 }: {
   headerRight?: ReactNode;
   /** Where the back arrow points. Defaults to the tools hub. */
   backTo?: string;
+  wide?: boolean;
   children: ReactNode;
 }) {
   const { user, signOut } = useAuth();
@@ -123,7 +125,7 @@ export function ToolsShell({
           </div>
         </div>
       </header>
-      <main className="container mx-auto max-w-4xl px-4 py-10">{children}</main>
+      <main className={`container mx-auto px-4 py-10 ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>{children}</main>
     </div>
   );
 }
