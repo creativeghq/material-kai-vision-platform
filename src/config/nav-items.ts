@@ -166,6 +166,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // MoodBoards and Room Planner (no module, no extra capability): `blueprints` is workspace-scoped
   // by RLS and the editor draws the workspace's own catalogue.
   { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', hub: 'projects', description: 'Reusable room and scope templates that price a project in one click.' },
+  { id: 'installation-guides', label: 'Installation Guides', path: '/guides', icon: BookOpen, moduleSlug: 'installation-guides', surface: 'app', hub: 'projects', description: 'Upload a supplier manual and watch it put together, step by step, in 3D.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
   // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
@@ -377,6 +378,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'room-planner',
   'surface-visualizer',
   'blueprints',
+  'installation-guides',
   'catalogs',
   'image-studio',
   // Vertical modules

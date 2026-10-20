@@ -106,7 +106,9 @@ function CameraRig({ shot, version, build, xRef, follow }: {
 }) {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
+  const dom = useThree((s) => s.gl.domElement);
   const following = useRef(true);
+  const zoom = useRef(1);
   const goal = useRef(new THREE.Vector3());
   const target = useRef(new THREE.Vector3());
   const focus = useRef(new THREE.Vector3());
@@ -126,26 +128,79 @@ function CameraRig({ shot, version, build, xRef, follow }: {
     return () => controls.removeEventListener('start', stop);
   }, [controls]);
 
+  useEffect(() => {
+    const pointers = new Map<number, { x: number; y: number }>();
+    let spread = 0;
+    const zoomBy = (factor: number) => {
+      const next = Math.min(3, Math.max(0.35, zoom.current * factor));
+      const applied = next / zoom.current;
+      zoom.current = next;
+      if (!following.current && controls) {
+        camera.position.sub(controls.target).multiplyScalar(applied).add(controls.target);
+      }
+    };
+    const gap = () => {
+      const [a, b] = [...pointers.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      zoomBy(Math.exp(e.deltaY * 0.0012));
+    };
+    const onDown = (e: PointerEvent) => {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) spread = gap();
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2 && spread > 0) {
+        const now = gap();
+        if (now > 0) zoomBy(spread / now);
+        spread = now;
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      spread = 0;
+    };
+    dom.addEventListener('wheel', onWheel, { passive: false });
+    dom.addEventListener('pointerdown', onDown);
+    dom.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      dom.removeEventListener('wheel', onWheel);
+      dom.removeEventListener('pointerdown', onDown);
+      dom.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [dom, camera, controls]);
+
   useFrame((_, delta) => {
     if (!following.current || !controls) return;
     const active = follow ? activeItemAt(build, xRef.current) : null;
     if (active && active.placed) {
       const hardware = active.kind === 'hardware';
-      const wantDist = hardware
-        ? 1.1
-        : Math.max(0.9, Math.min(shot.dist, Math.hypot(active.size.x, active.size.y, active.size.z) * 1.6 + 0.4));
-      const f = 1 - Math.exp(-delta * 3);
+      const reach = Math.hypot(active.size.x, active.size.y, active.size.z);
+      const wantDist = Math.max(hardware ? 1.9 : 2.2, Math.min(shot.dist, reach * 2.4 + 1));
+      const f = 1 - Math.exp(-delta * 1.6);
       const pose = poseAt(build, active, xRef.current, 0);
-      focus.current.lerp(new THREE.Vector3(pose.destination.x, pose.destination.y, pose.destination.z), f);
+      const piece = new THREE.Vector3(pose.destination.x, pose.destination.y, pose.destination.z);
+      const context = new THREE.Vector3(shot.target.x, shot.target.y, shot.target.z);
+      const near = piece.distanceTo(context) < Math.max(1.2, shot.dist * 0.45);
+      focus.current.lerp(near ? piece.lerp(context, hardware ? 0.35 : 0.25) : piece, f);
       focusDist.current += (wantDist - focusDist.current) * f;
       const out = pose.outward;
       const flat = Math.hypot(out.x, out.z);
       const side = hardware && flat > 1e-4 && flat > Math.abs(out.y) * 0.5;
-      const yaw = side ? Math.atan2(out.x, out.z) : shot.yaw;
-      const pitch = hardware ? (side ? 0.5 : out.y < -1e-4 ? 0.2 : 1.05) : Math.max(shot.pitch, 0.5);
-      aimAt(goal.current, target.current, focus.current, focusDist.current, yaw, pitch);
+      const turn = side ? Math.atan2(Math.sin(Math.atan2(out.x, out.z) - shot.yaw), Math.cos(Math.atan2(out.x, out.z) - shot.yaw)) : 0;
+      const yaw = shot.yaw + Math.max(-0.7, Math.min(0.7, turn * 0.5));
+      const pitch = hardware && !side && out.y > 1e-4 ? 0.85 : Math.max(shot.pitch, 0.5);
+      aimAt(goal.current, target.current, focus.current, focusDist.current * zoom.current, yaw, pitch);
     } else if (!follow || !build.items.some((it) => it.t0 > xRef.current && it.t0 < Math.floor(xRef.current) + 1)) {
-      aimAt(goal.current, target.current, shot.target, shot.dist, shot.yaw, shot.pitch);
+      aimAt(goal.current, target.current, shot.target, shot.dist * zoom.current, shot.yaw, shot.pitch);
     }
     const k = 1 - Math.exp(-delta * 2.2);
     camera.position.lerp(goal.current, k);
@@ -642,7 +697,7 @@ export const GuideScene: React.FC<Props> = (props) => {
 
   return (
     <>
-      <OrbitControls makeDefault enableDamping maxPolarAngle={Math.PI / 2.02} minDistance={0.25} maxDistance={span * 5} />
+      <OrbitControls makeDefault enableDamping enableZoom={false} maxPolarAngle={Math.PI / 2.02} minDistance={0.25} maxDistance={span * 5} />
       <CameraRig shot={shot} version={shotVersion} build={build} xRef={xRef} follow={props.follow} />
       <KeyboardFly />
       {view === 'room' ? (
@@ -680,9 +735,47 @@ export const GuideScene: React.FC<Props> = (props) => {
       <Trails build={build} xRef={xRef} />
       <ActiveLabel build={build} guide={guide} xRef={xRef} labels={props.labels} />
       {props.labels && props.atStart && build.items.length > 0 && <StartTags build={build} guide={guide} />}
+      {props.labels && !props.atStart && <StepTags build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} stepIndex={props.stepIndex} />}
     </>
   );
 };
+
+function StepTags({ build, guide, xRef, explodeRef, stepIndex }: {
+  build: GuideBuild;
+  guide: InstallationGuideData;
+  xRef: React.MutableRefObject<number>;
+  explodeRef: React.MutableRefObject<number>;
+  stepIndex: number;
+}) {
+  const tags = useMemo(() => {
+    const byPart = new Map<string, BuildItem>();
+    for (const it of build.items) if (it.step === stepIndex && Number.isFinite(it.t0)) byPart.set(it.partId, it);
+    return [...byPart.values()].slice(0, 10).map((it) => {
+      const part = guide.parts[it.partIndex];
+      return { it, text: [part?.name, part?.code].filter(Boolean).join(' · ') };
+    });
+  }, [build.items, guide.parts, stepIndex]);
+  const refs = useRef<Array<THREE.Group | null>>([]);
+  useFrame(() => {
+    tags.forEach(({ it }, i) => {
+      const g = refs.current[i];
+      if (!g) return;
+      const p = poseAt(build, it, xRef.current, explodeRef.current).pos;
+      g.position.set(p.x, p.y + Math.max(it.size.y, it.size.x, 0.04) / 2 + 0.04, p.z);
+    });
+  });
+  return (
+    <group>
+      {tags.map((t, i) => (
+        <group key={t.it.key} ref={(g) => { refs.current[i] = g; }}>
+          <Html center style={{ pointerEvents: 'none' }}>
+            <div className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
+          </Html>
+        </group>
+      ))}
+    </group>
+  );
+}
 
 function StartTags({ build, guide }: { build: GuideBuild; guide: InstallationGuideData }) {
   const tags = useMemo(() => {

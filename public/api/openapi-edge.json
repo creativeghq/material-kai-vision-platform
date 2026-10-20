@@ -32412,6 +32412,68 @@
         }
       }
     },
+    "/installation-guide-public": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Open an installation guide through its public share link",
+        "operationId": "post_installation_guide_public",
+        "description": "Resolves a public share token to one installation guide and returns the guide, its title and page count, and short-lived signed URLs for its rendered manual pages, so the step-by-step player can run for someone who is not signed in. The token is the only credential: it is minted and revoked by set_installation_guide_public_share, which requires projects.use in the guide's workspace, and a revoked or unknown token returns 404. Read-only; it writes nothing and costs no credits.\n\n**Response:** `200 { title, page_count, page_aspect, guide, page_urls } · 404 when the link is unknown or was turned off`",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "The 64-character token from the /g/<token> link."
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/structure-site-note": {
       "post": {
         "tags": [

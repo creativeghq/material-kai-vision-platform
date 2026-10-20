@@ -2,11 +2,13 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import { Link, useParams } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import {
-  ArrowLeft, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Clapperboard, Expand, Pause, Play, Share2, Tags, TriangleAlert, Users,
+  ArrowLeft, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Copy, Crosshair, Expand, Globe, Pause, Play, Share2, Tags, TriangleAlert, Users,
 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Input } from '@/components/core/ui/input';
+import { Switch } from '@/components/core/ui/switch';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { GuideScene, type GuideView } from '@/components/features/guides/GuideScene';
 import { GuideBook } from '@/components/features/guides/GuideBook';
@@ -115,12 +117,13 @@ function PlayerMessage({ text, id }: { text: string; id: string }) {
   );
 }
 
-export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
+export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared = false }: {
   row: InstallationGuideRow;
   guide: InstallationGuideData;
   pageUrls: string[];
   sourceUrl: string | null;
   toast: ReturnType<typeof useToast>['toast'];
+  shared?: boolean;
 }) {
   const build = useMemo(() => buildGuide(guide), [guide]);
   const pageAspects = usePageAspects(pageUrls, row.page_aspect);
@@ -137,6 +140,8 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
   const [view, setView] = useState<GuideView>('room');
   const [bookOpen, setBookOpen] = useState(false);
   const [labels, setLabels] = useState(true);
+  const [followCam, setFollowCam] = useState(true);
+  const [shareOpen, setShareOpen] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
   const [shotVersion, setShotVersion] = useState(0);
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
@@ -268,6 +273,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
       else if (e.shiftKey && k.toLowerCase() === 'x') { e.preventDefault(); toggleExploded(); }
       else if (e.shiftKey && k.toLowerCase() === 'n') { e.preventDefault(); setLabels((l) => !l); }
       else if (!e.shiftKey && k.toLowerCase() === 'c') { e.preventDefault(); setCinematic(!cineRef.current); }
+      else if (!e.shiftKey && k.toLowerCase() === 'f') { e.preventDefault(); setFollowCam((f) => !f); setShotVersion((v) => v + 1); }
       else if (!e.shiftKey && k.toLowerCase() === 'r') { e.preventDefault(); setShotVersion((v) => v + 1); }
       else if (k === 'Escape' && bookOpen) setBookOpen(false);
     };
@@ -294,15 +300,6 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
   const hoverText = hoverItem
     ? `${guide.parts[hoverItem.partIndex]?.name ?? ''}${x < hoverItem.ta - 1e-6 && Number.isFinite(hoverItem.ta) ? ` · goes in at step ${hoverItem.step}` : ''}`
     : '';
-
-  const share = async () => {
-    try {
-      await navigator.clipboard.writeText(location.href);
-      toast({ title: 'Link copied', description: 'Anyone in this workspace can open it.' });
-    } catch {
-      toast({ title: 'Copy the address bar to share this guide.' });
-    }
-  };
 
   const metaLine = `${row.page_count} pages · ${guide.parts.length} parts · ${K} steps`;
   const words = current ? (
@@ -335,7 +332,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
                 onPick={onPick}
                 labels={labels}
                 atStart={x < 0.02}
-                follow={!exploded}
+                follow={followCam && !exploded}
               />
             </Canvas>
           </Suspense>
@@ -344,9 +341,11 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
 
       <aside className={cn('pointer-events-none absolute left-3 top-3 z-20 flex w-[min(340px,calc(100vw-24px))] flex-col gap-2.5 transition-opacity', bookOpen && 'lg:opacity-0')}>
         <div className="pointer-events-auto">
-          <Link to={`/guides/${row.id}`} className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-3.5 w-3.5" />Guide
-          </Link>
+          {!shared && (
+            <Link to={`/guides/${row.id}`} className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-3.5 w-3.5" />Guide
+            </Link>
+          )}
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Step by step</p>
           <h1 className="font-sans text-2xl font-bold leading-tight text-amber-700 dark:text-amber-300">{guide.title}</h1>
           {guide.summary && <p className="mt-1 hidden text-sm text-muted-foreground sm:block">{guide.summary}</p>}
@@ -450,9 +449,9 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
           <div className="ml-auto flex gap-1">
             <ToolButton on={bookOpen} onClick={() => setBookOpen((o) => !o)} label="Open the manual (⇧B)"><BookOpen className="h-4 w-4" /></ToolButton>
             <ToolButton on={exploded} onClick={toggleExploded} label="Exploded (⇧X)"><Expand className="h-4 w-4" /></ToolButton>
-            <ToolButton on={cine} onClick={() => setCinematic(!cine)} label="Play the whole build, with a camera for each step (C)"><Clapperboard className="h-4 w-4" /></ToolButton>
-            <ToolButton on={labels} onClick={() => setLabels((l) => !l)} label="Labels (⇧N)"><Tags className="h-4 w-4" /></ToolButton>
-            <ToolButton on={false} onClick={share} label="Share"><Share2 className="h-4 w-4" /></ToolButton>
+            <ToolButton on={followCam} onClick={() => { setFollowCam((f) => !f); setShotVersion((v) => v + 1); }} label={followCam ? 'Camera follows each piece. Click to hold the step view (F)' : 'Camera holds the step view. Click to follow each piece (F)'}><Crosshair className="h-4 w-4" /></ToolButton>
+            <ToolButton on={labels} onClick={() => setLabels((l) => !l)} label={labels ? 'Hide part names (⇧N)' : 'Show part names (⇧N)'}><Tags className="h-4 w-4" /></ToolButton>
+            {!shared && <ToolButton on={shareOpen} onClick={() => setShareOpen(true)} label="Share"><Share2 className="h-4 w-4" /></ToolButton>}
             <ToolButton on={false} onClick={() => setHowOpen(true)} label="How it works"><CircleHelp className="h-4 w-4" /></ToolButton>
           </div>
         </div>
@@ -483,7 +482,75 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast }: {
       )}
 
       <HowItWorks open={howOpen} onOpenChange={setHowOpen} guide={guide} build={build} />
+      {!shared && <ShareGuide open={shareOpen} onOpenChange={setShareOpen} row={row} toast={toast} />}
     </div>
+  );
+}
+
+function ShareGuide({ open, onOpenChange, row, toast }: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  row: InstallationGuideRow;
+  toast: ReturnType<typeof useToast>['toast'];
+}) {
+  const [token, setToken] = useState<string | null>(row.public_share_token);
+  const [busy, setBusy] = useState(false);
+  const workspaceUrl = `${location.origin}/guides/${row.id}/play`;
+  const publicUrl = token ? `${location.origin}/g/${token}` : '';
+  const copy = async (url: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Link copied', description: what });
+    } catch {
+      toast({ title: 'Select the link and copy it.' });
+    }
+  };
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    try {
+      setToken(await installationGuideService.setPublicShare(row.id, on));
+      toast({ title: on ? 'Public link is on' : 'Public link turned off', description: on ? 'Anyone with the link can watch this guide.' : 'The old link no longer opens.' });
+    } catch (e) {
+      toast({ title: 'The link could not be changed', description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Share {row.title}</DialogTitle>
+          <DialogDescription>Choose who can open the step-by-step build.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium">Your workspace</p>
+            <div className="flex gap-2">
+              <Input readOnly value={workspaceUrl} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+              <Button variant="outline" size="sm" aria-label="Copy the workspace link" onClick={() => void copy(workspaceUrl, 'Members of this workspace can open it.')}><Copy className="h-4 w-4" /></Button>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-sm border border-hairline p-3">
+            <label className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-sm font-medium"><Globe className="h-4 w-4" />Public link</span>
+              <Switch checked={!!token} disabled={busy} onCheckedChange={(on) => void toggle(on)} aria-label="Public link" />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              {token
+                ? 'Anyone with this link can watch the build and read the manual without signing in. Turn it off to stop the link working.'
+                : 'Off. Turn it on to get a link a customer or installer can open without an account.'}
+            </p>
+            {token && (
+              <div className="flex gap-2">
+                <Input readOnly value={publicUrl} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+                <Button size="sm" aria-label="Copy the public link" onClick={() => void copy(publicUrl, 'Anyone with this link can open it.')}><Copy className="h-4 w-4" /></Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

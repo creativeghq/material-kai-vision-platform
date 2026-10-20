@@ -17964,6 +17964,29 @@
     "response": "202 { success, status: 'extracting', guide_id } — then poll installation_guides.status for 'review' or 'failed'"
   },
   {
+    "name": "installation-guide-public",
+    "tag": "Projects",
+    "summary": "Open an installation guide through its public share link",
+    "description": "Resolves a public share token to one installation guide and returns the guide, its title and page count, and short-lived signed URLs for its rendered manual pages, so the step-by-step player can run for someone who is not signed in. The token is the only credential: it is minted and revoked by set_installation_guide_public_share, which requires projects.use in the guide's workspace, and a revoked or unknown token returns 404. Read-only; it writes nothing and costs no credits.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "token",
+        "type": "string",
+        "required": true,
+        "desc": "The 64-character token from the /g/<token> link."
+      }
+    ],
+    "response": "200 { title, page_count, page_aspect, guide, page_urls } · 404 when the link is unknown or was turned off"
+  },
+  {
     "name": "structure-site-note",
     "tag": "Projects",
     "summary": "Turn a dictated site walk into a diary entry and the defects it described",

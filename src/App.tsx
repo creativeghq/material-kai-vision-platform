@@ -131,6 +131,7 @@ const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
+const PublicGuidePage = lazy(() => import('./pages/Guides/PublicGuidePage'));
 const ToolsHubPage = lazy(() => import('./pages/Tools/ToolsHubPage'));
 const PublicCareersPage = lazy(() => import('./pages/Careers/PublicCareersPage'));
 const PublicJobPage = lazy(() => import('./pages/Careers/PublicJobPage'));
@@ -211,6 +212,7 @@ const App = () => (
                 <Route path="/home" element={<PageErrorBoundary name="Home Landing"><HomePage /></PageErrorBoundary>} />
                 <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
+                <Route path="/g/:token" element={<PageErrorBoundary name="Shared Guide"><PublicGuidePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
                 <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
                 {/* The embed's "place it" stage (#341 join 4). PUBLIC and unauthenticated by

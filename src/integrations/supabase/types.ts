@@ -12619,6 +12619,8 @@ export type Database = {
           error: string | null
           extracted_at: string | null
           published_at: string | null
+          public_share_token: string | null
+          public_shared_at: string | null
           created_at: string
           updated_at: string
         }
@@ -12635,6 +12637,8 @@ export type Database = {
           error?: string | null
           extracted_at?: string | null
           published_at?: string | null
+          public_share_token?: string | null
+          public_shared_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -12651,6 +12655,8 @@ export type Database = {
           error?: string | null
           extracted_at?: string | null
           published_at?: string | null
+          public_share_token?: string | null
+          public_shared_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -35598,6 +35604,10 @@ export type Database = {
       recompute_invoice_tax_totals: {
         Args: { p_invoice_id: string }
         Returns: Json
+      }
+      set_installation_guide_public_share: {
+        Args: { p_enabled: boolean; p_guide_id: string }
+        Returns: string
       }
       set_invoice_document_taxes: {
         Args: { p_invoice_id: string; p_rows?: Json }

@@ -26,11 +26,12 @@ export interface InstallationGuideRow {
   error: string | null;
   extracted_at: string | null;
   published_at: string | null;
+  public_share_token: string | null;
   created_at: string;
   updated_at: string;
 }
 
-const COLUMNS = 'id, workspace_id, title, status, page_count, page_aspect, guide, error, extracted_at, published_at, created_at, updated_at';
+const COLUMNS = 'id, workspace_id, title, status, page_count, page_aspect, guide, error, extracted_at, published_at, public_share_token, created_at, updated_at';
 
 const folder = (row: Pick<InstallationGuideRow, 'workspace_id' | 'id'>) => `installation-guides/${row.workspace_id}/${row.id}`;
 export const guidePagePath = (row: Pick<InstallationGuideRow, 'workspace_id' | 'id'>, page: number) =>
@@ -85,6 +86,24 @@ export const installationGuideService = {
     const { data, error } = await supabase.from('installation_guides').select(COLUMNS).eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? normalise(data as Record<string, unknown>) : null;
+  },
+
+  async setPublicShare(id: string, enabled: boolean): Promise<string | null> {
+    const { data, error } = await supabase.rpc('set_installation_guide_public_share', { p_guide_id: id, p_enabled: enabled });
+    if (error) throw new Error(error.message);
+    return data ?? null;
+  },
+
+  async openPublic(token: string): Promise<{ row: InstallationGuideRow; pageUrls: string[] }> {
+    const { data, error } = await supabase.functions.invoke('installation-guide-public', { body: { token } });
+    if (error || !data?.guide) throw new Error('This link is not valid any more.');
+    const row: Record<string, unknown> = {
+      id: token, workspace_id: '', title: String(data.title ?? ''), status: 'published',
+      page_count: Number(data.page_count) || 0, page_aspect: Number(data.page_aspect) || 1.414,
+      guide: data.guide, error: null, extracted_at: null, published_at: null, public_share_token: token,
+      created_at: '', updated_at: '',
+    };
+    return { row: normalise(row), pageUrls: Array.isArray(data.page_urls) ? data.page_urls.map(String) : [] };
   },
 
   async pageUrls(row: InstallationGuideRow): Promise<string[]> {
