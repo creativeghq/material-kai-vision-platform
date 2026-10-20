@@ -21,6 +21,7 @@ const MODULE_SLUG = 'sales-finance';
 // Invoice statuses that count as "owed" for the unpaid filter.
 const UNPAID_STATUSES = ['issued', 'partially_paid', 'overdue', 'sent'];
 
+import { shownOf } from '../tool-result-shape.ts';
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { attachPartyNames } from './record-labels.ts';
 import { roleGate } from './module-gate.ts';
@@ -58,6 +59,14 @@ async function resolveCompany(sb: ReturnType<typeof callerDbClient>, workspaceId
   }
   return null;
 }
+
+const MODEL_ROWS = 15;
+
+const nextDayIso = (day: string) => {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
 
 export const createManageFinanceTool = (
   userId: string,
@@ -118,13 +127,13 @@ export const createManageFinanceTool = (
         }
         // `invoice_number` does not exist — see the note in issue_invoice above. This select
         // was rejected outright, so list_invoices returned an error for every call.
-        let q = sb.from('invoices').select('id, legal_number, internal_number, status, total, currency, issued_at, due_at, customer_company_id, customer_contact_id')
+        let q = sb.from('invoices').select('id, legal_number, internal_number, status, total, currency, issued_at, due_at, customer_company_id, customer_contact_id', { count: 'exact' })
           .eq('workspace_id', workspaceId)
           .order('issued_at', { ascending: false, nullsFirst: false })
           .limit(Math.min(limit, 50));
         if (company) q = q.eq('customer_company_id', company.id);
         if (unpaid_only) q = q.in('status', UNPAID_STATUSES);
-        const { data, error } = await q;
+        const { data, error, count: invoiceTotal } = await q;
         if (error) return JSON.stringify({ success: false, error: error.message });
         // The customer id was already here; the NAME was not, so the card had a column of nothing
         // to link and the reader had a list of invoices with no counterparty on it.
@@ -132,8 +141,9 @@ export const createManageFinanceTool = (
           { idField: 'customer_company_id', nameField: 'customer_name' },
           { idField: 'customer_contact_id', nameField: 'customer_name', table: 'crm_contacts' },
         ]);
-        onChunk?.({ type: 'finance_invoices_list', workspace_id: workspaceId, customer: company, unpaid_only: !!unpaid_only, invoices, timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: invoices.length, invoices: invoices.slice(0, 15) });
+        const invTotal = invoiceTotal ?? invoices.length;
+        onChunk?.({ type: 'finance_invoices_list', workspace_id: workspaceId, customer: company, unpaid_only: !!unpaid_only, invoices, total: invTotal, timestamp: Date.now() });
+        return JSON.stringify({ success: true, ...shownOf(invoices, invTotal, 'invoice'), invoices: invoices.slice(0, MODEL_ROWS) });
       }
 
       if (action === 'list_orders') {
@@ -149,7 +159,8 @@ export const createManageFinanceTool = (
           p_total_min: null, p_total_max: null, p_currency: null, p_payment_status: null,
         });
         if (error) return JSON.stringify({ success: false, error: error.message });
-        const found = ((data ?? []) as Array<{ order_row: Record<string, any>; party_name: string | null }>);
+        const found = ((data ?? []) as Array<{ order_row: Record<string, any>; party_name: string | null; total_count?: number }>);
+        const orderTotal = Number(found[0]?.total_count ?? found.length);
         const ids = found.map((r) => r.order_row.id as string);
         const { data: settlements, error: sErr } = ids.length
           ? await sb.rpc('get_order_settlements', { p_order_ids: ids })
@@ -166,17 +177,31 @@ export const createManageFinanceTool = (
             settled: s?.settled ?? null, outstanding: s?.outstanding ?? null, payment_status: s?.payment_status ?? null,
           };
         });
-        onChunk?.({ type: 'finance_orders_list', workspace_id: workspaceId, customer: company, orders, timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: orders.length, orders: orders.slice(0, 15) });
+        onChunk?.({ type: 'finance_orders_list', workspace_id: workspaceId, customer: company, orders, total: orderTotal, timestamp: Date.now() });
+        return JSON.stringify({ success: true, ...shownOf(orders, orderTotal, 'order'), orders: orders.slice(0, MODEL_ROWS) });
       }
 
       if (action === 'list_payments') {
-        let q = sb.from('payments').select('id, reference, amount, currency, direction, method, paid_at, counterparty_company_id, counterparty_contact_id, counterparty_name, order_id')
+        let company: { id: string; name: string } | null = null;
+        if (customer_company_id || customer_name) {
+          company = await resolveCompany(sb, workspaceId, customer_company_id, customer_name);
+          if (!company) return JSON.stringify({ success: false, error: 'counterparty not found in this workspace' });
+        }
+        let q = sb.from('payments').select('id, reference, amount, currency, direction, method, paid_at, counterparty_company_id, counterparty_contact_id, counterparty_name, order_id', { count: 'exact' })
           .eq('workspace_id', workspaceId)
           .order('paid_at', { ascending: false, nullsFirst: false })
           .limit(Math.min(limit, 50));
         if (direction) q = q.eq('direction', direction);
-        const { data, error } = await q;
+        if (company) q = q.eq('counterparty_company_id', company.id);
+        const badDate = [from_date, to_date].find((d) => d && !/^\d{4}-\d{2}-\d{2}$/.test(String(d)));
+        if (badDate) return JSON.stringify({ success: false, error: `"${badDate}" is not a date — use YYYY-MM-DD.` });
+        if (from_date) q = q.gte('paid_at', from_date);
+        if (to_date) q = q.lt('paid_at', nextDayIso(to_date));
+        if (search) {
+          const term = search.replace(/[%_,()*\\]/g, ' ').trim();
+          if (term) q = q.or(`reference.ilike.%${term}%,counterparty_name.ilike.%${term}%`);
+        }
+        const { data, error, count: paymentTotal } = await q;
         if (error) return JSON.stringify({ success: false, error: error.message });
         // "Who was this paid to" is the whole point of a payment row, and the select answered it
         // for nobody: a list of amounts and dates with no counterparty at all.
@@ -195,8 +220,9 @@ export const createManageFinanceTool = (
           allocated: byPayment.get(p.id)?.allocated ?? null,
           unallocated: byPayment.get(p.id)?.unallocated ?? null,
         }));
-        onChunk?.({ type: 'finance_payments_list', workspace_id: workspaceId, direction: direction || 'all', payments, timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: payments.length, payments: payments.slice(0, 15) });
+        const payTotal = paymentTotal ?? payments.length;
+        onChunk?.({ type: 'finance_payments_list', workspace_id: workspaceId, direction: direction || 'all', counterparty: company, payments, total: payTotal, timestamp: Date.now() });
+        return JSON.stringify({ success: true, ...shownOf(payments, payTotal, 'payment'), payments: payments.slice(0, MODEL_ROWS) });
       }
 
       if (action === 'customer_balance') {
@@ -318,8 +344,23 @@ export const createManageFinanceTool = (
       if (action === 'supplier_inbound_orders') {
         const { data, error } = await sb.rpc('get_supplier_inbound_orders', { p_workspace_id: workspaceId });
         if (error) return JSON.stringify({ success: false, error: error.message });
-        onChunk?.({ type: 'finance_supplier_inbound_orders', result: data, timestamp: Date.now() });
-        return JSON.stringify({ success: true, result: data });
+        const needle = search?.trim().toLowerCase();
+        const matching = ((data ?? []) as Array<Record<string, any>>).filter((o) => {
+          const day = String(o.created_at ?? '').slice(0, 10);
+          if (from_date && day < from_date) return false;
+          if (to_date && day > to_date) return false;
+          if (needle && !`${o.order_number ?? ''} ${o.buyer_name ?? ''}`.toLowerCase().includes(needle)) return false;
+          return true;
+        });
+        const page = matching.slice(0, Math.min(limit, 50));
+        onChunk?.({ type: 'finance_supplier_inbound_orders', result: page, total: matching.length, timestamp: Date.now() });
+        const orders = page.slice(0, MODEL_ROWS).map((o) => ({
+          order_id: o.order_id, order_number: o.order_number, buyer_name: o.buyer_name, status: o.status,
+          supplier_status: o.supplier_status, supplier_eta: o.supplier_eta, created_at: o.created_at,
+          total: o.total, currency: o.currency, line_count: Array.isArray(o.lines) ? o.lines.length : 0,
+          linked_order_id: o.linked_order_id,
+        }));
+        return JSON.stringify({ success: true, ...shownOf(orders, matching.length, 'order'), orders });
       }
 
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
@@ -356,9 +397,9 @@ export const createManageFinanceTool = (
         invoice_id: z.string().optional().describe('issue_invoice: the DRAFT invoice UUID to issue. invoice_profit: the invoice UUID.'),
         order_id: z.string().optional().describe('order_profit / order_customs: the order UUID (from list_orders).'),
         order_type: z.string().optional().describe('list_orders: "sales" or "purchase". Omit for both.'),
-        search: z.string().optional().describe('list_orders: free-text search over order number and party name.'),
-        from_date: z.string().optional().describe('YYYY-MM-DD start for list_orders, monthly_pnl, profit_drawdown (default: 11 months back, first of the month).'),
-        to_date: z.string().optional().describe('YYYY-MM-DD end for list_orders, profit_drawdown (default today).'),
+        search: z.string().optional().describe('list_orders / supplier_inbound_orders: order number or party name. list_payments: reference or counterparty name.'),
+        from_date: z.string().optional().describe('YYYY-MM-DD start for list_orders, list_payments, supplier_inbound_orders, monthly_pnl, profit_drawdown (default for the last two: 11 months back, first of the month).'),
+        to_date: z.string().optional().describe('YYYY-MM-DD end (inclusive) for list_orders, list_payments, supplier_inbound_orders, profit_drawdown (default today).'),
         confirm: z.boolean().optional().describe('Do NOT set this — the Approve/Decline card sets confirm:true when the user approves.'),
       }),
     },

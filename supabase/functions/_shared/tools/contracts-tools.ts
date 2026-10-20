@@ -54,6 +54,13 @@ async function callContracts(body: Record<string, unknown>, jwt: string | undefi
   }
 }
 
+const contractSummary = (c: any) => c ? ({
+  id: c.id, title: c.title, status: c.status, context: c.context, contract_type: c.contract_type,
+  counterparty_name: c.counterparty_name, counterparty_email: c.counterparty_email,
+  value: c.value, currency: c.currency, effective_date: c.effective_date, expiry_date: c.expiry_date,
+  sent_at: c.sent_at, signed_at: c.signed_at, created_at: c.created_at,
+}) : null;
+
 export const createManageContractsTool = (
   userId: string,
   workspaceId: string,
@@ -68,16 +75,21 @@ export const createManageContractsTool = (
       if (action === 'list') {
         const r = await callContracts({ action: 'list', workspace_id: workspaceId, status, context }, jwt);
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `contracts-api ${r.status}` });
-        const contracts = r.data?.contracts ?? [];
-        onChunk?.({ type: 'contracts_list', workspace_id: workspaceId, contracts, timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: contracts.length, contracts: contracts.slice(0, 15) });
+        const all = r.data?.contracts ?? [];
+        const contracts = all.slice(0, 15).map(contractSummary);
+        onChunk?.({ type: 'contracts_list', workspace_id: workspaceId, contracts, total: all.length, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true, count: all.length, shown: contracts.length, total: all.length, contracts,
+          message: all.length > contracts.length ? `Showing the ${contracts.length} most recent of ${all.length} contracts.` : `${all.length} contract${all.length === 1 ? '' : 's'}.`,
+        });
       }
 
       if (action === 'get') {
         if (!contract_id) return JSON.stringify({ success: false, error: 'get needs a contract_id.' });
         const r = await callContracts({ action: 'get', workspace_id: workspaceId, id: contract_id }, jwt);
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `contracts-api ${r.status}` });
-        return JSON.stringify({ success: true, contract: r.data?.contract ?? null, signatures: r.data?.signatures ?? [] });
+        const signatures = (r.data?.signatures ?? []).map((s: any) => ({ signer_name: s.signer_name, signer_role: s.signer_role, signed_at: s.signed_at }));
+        return JSON.stringify({ success: true, contract: contractSummary(r.data?.contract), signatures });
       }
 
       if (action === 'create') {
@@ -90,7 +102,11 @@ export const createManageContractsTool = (
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `contracts-api ${r.status}` });
         const c = r.data?.contract;
         onChunk?.({ type: 'contract_created', contract_id: c?.id, title: c?.title, timestamp: Date.now() });
-        return JSON.stringify({ success: true, contract: c, message: `Draft contract "${c?.title}" created. Use action=send to email the signing link.` });
+        return JSON.stringify({
+          success: true, contract: contractSummary(c),
+          message: `Draft contract "${c?.title}" created. It has not been sent for signature yet.`,
+          next_step: 'To email the signing link, call manage_contracts action=send with this contract id; the user approves first.',
+        });
       }
 
       if (action === 'void') {
@@ -126,7 +142,10 @@ export const createManageContractsTool = (
         const sent = await callContracts({ action: 'send', workspace_id: workspaceId, id: contract_id }, jwt);
         if (!sent.ok) return JSON.stringify({ success: false, error: sent.error || `contracts-api ${sent.status}` });
         onChunk?.({ type: 'contract_sent', contract_id, sign_path: sent.data?.sign_path, timestamp: Date.now() });
-        return JSON.stringify({ success: true, sent: true, contract_id, sign_path: sent.data?.sign_path });
+        return JSON.stringify({
+          success: true, sent: true, contract_id, emailed: sent.data?.emailed ?? null,
+          message: sent.data?.emailed ? 'Sent: the counterparty has been emailed a signing link.' : 'Sent for signature. The signing link is on the card for the user to share.',
+        });
       }
 
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });

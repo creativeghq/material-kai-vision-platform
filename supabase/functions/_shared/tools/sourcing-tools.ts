@@ -21,6 +21,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+const BOARD_ROWS = 15;
+
 // ───────────────────────────────────────────────────────────────────────────
 // 1) source_product — rank supply options
 // ───────────────────────────────────────────────────────────────────────────
@@ -38,7 +40,17 @@ export const createSourceProductTool = (
           const { data, error } = await sb.rpc('get_sourcing_board', { p_workspace_id: workspaceId, p_mine: mine === true });
           if (error) return JSON.stringify({ success: false, error: error.message });
           onChunk?.({ type: 'sourcing_board', board: data, timestamp: Date.now() });
-          return JSON.stringify({ success: true, board: data });
+          const bucket = (rows: any[] | undefined) => (rows ?? []).slice(0, BOARD_ROWS).map((a) => ({
+            id: a.id, product_name: a.product_name, product_sku: a.product_sku, quantity: a.quantity,
+            customer_name: a.customer_name, source_type: a.source_type, expected_at: a.expected_at,
+            supply_order_number: a.supply_order_number, supplier_name: a.supplier_name, warehouse_name: a.warehouse_name,
+          }));
+          const counts = data?.counts ?? {};
+          return JSON.stringify({
+            success: true, counts,
+            needs_ordering: bucket(data?.needs_ordering), on_order: bucket(data?.on_order), reserved: bucket(data?.reserved),
+            message: `${counts.needs_ordering ?? 0} line(s) need ordering, ${counts.on_order ?? 0} are on order and ${counts.reserved ?? 0} are reserved from stock. Up to ${BOARD_ROWS} of each are listed here; the card shows all.`,
+          });
         }
         if (action === 'suppliers') {
           if (product_id) {
@@ -49,8 +61,13 @@ export const createSourceProductTool = (
             ? await sb.rpc('list_supplier_products', { p_product_id: product_id })
             : await sb.rpc('list_workspace_product_suppliers', { p_workspace_id: workspaceId });
           if (error) return JSON.stringify({ success: false, error: error.message });
-          onChunk?.({ type: 'sourcing_suppliers', product_id: product_id ?? null, suppliers: data ?? [], timestamp: Date.now() });
-          return JSON.stringify({ success: true, product_id: product_id ?? null, suppliers: data ?? [] });
+          const all = (data ?? []) as any[];
+          onChunk?.({ type: 'sourcing_suppliers', product_id: product_id ?? null, suppliers: all, timestamp: Date.now() });
+          const suppliers = all.slice(0, BOARD_ROWS);
+          return JSON.stringify({
+            success: true, product_id: product_id ?? null, count: all.length, shown: suppliers.length, total: all.length, suppliers,
+            message: all.length > suppliers.length ? `${all.length} suppliers; the first ${suppliers.length} are listed here and the card shows all.` : `${all.length} supplier${all.length === 1 ? '' : 's'}.`,
+          });
         }
         if (action === 'granted_catalog') {
           const { data, error } = await sb.rpc('list_granted_catalog_products', {

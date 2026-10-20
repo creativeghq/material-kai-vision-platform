@@ -244,7 +244,7 @@ export const create3DGenerationTool = (
               : resolvedImageUrl
                 ? 'the most recent generated image'
                 : 'no source image — this is text-to-image',
-          message: `Started generating ${result.model_count} interior design variations (${modeLabel}) for your ${roomType || 'space'}${style ? ` in ${style} style` : ''}. Watch progress in the panel below.`,
+          message: `Started generating ${result.model_count} interior design variations (${modeLabel}) for your ${roomType || 'space'}${style ? ` in ${style} style` : ''}. The images will appear here as each one finishes.`,
         });
       } catch (error) {
         console.error('Interior design generation error:', error);

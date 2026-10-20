@@ -1239,7 +1239,7 @@ export const createPublishCatalogTool = (userId: string, workspaceId: string | n
           type: 'workflow_finished',
           run_id: input.catalog_id,
           status: 'done',
-          summary: `Published as ${publicUrl}. Use "Send to Customers" on /catalogs/${input.catalog_id} to email it via CRM categories.`,
+          summary: `Published at ${publicUrl}. To email it to a group of customers, open the catalog and choose "Send to Customers".`,
         });
 
         return JSON.stringify({

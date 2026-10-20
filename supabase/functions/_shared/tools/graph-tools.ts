@@ -30,6 +30,76 @@ function userClient(jwt: string, userId: string, workspaceId: string) {
   return callerDbClient(jwt, userId, workspaceId);
 }
 
+const LIST_CAP = 20;
+
+function capList(rows: unknown, cap = LIST_CAP): { total: number; items: unknown[]; truncated: boolean } {
+  const arr = Array.isArray(rows) ? rows : [];
+  return { total: arr.length, items: arr.slice(0, cap), truncated: arr.length > cap };
+}
+
+/** Most recent work entries plus a count per kind, instead of the whole party history. */
+function summarizeWork(work: unknown): unknown {
+  if (!Array.isArray(work)) return work;
+  const byKind: Record<string, number> = {};
+  for (const w of work as Array<Record<string, unknown>>) {
+    const k = String(w?.kind ?? 'other');
+    byKind[k] = (byKind[k] ?? 0) + 1;
+  }
+  const recent = [...(work as Array<Record<string, any>>)]
+    .sort((a, b) => String(b?.occurred_at ?? '').localeCompare(String(a?.occurred_at ?? '')))
+    .slice(0, LIST_CAP)
+    .map((w) => ({
+      kind: w.kind, id: w.id, title: w.title, status: w.status,
+      occurred_at: w.occurred_at, amount: w.amount, currency: w.currency, role: w.role,
+    }));
+  return { total: work.length, by_kind: byKind, recent, truncated: work.length > LIST_CAP };
+}
+
+// deno-lint-ignore no-explicit-any
+function slimProductDetail(p: Record<string, any> | null): Record<string, unknown> | null {
+  if (!p) return null;
+  const desc = typeof p.description === 'string' ? p.description.slice(0, 300) : undefined;
+  const out: Record<string, unknown> = {
+    id: p.id, name: p.name, sku: p.sku, category: p.category ?? p.category_name, brand: p.brand ?? p.metadata?.factory_name,
+    description: desc, price: p.price, currency: p.currency, unit: p.unit, status: p.status,
+  };
+  for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === null || out[k] === '') delete out[k];
+  return out;
+}
+
+/** Price history as stats plus the latest points — the raw series can run to hundreds of rows. */
+// deno-lint-ignore no-explicit-any
+function summarizePriceHistory(h: Record<string, any> | null): unknown {
+  if (!h || typeof h !== 'object') return h;
+  const series: Array<Record<string, any>> = Array.isArray(h.series) ? h.series : [];
+  const prices = series.map((r) => Number(r.price)).filter((n) => Number.isFinite(n));
+  const oldest = series[series.length - 1];
+  const newest = series[0];
+  return {
+    window_days: h.window_days,
+    sample_count: h.sample_count ?? series.length,
+    stats: h.stats,
+    first: oldest ? { price: oldest.price, currency: oldest.currency, retailer: oldest.retailer, at: oldest.scraped_at } : null,
+    last: newest ? { price: newest.price, currency: newest.currency, retailer: newest.retailer, at: newest.scraped_at } : null,
+    min: prices.length ? Math.min(...prices) : null,
+    max: prices.length ? Math.max(...prices) : null,
+    retailers: [...new Set(series.map((r) => r.retailer).filter(Boolean))].slice(0, 10),
+    latest_points: series.slice(0, 10).map((r) => ({ retailer: r.retailer, price: r.price, currency: r.currency, at: r.scraped_at, availability: r.availability })),
+  };
+}
+
+// deno-lint-ignore no-explicit-any
+function slimProvenance(p: Record<string, any> | null): unknown {
+  if (!p || typeof p !== 'object') return p;
+  const suppliers = capList(p.bought_from_suppliers);
+  const projects = capList(p.used_in_projects);
+  return {
+    ...p,
+    bought_from_suppliers: suppliers.items, supplier_total: suppliers.total,
+    used_in_projects: projects.items, project_total: projects.total,
+  };
+}
+
 // ── id resolvers (workspace-scoped) ─────────────────────────────────────────
 
 async function resolveProductId(sb: any, workspaceId: string, productId?: string, sku?: string): Promise<string | null> {
@@ -105,7 +175,7 @@ export const createProductProvenanceTool = (
       }
 
       onChunk?.({ type: 'product_provenance_result', workspace_id: workspaceId, product_id: pid, provenance: data, product, costs, timestamp: Date.now() });
-      return JSON.stringify({ success: true, provenance: data, product, costs });
+      return JSON.stringify({ success: true, provenance: slimProvenance(data), product: slimProductDetail(product), costs });
     },
     {
       name: 'product_provenance',
@@ -141,7 +211,7 @@ export const createProductPriceHistoryTool = (
       if (error) return JSON.stringify({ success: false, error: error.message });
 
       onChunk?.({ type: 'product_price_history_result', workspace_id: workspaceId, product_id: pid, history: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, history: data });
+      return JSON.stringify({ success: true, history: summarizePriceHistory(data) });
     },
     {
       name: 'product_price_history',
@@ -175,7 +245,8 @@ export const createProjectsUsingProductTool = (
       if (error) return JSON.stringify({ success: false, error: error.message });
 
       onChunk?.({ type: 'projects_using_product_result', workspace_id: workspaceId, product_id: pid, projects: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, projects: data });
+      const capped = capList(data);
+      return JSON.stringify({ success: true, count: capped.total, truncated: capped.truncated, projects: capped.items });
     },
     {
       name: 'projects_using_product',
@@ -206,7 +277,8 @@ export const createProductsInProjectTool = (
       if (error) return JSON.stringify({ success: false, error: error.message });
 
       onChunk?.({ type: 'products_in_project_result', workspace_id: workspaceId, project_id: prid, products: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, products: data });
+      const capped = capList(data);
+      return JSON.stringify({ success: true, count: capped.total, truncated: capped.truncated, products: capped.items });
     },
     {
       name: 'products_in_project',
@@ -240,14 +312,14 @@ export const createCustomerOverviewTool = (
       const work = await readPartyWork(jwt, cid, userId, workspaceId);
 
       onChunk?.({ type: 'customer_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, work, timestamp: Date.now() });
-      return JSON.stringify({ success: true, overview: data, work });
+      return JSON.stringify({ success: true, overview: data, work: summarizeWork(work) });
     },
     {
       name: 'customer_overview',
       description:
         'A 360° view of a customer company: quote count + total value + open count, invoice count + outstanding ' +
         'AR with aging buckets (current / 1-30 / 31-60 / 61-90 / 90+), and their projects. ' +
-        'Plus `work`: the dated log of every project, quote, order, invoice, payment, contract, deal and message with them, with amounts and status. ' +
+        'Plus `work`: the dated log of every project, quote, order, invoice, payment, contract, deal and message with them — the 20 most recent, with amounts and status, and a count per kind. ' +
         'Use for "give me everything on customer X", "how much does X owe us", "X\'s account summary". ' +
         'Pass company_id or company_name.',
       schema: z.object({
@@ -277,14 +349,14 @@ export const createSupplierOverviewTool = (
       const work = await readPartyWork(jwt, cid, userId, workspaceId);
 
       onChunk?.({ type: 'supplier_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, work, timestamp: Date.now() });
-      return JSON.stringify({ success: true, overview: data, work });
+      return JSON.stringify({ success: true, overview: data, work: summarizeWork(work) });
     },
     {
       name: 'supplier_overview',
       description:
         'A 360° view of a supplier company: bill count + outstanding AP with aging buckets, purchase-order ' +
         'count + open count, and the products we source from them, plus `work`: the dated log of every document '
-        + 'and project with them. Finance data — admin/owner only. ' +
+        + 'and project with them (the 20 most recent, and a count per kind). Finance data — admin/owner only. ' +
         'Use for "what do we owe supplier X", "what do we buy from X". Pass company_id or company_name.',
       schema: z.object({
         company_id: z.string().optional().describe('CRM company UUID'),
@@ -308,7 +380,8 @@ export const createProductsByBrandTool = (
       const { data, error } = await sb.rpc('get_products_by_brand', { p_workspace_id: workspaceId, p_company_id: cid });
       if (error) return JSON.stringify({ success: false, error: error.message });
       onChunk?.({ type: 'products_by_brand_result', workspace_id: workspaceId, company_id: cid, products: data, timestamp: Date.now() });
-      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, products: data });
+      const capped = capList(data);
+      return JSON.stringify({ success: true, count: capped.total, truncated: capped.truncated, products: capped.items });
     },
     {
       name: 'products_by_brand',

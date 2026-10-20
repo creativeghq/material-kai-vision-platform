@@ -650,10 +650,12 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
 
       // ── Pending intake (AI-extracted from inbound expenses) ──────────────────
       case 'list-pending': {
-        const { data, error } = await usr.from('warehouse_pending_items').select('*')
+        let q = usr.from('warehouse_pending_items').select('*', { count: 'exact' })
           .eq('workspace_id', workspaceId).eq('status', 'pending').order('created_at', { ascending: false });
+        if (body?.limit != null) q = q.limit(Math.min(Math.max(Number(body.limit) || 25, 1), 500));
+        const { data, error, count } = await q;
         if (error) throw new HttpError(400, error.message);
-        return json({ pending: data ?? [] });
+        return json({ pending: data ?? [], total: count ?? (data ?? []).length });
       }
       case 'approve-pending': {
         const id = String(body?.pending_id ?? '');

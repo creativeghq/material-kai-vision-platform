@@ -491,19 +491,18 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
         ? { limit_clamped: { requested: requestedLimit, used: MAX_PER_CALL,
             note: `Capped at ${MAX_PER_CALL} per call — more than that cannot finish inside the 90s tool timeout. Call again for another country/region, or dispatch a background task for a full multi-market sweep.` } }
         : {}),
-      // `results` is the countable shape shapeToolResult() recognises (#370, Class E).
-      results: matches,
+      // `count` below is what shapeToolResult() counts; `companies` is what the card reads.
       companies: matches,
-      unverified,
+      unverified: unverified.slice(0, 10),
       unverified_note: unverified.length
-        ? 'These were found but are NOT matches: each carries `unverified_reason`. Present them separately, never as results.'
+        ? `${unverified.length} were found but are NOT matches${unverified.length > 10 ? ' (first 10 listed)' : ''}: each carries \`unverified_reason\`. Present them separately, never as results.`
         : undefined,
       count: matches.length,
       with_domain: withDomain,
       excluded_domains: blockedDomains.length,
       ...(known.error ? { crm_exclusion_unavailable: known.error } : {}),
       // Human-facing summary only. Downstream steps read `companies`.
-      search_results: textContent || (recorded.length ? '' : 'No results found.'),
+      search_results: textContent ? textContent.slice(0, 500) : (recorded.length ? '' : 'No results found.'),
       query_params: queryParams,
       source: 'claude_web_search',
       // Hand this to `b2b_research_validate`; null means the pair could not be recorded.
@@ -1704,7 +1703,6 @@ export const createIndustrialFacilitySearchTool = (_userId: string, onProgress?:
         success: true,
         found: r.status === 'hit',
         query_describes: describes,
-        results: r.facilities ?? [],
         facilities: r.facilities ?? [],
         count: r.facilities?.length ?? 0,
         cost: { credits: 0, note: 'EU Industrial Emissions Database — public, no key, no charge.' },
@@ -2579,9 +2577,14 @@ export const createB2BResearchValidateTool = (
           challenger_ran: challengerError === null,
           challenger_error: challengerError,
           comparison,
-          // The rows themselves, so the agent can show what the challenger uniquely
-          // found rather than only the counts.
-          challenger_results: challengerRows,
+          challenger_count: challengerRows.length,
+          challenger_shown: Math.min(challengerRows.length, 8),
+          challenger_results: challengerRows.slice(0, 8).map((r) => ({
+            name: r.company_name,
+            domain: r.domain ?? r.website ?? null,
+            type: r.company_type ?? null,
+            has_type_evidence: !!r.type_evidence,
+          })),
         });
       } catch (error) {
         console.error('b2b_research_validate error:', error);

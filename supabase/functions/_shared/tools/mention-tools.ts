@@ -451,6 +451,58 @@ export const createGetMentionSummaryTool = (
 // 3) check_llm_visibility
 // ───────────────────────────────────────────────────────────────────────────
 
+/** A null share of voice is NO VERDICT (no probe answered), never 0%. */
+// deno-lint-ignore no-explicit-any
+function summarizeVisibilitySnapshot(s: any): unknown {
+  if (!s || s.present === false) return { present: false, ...(s?.error ? { error: s.error } : {}) };
+  const perModel = Object.entries((s.per_model ?? {}) as Record<string, any>).map(([model, d]) => ({
+    model,
+    status: d.status,
+    share_of_voice: d.share_of_voice ?? null,
+    avg_rank: Array.isArray(d.positions) && d.positions.length
+      ? Math.round((d.positions.reduce((a: number, b: number) => a + b, 0) / d.positions.length) * 10) / 10
+      : null,
+    answered: d.answered, failed: d.failed,
+    sentiment: d.sentiment?.score ?? d.sentiment?.label ?? null,
+    ...(d.error ? { error: String(d.error).slice(0, 160) } : {}),
+  }));
+  return {
+    present: true,
+    run_at: s.run_at,
+    probes: { total: s.total_probes, answered: s.answered_probes, failed: s.failed_probes },
+    share_of_voice: s.share_of_voice ?? null,
+    avg_rank: s.avg_position ?? null,
+    sentiment: s.sentiment?.score ?? s.sentiment?.label ?? null,
+    ghost_citations: s.citations?.ghost_citations ?? null,
+    brand_cited: s.citations?.brand_cited ?? null,
+    per_model: perModel,
+    top_competitors: (s.top_competitors ?? []).slice(0, 5).map((c: any) => Array.isArray(c) ? { name: c[0], mentions: c[1] } : c),
+    ...(s.probe_error_sample ? { probe_error_sample: String(s.probe_error_sample).slice(0, 200) } : {}),
+  };
+}
+
+// deno-lint-ignore no-explicit-any
+function summarizeVisibilityTrend(t: any): unknown {
+  if (!t || t.present === false || !Array.isArray(t.points) || t.points.length === 0) {
+    return { present: false, ...(t?.error ? { error: t.error } : {}) };
+  }
+  const first = t.points[0];
+  const last = t.points[t.points.length - 1];
+  const delta = t.change?.share_of_voice;
+  const direction = delta == null ? 'not comparable' : delta > 0.02 ? 'up' : delta < -0.02 ? 'down' : 'flat';
+  return {
+    present: true,
+    days: t.days,
+    runs: t.points.length,
+    first: { run_at: first.run_at, share_of_voice: first.share_of_voice, avg_rank: first.avg_position },
+    last: { run_at: last.run_at, share_of_voice: last.share_of_voice, avg_rank: last.avg_position },
+    direction,
+    share_of_voice_change: delta ?? null,
+    avg_rank_change: t.change?.avg_position ?? null,
+    ...(t.change?.not_comparable_reason ? { not_comparable_reason: t.change.not_comparable_reason } : {}),
+  };
+}
+
 export const createCheckLlmVisibilityTool = (
   userId: string,
   /** Attribution for the usage row; the probe fee stays on the personal balance. */
@@ -502,7 +554,13 @@ export const createCheckLlmVisibilityTool = (
         credits_used: force_run ? LLM_PROBE_CREDITS : 0,
         timestamp: Date.now(),
       });
-      return JSON.stringify({ success: true, subject: label, snapshot, trend, credits_used: force_run ? LLM_PROBE_CREDITS : 0 });
+      return JSON.stringify({
+        success: true,
+        subject: label,
+        visibility: summarizeVisibilitySnapshot(snapshot),
+        trend: summarizeVisibilityTrend(trend),
+        credits_used: force_run ? LLM_PROBE_CREDITS : 0,
+      });
     },
     {
       name: 'check_llm_visibility',

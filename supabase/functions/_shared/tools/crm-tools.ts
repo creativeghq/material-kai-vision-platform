@@ -185,15 +185,17 @@ export const createCrmKadSearchTool = (workspaceId: string, onChunk?: (chunk: An
         };
       });
 
-      onChunk?.({ type: 'crm_kad_results', data: { kad: code, match: mode, count: results.length, companies: results } });
+      onChunk?.({ type: 'crm_kad_results', data: { kad: code, match: mode, count: results.length, companies: results.slice(0, 50) } });
+      const shown = results.slice(0, 25);
       return JSON.stringify({
         kad: code,
         match: mode,
         count: results.length,
-        companies: results,
+        shown: shown.length,
+        companies: shown,
         note: results.length === 0
           ? 'No companies in this workspace carry that ΚΑΔ yet. ΚΑΔ is populated when a company is enriched from ΑΑΔΕ/ΓΕΜΗ.'
-          : undefined,
+          : results.length > shown.length ? `${results.length} companies match; the first ${shown.length} are listed.` : undefined,
       });
     },
     {
@@ -269,7 +271,11 @@ export const createCompanyFromVatTool = (
       // Create through crm-api (validation + dedupe + crm_company_created event) as the user.
       const created = await callEdge('crm-api/companies', company, jwt);
       if (!created.ok) return JSON.stringify({ success: false, error: created.error || `crm-api ${created.status}` });
-      const row = created.data?.data ?? created.data;
+      const full = (created.data?.data ?? created.data ?? {}) as AnyRow;
+      const row = {
+        id: full.id ?? null, name: full.name ?? company.name ?? null, vat_number: full.vat_number ?? digits,
+        city: full.city ?? company.city ?? null, country: full.country ?? company.country ?? full.country_code ?? company.country_code ?? null,
+      };
 
       onChunk?.({ type: 'crm_company_created', data: { company: row, source: isGreek ? 'aade' : 'vies' }, timestamp: Date.now() });
       return JSON.stringify({ success: true, company: row, source: isGreek ? 'aade' : 'vies' });
@@ -336,7 +342,8 @@ export const createManageCrmTool = (
         });
         if (error) return JSON.stringify({ success: false, error: error.message });
         onChunk?.({ type: 'crm_activity_logged', data: { contact: target.name, kind: activityType }, timestamp: Date.now() });
-        return JSON.stringify({ success: true, message: `Logged ${activityType.replace('_', ' ')} on ${target.name}.` });
+        const logged = ({ call: 'a call with', email: 'an email with', meeting: 'a meeting with' } as Record<string, string>)[String(kind)] ?? 'a note on';
+        return JSON.stringify({ success: true, message: `Logged ${logged} ${target.name}.` });
       }
 
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
@@ -403,9 +410,22 @@ export const createManageDealTool = (
       };
 
       if (action === 'list') {
-        const { data, error } = await db.from('crm_deals')
+        let q = db.from('crm_deals')
           .select('id, title, stage, status, value, currency, expected_close_date, company_id, contact_id, project_id, type:crm_deal_types ( label ), contact:crm_contacts!crm_deals_contact_id_fkey ( name )')
-          .eq('workspace_id', workspaceId).neq('status', 'lost').order('updated_at', { ascending: false }).limit(50);
+          .eq('workspace_id', workspaceId).eq('status', 'open');
+        if (deal_type) {
+          const { list, hit } = await resolveType();
+          if (!hit) return JSON.stringify({ success: false, error: `unknown deal type. Available: ${list.map((t: AnyRow) => t.label).join(', ')}` });
+          q = q.eq('deal_type_id', hit.id);
+        }
+        if (contact_query) {
+          const { data: contacts } = await db.from('crm_contacts').select('id')
+            .eq('workspace_id', workspaceId).ilike('name', `%${contact_query}%`).limit(25);
+          const ids = ((contacts ?? []) as AnyRow[]).map((c) => c.id);
+          if (!ids.length) return JSON.stringify({ success: false, error: `No contact matches "${contact_query}".` });
+          q = q.in('contact_id', ids);
+        }
+        const { data, error } = await q.order('updated_at', { ascending: false }).limit(50);
         if (error) return JSON.stringify({ success: false, error: error.message });
         // Flattened, because a nested `{type: {label}}` is not a table column: the card's row
         // builder skips non-scalars, so the deal type and the contact were in the payload and on
@@ -427,7 +447,13 @@ export const createManageDealTool = (
 
       if (action === 'forecast') {
         // Weighted pipeline is DERIVED in SQL; this never multiplies value by probability.
-        const { data, error } = await db.rpc('get_deal_forecast', { p_workspace_id: workspaceId, p_deal_type_id: null });
+        let typeId: string | null = null;
+        if (deal_type) {
+          const { list, hit } = await resolveType();
+          if (!hit) return JSON.stringify({ success: false, error: `unknown deal type. Available: ${list.map((t: AnyRow) => t.label).join(', ')}` });
+          typeId = hit.id;
+        }
+        const { data, error } = await db.rpc('get_deal_forecast', { p_workspace_id: workspaceId, p_deal_type_id: typeId });
         if (error) return JSON.stringify({ success: false, error: error.message });
         onChunk?.({ type: 'crm_deal_forecast', rows: data ?? [], timestamp: Date.now() });
         return JSON.stringify({ success: true, forecast: data ?? [] });
@@ -545,11 +571,11 @@ export const createManageDealTool = (
         + 'the board, because they must be attached to a listing or project.',
       schema: z.object({
         action: z.enum(['list', 'forecast', 'documents', 'pipeline_stats', 'create', 'move', 'lose']).default('list'),
-        deal_type: z.string().optional().describe('create: the deal type by name, e.g. "Construction". Defaults to General. pipeline_stats: limit to this type (omit for all).'),
+        deal_type: z.string().optional().describe('create: the deal type by name, e.g. "Construction". Defaults to General. list / forecast / pipeline_stats: limit to this type (omit for all).'),
         deal_id: z.string().optional().describe('documents/move/lose: the deal UUID from list.'),
         months: z.number().int().min(1).max(36).optional().describe('pipeline_stats: months of won/lost history (default 12).'),
         title: z.string().optional().describe('create: what the deal is called.'),
-        contact_query: z.string().optional().describe('create: the contact name to attach (required).'),
+        contact_query: z.string().optional().describe('create: the contact name to attach (required). list: only deals with that contact.'),
         value: z.number().optional().describe('create: deal value.'),
         stage: z.string().optional().describe('move: the target stage name. Stages are per deal type.'),
         lost_reason: z.string().optional().describe('lose: why it was lost.'),

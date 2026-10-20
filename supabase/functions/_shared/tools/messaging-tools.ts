@@ -66,7 +66,11 @@ export const createManageMessagingTool = (
 
         // HUMAN-IN-THE-LOOP GATE (invariant #9): outbound message → confirm first.
         if (confirm !== true) {
-          const preview = content ? `"${String(content).slice(0, 140)}"` : `template ${template_id}`;
+          let preview = content ? `"${String(content).slice(0, 140)}"` : '';
+          if (!content) {
+            const { data: tpl } = await sb.from('messaging_templates').select('name').eq('id', template_id).maybeSingle();
+            preview = tpl?.name ? `the "${tpl.name}" template` : 'the selected template';
+          }
           onChunk?.({
             type: 'action_confirmation',
             tool: 'manage_messaging',

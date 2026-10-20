@@ -28,14 +28,56 @@ import { rerankResults, type RerankCandidate } from '../rerank.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 // One wording for every untrusted block (security invariant 9).
 import { wrapUntrusted, UNTRUSTED_FIELDS_NOTE } from '../untrusted.ts';
+import { clipText } from '../tool-result-shape.ts';
 
 /** Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place. */
 const RERANKABLE_KEYS = ['results', 'chunks', 'products'] as const;
 
+const clip = clipText;
+
+/** A product's spec fields (finish, size, …) — scalars only, so a nested blob cannot ride along. */
+// deno-lint-ignore no-explicit-any
+function scalarMetadata(md: any): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(md ?? {})) {
+    if (Object.keys(out).length >= 30) break;
+    if (typeof v === 'number' || typeof v === 'boolean') out[k] = v;
+    else if (typeof v === 'string' && v && v.length <= 200) out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** The fields a person needs plus the ones agent-chat reads to build product cards. */
+// deno-lint-ignore no-explicit-any
+function projectProductRow(r: any): Record<string, unknown> {
+  const md = r.metadata && typeof r.metadata === 'object' ? r.metadata : {};
+  const imageUrl = r.image_url || r.thumbnail || r.related_images?.[0]?.url || md.image_url;
+  const out: Record<string, unknown> = {
+    id: r.id ?? r.product_id,
+    product_id: r.product_id,
+    product_name: r.product_name || r.name || r.title,
+    category: r.category || md.category,
+    description: clip(r.description || md.description || r.content, 1000),
+    metadata: scalarMetadata(md),
+    image_url: imageUrl,
+    score: r.score ?? r.similarity_score ?? r.relevance_score,
+    sku: r.sku || md.sku,
+    factory: r.factory || md.factory_name || r.manufacturer,
+    type: r.type || md.material,
+    price: r.price ?? md.price,
+    currency: r.cost_currency || r.currency,
+    unit: r.unit,
+    stock: r.stock,
+    tags: Array.isArray(r.tags) ? r.tags.slice(0, 8) : undefined,
+  };
+  for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === null || out[k] === '') delete out[k];
+  return out;
+}
+
 /**
  * Catalogue text is supplier/PDF content (invariant 9). The payload stays JSON because agent-chat
- * parses it into product cards, so product rows carry the structured-result note and raw chunk
- * text — which no card renders — is fenced in full.
+ * parses it into product cards, so product rows carry the structured-result note and chunk text
+ * is clipped and fenced.
  */
 // deno-lint-ignore no-explicit-any
 export function fenceSearchPayload(data: any): any {
@@ -46,14 +88,23 @@ export function fenceSearchPayload(data: any): any {
     data[key] = arr.map((r) => {
       if (!r || typeof r !== 'object') return r;
       const isProduct = key === 'products' || r.product_id || r.product_name || r.name;
-      if (isProduct) return r;
-      const out = { ...r };
+      if (isProduct) return projectProductRow(r);
+      const out: Record<string, unknown> = {
+        id: r.id ?? r.chunk_id,
+        document_id: r.document_id,
+        title: r.title ?? r.document_title ?? r.document_name ?? r.heading,
+        page_number: r.page_number,
+        score: r.score ?? r.similarity_score ?? r.relevance_score,
+      };
       for (const f of ['content', 'text', 'chunk_text']) {
-        if (typeof out[f] === 'string' && out[f]) out[f] = wrapUntrusted('catalogue excerpt', out[f]);
+        const t = clip(r[f], 800);
+        if (t) out[f] = wrapUntrusted('catalogue excerpt', t);
       }
+      for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === null) delete out[k];
       return out;
     });
   }
+  delete data.search_metadata;
   data._untrusted = UNTRUSTED_FIELDS_NOTE;
   return data;
 }
@@ -281,7 +332,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
             body: JSON.stringify({
               query,
               workspace_id: workspaceId,
-              top_k: limit,
+              top_k: Math.min(Math.max(Math.round(Number(limit) || 10), 1), 20),
               // Aspect bias: when the user asks for similar color/texture/style/material,
               // MIVAA weights that per-aspect embedding collection. Omitted = full 7-vector fusion.
               ...(aspect ? { aspect } : {}),
@@ -338,7 +389,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
       description: 'Search for materials, products, and technical information using RAG. Uses multi_vector strategy (7-vector fusion) for best accuracy. ALWAYS provide a search_spec to explain your interpretation of the query — this helps users understand why results were selected.',
       schema: z.object({
         query: z.string().describe('Search query - be specific and detailed'),
-        limit: z.number().default(10).describe('Maximum number of results to return'),
+        limit: z.number().optional().describe('Maximum number of results to return (1-20, default 10)'),
         aspect: z.enum(['color', 'texture', 'style', 'material']).optional()
           .describe('Bias results toward one aspect when the user asks for similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for a normal all-round search.'),
         search_spec: z.object({
@@ -1135,7 +1186,7 @@ ${scrapeResult.markdown.substring(0, 8000)}
           success: true,
           design_tokens: designTokens,
           search_query_used: searchQuery,
-          products: matchedProducts,
+          products: cardProducts,
           total_results: totalResults,
           source_url: url,
           hero_image: scrapeResult.images[0] || null,

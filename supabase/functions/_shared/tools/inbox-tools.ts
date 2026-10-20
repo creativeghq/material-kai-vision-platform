@@ -226,7 +226,13 @@ export const createManageInboxTool = (
           ...(search ? { search: String(search) } : {}),
         }, jwt);
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `inbox-api ${r.status}` });
-        const threads = r.data?.threads ?? [];
+        const threads = ((r.data?.threads ?? []) as Array<Record<string, any>>).map((t) => ({
+          id: t.id, subject: t.subject ?? null, channel: t.channel ?? null, status: t.status ?? null,
+          last_message_at: t.last_message_at ?? null, preview: t.last_message_preview ?? null, unread: !!t.unread,
+          needs_reply: t.needs_reply ?? null, waiting_on: t.waiting_on ?? null, waiting_since: t.waiting_since ?? null,
+          unanswered_count: t.unanswered_count ?? 0, assignee_name: t.assignee_name ?? null,
+          labels: t.labels ?? [], has_attachments: !!t.has_attachments,
+        }));
         onChunk?.({ type: 'inbox_threads_list', workspace_id: workspaceId, threads, timestamp: Date.now() });
         return JSON.stringify({ success: true, count: threads.length, label: label ?? null, search: search ?? null, threads: threads.slice(0, 15) });
       }

@@ -205,7 +205,21 @@ export const createCompanySignalsTool = (
         careers_page: profile.careers_url ?? '—', discovery: profile.ats_check_status ?? 'not_collected',
         open_roles: data?.hiring?.open_count ?? 0, timestamp: Date.now(),
       });
-      return JSON.stringify({ success: true, ...data });
+      const FACT_CAP = 25;
+      return JSON.stringify({
+        success: true,
+        domain: data?.domain,
+        status: data?.status,
+        careers_page: profile.careers_url ?? null,
+        discovery: profile.ats_check_status ?? 'not_collected',
+        counts: {
+          open_roles: data?.hiring?.open_count ?? (data?.hiring?.open_roles ?? []).length,
+          technologies: (data?.technologies?.items ?? []).length,
+          intents: (data?.intents?.items ?? []).length,
+        },
+        signals: facts.slice(0, FACT_CAP),
+        truncated: facts.length > FACT_CAP,
+      });
     },
     {
       name: 'company_signals',

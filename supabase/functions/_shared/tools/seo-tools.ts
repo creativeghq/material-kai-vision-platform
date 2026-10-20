@@ -444,7 +444,7 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
         return JSON.stringify({
           success: true,
           article_id: articleId,
-          message: `SEO article pipeline started for "${target_keyword}". The article is being generated in the background — you can track progress in the viewer above.`,
+          message: `The article on "${target_keyword}" is being written in the background; it will appear here when it's ready.`,
         });
       } catch (error: any) {
         console.error('SEO pipeline error:', error);

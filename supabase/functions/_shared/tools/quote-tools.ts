@@ -458,7 +458,7 @@ export const createCreateQuoteTool = (
           grand_total: round2(grandTotal),
           currency: 'EUR',
           pdf_generated: Boolean(pdfUrl),
-          message: `Created quote${quoteNumber ? ` ${quoteNumber}` : ''} with ${lineCount} item(s), total €${round2(grandTotal).toFixed(2)}. It's open on the canvas and available on the Quotes page.`,
+          message: `Created quote${quoteNumber ? ` ${quoteNumber}` : ''} with ${lineCount} item(s), total €${round2(grandTotal).toFixed(2)}. You can review it beside this chat or any time under Quotes.`,
         });
       } catch (e) {
         return JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) });

@@ -191,10 +191,11 @@ export async function recordExpense(
         message: (reallyPaid
           ? `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) and marked it paid.`
           : paymentError
-            ? `Recorded the ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable — the PAYMENT was not recorded (${paymentError}). Settle it from Payables or with pay_expense. Do NOT record the expense again.`
+            ? `Recorded the ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable — the PAYMENT was not recorded (${paymentError}). It can be settled from Payables. The expense itself is saved, so it does not need recording again.`
             : `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable in AP.`)
           + (tripRef ? ` Filed against ${tripRef.name}.` : '')
           + (propRef ? ` For ${propRef.name}.` : ''),
+        next_step: paymentError && !reallyPaid ? 'Do NOT record the expense again — no second record_expense call. To settle it, call pay_expense for this bill.' : undefined,
       });
     } catch (e: any) {
       return JSON.stringify({ success: false, error: e?.message || 'Could not record expense' });
@@ -485,18 +486,22 @@ export const createListExpensesTool = (userId: string, workspaceId: string, onCh
       // thing the select left out: the supplier survived only inside `notes` ("From myDATA
       // received document 4000… · ΑΠΟΣΤΟΛΙΔΗΣ ΑΕΒΕ"), so the card had no Supplier column and
       // nothing to link to CRM. `supplier_company_id` + `order_id` are what make the row openable.
-      const { data, error } = await sb.from('supplier_bills')
-        .select('id, supplier_bill_number, supplier_company_id, supplier_name, total, amount_due, currency, status, issued_at, order_id, project_id, category_id, notes')
-        .eq('workspace_id', workspaceId)
+      const want = source && source !== 'all' ? source : null;
+      const cols = 'id, supplier_bill_number, supplier_company_id, supplier_name, total, amount_due, currency, status, issued_at, order_id, project_id, category_id, notes';
+      let q = sb.from('supplier_bills')
+        .select(want === 'mydata' ? `${cols}, inbound_documents!inner(id)` : want ? `${cols}, inbound_documents(id)` : cols)
+        .eq('workspace_id', workspaceId);
+      if (want === 'order') q = q.not('order_id', 'is', null).is('inbound_documents', null);
+      if (want === 'manual') q = q.is('order_id', null).is('inbound_documents', null);
+      const { data, error } = await q
         .order('issued_at', { ascending: false, nullsFirst: false })
         .limit(Math.min(Math.max(limit ?? 15, 1), 50));
       if (error) throw error;
-      const named = await attachPartyNames(sb, data ?? [], [
+      const bills = ((data ?? []) as any[]).map(({ inbound_documents: _link, ...b }) => b);
+      const named = await attachPartyNames(sb, bills, [
         { idField: 'supplier_company_id', nameField: 'supplier_name' },
       ]);
-      const stamped = await stampExpenseSource(sb, workspaceId, named);
-      const want = source && source !== 'all' ? source : null;
-      const expenses = want ? stamped.filter((r) => r.source === want) : stamped;
+      const expenses = await stampExpenseSource(sb, workspaceId, named);
       // Ship the rows in the chunk (not just a count) so the card renders line items, like the
       // finance-tools list chunks — a count-only chunk rendered an empty-looking card.
       onChunk?.({ type: 'expenses_list', data: { count: expenses.length, source: source ?? 'all', expenses } });
@@ -688,6 +693,10 @@ export const createMydataExpensesTool = (
         if (booked === 'only_booked') c = c.not('created_supplier_bill_id', 'is', null);
         if (from) c = c.gte('issue_date', from);
         if (to) c = c.lte('issue_date', to);
+        if (issuer) {
+          const t = issuer.trim();
+          c = /^[0-9]{6,}$/.test(t) ? c.eq('issuer_vat', t) : c.ilike('issuer_name', `%${t}%`);
+        }
         const { count } = await c;
         total = count ?? null;
       } catch { total = null; }

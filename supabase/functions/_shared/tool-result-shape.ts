@@ -123,3 +123,16 @@ export function describeUpstreamError(status: number, parsed: unknown, max = 300
     return `${prefix}unreadable error body`;
   }
 }
+
+/** A string cut to `n` chars with an ellipsis; anything else, or empty, is `undefined` (dropped from JSON). */
+export const clipText = (v: unknown, n = 300): string | undefined =>
+  typeof v === 'string' && v ? (v.length > n ? `${v.slice(0, n)}…` : v) : undefined;
+
+/** The counts a list result carries so the model never reads its sample as the whole set. */
+export const shownOf = (rows: readonly unknown[], total: number, noun: string, cap = 15) => {
+  const shown = Math.min(rows.length, cap);
+  return {
+    count: total, shown, total,
+    message: total > shown ? `Showing the ${shown} most recent of ${total} ${noun}s.` : `${total} ${noun}${total === 1 ? '' : 's'}.`,
+  };
+};

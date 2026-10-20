@@ -228,21 +228,96 @@ export const createManageSocialTool = (
       }
 
       if (action === 'account_insights') {
-        const resolved = account_id || platform ? await resolveAccount(ws, account_id, platform) : null;
+        let accountIds: string[] | null = null;
+        if (account_id || platform) {
+          const resolved = await resolveAccount(ws, account_id, platform);
+          if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
+          accountIds = [resolved.account.id];
+        }
         const res = await callZernio(jwt!, {
           action: 'get_account_insights',
-          ...(resolved && resolved.ok ? { social_account_id: resolved.account.id } : { workspace_id: ws }),
+          ...(accountIds ? { social_account_id: accountIds[0] } : { workspace_id: ws }),
         });
         if (!res.ok) return JSON.stringify({ success: false, error: res.error });
-        onChunk?.({ type: 'social_insights', insights: res.data, timestamp: Date.now() });
-        return JSON.stringify({ success: true, insights: res.data });
+        let acctQ = svc.from('social_accounts').select('id, platform, handle, followers_count, following_count, last_synced_at')
+          .eq('workspace_id', ws).eq('is_active', true);
+        if (accountIds) acctQ = acctQ.in('id', accountIds);
+        const { data: accts, error: acctErr } = await acctQ.limit(20);
+        if (acctErr) return JSON.stringify({ success: false, error: `Could not read the account figures: ${acctErr.message}` });
+        const ids = (accts ?? []).map((a: any) => a.id);
+        const { data: snaps } = ids.length
+          ? await svc.from('social_account_insights').select('social_account_id, snapshot_date, followers_count, posts_count')
+            .in('social_account_id', ids).order('snapshot_date', { ascending: false }).limit(ids.length * 30)
+          : { data: [] as any[] };
+        const accounts = (accts ?? []).map((a: any) => {
+          // A 0 snapshot is what a failed follower fetch writes, so it is unknown, not a loss.
+          const own = (snaps ?? []).filter((s: any) => s.social_account_id === a.id && Number(s.followers_count) > 0);
+          const oldest = own[own.length - 1];
+          return {
+            platform: a.platform, handle: a.handle,
+            followers: a.followers_count ?? own[0]?.followers_count ?? null,
+            following: a.following_count ?? null,
+            posts: own[0]?.posts_count ?? null,
+            follower_change: own.length > 1 ? own[0].followers_count - oldest.followers_count : null,
+            change_since: own.length > 1 ? oldest.snapshot_date : null,
+            last_synced_at: a.last_synced_at,
+          };
+        });
+        const insights = { synced: res.data?.synced ?? 0, accounts };
+        onChunk?.({ type: 'social_insights', insights, timestamp: Date.now() });
+        return JSON.stringify({ success: true, insights });
       }
 
       if (action === 'post_analytics') {
-        const res = await callZernio(jwt!, { action: 'get_post_analytics', workspace_id: ws });
+        let postIds: string[] | null = post_id ? [String(post_id)] : null;
+        if (!postIds && (account_id || platform)) {
+          const resolved = await resolveAccount(ws, account_id, platform);
+          if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
+          const { data: own } = await svc.from('social_posts').select('id')
+            .eq('workspace_id', ws).eq('social_account_id', resolved.account.id).eq('status', 'published')
+            .order('published_at', { ascending: false, nullsFirst: false }).limit(50);
+          postIds = (own ?? []).map((p: any) => p.id);
+          if (postIds.length === 0) {
+            const result = { synced: 0, posts: [] };
+            onChunk?.({ type: 'social_post_analytics', result, timestamp: Date.now() });
+            return JSON.stringify({ success: true, result, message: `Nothing has been published on ${resolved.account.platform} yet.` });
+          }
+        }
+        if (!postIds) {
+          const { data: latest } = await svc.from('social_posts').select('id')
+            .eq('workspace_id', ws).eq('status', 'published')
+            .order('published_at', { ascending: false, nullsFirst: false }).limit(15);
+          postIds = (latest ?? []).map((p: any) => p.id);
+        }
+        const res = postIds.length
+          ? await callZernio(jwt!, { action: 'get_post_analytics', post_ids: postIds })
+          : { ok: true, data: { synced: 0 } } as any;
         if (!res.ok) return JSON.stringify({ success: false, error: res.error });
-        onChunk?.({ type: 'social_post_analytics', result: res.data, timestamp: Date.now() });
-        return JSON.stringify({ success: true, result: res.data });
+        let postQ = svc.from('social_posts').select('id, platform, caption, published_at')
+          .eq('workspace_id', ws).eq('status', 'published');
+        if (postIds) postQ = postQ.in('id', postIds);
+        const { data: posts, error: postsErr } = await postQ.order('published_at', { ascending: false, nullsFirst: false }).limit(15);
+        if (postsErr) return JSON.stringify({ success: false, error: `Could not read the post figures: ${postsErr.message}` });
+        const ids = (posts ?? []).map((p: any) => p.id);
+        const { data: metrics } = ids.length
+          ? await svc.from('social_post_analytics')
+            .select('post_id, snapshot_date, impressions, reach, likes, comments, shares, saves, clicks, engagement_rate')
+            .in('post_id', ids).order('snapshot_date', { ascending: false })
+          : { data: [] as any[] };
+        const rows = (posts ?? []).map((p: any) => {
+          const m = (metrics ?? []).find((x: any) => x.post_id === p.id);
+          return {
+            platform: p.platform,
+            caption: typeof p.caption === 'string' ? p.caption.slice(0, 120) : null,
+            published_at: p.published_at,
+            ...(m
+              ? { impressions: m.impressions, reach: m.reach, likes: m.likes, comments: m.comments, shares: m.shares, saves: m.saves, clicks: m.clicks, engagement_rate: m.engagement_rate, as_of: m.snapshot_date }
+              : { metrics: 'not synced yet' }),
+          };
+        });
+        const result = { synced: res.data?.synced ?? 0, sync_errors: Array.isArray(res.data?.errors) ? res.data.errors.length : 0, posts: rows };
+        onChunk?.({ type: 'social_post_analytics', result, timestamp: Date.now() });
+        return JSON.stringify({ success: true, result });
       }
 
       if (action === 'generate_content') {
@@ -360,7 +435,8 @@ export const createManageSocialTool = (
         '  schedule         → post at a future time. Same as publish + scheduled_at (ISO datetime).',
         '  best_time        → recommended posting window for an account (account_id or platform).',
         '  account_insights → follower/engagement insights for an account (or the whole workspace if none given).',
-        '  post_analytics   → sync + return analytics for the workspace\'s published posts.',
+        '  post_analytics   → sync + return analytics for the 15 latest published posts. Narrow with post_id,',
+        '                     account_id or platform.',
         '  generate_content → AI-draft a caption + hashtags for a topic on a platform (topic + platform).',
         '                     Saves a DRAFT post and returns its post_id.',
         '  generate_image   → AI-generate an image from a prompt. Pass the post_id from generate_content',

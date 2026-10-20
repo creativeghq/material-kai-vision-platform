@@ -5,7 +5,7 @@ import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
 // One dispatcher, shared with the CRM's Google Business lookup — a second copy of the
 // reserve → call → settle chain is a second place for invariant 10 to be got wrong.
 import { callDataForSEO, callSEOAgentRoute } from './dataforseo-dispatch.ts';
-import { describeUpstreamError } from '../tool-result-shape.ts';
+import { clipText, describeUpstreamError } from '../tool-result-shape.ts';
 // Invariant 7 — a model-supplied URL that OUR infrastructure will fetch (#352 A19).
 import { assertSafeUrl } from '../ssrf-guard.ts';
 import { findWorkspacePage, recordPageAudit } from '../seo/page-audit-store.ts';
@@ -509,6 +509,34 @@ export const createSEOGscTopMoversTool = (
 // Own rankings — the workspace's rank tracker + Search Console, FIRST-PARTY
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** One keyword's daily rank history folded to a summary plus its last 7 days. */
+function summarizeKeywordHistory(k: any) {
+  const byDay = new Map<string, any>();
+  for (const d of Array.isArray(k?.days) ? k.days : []) {
+    const day = String(d?.date ?? '').slice(0, 10);
+    if (day && !byDay.has(day)) byDay.set(day, d);
+  }
+  const days = [...byDay.entries()].map(([date, d]) => ({
+    date, position: d.position ?? null, url: d.url ?? null, error: d.error ?? null,
+    rechecked: d.rechecked ?? null, recheck_best_position: d.recheck_best_position ?? null,
+  }));
+  const ranked = days.filter((d) => !d.error && d.position != null);
+  const positions = ranked.map((d) => Number(d.position));
+  return {
+    keyword: k?.keyword, device: k?.device ?? null, country_code: k?.country_code ?? null,
+    days_checked: days.length,
+    first_position: ranked[0]?.position ?? null,
+    last_position: ranked[ranked.length - 1]?.position ?? null,
+    best_position: positions.length ? Math.min(...positions) : null,
+    worst_position: positions.length ? Math.max(...positions) : null,
+    days_out_of_top_100: days.filter((d) => !d.error && d.position == null).length,
+    days_with_errors: days.filter((d) => d.error).length,
+    pages_that_ranked: [...new Set(ranked.map((d) => d.url).filter(Boolean))].slice(0, 5),
+    search_console: k?.search_console ?? null,
+    last_7_days: days.slice(-7),
+  };
+}
+
 /**
  * "Which keywords do we rank for?" answered from what the platform already MEASURES for the
  * connected website, rather than from a third-party index.
@@ -531,6 +559,14 @@ export const createSEOMyRankingsTool = (
       onChunk?.({ type: 'tool_progress', status: `Reading the rank tracker and Search Console for ${site.domain}…`, timestamp: Date.now() });
 
       const wanted = (keywords ?? []).map((k) => k.trim()).filter(Boolean).slice(0, 20);
+      const wantedLc = wanted.map((w) => w.toLowerCase());
+      const isWantedKeyword = (kw: unknown) => wantedLc.includes(String(kw || '').trim().toLowerCase());
+      // Whole words only: "tile" must not pull in "textile".
+      const wantedRe = wantedLc.map((w) => new RegExp(`(^|[^\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}\\p{N}])`, 'u'));
+      const isWantedQuery = (q: unknown) => {
+        const s = String(q || '').trim().toLowerCase();
+        return wantedRe.some((re) => re.test(s));
+      };
       const [rankRes, gscRes, connRes, histRes] = await Promise.all([
         ctx.supabase.rpc('get_website_rank_summary', { p_website_id: site.id, p_days: windowDays }),
         ctx.supabase.rpc('get_gsc_summary', { p_website_id: site.id, p_days: windowDays }),
@@ -549,8 +585,10 @@ export const createSEOMyRankingsTool = (
       const connected = !!conn?.is_active;
       const summary = rank.summary || {};
       const rows: any[] = Array.isArray(rank.keywords) ? rank.keywords : [];
-      const ranking = rows.filter((k: any) => k.found && !k.error && k.position != null);
-      const queries: any[] = Array.isArray(gsc.top_queries) ? gsc.top_queries : [];
+      const scopedRows = wanted.length ? rows.filter((k: any) => isWantedKeyword(k.keyword)) : rows;
+      const ranking = scopedRows.filter((k: any) => k.found && !k.error && k.position != null);
+      const allQueries: any[] = Array.isArray(gsc.top_queries) ? gsc.top_queries : [];
+      const queries = wanted.length ? allQueries.filter((q: any) => isWantedQuery(q.query)) : allQueries;
       const trackedSet = new Set(rows.map((k: any) => String(k.keyword || '').trim().toLowerCase()));
       const untracked = queries.filter((q: any) => Number(q.impressions) >= 5 && !trackedSet.has(String(q.query || '').trim().toLowerCase()));
       const gscStatus = connected ? gsc.status : 'not_connected';
@@ -563,9 +601,7 @@ export const createSEOMyRankingsTool = (
           // Series and SERP-feature arrays stay out of the card: 129 keywords × 28 points is
           // weight the chat message store carries forever and the card never reads.
           // Asked about named keywords → the card is about those, not all 130.
-          keywords: (wanted.length
-            ? rows.filter((k: any) => wanted.some((w) => w.toLowerCase() === String(k.keyword || '').trim().toLowerCase()))
-            : rows).map((k: any) => ({
+          keywords: scopedRows.map((k: any) => ({
             keyword: k.keyword, position: k.position, previous: k.previous, change: k.change,
             found: k.found, entered: k.entered, lost: k.lost, url: k.url, error: k.error,
             search_volume: k.search_volume, captured_at: k.captured_at, tags: k.tags,
@@ -588,6 +624,10 @@ export const createSEOMyRankingsTool = (
           note: rank.note ?? null,
           tracked: rank.tracked ?? 0,
           checked_at: summary.captured_at ?? null,
+          ...(wanted.length ? {
+            counts_scope: 'The ranking / not_ranking / failed / top_10 / avg_position figures are for ALL tracked keywords, not only the ones asked about.',
+            not_tracked: wanted.filter((w) => !trackedSet.has(w.toLowerCase())),
+          } : {}),
           ranking: summary.ranking ?? 0,
           not_ranking: summary.not_ranking ?? 0,
           failed: summary.failed ?? 0,
@@ -597,8 +637,8 @@ export const createSEOMyRankingsTool = (
             keyword: k.keyword, position: k.position, previous: k.previous ?? null, change: k.change ?? null,
             url: k.url, volume: k.search_volume ?? null, tags: k.tags ?? [],
           })),
-          entered: rows.filter((k: any) => k.entered).map((k: any) => k.keyword).slice(0, 15),
-          lost: rows.filter((k: any) => k.lost).map((k: any) => k.keyword).slice(0, 15),
+          entered: scopedRows.filter((k: any) => k.entered).map((k: any) => k.keyword).slice(0, 15),
+          lost: scopedRows.filter((k: any) => k.lost).map((k: any) => k.keyword).slice(0, 15),
         },
         search_console: {
           connected,
@@ -610,8 +650,8 @@ export const createSEOMyRankingsTool = (
           queries_with_demand_not_tracked: untracked.slice(0, 10).map((q: any) => ({ query: q.query, position: q.position, impressions: q.impressions })),
         },
         ...(wanted.length ? {
-          keyword_history: histRes.data?.keywords ?? [],
-          keyword_history_guidance: 'One row per day. position is that day\'s FIRST read; null with no error = not in the top 100, an error = unknown. Each daily read is a single sample, and Google can return a different page for the same query seconds later, so a keyword that alternates in and out is volatile, not lost. Treat a drop as real only when it persists over several days, or when rechecked is true and recheck_best_position is also outside the top 10. Compare with search_console.avg_position, which averages every real impression.',
+          keyword_history: (histRes.data?.keywords ?? []).map(summarizeKeywordHistory),
+          keyword_history_guidance: 'One entry per keyword: first/last/best/worst position over the window, days_out_of_top_100, days_with_errors, the pages that ranked, and last_7_days (one row per day). position is that day\'s FIRST read; null with no error = not in the top 100, an error = unknown. Each daily read is a single sample, and Google can return a different page for the same query seconds later, so a keyword that alternates in and out is volatile, not lost. Treat a drop as real only when it persists over several days, or when rechecked is true and recheck_best_position is also outside the top 10. Compare with search_console.avg_position, which averages every real impression.',
         } : {}),
         guidance: 'These are measurements, not estimates: the rank tracker is a live Google check of the keywords this workspace chose to track, and Search Console is what Google reports having shown. Answer from them. A third-party index (seo_ranked_keywords, seo_domain_snapshot) is refreshed weeks apart and routinely misses a site\'s own brand rank — never let it override these, and if you cite it, give its SERP date. A status of not_connected / not_collected is a fact to report, not a zero.',
       });
@@ -643,20 +683,31 @@ const SITE_REPORT_DEFAULT_DAYS: Record<string, number> = {
 };
 
 /** Trim a jsonb payload so a 129-row series does not become the whole context window. */
-function compactJson(value: any, depth = 0): any {
+function compactJson(value: any, depth = 0, maxRows = 20, maxChars = 300): any {
   if (depth > 5) return '[…]';
   if (Array.isArray(value)) {
-    const out = value.slice(0, 20).map((v) => compactJson(v, depth + 1));
-    if (value.length > 20) out.push({ _truncated: `${value.length - 20} more rows` });
+    const out = value.slice(0, maxRows).map((v) => compactJson(v, depth + 1, maxRows, maxChars));
+    if (value.length > maxRows) out.push({ _truncated: `${value.length - maxRows} more rows` });
     return out;
   }
   if (value && typeof value === 'object') {
     const out: Record<string, any> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = compactJson(v, depth + 1);
+    for (const [k, v] of Object.entries(value)) out[k] = compactJson(v, depth + 1, maxRows, maxChars);
     return out;
   }
-  if (typeof value === 'string' && value.length > 300) return value.slice(0, 300) + '…';
+  if (typeof value === 'string' && value.length > maxChars) return value.slice(0, maxChars) + '…';
   return value;
+}
+
+const SITE_REPORT_MAX_CHARS = 15000;
+
+function boundedReport(data: any): { data: any; truncated?: string } {
+  const compact = compactJson(data);
+  if (JSON.stringify(compact ?? null).length <= SITE_REPORT_MAX_CHARS) return { data: compact };
+  return {
+    data: compactJson(data, 0, 5, 200),
+    truncated: 'This report was shortened to fit: lists cut to their first 5 rows and long text to 200 characters. Ask for a narrower report (a page, a query, a shorter window) for the full rows.',
+  };
 }
 
 const SITE_REPORT_LIST_KEYS = ['items', 'issue_groups', 'issues', 'top_keywords', 'questions', 'competitors', 'channels', 'prompts', 'models', 'queries', 'subjects', 'trend', 'toolkit_runs', 'articles'];
@@ -880,7 +931,7 @@ export const createSEOSiteReportTool = (
         window_days: windowDays,
         status,
         note,
-        data: compactJson(data),
+        ...boundedReport(data),
         guidance: status && status !== 'ok'
           ? `The source reports status "${status}": say that in those words — it is a fact about the collector, not a zero.`
           : 'First-party measurement of the workspace\'s own site. Quote the figures with the dates they carry; nothing here is an estimate.',
@@ -955,9 +1006,24 @@ export const createSEOKeywordSuggestionsTool = (
       }, { user_id: _userId });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
+      const cardItems = items.map((i: any) => {
+        const kd = i.keyword_data || i;
+        return {
+          keyword: kd.keyword ?? i.keyword,
+          keyword_data: {
+            keyword: kd.keyword ?? i.keyword,
+            keyword_info: {
+              search_volume: kd.keyword_info?.search_volume ?? i.search_volume ?? null,
+              cpc: kd.keyword_info?.cpc ?? null,
+              competition: kd.keyword_info?.competition ?? null,
+            },
+            keyword_properties: { keyword_difficulty: kd.keyword_properties?.keyword_difficulty ?? null },
+          },
+        };
+      });
       onChunk?.({
         type: 'seo_keywords_card',
-        seed: keyword, items, source: 'suggestions',
+        seed: keyword, items: cardItems, source: 'suggestions',
         country: (country_code || 'US').toUpperCase(),
         timestamp: Date.now(),
       });
@@ -1035,10 +1101,17 @@ export const createSEOSerpAuditTool = (
       onChunk?.({
         type: 'seo_serp_audit_card',
         keyword, country: (country_code || 'US').toUpperCase(),
-        items, types_summary: byType, timestamp: Date.now(),
+        items: items.map((it: any) => ({
+          type: it.type, rank_absolute: it.rank_absolute ?? null, domain: it.domain ?? null, url: it.url ?? null,
+        })),
+        types_summary: byType, timestamp: Date.now(),
       });
       return JSON.stringify({
         success: true, keyword, item_count: items.length, types: byType,
+        _untrusted: UNTRUSTED_FIELDS_NOTE,
+        top_organic: items.filter((it: any) => it.type === 'organic').slice(0, 10).map((it: any) => ({
+          rank: it.rank_absolute ?? it.rank_group, domain: it.domain, title: typeof it.title === 'string' ? it.title.slice(0, 120) : null, url: it.url,
+        })),
       });
     },
     {
@@ -1057,6 +1130,49 @@ export const createSEOSerpAuditTool = (
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 4 — URL audit tool
 // ─────────────────────────────────────────────────────────────────────────────
+
+const LH_UNSCORED_MODES = new Set(['notApplicable', 'informative', 'manual', 'error']);
+
+/** Lighthouse audits scoring under 0.9, by title. */
+function failedLighthouseAudits(lh: any, max = 25): string[] {
+  const audits = lh?.audits && typeof lh.audits === 'object' ? Object.values(lh.audits) : [];
+  return (audits as any[])
+    .filter((a) => a && typeof a.score === 'number' && a.score < 0.9 && !LH_UNSCORED_MODES.has(a.scoreDisplayMode))
+    .sort((a, b) => a.score - b.score)
+    .slice(0, max)
+    .map((a) => String(a.title ?? a.id ?? ''));
+}
+
+/** Only what the URL-audit card reads: category scores, failed audits, page meta + checks. */
+function projectUrlAuditSections(sections: any) {
+  const lh = sections?.lighthouse?.items?.[0];
+  const ip = sections?.instant_page?.items?.[0];
+  const out: Record<string, unknown> = {};
+  if (lh) {
+    const categories: Record<string, { score: number | null }> = {};
+    for (const [k, c] of Object.entries(lh.categories || {})) categories[k] = { score: (c as any)?.score ?? null };
+    out.lighthouse = { items: [{ categories, failed_audits: failedLighthouseAudits(lh) }] };
+  }
+  if (ip) {
+    out.instant_page = {
+      items: [{
+        url: ip.url ?? null, status_code: ip.status_code ?? null,
+        meta: ip.meta ? {
+          title: ip.meta.title ?? null,
+          internal_links_count: ip.meta.internal_links_count ?? null,
+          external_links_count: ip.meta.external_links_count ?? null,
+          images_count: ip.meta.images_count ?? null,
+        } : null,
+        page_metrics: ip.page_metrics ? {
+          onpage_score: { value: ip.page_metrics.onpage_score?.value ?? ip.onpage_score ?? null },
+          checks: ip.page_metrics.checks ?? null,
+        } : null,
+        checks: ip.checks ?? null,
+      }],
+    };
+  }
+  return out;
+}
 
 export const createSEOAuditUrlTool = (
   _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
@@ -1093,7 +1209,7 @@ export const createSEOAuditUrlTool = (
       onChunk?.({
         type: 'seo_url_audit_card',
         url, for_mobile: !!for_mobile,
-        sections: r.data?.sections || {},
+        sections: projectUrlAuditSections(r.data?.sections || {}),
         errors: r.data?.errors || {},
         saved_to_page: page ? { page_id: page.id, website_id: page.website_id } : null,
         content_scores: contentScores,
@@ -1110,6 +1226,7 @@ export const createSEOAuditUrlTool = (
           best_practices: categories['best-practices']?.score,
           seo: categories.seo?.score,
         },
+        failed_audits: failedLighthouseAudits(lh, 10),
       });
     },
     {
@@ -1451,7 +1568,8 @@ export const createSEOSiteCrawlStartTool = (
       });
       return JSON.stringify({
         success: true, target, task_id: r.data?.task_id,
-        message: 'Crawl queued. Use seo_site_crawl_status with the task_id to poll for completion.',
+        message: 'Crawl started — ask me for its status in a few minutes.',
+        next_step: 'Call seo_site_crawl_status with this task_id when the user asks for the result; do not poll it now.',
       });
     },
     {
@@ -1574,6 +1692,13 @@ export const createSEOLlmMentionsSearchTool = (
       });
       return JSON.stringify({
         success: true, keyword, count: items.length,
+        _untrusted: UNTRUSTED_FIELDS_NOTE,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          question: clip(i.question, 150), platform: i.platform ?? i.model_name ?? null,
+          ai_search_volume: i.ai_search_volume ?? null,
+          title: clip(i.title), domain: i.domain ?? null, url: i.url ?? null,
+          sources: (Array.isArray(i.sources) ? i.sources : []).slice(0, 3).map((s: any) => s?.domain ?? s?.url ?? null),
+        })),
       });
     },
     {
@@ -1676,7 +1801,22 @@ export const createSEOGoogleTrendsTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_trends_card', keywords, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, count: items.length });
+      const graph = items.find((i: any) => i?.type === 'google_trends_graph') || items[0] || {};
+      const points: any[] = Array.isArray(graph.data) ? graph.data : [];
+      const terms: string[] = Array.isArray(graph.keywords) ? graph.keywords : keywords;
+      const trend = terms.map((kw, idx) => {
+        const series = points
+          .map((p: any) => ({ date: p.date_from ?? p.date ?? null, v: Array.isArray(p.values) ? p.values[idx] : null }))
+          .filter((p) => typeof p.v === 'number');
+        const peak = series.reduce((m: any, p) => (!m || p.v > m.v ? p : m), null);
+        return {
+          keyword: kw,
+          average: Array.isArray(graph.averages) ? graph.averages[idx] ?? null : null,
+          first: series[0] ?? null, last: series[series.length - 1] ?? null, peak,
+          last_points: series.slice(-6),
+        };
+      });
+      return JSON.stringify({ success: true, count: items.length, points: points.length, trend, scale: 'Google Trends relative interest, 0-100 within this query' });
     },
     {
       name: 'seo_google_trends',
@@ -1753,8 +1893,11 @@ export const createSEOBrandSearchAuditTool = (
       const organic = items.filter((i: any) => i.type === 'organic').slice(0, 5);
       onChunk?.({
         type: 'seo_brand_audit_card',
-        brand_name, items, kp_present: !!kp,
-        ai_overview_present: !!aio, organic_top: organic,
+        brand_name,
+        items: items.map((i: any) => ({ type: i.type, rank_absolute: i.rank_absolute ?? null, domain: i.domain ?? null })),
+        kp_present: !!kp,
+        ai_overview_present: !!aio,
+        organic_top: organic.map((o: any) => ({ title: o.title ?? null, domain: o.domain ?? null, url: o.url ?? null })),
         timestamp: Date.now(),
       });
       return JSON.stringify({
@@ -1835,7 +1978,14 @@ export const createSEOAppKeywordsTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_app_keywords_card', store, app_id, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, store, app_id, count: items.length });
+      return JSON.stringify({
+        success: true, store, app_id, count: items.length,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          keyword: i.keyword_data?.keyword ?? i.keyword ?? null,
+          volume: i.keyword_data?.keyword_info?.search_volume ?? null,
+          rank: i.ranked_serp_element?.serp_item?.rank_absolute ?? null,
+        })),
+      });
     },
     {
       name: 'seo_app_keywords',
@@ -1895,7 +2045,13 @@ export const createSEOPinterestSearchTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_pinterest_card', keyword, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, keyword, count: items.length });
+      return JSON.stringify({
+        success: true, keyword, count: items.length,
+        _untrusted: UNTRUSTED_FIELDS_NOTE,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          title: clip(i.title) ?? clip(i.description, 80), author: i.author ?? null, url: i.url ?? null,
+        })),
+      });
     },
     {
       name: 'seo_pinterest_search',
@@ -1921,7 +2077,13 @@ export const createSEORedditSearchTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_reddit_card', keyword, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, keyword, count: items.length });
+      return JSON.stringify({
+        success: true, keyword, count: items.length,
+        _untrusted: UNTRUSTED_FIELDS_NOTE,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          title: clip(i.title), subreddit: i.subreddit ?? null, url: i.url ?? null,
+        })),
+      });
     },
     {
       name: 'seo_reddit_search',
@@ -1974,7 +2136,12 @@ export const createSEOSubdomainsTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_subdomains_card', domain, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, domain, count: items.length });
+      return JSON.stringify({
+        success: true, domain, count: items.length,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          subdomain: i.subdomain ?? null, keywords: i.metrics?.organic?.count ?? null, etv: i.metrics?.organic?.etv ?? null,
+        })),
+      });
     },
     {
       name: 'seo_subdomains',
@@ -2004,7 +2171,12 @@ export const createSEORelevantPagesTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_relevant_pages_card', domain, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, domain, count: items.length });
+      return JSON.stringify({
+        success: true, domain, count: items.length,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          page: i.page_address ?? null, keywords: i.metrics?.organic?.count ?? null, etv: i.metrics?.organic?.etv ?? null,
+        })),
+      });
     },
     {
       name: 'seo_relevant_pages',
@@ -2033,8 +2205,15 @@ export const createSEOHistoricalSerpsTool = (
       }, { user_id: _userId });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
-      onChunk?.({ type: 'seo_historical_serps_card', keyword, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, keyword, snapshot_count: items.length });
+      const snapshots = items.map((s: any) => ({
+        datetime: s.datetime ?? s.date ?? null,
+        se_results_count: s.se_results_count ?? null,
+        top: (Array.isArray(s.items) ? s.items : [])
+          .filter((x: any) => x?.type === 'organic').slice(0, 10)
+          .map((x: any) => ({ rank: x.rank_absolute ?? x.rank_group ?? null, domain: x.domain ?? null })),
+      }));
+      onChunk?.({ type: 'seo_historical_serps_card', keyword, items: snapshots, timestamp: Date.now() });
+      return JSON.stringify({ success: true, keyword, snapshot_count: items.length, snapshots: snapshots.slice(0, 12) });
     },
     {
       name: 'seo_historical_serps',
@@ -2099,7 +2278,10 @@ export const createSEOAIKeywordVolumeTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_ai_keyword_volume_card', items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, count: items.length });
+      return JSON.stringify({
+        success: true, count: items.length,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({ keyword: i.keyword ?? null, ai_search_volume: i.ai_search_volume ?? null })),
+      });
     },
     {
       name: 'seo_ai_keyword_volume',
@@ -2126,7 +2308,12 @@ export const createSEOCategoriesForDomainTool = (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_categories_card', domain, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, domain, count: items.length });
+      return JSON.stringify({
+        success: true, domain, count: items.length,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          category: i.category_name ?? i.name ?? null, keywords: i.metrics?.organic?.count ?? null, etv: i.metrics?.organic?.etv ?? null,
+        })),
+      });
     },
     {
       name: 'seo_categories_for_domain',
@@ -2151,13 +2338,13 @@ export const createSEODataForSEOCallTool = (
       const items = r.data?.items || [];
       onChunk?.({
         type: 'seo_dataforseo_raw_card',
-        kind, items, raw: r.data?.raw,
+        kind, items,
         cost_usd: r.data?.cost_usd, latency_ms: r.data?.latency_ms,
         timestamp: Date.now(),
       });
       return JSON.stringify({
         success: true, kind, item_count: items.length,
-        cost_usd: r.data?.cost_usd, sample: items.slice(0, 3),
+        cost_usd: r.data?.cost_usd, sample: compactJson(items.slice(0, 3)),
       });
     },
     {
@@ -2176,6 +2363,51 @@ export const createSEODataForSEOCallTool = (
 // from the escape hatch to first-class tools. Each is a thin wrapper over
 // callDataForSEO(<unified-client-method>, params).
 // ═══════════════════════════════════════════════════════════════════════════
+
+const clip = (v: unknown, n = 120): string | null => clipText(v, n) ?? null;
+const MODEL_ROWS = 15;
+
+/** A DataForSEO Labs keyword item, flat or nested under keyword_data, as one small row. */
+function kwRow(i: any) {
+  const kd = i?.keyword_data ?? i ?? {};
+  return {
+    keyword: kd.keyword ?? i?.keyword ?? null,
+    volume: kd.keyword_info?.search_volume ?? i?.search_volume ?? null,
+    difficulty: kd.keyword_properties?.keyword_difficulty ?? i?.keyword_difficulty ?? null,
+    intent: kd.search_intent_info?.main_intent ?? i?.search_intent_info?.main_intent ?? null,
+    cpc: kd.keyword_info?.cpc ?? i?.cpc ?? null,
+  };
+}
+
+const monthOf = (i: any): string | null =>
+  i?.date ?? (i?.year != null && i?.month != null ? `${i.year}-${String(i.month).padStart(2, '0')}` : null);
+
+/** CHECK_META in SEOGenericCard: these three are issues when FALSE, every other check when TRUE. */
+const ONPAGE_ISSUE_WHEN_FALSE = new Set(['is_https', 'canonical', 'seo_friendly_url']);
+
+function failedCheckNames(checks: any): string[] {
+  if (!checks || typeof checks !== 'object') return [];
+  return Object.entries(checks)
+    .filter(([k, v]) => (ONPAGE_ISSUE_WHEN_FALSE.has(k) ? v === false : v === true))
+    .map(([k]) => k)
+    .slice(0, 20);
+}
+
+function onpageIssueRow(i: any) {
+  const categories = i?.categories && typeof i.categories === 'object' ? i.categories : null;
+  const scores: Record<string, number | null> = {};
+  if (categories) for (const [k, c] of Object.entries(categories)) scores[k] = (c as any)?.score ?? null;
+  return {
+    url: i?.url ?? i?.page_address ?? i?.from_url ?? i?.finalUrl ?? i?.requestedUrl ?? null,
+    to_url: i?.to_url ?? null,
+    status_code: i?.status_code ?? null,
+    title: clip(i?.meta?.title ?? i?.title),
+    failed_checks: failedCheckNames(i?.checks ?? i?.page_metrics?.checks),
+    onpage_score: i?.onpage_score ?? i?.page_metrics?.onpage_score?.value ?? null,
+    ...(categories ? { lighthouse_scores: scores, failed_audits: failedLighthouseAudits(i, 5) } : {}),
+    ...(Array.isArray(i?.pages) ? { pages: i.pages.length } : {}),
+  };
+}
 
 const ONPAGE_ISSUE_KIND: Record<string, string> = {
   non_indexable: 'onpage_non_indexable',
@@ -2199,7 +2431,7 @@ export const createSEOOnpageIssuesTool = (_userId: string, onChunk?: (chunk: any
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_onpage_issues_card', task_id, issue_type, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, issue_type, count: items.length, sample: items.slice(0, 8) });
+      return JSON.stringify({ success: true, issue_type, count: items.length, sample: items.slice(0, 8).map(onpageIssueRow) });
     },
     {
       name: 'seo_onpage_issues',
@@ -2222,7 +2454,14 @@ export const createSEOBacklinksTimeseriesTool = (_userId: string, onChunk?: (chu
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_backlinks_timeseries_card', target, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, target, points: items.length });
+      const point = (i: any) => i ? ({
+        date: monthOf(i), referring_domains: i.referring_domains ?? null, backlinks: i.backlinks ?? null, rank: i.rank ?? null,
+      }) : null;
+      return JSON.stringify({
+        success: true, target, points: items.length,
+        first: point(items[0]), last: point(items[items.length - 1]),
+        recent: items.slice(-12).map(point),
+      });
     },
     {
       name: 'seo_backlinks_timeseries',
@@ -2262,7 +2501,16 @@ export const createSEOHistoricalRankOverviewTool = (_userId: string, onChunk?: (
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_historical_rank_card', domain, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, domain, points: items.length });
+      const point = (i: any) => {
+        if (!i) return null;
+        const m = i.metrics?.organic || i.organic || i;
+        return { date: monthOf(i), keywords: m.count ?? null, etv: m.etv ?? null, traffic_value: m.estimated_paid_traffic_cost ?? null };
+      };
+      return JSON.stringify({
+        success: true, domain, points: items.length,
+        first: point(items[0]), last: point(items[items.length - 1]),
+        recent: items.slice(-12).map(point),
+      });
     },
     {
       name: 'seo_historical_rank_overview',
@@ -2287,7 +2535,13 @@ export const createSEOKeywordsForSiteTool = (_userId: string, onChunk?: (chunk: 
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_keywords_for_site_card', domain, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, domain, count: items.length });
+      return JSON.stringify({
+        success: true, domain, count: items.length,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          ...kwRow(i),
+          position: i?.ranked_serp_element?.serp_item?.rank_absolute ?? i?.rank_absolute ?? i?.position ?? null,
+        })),
+      });
     },
     {
       name: 'seo_keywords_for_site',
@@ -2313,7 +2567,7 @@ export const createSEOKeywordIdeasTool = (_userId: string, onChunk?: (chunk: any
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_keyword_ideas_card', seeds: keywords, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, count: items.length, top: items.slice(0, 15) });
+      return JSON.stringify({ success: true, count: items.length, top: items.slice(0, 15).map(kwRow) });
     },
     {
       name: 'seo_keyword_ideas',
@@ -2339,7 +2593,7 @@ export const createSEORelatedKeywordsTool = (_userId: string, onChunk?: (chunk: 
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_related_keywords_card', keyword, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, keyword, count: items.length });
+      return JSON.stringify({ success: true, keyword, count: items.length, top: items.slice(0, MODEL_ROWS).map(kwRow) });
     },
     {
       name: 'seo_related_keywords',
@@ -2393,7 +2647,16 @@ export const createSEODomainIntersectionTool = (_userId: string, onChunk?: (chun
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_domain_intersection_card', target1, target2, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, target1, target2, count: items.length });
+      const rankOf = (el: any) => el?.rank_absolute ?? el?.rank_group ?? null;
+      return JSON.stringify({
+        success: true, target1, target2, count: items.length,
+        top: items.slice(0, MODEL_ROWS).map((i: any) => ({
+          keyword: i?.keyword_data?.keyword ?? i?.keyword ?? null,
+          volume: i?.keyword_data?.keyword_info?.search_volume ?? null,
+          target1_position: rankOf(i.first_domain_serp_element),
+          target2_position: rankOf(i.second_domain_serp_element),
+        })),
+      });
     },
     {
       name: 'seo_domain_intersection',
@@ -2420,7 +2683,19 @@ export const createSEOAiOverviewTool = (_userId: string, onChunk?: (chunk: any) 
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
       const items = r.data?.items || [];
       onChunk?.({ type: 'seo_ai_overview_card', keyword, items, timestamp: Date.now() });
-      return JSON.stringify({ success: true, keyword, present: items.length > 0 });
+      const block: any = items.find((i: any) => i?.type === 'ai_overview') || items[0] || {};
+      const refs: any[] = block.references || block.items || [];
+      const text: string = block.text
+        || (Array.isArray(block.items) ? block.items.map((x: any) => x?.text).filter(Boolean).join(' ') : '')
+        || '';
+      return JSON.stringify({
+        success: true, keyword, present: !!text || refs.length > 0,
+        _untrusted: UNTRUSTED_FIELDS_NOTE,
+        answer_excerpt: clip(text, 600),
+        cited_sources: refs.slice(0, MODEL_ROWS).map((r: any) => ({
+          title: clip(r?.title), domain: r?.domain ?? null, url: r?.url ?? null,
+        })),
+      });
     },
     {
       name: 'seo_ai_overview',

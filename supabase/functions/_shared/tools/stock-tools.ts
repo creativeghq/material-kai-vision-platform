@@ -272,13 +272,21 @@ export const createManageStockTool = (
       }
 
       if (action === 'list_pending') {
-        const res = await callStockApi(jwt!, ws, 'list-pending');
+        const res = await callStockApi(jwt!, ws, 'list-pending', { limit: 25 });
         if (!res.ok) return JSON.stringify({ success: false, error: res.error });
-        const pending = (res.data?.pending ?? []).map((p: any) => ({
-          id: p.id, name: p.name, sku: p.sku, unit: p.unit, quantity: p.quantity, unit_cost: p.unit_cost, raw_description: p.raw_description,
+        const rows = (res.data?.pending ?? []).slice(0, 25);
+        const total = Number(res.data?.total ?? rows.length);
+        const pending = rows.map((p: any) => ({
+          id: p.id, name: p.name, sku: p.sku, unit: p.unit, quantity: p.quantity, unit_cost: p.unit_cost,
         }));
-        onChunk?.({ type: 'stock_pending', pending, timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: pending.length, pending, message: pending.length ? 'Pending intake items awaiting approval. Use approve_pending / dismiss_pending with the id.' : 'No pending intake items.' });
+        onChunk?.({ type: 'stock_pending', pending: pending.map((p: any, i: number) => ({ ...p, raw_description: rows[i].raw_description })), total, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true, count: pending.length, shown: pending.length, total, pending,
+          message: total
+            ? `${total} delivery line${total === 1 ? ' is' : 's are'} waiting to be checked into stock${total > pending.length ? `; showing the ${pending.length} most recent` : ''}.`
+            : 'Nothing is waiting to be checked into stock.',
+          ...(total ? { next_step: 'To add or dismiss a line, call manage_stock approve_pending / dismiss_pending with its id; both ask the user to confirm. Never do this unprompted.' } : {}),
+        });
       }
 
       if (action === 'approve_pending' || action === 'dismiss_pending') {

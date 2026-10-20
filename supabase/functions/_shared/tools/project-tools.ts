@@ -354,8 +354,9 @@ export const createAddTaskTool = (
         return JSON.stringify({
           success: false,
           error: project_name
-            ? `No project found matching "${project_name}". Use find_project first or pass project_id directly.`
-            : 'Need either project_id or project_name to know where to add this task.',
+            ? `I could not find a project called "${project_name}".`
+            : 'Which project should this task go on?',
+          next_step: 'Resolve the project with find_project, then retry with its project_id.',
         });
       }
 
@@ -469,8 +470,9 @@ export const createAddPurchaseItemTool = (
         return JSON.stringify({
           success: false,
           error: input.project_name
-            ? `No project found matching "${input.project_name}". Use find_project first or pass project_id.`
-            : 'Need either project_id or project_name to add a purchase item.',
+            ? `I could not find a project called "${input.project_name}".`
+            : 'Which project should this item go on?',
+          next_step: 'Resolve the project with find_project, then retry with its project_id.',
         });
       }
       // workspace_id is required on the row. Read from the PROJECT rather than reusing the
@@ -523,7 +525,8 @@ export const createAddPurchaseItemTool = (
         success: true,
         purchase_item_id: (row as any).id,
         project_id: projectId,
-        message: `Added ${input.item_type || 'door'} "${input.name}". It has no photo yet — open the project's Purchases tab to generate one from the spec, or run generate_purchase_sheet to produce the spec PDF.`,
+        message: `Added ${input.item_type || 'door'} "${input.name}". It has no photo yet — you can create one from the spec on the project's Purchases tab, or I can produce the spec sheet as a PDF.`,
+        next_step: 'Offer generate_purchase_sheet for this project if the user wants the spec PDF.',
         url: `/projects/${projectId}`,
       });
     },
@@ -586,8 +589,9 @@ export const createGeneratePurchaseSheetTool = (
         return JSON.stringify({
           success: false,
           error: project_name
-            ? `No project found matching "${project_name}". Use find_project first or pass project_id.`
-            : 'Need either project_id or project_name to generate the sheet.',
+            ? `I could not find a project called "${project_name}".`
+            : 'Which project should the sheet be made for?',
+          next_step: 'Resolve the project with find_project, then retry with its project_id.',
         });
       }
 

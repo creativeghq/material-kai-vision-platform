@@ -113,29 +113,15 @@ export const createCheckServerHealthTool = () => {
  */
 export const createQuerySentryTool = () => {
   return tool(
-    async ({ jobId, timeRange }) => {
-      try {
-
-        // This is a placeholder implementation
-        // In production, you would integrate with Sentry API using SENTRY_AUTH_TOKEN
-        // For now, we'll return a mock response indicating the feature is available
-
-
-        return JSON.stringify({
-          success: true,
-          jobId,
-          timeRange,
-          errorCount: 0,
-          recentErrors: [],
-          message: 'Sentry integration available - configure SENTRY_AUTH_TOKEN to enable',
-        });
-      } catch (error) {
-        console.error('Query Sentry tool error:', error);
-        return JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : 'Sentry query failed',
-        });
-      }
+    // Not wired to Sentry. A success with errorCount 0 would read as "no errors", which is a claim.
+    ({ jobId, timeRange }) => {
+      return JSON.stringify({
+        success: false,
+        not_connected: true,
+        jobId,
+        timeRange,
+        error: 'Error monitoring is not connected to the assistant, so I cannot check for errors on this job.',
+      });
     },
     {
       name: 'querySentry',

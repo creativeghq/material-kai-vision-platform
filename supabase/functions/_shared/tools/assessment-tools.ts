@@ -253,7 +253,8 @@ function getBody(
       });
       return JSON.stringify({
         success: true, assessed: false, reason: 'no_assessment_yet',
-        message: `"${found.name}" has never been assessed. Run ${runTool} to produce one.`,
+        message: `"${found.name}" has not been assessed yet. I can run an assessment now (about 9 credits).`,
+        next_step: `Offer ${runTool}; run it only if the user agrees to the credit cost.`,
       });
     }
 

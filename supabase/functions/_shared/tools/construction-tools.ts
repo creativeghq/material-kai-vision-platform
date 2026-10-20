@@ -67,8 +67,9 @@ async function resolveProject(
 const notFound = (name?: string) => JSON.stringify({
   success: false,
   error: name
-    ? `No project matching "${name}". Use find_project to look it up first.`
-    : 'Name or id the project — use find_project if you are not sure which one.',
+    ? `No project matching "${name}" was found in this workspace.`
+    : 'Which project? Give its name or id.',
+  next_step: 'Call find_project to look the project up, then retry with its id.',
 });
 
 const money = (v: unknown) => Number(v ?? 0);
@@ -539,9 +540,9 @@ export const createBidAnalysisTool = (
         });
         if (lineDb) {
           const { data: comparison, error: cmpErr } = await lineDb.rpc('get_package_bid_comparison', { p_package_id: pid });
-          out[out.length - 1].line_comparison = cmpErr
-            ? { error: cmpErr.message }
-            : ((comparison ?? []) as Array<Record<string, unknown>>).slice(0, 200);
+          const all = (comparison ?? []) as Array<Record<string, unknown>>;
+          out[out.length - 1].line_comparison = cmpErr ? { error: cmpErr.message } : all.slice(0, 200);
+          if (!cmpErr) out[out.length - 1].line_comparison_total = all.length;
         }
       }
 
@@ -565,7 +566,20 @@ export const createBidAnalysisTool = (
         onChunk?.({ type: 'construction_bid_analysis', ...payload, timestamp: Date.now() });
       } catch { /* stream may be closed */ }
 
-      return JSON.stringify(payload);
+      const LINE_ROWS = 50;
+      return JSON.stringify({
+        ...payload,
+        packages: out.map((pkg) => {
+          const cmp = pkg.line_comparison;
+          if (!Array.isArray(cmp) || cmp.length <= LINE_ROWS) return pkg;
+          const total = Number(pkg.line_comparison_total ?? cmp.length);
+          return {
+            ...pkg,
+            line_comparison: cmp.slice(0, LINE_ROWS),
+            line_comparison_note: `Showing ${LINE_ROWS} of ${total} comparison lines; the card shows the first ${cmp.length}.`,
+          };
+        }),
+      });
     },
     {
       name: 'tender_bid_analysis',

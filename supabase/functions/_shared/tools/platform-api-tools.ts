@@ -74,6 +74,33 @@ function cleanPath(raw: unknown): { path: string } | { error: string } {
   return { path: v };
 }
 
+const UUIDISH = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+const humanKey = (k: string) => k.replace(/_id$/, '').replace(/[_-]+/g, ' ').trim();
+
+/**
+ * The approval card's question. Built from the CATALOG's own words, never from the model's
+ * `reason`: the card is the human gate (invariant 9), so a model steered by tool-result content
+ * must not be able to title a payment "Refresh my dashboard?".
+ */
+function approvalTitle(endpoint: PlatformApiEndpoint): string {
+  const clause = (endpoint.summary || endpoint.tag || endpoint.name).split(/(?<=[a-z0-9)])\.\s| - |; |\(/)[0].trim();
+  return `${clause.slice(0, 100)}?`;
+}
+
+/** EVERY body field in words — an amount is never hidden; an id is named, not printed. */
+function describeBody(payload: AnyRow | undefined): string {
+  if (!payload) return '';
+  const parts = Object.entries(payload)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => {
+      const plain = typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+      const text = plain ? String(v) : '';
+      if (plain && UUIDISH.test(text)) return `a specific ${humanKey(k)}`;
+      return plain && text.length <= 80 ? `${humanKey(k)}: ${text}` : `${humanKey(k)} (details)`;
+    });
+  return parts.length ? ` It will send ${parts.join('; ')}.` : '';
+}
+
 /** Score an endpoint against a free-text need. Name and tag beat prose. */
 function score(endpoint: PlatformApiEndpoint, terms: string[]): number {
   const name = endpoint.name.toLowerCase();
@@ -263,10 +290,10 @@ export const createCallPlatformApiTool = (
         onChunk?.({
           type: 'action_confirmation',
           tool: 'call_platform_api',
-          input: { endpoint: name, method: verb, body: payload },
-          title: `Run ${name}?`,
-          summary: `${access.reason} ${reason ? `Asked for: ${reason}` : ''}`.trim()
-            + (serialized ? ` — with: ${serialized.slice(0, 300)}` : ''),
+          input: { endpoint: name, path: sub.path || undefined, method: verb, body: payload, reason },
+          title: approvalTitle(known),
+          summary: `${access.reason}${describeBody(payload)}`
+            + (reason ? ` The assistant's reason: ${String(reason).slice(0, 200)}` : ''),
           danger: true,
           toolkit_id: 'platform-api',
           timestamp: Date.now(),

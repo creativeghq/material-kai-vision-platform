@@ -185,6 +185,31 @@ export const createMailSearchTool = (ctx: Ctx) =>
 
 // ── mail_read ────────────────────────────────────────────────────────────────────────
 
+const THREAD_BODY_BUDGET = 20_000;
+
+/** The newest messages spend the body budget first; an older one past it keeps its metadata only. */
+function budgetBodies(texts: Array<string | null>, perBody: number, label: string) {
+  let left = THREAD_BODY_BUDGET;
+  let dropped = 0;
+  const out: Array<string | null> = texts.map(() => null);
+  for (let i = texts.length - 1; i >= 0; i--) {
+    const t = texts[i];
+    if (!t) continue;
+    if (left <= 0) { dropped++; continue; }
+    const cap = Math.min(perBody, left);
+    out[i] = wrapUntrusted(label, t, cap);
+    left -= Math.min(t.length, cap);
+  }
+  return { out, dropped };
+}
+
+function omittedNote(total: number, shown: number, bodiesDropped: number) {
+  const parts: string[] = [];
+  if (total > shown) parts.push(`Showing the newest ${shown} of ${total} messages; the ${total - shown} older ones are not included.`);
+  if (bodiesDropped) parts.push(`${bodiesDropped} older message bodies were left out to keep this short.`);
+  return parts.length ? { omitted_messages: total - shown, omitted: parts.join(' ') } : {};
+}
+
 export const createMailReadTool = (ctx: Ctx) =>
   tool(async ({ ref }: { ref: string }) => {
     const r0 = parseMailRef(ref);
@@ -195,15 +220,18 @@ export const createMailReadTool = (ctx: Ctx) =>
     if (r0.source === 'gmail') {
       const r = await callFn('gmail-api', 'thread', { account_id: r0.accountId, thread_id: r0.threadId, mark_read: false }, ctx.jwt);
       if (!r.ok) return fail(r.error ?? 'Could not read the thread');
-      const msgs = ((r.data?.messages ?? []) as Array<Record<string, any>>).slice(-15);
+      const all = (r.data?.messages ?? []) as Array<Record<string, any>>;
+      const msgs = all.slice(-15);
+      const bodies = budgetBodies(msgs.map((m) => String(m.text ?? (m.html ?? '').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')).replace(/\s+\n/g, '\n')), 6000, 'email body');
       return ok({
         ref, source: 'gmail', mailbox: r.data?.account_email,
-        messages: msgs.map((m) => ({
+        ...omittedNote(all.length, msgs.length, bodies.dropped),
+        messages: msgs.map((m, i) => ({
           message_id: m.id, date: m.date,
           from: m.from?.address ? `${m.from.name ?? ''} <${m.from.address}>`.trim() : null,
           to: (m.to ?? []).map((a: any) => a.address).filter(Boolean),
           subject: m.subject,
-          body: wrapUntrusted('email body', String(m.text ?? (m.html ?? '').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')).replace(/\s+\n/g, '\n'), 6000),
+          body: bodies.out[i],
           attachments: attachmentRefsFor('gmail', r0.accountId, m.id, m.attachments ?? []),
         })),
       });
@@ -212,14 +240,17 @@ export const createMailReadTool = (ctx: Ctx) =>
     const r = await callFn('inbox-api', 'get_thread', { thread_id: r0.threadId, peek: true }, ctx.jwt);
     if (!r.ok) return fail(r.error ?? 'Could not read the conversation');
     const thread = r.data?.thread ?? {};
-    const msgs = ((r.data?.messages ?? []) as Array<Record<string, any>>).filter((m) => m.message_type !== 'system');
+    const all = ((r.data?.messages ?? []) as Array<Record<string, any>>).filter((m) => m.message_type !== 'system');
+    const msgs = all.slice(-10);
+    const bodies = budgetBodies(msgs.map((m) => (m.body ? String(m.body) : null)), 1500, 'message');
     return ok({
       ref, source: 'inbox', channel: thread.channel, subject: thread.subject ?? null, status: thread.status,
-      messages: msgs.map((m) => ({
+      ...omittedNote(all.length, msgs.length, bodies.dropped),
+      messages: msgs.map((m, i) => ({
         message_id: m.id, date: m.created_at, type: m.message_type,
         direction: m.metadata?.direction ?? (m.message_type === 'note' ? 'internal' : null),
         from: m.metadata?.email_from ?? null,
-        body: m.body ? wrapUntrusted('message', String(m.body), 6000) : null,
+        body: bodies.out[i],
         attachments: attachmentRefsFor('inbox', r0.threadId, m.id, m.attachments ?? []),
       })),
     });
@@ -252,7 +283,11 @@ export const createMailAttachmentTool = (ctx: Ctx) =>
       return ok({ filename: file.filename, type: file.mime, text: wrapUntrusted('attachment', text, 20000) });
     }
     if (!READABLE_MIME.test(file.mime)) {
-      return fail(`${file.filename} (${file.mime}) cannot be read here. PDFs, images and text files can; for a spreadsheet use manage_inbox ask_spreadsheet.`);
+      return JSON.stringify({
+        success: false,
+        error: `${file.filename} is a file type that cannot be read here. PDFs, images and text files can be read; spreadsheets can be asked questions instead.`,
+        next_step: 'If this is a spreadsheet, call manage_inbox with action ask_spreadsheet.',
+      });
     }
 
     const db = svcClient();

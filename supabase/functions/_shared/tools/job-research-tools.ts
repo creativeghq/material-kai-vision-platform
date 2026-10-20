@@ -281,7 +281,15 @@ export const createListMyJobSearchesTool = (
       if (denied) return denied;
       const r = await callMivaa(`/api/v1/job-research/track?only_active=${only_active}`, { method: 'GET', jwt, actor: { userId, workspaceId } });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
-      const tracked = r.data?.tracked_jobs ?? [];
+      let tracked = r.data?.tracked_jobs ?? [];
+      if (workspaceId) {
+        const { data: own, error: ownErr } = await svcClient()
+          .from('tracked_jobs').select('id').eq('user_id', userId)
+          .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`);
+        if (ownErr) return JSON.stringify({ success: false, error: `Could not read your job searches: ${ownErr.message}` });
+        const ids = new Set((own ?? []).map((t: any) => t.id));
+        tracked = tracked.filter((t: any) => ids.has(t.id));
+      }
       onChunk?.({
         type: 'job_searches_list',
         tracked_jobs: tracked,
@@ -319,6 +327,11 @@ export const createFindJobsTool = (
         targetId = existing?.id;
       }
       if (!targetId) return JSON.stringify({ success: false, error: 'tracked_job not found by label or id' });
+      // A body-supplied id must be the caller's own, on the same scope the label lookup uses.
+      let ownQ = svcClient().from('tracked_jobs').select('id').eq('id', targetId).eq('user_id', userId);
+      if (workspaceId) ownQ = ownQ.eq('workspace_id', workspaceId);
+      const { data: owned } = await ownQ.maybeSingle();
+      if (!owned) return JSON.stringify({ success: false, error: 'tracked_job not found by label or id' });
 
       onChunk?.({ type: 'tool_progress', status: `Loading recent matches (last ${days}d)...`, timestamp: Date.now() });
 
@@ -357,10 +370,20 @@ export const createFindJobsTool = (
         last_refreshed_at: lastRefreshedAt,
         timestamp: Date.now(),
       });
+      const MODEL_LISTING_CAP = 15;
+      const forModel = listings.slice(0, MODEL_LISTING_CAP).map((l: any) => ({
+        id: l.id, title: l.title, company: l.company, location: l.location, remote: l.is_remote,
+        salary: l.salary_min || l.salary_max
+          ? { min: l.salary_min, max: l.salary_max, currency: l.salary_currency, period: l.salary_period }
+          : undefined,
+        employment_type: l.employment_type, seniority: l.seniority,
+        posted_at: l.posted_at, url: l.url, match_note: l.match_note, user_action: l.user_action,
+      }));
       return JSON.stringify({
         success: true,
         count: listings.length,
-        listings,
+        shown: forModel.length,
+        listings: forModel,
         empty_sources: emptySources,
         // Instruction the model MUST honour so reporting is always identical.
         reporting_instruction:
