@@ -377,8 +377,44 @@ export interface SearchQuestion {
   tracked: boolean;
 }
 
+export interface MarketQuestion {
+  platform: string;
+  question: string;
+  topics: string[];
+  ai_search_volume: number | null;
+  cites_you: boolean;
+  our_sources: { url: string; title: string | null; position: number | null }[];
+  rival_sources: { domain: string; url: string; position: number | null }[];
+  source_count: number;
+  answer: string | null;
+  last_response_at: string | null;
+  captured_at: string;
+  tracked: boolean;
+}
+
+export interface MarketQuestionsFetch {
+  platform: string;
+  status: string;
+  note: string | null;
+  found: number | null;
+  stored: number | null;
+  per_topic: { topic: string; status: string; total_count: number | null; error?: string }[];
+  cost_usd: number | null;
+  country_code: string | null;
+  language_code: string | null;
+  captured_at: string;
+}
+
 export interface AiQuestionsReport {
   cited: { status: AiQuestionsFetchStatus[]; rows: AiCitedQuestion[] };
+  /** Absent on a payload from before the topic search existed. */
+  market?: {
+    status: 'ok' | 'no_data' | 'not_collected' | string;
+    topics: string[];
+    topics_source: 'set' | 'tracked_keywords' | 'none';
+    fetches: MarketQuestionsFetch[];
+    rows: MarketQuestion[];
+  };
   search: { days: number; from: string; to: string; status: 'ok' | 'no_data' | 'not_connected' | string; rows: SearchQuestion[] };
   /** Absent on a payload from before the PAA source existed. */
   paa?: { status: 'ok' | 'no_data' | 'not_collected' | string; research_runs: number; rows: PaaQuestion[] };
@@ -393,4 +429,4 @@ export interface PaaQuestion {
 }
 
 /** Where a tracked question came from; stored on its `custom_probes` entry. */
-export type AiQuestionSource = 'ai_cited' | 'gsc' | 'paa' | 'manual';
+export type AiQuestionSource = 'ai_cited' | 'ai_market' | 'gsc' | 'paa' | 'manual';

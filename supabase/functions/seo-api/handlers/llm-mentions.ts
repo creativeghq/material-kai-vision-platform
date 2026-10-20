@@ -4,6 +4,7 @@ import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../.
 import { assertEntitled, isWorkspaceEntitled } from '../../_shared/entitlement.ts';
 import { callDataForSEO } from '../../_shared/tools/dataforseo-dispatch.ts';
 import { SEO_MODULE } from './entitlement.ts';
+import { mergeMarketQuestions, ourSources } from './market-questions.ts';
 
 const supabaseUrl = () => Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = () => Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -23,7 +24,7 @@ interface Site { id: string; workspace_id: string; user_id: string | null; url: 
 interface Market { country_code: string | null; language_code: string | null; source: string | null; note: string | null }
 interface Coverage { platform: string; label: string; covered: boolean; note: string | null }
 interface Leader { label: string; mentions: number | null; ai_search_volume: number | null }
-interface CallOut { ok: boolean; error?: string; items: Loose[]; raw: Loose }
+interface CallOut { ok: boolean; error?: string; items: Loose[]; raw: Loose; cost: number | null }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
@@ -98,10 +99,6 @@ export interface CitedQuestion {
 }
 
 export function parseCitedQuestions(items: Loose[], domain: string, platform: string): CitedQuestion[] {
-  const ours = (d: unknown) => {
-    const h = String(d ?? '').toLowerCase().replace(/^www\./, '');
-    return h === domain || h.endsWith(`.${domain}`);
-  };
   const out: CitedQuestion[] = [];
   for (const it of items) {
     const question = typeof it?.question === 'string' ? it.question.trim() : '';
@@ -112,9 +109,7 @@ export function parseCitedQuestions(items: Loose[], domain: string, platform: st
       model_name: typeof it?.model_name === 'string' ? it.model_name : null,
       question,
       answer: typeof it?.answer === 'string' ? it.answer.slice(0, 4000) : null,
-      our_sources: sources.filter((x) => ours(x?.domain)).map((x) => ({
-        url: String(x?.url ?? ''), title: typeof x?.title === 'string' ? x.title : null, position: num(x?.position),
-      })),
+      our_sources: ourSources(sources, domain),
       source_count: sources.length,
       ai_search_volume: num(it?.ai_search_volume),
       monthly_searches: Array.isArray(it?.monthly_searches) ? it.monthly_searches : [],
@@ -150,8 +145,82 @@ function failures(calls: CallOut[], names: string[], snap: Snapshot): boolean {
  *  name collected a Bugatti review's sources as "your market". */
 const BRAND_SCOPE = ['brand_entities'];
 
+/** Real questions in the market's corpus that contain a topic term, whoever the answer cites. */
+async function collectTopicQuestions(
+  db: Loose, site: Site, market: Market, cov: Coverage, domain: string, topics: string[], now: string,
+  call: (kind: string, params: Record<string, unknown>) => Promise<CallOut>,
+): Promise<{ status: Status; note: string | null; metrics: Record<string, unknown> }> {
+  if (topics.length === 0) {
+    return {
+      status: 'not_collected',
+      note: 'No topic is set and no short tracked keyword exists to derive one, so the market was not searched.',
+      metrics: { topics: [], found: 0, stored: 0, per_topic: [] },
+    };
+  }
+  const perTopic: Record<string, unknown>[] = [];
+  const answered: { topic: string; items: Loose[] }[] = [];
+  const errors: string[] = [];
+  let cost = 0;
+  const results: { topic: string; r: CallOut }[] = [];
+  for (let i = 0; i < topics.length; i += 4) {
+    results.push(...await Promise.all(topics.slice(i, i + 4).map(async (topic) => ({
+      topic,
+      r: await call('ai_llm_mentions_search', {
+        keyword: topic, keyword_scope: ['question'], language_code: market.language_code,
+        country_code: market.country_code, platform: cov.platform, limit: 100, order_by: ['ai_search_volume,desc'],
+      }),
+    }))));
+  }
+  for (const { topic, r } of results) {
+    cost += r.cost ?? 0;
+    const total = num(firstResult(r.raw)?.total_count);
+    if (!r.ok) {
+      errors.push(`${topic}: ${r.error ?? 'failed'}`);
+      perTopic.push({ topic, status: 'collector_failed', total_count: null, error: (r.error ?? '').slice(0, 200) });
+      continue;
+    }
+    answered.push({ topic, items: r.items });
+    perTopic.push({ topic, status: r.items.length > 0 ? 'ok' : 'no_data', total_count: total ?? r.items.length });
+  }
+  const metrics: Record<string, unknown> = { topics, found: 0, stored: 0, per_topic: perTopic, cost_usd: Math.round(cost * 1000) / 1000 };
+  if (answered.length === 0) {
+    return { status: 'collector_failed', note: `Every topic search failed, so the market's questions are unknown. ${errors[0] ?? ''}`.trim().slice(0, 500), metrics };
+  }
+  const merged = mergeMarketQuestions(answered, domain, cov.platform);
+  metrics.found = merged.length;
+  const partial = errors.length > 0 ? `${errors.length} of ${topics.length} topic searches failed: ${errors.join('; ')}`.slice(0, 500) : null;
+  if (merged.length === 0) {
+    const shape = answered.some((a) => a.items.length > 0);
+    return {
+      status: shape ? 'collector_failed' : 'no_data',
+      note: shape
+        ? 'The corpus answered in a shape this build does not read, so the questions are unknown.'
+        : partial ?? `No ${cov.label} answer in the ${market.country_code} / ${market.language_code} corpus has a question containing these topics.`,
+      metrics,
+    };
+  }
+  const { error } = await db.from('website_ai_market_questions').upsert(
+    merged.map((q) => ({
+      ...q, website_id: site.id, workspace_id: site.workspace_id,
+      country_code: market.country_code, language_code: market.language_code, captured_at: now,
+    })),
+    { onConflict: 'website_id,platform,country_code,language_code,question' },
+  );
+  if (error) {
+    return { status: 'collector_failed', note: `The questions were fetched but could not be stored: ${error.message}`.slice(0, 500), metrics };
+  }
+  metrics.stored = merged.length;
+  return { status: 'ok', note: partial, metrics };
+}
+
+async function topicsFor(db: Loose, siteId: string): Promise<string[]> {
+  const { data, error } = await db.rpc('website_ai_question_topics', { p_website_id: siteId });
+  if (error) throw new Error(`Could not read the site's question topics: ${error.message}`);
+  return Array.isArray(data?.topics) ? data.topics.filter((t: unknown): t is string => typeof t === 'string') : [];
+}
+
 async function collect(
-  db: Loose, site: Site, market: Market, coverage: Coverage[], keyword: string, payer: string | null,
+  db: Loose, site: Site, market: Market, coverage: Coverage[], keyword: string, topics: string[], payer: string | null,
 ): Promise<{ rows: Record<string, unknown>[]; summary: Record<string, unknown>[] }> {
   const domain = host(site.url ?? '');
   const now = new Date().toISOString();
@@ -167,14 +236,14 @@ async function collect(
 
   const call = async (kind: string, params: Record<string, unknown>): Promise<CallOut> => {
     const r = await callDataForSEO(kind, params, attribution);
-    return { ok: r.ok, error: r.error, items: r.data?.items ?? [], raw: r.data?.raw ?? null };
+    return { ok: r.ok, error: r.error, items: r.data?.items ?? [], raw: r.data?.raw ?? null, cost: num(r.data?.cost_usd) };
   };
 
   for (const cov of coverage) {
     if (!cov.covered) {
-      for (const kind of ['domain', 'keyword'] as const) {
+      for (const kind of ['domain', 'keyword', 'topic_questions'] as const) {
         rows.push({
-          ...shared, platform: cov.platform, target_kind: kind, target: kind === 'domain' ? domain : keyword,
+          ...shared, platform: cov.platform, target_kind: kind, target: kind === 'keyword' ? keyword : domain,
           status: 'not_collected', note: cov.note, metrics: {}, top_domains: [], top_pages: [], top_brands: [], series: [],
         });
       }
@@ -267,9 +336,18 @@ async function collect(
       top_domains: [], top_pages: [], top_brands: [], series: [],
     });
 
+    const tq = await collectTopicQuestions(db, site, market, cov, domain, topics, now, call);
+    rows.push({
+      ...shared, platform: cov.platform, target_kind: 'topic_questions', target: domain,
+      status: tq.status, note: tq.note, metrics: tq.metrics,
+      top_domains: [], top_pages: [], top_brands: [], series: [],
+    });
+
     summary.push({
       platform: cov.platform, our_status: ours.status, market_status: mk.status,
-      questions_status: qSnap.status, cited_questions: cited.length, note: ours.note ?? mk.note ?? qSnap.note,
+      questions_status: qSnap.status, cited_questions: cited.length,
+      topic_questions_status: tq.status, topic_questions: tq.metrics.stored,
+      note: ours.note ?? mk.note ?? qSnap.note,
     });
   }
 
@@ -302,8 +380,9 @@ async function runFor(db: Loose, site: Site, body: Loose, payer: string | null) 
   const domain = host(site.url ?? '');
   const keyword: string = (body?.keyword || site.display_name || domain.split('.')[0] || '').trim();
   const coverage = await coverageFor(db, market);
-  const { summary } = await collect(db, site, market, coverage, keyword, payer);
-  return { domain, keyword, market, platforms: summary };
+  const topics = await topicsFor(db, site.id);
+  const { summary } = await collect(db, site, market, coverage, keyword, topics, payer);
+  return { domain, keyword, market, topics, platforms: summary };
 }
 
 export async function handleLlmMentions(req: Request, body: Loose): Promise<Response> {

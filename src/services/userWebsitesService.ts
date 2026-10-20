@@ -1759,6 +1759,15 @@ export const userWebsitesService = {
     return (data as AiQuestionsReport) ?? null;
   },
 
+  /** An empty list returns the site to topics derived from its tracked keywords. */
+  async setAiQuestionTopics(websiteId: string, topics: string[]): Promise<void> {
+    const { error } = await supabase.rpc(
+      'set_website_ai_question_topics' as any,
+      { p_website_id: websiteId, p_topics: topics } as any,
+    );
+    if (error) throw error;
+  },
+
   async llmMentions(websiteId: string, days = 90): Promise<LlmMentionsReport | null> {
     const { data, error } = await supabase.rpc(
       'get_website_llm_mentions' as any,

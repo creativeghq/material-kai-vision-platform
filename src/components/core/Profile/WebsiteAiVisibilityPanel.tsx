@@ -736,6 +736,16 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         trackedCount={probeCount}
         trackLimit={PROBE_LIMIT}
         onTrack={trackQuestion}
+        onSaveTopics={async (topics) => {
+          try {
+            await userWebsitesService.setAiQuestionTopics(website.id, topics);
+          } catch (e: any) {
+            toast({ title: 'Could not save the topics', description: e?.message, variant: 'destructive' });
+            throw e;
+          }
+          toast({ title: 'Topics saved', description: 'The next LLM Mentions read searches the market for them.' });
+          setQuestions(await userWebsitesService.aiQuestions(website.id, 90).catch(() => questions));
+        }}
       />
 
       <CitabilityPanel
