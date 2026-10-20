@@ -420,7 +420,7 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
       )}
 
       {sel && (
-        <Html position={[ox + mm(sel.cx), tileY + 0.06, oz + mm(sel.cz)]} center>
+        <Html zIndexRange={[10, 0]} position={[ox + mm(sel.cx), tileY + 0.06, oz + mm(sel.cz)]} center>
           <div className="pointer-events-none whitespace-nowrap rounded-sm border border-hairline bg-card px-2 py-1 text-xs text-foreground shadow-overlay">
             {selText}
           </div>
@@ -432,7 +432,7 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
 
 function LayerLabel({ position, text }: { position: [number, number, number]; text: string }) {
   return (
-    <Html position={position} center>
+    <Html zIndexRange={[10, 0]} position={position} center>
       <div className="pointer-events-none whitespace-nowrap rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground">
         {text}
       </div>

@@ -543,7 +543,7 @@ function ActiveLabel({ build, guide, xRef, labels }: { build: GuideBuild; guide:
   });
   return (
     <group ref={groupRef} visible={false}>
-      <Html center style={{ pointerEvents: 'none' }}>
+      <Html zIndexRange={[10, 0]} center style={{ pointerEvents: 'none' }}>
         <div ref={textRef} className="whitespace-nowrap rounded-full border border-hairline bg-card/95 px-2.5 py-1 text-xs font-medium text-foreground shadow-overlay" />
       </Html>
     </group>
@@ -768,7 +768,7 @@ function StepTags({ build, guide, xRef, explodeRef, stepIndex }: {
     <group>
       {tags.map((t, i) => (
         <group key={t.it.key} ref={(g) => { refs.current[i] = g; }}>
-          <Html center style={{ pointerEvents: 'none' }}>
+          <Html zIndexRange={[10, 0]} center style={{ pointerEvents: 'none' }}>
             <div className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
           </Html>
         </group>
@@ -792,7 +792,7 @@ function StartTags({ build, guide }: { build: GuideBuild; guide: InstallationGui
   return (
     <group>
       {tags.map((t) => (
-        <Html key={t.key} position={t.pos} center style={{ pointerEvents: 'none' }}>
+        <Html zIndexRange={[10, 0]} key={t.key} position={t.pos} center style={{ pointerEvents: 'none' }}>
           <div className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
         </Html>
       ))}
