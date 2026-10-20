@@ -91,7 +91,7 @@ async function readManual(
       model: MODEL,
       max_tokens: 16000,
       system,
-      output_config: { format: { type: 'json_schema', name: 'installation_guide', schema: GUIDE_OUTPUT_SCHEMA } },
+      output_config: { format: { type: 'json_schema', schema: GUIDE_OUTPUT_SCHEMA } },
       messages: [{ role: 'user', content }],
     }, {
       task: 'installation-guide-extract', userId: uid, workspaceId: guide.workspace_id, timeoutMs: 360_000,
@@ -126,8 +126,8 @@ Deno.serve(withApiLogging('installation-guide-extract', async (req: Request) => 
   if (req.method !== 'POST') throw new HttpError(405, 'POST only');
 
   const auth = await authenticate(req, { requireUser: true });
-  if (!auth.success || !auth.userId) throw new HttpError(401, auth.error || 'Invalid session');
-  const uid = auth.userId;
+  const isService = auth.success && auth.level === 'secret';
+  if (!auth.success || (!auth.userId && !isService)) throw new HttpError(401, auth.error || 'Invalid session');
   const keyWs = auth.apiKey?.workspace_id;
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -136,12 +136,13 @@ Deno.serve(withApiLogging('installation-guide-extract', async (req: Request) => 
 
   const { data: guide } = await admin
     .from('installation_guides')
-    .select('id, workspace_id, page_count, title, status, updated_at')
+    .select('id, workspace_id, page_count, title, status, updated_at, created_by')
     .eq('id', guide_id)
     .maybeSingle();
+  const uid = isService ? (guide?.created_by as string | null) : auth.userId;
   if (
-    !guide || (keyWs && guide.workspace_id !== keyWs)
-    || !(await userHasWorkspaceCapability(admin, uid, guide.workspace_id, 'projects.use'))
+    !guide || !uid || (keyWs && guide.workspace_id !== keyWs)
+    || (!isService && !(await userHasWorkspaceCapability(admin, uid, guide.workspace_id, 'projects.use')))
   ) {
     throw new HttpError(404, 'Guide not found');
   }
