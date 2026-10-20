@@ -38,17 +38,42 @@ describe('tile floor layout', () => {
     expect(p.quantities.fullTiles + p.quantities.cutTiles).toBe(p.pieces.length);
   });
 
-  it('puts one spacer at each internal grid crossing', () => {
+  it('puts a spacer at every grid crossing and where each joint meets a wall', () => {
     const p = plan({ areaWidthM: 3.37, areaDepthM: 2.11 });
     const rows = new Set(p.pieces.map((pc) => pc.row)).size;
     const cols = p.pieces.filter((pc) => pc.row === 0).length;
-    expect(p.quantities.spacers).toBe((cols - 1) * (rows - 1));
+    expect(p.quantities.spacers).toBe((rows + 1) * (cols - 1) + 2 * (rows - 1));
+  });
+
+  it('skips a laying step with nothing to lay', () => {
+    const p = plan({ areaWidthM: 3, areaDepthM: 0.55 });
+    expect(p.quantities.fullTiles).toBe(0);
+    expect(p.steps.map((s) => s.key)).not.toContain('lay_full');
+    const end = sceneStateAt(p, p.steps.findIndex((s) => s.key === 'lay_cuts'), 1);
+    expect(progressCounts(p, end).spacersPlaced).toBe(p.quantities.spacers);
+  });
+
+  it('spaces the joints of a single-row floor', () => {
+    const p = plan({ areaWidthM: 3, areaDepthM: 0.55 });
+    expect(new Set(p.pieces.map((pc) => pc.row)).size).toBe(1);
+    expect(p.quantities.spacers).toBe(2 * (p.pieces.length - 1));
   });
 });
 
 describe('tile floor quantities', () => {
-  it('orders the area plus waste in whole tiles', () => {
-    expect(plan().quantities.tilesToBuy).toBe(22);
+  it('never orders fewer tiles than the layout cuts from', () => {
+    const p = plan({ areaWidthM: 1.3, areaDepthM: 1.3 });
+    expect(p.pieces).toHaveLength(9);
+    expect(p.quantities.tilesFromLayout).toBe(9);
+    expect(p.quantities.tilesToBuy).toBeGreaterThanOrEqual(9);
+  });
+
+  it('reuses an offcut from one row in the next on an offset pattern', () => {
+    const p = plan({ areaWidthM: 2, areaDepthM: 1.2, tileLengthMm: 600, tileWidthMm: 300, pattern: 'offset_half' });
+    const { fullTiles, cutTiles, tilesFromLayout } = p.quantities;
+    expect(cutTiles).toBeGreaterThan(0);
+    expect(tilesFromLayout).toBeLessThan(fullTiles + cutTiles);
+    expect(tilesFromLayout).toBeGreaterThan(fullTiles);
   });
 
   it('uses the manufacturers grout formula', () => {

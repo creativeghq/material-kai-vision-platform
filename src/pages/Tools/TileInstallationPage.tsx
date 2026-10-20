@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Grid3x3, TriangleAlert } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -97,8 +97,11 @@ export default function TileInstallationPage() {
   const longSide = Math.max(params.tileLengthMm || 0, params.tileWidthMm || 0);
   const typicalNotch = suggestedTrowelNotchMm(longSide);
   const errors = plan.issues.filter((i) => i.level === 'error');
-  const warnings = plan.issues.filter((i) => i.level === 'warning');
-  const q = plan.quantities;
+  const lastValid = useRef(plan);
+  if (errors.length === 0) lastValid.current = plan;
+  const shown = lastValid.current;
+  const warnings = shown.issues.filter((i) => i.level === 'warning');
+  const q = shown.quantities;
 
   const field = (k: NumericKey, label: string, step = '1') => (
     <FormField label={label}>
@@ -208,7 +211,7 @@ export default function TileInstallationPage() {
         </Card>
 
         <div className="order-first min-w-0 space-y-4 lg:order-none">
-          {errors.length > 0 ? (
+          {errors.length > 0 && (
             <Card>
               <CardContent className="space-y-1 p-4">
                 {errors.map((e) => (
@@ -217,11 +220,13 @@ export default function TileInstallationPage() {
                     {e.message}
                   </p>
                 ))}
+                <p className="text-xs text-muted-foreground">Showing your last valid floor until this is fixed.</p>
               </CardContent>
             </Card>
-          ) : (
+          )}
+          {shown.steps.length > 0 && (
             <>
-              <TileInstallationViewer plan={plan} colors={colors} />
+              <TileInstallationViewer plan={shown} colors={colors} />
 
               {warnings.length > 0 && (
                 <Card>
@@ -246,11 +251,11 @@ export default function TileInstallationPage() {
                 <CardContent className="p-0">
                   <dl className="divide-y divide-hairline text-sm">
                     <Row label="Floor area" value={`${formatNumber(q.areaM2, { maxDecimals: 2 })} m²`} />
-                    <Row label={`Tiles to order (incl. ${q.wastePct}% for cuts and breakage)`} value={formatNumber(q.tilesToBuy)} />
+                    <Row label={`Tiles to order (the layout uses ${q.tilesFromLayout}, plus ${q.sparePct}% spare)`} value={formatNumber(q.tilesToBuy)} />
                     <Row label="Pieces on the floor" value={`${q.fullTiles} full + ${q.cutTiles} cut`} />
-                    <Row label={`Spacers (${params.jointMm} mm)`} value={formatNumber(q.spacers)} />
-                    <Row label={`Tile adhesive (${params.trowelNotchMm} mm notch${backButter ? ', back-buttered' : ''})`} value={`≈ ${formatNumber(q.adhesiveKg, { maxDecimals: 0 })} kg`} />
-                    <Row label={`Grout (${params.jointMm} mm joints)`} value={`≈ ${formatNumber(q.groutKg, { maxDecimals: 1 })} kg`} />
+                    <Row label={`Spacers (${shown.params.jointMm} mm)`} value={formatNumber(q.spacers)} />
+                    <Row label={`Tile adhesive (${shown.params.trowelNotchMm} mm notch${shown.params.backButter ? ', back-buttered' : ''})`} value={`≈ ${formatNumber(q.adhesiveKg, { maxDecimals: 0 })} kg`} />
+                    <Row label={`Grout (${shown.params.jointMm} mm joints)`} value={`≈ ${formatNumber(q.groutKg, { maxDecimals: 1 })} kg`} />
                   </dl>
                 </CardContent>
               </Card>

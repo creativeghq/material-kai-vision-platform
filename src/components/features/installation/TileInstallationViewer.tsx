@@ -12,6 +12,7 @@ import {
   progressCounts,
   sceneStateAt,
   type TileFloorPlan,
+  type TileStepKey,
 } from '@/lib/installation/tileFloorTemplate';
 import { TileInstallationScene, type TileSceneColors } from './TileInstallationScene';
 
@@ -22,7 +23,7 @@ interface Props {
 
 export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
   const steps = plan.steps;
-  const [stepIndex, setStepIndex] = useState(0);
+  const [stepKey, setStepKey] = useState<TileStepKey>(steps[0]?.key ?? 'prepare');
   const [progress, setProgress] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [playAll, setPlayAll] = useState(false);
@@ -30,7 +31,10 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
   const [selected, setSelected] = useState<number | null>(null);
 
   const last = steps.length - 1;
-  const safeIndex = Math.min(stepIndex, Math.max(last, 0));
+  const lastIndexRef = useRef(0);
+  const found = steps.findIndex((s) => s.key === stepKey);
+  const safeIndex = found >= 0 ? found : Math.min(lastIndexRef.current, Math.max(last, 0));
+  lastIndexRef.current = safeIndex;
   const step = steps[safeIndex];
 
   useEffect(() => {
@@ -38,14 +42,18 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
   }, [plan]);
 
   const goTo = useCallback((i: number, animate: boolean) => {
-    setStepIndex(Math.min(Math.max(i, 0), Math.max(last, 0)));
+    const target = steps[Math.min(Math.max(i, 0), Math.max(last, 0))];
+    if (!target) return;
+    setStepKey(target.key);
     setProgress(animate ? 0 : 1);
     setPlaying(animate);
     setPlayAll(false);
-  }, [last]);
+  }, [steps, last]);
 
-  const stepRef = useRef({ index: safeIndex, playAll, last, durations: steps.map((s) => s.durationS) });
-  stepRef.current = { index: safeIndex, playAll, last, durations: steps.map((s) => s.durationS) };
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
+  const stepRef = useRef({ index: safeIndex, playAll, steps });
+  stepRef.current = { index: safeIndex, playAll, steps };
 
   useEffect(() => {
     if (!playing) return;
@@ -54,18 +62,21 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
     const tick = (now: number) => {
       const dt = (now - prev) / 1000;
       prev = now;
-      const { index, playAll: all, last: end, durations } = stepRef.current;
-      setProgress((p) => {
-        const next = p + dt / (durations[index] ?? 4);
-        if (next < 1) return next;
-        if (all && index < end) {
-          setStepIndex(index + 1);
-          return 0;
-        }
+      const { index, playAll: all, steps: list } = stepRef.current;
+      const next = progressRef.current + dt / (list[index]?.durationS ?? 4);
+      if (next < 1) {
+        progressRef.current = next;
+        setProgress(next);
+      } else if (all && index < list.length - 1) {
+        progressRef.current = 0;
+        setStepKey(list[index + 1].key);
+        setProgress(0);
+      } else {
+        setProgress(1);
         setPlaying(false);
         setPlayAll(false);
-        return 1;
-      });
+        return;
+      }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -89,7 +100,8 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
   };
 
   const playWhole = () => {
-    setStepIndex(0);
+    if (!steps[0]) return;
+    setStepKey(steps[0].key);
     setProgress(0);
     setPlayAll(true);
     setPlaying(true);

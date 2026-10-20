@@ -74,8 +74,9 @@ export interface TileQuantities {
   pieces: number;
   fullTiles: number;
   cutTiles: number;
+  tilesFromLayout: number;
   tilesToBuy: number;
-  wastePct: number;
+  sparePct: number;
   spacers: number;
   adhesiveKg: number;
   groutKg: number;
@@ -105,7 +106,8 @@ export const TILE_FLOOR_LIMITS = {
   maxPieces: 4000,
 } as const;
 
-export const WASTE_PCT = 10;
+export const SPARE_PCT = 5;
+const CUT_ALLOWANCE_MM = 5;
 const GROUT_DENSITY = 1.6;
 const BACK_BUTTER_KG_M2 = 1;
 
@@ -184,6 +186,22 @@ function centredOrigin(span: number, tile: number, joint: number): number {
   return smallestEdge(lay1D(span, tile, joint, onTile)) >= smallestEdge(lay1D(span, tile, joint, onJoint))
     ? onTile
     : onJoint;
+}
+
+function tilesForCuts(cuts: Array<{ lx: number; lz: number }>, tl: number, tw: number): number {
+  const binPack = (sizes: number[], capacity: number): number => {
+    const left: number[] = [];
+    for (const size of [...sizes].sort((a, b) => b - a)) {
+      const i = left.findIndex((room) => room >= size + CUT_ALLOWANCE_MM);
+      if (i >= 0) left[i] -= size + CUT_ALLOWANCE_MM;
+      else left.push(capacity - size);
+    }
+    return left.length;
+  };
+  const alongLength = cuts.filter((c) => c.lz >= tw - EPS).map((c) => c.lx);
+  const alongWidth = cuts.filter((c) => c.lx >= tl - EPS).map((c) => c.lz);
+  const corners = cuts.length - alongLength.length - alongWidth.length;
+  return binPack(alongLength, tl) + binPack(alongWidth, tw) + corners;
 }
 
 const OFFSET: Record<TilePattern, number> = { grid: 0, offset_half: 1 / 2, offset_third: 1 / 3 };
@@ -269,7 +287,7 @@ function buildSteps(p: TileFloorParams, q: TileQuantities, pattern: string): Til
       durationS: 3,
     });
   }
-  steps.push(
+  const laying: TileStep[] = [
     {
       key: 'lay_full',
       title: `Lay the ${q.fullTiles} full tiles`,
@@ -286,6 +304,9 @@ function buildSteps(p: TileFloorParams, q: TileQuantities, pattern: string): Til
       camera: 'top',
       durationS: 6,
     },
+  ];
+  steps.push(...laying.filter((s) => (s.key === 'lay_full' ? q.fullTiles : q.cutTiles) > 0));
+  steps.push(
     {
       key: 'level',
       title: 'Check level and lippage',
@@ -334,7 +355,7 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
   const empty = (): TileFloorPlan => {
     const quantities: TileQuantities = {
       areaM2: 0, tileAreaM2: 0, pieces: 0, fullTiles: 0, cutTiles: 0,
-      tilesToBuy: 0, wastePct: WASTE_PCT, spacers: 0, adhesiveKg: 0, groutKg: 0,
+      tilesFromLayout: 0, tilesToBuy: 0, sparePct: SPARE_PCT, spacers: 0, adhesiveKg: 0, groutKg: 0,
     };
     return {
       params, innerWidthMm: innerW, innerDepthMm: innerD, pieces: [], spacers: [],
@@ -378,24 +399,34 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
   const cuts = raw.filter((r) => r.cut);
   const pieces: TilePiece[] = [...full, ...cuts].map((r, i) => ({ ...r, order: i, index: i }));
 
+  const rowPieces: TilePiece[][] = rowsRuns.map(() => []);
+  for (const pc of pieces) rowPieces[pc.row].push(pc);
+  const lastRow = rowsRuns.length - 1;
   const spacers: TileSpacer[] = [];
-  for (let r = 0; r + 1 < rowsRuns.length; r++) {
-    const zJoint = gap + rowsRuns[r].start + rowsRuns[r].size + j / 2;
+  const addSpacer = (x: number, z: number, rows: number[]) => {
+    let after = 0;
+    for (const r of rows) {
+      for (const pc of rowPieces[r]) {
+        if (x >= pc.x - j - EPS && x <= pc.x + pc.lx + j + EPS) after = Math.max(after, pc.order);
+      }
+    }
+    spacers.push({ x, z, afterOrder: after });
+  };
+  for (let b = -1; b <= lastRow; b++) {
+    const rows = [b, b + 1].filter((r) => r >= 0 && r <= lastRow);
+    const z = b < 0
+      ? gap
+      : gap + rowsRuns[b].start + rowsRuns[b].size + (b === lastRow ? 0 : j / 2);
     const xs: number[] = [];
-    for (const rr of [r, r + 1]) {
-      const runs = rowRuns[rr];
+    for (const r of rows) {
+      const runs = rowRuns[r];
       for (let k = 0; k + 1 < runs.length; k++) xs.push(gap + runs[k].start + runs[k].size + j / 2);
     }
-    xs.sort((a, b) => a - b);
-    const merged = xs.filter((x, i) => i === 0 || x - xs[i - 1] > 1);
-    for (const x of merged) {
-      let after = 0;
-      for (const pc of pieces) {
-        if ((pc.row === r || pc.row === r + 1) && x >= pc.x - j - EPS && x <= pc.x + pc.lx + j + EPS) {
-          after = Math.max(after, pc.order);
-        }
-      }
-      spacers.push({ x, z: zJoint, afterOrder: after });
+    xs.sort((a, c) => a - c);
+    for (const x of xs.filter((x, i) => i === 0 || x - xs[i - 1] > 1)) addSpacer(x, z, rows);
+    if (rows.length === 2) {
+      addSpacer(gap, z, rows);
+      addSpacer(gap + innerW, z, rows);
     }
   }
 
@@ -406,6 +437,7 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
     .filter((pc) => !pc.cut)
     .map((pc) => pc.index);
 
+  const tilesFromLayout = full.length + tilesForCuts(cuts, tl, tw);
   const areaM2 = params.areaWidthM * params.areaDepthM;
   const tileAreaM2 = (tl * tw) / 1e6;
   const quantities: TileQuantities = {
@@ -414,8 +446,9 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
     pieces: pieces.length,
     fullTiles: full.length,
     cutTiles: cuts.length,
-    tilesToBuy: Math.ceil((areaM2 / tileAreaM2) * (1 + WASTE_PCT / 100) - 1e-9),
-    wastePct: WASTE_PCT,
+    tilesFromLayout,
+    tilesToBuy: Math.ceil(tilesFromLayout * (1 + SPARE_PCT / 100) - 1e-9),
+    sparePct: SPARE_PCT,
     spacers: spacers.length,
     adhesiveKg: areaM2 * (adhesiveKgPerM2(params.trowelNotchMm) + (params.backButter ? BACK_BUTTER_KG_M2 : 0)),
     groutKg: areaM2 * groutKgPerM2(tl, tw, params.tileThicknessMm, j),
@@ -437,7 +470,7 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
   if (cuts.length > 0 && minCut < Math.min(tl, tw) / 4) {
     issues.push({
       level: 'warning',
-      message: `The narrowest edge piece is ${Math.round(minCut)} mm. Slivers under a quarter tile break easily; shifting the centre line by half a tile avoids them.`,
+      message: `The narrowest edge piece is ${Math.round(minCut)} mm. Pieces that thin break easily when cut; a different tile size, pattern or starting line avoids them.`,
     });
   }
 
@@ -506,6 +539,7 @@ function applyStep(s: TileSceneState, step: TileStep, t: number, plan: TileFloor
     case 'lay_cuts':
       s.placed = fullTiles + t * cutTiles;
       s.highlightCuts = current;
+      s.spacersVisible = true;
       break;
     case 'level':
       s.level = current ? t : null;

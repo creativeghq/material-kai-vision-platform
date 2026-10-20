@@ -50,7 +50,7 @@ function ease(t: number): number {
 }
 
 function useRidgeTexture(): THREE.CanvasTexture | null {
-  return useMemo(() => {
+  const texture = useMemo(() => {
     if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
     canvas.width = 8;
@@ -67,6 +67,8 @@ function useRidgeTexture(): THREE.CanvasTexture | null {
     tex.wrapT = THREE.RepeatWrapping;
     return tex;
   }, []);
+  useEffect(() => () => texture?.dispose(), [texture]);
+  return texture;
 }
 
 function CameraRig({ shot, widthM, depthM }: { shot: CameraShot; widthM: number; depthM: number }) {
@@ -116,9 +118,6 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
   const tilesRef = useRef<THREE.InstancedMesh>(null);
   const spacersRef = useRef<THREE.InstancedMesh>(null);
   const ridges = useRidgeTexture();
-  useEffect(() => {
-    if (ridges) ridges.repeat.set(1, Math.max(mm(plan.innerDepthMm), 0.01) / mm(params.trowelNotchMm * 2.2));
-  }, [ridges, plan.innerDepthMm, params.trowelNotchMm]);
 
   const matrix = useMemo(() => new THREE.Matrix4(), []);
   const quat = useMemo(() => new THREE.Quaternion(), []);
@@ -184,13 +183,18 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
   const innerD = mm(plan.innerDepthMm);
   const gapM = mm(params.perimeterGapMm);
   const adhesiveDepth = innerD * state.adhesive;
+  const ridgePitch = mm(params.trowelNotchMm * 2.2);
+  useLayoutEffect(() => {
+    if (ridges) ridges.repeat.set(1, Math.max(adhesiveDepth, 0.001) / ridgePitch);
+  }, [ridges, adhesiveDepth, ridgePitch]);
 
   const onTileClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     if (e.instanceId != null) onSelect(e.instanceId);
   };
 
-  const sel = selected != null ? pieces[selected] : null;
+  const picked = selected != null ? pieces[selected] : null;
+  const sel = picked && picked.order < state.placed ? picked : null;
   const span = Math.max(roomW, roomD);
 
   return (
@@ -233,8 +237,8 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
       )}
 
       {adhesiveDepth > 0.001 && (
-        <mesh position={[0, bedM / 2 + lift.adhesive, oz + gapM + adhesiveDepth / 2]}>
-          <boxGeometry args={[innerW, bedM, adhesiveDepth]} />
+        <mesh position={[0, bedM / 2 + lift.adhesive, oz + gapM + adhesiveDepth / 2]} scale={[innerW, bedM, adhesiveDepth]}>
+          <boxGeometry args={[1, 1, 1]} />
           <meshStandardMaterial color={ADHESIVE} map={ridges ?? undefined} roughness={1} />
         </mesh>
       )}
@@ -252,25 +256,32 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
         </group>
       )}
 
-      <instancedMesh
+      {pieces.length > 0 && (
+        <instancedMesh
         key={`tiles-${pieces.length}`}
         ref={tilesRef}
-        args={[undefined, undefined, Math.max(pieces.length, 1)]}
+        args={[undefined, undefined, pieces.length]}
         onClick={onTileClick}
         castShadow
       >
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial roughness={0.35} metalness={0.02} />
-      </instancedMesh>
+        </instancedMesh>
+      )}
 
-      <instancedMesh key={`spacers-${spacers.length}`} ref={spacersRef} args={[undefined, undefined, Math.max(spacers.length * 2, 1)]}>
+      {spacers.length > 0 && (
+        <instancedMesh key={`spacers-${spacers.length}`} ref={spacersRef} args={[undefined, undefined, spacers.length * 2]}>
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color={SPACER} roughness={0.6} />
-      </instancedMesh>
+        </instancedMesh>
+      )}
 
       {state.grout > 0 && (
-        <mesh position={[0, bedM + tileM * 0.48 + lift.tiles, oz + gapM + (innerD * state.grout) / 2]}>
-          <boxGeometry args={[innerW, tileM * 0.96, innerD * state.grout]} />
+        <mesh
+          position={[0, bedM + tileM * 0.48 + lift.tiles, oz + gapM + (innerD * state.grout) / 2]}
+          scale={[innerW, tileM * 0.96, innerD * state.grout]}
+        >
+          <boxGeometry args={[1, 1, 1]} />
           <meshStandardMaterial color={colors.grout} roughness={0.95} />
         </mesh>
       )}
@@ -310,8 +321,9 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
           </mesh>
           <mesh
             position={[0, -tileM / 2 - 0.0012, -mm(params.tileWidthMm) / 2 + (mm(params.tileWidthMm) * state.backButter) / 2]}
+            scale={[mm(params.tileLengthMm), 0.002, Math.max(mm(params.tileWidthMm) * state.backButter, 0.001)]}
           >
-            <boxGeometry args={[mm(params.tileLengthMm), 0.002, Math.max(mm(params.tileWidthMm) * state.backButter, 0.001)]} />
+            <boxGeometry args={[1, 1, 1]} />
             <meshStandardMaterial color={ADHESIVE} roughness={1} />
           </mesh>
         </group>
