@@ -133,3 +133,22 @@ describe('installation guide counts above the render cap', () => {
     expect(b.hardwareTotal).toBe(120);
   });
 });
+
+describe('installation guide read in passes', () => {
+  it('merges step batches in page order and ties each placement to the step that places it', async () => {
+    const { mergeGuidePasses, KIT_PASS_SCHEMA, STEPS_PASS_SCHEMA, ASSEMBLY_PASS_SCHEMA } = await import('@/lib/installation/guideSchema');
+    const kit = { ...raw, steps: undefined, assembly: undefined };
+    const later = { steps: raw.steps.slice(2) };
+    const earlier = { steps: raw.steps.slice(0, 2) };
+    const assembly = {
+      available: true,
+      placements: raw.assembly.placements.filter((p) => p.part_id !== 'NOPE').map(({ step: _s, ...p }) => ({ ...p, page: 99 })),
+    };
+    const g = mergeGuidePasses(kit, [later, earlier], assembly, 12);
+    expect(g.steps.map((s) => s.title)).toEqual(['What is in the box', 'Dowels', 'Sides']);
+    expect(g.assembly.placements.every((p) => p.step === 2)).toBe(true);
+    for (const schema of [KIT_PASS_SCHEMA, STEPS_PASS_SCHEMA, ASSEMBLY_PASS_SCHEMA]) {
+      expect(schema.additionalProperties).toBe(false);
+    }
+  });
+});

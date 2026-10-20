@@ -109,6 +109,47 @@ export const GUIDE_OUTPUT_SCHEMA = closed({
   }),
 });
 
+const P = GUIDE_OUTPUT_SCHEMA.properties;
+
+export const KIT_PASS_SCHEMA = closed({
+  title: P.title,
+  summary: P.summary,
+  overall_cm: P.overall_cm,
+  people_required: P.people_required,
+  tools: P.tools,
+  warnings: P.warnings,
+  parts: P.parts,
+});
+
+export const STEPS_PASS_SCHEMA = closed({ steps: P.steps });
+
+export const ASSEMBLY_PASS_SCHEMA = closed({
+  available: bool,
+  placements: {
+    type: 'array',
+    items: closed({ part_id: str, instance: int, center_cm: vec3, extent_cm: vec3, page: int }),
+  },
+});
+
+export function mergeGuidePasses(kit: unknown, stepBatches: unknown[], assembly: unknown, pageCount: number): InstallationGuideData {
+  const k = isObj(kit) ? kit : {};
+  const steps = stepBatches.flatMap((b) => (isObj(b) && Array.isArray(b.steps) ? b.steps : []));
+  const pageOf = (s: unknown) => (isObj(s) ? finite(s.page, 0) : 0);
+  steps.sort((a, b) => pageOf(a) - pageOf(b));
+  const a = isObj(assembly) ? assembly : {};
+  const placements = (Array.isArray(a.placements) ? a.placements : []).map((p) => {
+    if (!isObj(p)) return p;
+    const page = finite(p.page, 0);
+    const uses = (s: unknown) => isObj(s) && Array.isArray(s.parts_used)
+      && s.parts_used.some((u) => isObj(u) && u.part_id === p.part_id);
+    let step = steps.findIndex((s) => pageOf(s) === page && uses(s));
+    if (step < 0) step = steps.findIndex((s) => uses(s));
+    if (step < 0) step = steps.findIndex((s) => pageOf(s) >= page);
+    return { ...p, step: step < 0 ? steps.length - 1 : step };
+  });
+  return sanitizeGuide({ ...k, steps, assembly: { available: a.available === true, placements } }, pageCount);
+}
+
 const MAX_PARTS = 80;
 const MAX_STEPS = 80;
 const MAX_PLACEMENTS = 120;
