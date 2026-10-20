@@ -113,6 +113,7 @@ async function initRuntime() {
   getToolPrompt = promptMod.getToolPrompt;
   getAgentSystemPrompt = promptMod.getAgentSystemPrompt;
   getSharedOperatingDoctrine = promptMod.getSharedOperatingDoctrine;
+  getSharedReplyStyle = promptMod.getSharedReplyStyle;
   loadPrompt = promptMod.loadPrompt;
   renderPromptTemplate = promptMod.renderPromptTemplate;
   extractTextContent = lgCoreMod.extractTextContent;
@@ -859,6 +860,7 @@ let getAgentSystemPrompt: (supabase: any, agentType: string) => Promise<string>;
 
 // The act-then-refine doctrine appended to every agent prompt (#370). Also from promptMod.
 let getSharedOperatingDoctrine: (supabase: any) => Promise<string>;
+let getSharedReplyStyle: (supabase: any) => Promise<string>;
 
 // Prompts that are neither an agent persona nor a tool description — the router classifier and
 // the conversation compactor. Both used to be string literals in this file. Also from promptMod.
@@ -1939,7 +1941,7 @@ async function executeAgent(
   // Act, then refine — the same rules for every agent (#370, Class C). Appended rather than
   // written into each agent's own prompt: 8 of 15 prompts were confirm-first and only 5 had any
   // counterweight, so this is an ABSENCE being filled, and fifteen hand-kept copies would drift.
-  systemPrompt += `\n\n${await getSharedOperatingDoctrine(supabase)}`;
+  systemPrompt += `\n\n${await getSharedOperatingDoctrine(supabase)}\n\n${await getSharedReplyStyle(supabase)}`;
 
   // Who the workspace IS. Not a toolkit and not a lookup: "what is our VAT number", "what address
   // do we invoice from", "what do we actually sell" are facts every agent needs on every turn and

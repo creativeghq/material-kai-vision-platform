@@ -11,7 +11,7 @@ import { resolveSecret } from '../_shared/secrets.ts';
 // it constructs the provider lazily so bootstrapped secrets are seen, and books the tokens.
 import { generateWithClaude } from '../_shared/ai-client.ts';
 // The prompt comes from the DB and there is no fallback, by design.
-import { loadPrompt } from '../_shared/prompt-utils.ts';
+import { getSharedReplyStyle, loadPrompt } from '../_shared/prompt-utils.ts';
 // The ONE USD source, so this does not become a second opinion about what a model costs.
 import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 
@@ -266,7 +266,7 @@ Deno.serve(withApiLogging((req) => {
     try {
       // From the DB, with no fallback — a hardcoded prompt here would make an admin's edit save
       // and change nothing, forever, while every health signal stayed green.
-      systemPrompt = await loadPrompt(supabase, 'embed', 'embed_assistant_answer');
+      systemPrompt = `${await loadPrompt(supabase, 'embed', 'embed_assistant_answer')}\n\n${await getSharedReplyStyle(supabase)}`;
     } catch (e) {
       console.error('[embed-agent] prompt unavailable', e instanceof Error ? e.message : e);
       return embedJson({ ok: true, available: false, reason: 'not_configured' }, 200, cors);

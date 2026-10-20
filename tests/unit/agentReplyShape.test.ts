@@ -132,3 +132,11 @@ describe('every tool result reaches the model in ONE shape, whichever toolkit ma
     expect(plain).toMatch(/cut: 40000 characters/);
   });
 });
+
+describe('every place the platform writes a reply loads the ONE reply style', () => {
+  it('agent-chat, background KAI tasks and the public embed assistant all append it', () => {
+    expect(CHAT).toContain('await getSharedReplyStyle(supabase)');
+    expect(code('supabase/functions/_shared/agents/kai-task-agent.ts')).toContain('await getSharedReplyStyle(supabase)');
+    expect(code('supabase/functions/embed-agent/index.ts')).toContain('await getSharedReplyStyle(supabase)');
+  });
+});

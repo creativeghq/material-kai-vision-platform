@@ -90,9 +90,8 @@ export async function getAgentSystemPrompt(
   return data.system_prompt;
 }
 
-/** The shared operating doctrine appended to EVERY agent's system prompt (issue #370, Class C). */
-export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<string> {
-  const cacheKey = 'system:shared_operating_doctrine';
+async function getSharedSystemSection(supabase: DbClient, category: string, missing: string): Promise<string> {
+  const cacheKey = `system:${category}`;
   const cached = getCachedPrompt(cacheKey);
   if (cached !== undefined && cached !== null) return cached;
 
@@ -100,13 +99,13 @@ export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<st
     .from('prompts')
     .select('id, system_prompt')
     .eq('prompt_type', 'system')
-    .eq('category', 'shared_operating_doctrine')
+    .eq('category', category)
     .eq('is_active', true)
     .eq('status', 'active')
     .maybeSingle();
 
   if (error || !data?.system_prompt) {
-    console.warn('⚠️ shared_operating_doctrine prompt row missing — agents run without the act-then-refine rules', error?.message ?? '');
+    console.warn(`⚠️ ${category} prompt row missing — ${missing}`, error?.message ?? '');
     return '';
   }
 
@@ -114,6 +113,14 @@ export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<st
   setCachedPrompt(cacheKey, data.system_prompt);
   return data.system_prompt;
 }
+
+/** The shared operating doctrine appended to EVERY agent's system prompt (issue #370, Class C). */
+export const getSharedOperatingDoctrine = (supabase: DbClient) =>
+  getSharedSystemSection(supabase, 'shared_operating_doctrine', 'agents run without the act-then-refine rules');
+
+/** How the platform talks to a person — loaded by EVERY prompt whose output a user reads. */
+export const getSharedReplyStyle = (supabase: DbClient) =>
+  getSharedSystemSection(supabase, 'shared_reply_style', 'replies may name tools, cards and ids');
 
 /**
  * Load a tool-specific prompt from the database.

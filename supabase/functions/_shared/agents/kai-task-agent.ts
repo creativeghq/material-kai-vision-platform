@@ -4,6 +4,7 @@ import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
+import { getSharedReplyStyle } from '../prompt-utils.ts';
 
 // Up-front credit ceiling reserved before the Opus loop, then settled down to the actual
 // token-based cost after the run (surplus refunded, overage charged best-effort). Admin-triggered,
@@ -269,7 +270,8 @@ export class KaiTaskAgent implements AgentRunner {
     // tools erroring, this agent did not stop and did not report the breakage as the result — it
     // wrote a polished 4,300-token report from training data, dated it, and returned it as
     // research.
-    const systemPrompt = agentConfig.system_prompt_override || [
+    const replyStyle = await getSharedReplyStyle(supabase);
+    const systemPrompt = agentConfig.system_prompt_override ? `${agentConfig.system_prompt_override}\n\n${replyStyle}` : [
       'You are KAI, a material intelligence agent working on a background task assigned by an admin user.',
       'Complete the task thoroughly, use your tools as needed, and produce a detailed structured report.',
       'Be precise: cite data, counts, and sources in your output.',
@@ -282,6 +284,8 @@ export class KaiTaskAgent implements AgentRunner {
       '  report from your own knowledge — a plausible answer nobody can check is worse than none.',
       '- Never state or imply a research date, a source, or a URL you did not actually retrieve.',
       contextSnippet ? `\n## Context from user session\n${contextSnippet}` : '',
+      '',
+      replyStyle,
     ].join('\n');
 
     // ── Run LangGraph loop ─────────────────────────────────────────────────────
