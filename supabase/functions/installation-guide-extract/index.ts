@@ -106,7 +106,7 @@ async function readManual(
         model: MODEL,
         max_tokens: maxTokens,
         system: `${system}\n\n${task}`,
-        output_config: { format: { type: 'json_schema', schema } },
+        output_config: { effort: 'low', format: { type: 'json_schema', schema } },
         messages: [{ role: 'user', content }],
       }, {
         task: `installation-guide-extract:${label}`, userId: uid, workspaceId: guide.workspace_id, timeoutMs: 240_000,
@@ -123,7 +123,7 @@ async function readManual(
     };
 
     const total = guide.page_count;
-    const kit = await pass('parts list', fill(kitTask, { total }), pagesContent(1, total), KIT_PASS_SCHEMA, 8000) as { parts?: unknown[] };
+    const kit = await pass('parts list', fill(kitTask, { total }), pagesContent(1, total), KIT_PASS_SCHEMA, 16000) as { parts?: unknown[] };
     const kitIds = JSON.stringify((kit.parts ?? []).map((p) => {
       const o = p as Record<string, unknown>;
       return { id: o.id, name: o.name, code: o.code, quantity: o.quantity, kind: o.kind };
@@ -132,8 +132,8 @@ async function readManual(
     for (let from = 1; from <= total; from += PAGES_PER_STEP_PASS) batches.push([from, Math.min(total, from + PAGES_PER_STEP_PASS - 1)]);
     const [stepResults, assembly] = await Promise.all([
       Promise.all(batches.map(([from, to]) =>
-        pass(`steps on pages ${from}-${to}`, fill(stepsTask, { from, to, total, kit: kitIds }), pagesContent(from, to), STEPS_PASS_SCHEMA, 8000))),
-      pass('assembled layout', fill(assemblyTask, { total, kit: kitIds }), pagesContent(1, total), ASSEMBLY_PASS_SCHEMA, 8000)
+        pass(`steps on pages ${from}-${to}`, fill(stepsTask, { from, to, total, kit: kitIds }), pagesContent(from, to), STEPS_PASS_SCHEMA, 16000))),
+      pass('assembled layout', fill(assemblyTask, { total, kit: kitIds }), pagesContent(1, total), ASSEMBLY_PASS_SCHEMA, 16000)
         .catch(() => ({ available: false, placements: [] })),
     ]);
     const guideData = mergeGuidePasses(kit, stepResults, assembly, total);
