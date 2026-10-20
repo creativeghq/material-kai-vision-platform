@@ -56,7 +56,8 @@ function describe(entry: PlatformRpcEntry) {
   return {
     reader: entry.name,
     answers: entry.subject,
-    arguments: entry.args,
+    arguments: entry.args.filter((a) => a.name !== 'p_workspace_id'),
+    workspace: entry.args.some((a) => a.name === 'p_workspace_id') ? 'filled in for you — do not pass it' : undefined,
     withheld: access.access === 'withheld' ? access.reason : undefined,
   };
 }
@@ -101,6 +102,7 @@ export const createCallPlatformRpcTool = (
   jwt: string | undefined,
   onChunk?: (chunk: AnyRow) => void,
   userId = '',
+  workspaceId = '',
 ) => tool(
   async ({ reader, args }: AnyRow) => {
     const name = String(reader ?? '').trim();
@@ -131,8 +133,10 @@ export const createCallPlatformRpcTool = (
       });
     }
 
-    const supplied = args && typeof args === 'object' && !Array.isArray(args) ? args as AnyRow : {};
+    const supplied: AnyRow = args && typeof args === 'object' && !Array.isArray(args) ? { ...(args as AnyRow) } : {};
     const declared = new Set(known.args.map((a) => a.name));
+    // The session's workspace, never the model's (invariant 1); the RPC still checks membership.
+    if (declared.has('p_workspace_id') && workspaceId) supplied.p_workspace_id = workspaceId;
     const unknownArgs = Object.keys(supplied).filter((k) => !declared.has(k));
     if (unknownArgs.length) {
       return JSON.stringify({

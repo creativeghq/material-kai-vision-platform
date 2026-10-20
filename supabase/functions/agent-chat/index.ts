@@ -2502,7 +2502,7 @@ async function executeAgent(
     tools.push(platformRpcMod.createDiscoverPlatformDataTool(onChunk));
   }
   if (config.tools.includes('call_platform_rpc') && platformRpcMod?.createCallPlatformRpcTool) {
-    tools.push(platformRpcMod.createCallPlatformRpcTool(userJwt, onChunk, userId));
+    tools.push(platformRpcMod.createCallPlatformRpcTool(userJwt, onChunk, userId, workspaceId));
   }
 
   if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {

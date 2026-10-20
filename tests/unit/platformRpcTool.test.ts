@@ -147,7 +147,7 @@ describe('the tools are reachable', () => {
     const agentChat = code('supabase/functions/agent-chat/index.ts');
     expect((agentChat.match(/'discover_platform_data', 'call_platform_rpc'/g) ?? []).length)
       .toBeGreaterThan(0);
-    expect(agentChat).toContain('createCallPlatformRpcTool(userJwt, onChunk, userId)');
+    expect(agentChat).toContain('createCallPlatformRpcTool(userJwt, onChunk, userId, workspaceId)');
   });
 
   it('their output is registered, or the card renders nothing', () => {
