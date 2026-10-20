@@ -1,0 +1,664 @@
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Edges, Html, OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
+
+import {
+  partCountAt,
+  poseAt,
+  type BuildItem,
+  type CameraShot,
+  type GuideBuild,
+} from '@/lib/installation/guideBuild';
+import type { InstallationGuideData } from '@/lib/installation/guideSchema';
+
+export type GuideView = 'room' | 'drawing';
+
+interface ControlsLike {
+  target: THREE.Vector3;
+  update: () => void;
+  addEventListener: (type: 'start', fn: () => void) => void;
+  removeEventListener: (type: 'start', fn: () => void) => void;
+}
+
+interface Props {
+  guide: InstallationGuideData;
+  build: GuideBuild;
+  xRef: React.MutableRefObject<number>;
+  explodeRef: React.MutableRefObject<number>;
+  view: GuideView;
+  shot: CameraShot;
+  shotVersion: number;
+  stepIndex: number;
+  pageUrl: string | null;
+  hovered: string | null;
+  onHover: (key: string | null, clientX: number, clientY: number) => void;
+  onPick: (key: string) => void;
+  labels: boolean;
+  atStart: boolean;
+}
+
+const PANEL_ROOM = '#ece5d8';
+const PANEL_EDGE_ROOM = '#c8a46a';
+const GHOST = '#7fe3ff';
+const HOVER = '#ffb454';
+const tmp = {
+  m: new THREE.Matrix4(),
+  q: new THREE.Quaternion(),
+  q2: new THREE.Quaternion(),
+  e: new THREE.Euler(),
+  p: new THREE.Vector3(),
+  s: new THREE.Vector3(),
+  axisY: new THREE.Vector3(0, 1, 0),
+};
+
+function hardwareColor(name: string): string {
+  if (/dowel|wood/i.test(name)) return '#c8975a';
+  if (/nail|screw|bolt|pin|bracket|washer|cam|hinge|lock/i.test(name)) return '#b9bec6';
+  return '#4b4f57';
+}
+
+function canvasTexture(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  draw(ctx);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function useDisposable<T extends { dispose: () => void } | null>(factory: () => T, key: unknown): T {
+  const ref = useRef<{ key: unknown; value: T } | null>(null);
+  if (!ref.current || ref.current.key !== key) {
+    ref.current?.value?.dispose();
+    ref.current = { key, value: factory() };
+  }
+  useEffect(() => () => {
+    ref.current?.value?.dispose();
+    ref.current = null;
+  }, []);
+  return ref.current.value;
+}
+
+function CameraRig({ shot, version }: { shot: CameraShot; version: number }) {
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
+  const following = useRef(true);
+  const goal = useRef(new THREE.Vector3());
+  const target = useRef(new THREE.Vector3());
+
+  useEffect(() => {
+    following.current = true;
+    const { target: t, yaw, pitch, dist } = shot;
+    target.current.set(t.x, t.y, t.z);
+    goal.current.set(
+      t.x + Math.sin(yaw) * Math.cos(pitch) * dist,
+      t.y + Math.sin(pitch) * dist,
+      t.z + Math.cos(yaw) * Math.cos(pitch) * dist,
+    );
+  }, [shot, version]);
+
+  useEffect(() => {
+    if (!controls) return;
+    const stop = () => { following.current = false; };
+    controls.addEventListener('start', stop);
+    return () => controls.removeEventListener('start', stop);
+  }, [controls]);
+
+  useFrame((_, delta) => {
+    if (!following.current || !controls) return;
+    const k = 1 - Math.exp(-delta * 2.2);
+    camera.position.lerp(goal.current, k);
+    controls.target.lerp(target.current, k);
+    controls.update();
+  });
+  return null;
+}
+
+function KeyboardFly() {
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
+  const keys = useRef(new Set<string>());
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      keys.current.add(e.key.toLowerCase());
+    };
+    const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
+    const clear = () => keys.current.clear();
+    addEventListener('keydown', down);
+    addEventListener('keyup', up);
+    addEventListener('blur', clear);
+    return () => {
+      removeEventListener('keydown', down);
+      removeEventListener('keyup', up);
+      removeEventListener('blur', clear);
+    };
+  }, []);
+  useFrame((_, delta) => {
+    const k = keys.current;
+    if (!controls || k.size === 0) return;
+    const fwd = new THREE.Vector3().subVectors(controls.target, camera.position).setY(0).normalize();
+    const right = new THREE.Vector3().crossVectors(fwd, tmp.axisY).normalize();
+    const speed = delta * 1.6 * (k.has('shift') ? 2.4 : 1);
+    const move = new THREE.Vector3();
+    if (k.has('w')) move.add(fwd);
+    if (k.has('s')) move.sub(fwd);
+    if (k.has('d')) move.add(right);
+    if (k.has('a')) move.sub(right);
+    if (move.lengthSq() > 0) {
+      move.normalize().multiplyScalar(speed);
+      camera.position.add(move);
+      controls.target.add(move);
+    }
+    const turn = (k.has('q') ? 1 : 0) - (k.has('e') ? 1 : 0);
+    if (turn) {
+      const off = new THREE.Vector3().subVectors(camera.position, controls.target);
+      off.applyAxisAngle(tmp.axisY, turn * delta * 1.1);
+      camera.position.copy(controls.target).add(off);
+    }
+    if (move.lengthSq() > 0 || turn) controls.update();
+  });
+  return null;
+}
+
+function Room({ build }: { build: GuideBuild }) {
+  const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.x, 3) + 2.4;
+  const rugW = Math.max(build.kitBounds.size.x, build.product.size.x) + 1.2;
+  const rugD = build.kitBounds.center.z + build.kitBounds.size.z / 2 - (build.product.center.z - build.product.size.z / 2) + 1;
+  const rugZ = (build.kitBounds.center.z + build.kitBounds.size.z / 2 + build.product.center.z - build.product.size.z / 2) / 2;
+  const rug = useDisposable(() => canvasTexture(512, 512, (ctx) => {
+    ctx.fillStyle = '#e7dcc8';
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = '#8a9a78';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(22, 22, 468, 468);
+    ctx.strokeStyle = '#c75b39';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(40, 40, 432, 432);
+  }), 'rug');
+  const wallZ = build.product.center.z - build.product.size.z / 2 - 0.35;
+  const wallH = Math.max(2.8, build.product.size.y + 1);
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, rugZ]} receiveShadow>
+        <planeGeometry args={[span * 2.2, span * 2.2]} />
+        <meshStandardMaterial color="#cdb593" roughness={0.85} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.0005, rugZ]} receiveShadow>
+        <planeGeometry args={[rugW, rugD]} />
+        <meshStandardMaterial map={rug ?? undefined} roughness={0.95} />
+      </mesh>
+      <mesh position={[0, wallH / 2, wallZ]} receiveShadow>
+        <planeGeometry args={[span * 2.2, wallH]} />
+        <meshStandardMaterial color="#5a4636" roughness={0.9} />
+      </mesh>
+      <mesh position={[-span * 0.75, wallH / 2, rugZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[span * 2.2, wallH]} />
+        <meshStandardMaterial color="#4e3d30" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, wallH - 0.05, wallZ + 0.01]}>
+        <boxGeometry args={[span * 2.2, 0.025, 0.02]} />
+        <meshBasicMaterial color="#ffd9a0" />
+      </mesh>
+      <pointLight position={[0, wallH - 0.2, wallZ + 0.4]} intensity={6} distance={span * 2} color="#ffcf8a" />
+    </group>
+  );
+}
+
+function KitCards({ build, guide, view }: { build: GuideBuild; guide: InstallationGuideData; view: GuideView }) {
+  const textures = useMemo(() => build.cards.map((c) => {
+    const part = guide.parts.find((p) => p.id === c.partId);
+    const w = 512;
+    const h = Math.max(128, Math.round((c.depth / c.width) * 512));
+    return canvasTexture(w, h, (ctx) => {
+      ctx.fillStyle = view === 'drawing' ? '#ffffff' : '#f6f3ec';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#16171a';
+      ctx.font = '600 56px sans-serif';
+      ctx.fillText(c.label, 20, h - 24);
+      ctx.font = '400 26px monospace';
+      if (c.code) ctx.fillText(c.code, w - 20 - ctx.measureText(c.code).width, h - 28);
+      ctx.font = '500 24px sans-serif';
+      ctx.fillStyle = '#555';
+      ctx.fillText((part?.name ?? '').slice(0, 28), 20, 34);
+      ctx.fillStyle = '#c75b39';
+      ctx.fillRect(0, h - 8, w, 8);
+    });
+  }), [build.cards, guide.parts, view]);
+  useEffect(() => () => textures.forEach((t) => t?.dispose()), [textures]);
+  return (
+    <group>
+      {build.cards.map((c, i) => (
+        <mesh key={c.partId} rotation={[-Math.PI / 2, 0, 0]} position={[c.pos.x, 0.0012, c.pos.z]} receiveShadow>
+          <planeGeometry args={[c.width, c.depth]} />
+          <meshStandardMaterial map={textures[i] ?? undefined} roughness={0.9} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Ghost({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObject<number> }) {
+  const group = useRef<THREE.Group>(null);
+  const geometry = useDisposable(() => {
+    const parts = build.ghost.map((g) => {
+      const box = new THREE.BoxGeometry(g.size.x, g.size.y, g.size.z);
+      const edges = new THREE.EdgesGeometry(box);
+      box.dispose();
+      edges.translate(g.center.x, g.center.y, g.center.z);
+      return edges;
+    });
+    if (parts.length === 0) return null;
+    const merged = new THREE.BufferGeometry();
+    const positions: number[] = [];
+    for (const p of parts) {
+      positions.push(...(p.getAttribute('position').array as Float32Array));
+      p.dispose();
+    }
+    merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    return merged;
+  }, build.ghost);
+  const material = useDisposable(() => new THREE.LineBasicMaterial({ color: GHOST, transparent: true, opacity: 0.8, depthWrite: false }), 'ghost');
+  useFrame(() => {
+    if (!group.current || !material) return;
+    const fade = Math.min(1, Math.max(0, (build.steps - 0.4 - xRef.current) / 0.6));
+    material.opacity = 0.75 * fade;
+    group.current.visible = fade > 0.01;
+  });
+  if (!geometry || !material) return null;
+  return (
+    <group ref={group}>
+      <lineSegments geometry={geometry} material={material} />
+    </group>
+  );
+}
+
+function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick }: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' | 'view' | 'hovered' | 'onHover' | 'onPick'>) {
+  const panels = useMemo(() => build.items.filter((it) => it.kind === 'panel'), [build.items]);
+  const refs = useRef<Array<THREE.Mesh | null>>([]);
+  useFrame(() => {
+    panels.forEach((it, i) => {
+      const mesh = refs.current[i];
+      if (!mesh) return;
+      const pose = poseAt(it, xRef.current, explodeRef.current);
+      mesh.position.set(pose.pos.x, pose.pos.y, pose.pos.z);
+      mesh.rotation.set(pose.rot.x, pose.rot.y, pose.rot.z);
+    });
+  });
+  return (
+    <group>
+      {panels.map((it, i) => {
+        const part = guide.parts[it.partIndex];
+        const isHover = hovered === it.key;
+        return (
+          <mesh
+            key={it.key}
+            ref={(m) => { refs.current[i] = m; }}
+            castShadow
+            receiveShadow
+            onPointerMove={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); onHover(it.key, e.clientX, e.clientY); }}
+            onPointerOut={() => onHover(null, 0, 0)}
+            onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onPick(it.key); }}
+          >
+            <boxGeometry args={[it.size.x, it.size.y, it.size.z]} />
+            <meshStandardMaterial
+              color={isHover ? HOVER : view === 'drawing' ? '#ffffff' : part?.kind === 'fitting' ? '#d9d9d9' : PANEL_ROOM}
+              roughness={0.7}
+            />
+            <Edges threshold={20} color={view === 'drawing' ? '#111111' : PANEL_EDGE_ROOM} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function HardwarePart({ items, color, xRef, explodeRef, view, onHover, onPick }: {
+  items: BuildItem[];
+  color: string;
+  xRef: React.MutableRefObject<number>;
+  explodeRef: React.MutableRefObject<number>;
+  view: GuideView;
+  onHover: Props['onHover'];
+  onPick: Props['onPick'];
+}) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const dims = items[0].size;
+  useFrame(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    items.forEach((it, i) => {
+      const pose = poseAt(it, xRef.current, explodeRef.current);
+      tmp.e.set(pose.rot.x, pose.rot.y, pose.rot.z);
+      tmp.q.setFromEuler(tmp.e);
+      if (pose.spinAngle) tmp.q.multiply(tmp.q2.setFromAxisAngle(tmp.axisY, pose.spinAngle));
+      tmp.p.set(pose.pos.x, pose.pos.y, pose.pos.z);
+      tmp.s.set(1, 1, 1);
+      mesh.setMatrixAt(i, tmp.m.compose(tmp.p, tmp.q, tmp.s));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <instancedMesh
+      ref={ref}
+      args={[undefined, undefined, items.length]}
+      castShadow
+      onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+        e.stopPropagation();
+        if (e.instanceId != null && items[e.instanceId]) onHover(items[e.instanceId].key, e.clientX, e.clientY);
+      }}
+      onPointerOut={() => onHover(null, 0, 0)}
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        e.stopPropagation();
+        if (e.instanceId != null && items[e.instanceId]) onPick(items[e.instanceId].key);
+      }}
+    >
+      <cylinderGeometry args={[dims.x / 2, dims.x / 2, dims.y, 10]} />
+      <meshStandardMaterial color={view === 'drawing' ? '#222222' : color} metalness={/b9bec6/.test(color) ? 0.7 : 0.05} roughness={0.4} />
+    </instancedMesh>
+  );
+}
+
+function Hardware(props: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' | 'view' | 'onHover' | 'onPick'>) {
+  const groups = useMemo(() => {
+    const byPart = new Map<string, BuildItem[]>();
+    for (const it of props.build.items) {
+      if (it.kind !== 'hardware') continue;
+      byPart.set(it.partId, [...(byPart.get(it.partId) ?? []), it]);
+    }
+    return [...byPart.entries()];
+  }, [props.build.items]);
+  return (
+    <group>
+      {groups.map(([partId, items]) => (
+        <HardwarePart
+          key={`${partId}-${items.length}`}
+          items={items}
+          color={hardwareColor(props.guide.parts[items[0].partIndex]?.name ?? '')}
+          xRef={props.xRef}
+          explodeRef={props.explodeRef}
+          view={props.view}
+          onHover={props.onHover}
+          onPick={props.onPick}
+        />
+      ))}
+    </group>
+  );
+}
+
+function Trails({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObject<number> }) {
+  const lineRef = useRef<THREE.LineSegments>(null);
+  const geometry = useDisposable(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6 * 40 * 3), 3));
+    return g;
+  }, 'trails');
+  const material = useDisposable(() => new THREE.LineDashedMaterial({ color: GHOST, dashSize: 0.025, gapSize: 0.02, transparent: true, opacity: 0.85 }), 'trail-material');
+  useFrame(() => {
+    if (!geometry || !lineRef.current) return;
+    const arr = geometry.getAttribute('position').array as Float32Array;
+    let n = 0;
+    for (const it of build.items) {
+      if (n >= 40) break;
+      const x = xRef.current;
+      if (!(x > it.t0 && x < it.ta)) continue;
+      const pose = poseAt(it, x, 0);
+      arr.set([pose.pos.x, pose.pos.y, pose.pos.z, it.target.pos.x, it.target.pos.y, it.target.pos.z], n * 6);
+      n++;
+    }
+    geometry.setDrawRange(0, n * 2);
+    geometry.getAttribute('position').needsUpdate = true;
+    lineRef.current.computeLineDistances();
+  });
+  if (!geometry || !material) return null;
+  return <lineSegments ref={lineRef} geometry={geometry} material={material} frustumCulled={false} />;
+}
+
+function ActiveLabel({ build, guide, xRef, labels }: { build: GuideBuild; guide: InstallationGuideData; xRef: React.MutableRefObject<number>; labels: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  useFrame(() => {
+    const x = xRef.current;
+    let active: BuildItem | null = null;
+    for (const it of build.items) {
+      if (x > it.t0 && x < it.ta + 0.004 && (!active || it.t0 > active.t0)) active = it;
+    }
+    if (!groupRef.current || !textRef.current) return;
+    const show = labels && !!active;
+    groupRef.current.visible = show;
+    textRef.current.style.display = show ? '' : 'none';
+    if (!active) return;
+    const pose = poseAt(active, x, 0);
+    groupRef.current.position.set(pose.pos.x, pose.pos.y + Math.max(active.size.y, 0.05) / 2 + 0.06, pose.pos.z);
+    const part = guide.parts[active.partIndex];
+    const code = part?.code ? ` · ${part.code}` : '';
+    const count = active.kind === 'hardware' ? ` · ${partCountAt(build, active.partId, x)}/${part?.quantity ?? 0}` : '';
+    const text = `${part?.name ?? ''}${code}${count}`;
+    if (textRef.current.textContent !== text) textRef.current.textContent = text;
+  });
+  return (
+    <group ref={groupRef} visible={false}>
+      <Html center style={{ pointerEvents: 'none' }}>
+        <div ref={textRef} className="whitespace-nowrap rounded-full border border-hairline bg-card/95 px-2.5 py-1 text-xs font-medium text-foreground shadow-overlay" />
+      </Html>
+    </group>
+  );
+}
+
+function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideBuild; guide: InstallationGuideData; stepIndex: number; pageUrl: string | null; xRef: React.MutableRefObject<number> }) {
+  const step = guide.steps[stepIndex];
+  const stepTexRef = useRef<THREE.CanvasTexture | null>(null);
+  const hwTexRef = useRef<THREE.CanvasTexture | null>(null);
+  const stepCanvas = useMemo(() => (typeof document === 'undefined' ? null : Object.assign(document.createElement('canvas'), { width: 620, height: 480 })), []);
+  const hwCanvas = useMemo(() => (typeof document === 'undefined' ? null : Object.assign(document.createElement('canvas'), { width: 620, height: 480 })), []);
+  const stepTex = useDisposable(() => (stepCanvas ? new THREE.CanvasTexture(stepCanvas) : null), stepCanvas);
+  const hwTex = useDisposable(() => (hwCanvas ? new THREE.CanvasTexture(hwCanvas) : null), hwCanvas);
+  stepTexRef.current = stepTex;
+  hwTexRef.current = hwTex;
+
+  useEffect(() => {
+    const ctx = stepCanvas?.getContext('2d');
+    if (!ctx || !stepCanvas || !step) return;
+    const frame = () => {
+      ctx.fillStyle = 'rgba(14,30,48,0.92)';
+      ctx.fillRect(0, 0, 620, 480);
+      ctx.strokeStyle = '#8fe4ff';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(3, 3, 614, 474);
+      ctx.fillStyle = '#cfe9ff';
+      ctx.font = '600 44px sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.fillText(stepIndex ? `STEP ${stepIndex}` : 'THE KIT', 28, 24);
+      ctx.font = '400 26px monospace';
+      ctx.fillStyle = '#8fd8ff';
+      ctx.fillText(`page ${step.page}`, 470, 34);
+    };
+    frame();
+    if (stepTexRef.current) stepTexRef.current.needsUpdate = true;
+    if (!pageUrl) return;
+    let live = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (!live) return;
+      frame();
+      const { x0, y0, x1, y1 } = step.box;
+      const sw = (x1 - x0) * img.naturalWidth;
+      const sh = (y1 - y0) * img.naturalHeight;
+      const k = Math.min(560 / sw, 360 / sh);
+      const w = Math.round(sw * k);
+      const h = Math.round(sh * k);
+      const tmpCanvas = Object.assign(document.createElement('canvas'), { width: w, height: h });
+      const t = tmpCanvas.getContext('2d', { willReadFrequently: true });
+      if (!t) return;
+      t.drawImage(img, x0 * img.naturalWidth, y0 * img.naturalHeight, sw, sh, 0, 0, w, h);
+      try {
+        const data = t.getImageData(0, 0, w, h);
+        for (let i = 0; i < data.data.length; i += 4) {
+          const ink = 255 - data.data[i];
+          data.data[i] = 190;
+          data.data[i + 1] = 236;
+          data.data[i + 2] = 255;
+          data.data[i + 3] = Math.min(255, ink * 1.6);
+        }
+        t.putImageData(data, 0, 0);
+      } catch {
+        return;
+      }
+      ctx.drawImage(tmpCanvas, (620 - w) / 2, 96 + (360 - h) / 2);
+      if (stepTexRef.current) stepTexRef.current.needsUpdate = true;
+    };
+    img.src = pageUrl;
+    return () => { live = false; };
+  }, [step, stepIndex, pageUrl, stepCanvas]);
+
+  const lastDrawn = useRef(-1);
+  useFrame(() => {
+    const ctx = hwCanvas?.getContext('2d');
+    if (!ctx) return;
+    const x = Math.round(xRef.current * 20) / 20;
+    if (x === lastDrawn.current) return;
+    lastDrawn.current = x;
+    const hw = guide.parts.filter((p) => p.kind === 'hardware').slice(0, 7);
+    ctx.fillStyle = 'rgba(14,30,48,0.92)';
+    ctx.fillRect(0, 0, 620, 480);
+    ctx.strokeStyle = '#8fe4ff';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(3, 3, 614, 474);
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#cfe9ff';
+    ctx.font = '600 34px sans-serif';
+    ctx.fillText('HARDWARE', 28, 22);
+    const total = build.hardwareTotal;
+    const inCount = build.items.filter((it) => it.kind === 'hardware' && xRef.current >= it.ta - 1e-6).length;
+    ctx.font = '400 24px monospace';
+    ctx.fillStyle = '#8fd8ff';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${inCount} / ${total} in`, 590, 30);
+    ctx.textAlign = 'left';
+    hw.forEach((p, i) => {
+      const y = 82 + i * 54;
+      const got = partCountAt(build, p.id, xRef.current);
+      const shown = Math.min(p.quantity, 24);
+      ctx.fillStyle = '#cfe9ff';
+      ctx.font = '500 22px sans-serif';
+      ctx.fillText(p.name.slice(0, 18), 28, y);
+      ctx.fillStyle = '#7fb8d8';
+      ctx.font = '400 18px monospace';
+      ctx.fillText(p.code || '—', 28, y + 24);
+      const bw = Math.min(14, 300 / shown);
+      for (let k = 0; k < shown; k++) {
+        ctx.fillStyle = k < (got / p.quantity) * shown ? '#ffd08a' : 'rgba(143,228,255,.28)';
+        ctx.fillRect(250 + k * bw, y + 6, bw - 3, 26);
+      }
+      ctx.fillStyle = got >= p.quantity ? '#ffd08a' : '#cfe9ff';
+      ctx.font = '500 20px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${got}/${p.quantity}`, 592, y + 8);
+      ctx.textAlign = 'left';
+    });
+    if (hwTexRef.current) hwTexRef.current.needsUpdate = true;
+  });
+
+  const wallZ = build.product.center.z - build.product.size.z / 2 - 0.33;
+  const y = Math.max(1.3, build.product.size.y * 0.55 + 0.4);
+  const half = Math.max(build.product.size.x / 2 + 1.05, 1.2);
+  return (
+    <group>
+      <mesh position={[-half, y, wallZ]}>
+        <planeGeometry args={[0.93, 0.72]} />
+        <meshBasicMaterial map={stepTex ?? undefined} transparent toneMapped={false} />
+      </mesh>
+      <mesh position={[half, y, wallZ]}>
+        <planeGeometry args={[0.93, 0.72]} />
+        <meshBasicMaterial map={hwTex ?? undefined} transparent toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+export const GuideScene: React.FC<Props> = (props) => {
+  const { build, guide, view, shot, shotVersion, xRef, explodeRef } = props;
+  const scene = useThree((s) => s.scene);
+  const gl = useThree((s) => s.gl);
+
+  useLayoutEffect(() => {
+    scene.background = new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
+    scene.fog = view === 'drawing' ? null : new THREE.FogExp2('#1a1410', 0.035);
+    gl.toneMappingExposure = view === 'drawing' ? 1.1 : 1;
+  }, [scene, gl, view]);
+
+  const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.y, 2);
+
+  return (
+    <>
+      <OrbitControls makeDefault enableDamping maxPolarAngle={Math.PI / 2.02} minDistance={0.25} maxDistance={span * 5} />
+      <CameraRig shot={shot} version={shotVersion} />
+      <KeyboardFly />
+      {view === 'room' ? (
+        <>
+          <hemisphereLight args={['#fff2dd', '#3a2a1c', 0.9]} />
+          <directionalLight
+            position={[-3, 6, 4]}
+            intensity={2.2}
+            color="#ffe2b8"
+            castShadow
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
+            shadow-camera-left={-span}
+            shadow-camera-right={span}
+            shadow-camera-top={span}
+            shadow-camera-bottom={-span}
+          />
+          <directionalLight position={[4, 3, -2]} intensity={0.6} color="#9fc4ff" />
+          <Room build={build} />
+          {build.hasAssembly && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} />}
+        </>
+      ) : (
+        <>
+          <hemisphereLight args={['#ffffff', '#ffffff', 2.2]} />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]}>
+            <planeGeometry args={[span * 6, span * 6]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+        </>
+      )}
+      <KitCards build={build} guide={guide} view={view} />
+      {build.hasAssembly && <Ghost build={build} xRef={xRef} />}
+      <Panels build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} hovered={props.hovered} onHover={props.onHover} onPick={props.onPick} />
+      <Hardware build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} onHover={props.onHover} onPick={props.onPick} />
+      <Trails build={build} xRef={xRef} />
+      <ActiveLabel build={build} guide={guide} xRef={xRef} labels={props.labels} />
+      {props.labels && props.atStart && build.items.length > 0 && <StartTags build={build} guide={guide} />}
+    </>
+  );
+};
+
+function StartTags({ build, guide }: { build: GuideBuild; guide: InstallationGuideData }) {
+  const tags = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{ key: string; text: string; pos: [number, number, number] }> = [];
+    for (const it of build.items) {
+      if (it.kind !== 'panel' || seen.has(it.partId)) continue;
+      seen.add(it.partId);
+      const part = guide.parts[it.partIndex];
+      out.push({ key: it.partId, text: `${part?.quantity > 1 ? `${part.quantity} × ` : ''}${part?.name ?? ''}`, pos: [it.kit.pos.x, it.kit.pos.y + 0.05, it.kit.pos.z] });
+    }
+    return out.slice(0, 12);
+  }, [build.items, guide.parts]);
+  return (
+    <group>
+      {tags.map((t) => (
+        <Html key={t.key} position={t.pos} center style={{ pointerEvents: 'none' }}>
+          <div className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
+        </Html>
+      ))}
+    </group>
+  );
+}

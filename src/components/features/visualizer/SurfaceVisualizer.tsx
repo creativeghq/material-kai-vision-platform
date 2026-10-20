@@ -4,7 +4,8 @@
  * step that does, and it starts from the finished composition.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Link2, Sparkles, Loader2, RotateCw } from 'lucide-react';
+import { Download, Link2, Sparkles, Loader2, Play, RotateCw } from 'lucide-react';
+import { TileInstallStudioDialog } from '@/components/features/installation/TileInstallStudioDialog';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -67,6 +68,7 @@ export const SurfaceVisualizer: React.FC<Props> = ({
   const [photoreal, setPhotoreal] = useState<{ url: string; credits: number; fidelity: Fidelity } | null>(null);
   const [photorealBusy, setPhotorealBusy] = useState(false);
   const [wastage, setWastage] = useState<WastageRates>({});
+  const [installOpen, setInstallOpen] = useState(false);
 
   const surface = useMemo(() => surfaces.find((s) => s.key === surfaceKey) ?? null, [surfaces, surfaceKey]);
   const product = useMemo(() => products.find((p) => p.id === productId) ?? null, [products, productId]);
@@ -268,6 +270,16 @@ export const SurfaceVisualizer: React.FC<Props> = ({
             <img src={photoreal.url} alt="Photoreal AI render of the composition" className="w-full rounded-lg border border-border/60" />
           </div>
         )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => setInstallOpen(true)} disabled={!surface || !product}>
+            <Play className="mr-1.5 h-3.5 w-3.5" />See it installed
+          </Button>
+        </div>
+        <TileInstallStudioDialog
+          open={installOpen}
+          onOpenChange={setInstallOpen}
+          design={surface && product ? { scene, surface, product, pattern, groutWidthMm, groutColorHex, rotationDeg } : null}
+        />
         {!compact && (
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={download} disabled={!rendered}><Download className="mr-1.5 h-3.5 w-3.5" />Download</Button>

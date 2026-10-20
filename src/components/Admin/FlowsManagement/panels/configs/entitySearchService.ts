@@ -189,6 +189,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'supplier-orders-api', label: 'supplier-orders-api', sublabel: 'Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back' },
   { id: 'taric-classify', label: 'taric-classify', sublabel: 'Propose a TARIC commodity code for catalog products' },
   { id: 'taric-reference-sync', label: 'taric-reference-sync', sublabel: 'Import the EU TARIC goods nomenclature (Greek extract) into the reference table' },
+  { id: 'installation-guide-extract', label: 'installation-guide-extract', sublabel: 'Read an uploaded installation manual into a step-by-step guide with the page and box of every drawing' },
   { id: 'takeoff-from-drawing', label: 'takeoff-from-drawing', sublabel: 'Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines — never measured, always cited' },
   { id: 'trade-portal', label: 'trade-portal', sublabel: 'A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin' },
   { id: 'trigger-factory-enrichment', label: 'trigger-factory-enrichment', sublabel: 'Propagate factory fields within a scope and queue a factory-enrichment agent if needed' },

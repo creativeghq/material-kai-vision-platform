@@ -49,6 +49,9 @@ const SearchEntryRedirect: React.FC = () => {
 const Index = lazy(() => import('./pages/Index'));
 const RoomPlannerPage = lazy(() => import('./pages/RoomPlannerPage').then(m => ({ default: m.RoomPlannerPage })));
 const SurfaceVisualizerPage = lazy(() => import('./pages/SurfaceVisualizerPage'));
+const GuidesPage = lazy(() => import('./pages/Guides/GuidesPage'));
+const GuideDetailPage = lazy(() => import('./pages/Guides/GuideDetailPage'));
+const GuidePlayerPage = lazy(() => import('./pages/Guides/GuidePlayerPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
 const WebsiteDetailPage = lazy(() => import('./pages/WebsiteDetailPage').then(m => ({ default: m.WebsiteDetailPage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
@@ -563,6 +566,42 @@ const App = () => (
                         <SurfaceVisualizerPage />
                       </Layout>
                     </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/guides"
+                  element={
+                    <AuthGuard>
+                      <EntitlementGuard moduleSlug="installation-guides" moduleName="Installation Guides">
+                        <Layout>
+                          <GuidesPage />
+                        </Layout>
+                      </EntitlementGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/guides/:id"
+                  element={
+                    <AuthGuard>
+                      <EntitlementGuard moduleSlug="installation-guides" moduleName="Installation Guides">
+                        <Layout>
+                          <GuideDetailPage />
+                        </Layout>
+                      </EntitlementGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/guides/:id/play"
+                  element={
+                    <PageErrorBoundary name="Installation Guide">
+                      <AuthGuard>
+                        <EntitlementGuard moduleSlug="installation-guides" moduleName="Installation Guides">
+                          <GuidePlayerPage />
+                        </EntitlementGuard>
+                      </AuthGuard>
+                    </PageErrorBoundary>
                   }
                 />
                 <Route

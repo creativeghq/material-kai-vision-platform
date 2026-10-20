@@ -1,6 +1,8 @@
 /** Tile-floor installation template: layout, quantities, steps and per-step 3D scene state. */
+import { PATTERN_LABELS, type Pattern } from '@/lib/surfaceRenderer/patternVocabulary';
+import { clipSegment, layPattern } from './tilePieces';
 
-export type TilePattern = 'grid' | 'offset_half' | 'offset_third';
+export type TileAnchor = 'centre' | 'corner';
 
 export interface TileFloorParams {
   areaWidthM: number;
@@ -12,7 +14,9 @@ export interface TileFloorParams {
   jointMm: number;
   perimeterGapMm: number;
   trowelNotchMm: number;
-  pattern: TilePattern;
+  pattern: Pattern;
+  rotationDeg: number;
+  anchor: TileAnchor;
   prime: boolean;
   backButter: boolean;
   adhesiveCureHours: number;
@@ -22,11 +26,13 @@ export interface TileFloorParams {
 export interface TilePiece {
   index: number;
   row: number;
-  x: number;
-  z: number;
-  lx: number;
-  lz: number;
+  cx: number;
+  cz: number;
+  length: number;
+  width: number;
+  angle: number;
   cut: boolean;
+  visible: { lx: number; lz: number } | null;
   /** 0-based position in the laying order: every full tile first, then the cuts. */
   order: number;
 }
@@ -148,7 +154,9 @@ export const DEFAULT_TILE_FLOOR: TileFloorParams = {
   jointMm: 3,
   perimeterGapMm: 5,
   trowelNotchMm: suggestedTrowelNotchMm(600),
-  pattern: 'grid',
+  pattern: 'stack',
+  rotationDeg: 0,
+  anchor: 'centre',
   prime: true,
   backButter: suggestBackButter(600),
   adhesiveCureHours: 24,
@@ -157,41 +165,10 @@ export const DEFAULT_TILE_FLOOR: TileFloorParams = {
 
 const EPS = 0.5;
 
-interface Run { start: number; size: number }
-
-function normalizeOrigin(origin: number, module: number): number {
-  const o = ((origin % module) + module) % module;
-  return o > 0 ? o - module : o;
-}
-
-function lay1D(span: number, tile: number, joint: number, origin: number): Run[] {
-  const module = tile + joint;
-  const runs: Run[] = [];
-  for (let a = normalizeOrigin(origin, module); a < span; a += module) {
-    const s = Math.max(a, 0);
-    const e = Math.min(a + tile, span);
-    if (e - s > EPS) runs.push({ start: s, size: e - s });
-  }
-  return runs;
-}
-
-function smallestEdge(runs: Run[]): number {
-  if (runs.length === 0) return 0;
-  return Math.min(runs[0].size, runs[runs.length - 1].size);
-}
-
-function centredOrigin(span: number, tile: number, joint: number): number {
-  const onTile = span / 2 - tile / 2;
-  const onJoint = span / 2 + joint / 2;
-  return smallestEdge(lay1D(span, tile, joint, onTile)) >= smallestEdge(lay1D(span, tile, joint, onJoint))
-    ? onTile
-    : onJoint;
-}
-
 function tilesForCuts(cuts: Array<{ lx: number; lz: number }>, tl: number, tw: number): number {
   const binPack = (sizes: number[], capacity: number): number => {
     const left: number[] = [];
-    for (const size of [...sizes].sort((a, b) => b - a)) {
+    for (const size of [...sizes].sort((x, y) => y - x)) {
       const i = left.findIndex((room) => room >= size + CUT_ALLOWANCE_MM);
       if (i >= 0) left[i] -= size + CUT_ALLOWANCE_MM;
       else left.push(capacity - size);
@@ -204,7 +181,7 @@ function tilesForCuts(cuts: Array<{ lx: number; lz: number }>, tl: number, tw: n
   return binPack(alongLength, tl) + binPack(alongWidth, tw) + corners;
 }
 
-const OFFSET: Record<TilePattern, number> = { grid: 0, offset_half: 1 / 2, offset_third: 1 / 3 };
+const RUNNING: Pattern[] = ['stack', 'offset_1_2', 'offset_1_3'];
 
 function validate(p: TileFloorParams): TileIssue[] {
   const L = TILE_FLOOR_LIMITS;
@@ -337,12 +314,6 @@ function buildSteps(p: TileFloorParams, q: TileQuantities, pattern: string): Til
   return steps;
 }
 
-const PATTERN_LABEL: Record<TilePattern, string> = {
-  grid: 'straight grid',
-  offset_half: 'half-offset (brick)',
-  offset_third: 'one-third offset',
-};
-
 export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
   const issues = validate(params);
   const gap = params.perimeterGapMm;
@@ -364,80 +335,93 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
   };
   if (issues.some((i) => i.level === 'error')) return empty();
 
-  const estimate = Math.ceil(innerW / (tl + j) + 1) * Math.ceil(innerD / (tw + j) + 1);
+  const area = { x0: gap, z0: gap, x1: gap + innerW, z1: gap + innerD };
+  const axisAligned = RUNNING.includes(params.pattern) && (((params.rotationDeg % 90) + 90) % 90) === 0;
+  const L = Math.max(tl, tw);
+  const Wd = Math.min(tl, tw);
+  const frame = (ox: number, oz: number) => ({ originX: ox, originZ: oz, rotationDeg: params.rotationDeg });
+  let candidates = [frame(0, 0)];
+  if (params.anchor === 'centre') {
+    const cx = roomW / 2;
+    const cz = roomD / 2;
+    candidates = [
+      frame(cx - L / 2, cz - Wd / 2), frame(cx + j / 2, cz - Wd / 2),
+      frame(cx - L / 2, cz + j / 2), frame(cx + j / 2, cz + j / 2),
+    ];
+  }
+  const estimate = Math.ceil((innerW * innerD) / ((Wd + j) * (L + j))) + Math.ceil((2 * (innerW + innerD)) / Wd);
   if (estimate > TILE_FLOOR_LIMITS.maxPieces) {
-    issues.push({
-      level: 'error',
-      message: `That is about ${estimate} pieces, more than the viewer can draw. Use a smaller room or larger tiles.`,
-    });
+    issues.push({ level: 'error', message: `That is about ${estimate} pieces, more than the viewer can draw. Use a smaller room or larger tiles.` });
     return empty();
   }
-
-  const rowsRuns = lay1D(innerD, tw, j, centredOrigin(innerD, tw, j));
-  const baseX = centredOrigin(innerW, tl, j);
-  const shift = OFFSET[params.pattern] * (tl + j);
-
-  type Raw = Omit<TilePiece, 'order' | 'index'>;
-  const raw: Raw[] = [];
-  const rowRuns: Run[][] = [];
-  rowsRuns.forEach((zr, row) => {
-    const runs = lay1D(innerW, tl, j, baseX + row * shift);
-    rowRuns.push(runs);
-    for (const xr of runs) {
-      raw.push({
-        row,
-        x: gap + xr.start,
-        z: gap + zr.start,
-        lx: xr.size,
-        lz: zr.size,
-        cut: xr.size < tl - EPS || zr.size < tw - EPS,
-      });
-    }
+  type Laid = { p: ReturnType<typeof layPattern>[number]; cut: boolean; visible: { lx: number; lz: number } | null };
+  const describe = (pcs: ReturnType<typeof layPattern>): Laid[] => pcs.map((p) => {
+    const xs = p.corners.map((k) => k[0]);
+    const zs = p.corners.map((k) => k[1]);
+    const inside = xs.every((x) => x >= area.x0 - EPS && x <= area.x1 + EPS) && zs.every((z) => z >= area.z0 - EPS && z <= area.z1 + EPS);
+    const visible = axisAligned
+      ? {
+        lx: Math.min(Math.max(...xs), area.x1) - Math.max(Math.min(...xs), area.x0),
+        lz: Math.min(Math.max(...zs), area.z1) - Math.max(Math.min(...zs), area.z0),
+      }
+      : null;
+    return { p, cut: !inside, visible };
   });
+  const smallest = (laid: Laid[]) => Math.min(Infinity, ...laid.filter((x) => x.cut && x.visible).map((x) => Math.min(x.visible!.lx, x.visible!.lz)));
+  let laid = describe(layPattern(params.pattern, tw, tl, j, candidates[0], area));
+  for (const f of candidates.slice(1)) {
+    const next = describe(layPattern(params.pattern, tw, tl, j, f, area));
+    if (smallest(next) > smallest(laid) + EPS) laid = next;
+  }
 
-  const full = raw.filter((r) => !r.cut);
-  const cuts = raw.filter((r) => r.cut);
-  const pieces: TilePiece[] = [...full, ...cuts].map((r, i) => ({ ...r, order: i, index: i }));
+  const byPosition = (x: Laid, y: Laid) => (x.p.cz - y.p.cz) || (x.p.cx - y.p.cx);
+  const full = laid.filter((x) => !x.cut).sort(byPosition);
+  const cuts = laid.filter((x) => x.cut).sort(byPosition);
+  const ordered = [...full, ...cuts];
+  const pieces: TilePiece[] = ordered.map((x, i) => ({
+    index: i, row: x.p.j, cx: x.p.cx, cz: x.p.cz, length: x.p.length, width: x.p.width, angle: x.p.angle,
+    cut: x.cut, visible: x.visible, order: i,
+  }));
 
-  const rowPieces: TilePiece[][] = rowsRuns.map(() => []);
-  for (const pc of pieces) rowPieces[pc.row].push(pc);
-  const lastRow = rowsRuns.length - 1;
+  const radius = j * 1.5 + 1;
+  const cells = new Map<string, TileSpacer[]>();
   const spacers: TileSpacer[] = [];
-  const addSpacer = (x: number, z: number, rows: number[]) => {
-    let after = 0;
-    for (const r of rows) {
-      for (const pc of rowPieces[r]) {
-        if (x >= pc.x - j - EPS && x <= pc.x + pc.lx + j + EPS) after = Math.max(after, pc.order);
+  const addSpacer = (x: number, z: number, order: number) => {
+    const ki = Math.floor(x / radius);
+    const kj = Math.floor(z / radius);
+    for (let di = -1; di <= 1; di++) {
+      for (let dj = -1; dj <= 1; dj++) {
+        for (const sp of cells.get(`${ki + di}:${kj + dj}`) ?? []) {
+          if (Math.hypot(sp.x - x, sp.z - z) <= radius) {
+            sp.afterOrder = Math.max(sp.afterOrder, order);
+            return;
+          }
+        }
       }
     }
-    spacers.push({ x, z, afterOrder: after });
+    const sp = { x, z, afterOrder: order };
+    spacers.push(sp);
+    const key = `${ki}:${kj}`;
+    cells.set(key, [...(cells.get(key) ?? []), sp]);
   };
-  for (let b = -1; b <= lastRow; b++) {
-    const rows = [b, b + 1].filter((r) => r >= 0 && r <= lastRow);
-    const z = b < 0
-      ? gap
-      : gap + rowsRuns[b].start + rowsRuns[b].size + (b === lastRow ? 0 : j / 2);
-    const xs: number[] = [];
-    for (const r of rows) {
-      const runs = rowRuns[r];
-      for (let k = 0; k + 1 < runs.length; k++) xs.push(gap + runs[k].start + runs[k].size + j / 2);
+  const atRoomCorner = (px: number, pz: number) =>
+    (Math.abs(px - area.x0) < EPS || Math.abs(px - area.x1) < EPS) && (Math.abs(pz - area.z0) < EPS || Math.abs(pz - area.z1) < EPS);
+  ordered.forEach((x, order) => {
+    const k = x.p.corners;
+    for (let n = 0; n < 4; n++) {
+      const seg = clipSegment(k[n], k[(n + 1) % 4], area);
+      if (!seg) continue;
+      for (const [px, pz] of seg) if (!atRoomCorner(px, pz)) addSpacer(px, pz, order);
     }
-    xs.sort((a, c) => a - c);
-    for (const x of xs.filter((x, i) => i === 0 || x - xs[i - 1] > 1)) addSpacer(x, z, rows);
-    if (rows.length === 2) {
-      addSpacer(gap, z, rows);
-      addSpacer(gap + innerW, z, rows);
-    }
-  }
+  });
 
   const centreX = roomW / 2;
   const centreZ = roomD / 2;
   const dryLay = pieces
-    .filter((pc) => (centreZ >= pc.z && centreZ <= pc.z + pc.lz + j) || (centreX >= pc.x && centreX <= pc.x + pc.lx + j))
-    .filter((pc) => !pc.cut)
+    .filter((pc) => !pc.cut && (Math.abs(pc.cz - centreZ) <= Wd || Math.abs(pc.cx - centreX) <= Wd))
     .map((pc) => pc.index);
 
-  const tilesFromLayout = full.length + tilesForCuts(cuts, tl, tw);
+  const tilesFromLayout = full.length + (axisAligned ? tilesForCuts(cuts.map((x) => x.visible!), L, Wd) : cuts.length);
   const areaM2 = params.areaWidthM * params.areaDepthM;
   const tileAreaM2 = (tl * tw) / 1e6;
   const quantities: TileQuantities = {
@@ -454,7 +438,7 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
     groutKg: areaM2 * groutKgPerM2(tl, tw, params.tileThicknessMm, j),
   };
 
-  if (params.pattern === 'offset_half' && Math.max(tl, tw) >= 600) {
+  if (params.pattern === 'offset_1_2' && Math.max(tl, tw) >= 600) {
     issues.push({
       level: 'warning',
       message: 'Large tiles are slightly bowed, so a half offset puts a high centre next to a low edge. Most manufacturers allow at most a one-third offset — check the tile data sheet.',
@@ -466,8 +450,8 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
       message: `A ${params.trowelNotchMm} mm notch is small for this tile; ${suggestedTrowelNotchMm(Math.max(tl, tw))} mm is typical. Too little adhesive leaves hollow spots that crack.`,
     });
   }
-  const minCut = Math.min(...cuts.map((c) => Math.min(c.lx, c.lz)));
-  if (cuts.length > 0 && minCut < Math.min(tl, tw) / 4) {
+  const minCut = Math.min(Infinity, ...cuts.filter((c) => c.visible).map((c) => Math.min(c.visible!.lx, c.visible!.lz)));
+  if (Number.isFinite(minCut) && minCut < Math.min(tl, tw) / 4) {
     issues.push({
       level: 'warning',
       message: `The narrowest edge piece is ${Math.round(minCut)} mm. Pieces that thin break easily when cut; a different tile size, pattern or starting line avoids them.`,
@@ -484,7 +468,7 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
     centreZ,
     dryLay,
     quantities,
-    steps: buildSteps(params, quantities, PATTERN_LABEL[params.pattern]),
+    steps: buildSteps(params, quantities, PATTERN_LABELS[params.pattern].toLowerCase()),
     issues,
   };
 }

@@ -32323,6 +32323,95 @@
         }
       }
     },
+    "/installation-guide-extract": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Read an uploaded installation manual into a step-by-step guide",
+        "operationId": "post_installation_guide_extract",
+        "description": "Reads every rendered page of one supplier installation or assembly manual into the kit (panels and hardware with their printed codes and counts), the ordered steps with the page and the box of each step's drawing, and an approximate assembled layout of the panels for the 3D build. Only a guide id is accepted; the page images are read server-side from that guide's own folder, and the workspace comes from the guide row. The guide is claimed atomically (draft, failed or review to extracting), credits are debited per page BEFORE the model runs, and the reader is a strict output_config JSON schema whose result is sanitised before it is stored; a refusal or unparseable reply marks the guide failed rather than storing a partial guide. The read runs in the background and the guide row carries its status, so the caller polls the row. It writes only the guide row: the result lands in review for a person to check before it is published.\n\n**Response:** `202 { success, status: 'extracting', guide_id } — then poll installation_guides.status for 'review' or 'failed'`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guide_id": {
+                    "type": "string",
+                    "description": "The guide to read. Its pages, its page count and its workspace all come from this row. (string (uuid))"
+                  }
+                },
+                "required": [
+                  "guide_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/structure-site-note": {
       "post": {
         "tags": [

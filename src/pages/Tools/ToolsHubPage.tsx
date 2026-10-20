@@ -10,6 +10,7 @@
 
 import { Link } from 'react-router-dom';
 import {
+  BookOpen,
   Calculator,
   ChevronRight,
   ClipboardList,
@@ -126,6 +127,15 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
       'Upload a photo of a material or surface and identify it — AI vision returns the closest matches from your catalog.',
     icon: ScanSearch,
     badge: 'Signed in · AI',
+  },
+  {
+    slug: 'installation-guides',
+    to: '/guides',
+    title: 'Installation guides',
+    description:
+      'Upload a supplier\'s installation PDF and step through it in 3D, page by page beside the manual, with every part and step.',
+    icon: BookOpen,
+    badge: 'Signed in · module',
   },
   {
     slug: 'compare',

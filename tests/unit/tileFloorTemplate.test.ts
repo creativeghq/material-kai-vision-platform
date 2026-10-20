@@ -13,22 +13,23 @@ const plan = (over: Partial<TileFloorParams> = {}) => buildTileFloorPlan({ ...DE
 
 describe('tile floor layout', () => {
   it('covers the tiled area exactly, row by row and down the rows', () => {
-    const p = plan({ areaWidthM: 3.37, areaDepthM: 2.11, tileLengthMm: 450, tileWidthMm: 300, pattern: 'offset_third' });
+    const p = plan({ areaWidthM: 3.37, areaDepthM: 2.11, tileLengthMm: 450, tileWidthMm: 300, pattern: 'offset_1_3' });
     const j = p.params.jointMm;
     const rows = new Map<number, typeof p.pieces>();
     for (const pc of p.pieces) rows.set(pc.row, [...(rows.get(pc.row) ?? []), pc]);
     for (const row of rows.values()) {
-      const width = row.reduce((s, pc) => s + pc.lx, 0) + (row.length - 1) * j;
+      const width = row.reduce((s, pc) => s + pc.visible!.lx, 0) + (row.length - 1) * j;
       expect(width).toBeCloseTo(p.innerWidthMm, 6);
     }
-    const depths = [...rows.values()].map((r) => r[0].lz);
+    const depths = [...rows.values()].map((r) => r[0].visible!.lz);
     expect(depths.reduce((s, d) => s + d, 0) + (depths.length - 1) * j).toBeCloseTo(p.innerDepthMm, 6);
   });
 
   it('starts from the centre, so a grid has matching cuts at opposite walls', () => {
     const p = plan({ areaWidthM: 3.37, areaDepthM: 2.11 });
-    const row0 = p.pieces.filter((pc) => pc.row === 0).sort((a, b) => a.x - b.x);
-    expect(row0[0].lx).toBeCloseTo(row0[row0.length - 1].lx, 6);
+    const first = Math.min(...p.pieces.map((pc) => pc.row));
+    const row0 = p.pieces.filter((pc) => pc.row === first).sort((a, b) => a.cx - b.cx);
+    expect(row0[0].visible!.lx).toBeCloseTo(row0[row0.length - 1].visible!.lx, 6);
   });
 
   it('lays every full tile before any cut', () => {
@@ -41,7 +42,7 @@ describe('tile floor layout', () => {
   it('puts a spacer at every grid crossing and where each joint meets a wall', () => {
     const p = plan({ areaWidthM: 3.37, areaDepthM: 2.11 });
     const rows = new Set(p.pieces.map((pc) => pc.row)).size;
-    const cols = p.pieces.filter((pc) => pc.row === 0).length;
+    const cols = p.pieces.filter((pc) => pc.row === Math.min(...p.pieces.map((x) => x.row))).length;
     expect(p.quantities.spacers).toBe((rows + 1) * (cols - 1) + 2 * (rows - 1));
   });
 
@@ -69,7 +70,7 @@ describe('tile floor quantities', () => {
   });
 
   it('reuses an offcut from one row in the next on an offset pattern', () => {
-    const p = plan({ areaWidthM: 2, areaDepthM: 1.2, tileLengthMm: 600, tileWidthMm: 300, pattern: 'offset_half' });
+    const p = plan({ areaWidthM: 2, areaDepthM: 1.2, tileLengthMm: 600, tileWidthMm: 300, pattern: 'offset_1_2' });
     const { fullTiles, cutTiles, tilesFromLayout } = p.quantities;
     expect(cutTiles).toBeGreaterThan(0);
     expect(tilesFromLayout).toBeLessThan(fullTiles + cutTiles);
@@ -100,8 +101,8 @@ describe('tile floor issues and steps', () => {
   });
 
   it('warns about a half offset on large tiles', () => {
-    expect(plan({ pattern: 'offset_half' }).issues.some((i) => i.level === 'warning' && /offset/.test(i.message))).toBe(true);
-    expect(plan({ pattern: 'offset_third' }).issues.some((i) => /offset/.test(i.message))).toBe(false);
+    expect(plan({ pattern: 'offset_1_2' }).issues.some((i) => i.level === 'warning' && /offset/.test(i.message))).toBe(true);
+    expect(plan({ pattern: 'offset_1_3' }).issues.some((i) => /offset/.test(i.message))).toBe(false);
   });
 
   it('drops the priming and back-buttering steps when they are switched off', () => {

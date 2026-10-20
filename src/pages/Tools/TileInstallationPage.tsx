@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Grid3x3, TriangleAlert } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -13,16 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
-import { TileInstallationViewer } from '@/components/features/installation/TileInstallationViewer';
+import { TileInstallationViewer, type RoomPhoto } from '@/components/features/installation/TileInstallationViewer';
+import { RoomPhotoCorners, type CornerPoint } from '@/components/features/installation/RoomPhotoCorners';
+import { solvePhotoCamera } from '@/lib/installation/photoCamera';
 import {
   buildTileFloorPlan,
   DEFAULT_TILE_FLOOR,
   suggestBackButter,
   suggestedTrowelNotchMm,
   type TileFloorParams,
-  type TilePattern,
 } from '@/lib/installation/tileFloorTemplate';
 import { formatNumber } from '@/utils/decimal';
+import { PATTERNS, PATTERN_LABELS, type Pattern } from '@/lib/surfaceRenderer/patternVocabulary';
 import { useAuth } from '@/contexts/AuthContext';
 import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
 
@@ -58,6 +60,7 @@ function toDraft(p: TileFloorParams): Draft {
     trowelNotchMm: String(p.trowelNotchMm),
     adhesiveCureHours: String(p.adhesiveCureHours),
     groutCureHours: String(p.groutCureHours),
+    rotationDeg: String(p.rotationDeg),
   };
 }
 
@@ -66,7 +69,25 @@ export default function TileInstallationPage() {
   const { quota } = useToolsQuota(session?.access_token ?? null);
 
   const [draft, setDraft] = useState<Draft>(() => toDraft(DEFAULT_TILE_FLOOR));
-  const [pattern, setPattern] = useState<TilePattern>(DEFAULT_TILE_FLOOR.pattern);
+  const [pattern, setPattern] = useState<Pattern>(DEFAULT_TILE_FLOOR.pattern);
+  const [tileImage, setTileImage] = useState<string | null>(null);
+  const tileInput = useRef<HTMLInputElement>(null);
+  const roomInput = useRef<HTMLInputElement>(null);
+  const [room, setRoom] = useState<{ url: string; width: number; height: number } | null>(null);
+  const [corners, setCorners] = useState<CornerPoint[]>([]);
+  const [editCorners, setEditCorners] = useState(true);
+  useEffect(() => () => { if (room) URL.revokeObjectURL(room.url); }, [room]);
+  const pickRoom = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      setRoom({ url, width: img.naturalWidth, height: img.naturalHeight });
+      setCorners([]);
+      setEditCorners(true);
+    };
+    img.src = url;
+  };
+  useEffect(() => () => { if (tileImage) URL.revokeObjectURL(tileImage); }, [tileImage]);
   const [prime, setPrime] = useState(DEFAULT_TILE_FLOOR.prime);
   const [backButter, setBackButter] = useState(DEFAULT_TILE_FLOOR.backButter);
   const [tileColor, setTileColor] = useState(TILE_COLORS[0].value);
@@ -85,6 +106,8 @@ export default function TileInstallationPage() {
       trowelNotchMm: n('trowelNotchMm'),
       adhesiveCureHours: n('adhesiveCureHours'),
       groutCureHours: n('groutCureHours'),
+      rotationDeg: Number.isFinite(n('rotationDeg')) ? n('rotationDeg') : 0,
+      anchor: 'centre',
       pattern,
       prime,
       backButter,
@@ -92,6 +115,12 @@ export default function TileInstallationPage() {
   }, [draft, pattern, prime, backButter]);
 
   const plan = useMemo(() => buildTileFloorPlan(params), [params]);
+  const photo: RoomPhoto | null = useMemo(() => {
+    if (!room || corners.length !== 4) return null;
+    const quad = corners.map((c) => ({ x: c.x * room.width, y: c.y * room.height })) as [CornerPoint, CornerPoint, CornerPoint, CornerPoint];
+    const camera = solvePhotoCamera(quad, room.width, room.height, params.areaWidthM, params.areaDepthM);
+    return camera ? { url: room.url, width: room.width, height: room.height, camera } : null;
+  }, [room, corners, params.areaWidthM, params.areaDepthM]);
   const colors = useMemo(() => ({ tile: tileColor, grout: groutColor }), [tileColor, groutColor]);
 
   const longSide = Math.max(params.tileLengthMm || 0, params.tileWidthMm || 0);
@@ -147,19 +176,42 @@ export default function TileInstallationPage() {
                 {field('tileWidthMm', 'Width (mm)')}
                 {field('tileThicknessMm', 'Thickness (mm)')}
                 <FormField label="Pattern">
-                  <Select value={pattern} onValueChange={(v) => setPattern(v as TilePattern)}>
+                  <Select value={pattern} onValueChange={(v) => setPattern(v as Pattern)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="grid">Straight grid</SelectItem>
-                      <SelectItem value="offset_third">One-third offset</SelectItem>
-                      <SelectItem value="offset_half">Half offset (brick)</SelectItem>
+                      {PATTERNS.map((p) => <SelectItem key={p} value={p}>{PATTERN_LABELS[p]}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </FormField>
+                {field('rotationDeg', 'Rotation (°)', '15')}
               </FormGrid>
-              <Swatches label="Tile colour" options={TILE_COLORS} value={tileColor} onChange={setTileColor} />
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Tile photo (optional)</p>
+                <input
+                  ref={tileInput}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setTileImage(URL.createObjectURL(file));
+                  }}
+                />
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => tileInput.current?.click()}>
+                    {tileImage ? 'Change photo' : 'Use a photo of the tile'}
+                  </Button>
+                  {tileImage && (
+                    <>
+                      <img src={tileImage} alt="" className="h-8 w-8 rounded-sm border border-hairline object-cover" />
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setTileImage(null)}>Remove</Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {!tileImage && <Swatches label="Tile colour" options={TILE_COLORS} value={tileColor} onChange={setTileColor} />}
             </FormSection>
 
             <FormSection title="Setting">
@@ -201,6 +253,27 @@ export default function TileInstallationPage() {
               </div>
             </FormSection>
 
+            <FormSection title="Your room (optional)" description="Put the floor into a photo of the real room.">
+              <input
+                ref={roomInput}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) pickRoom(file); }}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => roomInput.current?.click()}>
+                  {room ? 'Change room photo' : 'Use a photo of my room'}
+                </Button>
+                {room && corners.length === 4 && !editCorners && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditCorners(true)}>Adjust the corners</Button>
+                )}
+                {room && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => { setRoom(null); setCorners([]); }}>Remove</Button>
+                )}
+              </div>
+            </FormSection>
+
             <FormSection title="Curing">
               <FormGrid>
                 {field('adhesiveCureHours', 'Adhesive (h)')}
@@ -226,7 +299,22 @@ export default function TileInstallationPage() {
           )}
           {shown.steps.length > 0 && (
             <>
-              <TileInstallationViewer plan={shown} colors={colors} />
+              {room && (editCorners || corners.length < 4) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Mark the floor in your photo</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <RoomPhotoCorners url={room.url} corners={corners} onChange={setCorners} />
+                    {corners.length === 4 && (
+                      photo
+                        ? <Button size="sm" onClick={() => setEditCorners(false)}>Show the tiles in my room</Button>
+                        : <p className="text-sm text-destructive">Those four corners do not make a floor the camera could see. Click them in order, around the floor.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+              <TileInstallationViewer plan={shown} colors={colors} tileImageUrl={tileImage} photo={editCorners ? null : photo} />
 
               {warnings.length > 0 && (
                 <Card>

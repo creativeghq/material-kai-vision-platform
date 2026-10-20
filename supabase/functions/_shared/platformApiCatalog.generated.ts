@@ -2753,6 +2753,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "installation-guide-extract",
+    "tag": "Projects",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Read an uploaded installation manual into a step-by-step guide",
+    "description": "Reads every rendered page of one supplier installation or assembly manual into the kit (panels and hardware with their printed codes and counts), the ordered steps with the page and the box of each step's drawing, and an approximate assembled layout of the panels for the 3D build. Only a guide id is accepted; the page images are read server-side from that guide's own folder, and the workspace come",
+    "fields": {
+      "guide_id": {
+        "type": "string",
+        "required": true,
+        "description": "The guide to read. Its pages, its page count and its workspace all come from this row. (string (uuid))"
+      }
+    }
+  },
+  {
     "name": "intake-enrich-products",
     "tag": "Warehouse",
     "methods": [

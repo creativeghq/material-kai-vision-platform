@@ -17940,6 +17940,30 @@
     "response": "{ success, status: 'read'|'no_schedules'|'failed', drawing: { revision_id, rev_label, drawing_number, title, project_id }, items: [{ description, item_ref, quantity, unit, schedule, source, notes }], truncated, without_quantity, confidence, notes }"
   },
   {
+    "name": "installation-guide-extract",
+    "tag": "Projects",
+    "summary": "Read an uploaded installation manual into a step-by-step guide",
+    "description": "Reads every rendered page of one supplier installation or assembly manual into the kit (panels and hardware with their printed codes and counts), the ordered steps with the page and the box of each step's drawing, and an approximate assembled layout of the panels for the 3D build. Only a guide id is accepted; the page images are read server-side from that guide's own folder, and the workspace comes from the guide row. The guide is claimed atomically (draft, failed or review to extracting), credits are debited per page BEFORE the model runs, and the reader is a strict output_config JSON schema whose result is sanitised before it is stored; a refusal or unparseable reply marks the guide failed rather than storing a partial guide. The read runs in the background and the guide row carries its status, so the caller polls the row. It writes only the guide row: the result lands in review for a person to check before it is published.",
+    "security": [
+      "supabaseJwt",
+      "apiKeyPartner"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "guide_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "The guide to read. Its pages, its page count and its workspace all come from this row."
+      }
+    ],
+    "response": "202 { success, status: 'extracting', guide_id } — then poll installation_guides.status for 'review' or 'failed'"
+  },
+  {
     "name": "structure-site-note",
     "tag": "Projects",
     "summary": "Turn a dictated site walk into a diary entry and the defects it described",

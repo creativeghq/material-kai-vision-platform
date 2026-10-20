@@ -12605,6 +12605,65 @@ export type Database = {
           },
         ]
       }
+      installation_guides: {
+        Row: {
+          id: string
+          workspace_id: string
+          created_by: string | null
+          title: string
+          status: string
+          source_storage_path: string | null
+          page_count: number
+          page_aspect: number
+          guide: Json | null
+          error: string | null
+          extracted_at: string | null
+          published_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          created_by?: string | null
+          title: string
+          status?: string
+          source_storage_path?: string | null
+          page_count?: number
+          page_aspect?: number
+          guide?: Json | null
+          error?: string | null
+          extracted_at?: string | null
+          published_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          created_by?: string | null
+          title?: string
+          status?: string
+          source_storage_path?: string | null
+          page_count?: number
+          page_aspect?: number
+          guide?: Json | null
+          error?: string | null
+          extracted_at?: string | null
+          published_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installation_guides_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           move_purpose_line: number | null

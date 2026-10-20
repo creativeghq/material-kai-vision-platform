@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -10,6 +10,7 @@ import {
   type TileFloorPlan,
   type TileSceneState,
 } from '@/lib/installation/tileFloorTemplate';
+import type { PhotoCamera } from '@/lib/installation/photoCamera';
 
 export interface TileSceneColors {
   tile: string;
@@ -24,6 +25,8 @@ interface Props {
   colors: TileSceneColors;
   selected: number | null;
   onSelect: (pieceIndex: number | null) => void;
+  tileImageUrl?: string | null;
+  photoCamera?: PhotoCamera | null;
 }
 
 const SUBSTRATE = '#b9b4ab';
@@ -71,8 +74,38 @@ function useRidgeTexture(): THREE.CanvasTexture | null {
   return texture;
 }
 
-function CameraRig({ shot, widthM, depthM }: { shot: CameraShot; widthM: number; depthM: number }) {
-  const camera = useThree((s) => s.camera);
+function useTileTexture(url: string | null | undefined): THREE.Texture | null {
+  const gl = useThree((s) => s.gl);
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    setTexture(null);
+    if (!url) return;
+    let live = true;
+    let loaded: THREE.Texture | null = null;
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    loader.load(url, (tex) => {
+      if (!live) { tex.dispose(); return; }
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
+      const img = tex.image as { width?: number; height?: number } | undefined;
+      if (img?.width && img?.height && img.height > img.width) {
+        tex.center.set(0.5, 0.5);
+        tex.rotation = Math.PI / 2;
+      }
+      loaded = tex;
+      setTexture(tex);
+    }, undefined, () => { if (live) setTexture(null); });
+    return () => {
+      live = false;
+      loaded?.dispose();
+    };
+  }, [url, gl]);
+  return texture;
+}
+
+function CameraRig({ shot, widthM, depthM, photo }: { shot: CameraShot; widthM: number; depthM: number; photo: PhotoCamera | null | undefined }) {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const moving = useRef(true);
   const pose = useMemo(() => cameraPose(shot, widthM, depthM), [shot, widthM, depthM]);
@@ -80,6 +113,26 @@ function CameraRig({ shot, widthM, depthM }: { shot: CameraShot; widthM: number;
   useEffect(() => {
     moving.current = true;
   }, [pose]);
+
+  useLayoutEffect(() => {
+    if (!photo) {
+      if (camera.fov !== 45) {
+        camera.fov = 45;
+        camera.updateProjectionMatrix();
+      }
+      moving.current = true;
+      return;
+    }
+    camera.position.set(...photo.position);
+    camera.quaternion.set(...photo.quaternion);
+    camera.fov = photo.fovDeg;
+    camera.updateProjectionMatrix();
+    if (controls) {
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const t = forward.y < -1e-3 ? -camera.position.y / forward.y : 3;
+      controls.target.copy(camera.position).addScaledVector(forward, t);
+    }
+  }, [photo, camera, controls]);
 
   useEffect(() => {
     if (!controls) return;
@@ -89,7 +142,7 @@ function CameraRig({ shot, widthM, depthM }: { shot: CameraShot; widthM: number;
   }, [controls]);
 
   useFrame((_, delta) => {
-    if (!moving.current || !controls) return;
+    if (photo || !moving.current || !controls) return;
     const k = 1 - Math.pow(0.02, delta);
     const goal = new THREE.Vector3(...pose.position);
     const target = new THREE.Vector3(...pose.target);
@@ -102,30 +155,49 @@ function CameraRig({ shot, widthM, depthM }: { shot: CameraShot; widthM: number;
   return null;
 }
 
-export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, exploded, colors, selected, onSelect }) => {
+export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, exploded, colors, selected, onSelect, tileImageUrl, photoCamera }) => {
   const { params, pieces, spacers } = plan;
   const roomW = params.areaWidthM;
   const roomD = params.areaDepthM;
   const ox = -roomW / 2;
   const oz = -roomD / 2;
+  const inPhoto = !!photoCamera;
+
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.localClippingEnabled = true;
+  }, [gl]);
 
   const gap = Math.max(roomW, roomD) * 0.05;
-  const lift = exploded ? { primer: gap, adhesive: gap * 2.4, tiles: gap * 4.2 } : { primer: 0, adhesive: 0, tiles: 0 };
+  const lift = exploded && !inPhoto ? { primer: gap, adhesive: gap * 2.4, tiles: gap * 4.2 } : { primer: 0, adhesive: 0, tiles: 0 };
   const bedM = mm(params.trowelNotchMm) / 2;
   const tileM = mm(params.tileThicknessMm);
   const tileY = bedM + tileM / 2 + lift.tiles;
+  const gapM = mm(params.perimeterGapMm);
+  const innerW = mm(plan.innerWidthMm);
+  const innerD = mm(plan.innerDepthMm);
 
   const tilesRef = useRef<THREE.InstancedMesh>(null);
   const spacersRef = useRef<THREE.InstancedMesh>(null);
   const ridges = useRidgeTexture();
+  const tileTexture = useTileTexture(tileImageUrl);
+
+  const clipping = useMemo(() => [
+    new THREE.Plane(new THREE.Vector3(1, 0, 0), -(ox + gapM)),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), ox + gapM + innerW),
+    new THREE.Plane(new THREE.Vector3(0, 0, 1), -(oz + gapM)),
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), oz + gapM + innerD),
+  ], [ox, oz, gapM, innerW, innerD]);
 
   const matrix = useMemo(() => new THREE.Matrix4(), []);
   const quat = useMemo(() => new THREE.Quaternion(), []);
+  const turn = useMemo(() => new THREE.Quaternion(), []);
   const euler = useMemo(() => new THREE.Euler(), []);
   const pos = useMemo(() => new THREE.Vector3(), []);
   const scl = useMemo(() => new THREE.Vector3(), []);
   const color = useMemo(() => new THREE.Color(), []);
   const hidden = useMemo(() => new THREE.Matrix4().makeScale(0, 0, 0), []);
+  const yAxis = useMemo(() => new THREE.Vector3(0, 1, 0), []);
 
   useLayoutEffect(() => {
     const mesh = tilesRef.current;
@@ -133,6 +205,7 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
     const placedWhole = Math.floor(state.placed);
     const partial = state.placed - placedWhole;
     const dryLay = state.dryLay > 0 && state.placed === 0 ? new Set(plan.dryLay) : null;
+    const base = tileTexture ? '#ffffff' : colors.tile;
     for (const pc of pieces) {
       const visible = pc.order < placedWhole || (pc.order === placedWhole && partial > 0) || dryLay?.has(pc.index);
       if (!visible) {
@@ -142,20 +215,21 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
       const dropping = pc.order === placedWhole && partial > 0;
       const e = dropping ? ease(partial) : 1;
       const ghostLift = dryLay?.has(pc.index) && pc.order >= placedWhole ? 0.002 : 0;
-      pos.set(ox + mm(pc.x + pc.lx / 2), tileY + (1 - e) * DROP_M + ghostLift, oz + mm(pc.z + pc.lz / 2));
+      pos.set(ox + mm(pc.cx), tileY + (1 - e) * DROP_M + ghostLift, oz + mm(pc.cz));
       euler.set((1 - e) * 0.25, 0, (1 - e) * -0.15);
-      quat.setFromEuler(euler);
-      scl.set(mm(pc.lx), tileM, mm(pc.lz));
+      turn.setFromAxisAngle(yAxis, pc.angle);
+      quat.setFromEuler(euler).premultiply(turn);
+      scl.set(mm(pc.length), tileM, mm(pc.width));
       mesh.setMatrixAt(pc.index, matrix.compose(pos, quat, scl));
       if (pc.index === selected) color.set(SELECTED);
       else if (state.highlightCuts && pc.cut) color.set(CUT_TINT);
-      else color.set(colors.tile);
+      else color.set(base);
       if (dryLay?.has(pc.index) && pc.order >= placedWhole) color.lerp(new THREE.Color('#ffffff'), 0.45);
       mesh.setColorAt(pc.index, color);
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [pieces, plan.dryLay, state.placed, state.dryLay, state.highlightCuts, selected, colors.tile, tileY, tileM, ox, oz, matrix, quat, euler, pos, scl, color, hidden]);
+  }, [pieces, plan.dryLay, state.placed, state.dryLay, state.highlightCuts, selected, colors.tile, tileTexture, tileY, tileM, ox, oz, matrix, quat, turn, euler, pos, scl, color, hidden, yAxis]);
 
   useLayoutEffect(() => {
     const mesh = spacersRef.current;
@@ -179,9 +253,6 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
     mesh.instanceMatrix.needsUpdate = true;
   }, [spacers, state.placed, state.spacersVisible, params.jointMm, tileY, tileM, ox, oz, matrix, quat, pos, scl, hidden]);
 
-  const innerW = mm(plan.innerWidthMm);
-  const innerD = mm(plan.innerDepthMm);
-  const gapM = mm(params.perimeterGapMm);
   const adhesiveDepth = innerD * state.adhesive;
   const ridgePitch = mm(params.trowelNotchMm * 2.2);
   useLayoutEffect(() => {
@@ -196,25 +267,34 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
   const picked = selected != null ? pieces[selected] : null;
   const sel = picked && picked.order < state.placed ? picked : null;
   const span = Math.max(roomW, roomD);
+  const selText = sel
+    ? sel.visible
+      ? `${sel.cut ? 'Cut piece' : 'Full tile'} · ${Math.round(sel.visible.lx)} × ${Math.round(sel.visible.lz)} mm`
+      : `${sel.cut ? 'Cut piece of a' : 'Full'} ${Math.round(sel.length)} × ${Math.round(sel.width)} mm tile`
+    : '';
 
   return (
     <>
       <PresetLighting preset="natural_daylight" />
-      <OrbitControls makeDefault enableDamping maxPolarAngle={Math.PI / 2.05} minDistance={0.3} maxDistance={span * 4} />
-      <CameraRig shot={exploded ? 'low' : shot} widthM={roomW} depthM={roomD} />
+      <OrbitControls makeDefault enabled={!inPhoto} enableDamping maxPolarAngle={Math.PI / 2.05} minDistance={0.3} maxDistance={span * 4} />
+      <CameraRig shot={exploded ? 'low' : shot} widthM={roomW} depthM={roomD} photo={photoCamera} />
 
-      <mesh position={[0, -SLAB_M / 2, 0]} receiveShadow onClick={() => onSelect(null)}>
-        <boxGeometry args={[roomW, SLAB_M, roomD]} />
-        <meshStandardMaterial color={SUBSTRATE} roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 0.2, oz - 0.04]}>
-        <boxGeometry args={[roomW + 0.16, 0.4 + SLAB_M, 0.08]} />
-        <meshStandardMaterial color="#e6e1d8" roughness={0.9} />
-      </mesh>
-      <mesh position={[ox - 0.04, 0.2, 0]}>
-        <boxGeometry args={[0.08, 0.4 + SLAB_M, roomD]} />
-        <meshStandardMaterial color="#e6e1d8" roughness={0.9} />
-      </mesh>
+      {!inPhoto && (
+        <>
+          <mesh position={[0, -SLAB_M / 2, 0]} receiveShadow onClick={() => onSelect(null)}>
+            <boxGeometry args={[roomW, SLAB_M, roomD]} />
+            <meshStandardMaterial color={SUBSTRATE} roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.2, oz - 0.04]}>
+            <boxGeometry args={[roomW + 0.16, 0.4 + SLAB_M, 0.08]} />
+            <meshStandardMaterial color="#e6e1d8" roughness={0.9} />
+          </mesh>
+          <mesh position={[ox - 0.04, 0.2, 0]}>
+            <boxGeometry args={[0.08, 0.4 + SLAB_M, roomD]} />
+            <meshStandardMaterial color="#e6e1d8" roughness={0.9} />
+          </mesh>
+        </>
+      )}
 
       {state.primer > 0 && (
         <mesh position={[0, 0.0006 + lift.primer, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -257,22 +337,23 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
       )}
 
       {pieces.length > 0 && (
-        <instancedMesh
-        key={`tiles-${pieces.length}`}
-        ref={tilesRef}
-        args={[undefined, undefined, pieces.length]}
-        onClick={onTileClick}
-        castShadow
-      >
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial roughness={0.35} metalness={0.02} />
+        <instancedMesh key={`tiles-${pieces.length}`} ref={tilesRef} args={[undefined, undefined, pieces.length]} onClick={onTileClick} castShadow>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial
+            key={tileTexture ? tileTexture.uuid : 'plain'}
+            map={tileTexture ?? undefined}
+            roughness={0.35}
+            metalness={0.02}
+            clippingPlanes={clipping}
+            side={THREE.DoubleSide}
+          />
         </instancedMesh>
       )}
 
       {spacers.length > 0 && (
         <instancedMesh key={`spacers-${spacers.length}`} ref={spacersRef} args={[undefined, undefined, spacers.length * 2]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color={SPACER} roughness={0.6} />
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color={SPACER} roughness={0.6} />
         </instancedMesh>
       )}
 
@@ -317,7 +398,7 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
         <group position={[0, 0.3, roomD / 2 + mm(params.tileWidthMm) / 2 + 0.15]} rotation={[Math.PI, 0, 0]}>
           <mesh>
             <boxGeometry args={[mm(params.tileLengthMm), tileM, mm(params.tileWidthMm)]} />
-            <meshStandardMaterial color={colors.tile} roughness={0.35} />
+            <meshStandardMaterial color={tileTexture ? '#ffffff' : colors.tile} map={tileTexture ?? undefined} roughness={0.35} />
           </mesh>
           <mesh
             position={[0, -tileM / 2 - 0.0012, -mm(params.tileWidthMm) / 2 + (mm(params.tileWidthMm) * state.backButter) / 2]}
@@ -329,7 +410,7 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
         </group>
       )}
 
-      {exploded && (
+      {exploded && !inPhoto && (
         <>
           <LayerLabel position={[ox - 0.1, 0, oz + roomD]} text="Substrate" />
           {params.prime && <LayerLabel position={[ox - 0.1, lift.primer, oz + roomD]} text="Primer" />}
@@ -339,9 +420,9 @@ export const TileInstallationScene: React.FC<Props> = ({ plan, state, shot, expl
       )}
 
       {sel && (
-        <Html position={[ox + mm(sel.x + sel.lx / 2), tileY + 0.06, oz + mm(sel.z + sel.lz / 2)]} center>
+        <Html position={[ox + mm(sel.cx), tileY + 0.06, oz + mm(sel.cz)]} center>
           <div className="pointer-events-none whitespace-nowrap rounded-sm border border-hairline bg-card px-2 py-1 text-xs text-foreground shadow-overlay">
-            {sel.cut ? 'Cut piece' : 'Full tile'} · {Math.round(sel.lx)} × {Math.round(sel.lz)} mm · row {sel.row + 1}
+            {selText}
           </div>
         </Html>
       )}

@@ -1,6 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { ChevronLeft, ChevronRight, Clock, Layers, Pause, Play, RotateCcw, TriangleAlert, Wrench } from 'lucide-react';
+import { Box, ChevronLeft, ChevronRight, Clock, Image as ImageIcon, Layers, Pause, Play, RotateCcw, TriangleAlert, Wrench } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -14,15 +14,69 @@ import {
   type TileFloorPlan,
   type TileStepKey,
 } from '@/lib/installation/tileFloorTemplate';
+import type { PhotoCamera } from '@/lib/installation/photoCamera';
 import { TileInstallationScene, type TileSceneColors } from './TileInstallationScene';
+
+export interface RoomPhoto {
+  url: string;
+  width: number;
+  height: number;
+  camera: PhotoCamera;
+  maskUrl?: string | null;
+}
 
 interface Props {
   plan: TileFloorPlan;
   colors: TileSceneColors;
+  tileImageUrl?: string | null;
+  photo?: RoomPhoto | null;
+  autoPlay?: boolean;
 }
 
-export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
+function useOccluderMask(maskUrl: string | null | undefined): string | null {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setDataUrl(null);
+    if (!maskUrl) return;
+    let live = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (!live) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      try {
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < data.data.length; i += 4) {
+          const a = data.data[i + 3];
+          const lum = 0.299 * data.data[i] + 0.587 * data.data[i + 1] + 0.114 * data.data[i + 2];
+          const paint = a < 255 ? a > 127 : lum > 127;
+          data.data[i] = 0;
+          data.data[i + 1] = 0;
+          data.data[i + 2] = 0;
+          data.data[i + 3] = paint ? 0 : 255;
+        }
+        ctx.putImageData(data, 0, 0);
+        setDataUrl(canvas.toDataURL('image/png'));
+      } catch {
+        setDataUrl(null);
+      }
+    };
+    img.src = maskUrl;
+    return () => { live = false; };
+  }, [maskUrl]);
+  return dataUrl;
+}
+
+export const TileInstallationViewer: React.FC<Props> = ({ plan, colors, tileImageUrl, photo, autoPlay }) => {
   const steps = plan.steps;
+  const [inRoom, setInRoom] = useState(!!photo);
+  const occluder = useOccluderMask(inRoom ? photo?.maskUrl : null);
+  useEffect(() => { setInRoom(!!photo); }, [photo]);
   const [stepKey, setStepKey] = useState<TileStepKey>(steps[0]?.key ?? 'prepare');
   const [progress, setProgress] = useState(1);
   const [playing, setPlaying] = useState(false);
@@ -99,6 +153,16 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
     setPlaying(true);
   };
 
+  const autoPlayed = useRef(false);
+  useEffect(() => {
+    if (!autoPlay || autoPlayed.current || !steps[0]) return;
+    autoPlayed.current = true;
+    setStepKey(steps[0].key);
+    setProgress(0);
+    setPlayAll(true);
+    setPlaying(true);
+  }, [autoPlay, steps]);
+
   const playWhole = () => {
     if (!steps[0]) return;
     setStepKey(steps[0].key);
@@ -129,7 +193,14 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
   return (
     <section ref={rootRef} className="space-y-3" tabIndex={-1} aria-label="Installation steps">
       <Card className="overflow-hidden">
-        <div className="relative aspect-[4/3] w-full bg-surface-sunken sm:aspect-[16/10]">
+        <div
+          className={cn('relative w-full bg-surface-sunken', !(inRoom && photo) && 'aspect-[4/3] sm:aspect-[16/10]')}
+          style={inRoom && photo ? {
+            aspectRatio: `${photo.width} / ${photo.height}`,
+            backgroundImage: `url("${photo.url}")`,
+            backgroundSize: '100% 100%',
+          } : undefined}
+        >
           <ThreeErrorBoundary>
             <Suspense fallback={<CanvasLoader label="Building the floor…" />}>
               <Canvas
@@ -146,10 +217,26 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
                   colors={colors}
                   selected={selected}
                   onSelect={setSelected}
+                  tileImageUrl={tileImageUrl}
+                  photoCamera={inRoom && photo ? photo.camera : null}
                 />
               </Canvas>
             </Suspense>
           </ThreeErrorBoundary>
+          {inRoom && photo && occluder && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{
+                backgroundImage: `url("${photo.url}")`,
+                backgroundSize: '100% 100%',
+                maskImage: `url(${occluder})`,
+                maskSize: '100% 100%',
+                WebkitMaskImage: `url(${occluder})`,
+                WebkitMaskSize: '100% 100%',
+              }}
+            />
+          )}
           <div className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1.5">
             <Badge variant="neutral" className="bg-card tabular-nums">Full tiles {counts.tilesPlaced} / {q.fullTiles}</Badge>
             <Badge variant="neutral" className="bg-card tabular-nums">Edge pieces {counts.cutsPlaced} / {q.cutTiles}</Badge>
@@ -175,7 +262,18 @@ export const TileInstallationViewer: React.FC<Props> = ({ plan, colors }) => {
             <RotateCcw className="h-4 w-4" />
             Play whole build
           </Button>
+          {photo && (
+            <div className="flex rounded-sm border border-hairline p-0.5" role="group" aria-label="View">
+              <Button variant={inRoom ? 'secondary' : 'ghost'} size="sm" className="h-7 gap-1.5 px-2" aria-pressed={inRoom} onClick={() => setInRoom(true)}>
+                <ImageIcon className="h-3.5 w-3.5" />In the room
+              </Button>
+              <Button variant={!inRoom ? 'secondary' : 'ghost'} size="sm" className="h-7 gap-1.5 px-2" aria-pressed={!inRoom} onClick={() => setInRoom(false)}>
+                <Box className="h-3.5 w-3.5" />3D
+              </Button>
+            </div>
+          )}
           <Button
+            disabled={inRoom && !!photo}
             variant={exploded ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setExploded((v) => !v)}
