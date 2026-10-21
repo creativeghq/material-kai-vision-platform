@@ -61,6 +61,7 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
     },
     show_client_page: true,
     notes: quote.notes ?? null,
+    terms: quote.terms ?? null,
     sections: [{ items }],
     totals: anyPriced ? {
       subtotal: quote.subtotal,
@@ -76,7 +77,7 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
 }
 
 // Bump when renderBrandedDocument's output changes: a stored PDF is reused while its fingerprint matches.
-const RENDER_REVISION = '2026-10-17';
+const RENDER_REVISION = '2026-10-21';
 
 async function documentFingerprint(doc: BrandedDoc, assetPaths: (string | null)[]): Promise<string> {
   const input = new TextEncoder().encode(JSON.stringify({ r: RENDER_REVISION, doc, assetPaths }));
@@ -126,10 +127,12 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       const branding = await fetchBrandingConfig(supabase, workspaceId);
 
       let logoPath: string | null = null;
+      let defaultTerms: string | null = null;
       if (workspaceId) {
         const { data: fs } = await supabase.from('finance_settings')
-          .select('business_logo_path').eq('workspace_id', workspaceId).maybeSingle();
+          .select('business_logo_path, default_quote_terms').eq('workspace_id', workspaceId).maybeSingle();
         logoPath = fs?.business_logo_path ?? null;
+        defaultTerms = fs?.default_quote_terms ?? null;
       }
       const [coverBytes, introBytes, bgBytes, backBytes, logoBytes] = await Promise.all([
         fetchTemplateImage(supabase, branding.cover_image_path),
@@ -139,7 +142,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
         logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
       ]);
 
-      const sample = buildSampleQuote(workspaceId, Number(branding.vat_rate_default ?? 24));
+      const sample = { ...buildSampleQuote(workspaceId, Number(branding.vat_rate_default ?? 24)), terms: defaultTerms };
       const { pdfBytes } = await renderBrandedDocument(mapQuoteToBrandedDoc(sample, branding), {
         coverBytes, introBytes, contentBgBytes: bgBytes, backCoverBytes: backBytes, logoBytes,
       });

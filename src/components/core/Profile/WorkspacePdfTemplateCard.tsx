@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { downscaleToJpeg } from '@/utils/pdfSafeImage';
 
 type Slot = 'cover' | 'intro' | 'background' | 'backcover';
 const SLOT_COL: Record<Slot, 'cover_path' | 'intro_path' | 'background_path' | 'backcover_path'> = {
@@ -34,28 +35,6 @@ interface TemplateRow {
 }
 
 const BUCKET = 'quote-templates';
-
-/**
- * Downscale + re-encode to JPEG before upload. Full-page template images are often huge
- * (e.g. 4200px photos); pdf-lib decodes PNGs fully into memory when embedding, which OOMs
- * the PDF worker. Capping the long edge (~2000px) as JPEG keeps the aspect ratio (so the
- * page size stays correct) while making the file tiny and cheap to embed.
- */
-async function downscaleToJpeg(file: File, maxEdge = 2000): Promise<{ blob: Blob; w: number; h: number }> {
-  const bmp = await createImageBitmap(file);
-  const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
-  const w = Math.max(1, Math.round(bmp.width * scale));
-  const h = Math.max(1, Math.round(bmp.height * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas not available');
-  ctx.drawImage(bmp, 0, 0, w, h);
-  bmp.close?.();
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob((b) => res(b), 'image/jpeg', 0.85));
-  if (!blob) throw new Error('Could not encode image');
-  return { blob, w, h };
-}
 
 export const WorkspacePdfTemplateCard: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
@@ -105,6 +84,7 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
     try {
       setBusy(slot);
       // Downscale + JPEG-encode before upload so large template photos don't OOM the PDF worker.
+      // Template images are often 4000px+; pdf-lib decodes them fully when embedding and OOMs the worker.
       const { blob, w, h } = await downscaleToJpeg(file);
       const path = `${activeWorkspaceId}/pdf-${slot}-${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: 'image/jpeg' });

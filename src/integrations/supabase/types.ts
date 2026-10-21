@@ -8876,6 +8876,8 @@ export type Database = {
           default_income_classification_category: string | null
           default_income_classification_type: string | null
           default_invoice_notes: string | null
+          default_quote_terms: string | null
+          quote_validity_days: number | null
           default_markup_pct: number
           default_payment_terms_days: number
           default_vat_rate: number
@@ -8993,6 +8995,8 @@ export type Database = {
           default_income_classification_category?: string | null
           default_income_classification_type?: string | null
           default_invoice_notes?: string | null
+          default_quote_terms?: string | null
+          quote_validity_days?: number | null
           default_markup_pct?: number
           default_payment_terms_days?: number
           default_vat_rate?: number
@@ -9110,6 +9114,8 @@ export type Database = {
           default_income_classification_category?: string | null
           default_income_classification_type?: string | null
           default_invoice_notes?: string | null
+          default_quote_terms?: string | null
+          quote_validity_days?: number | null
           default_markup_pct?: number
           default_payment_terms_days?: number
           default_vat_rate?: number
@@ -26602,6 +26608,7 @@ export type Database = {
           created_at: string
           currency: string | null
           custom_request_text: string | null
+          terms: string | null
           customer_address_unit_id: string | null
           customer_company_id: string | null
           customer_contact_id: string | null
@@ -26648,6 +26655,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           custom_request_text?: string | null
+          terms?: string | null
           customer_address_unit_id?: string | null
           customer_company_id?: string | null
           customer_contact_id?: string | null
@@ -26694,6 +26702,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           custom_request_text?: string | null
+          terms?: string | null
           customer_address_unit_id?: string | null
           customer_company_id?: string | null
           customer_contact_id?: string | null

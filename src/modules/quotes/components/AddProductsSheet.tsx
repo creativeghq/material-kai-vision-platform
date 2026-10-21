@@ -60,6 +60,7 @@ import { servicesService, type ServiceItem } from '@/modules/finance/services/se
 import { ordersService } from '@/modules/finance/services/ordersService';
 import { QuantityInput } from './QuantityInput';
 import { quotesService } from '../services/QuotesService';
+import { toPdfEmbeddableImage, UnsupportedImageError } from '@/utils/pdfSafeImage';
 import { projectIdentity, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
 import {
   getAvailableSizes,
@@ -328,16 +329,20 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     }
     try {
       setUploadingImage(true);
-      const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const { blob, type, ext } = await toPdfEmbeddableImage(file);
       const path = `quote-custom/${quoteId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from('generation-images')
-        .upload(path, file, { contentType: file.type, upsert: false });
+        .upload(path, blob, { contentType: type, upsert: false });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from('generation-images').getPublicUrl(path);
       if (!pub?.publicUrl) throw new Error('Could not resolve the uploaded image URL.');
       setCustomField('image_url', pub.publicUrl);
     } catch (err) {
+      if (err instanceof UnsupportedImageError) {
+        toast({ title: 'Unsupported image', description: err.message, variant: 'destructive' });
+        return;
+      }
       console.error('Custom image upload failed:', err);
       toast({ title: 'Upload failed', description: 'The image could not be uploaded. Please try again.', variant: 'destructive' });
     } finally {

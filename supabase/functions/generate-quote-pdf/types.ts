@@ -24,6 +24,7 @@ export interface QuoteData {
   quote_number?: string;
   status: string;
   notes?: string;
+  terms?: string | null;
   subtotal: number;
   vat_rate: number;
   vat_amount: number;

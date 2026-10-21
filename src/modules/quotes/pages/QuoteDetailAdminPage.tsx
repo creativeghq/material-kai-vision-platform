@@ -30,6 +30,7 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { QuoteItemsList } from '../components/QuoteItemsList';
 import { AddProductsSheet } from '../components/AddProductsSheet';
 import { QuoteShippingCard } from '../components/QuoteShippingCard';
+import { QuoteTermsEditor } from '../components/QuoteTermsEditor';
 import {
   Select,
   SelectContent,
@@ -965,6 +966,13 @@ export const QuoteDetailPage: React.FC = () => {
             )}
           </div>
         )}
+
+        <QuoteTermsEditor
+          quoteId={quote.id}
+          terms={quote.terms}
+          readOnly={quote.status === 'accepted' || quote.status === 'rejected'}
+          onSaved={loadQuoteDetails}
+        />
 
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full mt-2">

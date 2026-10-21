@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { QuoteTermsCard } from '../components/QuoteTermsCard';
 
 interface QuoteSettingsProps {
   /** Render without the page header — used when mounted inside a Sheet panel. */
@@ -174,6 +175,8 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
         </div>
       </div>
       )}
+
+      {activeWorkspaceId && <QuoteTermsCard workspaceId={activeWorkspaceId} />}
 
       <div className="dashboard-card space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">

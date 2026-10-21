@@ -154,6 +154,8 @@ export interface BrandedDoc {
   client?: BrandedClient | null;
   show_client_page?: boolean;
   notes?: string | null;
+  /** Terms & Conditions, printed after the totals. */
+  terms?: string | null;
   sections: BrandedDocSection[];
   /**
    * Optional technical-specification tables, rendered on their own pages after the
@@ -364,13 +366,18 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
 
     if (idx >= rows.length) {
       if (doc.totals) { drawTotals(page, g, doc.totals, y, font, fontBold); y -= 122; }
+      let tail = page;
+      if (doc.terms?.trim()) {
+        const r = drawTerms(pdfDoc, g, page, y, doc.terms, bgImage, font, fontBold);
+        tail = r.page; y = r.y; pages += r.added;
+      }
       const ffeItems = doc.sections.flatMap((s) => s.items).filter((it) => it.installation_requirements || it.delivery_date);
       if (ffeItems.length > 0) {
         if (y < 140) {
           const ffePage = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
           drawPageBackground(ffePage, g, bgImage);
           drawFFENotes(ffePage, g, ffeItems, g.PAGE_H - 80, font, fontBold);
-        } else drawFFENotes(page, g, ffeItems, y, font, fontBold);
+        } else drawFFENotes(tail, g, ffeItems, y, font, fontBold);
       }
       break;
     }
@@ -485,6 +492,27 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
   y -= 8;
   page.drawLine({ start: { x: labelX, y: y + 16 }, end: { x: rightEdge, y: y + 16 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
   line(hasDiscount ? 'Total payable' : 'FINAL', formatCurrency(totals.grand_total, cur), true);
+}
+
+function drawTerms(pdfDoc: PDFDocument, g: Geom, page: PDFPage, startY: number, terms: string, bgImage: PDFImage | null, font: PDFFont, fontBold: PDFFont): { page: PDFPage; y: number; added: number } {
+  const FS = 8.5, LH = 12, bottom = Math.round(g.PAGE_H * 0.12);
+  const lines = wrapCell(terms.trim(), font, FS, g.TABLE_W);
+  let added = 0, y = startY - 10;
+  const newPage = () => {
+    page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); added++;
+    drawPageBackground(page, g, bgImage);
+    y = g.TABLE_Y_START;
+  };
+  if (y - 18 - 3 * LH < bottom) newPage();
+  page.drawLine({ start: { x: g.TABLE_MARGIN, y: y + 10 }, end: { x: g.TABLE_MARGIN + g.TABLE_W, y: y + 10 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
+  page.drawText('TERMS & CONDITIONS', { x: g.TABLE_MARGIN, y, size: 10, font: fontBold, color: COLOR_DARK });
+  y -= 18;
+  for (const line of lines) {
+    if (y < bottom) newPage();
+    if (line) page.drawText(line, { x: g.TABLE_MARGIN, y, size: FS, font, color: COLOR_BLACK });
+    y -= LH;
+  }
+  return { page, y: y - 10, added };
 }
 
 function drawFFENotes(page: PDFPage, g: Geom, items: BrandedDocItem[], startY: number, font: PDFFont, fontBold: PDFFont): void {

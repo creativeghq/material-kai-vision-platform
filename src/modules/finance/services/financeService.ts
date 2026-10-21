@@ -3456,6 +3456,10 @@ export interface FinanceSettings {
   invoice_template_colors: Record<string, string>;
   /** Default footer notes prefilled onto every new invoice (editable per-invoice). */
   default_invoice_notes: string | null;
+  /** Terms & Conditions stamped onto every new quote (quotes.terms), editable per quote. */
+  default_quote_terms: string | null;
+  /** Days a new quote stays valid; null = platform default. */
+  quote_validity_days: number | null;
   /** Print a "Pay / view online" link + QR (→ /pay/{token}) on payable invoices. */
   invoice_show_pay_link: boolean;
   /** Print the customer's carry-forward (previous balance / credit) below the total. */
@@ -3813,6 +3817,7 @@ const _financeServiceV2 = {
       'min_order_value','default_credit_limit','risk_block_min_order','risk_block_unpaid_invoice',
       'negative_margin_policy','sales_can_see_cost',
       'invoice_template_id','invoice_template_colors','default_invoice_notes',
+      'default_quote_terms','quote_validity_days',
       'invoice_show_pay_link','invoice_show_previous_balance',
       'trip_expense_reimbursement_mode', 'vat_filing_frequency',
     ] as const) {

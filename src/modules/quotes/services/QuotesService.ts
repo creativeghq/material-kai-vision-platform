@@ -22,6 +22,7 @@ export interface Quote {
   status_tag_id?: string;
   total_items: number;
   notes?: string;
+  terms?: string | null;
   custom_request_text?: string; // Custom text request instead of products
   expires_at: string;
   last_activity_at: string;
@@ -581,6 +582,7 @@ export class QuotesService {
     data: {
       name?: string;
       notes?: string;
+      terms?: string | null;
       status?: Quote['status'];
       custom_request_text?: string;
       // A quote born without a customer can be given one later (drives pricing/email/invoicing).
@@ -1925,6 +1927,7 @@ export class QuotesService {
         revision_number: maxRev + 1,
         name: source.name ? `${source.name} (rev ${maxRev + 1})` : `Revision ${maxRev + 1}`,
         notes: source.notes ?? null,
+        terms: source.terms ?? null,
         customer_company_id: source.customer_company_id ?? null,
         customer_contact_id: source.customer_contact_id ?? null,
         currency: source.currency ?? 'EUR',
