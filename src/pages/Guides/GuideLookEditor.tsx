@@ -13,6 +13,8 @@ import { FINISH_KINDS, type FinishKind, type GuideAppearance, type GuideFinish }
 import { installationGuideService, type InstallationGuideRow } from '@/services/installationGuideService';
 
 const NONE = '__none';
+type Candidate = { thumb: string; full: string; title: string | null };
+const foundFor = new Map<string, { candidates: Candidate[]; picked: string }>();
 
 function Swatch({ finish, photoUrl }: { finish: GuideFinish; photoUrl: string | null }) {
   const s = finish.swatch;
@@ -34,8 +36,18 @@ export function GuideLookEditor({ row, onSaved, toast }: {
   const parts = row.guide?.parts ?? [];
   const [draft, setDraft] = useState<GuideAppearance | null>(row.appearance);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<Array<{ thumb: string; full: string; title: string | null }> | null>(null);
-  const [picked, setPicked] = useState('');
+  const [candidates, setCandidatesState] = useState<Candidate[] | null>(() => foundFor.get(row.id)?.candidates ?? null);
+  const [picked, setPickedState] = useState(() => foundFor.get(row.id)?.picked ?? '');
+  const setCandidates = (c: Candidate[] | null) => {
+    setCandidatesState(c);
+    if (c) foundFor.set(row.id, { candidates: c, picked: '' });
+    else foundFor.delete(row.id);
+  };
+  const setPicked = (p: string) => {
+    setPickedState(p);
+    const kept = foundFor.get(row.id);
+    if (kept) foundFor.set(row.id, { ...kept, picked: p });
+  };
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState<'search' | 'read' | 'save' | null>(null);
 
@@ -109,7 +121,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
       <Card>
         <CardHeader>
           <CardTitle>The product photo</CardTitle>
-          <p className="text-xs text-muted-foreground">The 3D takes its colours and wood or stone textures from one photo of the finished product. Reading a photo costs a few credits.</p>
+          <p className="text-xs text-muted-foreground">Find the product, tap the photo that matches yours, then press Read the finishes. The 3D takes its colours, its wood and stone textures and the room around it (wall and floor) from that photo. Reading a photo costs a few credits.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           {photoUrl && (
@@ -141,6 +153,9 @@ export function GuideLookEditor({ row, onSaved, toast }: {
                 </button>
               ))}
             </div>
+          )}
+          {candidates && candidates.length > 0 && (
+            <p className="text-xs text-muted-foreground">{picked ? 'Picked. Press Read the finishes to apply it.' : 'Tap the photo that matches your product.'}</p>
           )}
           <FormField label="Or paste a product page or photo address">
             <Input value={address} placeholder="https://www.ikea.com/…" onChange={(e) => { setAddress(e.target.value); setPicked(''); }} />

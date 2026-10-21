@@ -537,10 +537,10 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
     if (s === 0 || s < firstWork) return kitShot;
     const group = items.filter((it) => it.step === s);
     if (group.length === 0) return shotFor(product, -0.5, 0.42);
-    const b = bounds(group.map((it) => ({ center: it.host !== null ? add(items[it.host].target.pos, it.target.pos) : it.target.pos, size: it.size })));
-    const shot = shotFor(b, -0.5 + (s % 2 ? 0.1 : -0.1), 0.42);
-    const whole = shotFor(product, -0.5, 0.42);
-    return { ...shot, target: scale(add(b.center, product.center), 0.5), dist: Math.max(shot.dist, whole.dist * 0.85) };
+    const settled = { items } as GuideBuild;
+    const b = bounds(group.map((it) => ({ center: poseAt(settled, it, s, 0).pos, size: it.size })));
+    const work = { center: b.center, size: v(Math.max(b.size.x, 0.6), Math.max(b.size.y, 0.4), Math.max(b.size.z, 0.6)) };
+    return shotFor(work, -0.5 + (s % 2 ? 0.1 : -0.1), 0.5, 1.3);
   });
 
   return {

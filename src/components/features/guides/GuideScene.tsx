@@ -13,9 +13,9 @@ import {
   type CameraShot,
   type GuideBuild,
 } from '@/lib/installation/guideBuild';
-import type { GuideAppearance, InstallationGuideData } from '@/lib/installation/guideSchema';
+import type { GuideAppearance, GuideRoom, InstallationGuideData } from '@/lib/installation/guideSchema';
 import {
-  EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, useStudioLight, woodTexture,
+  EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, usePhotoCrops, useStudioLight, woodTexture,
   type FinishLook, type Hole,
 } from './partModels';
 
@@ -294,6 +294,60 @@ function KeyboardFly() {
     if (move.lengthSq() > 0 || turn) controls.update();
   });
   return null;
+}
+
+function tileTexture(): THREE.CanvasTexture | null {
+  return canvasTexture(256, 256, (ctx) => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, 253, 253);
+  });
+}
+
+function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoom | null; photoUrl: string | null }) {
+  const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.x, 3) + 2.4;
+  const floorZ = (build.kitBounds.center.z + build.kitBounds.size.z / 2 + build.product.center.z - build.product.size.z / 2) / 2;
+  const wallZ = build.product.center.z - build.product.size.z / 2 - 0.35;
+  const wallH = Math.max(2.8, build.product.size.y + 1);
+  const size = span * 2.2;
+  const crops = useMemo(() => [
+    ...(room?.wall_swatch ? [{ id: 'wall', box: room.wall_swatch, repeat: 3 }] : []),
+    ...(room?.floor_swatch ? [{ id: 'floor', box: room.floor_swatch, repeat: 6 }] : []),
+  ], [room]);
+  const photo = usePhotoCrops(photoUrl, crops);
+  const pattern = useDisposable(() => {
+    if (!room || room.floor_swatch) return null;
+    const t = room.floor_kind === 'wood' ? woodTexture()?.clone() ?? null : room.floor_kind === 'tile' || room.floor_kind === 'stone' ? tileTexture() : null;
+    if (!t) return null;
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(room.floor_kind === 'wood' ? 5 : size / 0.6, room.floor_kind === 'wood' ? size / 0.9 : size / 0.6);
+    t.needsUpdate = true;
+    return t;
+  }, room ? `${room.floor_kind}:${!!room.floor_swatch}:${size}` : 'none');
+  const wall = room?.wall ?? '#ece9e4';
+  const floor = room?.floor ?? '#d9d3c9';
+  const floorMap = photo.get('floor') ?? pattern;
+  const side = useMemo(() => new THREE.Color(wall).multiplyScalar(0.88), [wall]);
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, floorZ]} receiveShadow>
+        <planeGeometry args={[size, size]} />
+        <meshStandardMaterial color={floorMap && photo.get('floor') ? '#ffffff' : floor} map={floorMap ?? undefined} roughness={room?.floor_kind === 'tile' || room?.floor_kind === 'stone' ? 0.45 : 0.8} />
+      </mesh>
+      <mesh position={[0, wallH / 2, wallZ]} receiveShadow>
+        <planeGeometry args={[size, wallH]} />
+        <meshStandardMaterial color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />
+      </mesh>
+      <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[size, wallH]} />
+        <meshStandardMaterial color={side} roughness={0.92} />
+      </mesh>
+      <pointLight position={[0, wallH - 0.2, wallZ + 0.6]} intensity={4} distance={span * 2} color="#fff4e6" />
+    </group>
+  );
 }
 
 function Room({ build }: { build: GuideBuild }) {
@@ -815,7 +869,7 @@ export const GuideScene: React.FC<Props> = (props) => {
             shadow-camera-bottom={-span}
           />
           <directionalLight position={[4, 3, -2]} intensity={0.6} color="#9fc4ff" />
-          <Room build={build} />
+          {props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} /> : <Room build={build} />}
           {build.hasAssembly && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} />}
         </>
       ) : (

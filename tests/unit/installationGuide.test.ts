@@ -144,6 +144,15 @@ describe('installation guide build', () => {
     expect(hardwareShape('Corner bracket')).toBe('bracket');
   });
 
+  it('frames a step on where its work is, not on the finished product', () => {
+    const top = build.items.find((it) => it.partId === 'TOP')!;
+    const dowel = build.items.find((it) => it.partId === 'DOWEL' && it.host !== null)!;
+    expect(dowel.step).toBeLessThan(top.step);
+    const shot = build.cameras[dowel.step];
+    const d = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+    expect(d(shot.target, top.kit.pos)).toBeLessThan(d(shot.target, build.product.center));
+  });
+
   it('pushes placed parts apart when exploded', () => {
     const side = build.items.find((it) => it.partId === 'SIDE')!;
     const apart = poseAt(build, side, 2, 1).pos;

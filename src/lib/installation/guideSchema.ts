@@ -282,7 +282,19 @@ export type FinishKind = typeof FINISH_KINDS[number];
 
 export interface GuideFinish { id: string; name: string; color: string; kind: FinishKind; swatch: PageBox | null }
 
+export const FLOOR_KINDS = ['wood', 'tile', 'stone', 'carpet', 'concrete', 'vinyl'] as const;
+export type FloorKind = typeof FLOOR_KINDS[number];
+
+export interface GuideRoom {
+  wall: string;
+  floor: string;
+  floor_kind: FloorKind;
+  wall_swatch: PageBox | null;
+  floor_swatch: PageBox | null;
+}
+
 export interface GuideAppearance {
+  room: GuideRoom | null;
   image_path: string | null;
   source_url: string | null;
   finishes: GuideFinish[];
@@ -304,7 +316,38 @@ export const APPEARANCE_READ_SCHEMA = closed({
     }),
   },
   parts: { type: 'array', items: closed({ part_id: str, finish_id: str }) },
+  room: closed({
+    shown: bool,
+    wall_hex: str,
+    floor_hex: str,
+    floor_kind: { type: 'string', enum: [...FLOOR_KINDS] },
+    wall_textured: bool,
+    wall_swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
+    floor_textured: bool,
+    floor_swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
+  }),
 });
+
+function swatchBox(v: unknown): PageBox | null {
+  if (!isObj(v)) return null;
+  const b = box(v);
+  return b.x0 === 0 && b.y0 === 0 && b.x1 === 1 && b.y1 === 1 ? null : b;
+}
+
+function sanitizeRoom(raw: unknown): GuideRoom | null {
+  if (!isObj(raw)) return null;
+  if (raw.shown === false) return null;
+  const wall = text(raw.wall ?? raw.wall_hex, 7);
+  const floor = text(raw.floor ?? raw.floor_hex, 7);
+  if (!HEX.test(wall) || !HEX.test(floor)) return null;
+  return {
+    wall: wall.toLowerCase(),
+    floor: floor.toLowerCase(),
+    floor_kind: oneOf(raw.floor_kind, FLOOR_KINDS, 'wood'),
+    wall_swatch: raw.wall_textured === false ? null : swatchBox(raw.wall_swatch),
+    floor_swatch: raw.floor_textured === false ? null : swatchBox(raw.floor_swatch),
+  };
+}
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const MAX_FINISHES = 12;
@@ -332,6 +375,7 @@ export function sanitizeAppearance(raw: unknown, partIds: string[]): GuideAppear
     if (typeof pid === 'string' && known.has(pid) && typeof fid === 'string' && finishIds.has(fid)) parts[pid] = fid;
   }
   return {
+    room: sanitizeRoom(raw.room),
     image_path: typeof raw.image_path === 'string' ? raw.image_path.slice(0, 300) : null,
     source_url: typeof raw.source_url === 'string' ? raw.source_url.slice(0, 1000) : null,
     finishes,

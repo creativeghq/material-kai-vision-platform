@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 import type { BuildItem, GuideBuild } from '@/lib/installation/guideBuild';
-import type { FinishKind, GuideAppearance } from '@/lib/installation/guideSchema';
+import type { FinishKind, GuideAppearance, PageBox } from '@/lib/installation/guideSchema';
 
 export type HardwareShape = 'screw' | 'nail' | 'dowel' | 'cam' | 'hinge' | 'plate' | 'bracket' | 'knob' | 'foot' | 'pin';
 
@@ -208,11 +208,10 @@ const KIND_SURFACE: Record<FinishKind, { roughness: number; metalness: number; o
   fabric: { roughness: 0.95, metalness: 0, opacity: 1 },
 };
 
-export function useFinishLooks(appearance: GuideAppearance | null, photoUrl: string | null): Map<string, FinishLook> {
+export function usePhotoCrops(photoUrl: string | null, crops: Array<{ id: string; box: PageBox; repeat: number }>): Map<string, THREE.Texture> {
   const [maps, setMaps] = useState<Map<string, THREE.Texture>>(new Map());
   useEffect(() => {
-    const textured = (appearance?.finishes ?? []).filter((f) => f.swatch);
-    if (!photoUrl || textured.length === 0) {
+    if (!photoUrl || crops.length === 0) {
       setMaps(new Map());
       return;
     }
@@ -223,8 +222,8 @@ export function useFinishLooks(appearance: GuideAppearance | null, photoUrl: str
     img.onload = () => {
       if (!live) return;
       const next = new Map<string, THREE.Texture>();
-      for (const f of textured) {
-        const s = f.swatch!;
+      for (const c of crops) {
+        const s = c.box;
         const sw = Math.max(8, (s.x1 - s.x0) * img.naturalWidth);
         const sh = Math.max(8, (s.y1 - s.y0) * img.naturalHeight);
         const canvas = Object.assign(document.createElement('canvas'), { width: 256, height: 256 });
@@ -235,9 +234,9 @@ export function useFinishLooks(appearance: GuideAppearance | null, photoUrl: str
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.wrapS = THREE.MirroredRepeatWrapping;
         tex.wrapT = THREE.MirroredRepeatWrapping;
-        tex.repeat.set(2, 2);
+        tex.repeat.set(c.repeat, c.repeat);
         made.push(tex);
-        next.set(f.id, tex);
+        next.set(c.id, tex);
       }
       setMaps(next);
     };
@@ -246,7 +245,16 @@ export function useFinishLooks(appearance: GuideAppearance | null, photoUrl: str
       live = false;
       made.forEach((t) => t.dispose());
     };
-  }, [appearance, photoUrl]);
+  }, [photoUrl, crops]);
+  return maps;
+}
+
+export function useFinishLooks(appearance: GuideAppearance | null, photoUrl: string | null): Map<string, FinishLook> {
+  const crops = useMemo(
+    () => (appearance?.finishes ?? []).flatMap((f) => (f.swatch ? [{ id: f.id, box: f.swatch, repeat: 2 }] : [])),
+    [appearance],
+  );
+  const maps = usePhotoCrops(photoUrl, crops);
   return useMemo(() => {
     const out = new Map<string, FinishLook>();
     for (const f of appearance?.finishes ?? []) {
