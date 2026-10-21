@@ -44,7 +44,7 @@ function StepWords({ guide, build, index, x }: { guide: InstallationGuideData; b
   );
 }
 
-function ManualCrop({ url, step, aspect, onOpen }: { url: string | null; step: GuideStep | undefined; aspect: number; onOpen: () => void }) {
+function ManualCrop({ url, step, aspect, onOpen, tall = false }: { url: string | null; step: GuideStep | undefined; aspect: number; onOpen: () => void; tall?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [box, setBox] = useState({ w: 300, h: 210 });
   useEffect(() => {
@@ -71,7 +71,7 @@ function ManualCrop({ url, step, aspect, onOpen }: { url: string | null; step: G
       type="button"
       onClick={onOpen}
       aria-label="The current step's drawing from the manual"
-      className="relative block h-[clamp(110px,calc(100vh-520px),210px)] w-full cursor-zoom-in overflow-hidden rounded-sm bg-white"
+      className={cn('relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-white', tall ? 'h-[min(52dvh,460px)]' : 'h-[clamp(110px,calc(100vh-520px),210px)]')}
     >
       <i key={`${step.page}-${x0}-${y0}`} className="absolute inset-0 animate-in fade-in duration-300" style={style} />
     </button>
@@ -151,6 +151,11 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
   const [followCam, setFollowCam] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
   const [inspectKey, setInspectKey] = useState<string | null>(null);
+  const [board, setBoard] = useState<'step' | 'hardware' | null>(null);
+  const holdPart = (partId: string) => {
+    const it = build.items.find((i) => i.partId === partId && Number.isFinite(i.t0)) ?? build.items.find((i) => i.partId === partId);
+    if (it) { setBoard(null); setInspectKey(it.key); }
+  };
   const [wordsOpen, setWordsOpen] = useState(false);
   const [wordsCut, setWordsCut] = useState(false);
   const wordsRef = useRef<HTMLDivElement>(null);
@@ -345,6 +350,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
                 labels={labels}
                 atStart={x < 0.02}
                 follow={followCam && !exploded}
+                onBoard={(b) => { halt(); setBoard(b); }}
                 appearance={row.appearance}
                 photoUrl={photoUrl}
               />
@@ -504,6 +510,64 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
       )}
 
       <HowItWorks open={howOpen} onOpenChange={setHowOpen} guide={guide} build={build} />
+      <Dialog open={board !== null} onOpenChange={(o) => { if (!o) setBoard(null); }}>
+        <DialogContent className="flex max-h-[92dvh] max-w-3xl flex-col gap-3 overflow-y-auto p-3 sm:p-5">
+          {board === 'step' && current && (
+            <>
+              <DialogHeader className="text-left">
+                <DialogTitle className="font-sans">{step ? `Step ${step} · ${current.title}` : current.title}</DialogTitle>
+                <DialogDescription>Page {current.page} of the manual</DialogDescription>
+              </DialogHeader>
+              <ManualCrop tall url={pageUrl} step={current} aspect={pageAspects[current.page - 1] ?? row.page_aspect} onOpen={() => { setBoard(null); setBookOpen(true); }} />
+              {words}
+              {current.parts_used.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {current.parts_used.map((u) => {
+                    const idx = guide.parts.findIndex((p) => p.id === u.part_id);
+                    if (idx < 0) return null;
+                    return (
+                      <Button key={u.part_id} variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => holdPart(u.part_id)}>
+                        <b className="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1 text-[11px] text-background">{partNumber(idx)}</b>
+                        {guide.parts[idx].name}<span className="text-muted-foreground">×{u.quantity}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+              <Button variant="ghost" size="sm" className="self-start gap-1.5" onClick={() => { setBoard(null); setBookOpen(true); }}><BookOpen className="h-4 w-4" />Open the manual at this page</Button>
+            </>
+          )}
+          {board === 'hardware' && (
+            <>
+              <DialogHeader className="text-left">
+                <DialogTitle className="font-sans">Hardware</DialogTitle>
+                <DialogDescription>{counts.hardware} of {build.hardwareTotal} pieces in so far. Tap one to hold it.</DialogDescription>
+              </DialogHeader>
+              <ul className="divide-y divide-hairline">
+                {guide.parts.map((p, idx) => ({ p, idx })).filter(({ p }) => p.kind === 'hardware' || p.kind === 'accessory').map(({ p, idx }) => {
+                  const got = partCountAt(build, p.id, x);
+                  const total = partUsedTotal(build, p.id) || p.quantity;
+                  return (
+                    <li key={p.id}>
+                      <button type="button" onClick={() => holdPart(p.id)} className="flex w-full items-center gap-3 py-2 text-left hover:bg-muted/50">
+                        <b className="grid h-6 min-w-6 place-items-center rounded-full bg-foreground px-1 text-xs text-background">{partNumber(idx)}</b>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm">{p.name}</span>
+                          <span className="block font-mono text-[11px] text-muted-foreground">{p.code || '—'}</span>
+                        </span>
+                        <span className="hidden h-1.5 w-28 overflow-hidden rounded-full bg-muted sm:block">
+                          <span className="block h-full bg-amber-500" style={{ width: `${Math.min(100, (got / Math.max(total, 1)) * 100)}%` }} />
+                        </span>
+                        <span className="w-14 text-right text-sm tabular-nums">{got}/{total}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
       <PartInspector
         build={build}
         guide={guide}

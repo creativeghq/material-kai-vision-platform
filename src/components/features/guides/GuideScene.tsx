@@ -41,6 +41,7 @@ interface Props {
   hovered: string | null;
   onHover: (key: string | null, clientX: number, clientY: number) => void;
   onPick: (key: string) => void;
+  onBoard?: (board: 'step' | 'hardware') => void;
   labels: boolean;
   atStart: boolean;
   follow: boolean;
@@ -697,7 +698,8 @@ function ActiveLabel({ build, guide, xRef, labels }: { build: GuideBuild; guide:
   );
 }
 
-function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideBuild; guide: InstallationGuideData; stepIndex: number; pageUrl: string | null; xRef: React.MutableRefObject<number> }) {
+function SceneBoards({ build, guide, stepIndex, pageUrl, xRef, onBoard }: { build: GuideBuild; guide: InstallationGuideData; stepIndex: number; pageUrl: string | null; xRef: React.MutableRefObject<number>; onBoard?: Props['onBoard'] }) {
+  const pointer = (on: boolean) => { document.body.style.cursor = on && onBoard ? 'pointer' : ''; };
   const step = guide.steps[stepIndex];
   const stepTexRef = useRef<THREE.CanvasTexture | null>(null);
   const hwTexRef = useRef<THREE.CanvasTexture | null>(null);
@@ -829,11 +831,21 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideB
   const half = Math.max(build.product.size.x / 2 + 1.05, 1.2);
   return (
     <group>
-      <mesh position={[-half, y, wallZ]}>
+      <mesh
+        position={[-half, y, wallZ]}
+        onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onBoard?.('step'); }}
+        onPointerOver={() => pointer(true)}
+        onPointerOut={() => pointer(false)}
+      >
         <planeGeometry args={[0.93, 0.72]} />
         <meshBasicMaterial map={stepTex ?? undefined} transparent toneMapped={false} />
       </mesh>
-      <mesh position={[half, y, wallZ]}>
+      <mesh
+        position={[half, y, wallZ]}
+        onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onBoard?.('hardware'); }}
+        onPointerOver={() => pointer(true)}
+        onPointerOut={() => pointer(false)}
+      >
         <planeGeometry args={[0.93, 0.72]} />
         <meshBasicMaterial map={hwTex ?? undefined} transparent toneMapped={false} />
       </mesh>
@@ -884,7 +896,7 @@ export const GuideScene: React.FC<Props> = (props) => {
           />
           <directionalLight position={[4, 3, -2]} intensity={0.6} color="#9fc4ff" />
           {props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} /> : <Room build={build} />}
-          {build.hasAssembly && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} />}
+          {build.hasAssembly && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} onBoard={props.onBoard} />}
         </>
       ) : (
         <>
