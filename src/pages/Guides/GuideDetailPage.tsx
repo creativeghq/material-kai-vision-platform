@@ -64,7 +64,7 @@ function PageBoxEditor({ url, aspect, box, onChange }: { url: string | null; asp
   );
 }
 
-function StepsEditor({ row, guide, pageUrls, onChange }: { row: InstallationGuideRow; guide: InstallationGuideData; pageUrls: string[]; onChange: (g: InstallationGuideData) => void }) {
+function StepsEditor({ row, guide, pageUrls, onChange, locked }: { row: InstallationGuideRow; guide: InstallationGuideData; pageUrls: string[]; onChange: (g: InstallationGuideData) => void; locked: boolean }) {
   const [selected, setSelected] = useState(0);
   const aspects = usePageAspects(pageUrls, row.page_aspect);
   const step = guide.steps[Math.min(selected, guide.steps.length - 1)];
@@ -108,10 +108,14 @@ function StepsEditor({ row, guide, pageUrls, onChange }: { row: InstallationGuid
       <Card>
         <CardHeader>
           <CardTitle>{selected ? `Step ${selected}` : 'The kit'}</CardTitle>
-          <p className="text-xs text-muted-foreground">Drag on the page to re-draw the box around this step's drawing.</p>
+          <p className="text-xs text-muted-foreground">
+            {locked
+              ? 'Published, so this is read-only. Unpublish the guide to correct a step.'
+              : 'The reader filled these in from the page. Correct anything it misread, and drag on the page to re-draw the box around this step\'s drawing.'}
+          </p>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-3">
+          <fieldset disabled={locked} className="min-w-0 space-y-3">
             <FormField label="Title"><Input value={step.title} maxLength={80} onChange={(e) => patch({ title: e.target.value })} /></FormField>
             <FormField label="Instruction"><Textarea rows={5} value={step.instruction} maxLength={600} onChange={(e) => patch({ instruction: e.target.value })} /></FormField>
             <FormField label="Warning (optional)"><Input value={step.warning} maxLength={300} onChange={(e) => patch({ warning: e.target.value })} /></FormField>
@@ -137,22 +141,23 @@ function StepsEditor({ row, guide, pageUrls, onChange }: { row: InstallationGuid
                 </ul>
               )}
             </div>
-          </div>
-          <PageBoxEditor url={pageUrls[step.page - 1] ?? null} aspect={aspects[step.page - 1] ?? row.page_aspect} box={step.box} onChange={(b) => patch({ box: b })} />
+          </fieldset>
+          <PageBoxEditor url={pageUrls[step.page - 1] ?? null} aspect={aspects[step.page - 1] ?? row.page_aspect} box={step.box} onChange={(b) => { if (!locked) patch({ box: b }); }} />
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function PartsEditor({ guide, onChange }: { guide: InstallationGuideData; onChange: (g: InstallationGuideData) => void }) {
+function PartsEditor({ guide, onChange, locked }: { guide: InstallationGuideData; onChange: (g: InstallationGuideData) => void; locked: boolean }) {
   const patch = (id: string, p: Record<string, unknown>) => onChange({ ...guide, parts: guide.parts.map((x) => (x.id === id ? { ...x, ...p } : x)) });
   return (
     <Card>
       <CardHeader>
         <CardTitle>The kit</CardTitle>
-        <p className="text-xs text-muted-foreground">Names, printed part numbers and counts, as read from the manual.</p>
+        <p className="text-xs text-muted-foreground">{locked ? 'Published, so this is read-only. Unpublish the guide to correct a part.' : 'Names, printed part numbers and counts, as read from the manual. Correct anything it misread.'}</p>
       </CardHeader>
+      <fieldset disabled={locked} className="min-w-0">
       <div className="table-scroll">
         <table className="w-full text-sm">
           <thead className="bg-surface-sunken text-left text-[11px] font-semibold text-muted-foreground">
@@ -175,6 +180,7 @@ function PartsEditor({ guide, onChange }: { guide: InstallationGuideData; onChan
           </tbody>
         </table>
       </div>
+      </fieldset>
     </Card>
   );
 }
@@ -344,8 +350,8 @@ export default function GuideDetailPage() {
           onSelect={setTab}
           aria-label="Guide sections"
         />
-        {tab === 'steps' && <StepsEditor row={row} guide={g} pageUrls={pageUrls} onChange={setDraft} />}
-        {tab === 'parts' && <PartsEditor guide={g} onChange={setDraft} />}
+        {tab === 'steps' && <StepsEditor row={row} guide={g} pageUrls={pageUrls} onChange={setDraft} locked={row.status === 'published'} />}
+        {tab === 'parts' && <PartsEditor guide={g} onChange={setDraft} locked={row.status === 'published'} />}
         {tab === 'look' && <GuideLookEditor row={row} toast={toast} onSaved={(appearance) => setRow({ ...row, appearance })} />}
       </div>
     );

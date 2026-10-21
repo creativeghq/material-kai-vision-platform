@@ -6,13 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { FormField } from '@/components/core/ui/form-layout';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { partNumber } from '@/components/features/guides/partModels';
+import { hardwareShape, partNumber } from '@/components/features/guides/partModels';
 import type { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FINISH_KINDS, type FinishKind, type GuideAppearance, type GuideFinish } from '@/lib/installation/guideSchema';
 import { installationGuideService, type InstallationGuideRow } from '@/services/installationGuideService';
 
 const NONE = '__none';
+
+function ownLook(kind: string, name: string): string {
+  if (kind === 'panel' || kind === 'fitting') return 'Plain (not in the photo)';
+  const shape = hardwareShape(name);
+  if (shape === 'dowel') return 'Its own look: wood';
+  if (shape === 'foot') return 'Its own look: black plastic';
+  return 'Its own look: steel';
+}
 type Candidate = { thumb: string; full: string; title: string | null };
 const foundFor = new Map<string, { candidates: Candidate[]; picked: string }>();
 
@@ -193,6 +201,12 @@ export function GuideLookEditor({ row, onSaved, toast }: {
           <Card>
             <CardHeader>
               <CardTitle>Which part has which finish</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {draft.read_at ? `Read from the photo on ${new Date(draft.read_at).toLocaleString()}. ` : ''}
+                {Object.keys(draft.parts).length} of {parts.length} parts take a finish from the photo
+                {draft.finishes.map((f) => ` · ${f.name}: ${Object.values(draft.parts).filter((v) => v === f.id).length}`).join('')}.
+                Hidden hardware keeps its own look.
+              </p>
             </CardHeader>
             <div className="table-scroll">
               <table className="w-full text-sm">
@@ -208,7 +222,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
                         <Select value={draft.parts[p.id] ?? NONE} onValueChange={(v) => setPartFinish(p.id, v)}>
                           <SelectTrigger className="h-8 w-56"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={NONE}>Default</SelectItem>
+                            <SelectItem value={NONE}>{ownLook(p.kind, p.name)}</SelectItem>
                             {draft.finishes.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
