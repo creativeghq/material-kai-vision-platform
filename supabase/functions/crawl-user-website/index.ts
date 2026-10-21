@@ -18,7 +18,7 @@ import { chargeCronUser, refundCronUser } from '../_shared/cron-billing.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 import { extractContentImages, type PageImage } from '../_shared/page-images.ts';
-import { extractContentLinks, extractSpecs, type PageSpecs } from './spec-extract.ts';
+import { extractContentLinks, extractSpecs, textFromHtml, type PageSpecs } from './spec-extract.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -354,16 +354,6 @@ function decodeEntities(s: string): string {
       return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }[name] ?? ' ';
     },
   );
-}
-
-function textFromHtml(html: string): string {
-  return decodeEntities(
-    html
-      .replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/<(script|style|noscript|svg|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-      .replace(/<\/(p|div|section|article|li|h[1-6]|tr)>|<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, ' '),
-  ).replace(/[ \t ]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
 }
 
 function metaContent(html: string, names: string[]): string | null {

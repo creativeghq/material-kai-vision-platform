@@ -58,18 +58,22 @@ function rehypeCallouts() {
   return (tree: HastNode) => walk(tree);
 }
 
-const EXPORT_COMPONENTS: Components = {
-  img: ({ src, alt }) => (typeof src === 'string' && /^https:\/\//i.test(src) ? <img src={src} alt={alt ?? ''} /> : <>{alt}</>),
+export type PhotoSizes = Record<string, { width: number; height: number }>;
+
+const exportComponents = (sizes: PhotoSizes): Components => ({
+  img: ({ src, alt }) => (typeof src === 'string' && /^https:\/\//i.test(src)
+    ? <img src={src} alt={alt ?? ''} width={sizes[src]?.width} height={sizes[src]?.height} />
+    : <>{alt}</>),
   a: ({ href, children, node }) => {
     const anchor = textOf((node ?? { type: 'text' }) as HastNode);
     if (PLACEHOLDER_ANCHOR.test(anchor)) return <>{anchor.replace(PLACEHOLDER_ANCHOR, '').replace(/\]$/, '').trim()}</>;
     return <a href={href}>{children}</a>;
   },
-};
+});
 
-export function renderArticleHtml(markdown: string): string {
+export function renderArticleHtml(markdown: string, sizes: PhotoSizes = {}): string {
   return renderToStaticMarkup(
-    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeCallouts]} components={EXPORT_COMPONENTS}>
+    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeCallouts]} components={exportComponents(sizes)}>
       {markdown}
     </ReactMarkdown>,
   );

@@ -6,6 +6,8 @@ import { serpValue } from './untrusted.ts';
 export interface CatalogueSummary {
   category_url: string;
   category_found: boolean;
+  /** own: pages whose URL sits under the category page's; linked: every page it links to (other makers and categories included). */
+  scope?: 'own' | 'linked';
   links: number;
   members: number;
   with_price: number;
@@ -24,7 +26,9 @@ export function catalogueSummaryLines(s: CatalogueSummary): string[] {
   if (!s.members) return [];
   const lines = [
     `Category page: ${serpValue(s.category_url, 300)}`,
-    `  ${s.members} linked product pages state specs (of ${s.links} links on the page); ${s.with_price} of ${s.members} state a price.`,
+    s.scope === 'own'
+      ? `  ${s.members} product pages under this page state specs; ${s.with_price} of ${s.members} state their own price.`
+      : `  ${s.members} pages this page links to state specs (they may be other makers' or other categories' pages, not this page's own range); ${s.with_price} of ${s.members} state their own price.`,
   ];
   const labels = Object.entries(s.attributes ?? {})
     .sort((a, b) => b[1].present - a[1].present)

@@ -19,6 +19,7 @@ import { imageAlts, slugTerms } from './site-assets.ts';
 import { latinTerms } from './foreign-words.ts';
 
 import { resolveSeoMarket } from '../../_shared/seo-market.ts';
+import { fixDoubledFullStops } from './text-defects.ts';
 import { reviewArticle } from './review.ts';
 import { checkCoverage, mustCoverFrom } from './coverage.ts';
 import { approvedLessonLines } from './lessons.ts';
@@ -29,6 +30,7 @@ import { checkArithmetic, fixArithmetic } from './arithmetic-check.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { PHOTOS_PER_PAGE } from './site-pages.ts';
 import { PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, PHOTO_VERIFY_MODEL, type PhotoUsage } from './photo-verify.ts';
+import { PHOTO_TOPIC_MAX_INPUT_TOKENS, PHOTO_TOPIC_MAX_OUTPUT_TOKENS, PHOTO_TOPIC_MODEL } from './photo-topic.ts';
 import { WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS } from './write.ts';
 import { DEFAULT_CLAUDE_MODEL } from '../../_shared/ai-client.ts';
 import { avoidListHits, brandDraftCheck, loadBrandContext } from '../../_shared/brand-context.ts';
@@ -442,7 +444,8 @@ async function runPipelineStages(ctx: {
     // (a photo checked before is cached and costs nothing).
     const photoWallet: StageWallet = { userId, workspaceId, opType: 'seo_photo_verify' };
     const photoCeiling = SITE_LINK_TARGETS * PHOTOS_PER_PAGE * await tokenCeiling(
-      supabase, PHOTO_VERIFY_MODEL, PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, 1);
+      supabase, PHOTO_VERIFY_MODEL, PHOTO_VERIFY_MAX_INPUT_TOKENS, PHOTO_VERIFY_MAX_OUTPUT_TOKENS, 1)
+      + await tokenCeiling(supabase, PHOTO_TOPIC_MODEL, PHOTO_TOPIC_MAX_INPUT_TOKENS, PHOTO_TOPIC_MAX_OUTPUT_TOKENS, 1);
     const photoHold = await reserveStage(supabase, photoWallet, photoCeiling, `SEO photo checks: "${body.target_keyword}"`);
     const photoUsage: PhotoUsage[] = [];
     const sitePages = await findSitePages(supabase, {
@@ -452,6 +455,7 @@ async function runPipelineStages(ctx: {
       languageCode: body.language_code ?? null,
       photoUsage: photoHold.ok ? photoUsage : undefined,
       mustInclude: await requiredPages(supabase, websiteId, brief, body.target_keyword),
+      topic: `${body.topic} (${body.target_keyword})`,
     });
     if (photoHold.ok) {
       const priced = await Promise.all(photoUsage.map((u) => tokenCredits(supabase, u.model, u)));
@@ -470,6 +474,8 @@ async function runPipelineStages(ctx: {
     ].join(' ')));
     await updateArticle(supabase, articleId, {
       site_link_targets: sitePages.map((p) => ({ url: p.url, title: p.title, photos: p.images.length })),
+      photo_sizes: Object.fromEntries(sitePages.flatMap((p) => p.images)
+        .filter((im) => im.width && im.height).map((im) => [im.src, { width: im.width, height: im.height }])),
       protected_terms: [...protectedTerms],
     }, `Site context: ${sitePages.length} of our pages as link targets, ${sitePages.reduce((s, p) => s + p.images.length, 0)} photos, ${protectedTerms.size} protected terms`);
 
@@ -720,7 +726,7 @@ async function runLateStages(ctx: {
     totalCredits += grammar.report.credits;
     creditsByStage.grammar = grammar.report.credits;
     const arithmetic = checkArithmetic(grammar.markdown);
-    const finalMarkdown = arithmetic.wrong.length ? fixArithmetic(grammar.markdown, arithmetic.wrong).markdown : grammar.markdown;
+    const finalMarkdown = fixDoubledFullStops(arithmetic.wrong.length ? fixArithmetic(grammar.markdown, arithmetic.wrong).markdown : grammar.markdown);
     await updateArticle(supabase, articleId, {
       markdown_content: finalMarkdown,
       title: plan.title,

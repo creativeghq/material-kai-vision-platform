@@ -27,6 +27,7 @@ export interface ExportableArticle {
   content_brief?: { provenance?: Record<string, unknown> | null } | null;
   credits_used?: number | null;
   credits_by_stage?: Record<string, number> | null;
+  photo_sizes?: Record<string, { width: number; height: number }> | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -42,7 +43,10 @@ export interface ArticleExport {
   url_suggestion: string | null;
   published_url: string | null;
   meta: { title: string; description: string | null };
-  open_graph: { title: string; description: string | null; image: string | null; type: 'article'; locale: string | null };
+  open_graph: {
+    title: string; description: string | null; image: string | null;
+    image_width: number | null; image_height: number | null; type: 'article'; locale: string | null;
+  };
   target_keyword: string;
   secondary_keywords: string[];
   content_type: string | null;
@@ -51,7 +55,7 @@ export interface ArticleExport {
   structured: StructuredArticle;
   outline: { level: number; text: string }[];
   faq: { question: string; answer: string }[];
-  images: { src: string; alt: string }[];
+  images: { src: string; alt: string; width: number | null; height: number | null }[];
   links: { internal: { anchor: string; url: string }[]; external: { anchor: string; url: string }[] };
   schema_jsonld: unknown;
   author: Record<string, unknown> | null;
@@ -91,7 +95,9 @@ export function buildArticleExport(
   const title = article.title || h1 || article.target_keyword;
   const siteHost = article.site_url ? hostOf(article.site_url) : null;
 
-  const images = [...markdown.matchAll(/!\[([^\]]*)\]\(([^)\s]+)\)/g)].map((m) => ({ alt: m[1], src: m[2] }));
+  const sizes = article.photo_sizes ?? {};
+  const images = [...markdown.matchAll(/!\[([^\]]*)\]\(([^)\s]+)\)/g)]
+    .map((m) => ({ alt: m[1], src: m[2], width: sizes[m[2]]?.width ?? null, height: sizes[m[2]]?.height ?? null }));
   const internal: { anchor: string; url: string }[] = [];
   const external: { anchor: string; url: string }[] = [];
   for (const m of markdown.matchAll(/(?<!!)\[([^\]]+)\]\(([^)\s]+)\)/g)) {
@@ -122,6 +128,8 @@ export function buildArticleExport(
       title: metaTitle,
       description: article.meta_description ?? null,
       image: images[0]?.src ?? null,
+      image_width: images[0]?.width ?? null,
+      image_height: images[0]?.height ?? null,
       type: 'article',
       locale: article.language_code ? LOCALES[article.language_code] ?? null : null,
     },

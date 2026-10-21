@@ -17,6 +17,8 @@ const CARD_LOOKBACK_CHARS = 500;
 export const MAX_CONTENT_LINKS = 400;
 
 const CURRENCY_SYMBOLS: Record<string, string> = { '€': 'EUR', '$': 'USD', '£': 'GBP' };
+/** Two amounts joined by a dash, money on at least one side: «€21–€36», «20 - 30 EUR»; never «60x60 - 34,90 €» or «€34,90 - 2 pcs». */
+const DASH_RANGE = /(?:€|\$|£|\b(?:EUR|USD|GBP)\b)\s*\d[\d.,]*\s*[-–—]\s*(?:€|\$|£|\b(?:EUR|USD|GBP)\b)?\s*\d[\d.,]*(?!\s*(?!(?:EUR|USD|GBP)\b)\p{L})|(?<![x×\d.,])\d[\d.,]*\s*[-–—]\s*\d[\d.,]*\s*(?:€|\$|£|\b(?:EUR|USD|GBP)\b)/u;
 
 function decodeEntities(s: string): string {
   return s.replace(
@@ -41,6 +43,31 @@ function cellText(fragment: string): string {
       .replace(/<br\s*\/?>/gi, ' ')
       .replace(/<[^>]+>/g, ' '),
   ));
+}
+
+/** A table row on ONE line, cells joined by " | ": a value split across lines inside a cell must stay with its row's label. */
+function rowLine(row: string): string {
+  const cells = [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+    .map((m) => m[1]
+      .replace(/<\/(p|div|li)>|<br\s*\/?>/gi, '\u0000')
+      .replace(/<[^>]+>/g, ' ')
+      .split('\u0000')
+      .map((part) => part.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .join(' · '))
+    .filter(Boolean);
+  return cells.length ? `\n${cells.join(' | ')}\n` : '\n';
+}
+
+export function textFromHtml(html: string): string {
+  return decodeEntities(
+    html
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<(script|style|noscript|svg|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi, (_m, row: string) => rowLine(row))
+      .replace(/<\/(p|div|section|article|li|h[1-6]|tr)>|<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' '),
+  ).replace(/[ \t ]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
 }
 
 function cleanLabel(s: string): string {
@@ -278,12 +305,17 @@ function metaPrice(html: string): PageSpecs['price'] {
   return amount !== null && currency ? { amount, currency } : null;
 }
 
-/** The first spec value that states an amount of money, e.g. "€ 34,90" or "34.90 EUR". */
+/**
+ * The first money-bearing spec value, when it states ONE amount ("€ 34,90", "34.90 EUR"). When it
+ * states a range or several amounts ("€21–€36/m²"), the page has no single price: null, never the
+ * next amount on the page (which may be delivery).
+ */
 function priceFromValues(attrs: Record<string, string>): PageSpecs['price'] {
   const re = /(€|\$|£|\b(?:EUR|USD|GBP)\b)\s*(\d[\d.,\s]*\d|\d)|(\d[\d.,\s]*\d|\d)\s*(€|\$|£|\b(?:EUR|USD|GBP)\b)/;
   for (const value of Object.values(attrs)) {
     const m = re.exec(value);
     if (!m) continue;
+    if ([...value.matchAll(new RegExp(re.source, 'g'))].length > 1 || DASH_RANGE.test(value)) return null;
     const symbol = m[1] ?? m[4];
     const amount = parseAmount((m[2] ?? m[3]).trim());
     if (amount !== null) return { amount, currency: CURRENCY_SYMBOLS[symbol] ?? symbol.toUpperCase() };

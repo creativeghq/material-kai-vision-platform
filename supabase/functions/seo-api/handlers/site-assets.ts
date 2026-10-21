@@ -1,4 +1,6 @@
-/** Pure rules for links and photos pointing at an article's own site. Import-free (unit-tested). */
+/** Pure rules for links and photos pointing at an article's own site (unit-tested). */
+
+import { newDefects } from './text-defects.ts';
 
 const LINK_RE = /(?<!!)\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
 const IMAGE_RE = /!\[[^\]]*\]\(([^)\s]+)\)/g;
@@ -30,21 +32,37 @@ export function hostOf(u: string): string | null {
 }
 
 /** The facts a page states: content lines from its stored text, not navigation, menus or buttons. */
+const isSpecLabel = (l: string) => l.length >= 3 && /\p{L}/u.test(l) && !/[\d()→|]/.test(l);
+const isSpecValue = (l: string) => l.length <= 40 && /^[<>≤≥≈~±]?\s*\d/.test(l) && /[^\d\s]/.test(l) && !/→/.test(l);
+
 export function pageFacts(contentText: string | null | undefined, maxChars = 1500): string | null {
   if (!contentText) return null;
   const kept: string[] = [];
   let size = 0;
-  for (const raw of contentText.split('\n').slice(1)) {
-    const line = raw.replace(/\s+/g, ' ').trim();
+  const lines = contentText.split('\n').slice(1).map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  for (let i = 0; i < lines.length && size < maxChars; i++) {
+    const line = lines[i];
+    // A label and its value on separate short lines ("Water absorption" / "<0,5%") are one fact.
+    const value = lines[i + 1];
+    if (line.length < 20 && value && isSpecLabel(line) && isSpecValue(value)) {
+      kept.push(`${line}: ${value}`);
+      size += line.length + value.length + 3;
+      i += 1;
+      continue;
+    }
     if (line.length < 20 || !/[.,:;·×–\d]/.test(line) || /→/.test(line)) continue;
     kept.push(line);
     size += line.length + 1;
-    if (size >= maxChars) break;
   }
   return kept.length ? kept.join('\n').slice(0, maxChars) : null;
 }
 
 export interface ReviewEdit { find: string; replace: string; kind: string; note?: string }
+
+/** A correction of fact is applied even when it leaves a style slip: the analyzer reports the slip, a wrong fact would stay. */
+const FACT_EDIT_KINDS = new Set([
+  'unsupported_claim', 'wrong_fact', 'arithmetic', 'relationship_claim', 'contradiction', 'link', 'meta', 'photo_description',
+]);
 
 /** The words of a page's last URL segment that can name it in prose (cersanit-terrazzo-stone-2-0 → cersanit, terrazzo, stone). */
 export function slugNameWords(url: string): string[] {
@@ -90,7 +108,13 @@ export function applyReviewEdits(
       skipped.push({ ...e, why: 'would drop a link or image' });
       continue;
     }
-    out = out.replace(e.find, () => e.replace);
+    const next = out.replace(e.find, () => e.replace);
+    const introduced = FACT_EDIT_KINDS.has(e.kind) ? [] : newDefects(out, next);
+    if (introduced.length) {
+      skipped.push({ ...e, why: `would introduce ${introduced[0].kind}: «${introduced[0].text}»` });
+      continue;
+    }
+    out = next;
     applied.push(e);
   }
   return { markdown: out, applied, skipped };

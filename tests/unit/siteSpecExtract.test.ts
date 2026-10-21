@@ -3,6 +3,7 @@ import {
   extractContentLinks,
   extractSpecs,
   parseAmount,
+  textFromHtml,
 } from '../../supabase/functions/crawl-user-website/spec-extract.ts';
 import { blankedSource } from '../helpers/sourceIndex';
 
@@ -39,7 +40,21 @@ describe('extractSpecs — the facts a page states about itself', () => {
         </tbody></table>`);
     const specs = extractSpecs(html, PAGE, NOW);
     expect(specs?.attributes).toEqual({ Size: '60×60 cm, 60×120 cm', Finish: 'Matt', Price: '€34,90, €41,50' });
-    expect(specs?.price).toEqual({ amount: 34.9, currency: 'EUR' });
+    expect(specs?.price, 'one variant\'s price is not the product\'s price').toBeNull();
+  });
+
+  it('never reads a price range or an indicative band as the price', () => {
+    const band = page('<dl><dt>Τιμή/τ.μ.</dt><dd>Κατόπιν προσφοράς</dd><dt>Ενδεικτική τιμή</dt><dd>Ενδεικτικά €21–€36/τ.μ.</dd></dl>');
+    expect(extractSpecs(band, PAGE, NOW)?.price).toBeNull();
+    const dashed = page('<dl><dt>Price</dt><dd>20 - 30 EUR</dd></dl>');
+    expect(extractSpecs(dashed, PAGE, NOW)?.price).toBeNull();
+    const single = page('<dl><dt>Price</dt><dd>34,90 € / m² (10-12 mm)</dd></dl>');
+    expect(extractSpecs(single, PAGE, NOW)?.price).toEqual({ amount: 34.9, currency: 'EUR' });
+    for (const v of ['60x60 - 34,90 €', '€34,90 - 2 pcs']) {
+      expect(extractSpecs(page(`<dl><dt>Price</dt><dd>${v}</dd></dl>`), PAGE, NOW)?.price, v).toEqual({ amount: 34.9, currency: 'EUR' });
+    }
+    const thenDelivery = page('<dl><dt>Indicative</dt><dd>€21–€36/m²</dd><dt>Delivery</dt><dd>€15</dd></dl>');
+    expect(extractSpecs(thenDelivery, PAGE, NOW)?.price, 'the next amount on the page is not the price').toBeNull();
   });
 
   it('reads a definition list and keeps the page language', () => {
@@ -131,6 +146,32 @@ describe('extractContentLinks — what a category page links to', () => {
   it('is capped', () => {
     const links = Array.from({ length: 10 }, (_, i) => `<a href="/p/${i}">${i}</a>`).join('');
     expect(extractContentLinks(page(links), PAGE, 3)).toHaveLength(3);
+  });
+});
+
+describe('textFromHtml — the page text an article reads', () => {
+  it('keeps a table row on one line, so a value split inside a cell stays with its row', () => {
+    const text = textFromHtml(page(`
+      <table><tr><th>Size</th><th>Pieces for 20 m²</th></tr>
+        <tr><td>120×120</td><td><div>Straight (+10%): 16 pieces · 23,0 m²</div><div>Diagonal (+15%): 16 pieces · 23,0 m²</div></td></tr>
+        <tr><td>30×90</td><td><div>Straight (+10%): 82 pieces</div><div>Herringbone (+15%): 86 pieces</div></td></tr>
+      </table>`));
+    expect(text).toContain('120×120 | Straight (+10%): 16 pieces · 23,0 m² · Diagonal (+15%): 16 pieces · 23,0 m²');
+    expect(text).toContain('30×90 | Straight (+10%): 82 pieces · Herringbone (+15%): 86 pieces');
+  });
+
+  it('reads a cell full of inline markup in linear time and keeps inline pieces together', () => {
+    const swatches = '<span class="sw"></span>'.repeat(40);
+    const started = Date.now();
+    const text = textFromHtml(page(`<table><tr><td>Colours</td><td>${swatches}Grey<div></div><div></div>${'<br>'.repeat(40)}Sand</td></tr>`
+      + '<tr><td>Absorption</td><td><span>&lt;0,5</span><span>%</span></td></tr></table>'));
+    expect(Date.now() - started).toBeLessThan(200);
+    expect(text).toContain('Colours | Grey · Sand');
+    expect(text).toContain('Absorption | <0,5 %');
+  });
+
+  it('keeps a bound sign that the page encodes as an entity', () => {
+    expect(textFromHtml(page('<p>Water absorption &lt;0,5% · &gt;10%</p>'))).toContain('<0,5% · >10%');
   });
 });
 

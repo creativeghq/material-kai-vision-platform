@@ -88,6 +88,7 @@ interface SEOArticle {
   secondary_keywords: string[];
   content_type: string;
   markdown_content: string | null;
+  photo_sizes?: Record<string, { width: number; height: number }> | null;
   /**
    * The language the article was commissioned in, folded up from `stages_data.extra`.
    *
@@ -141,15 +142,16 @@ function ArticleExportPanel({ article }: { article: SEOArticle }) {
   const [html, setHtml] = useState<{ markdown: string; html: string } | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const markdown = article.markdown_content ?? '';
+  const sizesKey = JSON.stringify(article.photo_sizes ?? {});
   useEffect(() => {
     if (!markdown) return;
     let live = true;
     setRenderError(null);
     import('@/services/seo/articleHtml')
-      .then(({ renderArticleHtml }) => { if (live) setHtml({ markdown, html: renderArticleHtml(markdown) }); })
+      .then(({ renderArticleHtml }) => { if (live) setHtml({ markdown, html: renderArticleHtml(markdown, JSON.parse(sizesKey)) }); })
       .catch((e: unknown) => { if (live) setRenderError(e instanceof Error ? e.message : String(e)); });
     return () => { live = false; };
-  }, [markdown]);
+  }, [markdown, sizesKey]);
   const ready = !markdown || html?.markdown === markdown;
   const json = useMemo(
     () => (ready ? JSON.stringify(buildArticleExport(article, { html: html?.html ?? null }), null, 2) : ''),

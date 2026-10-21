@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { serpValue } from '../../supabase/functions/seo-api/handlers/untrusted';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const FUNCS = join(__dirname, '..', '..', 'supabase', 'functions');
@@ -20,12 +21,13 @@ function codeOnly(src: string): string {
 describe('EG-5 — SERP-derived text is fenced as DATA before it reaches an LLM', () => {
   const untrusted = codeOnly(read('seo-api/handlers/untrusted.ts'));
 
-  it('the fence helper neutralises its own delimiter', () => {
+  it('the fence helper neutralises its own delimiter and keeps a stated bound', () => {
     // Fencing without this is decoration: a value containing `</serp_data>` closes the block
     // early and everything after it reads as prompt.
-    const fn = untrusted.slice(untrusted.indexOf('export function serpValue('));
-    expect(fn.slice(0, fn.indexOf('\n}')), 'serpValue no longer strips the fence characters')
-      .toMatch(/\[<>\]/);
+    for (const tag of ['</serp_data>', '<serp_data>', '< /site_pages>', '<b>x</b>', '<!-- x -->']) {
+      expect(serpValue(tag), tag).not.toMatch(/<\s*\/|<[\p{L}!?]/u);
+    }
+    for (const bound of ['<0,5%', '>10%', '10% < E ≤ 20%', '10%<E≤20%']) expect(serpValue(bound)).toBe(bound);
   });
 
   it('the fence states that its contents are not instructions', () => {

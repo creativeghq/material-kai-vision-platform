@@ -12,6 +12,7 @@ import {
 } from '../../_shared/seo/articleSections.generated.ts';
 import { normalizeContentBrief, type NormalizedBrief } from './content-brief.ts';
 import { countSiteLinks } from './site-assets.ts';
+import { textDefects, type TextDefectKind } from './text-defects.ts';
 import { ALLOWED_FOREIGN_WORDS, foreignWords, latinTerms, unaccentedKeywordUses } from './foreign-words.ts';
 import type {
   SEOAnalyzeRequest,
@@ -40,6 +41,11 @@ const MIN_ACCEPTABLE_SCORE = 70;
  * the number is never quietly short (anti-regression rule 3).
  */
 const MAX_ANCHORED_FIXES_PER_CHECK = 4;
+const TEXT_DEFECT_LABEL: Record<TextDefectKind, (t: string) => string> = {
+  doubled_punctuation: (t) => `Doubled punctuation «${t}»`,
+  repeated_phrase: (t) => `Repeated words «${t}»`,
+  repeated_opener: (t) => `Two sentences in a row open with «${t}»`,
+};
 
 /**
  * Which `## Heading` a block sits under, for labelling only.
@@ -612,6 +618,34 @@ export function analyzeContent(
       affectedSection: null,
       autoFixable: false,
       applied: false,
+    });
+  }
+
+  const metaForeign = foreignWords(`${plan.metaTitle}\n${plan.metaDescription}`, ownTerms);
+  if (metaForeign.length > 0) {
+    fixes.push({
+      category: 'meta_tags',
+      severity: 'high',
+      description: `Foreign word(s) in the meta title or description: ${metaForeign.slice(0, 10).join(', ')}`,
+      suggestion: "The search snippet is the first thing a searcher reads: use the article language's own term",
+      affectedSection: null,
+      autoFixable: false,
+      applied: false,
+    });
+  }
+
+  for (const d of textDefects(markdown).slice(0, MAX_ANCHORED_FIXES_PER_CHECK)) {
+    const para = markdown.split(d.source).length === 2 ? d.source : null;
+    fixes.push({
+      category: 'language',
+      severity: d.kind === 'doubled_punctuation' ? 'low' : 'medium',
+      description: TEXT_DEFECT_LABEL[d.kind](d.text),
+      suggestion: 'Correct the slip and change nothing else.',
+      affectedSection: para ? headingAbove(markdown, para) : null,
+      autoFixable: !!para,
+      applied: false,
+      ...(para ? { scope: 'section' as const, anchor: para } : {}),
+      penaltyGroup: 'language:slips',
     });
   }
 

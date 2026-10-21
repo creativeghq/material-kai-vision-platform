@@ -9,6 +9,7 @@ import {
 import { serpValue } from './untrusted.ts';
 import { applySiteAssetRules, hostOf, inArticleLanguage, pageFacts, siteLinkUrls, trimSlash, type SiteAssetResult } from './site-assets.ts';
 import { verifyPhoto, type PhotoUsage } from './photo-verify.ts';
+import { photosFittingTopic } from './photo-topic.ts';
 import { productSpecsLines } from './site-catalogue.ts';
 
 export interface SitePage {
@@ -18,7 +19,8 @@ export interface SitePage {
   /** What the page itself states (pageFacts) — the only facts an article may say about it. */
   facts?: string | null;
   similarity: number;
-  images: PageImage[];
+  /** Offered photos carry their real pixel size, so whoever publishes the article can state it. */
+  images: (PageImage & { width?: number | null; height?: number | null })[];
 }
 
 const CANDIDATES = 80;
@@ -75,6 +77,8 @@ export async function findSitePages(
     photoUsage?: PhotoUsage[];
     /** Pages the article must use (asked for in the brief, or named by the topic), placed first with their product pages. */
     mustInclude?: string[];
+    /** What the article is about: a photo is offered only when its checked description fits it. */
+    topic?: string;
   },
 ): Promise<SitePage[]> {
   if (!opts.websiteId) return [];
@@ -175,11 +179,20 @@ export async function findSitePages(
     if (opts.photoUsage) {
       await verifyPhotos(supabase, picked, lang, { userId: opts.userId, workspaceId: opts.workspaceId }, opts.photoUsage);
     }
+    const offered = picked.flatMap((p) => p.images.slice(0, PHOTOS_PER_PAGE).filter((im) => photoOffered(im, lang, minWidth)));
+    const fitting = opts.photoUsage && opts.topic
+      ? await photosFittingTopic(supabase, {
+        topic: opts.topic, photos: offered.map((im) => ({ src: im.src, text: im.seen![lang].text })),
+        userId: opts.userId, workspaceId: opts.workspaceId,
+      })
+      : { fits: new Set<string>(), usage: null, failed: 'no photo topic check' };
+    if (fitting.usage) opts.photoUsage?.push(fitting.usage);
+    if (fitting.failed) console.warn(`[seo-site-pages] no photos offered: ${fitting.failed}`);
     return picked.map(({ id: _id, stale: _stale, impressions: _i, langPath: _l, ...page }) => ({
       ...page,
       images: page.images.slice(0, PHOTOS_PER_PAGE)
-        .filter((im) => photoOffered(im, lang, minWidth))
-        .map((im) => ({ src: im.src, alt: im.seen![lang].text })),
+        .filter((im) => photoOffered(im, lang, minWidth) && fitting.fits.has(im.src))
+        .map((im) => ({ src: im.src, alt: im.seen![lang].text, width: im.seen![lang].width ?? null, height: im.seen![lang].height ?? null })),
     }));
   } catch (e) {
     console.warn('[seo-site-pages] failed:', (e as Error).message);

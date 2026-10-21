@@ -67,7 +67,7 @@ describe('buildArticleExport — one portable document per article', () => {
   it('keeps the full markdown and derives outline, images and links from it', () => {
     expect(out.content.markdown).toBe(MD);
     expect(out.outline.map((h) => h.level)).toEqual([1, 2, 3]);
-    expect(out.images).toEqual([{ alt: 'Πλακάκι Kappa', src: 'https://media.materialshub.gr/products/kappa.webp' }]);
+    expect(out.images).toEqual([{ alt: 'Πλακάκι Kappa', src: 'https://media.materialshub.gr/products/kappa.webp', width: null, height: null }]);
     expect(out.links.internal.map((l) => l.url)).toEqual([
       'https://materialshub.gr/el/proionta/plakakia',
       'https://www.materialshub.gr/el/idees/x',
@@ -103,6 +103,15 @@ describe('buildArticleExport — one portable document per article', () => {
     expect(html).toContain('<p>Body text.</p>');
     expect(html).not.toContain('<img');
     expect(html).toContain('See κουζίνα.');
+  });
+
+  it('states the real size of each photo in the JSON and the HTML when the pipeline recorded it', () => {
+    const src = 'https://media.materialshub.gr/products/kappa.webp';
+    const sized = buildArticleExport({ ...ARTICLE, photo_sizes: { [src]: { width: 1600, height: 1067 } } });
+    expect(sized.images[0]).toMatchObject({ src, width: 1600, height: 1067 });
+    expect(sized.open_graph).toMatchObject({ image: src, image_width: 1600, image_height: 1067 });
+    expect(renderArticleHtml(`![Kappa](${src})`, { [src]: { width: 1600, height: 1067 } }))
+      .toContain(`<img src="${src}" alt="Kappa" width="1600" height="1067"/>`);
   });
 
   it('reports the score and what the article cost', () => {

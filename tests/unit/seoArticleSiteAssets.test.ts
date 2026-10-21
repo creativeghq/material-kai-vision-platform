@@ -138,6 +138,25 @@ describe('pageFacts — what a page states, not its navigation', () => {
     );
     expect(pageFacts(null)).toBeNull();
   });
+
+  it('keeps a value that sits on its own short line together with its label', () => {
+    const text = [
+      'Title',
+      'Απορρόφηση νερού',
+      '<0,5%',
+      'Ομάδα BIa: σχεδόν μηδενική απορρόφηση, η κατηγορία του πορσελανάτου.',
+      'Ζητήστε Τιμή',
+      'Καλέστε Τώρα',
+    ].join('\n');
+    expect(pageFacts(text)).toBe(
+      'Απορρόφηση νερού: <0,5%\nΟμάδα BIa: σχεδόν μηδενική απορρόφηση, η κατηγορία του πορσελανάτου.',
+    );
+  });
+
+  it('does not turn a menu, a pager or a footer into a fact', () => {
+    const text = ['Title', 'Αρχική', 'Προϊόντα', 'Καλάθι (0)', 'Σύνδεση', '1', '2', 'Επόμενη', '© 2026', 'Όροι'].join('\n');
+    expect(pageFacts(text)).toBeNull();
+  });
 });
 
 describe('applyReviewEdits — the editor fixes words, never links', () => {

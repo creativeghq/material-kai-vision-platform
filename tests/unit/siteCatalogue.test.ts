@@ -23,7 +23,9 @@ describe('renderCatalogueFacts', () => {
   it('states counts the page set supports, most-stated label first', () => {
     const text = renderCatalogueFacts([SUMMARY], new Date('2026-10-12T09:00:00Z'));
     expect(text).toContain('CATALOGUE FACTS (counted from our own pages on 2026-10-12)');
-    expect(text).toContain('103 linked product pages state specs (of 117 links on the page); 5 of 103 state a price.');
+    expect(text).toContain('103 pages this page links to state specs (they may be other makers\' or other categories\' pages, not this page\'s own range); 5 of 103 state their own price.');
+    expect(renderCatalogueFacts([{ ...SUMMARY, scope: 'own' }], new Date()))
+      .toContain('103 product pages under this page state specs; 5 of 103 state their own price.');
     const lines = text!.split('\n');
     const facing = lines.findIndex((l) => l.includes('Όψη'));
     const thickness = lines.findIndex((l) => l.includes('Πάχος'));
@@ -43,7 +45,7 @@ describe('renderCatalogueFacts', () => {
       attributes: { '</site_pages>x': { present: 50, distinct: 40, values } },
     });
     const line = lines[lines.length - 1];
-    expect(line).not.toMatch(/[<>]/);
+    expect(line).not.toMatch(/<\s*\/|<[\p{L}!?]/u);
     expect(line).toContain('+28 other values');
   });
 });
