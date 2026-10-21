@@ -634,7 +634,7 @@ single chokepoint for request logging (`api_usage_logs`) AND Sentry capture.
 
 ## Telemetry retention
 Log tables are bronze and need a TTL enforced in SQL — never assume the writer is well-behaved. `system_logs`
-(INFO 7d / WARNING+ 30d), `api_usage_logs` (90d), `cron.job_run_details` (succeeded 7d / failed 30d — pg_cron
+(2d), `api_usage_logs` (15d), `cron.job_run_details` (succeeded 1h / failed 1d, pruned hourly — pg_cron
 never prunes its own run log). `ai_usage_logs` / `credit_transactions` have **no** TTL by design (billing).
 
 **Distinguish the two failure modes before reaching for a fix:** unbounded *rows* need a retention cron;

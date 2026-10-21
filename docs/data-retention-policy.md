@@ -21,7 +21,7 @@ Cleanup is performed by two mechanisms:
 | `agent_checkpoints` | 30 days | age | Conversation state snapshots; stale after a month |
 | `flow_run_steps` | 30 days | age | Step-level execution details; parent run is enough after 30 days |
 | `flow_runs` | 30 days | completed/failed/cancelled | Old automation run history; summarised by stats |
-| `system_logs` | 30 days | age | Operational Python API logs (~77k rows/day); kept 30 days for debugging |
+| `system_logs` | 2 days | age | Operational Python API logs; kept 2 days for debugging (Sentry holds errors longer) |
 | `ai_call_logs` | 30 days | age | Raw per-call AI API debug logs with request/response payloads; distinct from billing logs |
 | `search_query_tracking` | 90 days | age | Search analytics; longer window useful for trend analysis |
 
@@ -49,7 +49,7 @@ Cleanup is performed by two mechanisms:
 | Job Name | Schedule | Type | What It Does |
 |---|---|---|---|
 | `job-cleanup-weekly` | `0 3 * * 0` (Sun 03:00 UTC) | Edge function | Full multi-table cleanup pass via `job-cleanup-cron` edge function |
-| `system-logs-daily-cleanup` | `0 2 * * *` (daily 02:00 UTC) | Direct SQL | `DELETE FROM system_logs WHERE created_at < NOW() - INTERVAL '30 days'` — handles bulk purge without edge function overhead |
+| `system-logs-daily-cleanup` | `0 2 * * *` (daily 02:00 UTC) | Direct SQL | `DELETE FROM system_logs WHERE created_at < NOW() - INTERVAL '2 days'` — handles bulk purge without edge function overhead |
 | `purge-orphan-agent-projects` | `30 3 */2 * *` (every 2 days, 03:30 UTC) | Direct SQL | `DELETE FROM agent_projects WHERE workspace_id IS NULL` — removes unreachable orphan Agent Fabric projects (NULL workspace can never satisfy the `is_workspace_admin(workspace_id)` RLS). CASCADEs to that project's secrets/deployments/snapshots. Same purge runs in `reset-platform` STEP 1.6. |
 | `retention-sweep-daily` | `30 3 * * *` (daily 03:30 UTC) | Direct SQL | `SELECT run_storage_retention_sweep(false, 30)` — see storage-retention note below. |
 
