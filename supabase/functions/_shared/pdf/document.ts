@@ -17,19 +17,15 @@ const A4_LONG = 841.89;
 const A4_SHORT = 595.28;
 const CELL_PAD = 6; // horizontal padding, shared by header + data so columns line up
 
-// The list column set. Widths are relative and re-scaled to the actual table width.
-// `align` is used for BOTH the header label and the cell, so they never drift apart.
-// Column ORDER mirrors a supplier proforma line: Code · Description · Unit · Qty ·
-// Price · Discount% · Discount · VAT% · Net. Discount/VAT columns are dynamic (only
-// rendered when the data carries them) so a plain price list stays lean.
+// Relative widths, re-scaled to the table. `align` drives header AND cell so they never drift.
 type ColumnKey = 'index' | 'thumb' | 'sku' | 'name' | 'room' | 'size_color' | 'unit' | 'qty' | 'price' | 'disc_pct' | 'disc_val' | 'vat_pct' | 'total';
 type Align = 'left' | 'right' | 'center';
 interface ColumnSpec { key: ColumnKey; label: string; width: number; align: Align; }
 const LIST_COLUMNS: ColumnSpec[] = [
   { key: 'index', label: '#', width: 20, align: 'left' },
   { key: 'thumb', label: '', width: 30, align: 'center' },
-  { key: 'sku', label: 'Code', width: 58, align: 'left' },
-  { key: 'name', label: 'Description', width: 120, align: 'left' },
+  { key: 'sku', label: 'Code', width: 30, align: 'left' },
+  { key: 'name', label: 'Description', width: 170, align: 'left' },
   { key: 'room', label: 'Room', width: 50, align: 'left' },
   { key: 'size_color', label: 'Size / Color', width: 55, align: 'left' },
   { key: 'unit', label: 'Unit', width: 40, align: 'left' },
@@ -346,17 +342,22 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
     drawTableHeader(page, g, y, cols, fontBold, doc.prices_include_vat === true);
     y -= g.HEADER_ROW_H;
 
+    // Rows grow to fit wrapped text, so a page is filled by height, never by a row count.
+    const floor = g.TABLE_Y_START - g.HEADER_ROW_H - g.ROWS_PER_PAGE * g.DATA_ROW_H;
     let drawn = 0, alt = 0;
-    while (idx < rows.length && drawn < g.ROWS_PER_PAGE) {
+    while (idx < rows.length) {
       const row = rows[idx];
       if (row.kind === 'section') {
+        if (drawn > 0 && y - g.DATA_ROW_H < floor) break;
         page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.DATA_ROW_H, width: g.TABLE_W, height: g.DATA_ROW_H, color: COLOR_DARK, opacity: 0.85 });
         page.drawText(row.title, { x: g.TABLE_MARGIN + 6, y: y - g.DATA_ROW_H / 2 - 3, size: 9, font: fontBold, color: COLOR_WHITE });
         y -= g.DATA_ROW_H; idx++; drawn++; alt = 0;
         continue;
       }
-      drawTableRow(page, g, y, row.num, row.item, alt % 2 === 1, cols, doc.currency, font, fontBold, itemImages[row.item.image_key ?? ''] ?? null);
-      y -= g.DATA_ROW_H; idx++; drawn++; alt++;
+      const rowH = tableRowHeight(g, row.item, cols, font, fontBold);
+      if (drawn > 0 && y - rowH < floor) break;
+      drawTableRow(page, g, y, rowH, row.num, row.item, alt % 2 === 1, cols, doc.currency, font, fontBold, itemImages[row.item.image_key ?? ''] ?? null);
+      y -= rowH; idx++; drawn++; alt++;
     }
 
     page.drawLine({ start: { x: g.TABLE_MARGIN, y }, end: { x: g.TABLE_MARGIN + g.TABLE_W, y }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
@@ -395,24 +396,50 @@ function drawInCell(page: PDFPage, text: string, x: number, w: number, y: number
   page.drawText(text, { x: tx, y, size, font, color });
 }
 
-function drawTableRow(page: PDFPage, g: Geom, y: number, rowNum: number, item: BrandedDocItem, isAlt: boolean, cols: ColumnSpec[], currency: string, font: PDFFont, fontBold: PDFFont, thumb: PDFImage | null): void {
-  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.DATA_ROW_H, width: g.TABLE_W, height: g.DATA_ROW_H, color: isAlt ? COLOR_ROW_ALT : COLOR_WHITE, opacity: isAlt ? 1 : 0.9 });
-  const textY = y - g.DATA_ROW_H / 2 - 3;
-  const fs = 7;
-  const pad = 2 * CELL_PAD;
+const ROW_FS = 7;
+const ROW_LINE_H = 9;
+const ROW_V_PAD = 7;
+
+/** Wrapped text of a free-text cell, or null for a column that is never wrapped. */
+function wrappedCell(item: BrandedDocItem, key: ColumnKey, w: number, font: PDFFont, fontBold: PDFFont): string[] | null {
+  const max = w - 2 * CELL_PAD;
+  switch (key) {
+    case 'name': return wrapCell(item.name || '-', fontBold, ROW_FS, max);
+    case 'room': return wrapCell(item.room || '-', font, ROW_FS, max);
+    case 'sku': return wrapCell(item.sku || '-', font, ROW_FS, max);
+    case 'size_color': return wrapCell(item.size_color || '-', font, ROW_FS, max);
+    case 'unit': return wrapCell(item.unit || 'pcs', font, ROW_FS, max);
+    default: return null;
+  }
+}
+
+function tableRowHeight(g: Geom, item: BrandedDocItem, cols: ColumnSpec[], font: PDFFont, fontBold: PDFFont): number {
+  let lines = 1;
+  for (const col of cols) lines = Math.max(lines, wrappedCell(item, col.key, col.width, font, fontBold)?.length ?? 1);
+  return Math.max(g.DATA_ROW_H, lines * ROW_LINE_H + 2 * ROW_V_PAD);
+}
+
+function drawTableRow(page: PDFPage, g: Geom, y: number, rowH: number, rowNum: number, item: BrandedDocItem, isAlt: boolean, cols: ColumnSpec[], currency: string, font: PDFFont, fontBold: PDFFont, thumb: PDFImage | null): void {
+  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - rowH, width: g.TABLE_W, height: rowH, color: isAlt ? COLOR_ROW_ALT : COLOR_WHITE, opacity: isAlt ? 1 : 0.9 });
+  const textY = y - rowH / 2 - 3;
+  const fs = ROW_FS;
   let x = g.TABLE_MARGIN;
   const unpriced = (item.pricing_status ?? 'priced') !== 'priced';
+  const drawLines = (lines: string[], cx: number, w: number, f: PDFFont, color: RGB, align: Align) => {
+    let ly = y - (rowH - lines.length * ROW_LINE_H) / 2 - ROW_LINE_H + 2;
+    for (const l of lines) { drawInCell(page, l, cx, w, ly, fs, f, color, align); ly -= ROW_LINE_H; }
+  };
   for (const col of cols) {
     const w = col.width;
     switch (col.key) {
       case 'index': drawInCell(page, String(rowNum), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
-      case 'thumb': if (thumb) { const s = Math.min(g.IMG_CELL / thumb.width, g.IMG_CELL / thumb.height); const iw = thumb.width * s, ih = thumb.height * s; page.drawImage(thumb, { x: x + (w - iw) / 2, y: y - g.DATA_ROW_H / 2 - ih / 2, width: iw, height: ih }); } break;
-      case 'name': drawInCell(page, truncateText(item.name || '-', fontBold, fs, w - pad), x, w, textY, fs, fontBold, COLOR_BLACK, col.align); break;
-      case 'room': drawInCell(page, truncateText(item.room || '-', font, fs, w - pad), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
-      case 'sku': drawInCell(page, truncateText(item.sku || '-', font, fs, w - pad), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
-      case 'size_color': drawInCell(page, truncateText(item.size_color || '-', font, fs, w - pad), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
+      case 'thumb': if (thumb) { const s = Math.min(g.IMG_CELL / thumb.width, g.IMG_CELL / thumb.height); const iw = thumb.width * s, ih = thumb.height * s; page.drawImage(thumb, { x: x + (w - iw) / 2, y: y - rowH / 2 - ih / 2, width: iw, height: ih }); } break;
+      case 'name': drawLines(wrappedCell(item, 'name', w, font, fontBold)!, x, w, fontBold, COLOR_BLACK, col.align); break;
+      case 'room': drawLines(wrappedCell(item, 'room', w, font, fontBold)!, x, w, font, COLOR_BLACK, col.align); break;
+      case 'sku': drawLines(wrappedCell(item, 'sku', w, font, fontBold)!, x, w, font, COLOR_GRAY, col.align); break;
+      case 'size_color': drawLines(wrappedCell(item, 'size_color', w, font, fontBold)!, x, w, font, COLOR_BLACK, col.align); break;
       case 'qty': drawInCell(page, formatQty(item.quantity), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
-      case 'unit': drawInCell(page, truncateText(item.unit || 'pcs', font, fs, w - pad), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
+      case 'unit': drawLines(wrappedCell(item, 'unit', w, font, fontBold)!, x, w, font, COLOR_GRAY, col.align); break;
       case 'price':
         if (unpriced) drawInCell(page, 'Call for price', x, w, textY, fs - 1, font, COLOR_GRAY, col.align);
         else drawInCell(page, item.unit_price != null ? formatCurrency(item.unit_price, currency) : '-', x, w, textY, fs, font, COLOR_BLACK, col.align);
@@ -467,7 +494,8 @@ function drawFFENotes(page: PDFPage, g: Geom, items: BrandedDocItem[], startY: n
   y -= 18;
   for (const item of items) {
     if (y < 60) break;
-    page.drawText(truncateText(item.name, fontBold, 8, g.TABLE_W - 20), { x: g.TABLE_MARGIN, y, size: 8, font: fontBold, color: COLOR_BLACK }); y -= 14;
+    for (const l of wrapCell(item.name, fontBold, 8, g.TABLE_W - 20)) { page.drawText(l, { x: g.TABLE_MARGIN, y, size: 8, font: fontBold, color: COLOR_BLACK }); y -= 11; }
+    y -= 3;
     if (item.installation_requirements) {
       page.drawText('Installation:', { x: g.TABLE_MARGIN + 8, y, size: 7, font: fontBold, color: COLOR_GRAY });
       for (const line of wrapText(item.installation_requirements, font, 7, g.TABLE_W - 80)) { page.drawText(line, { x: g.TABLE_MARGIN + 70, y, size: 7, font, color: COLOR_BLACK }); y -= 11; }
@@ -691,6 +719,21 @@ function truncateText(text: string, font: PDFFont, fontSize: number, maxWidth: n
   let t = text;
   while (t.length > 0 && font.widthOfTextAtSize(t + '...', fontSize) > maxWidth) t = t.slice(0, -1);
   return t + '...';
+}
+/** wrapText that also breaks a single word wider than the cell, so no text is ever dropped. */
+function wrapCell(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
+  const out: string[] = [];
+  for (const line of wrapText(text, font, fontSize, maxWidth)) {
+    let rest = line;
+    while (rest && font.widthOfTextAtSize(rest, fontSize) > maxWidth) {
+      let cut = rest.length - 1;
+      while (cut > 1 && font.widthOfTextAtSize(rest.slice(0, cut), fontSize) > maxWidth) cut--;
+      out.push(rest.slice(0, cut));
+      rest = rest.slice(cut);
+    }
+    out.push(rest);
+  }
+  return out.length ? out : [''];
 }
 function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
   const lines: string[] = [];
