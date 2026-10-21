@@ -265,3 +265,66 @@ export function sanitizeGuide(raw: unknown, pageCount: number): InstallationGuid
     assembly: { available: asm.available === true && placements.length > 0, placements },
   };
 }
+
+export const FINISH_KINDS = ['wood', 'gloss', 'matt', 'metal', 'stone', 'glass', 'fabric'] as const;
+export type FinishKind = typeof FINISH_KINDS[number];
+
+export interface GuideFinish { id: string; name: string; color: string; kind: FinishKind; swatch: PageBox | null }
+
+export interface GuideAppearance {
+  image_path: string | null;
+  source_url: string | null;
+  finishes: GuideFinish[];
+  parts: Record<string, string>;
+  read_at: string | null;
+}
+
+export const APPEARANCE_READ_SCHEMA = closed({
+  matches_product: bool,
+  finishes: {
+    type: 'array',
+    items: closed({
+      id: str,
+      name: str,
+      color_hex: str,
+      kind: { type: 'string', enum: [...FINISH_KINDS] },
+      textured: bool,
+      swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
+    }),
+  },
+  parts: { type: 'array', items: closed({ part_id: str, finish_id: str }) },
+});
+
+const HEX = /^#[0-9a-f]{6}$/i;
+const MAX_FINISHES = 12;
+
+export function sanitizeAppearance(raw: unknown, partIds: string[]): GuideAppearance | null {
+  if (!isObj(raw)) return null;
+  const finishes: GuideFinish[] = (Array.isArray(raw.finishes) ? raw.finishes : []).slice(0, MAX_FINISHES).flatMap((f) => {
+    if (!isObj(f)) return [];
+    const id = text(f.id, 12);
+    const color = text(f.color ?? f.color_hex, 7);
+    if (!id || !HEX.test(color)) return [];
+    const textured = f.textured === undefined ? !!f.swatch : f.textured === true;
+    const s = textured && isObj(f.swatch) ? box(f.swatch) : null;
+    const swatch = s && !(s.x0 === 0 && s.y0 === 0 && s.x1 === 1 && s.y1 === 1) ? s : null;
+    return [{ id, name: text(f.name, 60), color: color.toLowerCase(), kind: oneOf(f.kind, FINISH_KINDS, 'matt'), swatch }];
+  });
+  const finishIds = new Set(finishes.map((f) => f.id));
+  const known = new Set(partIds);
+  const parts: Record<string, string> = {};
+  const rawParts = raw.parts;
+  const pairs: Array<[unknown, unknown]> = Array.isArray(rawParts)
+    ? rawParts.filter(isObj).map((p) => [p.part_id, p.finish_id])
+    : isObj(rawParts) ? Object.entries(rawParts) : [];
+  for (const [pid, fid] of pairs) {
+    if (typeof pid === 'string' && known.has(pid) && typeof fid === 'string' && finishIds.has(fid)) parts[pid] = fid;
+  }
+  return {
+    image_path: typeof raw.image_path === 'string' ? raw.image_path.slice(0, 300) : null,
+    source_url: typeof raw.source_url === 'string' ? raw.source_url.slice(0, 1000) : null,
+    finishes,
+    parts,
+    read_at: typeof raw.read_at === 'string' ? raw.read_at.slice(0, 40) : null,
+  };
+}

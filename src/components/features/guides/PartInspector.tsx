@@ -7,9 +7,10 @@ import { Play } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import type { BuildItem, GuideBuild } from '@/lib/installation/guideBuild';
-import type { InstallationGuideData } from '@/lib/installation/guideSchema';
+import type { GuideAppearance, InstallationGuideData } from '@/lib/installation/guideSchema';
 import {
-  EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, panelHoles, partNumber, useStudioLight, woodTexture,
+  EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, useStudioLight, woodTexture,
+  type FinishLook,
 } from './partModels';
 
 const standingHeight = (s: { x: number; y: number; z: number }) => (s.y <= s.x && s.y <= s.z ? s.z : s.y);
@@ -21,7 +22,7 @@ function StudioLight() {
   return null;
 }
 
-function PanelModel({ build, guide, item }: { build: GuideBuild; guide: InstallationGuideData; item: BuildItem }) {
+function PanelModel({ build, guide, item, look }: { build: GuideBuild; guide: InstallationGuideData; item: BuildItem; look: FinishLook | null }) {
   const holes = useMemo(
     () => panelHoles(build, build.items.indexOf(item), (h) => guide.parts[h.partIndex]?.name ?? ''),
     [build, guide.parts, item],
@@ -36,7 +37,14 @@ function PanelModel({ build, guide, item }: { build: GuideBuild; guide: Installa
       {[0, 1, 2, 3, 4, 5].map((face) => {
         const isFace = Math.floor(face / 2) === thin;
         return (
-          <meshStandardMaterial key={face} attach={`material-${face}`} color={isFace ? WOOD_TINT : EDGE_BANDING} map={isFace ? wood ?? undefined : undefined} roughness={isFace ? 0.6 : 0.8} />
+          <meshStandardMaterial
+            key={face}
+            attach={`material-${face}`}
+            color={look ? (isFace ? look.color : look.base) : isFace ? WOOD_TINT : EDGE_BANDING}
+            map={(isFace ? (look ? look.map : wood) : null) ?? undefined}
+            roughness={look ? look.roughness : isFace ? 0.6 : 0.8}
+            metalness={look ? look.metalness : 0}
+          />
         );
       })}
       <Edges threshold={20} color="#b38f5c" />
@@ -50,9 +58,9 @@ function PanelModel({ build, guide, item }: { build: GuideBuild; guide: Installa
   );
 }
 
-function HardwareModel({ name, item }: { name: string; item: BuildItem }) {
+function HardwareModel({ name, item, finish }: { name: string; item: BuildItem; finish: FinishLook | null }) {
   const shape = hardwareShape(name);
-  const look = hardwareLook(shape);
+  const look = finish ? { color: finish.base, metalness: finish.metalness, roughness: finish.roughness } : hardwareLook(shape);
   const geometry = useMemo(() => hardwareGeometry(shape, item.size.x, item.size.y), [shape, item.size.x, item.size.y]);
   return (
     <mesh geometry={geometry} castShadow rotation={[0, 0, Math.PI / 5]}>
@@ -62,7 +70,9 @@ function HardwareModel({ name, item }: { name: string; item: BuildItem }) {
 }
 
 /** One part on its own: turn it with a drag, zoom with a pinch or the wheel, read what it is and where it goes. */
-export function PartInspector({ build, guide, item, onClose, onPlayStep }: {
+export function PartInspector({ build, guide, item, onClose, onPlayStep, appearance = null, photoUrl = null }: {
+  appearance?: GuideAppearance | null;
+  photoUrl?: string | null;
   build: GuideBuild;
   guide: InstallationGuideData;
   item: BuildItem | null;
@@ -70,6 +80,8 @@ export function PartInspector({ build, guide, item, onClose, onPlayStep }: {
   onPlayStep: (step: number) => void;
 }) {
   const part = item ? guide.parts[item.partIndex] : null;
+  const looks = useFinishLooks(appearance, photoUrl);
+  const look = part ? lookForPart(appearance, looks, part.id) : null;
   const steps = useMemo(() => (part
     ? guide.steps.map((s, i) => ({ i, s, used: s.parts_used.find((u) => u.part_id === part.id) })).filter((r) => r.i > 0 && r.used)
     : []), [guide.steps, part]);
@@ -98,7 +110,7 @@ export function PartInspector({ build, guide, item, onClose, onPlayStep }: {
                   <hemisphereLight args={['#fff6e8', '#45403a', 0.8]} />
                   <directionalLight position={[reach * 2, reach * 3, reach * 2]} intensity={2.4} castShadow />
                   <directionalLight position={[-reach * 2, reach, -reach]} intensity={0.7} color="#bcd4ff" />
-                  {item.kind === 'panel' ? <PanelModel build={build} guide={guide} item={item} /> : <HardwareModel name={part.name} item={item} />}
+                  {item.kind === 'panel' ? <PanelModel build={build} guide={guide} item={item} look={look} /> : <HardwareModel name={part.name} item={item} finish={look} />}
                   <ContactShadows position={[0, -(item.kind === 'panel' ? standingHeight(item.size) : Math.min(item.size.x, item.size.y, item.size.z)) / 2 - reach * 0.08, 0]} scale={reach * 3} blur={2.4} opacity={0.45} far={reach * 2} />
                   <OrbitControls makeDefault enableDamping autoRotate autoRotateSpeed={1.2} minDistance={reach * 0.5} maxDistance={reach * 6} />
                 </Canvas>

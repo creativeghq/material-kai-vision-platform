@@ -2753,6 +2753,30 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "installation-guide-appearance",
+    "tag": "Projects",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Read a product photo into the finish each part of an installation guide carries",
+    "description": "Takes one photo of the finished product, either as a photo address or as a product page whose og:image is used, fetches it through the SSRF guard, and reads it with Claude vision into the visible finishes (colour, material kind and, for wood or stone, a swatch rectangle on the photo) and which finish each part of the guide carries. The workspace comes from the guide row and the caller needs projec",
+    "fields": {
+      "guide_id": {
+        "type": "string",
+        "required": true,
+        "description": "The guide whose parts are coloured. (string (uuid))"
+      },
+      "image_url": {
+        "type": "string",
+        "description": "An https address of the product photo."
+      },
+      "page_url": {
+        "type": "string",
+        "description": "An https product page; its og:image photo is used when image_url is not given."
+      }
+    }
+  },
+  {
     "name": "installation-guide-extract",
     "tag": "Projects",
     "methods": [

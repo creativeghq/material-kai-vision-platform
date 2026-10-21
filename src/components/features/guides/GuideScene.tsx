@@ -12,9 +12,10 @@ import {
   type CameraShot,
   type GuideBuild,
 } from '@/lib/installation/guideBuild';
-import type { InstallationGuideData } from '@/lib/installation/guideSchema';
+import type { GuideAppearance, InstallationGuideData } from '@/lib/installation/guideSchema';
 import {
-  EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, panelHoles, partNumber, useStudioLight, woodTexture, type Hole,
+  EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, useStudioLight, woodTexture,
+  type FinishLook, type Hole,
 } from './partModels';
 
 export type GuideView = 'room' | 'drawing';
@@ -42,7 +43,11 @@ interface Props {
   labels: boolean;
   atStart: boolean;
   follow: boolean;
+  appearance?: GuideAppearance | null;
+  photoUrl?: string | null;
 }
+
+type Looks = { appearance: GuideAppearance | null; looks: Map<string, FinishLook> };
 
 const PANEL_EDGE_ROOM = '#c8a46a';
 const GHOST = '#7fe3ff';
@@ -403,7 +408,7 @@ function Ghost({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObjec
   );
 }
 
-function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick }: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' | 'view' | 'hovered' | 'onHover' | 'onPick'>) {
+function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick, finish }: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' | 'view' | 'hovered' | 'onHover' | 'onPick'> & { finish: Looks }) {
   const panels = useMemo(() => build.items.filter((it) => it.kind === 'panel'), [build.items]);
   const holes = useMemo(() => panels.map((it) => panelHoles(build, build.items.indexOf(it), (h) => guide.parts[h.partIndex]?.name ?? '')), [panels, build, guide.parts]);
   const wood = useMemo(() => woodTexture(), []);
@@ -424,6 +429,7 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
       {panels.map((it, i) => {
         const part = guide.parts[it.partIndex];
         const isHover = hovered === it.key;
+        const look = lookForPart(finish.appearance, finish.looks, it.partId);
         return (
           <mesh
             key={it.key}
@@ -438,14 +444,19 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
             {[0, 1, 2, 3, 4, 5].map((face) => {
               const thin = it.size.x <= it.size.y && it.size.x <= it.size.z ? 0 : it.size.y <= it.size.z ? 1 : 2;
               const isFace = Math.floor(face / 2) === thin;
-              const color = isHover ? HOVER : view === 'drawing' ? '#ffffff' : part?.kind === 'fitting' ? '#d9d9d9' : isFace ? WOOD_TINT : EDGE_BANDING;
+              const room = view === 'room';
+              const color = isHover ? HOVER : !room ? '#ffffff' : look ? (isFace ? look.color : look.base) : part?.kind === 'fitting' ? '#d9d9d9' : isFace ? WOOD_TINT : EDGE_BANDING;
+              const map = !room || !isFace ? null : look ? look.map : part?.kind !== 'fitting' ? wood : null;
               return (
                 <meshStandardMaterial
                   key={face}
                   attach={`material-${face}`}
                   color={color}
-                  map={view === 'room' && isFace && part?.kind !== 'fitting' ? wood ?? undefined : undefined}
-                  roughness={isFace ? 0.62 : 0.8}
+                  map={map ?? undefined}
+                  roughness={look && room ? look.roughness : isFace ? 0.62 : 0.8}
+                  metalness={look && room ? look.metalness : 0}
+                  transparent={!!look && room && look.opacity < 1}
+                  opacity={look && room ? look.opacity : 1}
                 />
               );
             })}
@@ -458,7 +469,8 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
   );
 }
 
-function HardwarePart({ build, items, name, xRef, explodeRef, view, onHover, onPick }: {
+function HardwarePart({ build, items, name, look: finishLook, xRef, explodeRef, view, onHover, onPick }: {
+  look: FinishLook | null;
   build: GuideBuild;
   items: BuildItem[];
   name: string;
@@ -471,7 +483,7 @@ function HardwarePart({ build, items, name, xRef, explodeRef, view, onHover, onP
   const ref = useRef<THREE.InstancedMesh>(null);
   const dims = items[0].size;
   const shape = hardwareShape(name);
-  const look = hardwareLook(shape);
+  const look = finishLook ? { color: finishLook.base, metalness: finishLook.metalness, roughness: finishLook.roughness } : hardwareLook(shape);
   const geometry = useDisposable(() => hardwareGeometry(shape, dims.x, dims.y), `${shape}:${dims.x}:${dims.y}`);
   const base = useMemo(() => new THREE.Color(view === 'drawing' ? '#222222' : look.color), [view, look.color]);
   const hot = useMemo(() => new THREE.Color('#ffb454'), []);
@@ -514,7 +526,7 @@ function HardwarePart({ build, items, name, xRef, explodeRef, view, onHover, onP
   );
 }
 
-function Hardware(props: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' | 'view' | 'onHover' | 'onPick'>) {
+function Hardware(props: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' | 'view' | 'onHover' | 'onPick'> & { finish: Looks }) {
   const groups = useMemo(() => {
     const byPart = new Map<string, BuildItem[]>();
     for (const it of props.build.items) {
@@ -531,6 +543,7 @@ function Hardware(props: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' |
           build={props.build}
           items={items}
           name={props.guide.parts[items[0].partIndex]?.name ?? ''}
+          look={lookForPart(props.finish.appearance, props.finish.looks, partId)}
           xRef={props.xRef}
           explodeRef={props.explodeRef}
           view={props.view}
@@ -758,6 +771,8 @@ export const GuideScene: React.FC<Props> = (props) => {
   const scene = useThree((s) => s.scene);
   const gl = useThree((s) => s.gl);
   useStudioLight(scene, gl, view === 'drawing' ? 0 : 0.28);
+  const looks = useFinishLooks(props.appearance ?? null, props.photoUrl ?? null);
+  const finish = useMemo(() => ({ appearance: props.appearance ?? null, looks }), [props.appearance, looks]);
 
   useLayoutEffect(() => {
     scene.background = new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
@@ -802,8 +817,8 @@ export const GuideScene: React.FC<Props> = (props) => {
       )}
       <KitCards build={build} guide={guide} view={view} />
       {build.hasAssembly && <Ghost build={build} xRef={xRef} />}
-      <Panels build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} hovered={props.hovered} onHover={props.onHover} onPick={props.onPick} />
-      <Hardware build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} onHover={props.onHover} onPick={props.onPick} />
+      <Panels build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} hovered={props.hovered} onHover={props.onHover} onPick={props.onPick} finish={finish} />
+      <Hardware build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} onHover={props.onHover} onPick={props.onPick} finish={finish} />
       <Trails build={build} xRef={xRef} />
       <ActiveLabel build={build} guide={guide} xRef={xRef} labels={props.labels} />
       {props.labels && props.atStart && build.items.length > 0 && <StartTags build={build} guide={guide} />}

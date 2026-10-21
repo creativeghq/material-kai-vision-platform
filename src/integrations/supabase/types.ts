@@ -12626,6 +12626,7 @@ export type Database = {
           extracted_at: string | null
           published_at: string | null
           public_share_token: string | null
+          appearance: Json | null
           public_shared_at: string | null
           created_at: string
           updated_at: string
@@ -12644,6 +12645,7 @@ export type Database = {
           extracted_at?: string | null
           published_at?: string | null
           public_share_token?: string | null
+          appearance?: Json | null
           public_shared_at?: string | null
           created_at?: string
           updated_at?: string
@@ -12662,6 +12664,7 @@ export type Database = {
           extracted_at?: string | null
           published_at?: string | null
           public_share_token?: string | null
+          appearance?: Json | null
           public_shared_at?: string | null
           created_at?: string
           updated_at?: string

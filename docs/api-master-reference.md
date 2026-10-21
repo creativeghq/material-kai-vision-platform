@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (174)
+## 1. Supabase Edge Functions (175)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -388,6 +388,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `installation-guide-appearance` | JWT / kai_* | Read a product photo into the finish each part of an installation guide carries |
 | `installation-guide-extract` | JWT / kai_* | Read an uploaded installation manual into a step-by-step guide |
 | `installation-guide-public` | public | Open an installation guide through its public share link |
 | `project-assessment` | JWT | Derive a project's health signals, and optionally write the AI assessment of them |

@@ -9,7 +9,7 @@ import { GuidePlayerView } from './GuidePlayerPage';
 export default function PublicGuidePage() {
   const { token = '' } = useParams();
   const { toast } = useToast();
-  const [opened, setOpened] = useState<{ row: InstallationGuideRow; pageUrls: string[] } | null>(null);
+  const [opened, setOpened] = useState<{ row: InstallationGuideRow; pageUrls: string[]; photoUrl: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,5 +29,5 @@ export default function PublicGuidePage() {
     );
   }
   if (!opened?.row.guide) return <div className="flex h-screen items-center justify-center bg-background"><CanvasLoader label="Opening the guide…" /></div>;
-  return <GuidePlayerView row={opened.row} guide={opened.row.guide} pageUrls={opened.pageUrls} sourceUrl={null} toast={toast} shared />;
+  return <GuidePlayerView row={opened.row} guide={opened.row.guide} pageUrls={opened.pageUrls} sourceUrl={null} photoUrl={opened.photoUrl} toast={toast} shared />;
 }

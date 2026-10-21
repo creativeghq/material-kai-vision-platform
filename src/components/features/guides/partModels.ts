@@ -1,9 +1,10 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 import type { BuildItem, GuideBuild } from '@/lib/installation/guideBuild';
+import type { FinishKind, GuideAppearance } from '@/lib/installation/guideSchema';
 
 export type HardwareShape = 'screw' | 'nail' | 'dowel' | 'cam' | 'hinge' | 'plate' | 'bracket' | 'knob' | 'foot' | 'pin';
 
@@ -187,3 +188,77 @@ export const HOLE_COLOR = '#2a2117';
 
 /** The number a part carries everywhere it is shown: its place in the manual's kit list. */
 export const partNumber = (partIndex: number) => partIndex + 1;
+
+export interface FinishLook {
+  color: string;
+  base: string;
+  roughness: number;
+  metalness: number;
+  map: THREE.Texture | null;
+  opacity: number;
+}
+
+const KIND_SURFACE: Record<FinishKind, { roughness: number; metalness: number; opacity: number }> = {
+  wood: { roughness: 0.62, metalness: 0, opacity: 1 },
+  gloss: { roughness: 0.12, metalness: 0, opacity: 1 },
+  matt: { roughness: 0.82, metalness: 0, opacity: 1 },
+  metal: { roughness: 0.3, metalness: 0.85, opacity: 1 },
+  stone: { roughness: 0.45, metalness: 0, opacity: 1 },
+  glass: { roughness: 0.05, metalness: 0, opacity: 0.35 },
+  fabric: { roughness: 0.95, metalness: 0, opacity: 1 },
+};
+
+export function useFinishLooks(appearance: GuideAppearance | null, photoUrl: string | null): Map<string, FinishLook> {
+  const [maps, setMaps] = useState<Map<string, THREE.Texture>>(new Map());
+  useEffect(() => {
+    const textured = (appearance?.finishes ?? []).filter((f) => f.swatch);
+    if (!photoUrl || textured.length === 0) {
+      setMaps(new Map());
+      return;
+    }
+    let live = true;
+    const made: THREE.Texture[] = [];
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (!live) return;
+      const next = new Map<string, THREE.Texture>();
+      for (const f of textured) {
+        const s = f.swatch!;
+        const sw = Math.max(8, (s.x1 - s.x0) * img.naturalWidth);
+        const sh = Math.max(8, (s.y1 - s.y0) * img.naturalHeight);
+        const canvas = Object.assign(document.createElement('canvas'), { width: 256, height: 256 });
+        const ctx = canvas.getContext('2d');
+        if (!ctx) continue;
+        ctx.drawImage(img, s.x0 * img.naturalWidth, s.y0 * img.naturalHeight, sw, sh, 0, 0, 256, 256);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.MirroredRepeatWrapping;
+        tex.wrapT = THREE.MirroredRepeatWrapping;
+        tex.repeat.set(2, 2);
+        made.push(tex);
+        next.set(f.id, tex);
+      }
+      setMaps(next);
+    };
+    img.src = photoUrl;
+    return () => {
+      live = false;
+      made.forEach((t) => t.dispose());
+    };
+  }, [appearance, photoUrl]);
+  return useMemo(() => {
+    const out = new Map<string, FinishLook>();
+    for (const f of appearance?.finishes ?? []) {
+      const surface = KIND_SURFACE[f.kind];
+      const map = maps.get(f.id) ?? null;
+      out.set(f.id, { color: map ? '#ffffff' : f.color, base: f.color, roughness: surface.roughness, metalness: surface.metalness, opacity: surface.opacity, map });
+    }
+    return out;
+  }, [appearance, maps]);
+}
+
+export function lookForPart(appearance: GuideAppearance | null, looks: Map<string, FinishLook>, partId: string): FinishLook | null {
+  const finishId = appearance?.parts[partId];
+  return finishId ? looks.get(finishId) ?? null : null;
+}

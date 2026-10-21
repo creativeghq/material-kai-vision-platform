@@ -24,7 +24,7 @@ Deno.serve(withApiLogging('installation-guide-public', async (req: Request) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const { data: row, error } = await admin
     .from('installation_guides')
-    .select('id, workspace_id, title, page_count, page_aspect, guide')
+    .select('id, workspace_id, title, page_count, page_aspect, guide, appearance')
     .eq('public_share_token', token)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -36,12 +36,18 @@ Deno.serve(withApiLogging('installation-guide-public', async (req: Request) => {
     ? await admin.storage.from(BUCKET).createSignedUrls(paths, URL_TTL_SECONDS)
     : { data: [], error: null };
   if (signError) throw new Error(signError.message);
+  const photoPath = (row.appearance as { image_path?: unknown } | null)?.image_path;
+  const { data: photo } = typeof photoPath === 'string' && photoPath.startsWith(`${folder}/`)
+    ? await admin.storage.from(BUCKET).createSignedUrl(photoPath, URL_TTL_SECONDS)
+    : { data: null };
 
   return new Response(JSON.stringify({
     title: row.title,
     page_count: row.page_count,
     page_aspect: row.page_aspect,
     guide: row.guide,
+    appearance: row.appearance ?? null,
+    photo_url: photo?.signedUrl ?? null,
     page_urls: paths.map((p) => signed?.find((s) => s.path === p)?.signedUrl ?? ''),
   }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }));

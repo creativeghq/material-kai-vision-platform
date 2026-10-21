@@ -17987,6 +17987,42 @@
     "response": "200 { title, page_count, page_aspect, guide, page_urls } · 404 when the link is unknown or was turned off"
   },
   {
+    "name": "installation-guide-appearance",
+    "tag": "Projects",
+    "summary": "Read a product photo into the finish each part of an installation guide carries",
+    "description": "Takes one photo of the finished product, either as a photo address or as a product page whose og:image is used, fetches it through the SSRF guard, and reads it with Claude vision into the visible finishes (colour, material kind and, for wood or stone, a swatch rectangle on the photo) and which finish each part of the guide carries. The workspace comes from the guide row and the caller needs projects.use there; credits are debited before the model runs and refunded when the photo does not show the product or the read fails. The reader is a strict output_config JSON schema whose reply is sanitised against the guide's own part ids. The photo is stored in the guide's folder and the result replaces installation_guides.appearance.",
+    "security": [
+      "supabaseJwt",
+      "apiKeyPartner"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "guide_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "The guide whose parts are coloured."
+      },
+      {
+        "name": "image_url",
+        "type": "string",
+        "required": false,
+        "desc": "An https address of the product photo."
+      },
+      {
+        "name": "page_url",
+        "type": "string",
+        "required": false,
+        "desc": "An https product page; its og:image photo is used when image_url is not given."
+      }
+    ],
+    "response": "200 { success, appearance } · 402 out of credits · 422 the photo could not be read or does not show the product"
+  },
+  {
     "name": "structure-site-note",
     "tag": "Projects",
     "summary": "Turn a dictated site walk into a diary entry and the defects it described",

@@ -3,7 +3,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 import { supabase } from '@/integrations/supabase/client';
 import { parseEdgeError } from '@/utils/edgeError';
-import { sanitizeGuide, type InstallationGuideData } from '@/lib/installation/guideSchema';
+import { sanitizeAppearance, sanitizeGuide, type GuideAppearance, type InstallationGuideData } from '@/lib/installation/guideSchema';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -27,11 +27,12 @@ export interface InstallationGuideRow {
   extracted_at: string | null;
   published_at: string | null;
   public_share_token: string | null;
+  appearance: GuideAppearance | null;
   created_at: string;
   updated_at: string;
 }
 
-const COLUMNS = 'id, workspace_id, title, status, page_count, page_aspect, guide, error, extracted_at, published_at, public_share_token, created_at, updated_at';
+const COLUMNS = 'id, workspace_id, title, status, page_count, page_aspect, guide, error, extracted_at, published_at, public_share_token, appearance, created_at, updated_at';
 
 const folder = (row: Pick<InstallationGuideRow, 'workspace_id' | 'id'>) => `installation-guides/${row.workspace_id}/${row.id}`;
 export const guidePagePath = (row: Pick<InstallationGuideRow, 'workspace_id' | 'id'>, page: number) =>
@@ -43,6 +44,7 @@ function normalise(row: Record<string, unknown>): InstallationGuideRow {
     ...r,
     page_aspect: Number(r.page_aspect) || 1.414,
     guide: r.guide ? sanitizeGuide(r.guide, r.page_count) : null,
+    appearance: r.guide && r.appearance ? sanitizeAppearance(r.appearance, (r.guide.parts ?? []).map((p: { id: string }) => p.id)) : null,
   };
 }
 
@@ -94,16 +96,16 @@ export const installationGuideService = {
     return data ?? null;
   },
 
-  async openPublic(token: string): Promise<{ row: InstallationGuideRow; pageUrls: string[] }> {
+  async openPublic(token: string): Promise<{ row: InstallationGuideRow; pageUrls: string[]; photoUrl: string | null }> {
     const { data, error } = await supabase.functions.invoke('installation-guide-public', { body: { token } });
     if (error || !data?.guide) throw new Error('This link is not valid any more.');
     const row: Record<string, unknown> = {
       id: token, workspace_id: '', title: String(data.title ?? ''), status: 'published',
       page_count: Number(data.page_count) || 0, page_aspect: Number(data.page_aspect) || 1.414,
-      guide: data.guide, error: null, extracted_at: null, published_at: null, public_share_token: token,
+      guide: data.guide, appearance: data.appearance ?? null, error: null, extracted_at: null, published_at: null, public_share_token: token,
       created_at: '', updated_at: '',
     };
-    return { row: normalise(row), pageUrls: Array.isArray(data.page_urls) ? data.page_urls.map(String) : [] };
+    return { row: normalise(row), pageUrls: Array.isArray(data.page_urls) ? data.page_urls.map(String) : [], photoUrl: typeof data.photo_url === 'string' ? data.photo_url : null };
   },
 
   async pageUrls(row: InstallationGuideRow): Promise<string[]> {
@@ -168,6 +170,35 @@ export const installationGuideService = {
     } finally {
       await doc.destroy();
     }
+  },
+
+  async findProductPhotos(row: InstallationGuideRow): Promise<Array<{ thumb: string; full: string; title: string | null }>> {
+    const query = `${row.guide?.title || row.title} product photo`.slice(0, 140);
+    const { data, error } = await supabase.functions.invoke('catalog-image-search', {
+      body: { query, workspace_id: row.workspace_id, max_candidates: 8, search_db_first: false },
+    });
+    if (error) throw new Error((await parseEdgeError(error, 'Photo search failed.')).message);
+    const list = (data?.candidates ?? []) as Array<{ thumb_url?: string; full_url?: string; title?: string | null }>;
+    return list.filter((c) => c.full_url).map((c) => ({ thumb: c.thumb_url || c.full_url!, full: c.full_url!, title: c.title ?? null }));
+  },
+
+  async readAppearance(id: string, source: { image_url?: string; page_url?: string }): Promise<GuideAppearance> {
+    const { data, error } = await supabase.functions.invoke('installation-guide-appearance', { body: { guide_id: id, ...source } });
+    if (error) throw new Error((await parseEdgeError(error, 'The finishes could not be read.')).message);
+    if (!data?.success || !data.appearance) throw new Error(data?.error ?? 'The finishes could not be read.');
+    return data.appearance as GuideAppearance;
+  },
+
+  async saveAppearance(id: string, appearance: GuideAppearance | null): Promise<void> {
+    const { error } = await supabase.from('installation_guides').update({ appearance: appearance as never }).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  async productPhotoUrl(row: InstallationGuideRow): Promise<string | null> {
+    const path = row.appearance?.image_path;
+    if (!path) return null;
+    const { data } = await supabase.storage.from(GUIDE_BUCKET).createSignedUrl(path, 60 * 60 * 6);
+    return data?.signedUrl ?? null;
   },
 
   async read(id: string): Promise<void> {

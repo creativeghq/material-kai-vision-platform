@@ -22,6 +22,7 @@ import { PART_KINDS, type InstallationGuideData, type PageBox, type PartKind } f
 import { installationGuideService, type InstallationGuideRow } from '@/services/installationGuideService';
 import { GUIDE_STATUS } from './GuidesPage';
 import { usePageAspects } from '@/components/features/guides/usePageAspects';
+import { GuideLookEditor } from './GuideLookEditor';
 
 function PageBoxEditor({ url, aspect, box, onChange }: { url: string | null; aspect: number; box: PageBox; onChange: (b: PageBox) => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -338,12 +339,14 @@ export default function GuideDetailPage() {
           <p className="flex gap-2 text-sm text-destructive"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />The last read failed: {row.error}</p>
         )}
         <HubTabNav
-          items={[{ id: 'steps', label: 'Steps', count: g.steps.length }, { id: 'parts', label: 'Parts', count: g.parts.length }]}
+          items={[{ id: 'steps', label: 'Steps', count: g.steps.length }, { id: 'parts', label: 'Parts', count: g.parts.length }, { id: 'look', label: 'Look', count: row.appearance?.finishes.length ?? 0 }]}
           activeId={tab}
           onSelect={setTab}
           aria-label="Guide sections"
         />
-        {tab === 'steps' ? <StepsEditor row={row} guide={g} pageUrls={pageUrls} onChange={setDraft} /> : <PartsEditor guide={g} onChange={setDraft} />}
+        {tab === 'steps' && <StepsEditor row={row} guide={g} pageUrls={pageUrls} onChange={setDraft} />}
+        {tab === 'parts' && <PartsEditor guide={g} onChange={setDraft} />}
+        {tab === 'look' && <GuideLookEditor row={row} toast={toast} onSaved={(appearance) => setRow({ ...row, appearance })} />}
       </div>
     );
   }

@@ -48,6 +48,7 @@ export const API_KEY_ENDPOINTS: ReadonlySet<string> = new Set([
   'gsc-api',
   'hr-api',
   'inbox-api',
+  'installation-guide-appearance',
   'installation-guide-extract',
   'intake-enrich-products',
   'kb-generate-embedding',

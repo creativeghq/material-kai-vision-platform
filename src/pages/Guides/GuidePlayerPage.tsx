@@ -83,6 +83,7 @@ export default function GuidePlayerPage() {
   const [row, setRow] = useState<InstallationGuideRow | null>(null);
   const [pageUrls, setPageUrls] = useState<string[]>([]);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,8 +94,11 @@ export default function GuidePlayerPage() {
         if (!live) return;
         if (!g) { setLoadError('This guide does not exist or you cannot open it.'); return; }
         setRow(g);
-        const urls = await installationGuideService.pageUrls(g);
-        if (live) setPageUrls(urls);
+        const [urls, photo] = await Promise.all([installationGuideService.pageUrls(g), installationGuideService.productPhotoUrl(g)]);
+        if (live) {
+          setPageUrls(urls);
+          setPhotoUrl(photo);
+        }
         const { data } = await supabase.storage.from(GUIDE_BUCKET).createSignedUrl(`installation-guides/${g.workspace_id}/${g.id}/source.pdf`, 60 * 60 * 6);
         if (live) setSourceUrl(data?.signedUrl ?? null);
       } catch (e) {
@@ -107,7 +111,7 @@ export default function GuidePlayerPage() {
   if (loadError) return <PlayerMessage text={loadError} id={id} />;
   if (!row) return <div className="flex h-screen items-center justify-center bg-background"><CanvasLoader label="Opening the guide…" /></div>;
   if (!row.guide || row.guide.steps.length === 0) return <PlayerMessage text="This manual has not been read into steps yet." id={id} />;
-  return <GuidePlayerView row={row} guide={row.guide} pageUrls={pageUrls} sourceUrl={sourceUrl} toast={toast} />;
+  return <GuidePlayerView row={row} guide={row.guide} pageUrls={pageUrls} sourceUrl={sourceUrl} photoUrl={photoUrl} toast={toast} />;
 }
 
 function PlayerMessage({ text, id }: { text: string; id: string }) {
@@ -119,7 +123,8 @@ function PlayerMessage({ text, id }: { text: string; id: string }) {
   );
 }
 
-export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared = false }: {
+export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = null, toast, shared = false }: {
+  photoUrl?: string | null;
   row: InstallationGuideRow;
   guide: InstallationGuideData;
   pageUrls: string[];
@@ -339,6 +344,8 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
                 labels={labels}
                 atStart={x < 0.02}
                 follow={followCam && !exploded}
+                appearance={row.appearance}
+                photoUrl={photoUrl}
               />
             </Canvas>
           </Suspense>
@@ -501,6 +508,8 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
         guide={guide}
         item={inspectKey ? build.items.find((i) => i.key === inspectKey) ?? null : null}
         onClose={() => setInspectKey(null)}
+        appearance={row.appearance}
+        photoUrl={photoUrl}
         onPlayStep={playStep}
       />
       {!shared && <ShareGuide open={shareOpen} onOpenChange={setShareOpen} row={row} toast={toast} />}
