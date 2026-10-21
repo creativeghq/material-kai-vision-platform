@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Flag, Pencil, Trash2, Banknote } from 'lucide-react';
+import { Loader2, Flag, Pencil, Trash2, Banknote, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -41,6 +41,7 @@ export const OpeningBalanceCard: React.FC<Props> = ({
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [showOpening, setShowOpening] = useState(false);
 
   const seq = useRef(0);
   const load = async () => {
@@ -95,28 +96,46 @@ export const OpeningBalanceCard: React.FC<Props> = ({
   return (
     <Card>
       <CardContent className="flex flex-wrap items-start justify-between gap-4 p-4">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Flag className="h-4 w-4 text-muted-foreground" />
+        <div className="min-w-0 space-y-2">
+          <Button size="sm" variant="outline" aria-expanded={showOpening} onClick={() => setShowOpening((v) => !v)}>
+            <Flag className="mr-1.5 h-3.5 w-3.5" />
             Opening balance · {side === 'customer' ? 'as customer' : 'as supplier'}
-          </div>
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          ) : opening ? (
-            <p className="text-sm">
-              On <strong>{formatDate(opening.as_of)}</strong> the account stood at{' '}
-              <strong className="tabular-nums">{formatMoney(Math.abs(opening.amount), opening.currency)}</strong>{' '}
-              <span className="text-muted-foreground">({netPositionDirection(toUs(opening.amount))})</span>
-              <span className="block text-xs text-muted-foreground">
-                {OPENING_BALANCE_SOURCE_LABELS[opening.source]}{opening.note ? ` · ${opening.note}` : ''}.
-                {' '}Entries dated on or before it are shown but not counted again.
-              </span>
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              None set — the balance counts every document from the first one. Set one when you take over an account
-              from another system or from the party&apos;s own statement.
-            </p>
+            {!loading && opening && <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-primary" aria-label="Set" />}
+            <ChevronDown className={`ml-1.5 h-3.5 w-3.5 transition-transform ${showOpening ? 'rotate-180' : ''}`} />
+          </Button>
+          {showOpening && (
+            <div className="space-y-2">
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : opening ? (
+                <p className="text-sm">
+                  On <strong>{formatDate(opening.as_of)}</strong> the account stood at{' '}
+                  <strong className="tabular-nums">{formatMoney(Math.abs(opening.amount), opening.currency)}</strong>{' '}
+                  <span className="text-muted-foreground">({netPositionDirection(toUs(opening.amount))})</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {OPENING_BALANCE_SOURCE_LABELS[opening.source]}{opening.note ? ` · ${opening.note}` : ''}.
+                    {' '}Entries dated on or before it are shown but not counted again.
+                  </span>
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  None set — the balance counts every document from the first one. Set one when you take over an account
+                  from another system or from the party&apos;s own statement.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {opening ? (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
+                    <Button size="sm" variant="ghost" disabled={removing} onClick={() => { void remove(); }}>
+                      {removing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />} Remove
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="secondary" disabled={loading} onClick={() => setEditing(true)}>Set opening balance</Button>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
@@ -137,16 +156,6 @@ export const OpeningBalanceCard: React.FC<Props> = ({
             <Button size="sm" variant="outline" onClick={onRecordPayment}>
               <Banknote className="mr-1.5 h-3.5 w-3.5" /> Record payment on account
             </Button>
-            {opening ? (
-              <>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
-                <Button size="sm" variant="ghost" disabled={removing} onClick={() => { void remove(); }}>
-                  {removing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />} Remove
-                </Button>
-              </>
-            ) : (
-              <Button size="sm" variant="secondary" disabled={loading} onClick={() => setEditing(true)}>Set opening balance</Button>
-            )}
           </div>
         </div>
       </CardContent>
