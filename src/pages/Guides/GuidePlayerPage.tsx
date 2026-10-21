@@ -13,6 +13,8 @@ import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/Canva
 import { GuideScene, type GuideView } from '@/components/features/guides/GuideScene';
 import { GuideBook } from '@/components/features/guides/GuideBook';
 import { usePageAspects } from '@/components/features/guides/usePageAspects';
+import { PartInspector } from '@/components/features/guides/PartInspector';
+import { partNumber } from '@/components/features/guides/partModels';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { buildGuide, countsAt, partCountAt, partUsedTotal, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
@@ -142,6 +144,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
   const [labels, setLabels] = useState(true);
   const [followCam, setFollowCam] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [inspectKey, setInspectKey] = useState<string | null>(null);
   const [wordsOpen, setWordsOpen] = useState(false);
   const [wordsCut, setWordsCut] = useState(false);
   const wordsRef = useRef<HTMLDivElement>(null);
@@ -188,8 +191,9 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
     setExploded(false);
     const e = Math.floor(xRef.current + 1e-6) + 1;
     if (e > K) { toast({ title: 'That was the last step' }); return; }
-    animateTo(e);
-  }, [halt, animateTo, K, toast]);
+    xRef.current = e;
+    setX(e);
+  }, [halt, K, toast]);
 
   const prev = useCallback(() => {
     halt();
@@ -197,6 +201,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
     explodeTarget.current = 0;
     setExploded(false);
     xRef.current = Math.max(0, Math.ceil(xRef.current - 1e-6) - 1);
+    setX(xRef.current);
   }, [halt]);
 
   const toggleExploded = useCallback(() => {
@@ -288,20 +293,13 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
     setHover(key ? { key, x: cx, y: cy } : null);
   }, []);
   const onPick = useCallback((key: string) => {
-    const it = build.items.find((i) => i.key === key);
-    if (!it) return;
-    if (xRef.current < it.ta - 1e-6 && Number.isFinite(it.ta)) {
-      playStep(it.step);
-      toast({ title: `Step ${it.step}: ${guide.steps[it.step]?.title ?? ''}` });
-    } else {
-      const part = guide.parts[it.partIndex];
-      toast({ title: part?.name ?? 'Part', description: [part?.code, part?.quantity ? `${part.quantity} in the kit` : ''].filter(Boolean).join(' · ') });
-    }
-  }, [build.items, guide, playStep, toast]);
+    halt();
+    setInspectKey(key);
+  }, [halt]);
 
   const hoverItem = hover ? build.items.find((i) => i.key === hover.key) : null;
   const hoverText = hoverItem
-    ? `${guide.parts[hoverItem.partIndex]?.name ?? ''}${x < hoverItem.ta - 1e-6 && Number.isFinite(hoverItem.ta) ? ` · goes in at step ${hoverItem.step}` : ''}`
+    ? `${partNumber(hoverItem.partIndex)} · ${guide.parts[hoverItem.partIndex]?.name ?? ''}${x < hoverItem.ta - 1e-6 && Number.isFinite(hoverItem.ta) ? ` · goes in at step ${hoverItem.step}` : ''} · click to hold it`
     : '';
 
   useLayoutEffect(() => {
@@ -498,6 +496,13 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, toast, shared
       )}
 
       <HowItWorks open={howOpen} onOpenChange={setHowOpen} guide={guide} build={build} />
+      <PartInspector
+        build={build}
+        guide={guide}
+        item={inspectKey ? build.items.find((i) => i.key === inspectKey) ?? null : null}
+        onClose={() => setInspectKey(null)}
+        onPlayStep={playStep}
+      />
       {!shared && <ShareGuide open={shareOpen} onOpenChange={setShareOpen} row={row} toast={toast} />}
     </div>
   );
@@ -590,12 +595,12 @@ function HowItWorks({ open, onOpenChange, guide, build }: { open: boolean; onOpe
           {guide.summary && <p>{guide.summary}{dims.stated ? ` It measures ${dims.x} × ${dims.z} × ${dims.y} cm.` : ''}</p>}
           <section className="space-y-1.5">
             <h3 className="font-semibold">What is in the box</h3>
-            <p className="text-muted-foreground">{panels.map((p) => `${p.quantity > 1 ? `${p.quantity} × ` : ''}${p.name}`).join(', ') || 'No large parts were listed.'}</p>
+            <p className="text-muted-foreground">{panels.map((p) => `${partNumber(guide.parts.indexOf(p))}. ${p.quantity > 1 ? `${p.quantity} × ` : ''}${p.name}`).join(', ') || 'No large parts were listed.'}</p>
             {hardware.length > 0 && (
               <ul className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
                 {hardware.map((p) => (
                   <li key={p.id} className="flex justify-between gap-2">
-                    <span>{p.name}{p.code && <span className="ml-1 font-mono text-xs text-muted-foreground">{p.code}</span>}</span>
+                    <span><b className="mr-1 tabular-nums">{partNumber(guide.parts.indexOf(p))}.</b>{p.name}{p.code && <span className="ml-1 font-mono text-xs text-muted-foreground">{p.code}</span>}</span>
                     <span className="tabular-nums text-muted-foreground">{p.quantity}x</span>
                   </li>
                 ))}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GUIDE_OUTPUT_SCHEMA, sanitizeGuide } from '@/lib/installation/guideSchema';
 import { buildGuide, countsAt, poseAt, stepAt } from '@/lib/installation/guideBuild';
+import { hardwareShape, panelHoles } from '@/components/features/guides/partModels';
 
 const raw = {
   title: 'BILLY',
@@ -120,6 +121,27 @@ describe('installation guide build', () => {
     for (const it of build.items.filter((x) => x.host !== null && x.step <= build.items[x.host!].step)) {
       expect(poseAt(build, it, it.ta, 0).outward.y).toBeGreaterThan(-1e-6);
     }
+  });
+
+  it('drills a hole on the face of the panel for each piece of hardware it hosts', () => {
+    const hosts = [...new Set(build.items.filter((it) => it.host !== null).map((it) => it.host!))];
+    expect(hosts.length).toBeGreaterThan(0);
+    for (const h of hosts) {
+      const panel = build.items[h];
+      const holes = panelHoles(build, h, (it) => guide.parts[it.partIndex].name);
+      expect(holes.length).toBeGreaterThan(0);
+      for (const hole of holes) {
+        const axis = (['x', 'y', 'z'] as const).find((a) => hole.normal[a] !== 0)!;
+        expect(Math.abs(hole.pos[axis])).toBeCloseTo(panel.size[axis] / 2, 2);
+      }
+    }
+  });
+
+  it('gives the hardware a recognisable shape', () => {
+    expect(hardwareShape('Door hinge')).toBe('hinge');
+    expect(hardwareShape('Hinge screw')).toBe('screw');
+    expect(hardwareShape('Wooden dowel')).toBe('dowel');
+    expect(hardwareShape('Corner bracket')).toBe('bracket');
   });
 
   it('pushes placed parts apart when exploded', () => {

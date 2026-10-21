@@ -13,6 +13,9 @@ import {
   type GuideBuild,
 } from '@/lib/installation/guideBuild';
 import type { InstallationGuideData } from '@/lib/installation/guideSchema';
+import {
+  EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, panelHoles, partNumber, useStudioLight, woodTexture, type Hole,
+} from './partModels';
 
 export type GuideView = 'room' | 'drawing';
 
@@ -41,7 +44,6 @@ interface Props {
   follow: boolean;
 }
 
-const PANEL_ROOM = '#ece5d8';
 const PANEL_EDGE_ROOM = '#c8a46a';
 const GHOST = '#7fe3ff';
 const HOVER = '#ffb454';
@@ -53,12 +55,42 @@ const tmp = {
   p: new THREE.Vector3(),
   s: new THREE.Vector3(),
   axisY: new THREE.Vector3(0, 1, 0),
+  axisZ: new THREE.Vector3(0, 0, 1),
 };
 
-function hardwareColor(name: string): string {
-  if (/dowel|wood/i.test(name)) return '#c8975a';
-  if (/nail|screw|bolt|pin|bracket|washer|cam|hinge|lock/i.test(name)) return '#b9bec6';
-  return '#8d939c';
+function numberBadge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, r: number, fill: string, ink: string) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.fillStyle = ink;
+  ctx.font = `700 ${Math.round(r * 1.1)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(n), x, y + 1);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+}
+
+function PanelHoles({ holes }: { holes: Hole[] }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    holes.forEach((h, i) => {
+      tmp.q.setFromUnitVectors(tmp.axisZ, h.normal);
+      tmp.s.set(h.radius, h.radius, 1);
+      mesh.setMatrixAt(i, tmp.m.compose(h.pos, tmp.q, tmp.s));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [holes]);
+  if (holes.length === 0) return null;
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, holes.length]} frustumCulled={false}>
+      <circleGeometry args={[1, 20]} />
+      <meshStandardMaterial color={HOLE_COLOR} roughness={1} polygonOffset polygonOffsetFactor={-2} />
+    </instancedMesh>
+  );
 }
 
 function canvasTexture(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture | null {
@@ -310,6 +342,7 @@ function KitCards({ build, guide, view }: { build: GuideBuild; guide: Installati
     return canvasTexture(w, h, (ctx) => {
       ctx.fillStyle = view === 'drawing' ? '#ffffff' : '#f6f3ec';
       ctx.fillRect(0, 0, w, h);
+      if (part) numberBadge(ctx, partNumber(guide.parts.indexOf(part)), w - 40, 40, 26, '#16171a', '#ffffff');
       ctx.fillStyle = '#16171a';
       ctx.font = '600 56px sans-serif';
       ctx.fillText(c.label, 20, h - 24);
@@ -317,7 +350,7 @@ function KitCards({ build, guide, view }: { build: GuideBuild; guide: Installati
       if (c.code) ctx.fillText(c.code, w - 20 - ctx.measureText(c.code).width, h - 28);
       ctx.font = '500 24px sans-serif';
       ctx.fillStyle = '#555';
-      ctx.fillText((part?.name ?? '').slice(0, 28), 20, 34);
+      ctx.fillText((part?.name ?? '').slice(0, 24), 20, 34);
       ctx.fillStyle = '#c75b39';
       ctx.fillRect(0, h - 8, w, 8);
     });
@@ -372,6 +405,8 @@ function Ghost({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObjec
 
 function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick }: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' | 'view' | 'hovered' | 'onHover' | 'onPick'>) {
   const panels = useMemo(() => build.items.filter((it) => it.kind === 'panel'), [build.items]);
+  const holes = useMemo(() => panels.map((it) => panelHoles(build, build.items.indexOf(it), (h) => guide.parts[h.partIndex]?.name ?? '')), [panels, build, guide.parts]);
+  const wood = useMemo(() => woodTexture(), []);
   const refs = useRef<Array<THREE.Mesh | null>>([]);
   useFrame(() => {
     panels.forEach((it, i) => {
@@ -380,8 +415,8 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
       const pose = poseAt(build, it, xRef.current, explodeRef.current);
       mesh.position.set(pose.pos.x, pose.pos.y, pose.pos.z);
       mesh.quaternion.set(pose.quat[0], pose.quat[1], pose.quat[2], pose.quat[3]);
-      const mat = mesh.material as THREE.MeshStandardMaterial;
-      if (mat?.emissive) mat.emissive.set(pose.moving ? '#a8590f' : '#000000');
+      const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[];
+      for (const mat of mats) mat?.emissive?.set(pose.moving ? '#5a2e06' : '#000000');
     });
   });
   return (
@@ -400,11 +435,22 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
             onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onPick(it.key); }}
           >
             <boxGeometry args={[it.size.x, it.size.y, it.size.z]} />
-            <meshStandardMaterial
-              color={isHover ? HOVER : view === 'drawing' ? '#ffffff' : part?.kind === 'fitting' ? '#d9d9d9' : PANEL_ROOM}
-              roughness={0.7}
-            />
+            {[0, 1, 2, 3, 4, 5].map((face) => {
+              const thin = it.size.x <= it.size.y && it.size.x <= it.size.z ? 0 : it.size.y <= it.size.z ? 1 : 2;
+              const isFace = Math.floor(face / 2) === thin;
+              const color = isHover ? HOVER : view === 'drawing' ? '#ffffff' : part?.kind === 'fitting' ? '#d9d9d9' : isFace ? WOOD_TINT : EDGE_BANDING;
+              return (
+                <meshStandardMaterial
+                  key={face}
+                  attach={`material-${face}`}
+                  color={color}
+                  map={view === 'room' && isFace && part?.kind !== 'fitting' ? wood ?? undefined : undefined}
+                  roughness={isFace ? 0.62 : 0.8}
+                />
+              );
+            })}
             <Edges threshold={20} color={view === 'drawing' ? '#111111' : PANEL_EDGE_ROOM} />
+            <PanelHoles holes={holes[i]} />
           </mesh>
         );
       })}
@@ -412,10 +458,10 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
   );
 }
 
-function HardwarePart({ build, items, color, xRef, explodeRef, view, onHover, onPick }: {
+function HardwarePart({ build, items, name, xRef, explodeRef, view, onHover, onPick }: {
   build: GuideBuild;
   items: BuildItem[];
-  color: string;
+  name: string;
   xRef: React.MutableRefObject<number>;
   explodeRef: React.MutableRefObject<number>;
   view: GuideView;
@@ -424,7 +470,10 @@ function HardwarePart({ build, items, color, xRef, explodeRef, view, onHover, on
 }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const dims = items[0].size;
-  const base = useMemo(() => new THREE.Color(view === 'drawing' ? '#222222' : color), [view, color]);
+  const shape = hardwareShape(name);
+  const look = hardwareLook(shape);
+  const geometry = useDisposable(() => hardwareGeometry(shape, dims.x, dims.y), `${shape}:${dims.x}:${dims.y}`);
+  const base = useMemo(() => new THREE.Color(view === 'drawing' ? '#222222' : look.color), [view, look.color]);
   const hot = useMemo(() => new THREE.Color('#ffb454'), []);
   useFrame(() => {
     const mesh = ref.current;
@@ -440,6 +489,8 @@ function HardwarePart({ build, items, color, xRef, explodeRef, view, onHover, on
     });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.boundingSphere = null;
+    mesh.boundingBox = null;
   });
   return (
     <instancedMesh
@@ -457,8 +508,8 @@ function HardwarePart({ build, items, color, xRef, explodeRef, view, onHover, on
         if (e.instanceId != null && items[e.instanceId]) onPick(items[e.instanceId].key);
       }}
     >
-      <cylinderGeometry args={[dims.x / 2, dims.x / 2, dims.y, 10]} />
-      <meshStandardMaterial color="#ffffff" metalness={/b9bec6/.test(color) ? 0.6 : 0.05} roughness={0.4} />
+      <primitive object={geometry} attach="geometry" />
+      <meshStandardMaterial color="#ffffff" metalness={view === 'drawing' ? 0 : look.metalness} roughness={look.roughness} />
     </instancedMesh>
   );
 }
@@ -479,7 +530,7 @@ function Hardware(props: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' |
           key={`${partId}-${items.length}`}
           build={props.build}
           items={items}
-          color={hardwareColor(props.guide.parts[items[0].partIndex]?.name ?? '')}
+          name={props.guide.parts[items[0].partIndex]?.name ?? ''}
           xRef={props.xRef}
           explodeRef={props.explodeRef}
           view={props.view}
@@ -523,6 +574,8 @@ function Trails({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObje
 function ActiveLabel({ build, guide, xRef, labels }: { build: GuideBuild; guide: InstallationGuideData; xRef: React.MutableRefObject<number>; labels: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
   const textRef = useRef<HTMLDivElement>(null);
+  const noRef = useRef<HTMLElement>(null);
+  const nameRef = useRef<HTMLSpanElement>(null);
   useFrame(() => {
     const x = xRef.current;
     let active: BuildItem | null = null;
@@ -540,12 +593,17 @@ function ActiveLabel({ build, guide, xRef, labels }: { build: GuideBuild; guide:
     const code = part?.code ? ` · ${part.code}` : '';
     const count = active.kind === 'hardware' ? ` · ${partCountAt(build, active.partId, x)}/${partUsedTotal(build, active.partId)}` : '';
     const text = `${part?.name ?? ''}${code}${count}`;
-    if (textRef.current.textContent !== text) textRef.current.textContent = text;
+    const no = String(partNumber(active.partIndex));
+    if (nameRef.current && nameRef.current.textContent !== text) nameRef.current.textContent = text;
+    if (noRef.current && noRef.current.textContent !== no) noRef.current.textContent = no;
   });
   return (
     <group ref={groupRef} visible={false}>
       <Html zIndexRange={[10, 0]} center style={{ pointerEvents: 'none' }}>
-        <div ref={textRef} className="whitespace-nowrap rounded-full border border-hairline bg-card/95 px-2.5 py-1 text-xs font-medium text-foreground shadow-overlay" />
+        <div ref={textRef} className="flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-hairline bg-card/95 py-1 pl-1 pr-2.5 text-xs font-medium text-foreground shadow-overlay">
+          <b ref={noRef} className="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1 text-[11px] text-background" />
+          <span ref={nameRef} />
+        </div>
       </Html>
     </group>
   );
@@ -578,6 +636,16 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideB
       ctx.font = '400 26px monospace';
       ctx.fillStyle = '#8fd8ff';
       ctx.fillText(`page ${step.page}`, 470, 34);
+      const used = step.parts_used.slice(0, 6);
+      used.forEach((u, i) => {
+        const idx = guide.parts.findIndex((p) => p.id === u.part_id);
+        if (idx < 0) return;
+        const x = 44 + i * 96;
+        numberBadge(ctx, partNumber(idx), x, 438, 18, '#ffd08a', '#0e1e30');
+        ctx.fillStyle = '#cfe9ff';
+        ctx.font = '500 22px monospace';
+        ctx.fillText(`×${u.quantity}`, x + 24, 427);
+      });
     };
     frame();
     if (stepTexRef.current) stepTexRef.current.needsUpdate = true;
@@ -591,7 +659,7 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideB
       const { x0, y0, x1, y1 } = step.box;
       const sw = (x1 - x0) * img.naturalWidth;
       const sh = (y1 - y0) * img.naturalHeight;
-      const k = Math.min(560 / sw, 360 / sh);
+      const k = Math.min(560 / sw, 300 / sh);
       const w = Math.round(sw * k);
       const h = Math.round(sh * k);
       const tmpCanvas = Object.assign(document.createElement('canvas'), { width: w, height: h });
@@ -611,12 +679,12 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideB
       } catch {
         return;
       }
-      ctx.drawImage(tmpCanvas, (620 - w) / 2, 96 + (360 - h) / 2);
+      ctx.drawImage(tmpCanvas, (620 - w) / 2, 96 + (300 - h) / 2);
       if (stepTexRef.current) stepTexRef.current.needsUpdate = true;
     };
     img.src = pageUrl;
     return () => { live = false; };
-  }, [step, stepIndex, pageUrl, stepCanvas]);
+  }, [step, stepIndex, pageUrl, stepCanvas, guide.parts]);
 
   const lastDrawn = useRef(-1);
   useFrame(() => {
@@ -626,6 +694,7 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideB
     if (x === lastDrawn.current) return;
     lastDrawn.current = x;
     const hw = guide.parts.filter((p) => p.kind === 'hardware').slice(0, 7);
+    const numberOf = (p: (typeof guide.parts)[number]) => partNumber(guide.parts.indexOf(p));
     ctx.fillStyle = 'rgba(14,30,48,0.92)';
     ctx.fillRect(0, 0, 620, 480);
     ctx.strokeStyle = '#8fe4ff';
@@ -646,12 +715,13 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef }: { build: GuideB
       const y = 82 + i * 54;
       const got = partCountAt(build, p.id, xRef.current);
       const shown = Math.min(p.quantity, 24);
+      numberBadge(ctx, numberOf(p), 44, y + 20, 17, '#cfe9ff', '#0e1e30');
       ctx.fillStyle = '#cfe9ff';
       ctx.font = '500 22px sans-serif';
-      ctx.fillText(p.name.slice(0, 18), 28, y);
+      ctx.fillText(p.name.slice(0, 15), 72, y);
       ctx.fillStyle = '#7fb8d8';
       ctx.font = '400 18px monospace';
-      ctx.fillText(p.code || '—', 28, y + 24);
+      ctx.fillText(p.code || '—', 72, y + 24);
       const bw = Math.min(14, 300 / shown);
       for (let k = 0; k < shown; k++) {
         ctx.fillStyle = k < (got / p.quantity) * shown ? '#ffd08a' : 'rgba(143,228,255,.28)';
@@ -687,6 +757,7 @@ export const GuideScene: React.FC<Props> = (props) => {
   const { build, guide, view, shot, shotVersion, xRef, explodeRef } = props;
   const scene = useThree((s) => s.scene);
   const gl = useThree((s) => s.gl);
+  useStudioLight(scene, gl, view === 'drawing' ? 0 : 0.28);
 
   useLayoutEffect(() => {
     scene.background = new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
@@ -753,7 +824,7 @@ function StepTags({ build, guide, xRef, explodeRef, stepIndex }: {
     for (const it of build.items) if (it.step === stepIndex && Number.isFinite(it.t0)) byPart.set(it.partId, it);
     return [...byPart.values()].slice(0, 10).map((it) => {
       const part = guide.parts[it.partIndex];
-      return { it, text: [part?.name, part?.code].filter(Boolean).join(' · ') };
+      return { it, no: partNumber(it.partIndex), text: [part?.name, part?.code].filter(Boolean).join(' · ') };
     });
   }, [build.items, guide.parts, stepIndex]);
   const refs = useRef<Array<THREE.Group | null>>([]);
@@ -774,7 +845,9 @@ function StepTags({ build, guide, xRef, explodeRef, stepIndex }: {
       {tags.map((t, i) => (
         <group key={t.it.key} ref={(g) => { refs.current[i] = g; }}>
           <Html zIndexRange={[10, 0]} center style={{ pointerEvents: 'none' }}>
-            <div ref={(el) => { texts.current[i] = el; }} className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
+            <div ref={(el) => { texts.current[i] = el; }} className="flex items-center gap-1 whitespace-nowrap rounded-sm border border-hairline bg-card/90 py-0.5 pl-0.5 pr-1.5 text-[11px] text-foreground">
+              <b className="grid h-4 min-w-4 place-items-center rounded-full bg-foreground px-0.5 text-[10px] text-background">{t.no}</b>{t.text}
+            </div>
           </Html>
         </group>
       ))}
@@ -785,12 +858,12 @@ function StepTags({ build, guide, xRef, explodeRef, stepIndex }: {
 function StartTags({ build, guide }: { build: GuideBuild; guide: InstallationGuideData }) {
   const tags = useMemo(() => {
     const seen = new Set<string>();
-    const out: Array<{ key: string; text: string; pos: [number, number, number] }> = [];
+    const out: Array<{ key: string; no: number; text: string; pos: [number, number, number] }> = [];
     for (const it of build.items) {
       if (it.kind !== 'panel' || seen.has(it.partId)) continue;
       seen.add(it.partId);
       const part = guide.parts[it.partIndex];
-      out.push({ key: it.partId, text: `${part?.quantity > 1 ? `${part.quantity} × ` : ''}${part?.name ?? ''}`, pos: [it.kit.pos.x, it.kit.pos.y + 0.05, it.kit.pos.z] });
+      out.push({ key: it.partId, no: partNumber(it.partIndex), text: `${part?.quantity > 1 ? `${part.quantity} × ` : ''}${part?.name ?? ''}`, pos: [it.kit.pos.x, it.kit.pos.y + 0.05, it.kit.pos.z] });
     }
     return out.slice(0, 12);
   }, [build.items, guide.parts]);
@@ -798,7 +871,9 @@ function StartTags({ build, guide }: { build: GuideBuild; guide: InstallationGui
     <group>
       {tags.map((t) => (
         <Html zIndexRange={[10, 0]} key={t.key} position={t.pos} center style={{ pointerEvents: 'none' }}>
-          <div className="whitespace-nowrap rounded-sm border border-hairline bg-card/90 px-1.5 py-0.5 text-[11px] text-foreground">{t.text}</div>
+          <div className="flex items-center gap-1 whitespace-nowrap rounded-sm border border-hairline bg-card/90 py-0.5 pl-0.5 pr-1.5 text-[11px] text-foreground">
+            <b className="grid h-4 min-w-4 place-items-center rounded-full bg-foreground px-0.5 text-[10px] text-background">{t.no}</b>{t.text}
+          </div>
         </Html>
       ))}
     </group>

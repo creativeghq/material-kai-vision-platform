@@ -118,6 +118,12 @@ type Box = { center: Vec3; size: Vec3 };
 const smallestAxis = (s: Vec3): Axis => (s.x <= s.y && s.x <= s.z ? 'x' : s.y <= s.z ? 'y' : 'z');
 const largestAxis = (s: Vec3): Axis => (s.x >= s.y && s.x >= s.z ? 'x' : s.y >= s.z ? 'y' : 'z');
 const unit = (a: Axis, sign = 1): Vec3 => v(a === 'x' ? sign : 0, a === 'y' ? sign : 0, a === 'z' ? sign : 0);
+const outwardQuat = (a: Axis, sign: number): Quat => {
+  const t = unit(a, sign);
+  if (t.y > 0.5) return IDENTITY;
+  if (t.y < -0.5) return axisAngle(v(1, 0, 0), Math.PI);
+  return axisAngle(v(t.z, 0, -t.x), Math.PI / 2);
+};
 const flatQuat = (s: Vec3): Quat => {
   const a = smallestAxis(s);
   return a === 'x' ? axisAngle(v(0, 0, 1), Math.PI / 2) : a === 'z' ? axisAngle(v(1, 0, 0), -Math.PI / 2) : IDENTITY;
@@ -409,7 +415,7 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
             key: `${p.id}#${unitIndex}`, partId: p.id, partIndex: i, instance: unitIndex, kind: 'hardware', step: use.step,
             t0: 0, ta: 0, size: dims, kit: { pos: kitPos, quat: lying },
             approach: add(local, scale(unit(normal, sign), dims.y * 1.8 + 0.05)),
-            target: { pos: local, quat: alongQuat(normal) }, host: hostIndex,
+            target: { pos: local, quat: outwardQuat(normal, sign) }, host: hostIndex,
             spin: /screw|cam|bolt|lock|foot|leg/i.test(p.name), placed: true, explode: v(0, 0, 0), weight: 1,
           };
         } else {
