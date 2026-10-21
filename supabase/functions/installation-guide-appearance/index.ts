@@ -193,7 +193,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
 
     const { error: saveError } = await admin.from('installation_guides').update({ appearance }).eq('id', guide.id);
     if (saveError) throw new Error(`The finishes could not be saved: ${saveError.message}`);
-    return json({ success: true, appearance });
+    return json({ success: true, appearance, used_preview: !!fallbackUrl && photoUrl === fallbackUrl && photoUrl !== imageUrl });
   } catch (err) {
     await refund(err instanceof Error ? err.message : 'read failed');
     throw err;

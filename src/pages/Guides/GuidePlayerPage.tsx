@@ -44,7 +44,13 @@ function StepWords({ guide, build, index, x }: { guide: InstallationGuideData; b
   );
 }
 
-function ManualCrop({ url, step, aspect, onOpen, tall = false }: { url: string | null; step: GuideStep | undefined; aspect: number; onOpen: () => void; tall?: boolean }) {
+const BLUEPRINT_SHEET: React.CSSProperties = {
+  backgroundColor: '#0c3866',
+  backgroundImage: 'linear-gradient(rgba(255,255,255,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.09) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px)',
+  backgroundSize: '80px 80px, 80px 80px, 16px 16px, 16px 16px',
+};
+
+function ManualCrop({ url, step, aspect, onOpen, tall = false, blueprint = false }: { url: string | null; step: GuideStep | undefined; aspect: number; onOpen: () => void; tall?: boolean; blueprint?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [box, setBox] = useState({ w: 300, h: 210 });
   useEffect(() => {
@@ -64,6 +70,7 @@ function ManualCrop({ url, step, aspect, onOpen, tall = false }: { url: string |
     backgroundSize: `${p}px ${p * aspect}px`,
     backgroundPosition: `${(box.w - u * p) / 2 - x0 * p}px ${(box.h - d * p) / 2 - y0 * p * aspect}px`,
     backgroundRepeat: 'no-repeat',
+    ...(blueprint ? { filter: 'invert(1) contrast(1.4)', mixBlendMode: 'screen' as const } : {}),
   } : {};
   return (
     <button
@@ -71,7 +78,8 @@ function ManualCrop({ url, step, aspect, onOpen, tall = false }: { url: string |
       type="button"
       onClick={onOpen}
       aria-label="The current step's drawing from the manual"
-      className={cn('relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-white', tall ? 'h-[min(52dvh,460px)]' : 'h-[clamp(110px,calc(100vh-520px),210px)]')}
+      className={cn('relative block w-full cursor-zoom-in overflow-hidden rounded-sm', blueprint ? 'border border-white/40' : 'bg-white', tall ? 'h-[min(52dvh,460px)]' : 'h-[clamp(110px,calc(100vh-520px),210px)]')}
+      style={blueprint ? BLUEPRINT_SHEET : undefined}
     >
       <i key={`${step.page}-${x0}-${y0}`} className="absolute inset-0 animate-in fade-in duration-300" style={style} />
     </button>
@@ -511,54 +519,54 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
 
       <HowItWorks open={howOpen} onOpenChange={setHowOpen} guide={guide} build={build} />
       <Dialog open={board !== null} onOpenChange={(o) => { if (!o) setBoard(null); }}>
-        <DialogContent className="flex max-h-[92dvh] max-w-3xl flex-col gap-3 overflow-y-auto p-3 sm:p-5">
+        <DialogContent className="flex max-h-[92dvh] max-w-3xl flex-col gap-3 overflow-y-auto border-[#7fc4ff] p-3 text-white sm:p-5 [&>button]:text-white" style={BLUEPRINT_SHEET}>
           {board === 'step' && current && (
             <>
               <DialogHeader className="text-left">
-                <DialogTitle className="font-sans">{step ? `Step ${step} · ${current.title}` : current.title}</DialogTitle>
-                <DialogDescription>Page {current.page} of the manual</DialogDescription>
+                <DialogTitle className="font-mono text-lg uppercase tracking-wider text-white">{step ? `Step ${step} · ${current.title}` : current.title}</DialogTitle>
+                <DialogDescription className="font-mono text-xs uppercase tracking-widest text-sky-200">Sheet {current.page} of the manual · {guide.title}</DialogDescription>
               </DialogHeader>
-              <ManualCrop tall url={pageUrl} step={current} aspect={pageAspects[current.page - 1] ?? row.page_aspect} onOpen={() => { setBoard(null); setBookOpen(true); }} />
-              {words}
+              <ManualCrop tall blueprint url={pageUrl} step={current} aspect={pageAspects[current.page - 1] ?? row.page_aspect} onOpen={() => { setBoard(null); setBookOpen(true); }} />
+              <div className="text-sm text-white [&_span]:!text-sky-200">{words}</div>
               {current.parts_used.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {current.parts_used.map((u) => {
                     const idx = guide.parts.findIndex((p) => p.id === u.part_id);
                     if (idx < 0) return null;
                     return (
-                      <Button key={u.part_id} variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => holdPart(u.part_id)}>
-                        <b className="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1 text-[11px] text-background">{partNumber(idx)}</b>
-                        {guide.parts[idx].name}<span className="text-muted-foreground">×{u.quantity}</span>
-                      </Button>
+                      <button key={u.part_id} type="button" className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-white/60 px-2 font-mono text-xs text-white hover:bg-white/10" onClick={() => holdPart(u.part_id)}>
+                        <b className="grid h-5 min-w-5 place-items-center rounded-full border border-white px-1 text-[11px]">{partNumber(idx)}</b>
+                        {guide.parts[idx].name}<span className="text-sky-200">×{u.quantity}</span>
+                      </button>
                     );
                   })}
                 </div>
               )}
-              <Button variant="ghost" size="sm" className="self-start gap-1.5" onClick={() => { setBoard(null); setBookOpen(true); }}><BookOpen className="h-4 w-4" />Open the manual at this page</Button>
+              <button type="button" className="inline-flex items-center gap-1.5 self-start font-mono text-xs uppercase tracking-wider text-sky-200 hover:text-white" onClick={() => { setBoard(null); setBookOpen(true); }}><BookOpen className="h-4 w-4" />Open the manual at this page</button>
             </>
           )}
           {board === 'hardware' && (
             <>
               <DialogHeader className="text-left">
-                <DialogTitle className="font-sans">Hardware</DialogTitle>
-                <DialogDescription>{counts.hardware} of {build.hardwareTotal} pieces in so far. Tap one to hold it.</DialogDescription>
+                <DialogTitle className="font-mono text-lg uppercase tracking-wider text-white">Hardware schedule</DialogTitle>
+                <DialogDescription className="font-mono text-xs uppercase tracking-widest text-sky-200">{counts.hardware} of {build.hardwareTotal} pieces in · tap one to hold it</DialogDescription>
               </DialogHeader>
-              <ul className="divide-y divide-hairline">
+              <ul className="divide-y divide-white/20 border-y border-white/30">
                 {guide.parts.map((p, idx) => ({ p, idx })).filter(({ p }) => p.kind === 'hardware' || p.kind === 'accessory').map(({ p, idx }) => {
                   const got = partCountAt(build, p.id, x);
                   const total = partUsedTotal(build, p.id) || p.quantity;
                   return (
                     <li key={p.id}>
-                      <button type="button" onClick={() => holdPart(p.id)} className="flex w-full items-center gap-3 py-2 text-left hover:bg-muted/50">
-                        <b className="grid h-6 min-w-6 place-items-center rounded-full bg-foreground px-1 text-xs text-background">{partNumber(idx)}</b>
+                      <button type="button" onClick={() => holdPart(p.id)} className="flex w-full items-center gap-3 px-1 py-2 text-left hover:bg-white/10">
+                        <b className="grid h-6 min-w-6 place-items-center rounded-full border border-white px-1 font-mono text-xs">{partNumber(idx)}</b>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">{p.name}</span>
-                          <span className="block font-mono text-[11px] text-muted-foreground">{p.code || '—'}</span>
+                          <span className="block truncate font-mono text-sm uppercase tracking-wide">{p.name}</span>
+                          <span className="block font-mono text-[11px] text-sky-200">{p.code || '—'}</span>
                         </span>
-                        <span className="hidden h-1.5 w-28 overflow-hidden rounded-full bg-muted sm:block">
-                          <span className="block h-full bg-amber-500" style={{ width: `${Math.min(100, (got / Math.max(total, 1)) * 100)}%` }} />
+                        <span className="hidden h-1.5 w-28 overflow-hidden border border-white/50 sm:block">
+                          <span className="block h-full bg-white" style={{ width: `${Math.min(100, (got / Math.max(total, 1)) * 100)}%` }} />
                         </span>
-                        <span className="w-14 text-right text-sm tabular-nums">{got}/{total}</span>
+                        <span className="w-14 text-right font-mono text-sm tabular-nums">{got}/{total}</span>
                       </button>
                     </li>
                   );

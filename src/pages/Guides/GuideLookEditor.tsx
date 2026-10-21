@@ -89,12 +89,12 @@ export function GuideLookEditor({ row, onSaved, toast }: {
       : { image_url: picked, fallback_url: candidates?.find((c) => c.full === picked)?.thumb };
     setBusy('read');
     try {
-      const appearance = await installationGuideService.readAppearance(row.id, source);
+      const { appearance, usedPreview } = await installationGuideService.readAppearance(row.id, source);
       onSaved(appearance);
-      setCandidates(null);
-      setPicked('');
       setAddress('');
-      toast({ title: 'Finishes read', description: `${appearance.finishes.length} finishes found. Check them below.` });
+      toast(usedPreview
+        ? { title: 'Read from a small preview', description: 'The full photo could not be downloaded, so the colours came from the search preview and textures will look soft. Pick another photo or paste the product page for a sharper result.' }
+        : { title: 'Finishes read', description: `${appearance.finishes.length} finishes and the room are now on the 3D. Check them below.` });
     } catch (e) {
       toast({ title: 'The finishes could not be read', description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
     } finally {
@@ -155,10 +155,13 @@ export function GuideLookEditor({ row, onSaved, toast }: {
                   key={c.full}
                   type="button"
                   onClick={() => { setPicked(c.full); setAddress(''); }}
-                  className={cn('aspect-square overflow-hidden rounded-sm border bg-white', picked === c.full ? 'border-primary ring-2 ring-primary' : 'border-hairline')}
+                  className={cn('relative aspect-square overflow-hidden rounded-sm border bg-white', picked === c.full ? 'border-primary ring-2 ring-primary' : 'border-hairline')}
                   title={c.title ?? undefined}
                 >
                   <img src={c.thumb} alt={c.title ?? 'Product photo'} className="h-full w-full object-contain" loading="lazy" />
+                  {(draft?.source_url === c.full || draft?.source_url === c.thumb) && (
+                    <span className="absolute inset-x-0 bottom-0 bg-primary py-0.5 text-center text-[10px] font-semibold text-primary-foreground">In use</span>
+                  )}
                 </button>
               ))}
             </div>
