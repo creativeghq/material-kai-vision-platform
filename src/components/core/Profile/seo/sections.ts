@@ -37,6 +37,15 @@ export const SEO_SECTION_GROUPS = {
   activity: 'Activity',
 } as const;
 
+export const AI_CITATIONS_VIEWS = [
+  { value: 'overview', label: '1. Where you stand' },
+  { value: 'asked', label: '2. What we ask' },
+  { value: 'discover', label: '3. Find questions' },
+  { value: 'pages', label: '4. Put them on pages' },
+  { value: 'beyond', label: '5. Beyond the chat' },
+] as const;
+export type AiCitationsView = typeof AI_CITATIONS_VIEWS[number]['value'];
+
 export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard, landing: true },
 
@@ -66,7 +75,7 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
     ],
   },
 
-  { value: 'ai', label: 'AI Citations', icon: Sparkles, group: 'visibility' },
+  { value: 'ai', label: 'AI Citations', icon: Sparkles, group: 'visibility', views: AI_CITATIONS_VIEWS },
   {
     value: 'authority', label: 'Authority', icon: Radar, group: 'visibility',
     views: [{ value: 'summary', label: 'Backlinks & authority' }, { value: 'history', label: 'Audit history' }],

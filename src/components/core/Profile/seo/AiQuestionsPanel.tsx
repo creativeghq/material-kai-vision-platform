@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, ExternalLink, Loader2, Pencil, Plus, Search } from 'lucide-react';
+import { Check, ExternalLink, FilePlus2, Loader2, Pencil, Plus, Search } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -10,13 +10,10 @@ import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { HubToolbar } from '@/components/core/hub/HubToolbar';
 import { formatDate } from '@/utils/datetime';
 import { compact, statusPresentation } from './seoMetrics';
-import { formatUsd, PLATFORM_LABEL, type AiQuestionSource, type AiQuestionsReport, type SearchQuestion } from './aiCitations';
+import {
+  formatUsd, PLATFORM_LABEL, questionNorm, urlPath, type AiQuestionSource, type AiQuestionsReport, type SearchQuestion,
+} from './aiCitations';
 import { safeHref } from '@/utils/safeUrl';
-
-const pathOf = (url: string | null): string => {
-  if (!url) return '—';
-  try { return new URL(url).pathname || '/'; } catch { return url; }
-};
 
 const TOPIC_LIMIT = 10;
 
@@ -58,7 +55,10 @@ export const AiQuestionsPanel: React.FC<{
   trackLimit: number;
   onTrack: (question: string, source: AiQuestionSource) => Promise<void>;
   onSaveTopics: (topics: string[]) => Promise<void>;
-}> = ({ report, canTrack, trackedCount, trackLimit, onTrack, onSaveTopics }) => {
+  /** Normalised question → the page it is assigned to. */
+  assignedPages?: ReadonlyMap<string, string>;
+  onPutOnPage?: (question: string, source: AiQuestionSource) => void;
+}> = ({ report, canTrack, trackedCount, trackLimit, onTrack, onSaveTopics, assignedPages, onPutOnPage }) => {
   const [tab, setTab] = useState<Tab>('market');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -114,6 +114,25 @@ export const AiQuestionsPanel: React.FC<{
       </Button>
     );
   };
+
+  const pageButton = (question: string, source: AiQuestionSource) => {
+    if (!onPutOnPage) return null;
+    const on = assignedPages?.get(questionNorm(question));
+    if (on) {
+      return <span className="inline-flex max-w-[160px] items-center gap-1 truncate text-xs text-muted-foreground" title={on}><Check className="h-3.5 w-3.5 shrink-0" />{urlPath(on)}</span>;
+    }
+    return (
+      <Button size="sm" variant="ghost" title="Choose the page on your site that should answer this question." onClick={() => onPutOnPage(question, source)}>
+        <FilePlus2 className="mr-1 h-3.5 w-3.5" />Put on a page
+      </Button>
+    );
+  };
+  const actions = (question: string, tracked: boolean, source: AiQuestionSource) => (
+    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+      {pageButton(question, source)}
+      {trackButton(question, tracked, source)}
+    </div>
+  );
 
   const statuses = report?.cited.status ?? [];
 
@@ -254,7 +273,7 @@ export const AiQuestionsPanel: React.FC<{
                                 : !r.cites_you && <span className="text-muted-foreground">No source</span>}
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">{PLATFORM_LABEL[r.platform] ?? r.platform}</td>
-                            <td className="px-3 py-2 text-right">{trackButton(r.question, r.tracked, 'ai_market')}</td>
+                            <td className="px-3 py-2 text-right">{actions(r.question, r.tracked, 'ai_market')}</td>
                           </tr>
                           {openAnswer === key && r.answer && (
                             <tr>
@@ -334,14 +353,14 @@ export const AiQuestionsPanel: React.FC<{
                             <td className="px-3 py-2 text-xs">
                               {first ? (
                                 <a href={safeHref(first.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                                  {pathOf(first.url)}<ExternalLink className="h-3 w-3" />
+                                  {urlPath(first.url)}<ExternalLink className="h-3 w-3" />
                                 </a>
                               ) : '—'}
                               {first?.position != null && <span className="ml-1 text-muted-foreground">· source #{first.position} of {r.source_count}</span>}
                               {r.our_sources.length > 1 && <span className="ml-1 text-muted-foreground">+{r.our_sources.length - 1}</span>}
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">{r.last_response_at ? formatDate(r.last_response_at) : '—'}</td>
-                            <td className="px-3 py-2 text-right">{trackButton(r.question, r.tracked, 'ai_cited')}</td>
+                            <td className="px-3 py-2 text-right">{actions(r.question, r.tracked, 'ai_cited')}</td>
                           </tr>
                           {openAnswer === key && r.answer && (
                             <tr>
@@ -396,12 +415,12 @@ export const AiQuestionsPanel: React.FC<{
                         <td className="px-3 py-2 text-xs">
                           {r.top_page ? (
                             <a href={safeHref(r.top_page)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                              {pathOf(r.top_page)}<ExternalLink className="h-3 w-3" />
+                              {urlPath(r.top_page)}<ExternalLink className="h-3 w-3" />
                             </a>
                           ) : '—'}
                         </td>
                         <td className="px-3 py-2"><Badge variant={AIO_BADGE[r.ai_overview].variant}>{AIO_BADGE[r.ai_overview].label}</Badge></td>
-                        <td className="px-3 py-2 text-right">{trackButton(r.query, r.tracked, 'gsc')}</td>
+                        <td className="px-3 py-2 text-right">{actions(r.query, r.tracked, 'gsc')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -441,7 +460,7 @@ export const AiQuestionsPanel: React.FC<{
                         <td className="px-3 py-2 text-xs text-muted-foreground">{r.keywords.length > 0 ? r.keywords.join(', ') : '—'}</td>
                         <td className="px-3 py-2 text-right text-xs tabular-nums">{r.seen}</td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{r.last_seen ? formatDate(r.last_seen) : '—'}</td>
-                        <td className="px-3 py-2 text-right">{trackButton(r.question, r.tracked, 'paa')}</td>
+                        <td className="px-3 py-2 text-right">{actions(r.question, r.tracked, 'paa')}</td>
                       </tr>
                     ))}
                   </tbody>

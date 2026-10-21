@@ -8,7 +8,10 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AiCitationReport, AiKeywordVolumes, AiQuestionsReport, AiReferrals, CitabilityReport, CitedPageComparison, LlmMentionsReport } from '@/components/core/Profile/seo/aiCitations';
+import type {
+  AiCitationReport, AiKeywordVolumes, AiQuestionsReport, AiReferrals, CitabilityReport, CitedPageComparison, LlmMentionsReport,
+  QuestionAssignment, QuestionPageSource, QuestionPageSuggestion,
+} from '@/components/core/Profile/seo/aiCitations';
 import type { AiCrawls } from '@/components/core/Profile/seo/aiCrawlers';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type { GaBreakdowns, GaDrillQuery, GaDrillResult, GaJourney } from '@/components/core/Profile/seo/gaBreakdowns';
@@ -1757,6 +1760,33 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as AiQuestionsReport) ?? null;
+  },
+
+  async suggestPagesForQuestion(websiteId: string, question: string, limit = 5): Promise<QuestionPageSuggestion[]> {
+    const { data, error } = await supabase.rpc(
+      'suggest_pages_for_question' as any,
+      { p_website_id: websiteId, p_question: question, p_limit: limit } as any,
+    );
+    if (error) throw error;
+    return (data as QuestionPageSuggestion[]) ?? [];
+  },
+
+  async assignQuestionToPage(pageId: string, question: string, source: QuestionPageSource): Promise<{ id: string; status: 'open' | 'applied'; created: boolean }> {
+    const { data, error } = await supabase.rpc(
+      'assign_question_to_page' as any,
+      { p_page_id: pageId, p_question: question, p_question_source: source } as any,
+    );
+    if (error) throw error;
+    return data as { id: string; status: 'open' | 'applied'; created: boolean };
+  },
+
+  async questionAssignments(websiteId: string): Promise<QuestionAssignment[] | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_question_assignments' as any,
+      { p_website_id: websiteId } as any,
+    );
+    if (error) throw error;
+    return (data as QuestionAssignment[] | null) ?? null;
   },
 
   /** An empty list returns the site to topics derived from its tracked keywords. */

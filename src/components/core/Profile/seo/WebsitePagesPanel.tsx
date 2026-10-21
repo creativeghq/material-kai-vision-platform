@@ -359,7 +359,7 @@ const PageDrawer: React.FC<{ websiteId: string; pageId: string | null; onClose: 
                   {detail.recommendations.map((r) => (
                     <div key={r.id} className="space-y-1 p-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold">{PAGE_RECOMMENDATION_KIND_LABELS[r.kind]}</span>
+                        <span className="text-xs font-semibold">{r.source === 'ai_questions' ? 'Question to answer' : PAGE_RECOMMENDATION_KIND_LABELS[r.kind]}</span>
                         <Badge variant={STATUS_TONE[r.status]}>{PAGE_RECOMMENDATION_STATUS_LABELS[r.status]}</Badge>
                         <div className="ml-auto flex gap-1">
                           <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void copy(r.proposed_value)} aria-label="Copy">

@@ -34,7 +34,7 @@ import { WebsiteDomainAuditsPanel } from '@/components/core/Profile/WebsiteDomai
 import { WebsiteCannibalisationPanel } from '@/components/core/Profile/WebsiteCannibalisationPanel';
 import { WebsiteBrandProfilePanel } from '@/components/core/Profile/WebsiteBrandProfilePanel';
 import { HubRailSectionLabel, HubStatGrid, HubStatTile, HubTabNav } from '@/components/core/hub';
-import { resolveSeoTarget, seoRailRows, seoSectionViews, type SeoSectionId } from '@/components/core/Profile/seo/sections';
+import { resolveSeoTarget, seoRailRows, seoSectionViews, type AiCitationsView, type SeoSectionId } from '@/components/core/Profile/seo/sections';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -194,8 +194,9 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
         </TabsContent>
 
         <TabsContent value="ai" className="space-y-4">
-          <WebsiteAiVisibilityPanel website={website} />
-          <PresencePlanCard websiteId={website.id} />
+          {viewStrip('ai')}
+          <WebsiteAiVisibilityPanel website={website} view={(view ?? 'overview') as AiCitationsView} onOpenView={(v) => writeTarget('ai', v)} />
+          {view === 'beyond' && <PresencePlanCard websiteId={website.id} />}
         </TabsContent>
 
         <TabsContent value="gsc" className="space-y-4">

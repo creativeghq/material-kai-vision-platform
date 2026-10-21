@@ -698,7 +698,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         <Header icon="🧭" title={`Presence plan: ${data.brand}`} subtitle={`${(data.keywords || []).join(' · ')}`} />
         <PresencePlatforms platforms={data.platforms || []} />
         {data.website_id && (
-          <a className="text-[11px] text-primary underline" href={`/websites/${data.website_id}?section=ai`}>Open in Website → AI Citations</a>
+          <a className="text-[11px] text-primary underline" href={`/websites/${data.website_id}?section=ai&view=beyond`}>Open in Website → AI Citations</a>
         )}
       </Card>
     );

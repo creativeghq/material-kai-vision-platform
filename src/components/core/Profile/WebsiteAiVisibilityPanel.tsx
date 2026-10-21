@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bot, ChevronDown, ChevronRight, Loader2, MessageSquareQuote, Play, Power, Plus, Quote, Users } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ArrowRight, Bot, ChevronDown, ChevronRight, FilePlus2, Loader2, MessageSquareQuote, Play, Power, Plus, Quote, Users } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -42,12 +42,15 @@ import { AiReferralsPanel } from './seo/AiReferralsPanel';
 import { AiCrawlersPanel } from './seo/AiCrawlersPanel';
 import { CitabilityPanel } from './seo/CitabilityPanel';
 import { LlmMentionsPanel } from './seo/LlmMentionsPanel';
+import { QuestionPagePicker } from './seo/QuestionPagePicker';
+import { QuestionPagesPanel } from './seo/QuestionPagesPanel';
 import { Sparkline } from './seo/Sparkline';
 import {
   VERDICT_BADGE, VERDICT_FILL, VERDICT_LABEL, answerVerdict, displayHost, formatUsd, modelLabel,
-  withRosterEngines, type AiQuestionSource,
+  questionNorm, withRosterEngines, type AiQuestionSource, type QuestionAssignment, type QuestionPageSource,
 } from './seo/aiCitations';
 import { compact, statusPresentation } from './seo/seoMetrics';
+import type { AiCitationsView } from './seo/sections';
 import { safeHref } from '@/utils/safeUrl';
 
 /** The feed's own health, above its numbers. */
@@ -150,7 +153,47 @@ const RivalList: React.FC<{ rivals: AiRival[]; empty: string }> = ({ rivals, emp
 
 const PROBE_LIMIT = 12;
 
-export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
+const STEP: Record<AiCitationsView, { intro: string; next?: { view: AiCitationsView; label: string } }> = {
+  overview: {
+    intro: 'We put a buyer’s questions to ChatGPT, Claude, Gemini and Perplexity on a schedule. This is how often they name you, link you, and who they pick instead.',
+    next: { view: 'asked', label: 'See the questions we ask' },
+  },
+  asked: {
+    intro: 'Every number in step 1 comes from these questions. If they are not what your customers really ask, change them here.',
+    next: { view: 'discover', label: 'Find better questions' },
+  },
+  discover: {
+    intro: 'Real questions people ask, from AI answers in your market, your own Google searches and People Also Ask. Track one to measure it, or put it on a page so you can rank for it.',
+    next: { view: 'pages', label: 'See which page answers what' },
+  },
+  pages: {
+    intro: 'Each question goes to the page that should answer it. Answer it on the site, under the question as a heading, and the next crawl marks it done.',
+    next: { view: 'beyond', label: 'Mentions and traffic from AI' },
+  },
+  beyond: {
+    intro: 'What the assistants say about you elsewhere in your market, the visits they send you, and where else the brand should appear.',
+  },
+};
+
+const StepIntro: React.FC<{ view: AiCitationsView; onOpenView?: (v: AiCitationsView) => void }> = ({ view, onOpenView }) => {
+  const step = STEP[view];
+  return (
+    <div className="flex flex-col gap-2 rounded-sm border border-hairline bg-surface-sunken px-3 py-2 sm:flex-row sm:items-center">
+      <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">{step.intro}</p>
+      {step.next && onOpenView && (
+        <Button size="sm" variant="ghost" className="shrink-0 self-start sm:self-auto" onClick={() => onOpenView(step.next!.view)}>
+          {step.next.label}<ArrowRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+};
+
+export const WebsiteAiVisibilityPanel: React.FC<{
+  website: UserWebsite;
+  view?: AiCitationsView;
+  onOpenView?: (view: AiCitationsView) => void;
+}> = ({ website, view = 'overview', onOpenView }) => {
   const { toast } = useToast();
   const { isPlatformOperator } = useWorkspace();
   const [data, setData] = useState<AiVisibility | null>(null);
@@ -174,9 +217,17 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const [answers, setAnswers] = useState<AiAnswers | null>(null);
   const [openAnswer, setOpenAnswer] = useState<Record<string, boolean>>({});
   const [openQuestion, setOpenQuestion] = useState<Record<string, boolean>>({});
+  const [assignments, setAssignments] = useState<QuestionAssignment[] | null>(null);
+  const [placing, setPlacing] = useState<{ question: string; source: QuestionPageSource } | null>(null);
+  const loadAssignments = useCallback(async () => {
+    setAssignments(await userWebsitesService.questionAssignments(website.id).catch(() => null));
+  }, [website.id]);
+  const assignedPages = useMemo(
+    () => new Map((assignments ?? []).map((a) => [a.question_norm || questionNorm(a.question), a.url])),
+    [assignments],
+  );
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       // `allSettled`: the monitoring state is the thing that EXPLAINS an empty or
       // stale report, so it must still render when the report itself fails.
@@ -278,7 +329,8 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadAssignments();
+  }, [load, loadAssignments]);
 
   // ── What we ask ───────────────────────────────────────────────────────────
   // The stock questions are rendered from the subject's facets, and a subject
@@ -462,6 +514,63 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     />
   );
 
+  const picker = (
+    <QuestionPagePicker
+      websiteId={website.id}
+      question={placing?.question ?? null}
+      source={placing?.source ?? 'manual'}
+      onClose={() => setPlacing(null)}
+      onAssigned={() => void loadAssignments()}
+    />
+  );
+  const putOnPage = (question: string, source: QuestionPageSource) => setPlacing({ question, source });
+
+  const questionsPanel = (
+    <AiQuestionsPanel
+      report={questions}
+      canTrack={!!state?.own_brand_subject_id}
+      trackedCount={probeCount}
+      trackLimit={PROBE_LIMIT}
+      onTrack={trackQuestion}
+      assignedPages={assignedPages}
+      onPutOnPage={putOnPage}
+      onSaveTopics={async (topics) => {
+        try {
+          await userWebsitesService.setAiQuestionTopics(website.id, topics);
+        } catch (e: any) {
+          toast({ title: 'Could not save the topics', description: e?.message, variant: 'destructive' });
+          throw e;
+        }
+        toast({ title: 'Topics saved', description: 'The next LLM Mentions read searches the market for them.' });
+        setQuestions(await userWebsitesService.aiQuestions(website.id, 90).catch(() => questions));
+      }}
+    />
+  );
+
+  const citabilityPanel = (
+    <CitabilityPanel
+      report={citability}
+      onAnalyse={async (question) => {
+        try {
+          await userWebsitesService.analyseCitability(website.id, question);
+          setCitability(await userWebsitesService.citabilityReport(website.id, 90));
+        } catch (e: any) {
+          toast({ title: 'Could not read the page', description: e?.message, variant: 'destructive' });
+        }
+      }}
+      onCompare={async (question, url) => {
+        try {
+          return await userWebsitesService.compareCitedPage(website.id, question, url);
+        } catch (e: any) {
+          toast({ title: 'Could not compare the pages', description: e?.message, variant: 'destructive' });
+          return null;
+        }
+      }}
+    />
+  );
+
+  const intro = <StepIntro view={view} onOpenView={onOpenView} />;
+
   if (loading) {
     return (
       <Card className="dashboard-card">
@@ -472,9 +581,226 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     );
   }
 
-  if (!data || data.status === 'not_collected') {
+  // Steps 3-5 read their own sources, so they work before anything has been asked.
+  if (view === 'discover') return <div className="space-y-4">{intro}{questionsPanel}{picker}</div>;
+  if (view === 'pages') {
     return (
       <div className="space-y-4">
+        {intro}
+        <QuestionPagesPanel
+          websiteId={website.id}
+          assignments={assignments}
+          onChanged={() => void loadAssignments()}
+          onFindQuestions={() => onOpenView?.('discover')}
+        />
+        {citabilityPanel}
+      </div>
+    );
+  }
+  if (view === 'beyond') {
+    return (
+      <div className="space-y-4">
+        {intro}
+        {corpusPanel}
+        <AiReferralsPanel websiteId={website.id} />
+        {isPlatformOperator && <AiCrawlersPanel websiteId={website.id} />}
+      </div>
+    );
+  }
+
+  const tier = state?.own_brand_probe_tier ?? 'cheap';
+  const tierRoster = roster?.tiers?.[tier] ?? [];
+  const questionCard = (
+      <Card className="dashboard-card">
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquareQuote className="h-4 w-4 text-primary" />
+                Question by question
+              </CardTitle>
+              <CardDescription>
+                Every assistant&rsquo;s latest answer to every question we ask. They are the measurement — if they
+                are not what your customers ask, nothing above means anything.
+              </CardDescription>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              {(answers?.questions.length ?? 0) > 1 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const all = answers?.questions ?? [];
+                    const anyOpen = all.some((q) => openQuestion[`${q.subject}:${q.template_key}`]);
+                    setOpenQuestion(anyOpen ? {} : Object.fromEntries(all.map((q) => [`${q.subject}:${q.template_key}`, true])));
+                  }}
+                >
+                  {(answers?.questions ?? []).some((q) => openQuestion[`${q.subject}:${q.template_key}`]) ? 'Collapse all' : 'Expand all'}
+                </Button>
+              )}
+              {state?.own_brand_subject_id && (
+                <Button size="sm" variant="outline" onClick={() => void openEditor()}>
+                  Edit questions
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const questions = answers?.questions ?? [];
+            if (questions.length === 0) {
+              return (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {answers
+                    ? `No question was asked about this site in the last ${answers.window_days} days.`
+                    : 'The answers could not be loaded, so this is unknown.'}
+                </p>
+              );
+            }
+            // Every assistant the tier asks for gets a chip, so one that never ran is
+            // a visible gap rather than a column that quietly does not exist.
+            const rosterModels = tierRoster.map((m) => m.model);
+            const seenModels = Array.from(new Set(questions.flatMap((q) => q.answers.map((a) => a.model))));
+            const allModels = Array.from(new Set([...rosterModels, ...seenModels]));
+            return (
+              <ul className="divide-y divide-hairline rounded-sm border border-hairline">
+                {questions.map((q) => {
+                  const qKey = `${q.subject}:${q.template_key}`;
+                  const qOpen = !!openQuestion[qKey];
+                  const verdicts = allModels.map((model) => ({ model, verdict: answerVerdict(q.answers.find((x) => x.model === model)) }));
+                  const cited = verdicts.filter((v) => v.verdict === 'cited').length;
+                  const named = verdicts.filter((v) => v.verdict === 'named').length;
+                  const answered = verdicts.filter((v) => v.verdict !== 'failed' && v.verdict !== 'not_run').length;
+                  return (
+                  <li key={qKey}>
+                    <button
+                      type="button"
+                      className="flex w-full flex-col gap-1.5 px-3 py-2.5 text-left hover:bg-surface-sunken/60 sm:flex-row sm:items-center sm:gap-3"
+                      onClick={() => setOpenQuestion((s) => ({ ...s, [qKey]: !qOpen }))}
+                      aria-expanded={qOpen}
+                    >
+                      <span className="flex min-w-0 flex-1 items-start gap-1.5">
+                        {qOpen
+                          ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          : <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        <span className={cn('min-w-0 text-xs font-medium leading-snug text-foreground', !qOpen && 'line-clamp-2')}>
+                          {q.prompt_text}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2 pl-5 sm:pl-0">
+                        <span className="flex gap-0.5" role="img" aria-label={verdicts.map((v) => `${modelLabel(v.model)}: ${VERDICT_LABEL[v.verdict]}`).join(', ')}>
+                          {verdicts.map((v) => (
+                            <span
+                              key={v.model}
+                              className={cn('h-2.5 w-2.5 rounded-[2px]', VERDICT_FILL[v.verdict])}
+                              title={`${modelLabel(v.model)}: ${VERDICT_LABEL[v.verdict]}`}
+                            />
+                          ))}
+                        </span>
+                        <span className="w-36 text-[11px] tabular-nums text-muted-foreground sm:text-right">
+                          {answered === 0
+                            ? 'no answer'
+                            : cited > 0
+                              ? <span className="font-semibold text-emerald-700 dark:text-emerald-400">cited by {cited} of {answered}</span>
+                              : named > 0
+                                ? <span className="font-medium text-foreground">named by {named} of {answered}</span>
+                                : `left out by ${answered} of ${answered}`}
+                          {' · '}{timeAgo(q.asked_at)}
+                        </span>
+                      </span>
+                    </button>
+                    {qOpen && (
+                    <div className="divide-y divide-hairline border-t border-hairline bg-surface-sunken/40">
+                      <div className="flex flex-wrap items-center gap-2 px-3 py-1.5">
+                        <p className="min-w-0 flex-1 text-[11px] text-muted-foreground" title={q.template_key}>{q.subject} · asked {timeAgo(q.asked_at)}</p>
+                        {assignedPages.get(questionNorm(q.prompt_text)) ? (
+                          <span className="truncate text-[11px] text-muted-foreground">On {assignedPages.get(questionNorm(q.prompt_text))}</span>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => putOnPage(q.prompt_text, 'probe')}>
+                            <FilePlus2 className="mr-1 h-3.5 w-3.5" />Put on a page
+                          </Button>
+                        )}
+                      </div>
+                      {allModels.map((model) => {
+                        const a = q.answers.find((x) => x.model === model);
+                        const rosterEntry = tierRoster.find((m) => m.model === model);
+                        const verdict = answerVerdict(a);
+                        const key = `${q.subject}:${q.template_key}:${model}`;
+                        const open = !!openAnswer[key];
+                        return (
+                          <div key={model} className="px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="w-20 shrink-0 text-xs font-medium text-foreground">{modelLabel(model)}</span>
+                              <Badge
+                                variant={VERDICT_BADGE[verdict]}
+                                title={verdict === 'failed' ? (a?.error ?? undefined) : undefined}
+                              >
+                                {verdict === 'not_run' && rosterEntry && !rosterEntry.enabled
+                                  ? 'Not run — no key'
+                                  : VERDICT_LABEL[verdict]}
+                                {verdict === 'named' && a?.position != null ? ` · #${a.position}` : ''}
+                              </Badge>
+                              {a && !a.error && a.cited_urls.length > 0 && (
+                                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                                  sources: {a.cited_urls.slice(0, 4).map(displayHost).join(', ')}
+                                  {a.cited_urls.length > 4 ? ` +${a.cited_urls.length - 4}` : ''}
+                                </span>
+                              )}
+                              {a && !a.error && a.cited_urls.length === 0 && a.competitors.length > 0 && (
+                                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={a.competitors.join(', ')}>
+                                  named: {a.competitors.slice(0, 5).join(', ')}
+                                  {a.competitors.length > 5 ? ` +${a.competitors.length - 5}` : ''}
+                                </span>
+                              )}
+                              {a && !a.error && a.answer && (
+                                <button
+                                  type="button"
+                                  className="ml-auto shrink-0 text-[11px] text-primary hover:underline"
+                                  onClick={() => setOpenAnswer((s) => ({ ...s, [key]: !open }))}
+                                >
+                                  {open ? 'Hide answer' : 'Show answer'}
+                                </button>
+                              )}
+                            </div>
+                            {a && !a.error && open && (
+                              <div className="mt-2 border-t border-hairline pt-2">
+                                <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground">
+                                  {a.answer}{a.answer_truncated ? ' …' : ''}
+                                </p>
+                                {a.cited_urls.length > 0 && (
+                                  <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                                    {a.cited_urls.slice(0, 8).map((u, i) => (
+                                      <a key={i} href={safeHref(u)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                        {displayHost(u)}
+                                      </a>
+                                    ))}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    )}
+                  </li>
+                  );
+                })}
+              </ul>
+            );
+          })()}
+        </CardContent>
+      </Card>
+  );
+
+  if (!data || data.status === 'not_collected') {
+    if (view === 'asked') {
+      return <div className="space-y-4">{editorDialog}{picker}{intro}{questionCard}</div>;
+    }
+    return (
+      <div className="space-y-4">
+      {intro}
       <Card className="dashboard-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -510,9 +836,6 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           />
         </CardContent>
       </Card>
-      {corpusPanel}
-      <AiReferralsPanel websiteId={website.id} />
-      {isPlatformOperator && <AiCrawlersPanel websiteId={website.id} />}
       </div>
     );
   }
@@ -522,18 +845,13 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const latestFailed = t.latest_failed ?? t.failed;
   const failedShare = latestChecks > 0 ? Math.round((latestFailed / latestChecks) * 100) : 0;
   const sentimentTotal = Object.values(data.sentiment).reduce((s, n) => s + n, 0);
-  const tier = state?.own_brand_probe_tier ?? 'cheap';
-  const tierRoster = roster?.tiers?.[tier] ?? [];
   const engines = withRosterEngines(report?.engines ?? [], tierRoster);
   const citedInstead = report?.cited_instead ?? [];
   const namedInstead = report?.named_instead ?? [];
   // Nobody browsed, so "cited" has no denominator. Say it once, at the top.
   const noSources = report?.status === 'no_sources';
 
-  return (
-    <div className="space-y-4">
-      {editorDialog}
-
+  const summaryCard = (
       <Card className="dashboard-card">
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -655,9 +973,75 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
               </div>
             );
           })()}
+          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-hairline pt-3">
+            <p className="text-[11px] text-muted-foreground">
+              How they talk about you{sentimentTotal > 0 ? ` · ${sentimentTotal} mentions` : ''}
+            </p>
+            {sentimentTotal === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {t.mentioned === 0
+                  ? 'No answer in this window named you, so there is no tone to read.'
+                  : `${t.mentioned} answers named you, but no tone was extracted from any of them.`}
+              </p>
+            ) : (
+              Object.entries(data.sentiment).map(([k, n]) => (
+                <p key={k} className="text-xs">
+                  <span className="capitalize text-muted-foreground">{k}</span>{' '}
+                  <span className="font-semibold tabular-nums text-foreground">{n}</span>{' '}
+                  <span className="tabular-nums text-muted-foreground">({Math.round((n / sentimentTotal) * 100)}%)</span>
+                </p>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
+  );
 
+  const subjectsCard = data.subjects.length > 0 ? (
+
+        <Card className="dashboard-card">
+          <CardHeader>
+            <CardTitle className="text-base">By subject</CardTitle>
+            <CardDescription>Which of your brands and products the assistants actually know.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Answered</TableHead>
+                  <TableHead className="text-right">Named</TableHead>
+                  <TableHead className="text-right">Named rate</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.subjects.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="max-w-[280px] truncate font-medium">{s.label}</TableCell>
+                    <TableCell className="capitalize text-muted-foreground">{s.subject_type}</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.answered}</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.mentioned}</TableCell>
+                    <TableCell className="text-right">
+                      {s.share_of_voice == null ? (
+                        <span className={cn('text-xs font-medium', 'text-amber-800 dark:text-amber-300')}>
+                          Unknown
+                        </span>
+                      ) : (
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{s.share_of_voice}%</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null;
+
+  const overview = (
+    <>
+      {summaryCard}
       {engines.length > 0 && (
         <div className={cn('grid gap-3', engineGridCols(engines.length))}>
           {engines.map((e) => (
@@ -725,262 +1109,13 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           </CardContent>
         </Card>
       </div>
+      {subjectsCard}
+    </>
+  );
 
-      {corpusPanel}
-      <AiReferralsPanel websiteId={website.id} />
-      {isPlatformOperator && <AiCrawlersPanel websiteId={website.id} />}
-
-      <AiQuestionsPanel
-        report={questions}
-        canTrack={!!state?.own_brand_subject_id}
-        trackedCount={probeCount}
-        trackLimit={PROBE_LIMIT}
-        onTrack={trackQuestion}
-        onSaveTopics={async (topics) => {
-          try {
-            await userWebsitesService.setAiQuestionTopics(website.id, topics);
-          } catch (e: any) {
-            toast({ title: 'Could not save the topics', description: e?.message, variant: 'destructive' });
-            throw e;
-          }
-          toast({ title: 'Topics saved', description: 'The next LLM Mentions read searches the market for them.' });
-          setQuestions(await userWebsitesService.aiQuestions(website.id, 90).catch(() => questions));
-        }}
-      />
-
-      <CitabilityPanel
-        report={citability}
-        onAnalyse={async (question) => {
-          try {
-            await userWebsitesService.analyseCitability(website.id, question);
-            setCitability(await userWebsitesService.citabilityReport(website.id, 90));
-          } catch (e: any) {
-            toast({ title: 'Could not read the page', description: e?.message, variant: 'destructive' });
-          }
-        }}
-        onCompare={async (question, url) => {
-          try {
-            return await userWebsitesService.compareCitedPage(website.id, question, url);
-          } catch (e: any) {
-            toast({ title: 'Could not compare the pages', description: e?.message, variant: 'destructive' });
-            return null;
-          }
-        }}
-      />
-
-      <Card className="dashboard-card">
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MessageSquareQuote className="h-4 w-4 text-primary" />
-                Question by question
-              </CardTitle>
-              <CardDescription>
-                Every assistant&rsquo;s latest answer to every question we ask. They are the measurement — if they
-                are not what your customers ask, nothing above means anything.
-              </CardDescription>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              {(answers?.questions.length ?? 0) > 1 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const all = answers?.questions ?? [];
-                    const anyOpen = all.some((q) => openQuestion[`${q.subject}:${q.template_key}`]);
-                    setOpenQuestion(anyOpen ? {} : Object.fromEntries(all.map((q) => [`${q.subject}:${q.template_key}`, true])));
-                  }}
-                >
-                  {(answers?.questions ?? []).some((q) => openQuestion[`${q.subject}:${q.template_key}`]) ? 'Collapse all' : 'Expand all'}
-                </Button>
-              )}
-              {state?.own_brand_subject_id && (
-                <Button size="sm" variant="outline" onClick={() => void openEditor()}>
-                  Edit questions
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {(() => {
-            const questions = answers?.questions ?? [];
-            if (questions.length === 0) {
-              return (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  {answers
-                    ? `No question was asked about this site in the last ${answers.window_days} days.`
-                    : 'The answers could not be loaded, so this is unknown.'}
-                </p>
-              );
-            }
-            // Every assistant the tier asks for gets a chip, so one that never ran is
-            // a visible gap rather than a column that quietly does not exist.
-            const rosterModels = tierRoster.map((m) => m.model);
-            const seenModels = Array.from(new Set(questions.flatMap((q) => q.answers.map((a) => a.model))));
-            const allModels = Array.from(new Set([...rosterModels, ...seenModels]));
-            return (
-              <ul className="divide-y divide-hairline rounded-sm border border-hairline">
-                {questions.map((q) => {
-                  const qKey = `${q.subject}:${q.template_key}`;
-                  const qOpen = !!openQuestion[qKey];
-                  const verdicts = allModels.map((model) => ({ model, verdict: answerVerdict(q.answers.find((x) => x.model === model)) }));
-                  const cited = verdicts.filter((v) => v.verdict === 'cited').length;
-                  const named = verdicts.filter((v) => v.verdict === 'named').length;
-                  const answered = verdicts.filter((v) => v.verdict !== 'failed' && v.verdict !== 'not_run').length;
-                  return (
-                  <li key={qKey}>
-                    <button
-                      type="button"
-                      className="flex w-full flex-col gap-1.5 px-3 py-2.5 text-left hover:bg-surface-sunken/60 sm:flex-row sm:items-center sm:gap-3"
-                      onClick={() => setOpenQuestion((s) => ({ ...s, [qKey]: !qOpen }))}
-                      aria-expanded={qOpen}
-                    >
-                      <span className="flex min-w-0 flex-1 items-start gap-1.5">
-                        {qOpen
-                          ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          : <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                        <span className={cn('min-w-0 text-xs font-medium leading-snug text-foreground', !qOpen && 'line-clamp-2')}>
-                          {q.prompt_text}
-                        </span>
-                      </span>
-                      <span className="flex shrink-0 items-center gap-2 pl-5 sm:pl-0">
-                        <span className="flex gap-0.5" role="img" aria-label={verdicts.map((v) => `${modelLabel(v.model)}: ${VERDICT_LABEL[v.verdict]}`).join(', ')}>
-                          {verdicts.map((v) => (
-                            <span
-                              key={v.model}
-                              className={cn('h-2.5 w-2.5 rounded-[2px]', VERDICT_FILL[v.verdict])}
-                              title={`${modelLabel(v.model)}: ${VERDICT_LABEL[v.verdict]}`}
-                            />
-                          ))}
-                        </span>
-                        <span className="w-36 text-[11px] tabular-nums text-muted-foreground sm:text-right">
-                          {answered === 0
-                            ? 'no answer'
-                            : cited > 0
-                              ? <span className="font-semibold text-emerald-700 dark:text-emerald-400">cited by {cited} of {answered}</span>
-                              : named > 0
-                                ? <span className="font-medium text-foreground">named by {named} of {answered}</span>
-                                : `left out by ${answered} of ${answered}`}
-                          {' · '}{timeAgo(q.asked_at)}
-                        </span>
-                      </span>
-                    </button>
-                    {qOpen && (
-                    <div className="divide-y divide-hairline border-t border-hairline bg-surface-sunken/40">
-                      <p className="px-3 py-1.5 text-[11px] text-muted-foreground" title={q.template_key}>{q.subject} · asked {timeAgo(q.asked_at)}</p>
-                      {allModels.map((model) => {
-                        const a = q.answers.find((x) => x.model === model);
-                        const rosterEntry = tierRoster.find((m) => m.model === model);
-                        const verdict = answerVerdict(a);
-                        const key = `${q.subject}:${q.template_key}:${model}`;
-                        const open = !!openAnswer[key];
-                        return (
-                          <div key={model} className="px-3 py-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="w-20 shrink-0 text-xs font-medium text-foreground">{modelLabel(model)}</span>
-                              <Badge
-                                variant={VERDICT_BADGE[verdict]}
-                                title={verdict === 'failed' ? (a?.error ?? undefined) : undefined}
-                              >
-                                {verdict === 'not_run' && rosterEntry && !rosterEntry.enabled
-                                  ? 'Not run — no key'
-                                  : VERDICT_LABEL[verdict]}
-                                {verdict === 'named' && a?.position != null ? ` · #${a.position}` : ''}
-                              </Badge>
-                              {a && !a.error && a.cited_urls.length > 0 && (
-                                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                                  sources: {a.cited_urls.slice(0, 4).map(displayHost).join(', ')}
-                                  {a.cited_urls.length > 4 ? ` +${a.cited_urls.length - 4}` : ''}
-                                </span>
-                              )}
-                              {a && !a.error && a.cited_urls.length === 0 && a.competitors.length > 0 && (
-                                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={a.competitors.join(', ')}>
-                                  named: {a.competitors.slice(0, 5).join(', ')}
-                                  {a.competitors.length > 5 ? ` +${a.competitors.length - 5}` : ''}
-                                </span>
-                              )}
-                              {a && !a.error && a.answer && (
-                                <button
-                                  type="button"
-                                  className="ml-auto shrink-0 text-[11px] text-primary hover:underline"
-                                  onClick={() => setOpenAnswer((s) => ({ ...s, [key]: !open }))}
-                                >
-                                  {open ? 'Hide answer' : 'Show answer'}
-                                </button>
-                              )}
-                            </div>
-                            {a && !a.error && open && (
-                              <div className="mt-2 border-t border-hairline pt-2">
-                                <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground">
-                                  {a.answer}{a.answer_truncated ? ' …' : ''}
-                                </p>
-                                {a.cited_urls.length > 0 && (
-                                  <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                                    {a.cited_urls.slice(0, 8).map((u, i) => (
-                                      <a key={i} href={safeHref(u)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                        {displayHost(u)}
-                                      </a>
-                                    ))}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    )}
-                  </li>
-                  );
-                })}
-              </ul>
-            );
-          })()}
-        </CardContent>
-      </Card>
-
-      {data.subjects.length > 0 && (
-        <Card className="dashboard-card">
-          <CardHeader>
-            <CardTitle className="text-base">By subject</CardTitle>
-            <CardDescription>Which of your brands and products the assistants actually know.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Answered</TableHead>
-                  <TableHead className="text-right">Named</TableHead>
-                  <TableHead className="text-right">Named rate</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.subjects.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="max-w-[280px] truncate font-medium">{s.label}</TableCell>
-                    <TableCell className="capitalize text-muted-foreground">{s.subject_type}</TableCell>
-                    <TableCell className="text-right tabular-nums">{s.answered}</TableCell>
-                    <TableCell className="text-right tabular-nums">{s.mentioned}</TableCell>
-                    <TableCell className="text-right">
-                      {s.share_of_voice == null ? (
-                        <span className={cn('text-xs font-medium', 'text-amber-800 dark:text-amber-300')}>
-                          Unknown
-                        </span>
-                      ) : (
-                        <span className="text-sm font-semibold tabular-nums text-foreground">{s.share_of_voice}%</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+  const asked = (
+    <>
+      {questionCard}
 
       <Card className="dashboard-card">
         <CardHeader>
@@ -1025,38 +1160,15 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         </CardContent>
       </Card>
 
-      <Card className="dashboard-card">
-        <CardHeader>
-          <CardTitle className="text-base">How they talk about you</CardTitle>
-          <CardDescription>
-            {sentimentTotal > 0
-              ? `Tone of the answers that named you, across ${sentimentTotal} mentions.`
-              : 'Tone of the answers that named you.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {sentimentTotal === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t.mentioned === 0
-                ? 'No answer in this window named you, so there is no tone to read.'
-                : `${t.mentioned} answers named you, but no tone was extracted from any of them.`}
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-6">
-              {Object.entries(data.sentiment).map(([k, n]) => (
-                <div key={k}>
-                  <p className="text-[11px] capitalize text-muted-foreground">{k}</p>
-                  <p className="text-lg font-semibold tabular-nums text-foreground">
-                    {n} <span className="text-xs font-normal text-muted-foreground">
-                      ({Math.round((n / sentimentTotal) * 100)}%)
-                    </span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    </>
+  );
+
+  return (
+    <div className="space-y-4">
+      {editorDialog}
+      {picker}
+      {intro}
+      {view === 'asked' ? asked : overview}
     </div>
   );
 };

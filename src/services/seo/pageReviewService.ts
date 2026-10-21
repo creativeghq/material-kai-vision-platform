@@ -27,6 +27,7 @@ export interface WebsitePageRow {
 export interface PageRecommendation {
   id: string;
   kind: PageRecommendationKind;
+  source: 'page_review' | 'ai_questions';
   status: PageRecommendationStatus;
   current_value: string | null;
   proposed_value: string;

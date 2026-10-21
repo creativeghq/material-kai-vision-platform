@@ -430,3 +430,43 @@ export interface PaaQuestion {
 
 /** Where a tracked question came from; stored on its `custom_probes` entry. */
 export type AiQuestionSource = 'ai_cited' | 'ai_market' | 'gsc' | 'paa' | 'manual';
+
+/** Where a question put on a page came from; `assign_question_to_page` refuses anything else. */
+export type QuestionPageSource = AiQuestionSource | 'probe';
+
+/** A page that could answer a question. Ranked by `suggest_pages_for_question`: Search Console first, then title/H1 match. */
+export interface QuestionPageSuggestion {
+  page_id: string;
+  url: string;
+  title: string | null;
+  h1: string | null;
+  match: number;
+  gsc_impressions: number | null;
+  reason: 'gsc' | 'text';
+  open_questions: number;
+}
+
+/** A question waiting on (open) or answered by (applied) a page. Applied is set by the crawler, never by hand. */
+export interface QuestionAssignment {
+  id: string;
+  question: string;
+  question_norm: string;
+  status: 'open' | 'applied';
+  source: 'page_review' | 'ai_questions';
+  question_source: string | null;
+  page_id: string;
+  url: string;
+  title: string | null;
+  fetched_at: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+/** Same rule as `page_question_norm` in SQL, so a row can tell it is already on a page. */
+export const questionNorm = (q: string): string =>
+  q.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+export const urlPath = (url: string | null): string => {
+  if (!url) return '—';
+  try { return decodeURIComponent(new URL(url).pathname) || '/'; } catch { return url; }
+};
