@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { hardwareShape, partNumber } from '@/components/features/guides/partModels';
 import type { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/utils/datetime';
 import { FINISH_KINDS, type FinishKind, type GuideAppearance, type GuideFinish } from '@/lib/installation/guideSchema';
 import { installationGuideService, type InstallationGuideRow } from '@/services/installationGuideService';
 
@@ -202,7 +203,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
             <CardHeader>
               <CardTitle>Which part has which finish</CardTitle>
               <p className="text-xs text-muted-foreground">
-                {draft.read_at ? `Read from the photo on ${new Date(draft.read_at).toLocaleString()}. ` : ''}
+                {draft.read_at ? `Read from the photo on ${formatDate(draft.read_at, { withTime: true })}. ` : ''}
                 {Object.keys(draft.parts).length} of {parts.length} parts take a finish from the photo
                 {draft.finishes.map((f) => ` · ${f.name}: ${Object.values(draft.parts).filter((v) => v === f.id).length}`).join('')}.
                 Hidden hardware keeps its own look.
