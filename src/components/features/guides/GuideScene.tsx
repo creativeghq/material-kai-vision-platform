@@ -313,10 +313,14 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
   const wallZ = build.product.center.z - build.product.size.z / 2 - 0.35;
   const wallH = Math.max(2.8, build.product.size.y + 1);
   const size = span * 2.2;
+  const splashW = build.product.size.x + 0.6;
+  const splashH = 0.65;
+  const splashY = build.product.center.y + build.product.size.y / 2 + splashH / 2;
   const crops = useMemo(() => [
     ...(room?.wall_swatch ? [{ id: 'wall', box: room.wall_swatch, repeat: [size / 0.25, wallH / 0.25] as [number, number] }] : []),
     ...(room?.floor_swatch ? [{ id: 'floor', box: room.floor_swatch, repeat: size / 1.2 }] : []),
-  ], [room, size, wallH]);
+    ...(room?.backsplash?.swatch ? [{ id: 'splash', box: room.backsplash.swatch, repeat: [splashW / 0.3, splashH / 0.3] as [number, number] }] : []),
+  ], [room, size, wallH, splashW, splashH]);
   const photo = usePhotoCrops(photoUrl, crops);
   const pattern = useDisposable(() => {
     if (!room || room.floor_swatch) return null;
@@ -347,6 +351,12 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
         <planeGeometry args={[size, wallH]} />
         <meshStandardMaterial color={side} roughness={0.92} />
       </mesh>
+      {room?.backsplash && (
+        <mesh position={[build.product.center.x, splashY, wallZ + 0.004]} receiveShadow>
+          <planeGeometry args={[splashW, splashH]} />
+          <meshStandardMaterial key={photo.get('splash')?.uuid ?? 'plain'} color={photo.get('splash') ? '#ffffff' : room.backsplash.color} map={photo.get('splash') ?? undefined} roughness={0.35} />
+        </mesh>
+      )}
       <mesh position={[0, 0.045, wallZ + 0.008]} receiveShadow castShadow>
         <boxGeometry args={[size, 0.09, 0.016]} />
         <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
@@ -355,7 +365,7 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
         <boxGeometry args={[0.016, 0.09, size]} />
         <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
       </mesh>
-      <pointLight position={[0, wallH - 0.2, wallZ + 0.6]} intensity={4} distance={span * 2} color="#fff4e6" />
+      <pointLight position={[0, wallH - 0.2, wallZ + 0.6]} intensity={3} distance={span * 2} color="#ffffff" />
       <directionalLight position={[1.5, 3.5, 9]} intensity={0.9} color="#ffffff" />
       <hemisphereLight args={['#ffffff', '#cfcac2', 0.25]} />
     </group>
@@ -479,6 +489,12 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
   const panels = useMemo(() => build.items.filter((it) => it.kind === 'panel'), [build.items]);
   const holes = useMemo(() => panels.map((it) => panelHoles(build, build.items.indexOf(it), (h) => guide.parts[h.partIndex]?.name ?? '')), [panels, build, guide.parts]);
   const wood = useMemo(() => woodTexture(), []);
+  const worktop = useMemo(() => {
+    const used = new Set(Object.values(finish.appearance?.parts ?? {}));
+    const f = finish.appearance?.finishes.find((x) => /worktop|countertop|benchtop|work top/i.test(x.name) && !used.has(x.id));
+    const top = panels.filter((it) => it.placed && it.size.y <= Math.min(it.size.x, it.size.z)).sort((a, b) => b.target.pos.y - a.target.pos.y)[0];
+    return f && top ? { key: top.key, look: finish.looks.get(f.id) ?? null } : null;
+  }, [finish, panels]);
   const geometries = useMemo(() => panels.map((it) => {
     const front = /door|front/i.test(guide.parts[it.partIndex]?.name ?? '');
     const gap = front ? 0.004 : 0;
@@ -505,7 +521,7 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
       {panels.map((it, i) => {
         const part = guide.parts[it.partIndex];
         const isHover = hovered === it.key;
-        const look = lookForPart(finish.appearance, finish.looks, it.partId);
+        const look = worktop?.key === it.key && worktop.look ? worktop.look : lookForPart(finish.appearance, finish.looks, it.partId);
         return (
           <mesh
             key={it.key}

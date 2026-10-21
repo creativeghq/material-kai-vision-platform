@@ -295,6 +295,7 @@ export interface GuideRoom {
   floor_kind: FloorKind;
   wall_swatch: PageBox | null;
   floor_swatch: PageBox | null;
+  backsplash: { color: string; swatch: PageBox | null } | null;
 }
 
 export interface GuideAppearance {
@@ -329,6 +330,10 @@ export const APPEARANCE_READ_SCHEMA = closed({
     wall_swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
     floor_textured: bool,
     floor_swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
+    backsplash_shown: bool,
+    backsplash_hex: str,
+    backsplash_textured: bool,
+    backsplash_swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
   }),
 });
 
@@ -336,6 +341,17 @@ function swatchBox(v: unknown): PageBox | null {
   if (!isObj(v)) return null;
   const b = box(v);
   return b.x0 === 0 && b.y0 === 0 && b.x1 === 1 && b.y1 === 1 ? null : b;
+}
+
+function sanitizeBacksplash(raw: Record<string, unknown>): GuideRoom['backsplash'] {
+  if (isObj(raw.backsplash)) {
+    const color = text(raw.backsplash.color, 7);
+    return HEX.test(color) ? { color: color.toLowerCase(), swatch: swatchBox(raw.backsplash.swatch) } : null;
+  }
+  if (raw.backsplash_shown !== true) return null;
+  const color = text(raw.backsplash_hex, 7);
+  if (!HEX.test(color)) return null;
+  return { color: color.toLowerCase(), swatch: raw.backsplash_textured === false ? null : swatchBox(raw.backsplash_swatch) };
 }
 
 function sanitizeRoom(raw: unknown): GuideRoom | null {
@@ -350,6 +366,7 @@ function sanitizeRoom(raw: unknown): GuideRoom | null {
     floor_kind: oneOf(raw.floor_kind, FLOOR_KINDS, 'wood'),
     wall_swatch: raw.wall_textured === false ? null : swatchBox(raw.wall_swatch),
     floor_swatch: raw.floor_textured === false ? null : swatchBox(raw.floor_swatch),
+    backsplash: sanitizeBacksplash(raw),
   };
 }
 
