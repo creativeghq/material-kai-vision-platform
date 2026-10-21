@@ -208,9 +208,10 @@ async function forcedPages(
   const memberByUrl = new Map((members ?? [])
     .filter((m: { url: string }) => inArticleLanguage(m.url, languageCode))
     .map((m: { url: string }) => [m.url, m]));
-  const rows = new Map<string, Record<string, unknown>>();
-  for (const h of (heads ?? []) as Record<string, unknown>[]) {
-    rows.set(trimSlash(String(h.url)), h);
+  const headRows = ((heads ?? []) as Record<string, unknown>[])
+    .sort((a, b) => wanted.indexOf(trimSlash(String(a.url))) - wanted.indexOf(trimSlash(String(b.url))));
+  const rows = new Map<string, Record<string, unknown>>(headRows.map((h) => [trimSlash(String(h.url)), h]));
+  for (const h of headRows) {
     ((h.links_to as string[] | null) ?? []).map((u) => memberByUrl.get(u)).filter(Boolean)
       .slice(0, MEMBERS_PER_FORCED_PAGE)
       .forEach((m) => rows.set(trimSlash(String((m as { url: string }).url)), m as Record<string, unknown>));
