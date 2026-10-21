@@ -158,6 +158,47 @@ describe('installation guide build', () => {
   });
 });
 
+describe('installation guide hardware placed where the drawing shows it', () => {
+  it('puts each dowel on the edge the step drew it on', () => {
+    const drawn = sanitizeGuide({
+      ...raw,
+      steps: raw.steps.map((st, i) => (i === 1 ? {
+        ...st,
+        parts_used: [{ part_id: 'DOWEL', quantity: 2, fixes_to: 'TOP', spots: [{ where: 'left', u: 0.5, v: 0.5 }, { where: 'right', u: 0.5, v: 0.5 }] }],
+      } : st)),
+    }, 12);
+    const b = buildGuide(drawn);
+    const top = b.items.find((it) => it.partId === 'TOP')!;
+    const dowels = b.items.filter((it) => it.partId === 'DOWEL' && it.host !== null);
+    expect(dowels).toHaveLength(2);
+    for (const d of dowels) expect(Math.abs(d.target.pos.x)).toBeGreaterThan(top.size.x / 2 - 0.05);
+    expect(Math.sign(dowels[0].target.pos.x)).toBe(-Math.sign(dowels[1].target.pos.x));
+  });
+
+  it('drops spots that name no panel', () => {
+    const g = sanitizeGuide({ ...raw, steps: raw.steps.map((st, i) => (i === 1 ? { ...st, parts_used: [{ part_id: 'DOWEL', quantity: 1, fixes_to: '', spots: [{ where: 'top', u: 0.2, v: 0.2 }] }] } : st)) }, 12);
+    expect(g.steps[1].parts_used[0].spots).toEqual([]);
+  });
+});
+
+describe('installation guide doors', () => {
+  it('swings a door shut on its hinge edge as it goes on', () => {
+    const doorGuide = sanitizeGuide({
+      ...raw,
+      parts: [...raw.parts, { id: 'DOOR', name: 'Door', code: '', quantity: 1, kind: 'panel', size_cm: { x: 40, y: 100, z: 2 }, size_stated: true }],
+      steps: [...raw.steps, { title: 'Door', page: 4, box: { x0: 0, y0: 0, x1: 1, y1: 1 }, instruction: 'Hang the door.', parts_used: [{ part_id: 'DOOR', quantity: 1, fixes_to: '' }], tools: [], warning: '', people: 1, action: 'place' }],
+      assembly: { ...raw.assembly, placements: [...raw.assembly.placements, { part_id: 'DOOR', instance: 0, center_cm: { x: 0, y: 60, z: 15 }, extent_cm: { x: 40, y: 100, z: 2 }, step: 3 }] },
+    }, 12);
+    const b = buildGuide(doorGuide);
+    const door = b.items.find((it) => it.partId === 'DOOR')!;
+    expect(door.motion).toBe('swing');
+    const mid = poseAt(b, door, door.t0 + (door.ta - door.t0) * 0.75, 0);
+    const done = poseAt(b, door, door.ta, 0);
+    expect(Math.abs(mid.quat[1])).toBeGreaterThan(0.05);
+    expect(done.quat).toEqual(door.target.quat);
+  });
+});
+
 describe('installation guide counts above the render cap', () => {
   it('counts every screw the manual lists, not just the ones drawn', () => {
     const many = sanitizeGuide({

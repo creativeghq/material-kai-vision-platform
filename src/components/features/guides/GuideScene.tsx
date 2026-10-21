@@ -1,7 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { Edges, Html, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Edges, Html, OrbitControls, SoftShadows } from '@react-three/drei';
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 import {
   activeItemAt,
@@ -412,6 +413,15 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
   const panels = useMemo(() => build.items.filter((it) => it.kind === 'panel'), [build.items]);
   const holes = useMemo(() => panels.map((it) => panelHoles(build, build.items.indexOf(it), (h) => guide.parts[h.partIndex]?.name ?? '')), [panels, build, guide.parts]);
   const wood = useMemo(() => woodTexture(), []);
+  const geometries = useMemo(() => panels.map((it) => {
+    const front = /door|front/i.test(guide.parts[it.partIndex]?.name ?? '');
+    const gap = front ? 0.004 : 0;
+    const thin = Math.min(it.size.x, it.size.y, it.size.z);
+    return new RoundedBoxGeometry(
+      Math.max(it.size.x - gap, 0.002), Math.max(it.size.y - gap, 0.002), it.size.z, 2, Math.min(0.0025, thin * 0.2),
+    );
+  }), [panels, guide.parts]);
+  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
   const refs = useRef<Array<THREE.Mesh | null>>([]);
   useFrame(() => {
     panels.forEach((it, i) => {
@@ -440,7 +450,7 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
             onPointerOut={() => onHover(null, 0, 0)}
             onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onPick(it.key); }}
           >
-            <boxGeometry args={[it.size.x, it.size.y, it.size.z]} />
+            <primitive object={geometries[i]} attach="geometry" />
             {[0, 1, 2, 3, 4, 5].map((face) => {
               const thin = it.size.x <= it.size.y && it.size.x <= it.size.z ? 0 : it.size.y <= it.size.z ? 1 : 2;
               const isFace = Math.floor(face / 2) === thin;
@@ -789,6 +799,8 @@ export const GuideScene: React.FC<Props> = (props) => {
       <KeyboardFly />
       {view === 'room' ? (
         <>
+          <SoftShadows size={22} samples={12} focus={0.5} />
+          <ContactShadows position={[build.product.center.x, 0.002, build.product.center.z]} scale={Math.max(build.product.size.x, build.product.size.z) * 2.2 + 1} blur={2.6} opacity={0.55} far={1.2} resolution={512} frames={Infinity} />
           <hemisphereLight args={['#fff2dd', '#3a2a1c', 0.9]} />
           <directionalLight
             position={[-3, 6, 4]}

@@ -17,7 +17,10 @@ export interface GuidePart {
   size_stated: boolean;
 }
 
-export interface GuidePartUse { part_id: string; quantity: number; fixes_to: string }
+export const SPOT_SIDES = ['inner', 'outer', 'top', 'bottom', 'left', 'right'] as const;
+export type SpotSide = typeof SPOT_SIDES[number];
+export interface GuideSpot { where: SpotSide; u: number; v: number }
+export interface GuidePartUse { part_id: string; quantity: number; fixes_to: string; spots: GuideSpot[] }
 
 export interface GuideStep {
   title: string;
@@ -92,7 +95,12 @@ export const GUIDE_OUTPUT_SCHEMA = closed({
       instruction: str,
       parts_used: {
         type: 'array',
-        items: closed({ part_id: str, quantity: int, fixes_to: str }),
+        items: closed({
+          part_id: str,
+          quantity: int,
+          fixes_to: str,
+          spots: { type: 'array', items: closed({ where: { type: 'string', enum: [...SPOT_SIDES] }, u: num, v: num }) },
+        }),
       },
       tools: strList,
       warning: str,
@@ -212,10 +220,17 @@ export function sanitizeGuide(raw: unknown, pageCount: number): InstallationGuid
       const partId = text(u.part_id, 40);
       if (!partIds.has(partId)) continue;
       const fixesTo = text(u.fixes_to, 40);
+      const quantity = wholeIn(u.quantity, 1, MAX_HARDWARE_QTY, 1);
+      const spots: GuideSpot[] = (Array.isArray(u.spots) ? u.spots : []).filter(isObj).slice(0, Math.min(quantity, 24)).map((p) => ({
+        where: oneOf(p.where, SPOT_SIDES, 'inner'),
+        u: clamp(finite(p.u, 0.5), 0, 1),
+        v: clamp(finite(p.v, 0.5), 0, 1),
+      }));
       used.push({
         part_id: partId,
-        quantity: wholeIn(u.quantity, 1, MAX_HARDWARE_QTY, 1),
+        quantity,
         fixes_to: partIds.has(fixesTo) ? fixesTo : '',
+        spots: partIds.has(fixesTo) ? spots : [],
       });
     }
     steps.push({

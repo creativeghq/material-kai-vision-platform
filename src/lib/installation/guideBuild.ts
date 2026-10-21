@@ -1,4 +1,4 @@
-import type { GuidePart, InstallationGuideData, Vec3 } from './guideSchema';
+import type { GuidePart, GuideSpot, InstallationGuideData, Vec3 } from './guideSchema';
 
 export type Quat = [number, number, number, number];
 
@@ -25,6 +25,9 @@ export interface BuildItem {
   placed: boolean;
   weight: number;
   explode: Vec3;
+  motion?: 'swing' | 'slide' | 'tap';
+  pivot?: Vec3;
+  forward?: Vec3;
 }
 
 export interface KitCard {
@@ -188,6 +191,34 @@ const KNOB = /knob|handle|pull/i;
 const NAIL = /nail/i;
 const SCREW = /screw/i;
 const isHinge = (name: string) => HINGE.test(name) && !SCREW.test(name);
+
+function spotOn(host: BuildItem, spot: GuideSpot, centre: Vec3): { offset: Vec3; normal: Axis; sign: number } {
+  const s = host.size;
+  const thin = smallestAxis(s);
+  const inward = Math.sign(centre[thin] - host.target.pos[thin]) || 1;
+  const across: Axis = thin === 'y' ? 'x' : thin === 'x' ? 'z' : 'x';
+  const down: Axis = thin === 'y' ? 'z' : 'y';
+  const downSign = down === 'y' ? -1 : 1;
+  const offset = v(0, 0, 0);
+  const along = (axis: Axis, f: number, sign = 1) => { offset[axis] = sign * (f - 0.5) * s[axis] * 0.94; };
+  if (spot.where === 'inner' || spot.where === 'outer') {
+    const sign = spot.where === 'inner' ? inward : -inward;
+    offset[thin] = (sign * s[thin]) / 2;
+    along(across, spot.u);
+    along(down, spot.v, downSign);
+    return { offset, normal: thin, sign };
+  }
+  if (spot.where === 'top' || spot.where === 'bottom') {
+    const sign = (spot.where === 'top' ? -1 : 1) * downSign;
+    offset[down] = (sign * s[down]) / 2;
+    along(across, spot.u);
+    return { offset, normal: down, sign };
+  }
+  const sign = spot.where === 'left' ? -1 : 1;
+  offset[across] = (sign * s[across]) / 2;
+  along(down, spot.v, downSign);
+  return { offset, normal: across, sign };
+}
 
 function mountFor(
   name: string,
@@ -373,7 +404,8 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
           const per = Math.max(1, Math.ceil(use.quantity / hosts.length));
           const nth = mounted.get(hostIndex) ?? 0;
           mounted.set(hostIndex, nth + 1);
-          const mount = mountFor(p.name, h, nth, Math.max(per, nth + 1), product.center);
+          const drawn = use.spots?.length && use.fixes_to === h.partId ? use.spots[nth % use.spots.length] : null;
+          const mount = drawn ? spotOn(h, drawn, product.center) : mountFor(p.name, h, nth, Math.max(per, nth + 1), product.center);
           const spots = mount ? [] : (hingeSpots.get(hostIndex) ?? []).filter((sp) => sp.step === use.step);
           const onHinge = SCREW.test(p.name) && spots.length ? spots[nth % spots.length] : null;
           const joint = mount || onHinge ? null : jointFor(h);
@@ -449,6 +481,23 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
       it.approach = add(it.approach, v(0, footDrop, 0));
     }
     product.center = add(product.center, v(0, footDrop, 0));
+  }
+
+  for (const it of items) {
+    const name = guide.parts[it.partIndex]?.name ?? '';
+    if (it.kind === 'panel' && it.placed) {
+      const fwd = Math.sign(it.target.pos.z - product.center.z) || 1;
+      if (/door/i.test(name) && !/drawer/i.test(name) && smallestAxis(it.size) === 'z') {
+        it.motion = 'swing';
+        it.pivot = v(-it.size.x / 2, 0, -fwd * it.size.z / 2);
+        it.forward = v(0, 0, fwd);
+      } else if (/drawer/i.test(name)) {
+        it.motion = 'slide';
+        it.forward = v(0, 0, fwd);
+      }
+    } else if (it.kind === 'hardware' && it.host !== null && /dowel|nail/i.test(name)) {
+      it.motion = 'tap';
+    }
   }
 
   for (const [idx, face] of faceUp) {
@@ -550,6 +599,25 @@ export interface LivePose extends BuildPose {
   outward: Vec3;
 }
 
+const SWING_OPEN = Math.PI * 0.42;
+const SLIDE_OUT = 0.42;
+const Y_AXIS = v(0, 1, 0);
+
+function openPose(it: BuildItem, targetPos: Vec3, targetQuat: Quat, open: number): BuildPose {
+  if (it.motion === 'swing' && it.pivot && it.forward) {
+    const turn = axisAngle(Y_AXIS, -it.forward.z * SWING_OPEN * open);
+    const offset = add(it.pivot, rotate(turn, scale(it.pivot, -1)));
+    return { pos: add(targetPos, rotate(targetQuat, offset)), quat: qmul(targetQuat, turn) };
+  }
+  return { pos: add(targetPos, scale(it.forward ?? v(0, 0, 1), SLIDE_OUT * open)), quat: targetQuat };
+}
+
+const tapped = (b: number) => {
+  const k = Math.min(b, 0.9999) * 3;
+  const hit = k - Math.floor(k);
+  return (Math.floor(k) + (hit < 0.55 ? 0 : ease((hit - 0.55) / 0.45))) / 3;
+};
+
 export function poseAt(build: GuideBuild, it: BuildItem, x: number, explode: number): LivePose {
   let targetPos: Vec3;
   let targetQuat: Quat;
@@ -565,6 +633,9 @@ export function poseAt(build: GuideBuild, it: BuildItem, x: number, explode: num
     targetQuat = it.target.quat;
     approach = add(it.approach, ex);
   }
+  const opens = it.motion === 'swing' || it.motion === 'slide';
+  const ajar = opens ? openPose(it, targetPos, targetQuat, 1) : null;
+  if (ajar) approach = ajar.pos;
   const outward = sub(approach, targetPos);
   if (!(x > it.t0)) return { ...it.kit, moving: false, spinAngle: 0, destination: approach, outward };
   if (x >= it.ta) return { pos: targetPos, quat: targetQuat, moving: false, spinAngle: 0, destination: targetPos, outward };
@@ -573,11 +644,15 @@ export function poseAt(build: GuideBuild, it: BuildItem, x: number, explode: num
     const a = ease(u / SPLIT);
     const pos = lerp3(it.kit.pos, approach, a);
     pos.y += Math.sin(Math.PI * a) * (it.kind === 'panel' ? 0.3 : 0.15);
-    return { pos, quat: slerp(it.kit.quat, targetQuat, Math.min(1, a * 1.3)), moving: true, spinAngle: 0, destination: approach, outward };
+    return { pos, quat: slerp(it.kit.quat, ajar ? ajar.quat : targetQuat, Math.min(1, a * 1.3)), moving: true, spinAngle: 0, destination: approach, outward };
   }
   const b = (u - SPLIT) / (1 - SPLIT);
+  if (opens) {
+    const pose = openPose(it, targetPos, targetQuat, 1 - ease(b));
+    return { ...pose, moving: true, spinAngle: 0, destination: targetPos, outward };
+  }
   return {
-    pos: lerp3(approach, targetPos, it.kind === 'panel' ? ease(b) : b),
+    pos: lerp3(approach, targetPos, it.kind === 'panel' ? ease(b) : it.motion === 'tap' ? tapped(b) : b),
     quat: targetQuat,
     moving: true,
     spinAngle: it.spin ? b * Math.PI * 8 : 0,
