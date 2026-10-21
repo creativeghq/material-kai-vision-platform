@@ -284,6 +284,9 @@ function jsonLdProduct(html: string): { attrs: Pair[]; price: PageSpecs['price']
     if (!o || typeof o !== 'object') continue;
     const offer = o as Record<string, unknown>;
     const spec = asArray(offer.priceSpecification)[0] as Record<string, unknown> | undefined;
+    const low = toAmount(offer.lowPrice);
+    const high = toAmount(offer.highPrice);
+    if (offer.price == null && low !== null && high !== null && low !== high) break;
     const amount = toAmount(offer.price ?? offer.lowPrice ?? spec?.price);
     const currency = clean(offer.priceCurrency ?? spec?.priceCurrency).toUpperCase();
     if (amount !== null && currency) { price = { amount, currency }; break; }

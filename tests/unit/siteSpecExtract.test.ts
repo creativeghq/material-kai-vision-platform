@@ -43,6 +43,13 @@ describe('extractSpecs — the facts a page states about itself', () => {
     expect(specs?.price, 'one variant\'s price is not the product\'s price').toBeNull();
   });
 
+  it('reads a JSON-LD AggregateOffer range as no price, and an equal low/high as that price', () => {
+    const ld = (offers: unknown) => page('<p>x</p>', `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name: 'Boiler', offers })}</script>`);
+    expect(extractSpecs(ld({ '@type': 'AggregateOffer', priceCurrency: 'EUR', lowPrice: 930, highPrice: 1180 }), PAGE, NOW)?.price).toBeNull();
+    expect(extractSpecs(ld({ '@type': 'AggregateOffer', priceCurrency: 'EUR', lowPrice: 930, highPrice: 930 }), PAGE, NOW)?.price)
+      .toEqual({ amount: 930, currency: 'EUR' });
+  });
+
   it('never reads a price range or an indicative band as the price', () => {
     const band = page('<dl><dt>Τιμή/τ.μ.</dt><dd>Κατόπιν προσφοράς</dd><dt>Ενδεικτική τιμή</dt><dd>Ενδεικτικά €21–€36/τ.μ.</dd></dl>');
     expect(extractSpecs(band, PAGE, NOW)?.price).toBeNull();
