@@ -60,6 +60,11 @@ describe('extractSpecs — the facts a page states about itself', () => {
     for (const v of ['60x60 - 34,90 €', '€34,90 - 2 pcs']) {
       expect(extractSpecs(page(`<dl><dt>Price</dt><dd>${v}</dd></dl>`), PAGE, NOW)?.price, v).toEqual({ amount: 34.9, currency: 'EUR' });
     }
+    for (const [k, v] of [['Ενδεικτική τιμή', 'Ενδεικτικά από €30/τ.μ.'], ['Price', 'approx. €30'], ['Richtwert', '30 €']]) {
+      expect(extractSpecs(page(`<dl><dt>${k}</dt><dd>${v}</dd></dl>`), PAGE, NOW)?.price, v).toBeNull();
+    }
+    const firmFirst = page('<dl><dt>Τιμή/τ.μ.</dt><dd>€29,90</dd><dt>Ενδεικτική τιμή</dt><dd>€29,90/τ.μ.</dd></dl>');
+    expect(extractSpecs(firmFirst, PAGE, NOW)?.price).toEqual({ amount: 29.9, currency: 'EUR' });
     const thenDelivery = page('<dl><dt>Indicative</dt><dd>€21–€36/m²</dd><dt>Delivery</dt><dd>€15</dd></dl>');
     expect(extractSpecs(thenDelivery, PAGE, NOW)?.price, 'the next amount on the page is not the price').toBeNull();
   });

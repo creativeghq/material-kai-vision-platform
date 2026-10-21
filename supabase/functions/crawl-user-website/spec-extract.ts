@@ -17,6 +17,8 @@ const CARD_LOOKBACK_CHARS = 500;
 export const MAX_CONTENT_LINKS = 400;
 
 const CURRENCY_SYMBOLS: Record<string, string> = { '€': 'EUR', '$': 'USD', '£': 'GBP' };
+/** The words a page uses to say a figure is an estimate, not its price, in the languages our sites are written in. */
+const ESTIMATE = /indicativ|estimat|approx|\bcirca\b|\bca\.|ενδεικτ|περίπου|εκτιμ|unverbindlich|richtwert|ungefähr|indicatif|environ|estimé|orientativ|aproximad|stimat|indicativo|orientativo/iu;
 /** Two amounts joined by a dash, money on at least one side: «€21–€36», «20 - 30 EUR»; never «60x60 - 34,90 €» or «€34,90 - 2 pcs». */
 const DASH_RANGE = /(?:€|\$|£|\b(?:EUR|USD|GBP)\b)\s*\d[\d.,]*\s*[-–—]\s*(?:€|\$|£|\b(?:EUR|USD|GBP)\b)?\s*\d[\d.,]*(?!\s*(?!(?:EUR|USD|GBP)\b)\p{L})|(?<![x×\d.,])\d[\d.,]*\s*[-–—]\s*\d[\d.,]*\s*(?:€|\$|£|\b(?:EUR|USD|GBP)\b)/u;
 
@@ -309,16 +311,17 @@ function metaPrice(html: string): PageSpecs['price'] {
 }
 
 /**
- * The first money-bearing spec value, when it states ONE amount ("€ 34,90", "34.90 EUR"). When it
- * states a range or several amounts ("€21–€36/m²"), the page has no single price: null, never the
- * next amount on the page (which may be delivery).
+ * The first money-bearing spec value, when it states ONE firm amount ("€ 34,90", "34.90 EUR").
+ * When it states a range, several amounts or an estimate the page labels as one ("€21–€36/m²",
+ * "Indicative from €30"), the page has no single price: null, never the next amount on the page.
  */
 function priceFromValues(attrs: Record<string, string>): PageSpecs['price'] {
   const re = /(€|\$|£|\b(?:EUR|USD|GBP)\b)\s*(\d[\d.,\s]*\d|\d)|(\d[\d.,\s]*\d|\d)\s*(€|\$|£|\b(?:EUR|USD|GBP)\b)/;
-  for (const value of Object.values(attrs)) {
+  for (const [label, value] of Object.entries(attrs)) {
     const m = re.exec(value);
     if (!m) continue;
     if ([...value.matchAll(new RegExp(re.source, 'g'))].length > 1 || DASH_RANGE.test(value)) return null;
+    if (ESTIMATE.test(label) || ESTIMATE.test(value)) return null;
     const symbol = m[1] ?? m[4];
     const amount = parseAmount((m[2] ?? m[3]).trim());
     if (amount !== null) return { amount, currency: CURRENCY_SYMBOLS[symbol] ?? symbol.toUpperCase() };
