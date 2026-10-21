@@ -845,12 +845,39 @@ async function upsertChunked(supabase: any, table: string, rows: any[], onConfli
 // Extra Performance-report dimensions (mirrors what the GSC UI shows): accurate daily
 // totals + device / country / search-appearance splits. Each is its own query because
 // stacking every dimension into one explodes rows and hits the API cap.
-const GSC_BREAKDOWNS: { dim: string; gscDims: string[] }[] = [
+// searchAppearance cannot be grouped with ANY other dimension, date included, so it is
+// queried one day at a time and the date comes from the request window.
+const GSC_BREAKDOWNS: { dim: string; gscDims: string[]; perDay?: boolean }[] = [
   { dim: 'total', gscDims: ['date'] },
   { dim: 'device', gscDims: ['date', 'device'] },
   { dim: 'country', gscDims: ['date', 'country'] },
-  { dim: 'searchAppearance', gscDims: ['date', 'searchAppearance'] },
+  { dim: 'searchAppearance', gscDims: ['searchAppearance'], perDay: true },
 ];
+
+function daysBetween(startDate: string, endDate: string): string[] {
+  const out: string[] = [];
+  for (let d = new Date(`${startDate}T00:00:00Z`); ymd(d) <= endDate; d.setUTCDate(d.getUTCDate() + 1)) out.push(ymd(d));
+  return out;
+}
+
+/** Rows as [date, value, row]; a per-day dimension is fetched day by day, a few in parallel. */
+async function breakdownRows(token: string, property: string, startDate: string, endDate: string,
+  gscDims: string[], perDay?: boolean): Promise<[string, string, any][]> {
+  if (!perDay) {
+    const rows = await gscQuery(token, property, { startDate, endDate, dimensions: gscDims });
+    return rows.map((row) => { const k = row.keys || []; return [k[0], gscDims.length > 1 ? (k[1] ?? '') : '', row]; });
+  }
+  const days = daysBetween(startDate, endDate);
+  const out: [string, string, any][] = [];
+  for (let i = 0; i < days.length; i += 6) {
+    const batch = await Promise.all(days.slice(i, i + 6).map(async (day) => {
+      const rows = await gscQuery(token, property, { startDate: day, endDate: day, dimensions: gscDims });
+      return rows.map((row): [string, string, any] => [day, (row.keys || [])[0] ?? '', row]);
+    }));
+    for (const b of batch) out.push(...b);
+  }
+  return out;
+}
 
 type SyncResult = { rows: number; partial: string[] };
 
@@ -880,12 +907,11 @@ async function syncConnection(supabase: any, conn: any, startDate: string, endDa
   if (corePayload.length) await upsertChunked(supabase, 'gsc_performance', corePayload, 'website_id,date,query,page');
 
   // 2. Dimension breakdowns
-  for (const { dim, gscDims } of GSC_BREAKDOWNS) {
+  for (const { dim, gscDims, perDay } of GSC_BREAKDOWNS) {
     try {
-      const rows = await gscQuery(token, conn.property, { startDate, endDate, dimensions: gscDims });
-      const payload = rows.map((row) => {
-        const keys = row.keys || [];
-        return { ...base, date: keys[0], dimension: dim, value: gscDims.length > 1 ? (keys[1] ?? '') : '',
+      const rows = await breakdownRows(token, conn.property, startDate, endDate, gscDims, perDay);
+      const payload = rows.map(([date, value, row]) => {
+        return { ...base, date, dimension: dim, value,
           clicks: Math.round(row.clicks || 0), impressions: Math.round(row.impressions || 0), ctr: row.ctr || 0, position: row.position || 0 };
       });
       if (payload.length) await upsertChunked(supabase, 'gsc_breakdown', payload, 'website_id,date,dimension,value');
