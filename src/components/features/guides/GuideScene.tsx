@@ -313,9 +313,9 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
   const wallH = Math.max(2.8, build.product.size.y + 1);
   const size = span * 2.2;
   const crops = useMemo(() => [
-    ...(room?.wall_swatch ? [{ id: 'wall', box: room.wall_swatch, repeat: 3 }] : []),
-    ...(room?.floor_swatch ? [{ id: 'floor', box: room.floor_swatch, repeat: 6 }] : []),
-  ], [room]);
+    ...(room?.wall_swatch ? [{ id: 'wall', box: room.wall_swatch, repeat: [size / 0.25, wallH / 0.25] as [number, number] }] : []),
+    ...(room?.floor_swatch ? [{ id: 'floor', box: room.floor_swatch, repeat: size / 1.2 }] : []),
+  ], [room, size, wallH]);
   const photo = usePhotoCrops(photoUrl, crops);
   const pattern = useDisposable(() => {
     if (!room || room.floor_swatch) return null;
@@ -330,22 +330,33 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
   const wall = room?.wall ?? '#ece9e4';
   const floor = room?.floor ?? '#d9d3c9';
   const floorMap = photo.get('floor') ?? pattern;
-  const side = useMemo(() => new THREE.Color(wall).multiplyScalar(0.88), [wall]);
+  const side = useMemo(() => new THREE.Color(wall).multiplyScalar(0.86), [wall]);
+  const ground = useMemo(() => new THREE.Color(floor).multiplyScalar(0.9), [floor]);
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, floorZ]} receiveShadow>
         <planeGeometry args={[size, size]} />
-        <meshStandardMaterial color={floorMap && photo.get('floor') ? '#ffffff' : floor} map={floorMap ?? undefined} roughness={room?.floor_kind === 'tile' || room?.floor_kind === 'stone' ? 0.45 : 0.8} />
+        <meshStandardMaterial key={floorMap?.uuid ?? 'plain'} color={floorMap && photo.get('floor') ? '#ffffff' : ground} map={floorMap ?? undefined} roughness={room?.floor_kind === 'tile' || room?.floor_kind === 'stone' ? 0.45 : 0.8} />
       </mesh>
       <mesh position={[0, wallH / 2, wallZ]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
-        <meshStandardMaterial color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />
+        <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />
       </mesh>
       <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
         <meshStandardMaterial color={side} roughness={0.92} />
       </mesh>
+      <mesh position={[0, 0.045, wallZ + 0.008]} receiveShadow castShadow>
+        <boxGeometry args={[size, 0.09, 0.016]} />
+        <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
+      </mesh>
+      <mesh position={[-span * 0.75 + 0.008, 0.045, floorZ]} receiveShadow>
+        <boxGeometry args={[0.016, 0.09, size]} />
+        <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
+      </mesh>
       <pointLight position={[0, wallH - 0.2, wallZ + 0.6]} intensity={4} distance={span * 2} color="#fff4e6" />
+      <directionalLight position={[1.5, 3.5, 9]} intensity={0.9} color="#ffffff" />
+      <hemisphereLight args={['#ffffff', '#cfcac2', 0.25]} />
     </group>
   );
 }
@@ -513,7 +524,7 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
               const map = !room || !isFace ? null : look ? look.map : part?.kind !== 'fitting' ? wood : null;
               return (
                 <meshStandardMaterial
-                  key={face}
+                  key={`${face}:${map?.uuid ?? 'plain'}`}
                   attach={`material-${face}`}
                   color={color}
                   map={map ?? undefined}
@@ -837,6 +848,7 @@ export const GuideScene: React.FC<Props> = (props) => {
   useStudioLight(scene, gl, view === 'drawing' ? 0 : 0.28);
   const looks = useFinishLooks(props.appearance ?? null, props.photoUrl ?? null);
   const finish = useMemo(() => ({ appearance: props.appearance ?? null, looks }), [props.appearance, looks]);
+  const real = props.appearance ? { floor: props.appearance.room?.floor ?? '#d9d3c9' } : null;
 
   useLayoutEffect(() => {
     scene.background = new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
@@ -855,11 +867,11 @@ export const GuideScene: React.FC<Props> = (props) => {
         <>
           <SoftShadows size={22} samples={12} focus={0.5} />
           <ContactShadows position={[build.product.center.x, 0.002, build.product.center.z]} scale={Math.max(build.product.size.x, build.product.size.z) * 2.2 + 1} blur={2.6} opacity={0.55} far={1.2} resolution={512} frames={Infinity} />
-          <hemisphereLight args={['#fff2dd', '#3a2a1c', 0.9]} />
+          <hemisphereLight args={real ? ['#ffffff', real.floor, 1.6] : ['#fff2dd', '#3a2a1c', 0.9]} />
           <directionalLight
-            position={[-3, 6, 4]}
-            intensity={2.2}
-            color="#ffe2b8"
+            position={real ? [-2.5, 5.5, 7] : [-3, 6, 4]}
+            intensity={real ? 3.4 : 2.2}
+            color={real ? '#fffaf2' : '#ffe2b8'}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
@@ -867,6 +879,8 @@ export const GuideScene: React.FC<Props> = (props) => {
             shadow-camera-right={span}
             shadow-camera-top={span}
             shadow-camera-bottom={-span}
+            shadow-bias={-0.0005}
+            shadow-normalBias={0.03}
           />
           <directionalLight position={[4, 3, -2]} intensity={0.6} color="#9fc4ff" />
           {props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} /> : <Room build={build} />}

@@ -1,6 +1,7 @@
 import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three';
 import {
   ArrowLeft, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Copy, Crosshair, Expand, Globe, Pause, Play, Share2, Tags, TriangleAlert, Users,
 } from 'lucide-react';
@@ -327,7 +328,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
       <main className="absolute inset-0" aria-label={`${guide.title} being put together, beside its manual`}>
         <ThreeErrorBoundary>
           <Suspense fallback={<CanvasLoader label="Opening the flat pack…" />}>
-            <Canvas shadows camera={{ position: [2.5, 2.2, 3.2], fov: 42, near: 0.02, far: 200 }} gl={{ antialias: true }} dpr={[1, 2]}>
+            <Canvas shadows camera={{ position: [2.5, 2.2, 3.2], fov: 42, near: 0.02, far: 200 }} gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping }} dpr={[1, 2]}>
               <GuideScene
                 guide={guide}
                 build={build}

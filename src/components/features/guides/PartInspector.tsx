@@ -38,7 +38,7 @@ function PanelModel({ build, guide, item, look }: { build: GuideBuild; guide: In
         const isFace = Math.floor(face / 2) === thin;
         return (
           <meshStandardMaterial
-            key={face}
+            key={`${face}:${(isFace ? (look ? look.map : wood) : null)?.uuid ?? 'plain'}`}
             attach={`material-${face}`}
             color={look ? (isFace ? look.color : look.base) : isFace ? WOOD_TINT : EDGE_BANDING}
             map={(isFace ? (look ? look.map : wood) : null) ?? undefined}
@@ -105,7 +105,7 @@ export function PartInspector({ build, guide, item, onClose, onPlayStep, appeara
             </DialogHeader>
             <div className="h-[min(52dvh,420px)] w-full touch-none overflow-hidden rounded-sm bg-gradient-to-b from-neutral-200 to-neutral-400 dark:from-neutral-700 dark:to-neutral-900">
               <Suspense fallback={null}>
-                <Canvas shadows dpr={[1, 2]} camera={{ position: item.kind === 'panel' ? [reach * 0.3, reach * 0.18, reach * 1.25] : [reach * 1.05, reach * 0.8, reach * 1.35], fov: 35, near: reach / 100, far: reach * 40 }}>
+                <Canvas shadows dpr={[1, 2]} gl={{ toneMapping: THREE.NeutralToneMapping }} camera={{ position: item.kind === 'panel' ? [reach * 0.3, reach * 0.18, reach * 1.25] : [reach * 1.05, reach * 0.8, reach * 1.35], fov: 35, near: reach / 100, far: reach * 40 }}>
                   <StudioLight />
                   <hemisphereLight args={['#fff6e8', '#45403a', 0.8]} />
                   <directionalLight position={[reach * 2, reach * 3, reach * 2]} intensity={2.4} castShadow />

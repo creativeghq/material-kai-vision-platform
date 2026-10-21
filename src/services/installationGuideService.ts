@@ -182,7 +182,7 @@ export const installationGuideService = {
     return list.filter((c) => c.full_url).map((c) => ({ thumb: c.thumb_url || c.full_url!, full: c.full_url!, title: c.title ?? null }));
   },
 
-  async readAppearance(id: string, source: { image_url?: string; page_url?: string }): Promise<GuideAppearance> {
+  async readAppearance(id: string, source: { image_url?: string; page_url?: string; fallback_url?: string }): Promise<GuideAppearance> {
     const { data, error } = await supabase.functions.invoke('installation-guide-appearance', { body: { guide_id: id, ...source } });
     if (error) throw new Error((await parseEdgeError(error, 'The finishes could not be read.')).message);
     if (!data?.success || !data.appearance) throw new Error(data?.error ?? 'The finishes could not be read.');

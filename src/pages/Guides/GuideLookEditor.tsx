@@ -77,7 +77,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
     const typed = address.trim();
     const source = typed
       ? (/\.(jpe?g|png|webp|gif)(\?|$)/i.test(typed) ? { image_url: typed } : { page_url: typed })
-      : { image_url: picked };
+      : { image_url: picked, fallback_url: candidates?.find((c) => c.full === picked)?.thumb };
     setBusy('read');
     try {
       const appearance = await installationGuideService.readAppearance(row.id, source);

@@ -6,7 +6,8 @@ import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
-import { fetchImageGuarded, fetchTextGuarded } from '../_shared/fetch-image.ts';
+import { fetchTextGuarded, readCapped } from '../_shared/fetch-image.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { APPEARANCE_READ_SCHEMA, sanitizeAppearance } from '../_shared/installationGuideSchema.generated.ts';
 
 const BUCKET = 'pdf-documents';
@@ -30,6 +31,38 @@ function base64FromBytes(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+async function fetchPhoto(url: string): Promise<{ bytes: Uint8Array; mimeType: string }> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20_000);
+  try {
+    let current = await assertSafeUrl(url.replace(/^http:\/\//i, 'https://'), { allowSchemes: ['https:'] });
+    for (let hop = 0; ; hop++) {
+      const res = await fetch(current, { redirect: 'manual', signal: ctl.signal, headers: { accept: 'image/*' } });
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        await res.body?.cancel();
+        if (!location || hop >= 4) throw new Error(`redirect without an end (HTTP ${res.status})`);
+        current = await assertSafeUrl(new URL(location, current).toString(), { allowSchemes: ['https:'] });
+        continue;
+      }
+      if (!res.ok) {
+        await res.body?.cancel();
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const mimeType = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+      if (mimeType && !mimeType.startsWith('image/')) {
+        await res.body?.cancel();
+        throw new Error(`not an image (${mimeType})`);
+      }
+      const bytes = await readCapped(res, MAX_IMAGE_BYTES);
+      if (bytes.length === 0) throw new Error('empty');
+      return { bytes, mimeType: mimeType || 'image/jpeg' };
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function photoFromPage(pageUrl: string): Promise<string> {
   const { text, finalUrl } = await fetchTextGuarded(pageUrl, { maxBytes: 1_500_000, contentTypePrefix: 'text/html' });
   const meta = text.match(/<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["'][^>]*>/i)?.[0] ?? '';
@@ -49,7 +82,8 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   const keyWs = auth.apiKey?.workspace_id;
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  const body = (await req.json().catch(() => ({}))) as { guide_id?: unknown; image_url?: unknown; page_url?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { guide_id?: unknown; image_url?: unknown; page_url?: unknown; fallback_url?: unknown };
+  const fallbackUrl = typeof body.fallback_url === 'string' ? body.fallback_url.trim() : '';
   const guideId = typeof body.guide_id === 'string' ? body.guide_id : '';
   const imageUrl = typeof body.image_url === 'string' ? body.image_url.trim() : '';
   const pageUrl = typeof body.page_url === 'string' ? body.page_url.trim() : '';
@@ -80,12 +114,19 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     if (e instanceof HttpError) throw e;
     throw new HttpError(422, 'That page could not be opened.');
   }
-  let photo: { bytes: Uint8Array; mimeType: string };
-  try {
-    photo = await fetchImageGuarded(photoUrl, { maxBytes: MAX_IMAGE_BYTES });
-  } catch {
-    throw new HttpError(422, 'That photo could not be downloaded. Try another one, or save it and paste a different address.');
+  let photo: { bytes: Uint8Array; mimeType: string } | null = null;
+  let why = '';
+  for (const candidate of [photoUrl, fallbackUrl].filter((u, i, all) => u && all.indexOf(u) === i)) {
+    try {
+      photo = await fetchPhoto(candidate);
+      photoUrl = candidate;
+      break;
+    } catch (e) {
+      why = e instanceof Error ? e.message : String(e);
+      console.warn(`[installation-guide-appearance] ${candidate} -> ${why}`);
+    }
   }
+  if (!photo) throw new HttpError(422, `That photo could not be downloaded (${why.slice(0, 80)}). Pick another one, or paste the product page address.`);
   const mime = photo.mimeType.split(';')[0].trim().toLowerCase();
   if (!READABLE.includes(mime)) throw new HttpError(415, 'That photo is in a format we cannot read (use JPEG, PNG or WebP).');
 

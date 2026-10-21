@@ -208,7 +208,7 @@ const KIND_SURFACE: Record<FinishKind, { roughness: number; metalness: number; o
   fabric: { roughness: 0.95, metalness: 0, opacity: 1 },
 };
 
-export function usePhotoCrops(photoUrl: string | null, crops: Array<{ id: string; box: PageBox; repeat: number }>): Map<string, THREE.Texture> {
+export function usePhotoCrops(photoUrl: string | null, crops: Array<{ id: string; box: PageBox; repeat: number | [number, number] }>): Map<string, THREE.Texture> {
   const [maps, setMaps] = useState<Map<string, THREE.Texture>>(new Map());
   useEffect(() => {
     if (!photoUrl || crops.length === 0) {
@@ -223,7 +223,10 @@ export function usePhotoCrops(photoUrl: string | null, crops: Array<{ id: string
       if (!live) return;
       const next = new Map<string, THREE.Texture>();
       for (const c of crops) {
-        const s = c.box;
+        const inset = 0.3;
+        const w = c.box.x1 - c.box.x0;
+        const h = c.box.y1 - c.box.y0;
+        const s = { x0: c.box.x0 + w * inset, y0: c.box.y0 + h * inset, x1: c.box.x1 - w * inset, y1: c.box.y1 - h * inset };
         const sw = Math.max(8, (s.x1 - s.x0) * img.naturalWidth);
         const sh = Math.max(8, (s.y1 - s.y0) * img.naturalHeight);
         const canvas = Object.assign(document.createElement('canvas'), { width: 256, height: 256 });
@@ -234,7 +237,8 @@ export function usePhotoCrops(photoUrl: string | null, crops: Array<{ id: string
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.wrapS = THREE.MirroredRepeatWrapping;
         tex.wrapT = THREE.MirroredRepeatWrapping;
-        tex.repeat.set(c.repeat, c.repeat);
+        const [rx, ry] = Array.isArray(c.repeat) ? c.repeat : [c.repeat, c.repeat];
+        tex.repeat.set(rx, ry);
         made.push(tex);
         next.set(c.id, tex);
       }
