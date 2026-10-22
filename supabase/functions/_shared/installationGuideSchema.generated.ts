@@ -299,6 +299,7 @@ export interface GuideRoom {
   product_box: PageBox | null;
   floor_line: number | null;
   plate_url: string | null;
+  footprint: Array<{ x: number; y: number }> | null;
 }
 
 export interface GuideAppearance {
@@ -339,6 +340,8 @@ export const APPEARANCE_READ_SCHEMA = closed({
     backsplash_swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
     product_box: closed({ x0: num, y0: num, x1: num, y1: num }),
     floor_line: num,
+    footprint_shown: bool,
+    footprint: closed({ fl_x: num, fl_y: num, fr_x: num, fr_y: num, br_x: num, br_y: num, bl_x: num, bl_y: num }),
   }),
 });
 
@@ -359,6 +362,19 @@ function sanitizeBacksplash(raw: Record<string, unknown>): GuideRoom['backsplash
   return { color: color.toLowerCase(), swatch: raw.backsplash_textured === false ? null : swatchBox(raw.backsplash_swatch) };
 }
 
+function sanitizeFootprint(raw: Record<string, unknown>): GuideRoom['footprint'] {
+  const inRange = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= -0.5 && v <= 1.5;
+  if (Array.isArray(raw.footprint)) {
+    const pts = raw.footprint.filter(isObj).map((p) => ({ x: p.x, y: p.y }));
+    return pts.length === 4 && pts.every((p) => inRange(p.x) && inRange(p.y)) ? pts as Array<{ x: number; y: number }> : null;
+  }
+  if (raw.footprint_shown !== true || !isObj(raw.footprint)) return null;
+  const f = raw.footprint;
+  const pts = [[f.fl_x, f.fl_y], [f.fr_x, f.fr_y], [f.br_x, f.br_y], [f.bl_x, f.bl_y]];
+  if (!pts.every(([x, y]) => inRange(x) && inRange(y))) return null;
+  return pts.map(([x, y]) => ({ x: x as number, y: y as number }));
+}
+
 function sanitizeRoom(raw: unknown): GuideRoom | null {
   if (!isObj(raw)) return null;
   if (raw.shown === false) return null;
@@ -375,6 +391,7 @@ function sanitizeRoom(raw: unknown): GuideRoom | null {
     product_box: swatchBox(raw.product_box),
     floor_line: typeof raw.floor_line === 'number' && raw.floor_line > 0.2 && raw.floor_line <= 1 ? raw.floor_line : null,
     plate_url: typeof raw.plate_url === 'string' && /^https:\/\//.test(raw.plate_url) ? raw.plate_url.slice(0, 1000) : null,
+    footprint: sanitizeFootprint(raw),
   };
 }
 

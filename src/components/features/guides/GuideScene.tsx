@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { ContactShadows, Edges, Html, OrbitControls, SoftShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -16,12 +16,13 @@ import {
   type GuideBuild,
 } from '@/lib/installation/guideBuild';
 import type { GuideAppearance, GuideRoom, InstallationGuideData } from '@/lib/installation/guideSchema';
+import type { PhotoCamera } from '@/lib/installation/photoCamera';
 import {
   EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, usePhotoCrops, useStudioLight, woodTexture,
   type FinishLook, type Hole,
 } from './partModels';
 
-export type GuideView = 'room' | 'drawing';
+export type GuideView = 'room' | 'drawing' | 'photo';
 
 interface ControlsLike {
   target: THREE.Vector3;
@@ -49,9 +50,10 @@ interface Props {
   follow: boolean;
   appearance?: GuideAppearance | null;
   photoUrl?: string | null;
+  photoCamera?: PhotoCamera | null;
 }
 
-type Looks = { appearance: GuideAppearance | null; looks: Map<string, FinishLook> };
+type Looks = { appearance: GuideAppearance | null; looks: Map<string, FinishLook>; hideKit: boolean };
 
 const PANEL_EDGE_ROOM = '#c8a46a';
 const GHOST = '#7fe3ff';
@@ -309,36 +311,17 @@ function tileTexture(): THREE.CanvasTexture | null {
   });
 }
 
-function RoomPlate({ build, room, wallZ }: { build: GuideBuild; room: GuideRoom; wallZ: number }) {
-  const [plate, setPlate] = useState<{ tex: THREE.Texture; w: number; h: number } | null>(null);
-  useEffect(() => {
-    if (!room.plate_url) return;
-    let live = true;
-    let made: THREE.Texture | null = null;
-    new THREE.TextureLoader().setCrossOrigin('anonymous').load(room.plate_url, (tex) => {
-      if (!live) { tex.dispose(); return; }
-      tex.colorSpace = THREE.SRGBColorSpace;
-      made = tex;
-      const img = tex.image as { width: number; height: number };
-      setPlate({ tex, w: img.width, h: img.height });
-    });
-    return () => { live = false; made?.dispose(); };
-  }, [room.plate_url]);
-  if (!plate || !room.product_box) return null;
-  const box = room.product_box;
-  const floorLine = room.floor_line ?? 1;
-  const perMetre = ((box.x1 - box.x0) * plate.w) / Math.max(build.product.size.x, 0.1);
-  const width = plate.w / perMetre;
-  const height = (floorLine * plate.h) / perMetre;
-  plate.tex.repeat.set(1, floorLine);
-  plate.tex.offset.set(0, 1 - floorLine);
-  const x = build.product.center.x + (0.5 - (box.x0 + box.x1) / 2) * width;
-  return (
-    <mesh position={[x, height / 2, wallZ + 0.006]}>
-      <planeGeometry args={[width, height]} />
-      <meshBasicMaterial key={plate.tex.uuid} map={plate.tex} toneMapped={false} />
-    </mesh>
-  );
+function PhotoCameraRig({ cam }: { cam: PhotoCamera }) {
+  const camera = useThree((st) => st.camera) as THREE.PerspectiveCamera;
+  useFrame(() => {
+    camera.position.set(...cam.position);
+    camera.quaternion.set(...cam.quaternion);
+    if (Math.abs(camera.fov - cam.fovDeg) > 1e-3) {
+      camera.fov = cam.fovDeg;
+      camera.updateProjectionMatrix();
+    }
+  });
+  return null;
 }
 
 function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoom | null; photoUrl: string | null }) {
@@ -379,16 +362,13 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
       </mesh>
       <mesh position={[0, wallH / 2, wallZ]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
-        {room?.plate_url
-          ? <meshBasicMaterial color={wall} toneMapped={false} />
-          : <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />}
+        <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />
       </mesh>
       <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
-        {room?.plate_url ? <meshBasicMaterial color={side} toneMapped={false} /> : <meshStandardMaterial color={side} roughness={0.92} />}
+        <meshStandardMaterial color={side} roughness={0.92} />
       </mesh>
-      {room?.plate_url && room.product_box && <RoomPlate build={build} room={room} wallZ={wallZ} />}
-      {room?.backsplash && !room.plate_url && (
+      {room?.backsplash && (
         <mesh position={[build.product.center.x, splashY, wallZ + 0.004]} receiveShadow>
           <planeGeometry args={[splashW, splashH]} />
           <meshStandardMaterial key={photo.get('splash')?.uuid ?? 'plain'} color={photo.get('splash') ? '#ffffff' : room.backsplash.color} map={photo.get('splash') ?? undefined} roughness={0.35} />
@@ -547,6 +527,7 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
       const mesh = refs.current[i];
       if (!mesh) return;
       const pose = poseAt(build, it, xRef.current, explodeRef.current);
+      mesh.visible = !(finish.hideKit && !(xRef.current > it.t0));
       mesh.position.set(pose.pos.x, pose.pos.y, pose.pos.z);
       mesh.quaternion.set(pose.quat[0], pose.quat[1], pose.quat[2], pose.quat[3]);
       const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[];
@@ -573,7 +554,7 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
             {[0, 1, 2, 3, 4, 5].map((face) => {
               const thin = it.size.x <= it.size.y && it.size.x <= it.size.z ? 0 : it.size.y <= it.size.z ? 1 : 2;
               const isFace = Math.floor(face / 2) === thin;
-              const room = view === 'room';
+              const room = view !== 'drawing';
               const color = isHover ? HOVER : !room ? '#ffffff' : look ? (isFace ? look.color : look.base) : part?.kind === 'fitting' ? '#d9d9d9' : isFace ? WOOD_TINT : EDGE_BANDING;
               const map = !room || !isFace ? null : look ? look.map : part?.kind !== 'fitting' ? wood : null;
               return (
@@ -598,7 +579,8 @@ function Panels({ build, guide, xRef, explodeRef, view, hovered, onHover, onPick
   );
 }
 
-function HardwarePart({ build, items, name, look: finishLook, xRef, explodeRef, view, onHover, onPick }: {
+function HardwarePart({ build, items, name, look: finishLook, hideKit, xRef, explodeRef, view, onHover, onPick }: {
+  hideKit: boolean;
   look: FinishLook | null;
   build: GuideBuild;
   items: BuildItem[];
@@ -625,7 +607,8 @@ function HardwarePart({ build, items, name, look: finishLook, xRef, explodeRef, 
       tmp.q.set(pose.quat[0], pose.quat[1], pose.quat[2], pose.quat[3]);
       if (pose.spinAngle) tmp.q.multiply(tmp.q2.setFromAxisAngle(tmp.axisY, pose.spinAngle));
       tmp.p.set(pose.pos.x, pose.pos.y, pose.pos.z);
-      tmp.s.set(1, 1, 1);
+      const shown = !(hideKit && !(xRef.current > it.t0));
+      tmp.s.setScalar(shown ? 1 : 0);
       mesh.setMatrixAt(i, tmp.m.compose(tmp.p, tmp.q, tmp.s));
     });
     mesh.instanceMatrix.needsUpdate = true;
@@ -673,6 +656,7 @@ function Hardware(props: Pick<Props, 'build' | 'guide' | 'xRef' | 'explodeRef' |
           items={items}
           name={props.guide.parts[items[0].partIndex]?.name ?? ''}
           look={lookForPart(props.finish.appearance, props.finish.looks, partId)}
+          hideKit={props.finish.hideKit}
           xRef={props.xRef}
           explodeRef={props.explodeRef}
           view={props.view}
@@ -896,23 +880,48 @@ export const GuideScene: React.FC<Props> = (props) => {
   const gl = useThree((s) => s.gl);
   useStudioLight(scene, gl, view === 'drawing' ? 0 : 0.28);
   const looks = useFinishLooks(props.appearance ?? null, props.photoUrl ?? null);
-  const finish = useMemo(() => ({ appearance: props.appearance ?? null, looks }), [props.appearance, looks]);
+  const inPhoto = view === 'photo' && !!props.photoCamera;
+  const finish = useMemo(() => ({ appearance: props.appearance ?? null, looks, hideKit: inPhoto }), [props.appearance, looks, inPhoto]);
   const real = props.appearance ? { floor: props.appearance.room?.floor ?? '#d9d3c9' } : null;
 
   useLayoutEffect(() => {
-    scene.background = new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
-    scene.fog = view === 'drawing' ? null : new THREE.FogExp2('#1a1410', 0.035);
+    scene.background = inPhoto ? null : new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
+    scene.fog = view === 'room' ? new THREE.FogExp2('#1a1410', 0.035) : null;
     gl.toneMappingExposure = view === 'drawing' ? 1.1 : 1;
-  }, [scene, gl, view]);
+  }, [scene, gl, view, inPhoto]);
 
   const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.y, 2);
 
   return (
     <>
-      <OrbitControls makeDefault enableDamping enableZoom={false} maxPolarAngle={Math.PI / 2.02} minDistance={0.25} maxDistance={span * 5} />
-      <CameraRig shot={shot} version={shotVersion} build={build} xRef={xRef} follow={props.follow} />
-      <KeyboardFly />
-      {view === 'room' ? (
+      <OrbitControls makeDefault enabled={!inPhoto} enableDamping enableZoom={false} maxPolarAngle={Math.PI / 2.02} minDistance={0.25} maxDistance={span * 5} />
+      {inPhoto && props.photoCamera ? <PhotoCameraRig cam={props.photoCamera} /> : <CameraRig shot={shot} version={shotVersion} build={build} xRef={xRef} follow={props.follow} />}
+      {!inPhoto && <KeyboardFly />}
+      {inPhoto ? (
+        <>
+          <SoftShadows size={22} samples={12} focus={0.5} />
+          <ContactShadows position={[build.product.center.x, 0.002, build.product.center.z]} scale={Math.max(build.product.size.x, build.product.size.z) * 2.2 + 1} blur={2.4} opacity={0.6} far={1.2} resolution={512} frames={Infinity} />
+          <hemisphereLight args={['#ffffff', real?.floor ?? '#d9d3c9', 1.6]} />
+          <directionalLight
+            position={[-2.5, 5.5, 7]}
+            intensity={3.2}
+            color="#fffaf2"
+            castShadow
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
+            shadow-camera-left={-span}
+            shadow-camera-right={span}
+            shadow-camera-top={span}
+            shadow-camera-bottom={-span}
+            shadow-bias={-0.0005}
+            shadow-normalBias={0.03}
+          />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
+            <planeGeometry args={[span * 6, span * 6]} />
+            <shadowMaterial transparent opacity={0.28} />
+          </mesh>
+        </>
+      ) : view === 'room' ? (
         <>
           <SoftShadows size={22} samples={12} focus={0.5} />
           <ContactShadows position={[build.product.center.x, 0.002, build.product.center.z]} scale={Math.max(build.product.size.x, build.product.size.z) * 2.2 + 1} blur={2.6} opacity={0.55} far={1.2} resolution={512} frames={Infinity} />
@@ -944,8 +953,8 @@ export const GuideScene: React.FC<Props> = (props) => {
           </mesh>
         </>
       )}
-      <KitCards build={build} guide={guide} view={view} />
-      {build.hasAssembly && <Ghost build={build} xRef={xRef} />}
+      {!inPhoto && <KitCards build={build} guide={guide} view={view} />}
+      {build.hasAssembly && !inPhoto && <Ghost build={build} xRef={xRef} />}
       <Panels build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} hovered={props.hovered} onHover={props.onHover} onPick={props.onPick} finish={finish} />
       <Hardware build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} onHover={props.onHover} onPick={props.onPick} finish={finish} />
       <Trails build={build} xRef={xRef} />
