@@ -901,7 +901,8 @@ export const GuideScene: React.FC<Props> = (props) => {
         <>
           <SoftShadows size={22} samples={12} focus={0.5} />
           <ContactShadows position={[build.product.center.x, 0.002, build.product.center.z]} scale={Math.max(build.product.size.x, build.product.size.z) * 2.2 + 1} blur={2.4} opacity={0.6} far={1.2} resolution={512} frames={Infinity} />
-          <hemisphereLight args={['#ffffff', real?.floor ?? '#d9d3c9', 1.6]} />
+          <hemisphereLight args={['#ffffff', real?.floor ?? '#d9d3c9', 2]} />
+          <directionalLight position={props.photoCamera.position} intensity={1.4} color="#ffffff" />
           <directionalLight
             position={[-2.5, 5.5, 7]}
             intensity={3.2}
