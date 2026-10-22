@@ -213,13 +213,6 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
   const [exploded, setExploded] = useState(false);
   const [view, setView] = useState<GuideView>('room');
   const photoView = usePhotoView(row, photoUrl, build);
-  const offeredPhoto = useRef(false);
-  useEffect(() => {
-    if (photoView && !offeredPhoto.current) {
-      offeredPhoto.current = true;
-      setView('photo');
-    }
-  }, [photoView]);
   const inPhoto = view === 'photo' && !!photoView;
   const [bookOpen, setBookOpen] = useState(false);
   const [labels, setLabels] = useState(true);
@@ -550,7 +543,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
 
         <div className="mt-1.5 flex items-center gap-2 sm:mt-2 sm:flex-wrap">
           <div className="flex rounded-sm border border-hairline p-0.5" role="group" aria-label="View">
-            {(photoView ? (['photo', 'room', 'drawing'] as const) : (['room', 'drawing'] as const)).map((v) => (
+            {(photoView ? (['room', 'drawing', 'photo'] as const) : (['room', 'drawing'] as const)).map((v) => (
               <button
                 key={v}
                 type="button"
