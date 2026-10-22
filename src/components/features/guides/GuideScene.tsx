@@ -20,7 +20,7 @@ import {
   EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, usePhotoCrops, useStudioLight, woodTexture,
   type FinishLook, type Hole,
 } from './partModels';
-import { usePhotoWall } from './photoWall';
+import { ProjectedRoom, type PhotoSpace } from './projectedRoom';
 
 export type GuideView = 'room' | 'drawing' | 'photo';
 
@@ -50,6 +50,7 @@ interface Props {
   follow: boolean;
   appearance?: GuideAppearance | null;
   photoUrl?: string | null;
+  photoSpace?: PhotoSpace | null;
 }
 
 type Looks = { appearance: GuideAppearance | null; looks: Map<string, FinishLook>; hideKit: boolean };
@@ -310,7 +311,7 @@ function tileTexture(): THREE.CanvasTexture | null {
   });
 }
 
-function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: GuideRoom | null; photoUrl: string | null; space: boolean }) {
+function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoom | null; photoUrl: string | null }) {
   const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.x, 3) + 2.4;
   const floorZ = (build.kitBounds.center.z + build.kitBounds.size.z / 2 + build.product.center.z - build.product.size.z / 2) / 2;
   const wallZ = build.product.center.z - build.product.size.z / 2 - 0.35;
@@ -325,8 +326,6 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
     ...(room?.backsplash?.swatch ? [{ id: 'splash', box: room.backsplash.swatch, repeat: [splashW / 0.3, splashH / 0.3] as [number, number] }] : []),
   ], [room, size, wallH, splashW, splashH]);
   const photo = usePhotoCrops(photoUrl, crops);
-  const frontTop = build.product.center.y + build.product.size.y / 2;
-  const photoWall = usePhotoWall(space ? room?.plate_url ?? photoUrl : null, space ? room?.front ?? null : null, room?.corners ?? null, build.product.size.x, frontTop);
   const pattern = useDisposable(() => {
     if (!room || room.floor_swatch) return null;
     const t = room.floor_kind === 'wood' ? woodTexture()?.clone() ?? null : room.floor_kind === 'tile' || room.floor_kind === 'stone' ? tileTexture() : null;
@@ -337,15 +336,11 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
     t.needsUpdate = true;
     return t;
   }, room ? `${room.floor_kind}:${!!room.floor_swatch}:${size}` : 'none');
-  const wall = photoWall?.color ?? room?.wall ?? '#ece9e4';
+  const wall = room?.wall ?? '#ece9e4';
   const floor = room?.floor ?? '#d9d3c9';
   const floorMap = photo.get('floor') ?? pattern;
   const side = useMemo(() => new THREE.Color(wall).multiplyScalar(0.86), [wall]);
   const ground = useMemo(() => new THREE.Color(floor).multiplyScalar(0.9), [floor]);
-  const leftEdge = build.product.center.x - build.product.size.x / 2;
-  const returnDepth = build.product.center.z + build.product.size.z / 2 - wallZ + 0.6;
-  const cornerL = photoWall?.left ? { x: leftEdge + photoWall.left.x - 0.01, depth: returnDepth, color: photoWall.left.color, turn: Math.PI / 2 } : null;
-  const cornerR = photoWall?.right ? { x: leftEdge + photoWall.right.x + 0.01, depth: returnDepth, color: photoWall.right.color, turn: -Math.PI / 2 } : null;
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, floorZ]} receiveShadow>
@@ -354,28 +349,13 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
       </mesh>
       <mesh position={[0, wallH / 2, wallZ]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
-        {photoWall ? <meshBasicMaterial color={wall} toneMapped={false} /> : <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />}
+        <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />
       </mesh>
-      {photoWall && (
-        <>
-          <mesh position={[leftEdge + (photoWall.x0 + photoWall.x1) / 2, (photoWall.y0 + photoWall.y1) / 2, wallZ + 0.002]}>
-            <planeGeometry args={[photoWall.x1 - photoWall.x0, photoWall.y1 - photoWall.y0]} />
-            <meshBasicMaterial key={photoWall.map.uuid} map={photoWall.map} transparent toneMapped={false} depthWrite={false} />
-          </mesh>
-          <mesh position={[0, wallH / 2, wallZ + 0.004]} receiveShadow>
-            <planeGeometry args={[size, wallH]} />
-            <shadowMaterial transparent opacity={0.22} />
-          </mesh>
-        </>
-      )}
-      {[cornerL, cornerR].map((c) => c && <ReturnWall key={c.turn} x={c.x} z={wallZ + c.depth / 2} depth={c.depth} height={wallH} turn={c.turn} color={c.color} />)}
-      {!cornerL && (
-        <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
-          <planeGeometry args={[size, wallH]} />
-          <meshStandardMaterial color={side} roughness={0.92} />
-        </mesh>
-      )}
-      {room?.backsplash && !photoWall && (
+      <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[size, wallH]} />
+        <meshStandardMaterial color={side} roughness={0.92} />
+      </mesh>
+      {room?.backsplash && (
         <mesh position={[build.product.center.x, splashY, wallZ + 0.004]} receiveShadow>
           <planeGeometry args={[splashW, splashH]} />
           <meshStandardMaterial key={photo.get('splash')?.uuid ?? 'plain'} color={photo.get('splash') ? '#ffffff' : room.backsplash.color} map={photo.get('splash') ?? undefined} roughness={0.35} />
@@ -385,43 +365,13 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
         <boxGeometry args={[size, 0.09, 0.016]} />
         <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
       </mesh>
-      {!cornerL && (
-        <mesh position={[-span * 0.75 + 0.008, 0.045, floorZ]} receiveShadow>
-          <boxGeometry args={[0.016, 0.09, size]} />
-          <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
-        </mesh>
-      )}
+      <mesh position={[-span * 0.75 + 0.008, 0.045, floorZ]} receiveShadow>
+        <boxGeometry args={[0.016, 0.09, size]} />
+        <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
+      </mesh>
       <pointLight position={[0, wallH - 0.2, wallZ + 0.6]} intensity={3} distance={span * 2} color="#ffffff" />
       <directionalLight position={[1.5, 3.5, 9]} intensity={0.9} color="#ffffff" />
       <hemisphereLight args={['#ffffff', '#cfcac2', 0.25]} />
-    </group>
-  );
-}
-
-function ReturnWall({ x, z, depth, height, turn, color }: { x: number; z: number; depth: number; height: number; turn: number; color: string }) {
-  const camera = useThree((st) => st.camera);
-  const wall = useRef<THREE.MeshStandardMaterial>(null);
-  const skirting = useRef<THREE.MeshStandardMaterial>(null);
-  useFrame((_, delta) => {
-    const inward = turn > 0 ? camera.position.x - x : x - camera.position.x;
-    const want = inward < 0.15 ? 0.12 : 1;
-    for (const m of [wall.current, skirting.current]) {
-      if (!m) continue;
-      m.opacity += (want - m.opacity) * (1 - Math.exp(-delta * 8));
-      m.transparent = m.opacity < 0.99;
-      m.depthWrite = !m.transparent;
-    }
-  });
-  return (
-    <group position={[x, 0, z]} rotation={[0, turn, 0]}>
-      <mesh position={[0, height / 2, -0.06]} castShadow>
-        <boxGeometry args={[depth, height, 0.12]} />
-        <meshStandardMaterial ref={wall} color={color} roughness={0.92} />
-      </mesh>
-      <mesh position={[0, 0.045, 0.008]}>
-        <boxGeometry args={[depth, 0.09, 0.016]} />
-        <meshStandardMaterial ref={skirting} color="#f7f6f3" roughness={0.6} />
-      </mesh>
     </group>
   );
 }
@@ -917,7 +867,6 @@ export const GuideScene: React.FC<Props> = (props) => {
   const gl = useThree((s) => s.gl);
   useStudioLight(scene, gl, view === 'drawing' ? 0 : 0.28);
   const looks = useFinishLooks(props.appearance ?? null, props.photoUrl ?? null);
-  const space = view === 'photo';
   const finish = useMemo(() => ({ appearance: props.appearance ?? null, looks, hideKit: false }), [props.appearance, looks]);
   const real = props.appearance ? { floor: props.appearance.room?.floor ?? '#d9d3c9' } : null;
 
@@ -954,8 +903,8 @@ export const GuideScene: React.FC<Props> = (props) => {
             shadow-normalBias={0.03}
           />
           <directionalLight position={[4, 3, -2]} intensity={0.6} color="#9fc4ff" />
-          {props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} space={space} /> : <Room build={build} />}
-          {build.hasAssembly && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} onBoard={props.onBoard} />}
+          {view === 'photo' && props.photoSpace ? <ProjectedRoom space={props.photoSpace} build={build} /> : props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} /> : <Room build={build} />}
+          {build.hasAssembly && !(view === 'photo' && props.photoSpace) && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} onBoard={props.onBoard} />}
         </>
       ) : (
         <>

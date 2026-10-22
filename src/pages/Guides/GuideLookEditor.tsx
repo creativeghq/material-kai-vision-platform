@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, ImageIcon, Loader2, Search, Sparkles } from 'lucide-react';
+import { ExternalLink, ImageIcon, Loader2, Search, Sparkles, Upload } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -149,13 +149,16 @@ export function GuideLookEditor({ row, onSaved, toast }: {
     }
   };
 
-  const read = async () => {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const read = async (file?: File) => {
     const typed = address.trim();
-    const source = typed
-      ? (/\.(jpe?g|png|webp|gif)(\?|$)/i.test(typed) ? { image_url: typed } : { page_url: typed })
-      : { image_url: picked, fallback_url: candidates?.find((c) => c.full === picked)?.thumb };
     setBusy('read');
     try {
+      const source = file
+        ? { image_url: await installationGuideService.uploadProductPhoto(row, file) }
+        : typed
+          ? (/\.(jpe?g|png|webp|gif)(\?|$)/i.test(typed) ? { image_url: typed } : { page_url: typed })
+          : { image_url: picked, fallback_url: candidates?.find((c) => c.full === picked)?.thumb };
       const { appearance, usedPreview } = await installationGuideService.readAppearance(row.id, source);
       onSaved(appearance);
       setAddress('');
@@ -197,7 +200,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
       <Card>
         <CardHeader>
           <CardTitle>The product photo</CardTitle>
-          <p className="text-xs text-muted-foreground">Find the product, tap the photo that matches yours, then press Read the finishes. The 3D takes its colours, its wood and stone textures and the room around it (wall and floor) from that photo. Reading a photo costs a few credits.</p>
+          <p className="text-xs text-muted-foreground">Find the product and tap the photo that matches yours, or upload your own photo of it in its room, then press Read the finishes. The 3D takes its colours, its wood and stone textures and the room around it (wall and floor) from that photo. Reading a photo costs a few credits.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           {photoUrl && (
@@ -214,6 +217,20 @@ export function GuideLookEditor({ row, onSaved, toast }: {
             <Button variant="outline" className="gap-1.5" disabled={busy !== null} onClick={() => void search()}>
               {busy === 'search' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}Find photos of {row.guide?.title || row.title}
             </Button>
+            <Button variant="outline" className="gap-1.5" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+              <Upload className="h-4 w-4" />Upload your photo
+            </Button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void read(file);
+              }}
+            />
           </div>
           {candidates && candidates.length > 0 && (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8">

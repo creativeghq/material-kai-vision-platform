@@ -189,6 +189,26 @@ export const installationGuideService = {
     return { appearance: data.appearance as GuideAppearance, usedPreview: data.used_preview === true };
   },
 
+  async uploadProductPhoto(row: InstallationGuideRow, file: File): Promise<string> {
+    if (!/^image\//.test(file.type)) throw new Error('Choose a photo (JPEG, PNG or WebP).');
+    const bitmap = await createImageBitmap(file).catch(() => null);
+    if (!bitmap) throw new Error('That photo could not be opened. Use a JPEG, PNG or WebP.');
+    const k = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * k);
+    canvas.height = Math.round(bitmap.height * k);
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/jpeg', 0.9));
+    if (!blob) throw new Error('That photo could not be prepared.');
+    const path = `${folder(row)}/upload-${Date.now()}.jpg`;
+    const { error } = await supabase.storage.from(GUIDE_BUCKET).upload(path, blob, { contentType: 'image/jpeg' });
+    if (error) throw new Error(error.message);
+    const { data, error: signError } = await supabase.storage.from(GUIDE_BUCKET).createSignedUrl(path, 60 * 60);
+    if (signError || !data?.signedUrl) throw new Error(signError?.message ?? 'The photo could not be opened after upload.');
+    return data.signedUrl;
+  },
+
   async saveAppearance(id: string, appearance: GuideAppearance | null): Promise<void> {
     const { error } = await supabase.from('installation_guides').update({ appearance: appearance as never }).eq('id', id);
     if (error) throw new Error(error.message);
