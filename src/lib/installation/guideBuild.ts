@@ -1,4 +1,4 @@
-import type { GuidePart, GuideSpot, InstallationGuideData, Vec3 } from './guideSchema';
+import type { GuidePart, GuidePlacement, GuideSpot, InstallationGuideData, Vec3 } from './guideSchema';
 
 export type Quat = [number, number, number, number];
 
@@ -185,7 +185,7 @@ function shotFor(b: Box, yaw: number, pitch: number, minDist = 0.9): CameraShot 
   return { target: b.center, yaw, pitch, dist: Math.max(minDist, r * 2.3 + 0.35) };
 }
 
-const FOOT = /foot|feet|leg|glide|socket/i;
+const FOOT = /foot|feet|leg|glide|socket|levell?ing/i;
 const HINGE = /hinge|mounting plate/i;
 const KNOB = /knob|handle|pull/i;
 const NAIL = /nail/i;
@@ -261,6 +261,43 @@ function mountFor(
   return null;
 }
 
+type Placed = GuidePlacement & { center: Vec3; size: Vec3 };
+
+function drawerBox(guide: InstallationGuideData, placed: Placed[], product: Box): Placed[] {
+  const front = placed.find((pl) => /drawer/i.test(guide.parts.find((p) => p.id === pl.part_id)?.name ?? '') && smallestAxis(pl.size) === 'z');
+  if (!front) return [];
+  const t = 0.012;
+  const w = front.size.x - 0.05;
+  const h = Math.max(0.06, front.size.y * 0.75);
+  const back = product.center.z - product.size.z / 2 + 0.02;
+  const z1 = front.center.z - front.size.z / 2;
+  const d = z1 - back;
+  if (d < 0.1) return [];
+  const zc = (z1 + back) / 2;
+  const { x, y } = front.center;
+  const shapes = [
+    { center: v(x - w / 2 + t / 2, y, zc), size: v(t, h, d) },
+    { center: v(x + w / 2 - t / 2, y, zc), size: v(t, h, d) },
+    { center: v(x, y - h / 2 + t / 2, zc), size: v(w - 2 * t, t, d) },
+    { center: v(x, y, back + t / 2), size: v(w - 2 * t, h, t) },
+  ];
+  const out: Placed[] = [];
+  let next = 0;
+  for (const part of guide.parts) {
+    if (part.kind !== 'panel' && part.kind !== 'fitting') continue;
+    if (!/drawer|runner/i.test(part.name) || placed.some((pl) => pl.part_id === part.id)) continue;
+    for (let k = 0; k < part.quantity; k++) {
+      const runner = /runner|slide|rail/i.test(part.name);
+      const shape = runner
+        ? { center: v(x - w / 2 - 0.006, y - h / 2 + 0.015, zc), size: v(0.01, 0.025, d) }
+        : shapes[next++];
+      if (!shape) break;
+      out.push({ step: front.step, part_id: part.id, instance: k + 1, center_cm: scale(shape.center, 100), extent_cm: scale(shape.size, 100), ...shape });
+    }
+  }
+  return out;
+}
+
 export function buildGuide(guide: InstallationGuideData): GuideBuild {
   const stepCount = Math.max(1, guide.steps.length - 1);
   const hasAssembly = guide.assembly.available && guide.assembly.placements.length > 0;
@@ -276,6 +313,7 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
   const lift = hasAssembly ? -(productBox.center.y - productBox.size.y / 2) : 0;
   for (const p of placements) p.center = add(p.center, v(-productBox.center.x, lift, -productBox.center.z));
   const product = hasAssembly ? bounds(placements) : productBox;
+  if (hasAssembly) placements.push(...drawerBox(guide, placements, product));
 
   const slotsOf = new Map<string, number[]>();
   guide.steps.forEach((s, i) => {
@@ -394,7 +432,10 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
       const sameStep = panelIdx.filter(({ it }) => it.step === use.step && it.placed);
       const pool = named.length ? named : sameStep.length ? sameStep : panelIdx.filter(({ it }) => it.placed && it.step <= use.step);
       const upcoming = pool.filter(({ it }) => it.step >= use.step).sort((a, b) => a.it.step - b.it.step);
-      const hosts = upcoming.length ? upcoming.filter(({ it }) => it.step === upcoming[0].it.step) : pool.slice(-1);
+      const lowest = Math.min(...pool.map(({ it }) => it.target.pos.y - it.size.y / 2));
+      const hosts = FOOT.test(p.name) && pool.length
+        ? pool.filter(({ it }) => it.target.pos.y - it.size.y / 2 < lowest + 0.02)
+        : upcoming.length ? upcoming.filter(({ it }) => it.step === upcoming[0].it.step) : pool.slice(-1);
       for (let k = 0; k < use.quantity && unitIndex < shown; k++, unitIndex++) {
         const kitPos = kitOf(unitIndex);
         let item: BuildItem;

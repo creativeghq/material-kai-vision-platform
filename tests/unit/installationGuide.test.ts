@@ -240,3 +240,47 @@ describe('installation guide read in passes', () => {
     }
   });
 });
+
+describe('installation guide cabinet built upside down', () => {
+  const cabinet = sanitizeGuide({
+    ...raw,
+    parts: [
+      { id: 'SIDE', name: 'Side panel', code: '', quantity: 2, kind: 'panel', size_cm: { x: 2, y: 76, z: 40 }, size_stated: true },
+      { id: 'TB', name: 'Top/bottom panel', code: '', quantity: 2, kind: 'panel', size_cm: { x: 76, y: 2, z: 40 }, size_stated: true },
+      { id: 'FRONT', name: 'Drawer front panel', code: '', quantity: 1, kind: 'panel', size_cm: { x: 76, y: 16, z: 2 }, size_stated: true },
+      { id: 'DSIDE', name: 'Drawer side panel', code: '', quantity: 3, kind: 'panel', size_cm: { x: 36, y: 12, z: 1 }, size_stated: false },
+      { id: 'FOOT', name: 'Leveling foot', code: '', quantity: 4, kind: 'hardware', size_cm: { x: 3, y: 10, z: 3 }, size_stated: false },
+    ],
+    steps: [
+      raw.steps[0],
+      { title: 'Feet', page: 4, box: { x0: 0, y0: 0, x1: 1, y1: 1 }, instruction: 'Fit the feet to the panel.', parts_used: [{ part_id: 'FOOT', quantity: 4, fixes_to: 'TB' }], tools: [], warning: '', people: 1, action: 'attach' },
+      { title: 'Carcass', page: 3, box: { x0: 0, y0: 0, x1: 1, y1: 1 }, instruction: 'Join it.', parts_used: [{ part_id: 'SIDE', quantity: 2, fixes_to: '' }, { part_id: 'TB', quantity: 2, fixes_to: '' }], tools: [], warning: '', people: 1, action: 'place' },
+      { title: 'Drawer', page: 5, box: { x0: 0, y0: 0, x1: 1, y1: 1 }, instruction: 'Build the drawer.', parts_used: [{ part_id: 'DSIDE', quantity: 3, fixes_to: '' }, { part_id: 'FRONT', quantity: 1, fixes_to: '' }], tools: [], warning: '', people: 1, action: 'place' },
+    ],
+    assembly: {
+      available: true,
+      placements: [
+        { part_id: 'SIDE', instance: 1, center_cm: { x: -39, y: 38, z: 0 }, extent_cm: { x: 2, y: 76, z: 40 }, step: 1 },
+        { part_id: 'SIDE', instance: 2, center_cm: { x: 39, y: 38, z: 0 }, extent_cm: { x: 2, y: 76, z: 40 }, step: 1 },
+        { part_id: 'TB', instance: 1, center_cm: { x: 0, y: 75, z: 0 }, extent_cm: { x: 76, y: 2, z: 40 }, step: 2 },
+        { part_id: 'TB', instance: 2, center_cm: { x: 0, y: 1, z: 0 }, extent_cm: { x: 76, y: 2, z: 40 }, step: 2 },
+        { part_id: 'FRONT', instance: 1, center_cm: { x: 0, y: 66, z: 21 }, extent_cm: { x: 76, y: 16, z: 2 }, step: 3 },
+      ],
+    },
+  }, 12);
+  const b = buildGuide(cabinet);
+
+  it('puts every foot under the cabinet, never on the top panel the step also names', () => {
+    const feet = b.items.filter((it) => it.partId === 'FOOT' && it.placed);
+    expect(feet.length).toBe(4);
+    const bottom = b.product.center.y - b.product.size.y / 2;
+    for (const f of feet) expect(poseAt(b, f, b.steps, 0).pos.y).toBeLessThan(bottom + 0.05);
+  });
+
+  it('builds the drawer box behind a placed drawer front instead of leaving it in the kit', () => {
+    const box = b.items.filter((it) => it.partId === 'DSIDE');
+    expect(box.every((it) => it.placed)).toBe(true);
+    const front = b.items.find((it) => it.partId === 'FRONT')!;
+    for (const it of box) expect(it.target.pos.z).toBeLessThan(front.target.pos.z);
+  });
+});
