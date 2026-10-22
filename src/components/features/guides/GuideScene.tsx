@@ -326,7 +326,7 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
   ], [room, size, wallH, splashW, splashH]);
   const photo = usePhotoCrops(photoUrl, crops);
   const frontTop = build.product.center.y + build.product.size.y / 2;
-  const photoWall = usePhotoWall(space ? room?.plate_url ?? photoUrl : null, space ? room?.front ?? null : null, build.product.size.x, frontTop);
+  const photoWall = usePhotoWall(space ? room?.plate_url ?? photoUrl : null, space ? room?.front ?? null : null, room?.corners ?? null, build.product.size.x, frontTop);
   const pattern = useDisposable(() => {
     if (!room || room.floor_swatch) return null;
     const t = room.floor_kind === 'wood' ? woodTexture()?.clone() ?? null : room.floor_kind === 'tile' || room.floor_kind === 'stone' ? tileTexture() : null;
@@ -342,6 +342,10 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
   const floorMap = photo.get('floor') ?? pattern;
   const side = useMemo(() => new THREE.Color(wall).multiplyScalar(0.86), [wall]);
   const ground = useMemo(() => new THREE.Color(floor).multiplyScalar(0.9), [floor]);
+  const leftEdge = build.product.center.x - build.product.size.x / 2;
+  const returnDepth = build.product.center.z + build.product.size.z / 2 - wallZ + 0.6;
+  const cornerL = photoWall?.left ? { x: leftEdge + photoWall.left.x - 0.01, depth: returnDepth, color: photoWall.left.color, turn: Math.PI / 2 } : null;
+  const cornerR = photoWall?.right ? { x: leftEdge + photoWall.right.x + 0.01, depth: returnDepth, color: photoWall.right.color, turn: -Math.PI / 2 } : null;
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, floorZ]} receiveShadow>
@@ -354,8 +358,8 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
       </mesh>
       {photoWall && (
         <>
-          <mesh position={[build.product.center.x, photoWall.height / 2, wallZ + 0.002]}>
-            <planeGeometry args={[photoWall.width, photoWall.height]} />
+          <mesh position={[leftEdge + (photoWall.x0 + photoWall.x1) / 2, (photoWall.y0 + photoWall.y1) / 2, wallZ + 0.002]}>
+            <planeGeometry args={[photoWall.x1 - photoWall.x0, photoWall.y1 - photoWall.y0]} />
             <meshBasicMaterial key={photoWall.map.uuid} map={photoWall.map} transparent toneMapped={false} depthWrite={false} />
           </mesh>
           <mesh position={[0, wallH / 2, wallZ + 0.004]} receiveShadow>
@@ -364,10 +368,13 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
           </mesh>
         </>
       )}
-      <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
-        <planeGeometry args={[size, wallH]} />
-        <meshStandardMaterial color={side} roughness={0.92} />
-      </mesh>
+      {[cornerL, cornerR].map((c) => c && <ReturnWall key={c.turn} x={c.x} z={wallZ + c.depth / 2} depth={c.depth} height={wallH} turn={c.turn} color={c.color} />)}
+      {!cornerL && (
+        <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+          <planeGeometry args={[size, wallH]} />
+          <meshStandardMaterial color={side} roughness={0.92} />
+        </mesh>
+      )}
       {room?.backsplash && !photoWall && (
         <mesh position={[build.product.center.x, splashY, wallZ + 0.004]} receiveShadow>
           <planeGeometry args={[splashW, splashH]} />
@@ -378,13 +385,43 @@ function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: G
         <boxGeometry args={[size, 0.09, 0.016]} />
         <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
       </mesh>
-      <mesh position={[-span * 0.75 + 0.008, 0.045, floorZ]} receiveShadow>
-        <boxGeometry args={[0.016, 0.09, size]} />
-        <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
-      </mesh>
+      {!cornerL && (
+        <mesh position={[-span * 0.75 + 0.008, 0.045, floorZ]} receiveShadow>
+          <boxGeometry args={[0.016, 0.09, size]} />
+          <meshStandardMaterial color="#f7f6f3" roughness={0.6} />
+        </mesh>
+      )}
       <pointLight position={[0, wallH - 0.2, wallZ + 0.6]} intensity={3} distance={span * 2} color="#ffffff" />
       <directionalLight position={[1.5, 3.5, 9]} intensity={0.9} color="#ffffff" />
       <hemisphereLight args={['#ffffff', '#cfcac2', 0.25]} />
+    </group>
+  );
+}
+
+function ReturnWall({ x, z, depth, height, turn, color }: { x: number; z: number; depth: number; height: number; turn: number; color: string }) {
+  const camera = useThree((st) => st.camera);
+  const wall = useRef<THREE.MeshStandardMaterial>(null);
+  const skirting = useRef<THREE.MeshStandardMaterial>(null);
+  useFrame((_, delta) => {
+    const inward = turn > 0 ? camera.position.x - x : x - camera.position.x;
+    const want = inward < 0.15 ? 0.12 : 1;
+    for (const m of [wall.current, skirting.current]) {
+      if (!m) continue;
+      m.opacity += (want - m.opacity) * (1 - Math.exp(-delta * 8));
+      m.transparent = m.opacity < 0.99;
+      m.depthWrite = !m.transparent;
+    }
+  });
+  return (
+    <group position={[x, 0, z]} rotation={[0, turn, 0]}>
+      <mesh position={[0, height / 2, -0.06]} castShadow>
+        <boxGeometry args={[depth, height, 0.12]} />
+        <meshStandardMaterial ref={wall} color={color} roughness={0.92} />
+      </mesh>
+      <mesh position={[0, 0.045, 0.008]}>
+        <boxGeometry args={[depth, 0.09, 0.016]} />
+        <meshStandardMaterial ref={skirting} color="#f7f6f3" roughness={0.6} />
+      </mesh>
     </group>
   );
 }

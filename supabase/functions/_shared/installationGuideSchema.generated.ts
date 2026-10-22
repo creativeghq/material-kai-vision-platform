@@ -301,6 +301,7 @@ export interface GuideRoom {
   plate_url: string | null;
   footprint: Array<{ x: number; y: number }> | null;
   front: Array<{ x: number; y: number }> | null;
+  corners: { left: number | null; right: number | null };
 }
 
 export interface GuideAppearance {
@@ -345,6 +346,10 @@ export const APPEARANCE_READ_SCHEMA = closed({
     footprint: closed({ fl_x: num, fl_y: num, fr_x: num, fr_y: num, br_x: num, br_y: num, bl_x: num, bl_y: num }),
     front_shown: bool,
     front: closed({ bl_x: num, bl_y: num, br_x: num, br_y: num, tr_x: num, tr_y: num, tl_x: num, tl_y: num }),
+    left_corner_shown: bool,
+    left_corner_x: num,
+    right_corner_shown: bool,
+    right_corner_x: num,
   }),
 });
 
@@ -391,6 +396,15 @@ function sanitizeFront(raw: Record<string, unknown>): GuideRoom['front'] {
   return pts.map(([x, y]) => ({ x: x as number, y: y as number }));
 }
 
+function sanitizeCorners(raw: Record<string, unknown>): GuideRoom['corners'] {
+  const at = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : null);
+  if (isObj(raw.corners)) return { left: at(raw.corners.left), right: at(raw.corners.right) };
+  return {
+    left: raw.left_corner_shown === true ? at(raw.left_corner_x) : null,
+    right: raw.right_corner_shown === true ? at(raw.right_corner_x) : null,
+  };
+}
+
 function sanitizeRoom(raw: unknown): GuideRoom | null {
   if (!isObj(raw)) return null;
   if (raw.shown === false) return null;
@@ -409,6 +423,7 @@ function sanitizeRoom(raw: unknown): GuideRoom | null {
     plate_url: typeof raw.plate_url === 'string' && /^https:\/\//.test(raw.plate_url) ? raw.plate_url.slice(0, 1000) : null,
     footprint: sanitizeFootprint(raw),
     front: sanitizeFront(raw),
+    corners: sanitizeCorners(raw),
   };
 }
 
