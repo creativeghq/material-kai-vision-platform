@@ -16,11 +16,11 @@ import {
   type GuideBuild,
 } from '@/lib/installation/guideBuild';
 import type { GuideAppearance, GuideRoom, InstallationGuideData } from '@/lib/installation/guideSchema';
-import type { PhotoCamera } from '@/lib/installation/photoCamera';
 import {
   EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, usePhotoCrops, useStudioLight, woodTexture,
   type FinishLook, type Hole,
 } from './partModels';
+import { usePhotoWall } from './photoWall';
 
 export type GuideView = 'room' | 'drawing' | 'photo';
 
@@ -50,7 +50,6 @@ interface Props {
   follow: boolean;
   appearance?: GuideAppearance | null;
   photoUrl?: string | null;
-  photoCamera?: PhotoCamera | null;
 }
 
 type Looks = { appearance: GuideAppearance | null; looks: Map<string, FinishLook>; hideKit: boolean };
@@ -176,7 +175,7 @@ function CameraRig({ shot, version, build, xRef, follow }: {
     const pointers = new Map<number, { x: number; y: number }>();
     let spread = 0;
     const zoomBy = (factor: number) => {
-      const next = Math.min(3, Math.max(0.35, zoom.current * factor));
+      const next = Math.min(400, Math.max(0.01, zoom.current * factor));
       const applied = next / zoom.current;
       zoom.current = next;
       if (!following.current && controls) {
@@ -311,20 +310,7 @@ function tileTexture(): THREE.CanvasTexture | null {
   });
 }
 
-function PhotoCameraRig({ cam }: { cam: PhotoCamera }) {
-  const camera = useThree((st) => st.camera) as THREE.PerspectiveCamera;
-  useFrame(() => {
-    camera.position.set(...cam.position);
-    camera.quaternion.set(...cam.quaternion);
-    if (Math.abs(camera.fov - cam.fovDeg) > 1e-3) {
-      camera.fov = cam.fovDeg;
-      camera.updateProjectionMatrix();
-    }
-  });
-  return null;
-}
-
-function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoom | null; photoUrl: string | null }) {
+function RealRoom({ build, room, photoUrl, space }: { build: GuideBuild; room: GuideRoom | null; photoUrl: string | null; space: boolean }) {
   const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.x, 3) + 2.4;
   const floorZ = (build.kitBounds.center.z + build.kitBounds.size.z / 2 + build.product.center.z - build.product.size.z / 2) / 2;
   const wallZ = build.product.center.z - build.product.size.z / 2 - 0.35;
@@ -339,6 +325,8 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
     ...(room?.backsplash?.swatch ? [{ id: 'splash', box: room.backsplash.swatch, repeat: [splashW / 0.3, splashH / 0.3] as [number, number] }] : []),
   ], [room, size, wallH, splashW, splashH]);
   const photo = usePhotoCrops(photoUrl, crops);
+  const frontTop = build.product.center.y + build.product.size.y / 2;
+  const photoWall = usePhotoWall(space ? room?.plate_url ?? photoUrl : null, space ? room?.front ?? null : null, build.product.size.x, frontTop);
   const pattern = useDisposable(() => {
     if (!room || room.floor_swatch) return null;
     const t = room.floor_kind === 'wood' ? woodTexture()?.clone() ?? null : room.floor_kind === 'tile' || room.floor_kind === 'stone' ? tileTexture() : null;
@@ -349,7 +337,7 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
     t.needsUpdate = true;
     return t;
   }, room ? `${room.floor_kind}:${!!room.floor_swatch}:${size}` : 'none');
-  const wall = room?.wall ?? '#ece9e4';
+  const wall = photoWall?.color ?? room?.wall ?? '#ece9e4';
   const floor = room?.floor ?? '#d9d3c9';
   const floorMap = photo.get('floor') ?? pattern;
   const side = useMemo(() => new THREE.Color(wall).multiplyScalar(0.86), [wall]);
@@ -362,13 +350,25 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
       </mesh>
       <mesh position={[0, wallH / 2, wallZ]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
-        <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />
+        {photoWall ? <meshBasicMaterial color={wall} toneMapped={false} /> : <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />}
       </mesh>
+      {photoWall && (
+        <>
+          <mesh position={[build.product.center.x, photoWall.height / 2, wallZ + 0.002]}>
+            <planeGeometry args={[photoWall.width, photoWall.height]} />
+            <meshBasicMaterial key={photoWall.map.uuid} map={photoWall.map} transparent toneMapped={false} depthWrite={false} />
+          </mesh>
+          <mesh position={[0, wallH / 2, wallZ + 0.004]} receiveShadow>
+            <planeGeometry args={[size, wallH]} />
+            <shadowMaterial transparent opacity={0.22} />
+          </mesh>
+        </>
+      )}
       <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
         <meshStandardMaterial color={side} roughness={0.92} />
       </mesh>
-      {room?.backsplash && (
+      {room?.backsplash && !photoWall && (
         <mesh position={[build.product.center.x, splashY, wallZ + 0.004]} receiveShadow>
           <planeGeometry args={[splashW, splashH]} />
           <meshStandardMaterial key={photo.get('splash')?.uuid ?? 'plain'} color={photo.get('splash') ? '#ffffff' : room.backsplash.color} map={photo.get('splash') ?? undefined} roughness={0.35} />
@@ -880,49 +880,24 @@ export const GuideScene: React.FC<Props> = (props) => {
   const gl = useThree((s) => s.gl);
   useStudioLight(scene, gl, view === 'drawing' ? 0 : 0.28);
   const looks = useFinishLooks(props.appearance ?? null, props.photoUrl ?? null);
-  const inPhoto = view === 'photo' && !!props.photoCamera;
-  const finish = useMemo(() => ({ appearance: props.appearance ?? null, looks, hideKit: inPhoto }), [props.appearance, looks, inPhoto]);
+  const space = view === 'photo';
+  const finish = useMemo(() => ({ appearance: props.appearance ?? null, looks, hideKit: false }), [props.appearance, looks]);
   const real = props.appearance ? { floor: props.appearance.room?.floor ?? '#d9d3c9' } : null;
 
   useLayoutEffect(() => {
-    scene.background = inPhoto ? null : new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
-    scene.fog = view === 'room' ? new THREE.FogExp2('#1a1410', 0.035) : null;
+    scene.background = new THREE.Color(view === 'drawing' ? '#ffffff' : '#1a1410');
+    scene.fog = view !== 'drawing' ? new THREE.FogExp2('#1a1410', 0.035) : null;
     gl.toneMappingExposure = view === 'drawing' ? 1.1 : 1;
-  }, [scene, gl, view, inPhoto]);
+  }, [scene, gl, view]);
 
   const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.y, 2);
 
   return (
     <>
-      <OrbitControls makeDefault enabled={!inPhoto} enableDamping enableZoom={false} maxPolarAngle={Math.PI / 2.02} minDistance={0.25} maxDistance={span * 5} />
-      {inPhoto && props.photoCamera ? <PhotoCameraRig cam={props.photoCamera} /> : <CameraRig shot={shot} version={shotVersion} build={build} xRef={xRef} follow={props.follow} />}
-      {!inPhoto && <KeyboardFly />}
-      {inPhoto ? (
-        <>
-          <SoftShadows size={22} samples={12} focus={0.5} />
-          <ContactShadows position={[build.product.center.x, 0.002, build.product.center.z]} scale={Math.max(build.product.size.x, build.product.size.z) * 2.2 + 1} blur={2.4} opacity={0.6} far={1.2} resolution={512} frames={Infinity} />
-          <hemisphereLight args={['#ffffff', real?.floor ?? '#d9d3c9', 2]} />
-          <directionalLight position={props.photoCamera.position} intensity={1.4} color="#ffffff" />
-          <directionalLight
-            position={[-2.5, 5.5, 7]}
-            intensity={3.2}
-            color="#fffaf2"
-            castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
-            shadow-camera-left={-span}
-            shadow-camera-right={span}
-            shadow-camera-top={span}
-            shadow-camera-bottom={-span}
-            shadow-bias={-0.0005}
-            shadow-normalBias={0.03}
-          />
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
-            <planeGeometry args={[span * 6, span * 6]} />
-            <shadowMaterial transparent opacity={0.28} />
-          </mesh>
-        </>
-      ) : view === 'room' ? (
+      <OrbitControls makeDefault enableDamping enableZoom={false} maxPolarAngle={Math.PI / 2.02} minDistance={0} maxDistance={Infinity} />
+      <CameraRig shot={shot} version={shotVersion} build={build} xRef={xRef} follow={props.follow} />
+      <KeyboardFly />
+      {view !== 'drawing' ? (
         <>
           <SoftShadows size={22} samples={12} focus={0.5} />
           <ContactShadows position={[build.product.center.x, 0.002, build.product.center.z]} scale={Math.max(build.product.size.x, build.product.size.z) * 2.2 + 1} blur={2.6} opacity={0.55} far={1.2} resolution={512} frames={Infinity} />
@@ -942,7 +917,7 @@ export const GuideScene: React.FC<Props> = (props) => {
             shadow-normalBias={0.03}
           />
           <directionalLight position={[4, 3, -2]} intensity={0.6} color="#9fc4ff" />
-          {props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} /> : <Room build={build} />}
+          {props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} space={space} /> : <Room build={build} />}
           {build.hasAssembly && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} onBoard={props.onBoard} />}
         </>
       ) : (
@@ -954,8 +929,8 @@ export const GuideScene: React.FC<Props> = (props) => {
           </mesh>
         </>
       )}
-      {!inPhoto && <KitCards build={build} guide={guide} view={view} />}
-      {build.hasAssembly && !inPhoto && <Ghost build={build} xRef={xRef} />}
+      <KitCards build={build} guide={guide} view={view} />
+      {build.hasAssembly && <Ghost build={build} xRef={xRef} />}
       <Panels build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} hovered={props.hovered} onHover={props.onHover} onPick={props.onPick} finish={finish} />
       <Hardware build={build} guide={guide} xRef={xRef} explodeRef={explodeRef} view={view} onHover={props.onHover} onPick={props.onPick} finish={finish} />
       <Trails build={build} xRef={xRef} />

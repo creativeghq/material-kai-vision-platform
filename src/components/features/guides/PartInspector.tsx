@@ -105,14 +105,14 @@ export function PartInspector({ build, guide, item, onClose, onPlayStep, appeara
             </DialogHeader>
             <div className="h-[min(52dvh,420px)] w-full touch-none overflow-hidden rounded-sm bg-gradient-to-b from-neutral-200 to-neutral-400 dark:from-neutral-700 dark:to-neutral-900">
               <Suspense fallback={null}>
-                <Canvas shadows dpr={[1, 2]} gl={{ toneMapping: THREE.NeutralToneMapping }} camera={{ position: item.kind === 'panel' ? [reach * 0.3, reach * 0.18, reach * 1.25] : [reach * 1.05, reach * 0.8, reach * 1.35], fov: 35, near: reach / 100, far: reach * 40 }}>
+                <Canvas shadows dpr={[1, 2]} gl={{ toneMapping: THREE.NeutralToneMapping }} camera={{ position: item.kind === 'panel' ? [reach * 0.3, reach * 0.18, reach * 1.25] : [reach * 1.05, reach * 0.8, reach * 1.35], fov: 35, near: reach / 1000, far: reach * 4000 }}>
                   <StudioLight />
                   <hemisphereLight args={['#fff6e8', '#45403a', 0.8]} />
                   <directionalLight position={[reach * 2, reach * 3, reach * 2]} intensity={2.4} castShadow />
                   <directionalLight position={[-reach * 2, reach, -reach]} intensity={0.7} color="#bcd4ff" />
                   {item.kind === 'panel' ? <PanelModel build={build} guide={guide} item={item} look={look} /> : <HardwareModel name={part.name} item={item} finish={look} />}
                   <ContactShadows position={[0, -(item.kind === 'panel' ? standingHeight(item.size) : Math.min(item.size.x, item.size.y, item.size.z)) / 2 - reach * 0.08, 0]} scale={reach * 3} blur={2.4} opacity={0.45} far={reach * 2} />
-                  <OrbitControls makeDefault enableDamping autoRotate autoRotateSpeed={1.2} minDistance={reach * 0.5} maxDistance={reach * 6} />
+                  <OrbitControls makeDefault enableDamping autoRotate autoRotateSpeed={1.2} />
                 </Canvas>
               </Suspense>
             </div>

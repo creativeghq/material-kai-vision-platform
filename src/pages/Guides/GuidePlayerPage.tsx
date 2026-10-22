@@ -17,8 +17,6 @@ import { usePageAspects } from '@/components/features/guides/usePageAspects';
 import { PartInspector } from '@/components/features/guides/PartInspector';
 import { partNumber } from '@/components/features/guides/partModels';
 import { blueprintInk } from '@/components/features/guides/blueprintInk';
-import { cameraOnFrontFace, cameraOnProduct } from '@/lib/installation/photoPlacement';
-import type { PhotoCamera } from '@/lib/installation/photoCamera';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { buildGuide, countsAt, partCountAt, partUsedTotal, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
@@ -167,29 +165,6 @@ function PlayerMessage({ text, id }: { text: string; id: string }) {
   );
 }
 
-function usePhotoView(row: InstallationGuideRow, photoUrl: string | null, build: GuideBuild) {
-  const room = row.appearance?.room ?? null;
-  const src = room?.plate_url ?? photoUrl;
-  const [view, setView] = useState<{ url: string; w: number; h: number; cam: PhotoCamera } | null>(null);
-  useEffect(() => {
-    setView(null);
-    if (!src || !(room?.front || room?.footprint) || !build.hasAssembly) return;
-    let live = true;
-    const img = new Image();
-    img.onload = () => {
-      if (!live) return;
-      const p = build.product;
-      const top = p.center.y + p.size.y / 2;
-      const cam = (room.front && cameraOnFrontFace(room.front, img.naturalWidth, img.naturalHeight, p.size.x, top, { x: p.center.x, y: top / 2, z: p.center.z + p.size.z / 2 }))
-        || (room.footprint && cameraOnProduct(room.footprint, img.naturalWidth, img.naturalHeight, p.size.x, p.size.z, { x: p.center.x, z: p.center.z }));
-      if (cam) setView({ url: src, w: img.naturalWidth, h: img.naturalHeight, cam });
-    };
-    img.src = src;
-    return () => { live = false; };
-  }, [src, room?.front, room?.footprint, build]);
-  return view;
-}
-
 export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = null, toast, shared = false }: {
   photoUrl?: string | null;
   row: InstallationGuideRow;
@@ -212,8 +187,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
   const [cine, setCine] = useState(true);
   const [exploded, setExploded] = useState(false);
   const [view, setView] = useState<GuideView>('room');
-  const photoView = usePhotoView(row, photoUrl, build);
-  const inPhoto = view === 'photo' && !!photoView;
+  const hasSpace = !!row.appearance?.room?.front && !!(row.appearance.room.plate_url || photoUrl);
   const [bookOpen, setBookOpen] = useState(false);
   const [labels, setLabels] = useState(true);
   const [followCam, setFollowCam] = useState(true);
@@ -399,19 +373,9 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-background text-foreground">
       <main className="absolute inset-0" aria-label={`${guide.title} being put together, beside its manual`}>
-        <div className={cn('absolute inset-0', inPhoto && 'grid place-items-center bg-black')}>
-        <div
-          className={inPhoto ? 'relative max-h-full' : 'absolute inset-0'}
-          style={inPhoto && photoView ? {
-            aspectRatio: `${photoView.w} / ${photoView.h}`,
-            width: `min(100%, calc(100dvh * ${photoView.w / photoView.h}))`,
-            backgroundImage: `url("${photoView.url}")`,
-            backgroundSize: '100% 100%',
-          } : undefined}
-        >
         <ThreeErrorBoundary>
           <Suspense fallback={<CanvasLoader label="Opening the flat pack…" />}>
-            <Canvas shadows camera={{ position: [2.5, 2.2, 3.2], fov: 42, near: 0.02, far: 200 }} gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping }} dpr={[1, 2]}>
+            <Canvas shadows camera={{ position: [2.5, 2.2, 3.2], fov: 42, near: 0.01, far: 5000 }} gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping }} dpr={[1, 2]}>
               <GuideScene
                 guide={guide}
                 build={build}
@@ -431,13 +395,10 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
                 onBoard={(b) => { halt(); setBoard(b); }}
                 appearance={row.appearance}
                 photoUrl={photoUrl}
-                photoCamera={inPhoto ? photoView?.cam ?? null : null}
               />
             </Canvas>
           </Suspense>
         </ThreeErrorBoundary>
-        </div>
-        </div>
       </main>
 
       <aside className={cn('pointer-events-none absolute inset-x-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 flex flex-col gap-1.5 transition-opacity sm:inset-x-auto sm:left-3 sm:top-3 sm:w-[340px] sm:gap-2.5', bookOpen && 'lg:opacity-0')}>
@@ -543,7 +504,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
 
         <div className="mt-1.5 flex items-center gap-2 sm:mt-2 sm:flex-wrap">
           <div className="flex rounded-sm border border-hairline p-0.5" role="group" aria-label="View">
-            {(photoView ? (['room', 'drawing', 'photo'] as const) : (['room', 'drawing'] as const)).map((v) => (
+            {(hasSpace ? (['photo', 'room', 'drawing'] as const) : (['room', 'drawing'] as const)).map((v) => (
               <button
                 key={v}
                 type="button"
@@ -551,7 +512,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
                 aria-pressed={view === v}
                 className={cn('rounded-sm px-2.5 py-1 text-xs font-medium capitalize', view === v ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
               >
-                {v === 'photo' ? 'Your photo' : v}
+                {v === 'photo' ? 'Your space' : v}
               </button>
             ))}
           </div>
