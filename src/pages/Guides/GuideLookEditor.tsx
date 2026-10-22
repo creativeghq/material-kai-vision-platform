@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, ImageIcon, Loader2, Search, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { FormField } from '@/components/core/ui/form-layout';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Switch } from '@/components/core/ui/switch';
 import { hardwareShape, partNumber } from '@/components/features/guides/partModels';
 import type { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/utils/datetime';
-import { FINISH_KINDS, type FinishKind, type GuideAppearance, type GuideFinish } from '@/lib/installation/guideSchema';
+import { FINISH_KINDS, type FinishKind, type GuideAppearance, type GuideFinish, type GuideRoom } from '@/lib/installation/guideSchema';
 import { installationGuideService, type InstallationGuideRow } from '@/services/installationGuideService';
 
 const NONE = '__none';
@@ -35,6 +36,72 @@ function Swatch({ finish, photoUrl }: { finish: GuideFinish; photoUrl: string | 
     }
     : { backgroundColor: finish.color };
   return <span className="block h-9 w-9 shrink-0 rounded-sm border border-hairline" style={style} />;
+}
+
+function SpaceCorners({ room, imageUrl, onChange }: { room: GuideRoom; imageUrl: string; onChange: (corners: GuideRoom['corners']) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
+  const at = (clientX: number) => {
+    const r = box.current?.getBoundingClientRect();
+    return r ? Math.min(1, Math.max(0, (clientX - r.left) / r.width)) : 0.5;
+  };
+  const sides = [
+    { side: 'left' as const, label: 'Corner on the left', x: room.corners.left, fallback: room.front ? Math.min(...room.front.map((p) => p.x)) : 0.2 },
+    { side: 'right' as const, label: 'Corner on the right', x: room.corners.right, fallback: room.front ? Math.max(...room.front.map((p) => p.x)) : 0.8 },
+  ];
+  return (
+    <div className="space-y-3">
+      <div
+        ref={box}
+        className="relative inline-block max-w-full touch-none select-none"
+        onPointerMove={(e) => { if (dragging) onChange({ ...room.corners, [dragging]: at(e.clientX) }); }}
+        onPointerUp={() => setDragging(null)}
+        onPointerLeave={() => setDragging(null)}
+      >
+        <img src={imageUrl} alt="The photographed room" className="block max-h-[28rem] w-auto max-w-full rounded-sm border border-hairline" draggable={false} />
+        {sides.map((c) => c.x != null && (
+          <div
+            key={c.side}
+            role="slider"
+            aria-label={c.label}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(c.x * 100)}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              const step = e.key === 'ArrowLeft' ? -0.005 : e.key === 'ArrowRight' ? 0.005 : 0;
+              if (step) onChange({ ...room.corners, [c.side]: Math.min(1, Math.max(0, (c.x ?? 0) + step)) });
+            }}
+            onPointerDown={(e) => {
+              setDragging(c.side);
+              try {
+                e.currentTarget.setPointerCapture(e.pointerId);
+              } catch {
+                // A pointer the browser cannot capture still drags through the parent's move handler.
+              }
+            }}
+            onPointerMove={(e) => { if (dragging === c.side) onChange({ ...room.corners, [c.side]: at(e.clientX) }); }}
+            onPointerUp={() => setDragging(null)}
+            className="absolute inset-y-0 -ml-3 w-6 cursor-ew-resize focus-visible:outline-none"
+            style={{ left: `${c.x * 100}%` }}
+          >
+            <div className="mx-auto h-full w-[3px] bg-primary shadow-[0_0_0_1px_rgba(0,0,0,0.5)]" />
+            <span className="absolute left-1/2 top-2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-primary px-1.5 py-0.5 text-[11px] font-semibold text-primary-foreground">
+              {c.side === 'left' ? 'Left corner' : 'Right corner'}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-5">
+        {sides.map((c) => (
+          <label key={c.side} className="flex items-center gap-2 text-sm">
+            <Switch checked={c.x != null} onCheckedChange={(on) => onChange({ ...room.corners, [c.side]: on ? c.fallback : null })} />
+            {c.label}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function GuideLookEditor({ row, onSaved, toast }: {
@@ -237,6 +304,23 @@ export function GuideLookEditor({ row, onSaved, toast }: {
               </table>
             </div>
           </Card>
+          {draft.room && (draft.room.plate_url || photoUrl) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Your space</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  The 3D builds this room: the wall behind the product, and a side wall wherever the room turns a corner. Drag each line onto the vertical line where two walls meet, or switch a side off if the wall carries on. Save the look to apply it.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <SpaceCorners
+                  room={draft.room}
+                  imageUrl={draft.room.plate_url ?? photoUrl ?? ''}
+                  onChange={(corners) => draft.room && setDraft({ ...draft, room: { ...draft.room, corners } })}
+                />
+              </CardContent>
+            </Card>
+          )}
           <div className="flex gap-2">
             <Button disabled={!dirty || busy !== null} onClick={() => void save()}>{busy === 'save' ? 'Saving…' : 'Save the look'}</Button>
             <Button variant="ghost" disabled={busy !== null} onClick={() => setDraft({ ...draft, finishes: [], parts: {} })}>Clear the finishes</Button>
