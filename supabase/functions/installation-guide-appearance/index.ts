@@ -1,5 +1,6 @@
 /** installation-guide-appearance — reads a product photo into the finish each part of a guide carries. */
 import { createClient } from '@supabase/supabase-js';
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
@@ -69,6 +70,46 @@ async function photoFromPage(pageUrl: string): Promise<string> {
   const content = meta.match(/content=["']([^"']+)["']/i)?.[1];
   if (!content) throw new HttpError(422, 'That page has no product photo we can read. Paste the photo address instead.');
   return new URL(content.replace(/&amp;/g, '&'), finalUrl).toString();
+}
+
+async function clearRoom(
+  admin: DbClient,
+  guide: { id: string; workspace_id: string },
+  uid: string,
+  photoPath: string,
+  readAt: string | null,
+): Promise<void> {
+  try {
+    const instruction = await loadPrompt(admin, 'extraction', 'installation_guide', 'room_plate');
+    const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(photoPath, 900);
+    if (!signed?.signedUrl) return;
+    const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-interior-gemini`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+      body: JSON.stringify({
+        mode: 'image-edit',
+        reference_image_url: signed.signedUrl,
+        edit_instruction: instruction,
+        user_id: uid,
+        workspace_id: guide.workspace_id,
+        model_tier: 'fast',
+      }),
+    });
+    const out = await res.json().catch(() => ({})) as { success?: boolean; image_url?: string; error?: string };
+    if (!res.ok || !out.success || !out.image_url) {
+      console.warn(`[installation-guide-appearance] empty-room plate failed: ${out.error ?? res.status}`);
+      return;
+    }
+    const { data: row } = await admin.from('installation_guides').select('appearance').eq('id', guide.id).maybeSingle();
+    const current = row?.appearance as { read_at?: string; room?: Record<string, unknown> | null } | null;
+    if (!current?.room || current.read_at !== readAt) return;
+    const { error } = await admin.from('installation_guides')
+      .update({ appearance: { ...current, room: { ...current.room, plate_url: out.image_url } } })
+      .eq('id', guide.id);
+    if (error) console.warn(`[installation-guide-appearance] could not save the empty-room plate: ${error.message}`);
+  } catch (e) {
+    console.warn('[installation-guide-appearance] empty-room plate error:', e instanceof Error ? e.message : e);
+  }
 }
 
 Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
@@ -193,6 +234,12 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
 
     const { error: saveError } = await admin.from('installation_guides').update({ appearance }).eq('id', guide.id);
     if (saveError) throw new Error(`The finishes could not be saved: ${saveError.message}`);
+    if (appearance.room) {
+      const work = clearRoom(admin, guide, uid, path, appearance.read_at);
+      const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (runtime?.waitUntil) runtime.waitUntil(work);
+      else await work;
+    }
     return json({ success: true, appearance, used_preview: !!fallbackUrl && photoUrl === fallbackUrl && photoUrl !== imageUrl });
   } catch (err) {
     await refund(err instanceof Error ? err.message : 'read failed');

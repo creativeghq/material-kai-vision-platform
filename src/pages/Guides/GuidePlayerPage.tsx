@@ -16,6 +16,7 @@ import { GuideBook } from '@/components/features/guides/GuideBook';
 import { usePageAspects } from '@/components/features/guides/usePageAspects';
 import { PartInspector } from '@/components/features/guides/PartInspector';
 import { partNumber } from '@/components/features/guides/partModels';
+import { blueprintInk } from '@/components/features/guides/blueprintInk';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { buildGuide, countsAt, partCountAt, partUsedTotal, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
@@ -50,7 +51,41 @@ const BLUEPRINT_SHEET: React.CSSProperties = {
   backgroundSize: '80px 80px, 80px 80px, 16px 16px, 16px 16px',
 };
 
-function ManualCrop({ url, step, aspect, onOpen, tall = false, blueprint = false }: { url: string | null; step: GuideStep | undefined; aspect: number; onOpen: () => void; tall?: boolean; blueprint?: boolean }) {
+function BlueprintDrawing({ url, step, onOpen }: { url: string | null; step: GuideStep; onOpen: () => void }) {
+  const holder = useRef<HTMLButtonElement>(null);
+  const [drawn, setDrawn] = useState<string | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let live = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (!live || !holder.current) return;
+      const { x0, y0, x1, y1 } = step.box;
+      const sw = (x1 - x0) * img.naturalWidth;
+      const sh = (y1 - y0) * img.naturalHeight;
+      const k = Math.min((holder.current.clientWidth * 1.5) / sw, (holder.current.clientHeight * 1.5) / sh, 2.5);
+      const canvas = blueprintInk(img, x0 * img.naturalWidth, y0 * img.naturalHeight, sw, sh, Math.round(sw * k), Math.round(sh * k), 2);
+      setDrawn(canvas.toDataURL('image/png'));
+    };
+    img.src = url;
+    return () => { live = false; };
+  }, [url, step]);
+  return (
+    <button
+      ref={holder}
+      type="button"
+      onClick={onOpen}
+      aria-label="The step's drawing from the manual"
+      className="relative grid h-[min(52dvh,460px)] w-full cursor-zoom-in place-items-center overflow-hidden rounded-sm border-2 border-white p-3"
+      style={BLUEPRINT_SHEET}
+    >
+      {drawn ? <img src={drawn} alt="" className="max-h-full max-w-full object-contain" /> : <span className="font-mono text-xs font-semibold uppercase text-white">Drawing loading…</span>}
+    </button>
+  );
+}
+
+function ManualCrop({ url, step, aspect, onOpen }: { url: string | null; step: GuideStep | undefined; aspect: number; onOpen: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [box, setBox] = useState({ w: 300, h: 210 });
   useEffect(() => {
@@ -70,7 +105,6 @@ function ManualCrop({ url, step, aspect, onOpen, tall = false, blueprint = false
     backgroundSize: `${p}px ${p * aspect}px`,
     backgroundPosition: `${(box.w - u * p) / 2 - x0 * p}px ${(box.h - d * p) / 2 - y0 * p * aspect}px`,
     backgroundRepeat: 'no-repeat',
-    ...(blueprint ? { filter: 'invert(1) contrast(1.4)', mixBlendMode: 'screen' as const } : {}),
   } : {};
   return (
     <button
@@ -78,8 +112,7 @@ function ManualCrop({ url, step, aspect, onOpen, tall = false, blueprint = false
       type="button"
       onClick={onOpen}
       aria-label="The current step's drawing from the manual"
-      className={cn('relative block w-full cursor-zoom-in overflow-hidden rounded-sm', blueprint ? 'border border-white/40' : 'bg-white', tall ? 'h-[min(52dvh,460px)]' : 'h-[clamp(110px,calc(100vh-520px),210px)]')}
-      style={blueprint ? BLUEPRINT_SHEET : undefined}
+      className="relative block h-[clamp(110px,calc(100vh-520px),210px)] w-full cursor-zoom-in overflow-hidden rounded-sm bg-white"
     >
       <i key={`${step.page}-${x0}-${y0}`} className="absolute inset-0 animate-in fade-in duration-300" style={style} />
     </button>
@@ -523,50 +556,50 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
           {board === 'step' && current && (
             <>
               <DialogHeader className="text-left">
-                <DialogTitle className="font-mono text-lg uppercase tracking-wider text-white">{step ? `Step ${step} · ${current.title}` : current.title}</DialogTitle>
-                <DialogDescription className="font-mono text-xs uppercase tracking-widest text-sky-200">Sheet {current.page} of the manual · {guide.title}</DialogDescription>
+                <DialogTitle className="font-mono text-lg font-bold uppercase tracking-wider text-white">{step ? `Step ${step} · ${current.title}` : current.title}</DialogTitle>
+                <DialogDescription className="font-mono text-xs font-semibold uppercase tracking-widest text-white">Sheet {current.page} of the manual · {guide.title}</DialogDescription>
               </DialogHeader>
-              <ManualCrop tall blueprint url={pageUrl} step={current} aspect={pageAspects[current.page - 1] ?? row.page_aspect} onOpen={() => { setBoard(null); setBookOpen(true); }} />
-              <div className="text-sm text-white [&_span]:!text-sky-200">{words}</div>
+              <BlueprintDrawing url={pageUrl} step={current} onOpen={() => { setBoard(null); setBookOpen(true); }} />
+              <div className="text-sm font-medium text-white [&_span]:!text-white [&_span]:font-bold">{words}</div>
               {current.parts_used.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {current.parts_used.map((u) => {
                     const idx = guide.parts.findIndex((p) => p.id === u.part_id);
                     if (idx < 0) return null;
                     return (
-                      <button key={u.part_id} type="button" className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-white/60 px-2 font-mono text-xs text-white hover:bg-white/10" onClick={() => holdPart(u.part_id)}>
-                        <b className="grid h-5 min-w-5 place-items-center rounded-full border border-white px-1 text-[11px]">{partNumber(idx)}</b>
-                        {guide.parts[idx].name}<span className="text-sky-200">×{u.quantity}</span>
+                      <button key={u.part_id} type="button" className="inline-flex h-8 items-center gap-1.5 rounded-sm border-2 border-white px-2 font-mono text-xs font-semibold text-white hover:bg-white/10" onClick={() => holdPart(u.part_id)}>
+                        <b className="grid h-5 min-w-5 place-items-center rounded-full border-2 border-white px-1 text-[11px]">{partNumber(idx)}</b>
+                        {guide.parts[idx].name}<span className="font-bold text-white">×{u.quantity}</span>
                       </button>
                     );
                   })}
                 </div>
               )}
-              <button type="button" className="inline-flex items-center gap-1.5 self-start font-mono text-xs uppercase tracking-wider text-sky-200 hover:text-white" onClick={() => { setBoard(null); setBookOpen(true); }}><BookOpen className="h-4 w-4" />Open the manual at this page</button>
+              <button type="button" className="inline-flex items-center gap-1.5 self-start font-mono text-xs font-semibold uppercase tracking-wider text-white underline-offset-4 hover:underline" onClick={() => { setBoard(null); setBookOpen(true); }}><BookOpen className="h-4 w-4" />Open the manual at this page</button>
             </>
           )}
           {board === 'hardware' && (
             <>
               <DialogHeader className="text-left">
-                <DialogTitle className="font-mono text-lg uppercase tracking-wider text-white">Hardware schedule</DialogTitle>
-                <DialogDescription className="font-mono text-xs uppercase tracking-widest text-sky-200">{counts.hardware} of {build.hardwareTotal} pieces in · tap one to hold it</DialogDescription>
+                <DialogTitle className="font-mono text-lg font-bold uppercase tracking-wider text-white">Hardware schedule</DialogTitle>
+                <DialogDescription className="font-mono text-xs font-semibold uppercase tracking-widest text-white">{counts.hardware} of {build.hardwareTotal} pieces in · tap one to hold it</DialogDescription>
               </DialogHeader>
-              <ul className="divide-y divide-white/20 border-y border-white/30">
+              <ul className="divide-y divide-white/40 border-y-2 border-white/70">
                 {guide.parts.map((p, idx) => ({ p, idx })).filter(({ p }) => p.kind === 'hardware' || p.kind === 'accessory').map(({ p, idx }) => {
                   const got = partCountAt(build, p.id, x);
                   const total = partUsedTotal(build, p.id) || p.quantity;
                   return (
                     <li key={p.id}>
                       <button type="button" onClick={() => holdPart(p.id)} className="flex w-full items-center gap-3 px-1 py-2 text-left hover:bg-white/10">
-                        <b className="grid h-6 min-w-6 place-items-center rounded-full border border-white px-1 font-mono text-xs">{partNumber(idx)}</b>
+                        <b className="grid h-6 min-w-6 place-items-center rounded-full border-2 border-white px-1 font-mono text-xs">{partNumber(idx)}</b>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-mono text-sm uppercase tracking-wide">{p.name}</span>
-                          <span className="block font-mono text-[11px] text-sky-200">{p.code || '—'}</span>
+                          <span className="block truncate font-mono text-sm font-bold uppercase tracking-wide">{p.name}</span>
+                          <span className="block font-mono text-xs font-semibold text-white">{p.code || '—'}</span>
                         </span>
-                        <span className="hidden h-1.5 w-28 overflow-hidden border border-white/50 sm:block">
+                        <span className="hidden h-2 w-28 overflow-hidden border-2 border-white sm:block">
                           <span className="block h-full bg-white" style={{ width: `${Math.min(100, (got / Math.max(total, 1)) * 100)}%` }} />
                         </span>
-                        <span className="w-14 text-right font-mono text-sm tabular-nums">{got}/{total}</span>
+                        <span className="w-14 text-right font-mono text-sm font-bold tabular-nums">{got}/{total}</span>
                       </button>
                     </li>
                   );

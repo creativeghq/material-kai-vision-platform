@@ -292,6 +292,9 @@ export interface GuideRoom {
   wall_swatch: PageBox | null;
   floor_swatch: PageBox | null;
   backsplash: { color: string; swatch: PageBox | null } | null;
+  product_box: PageBox | null;
+  floor_line: number | null;
+  plate_url: string | null;
 }
 
 export interface GuideAppearance {
@@ -330,6 +333,8 @@ export const APPEARANCE_READ_SCHEMA = closed({
     backsplash_hex: str,
     backsplash_textured: bool,
     backsplash_swatch: closed({ x0: num, y0: num, x1: num, y1: num }),
+    product_box: closed({ x0: num, y0: num, x1: num, y1: num }),
+    floor_line: num,
   }),
 });
 
@@ -363,6 +368,9 @@ function sanitizeRoom(raw: unknown): GuideRoom | null {
     wall_swatch: raw.wall_textured === false ? null : swatchBox(raw.wall_swatch),
     floor_swatch: raw.floor_textured === false ? null : swatchBox(raw.floor_swatch),
     backsplash: sanitizeBacksplash(raw),
+    product_box: swatchBox(raw.product_box),
+    floor_line: typeof raw.floor_line === 'number' && raw.floor_line > 0.2 && raw.floor_line <= 1 ? raw.floor_line : null,
+    plate_url: typeof raw.plate_url === 'string' && /^https:\/\//.test(raw.plate_url) ? raw.plate_url.slice(0, 1000) : null,
   };
 }
 

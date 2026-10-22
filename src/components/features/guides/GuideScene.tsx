@@ -1,8 +1,10 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { ContactShadows, Edges, Html, OrbitControls, SoftShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+
+import { blueprintInk } from './blueprintInk';
 
 import {
   activeItemAt,
@@ -307,6 +309,38 @@ function tileTexture(): THREE.CanvasTexture | null {
   });
 }
 
+function RoomPlate({ build, room, wallZ }: { build: GuideBuild; room: GuideRoom; wallZ: number }) {
+  const [plate, setPlate] = useState<{ tex: THREE.Texture; w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (!room.plate_url) return;
+    let live = true;
+    let made: THREE.Texture | null = null;
+    new THREE.TextureLoader().setCrossOrigin('anonymous').load(room.plate_url, (tex) => {
+      if (!live) { tex.dispose(); return; }
+      tex.colorSpace = THREE.SRGBColorSpace;
+      made = tex;
+      const img = tex.image as { width: number; height: number };
+      setPlate({ tex, w: img.width, h: img.height });
+    });
+    return () => { live = false; made?.dispose(); };
+  }, [room.plate_url]);
+  if (!plate || !room.product_box) return null;
+  const box = room.product_box;
+  const floorLine = room.floor_line ?? 1;
+  const perMetre = ((box.x1 - box.x0) * plate.w) / Math.max(build.product.size.x, 0.1);
+  const width = plate.w / perMetre;
+  const height = (floorLine * plate.h) / perMetre;
+  plate.tex.repeat.set(1, floorLine);
+  plate.tex.offset.set(0, 1 - floorLine);
+  const x = build.product.center.x + (0.5 - (box.x0 + box.x1) / 2) * width;
+  return (
+    <mesh position={[x, height / 2, wallZ + 0.006]}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial key={plate.tex.uuid} map={plate.tex} toneMapped={false} />
+    </mesh>
+  );
+}
+
 function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoom | null; photoUrl: string | null }) {
   const span = Math.max(build.kitBounds.size.x, build.kitBounds.size.z, build.product.size.x, 3) + 2.4;
   const floorZ = (build.kitBounds.center.z + build.kitBounds.size.z / 2 + build.product.center.z - build.product.size.z / 2) / 2;
@@ -351,7 +385,8 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
         <planeGeometry args={[size, wallH]} />
         <meshStandardMaterial color={side} roughness={0.92} />
       </mesh>
-      {room?.backsplash && (
+      {room?.plate_url && room.product_box && <RoomPlate build={build} room={room} wallZ={wallZ} />}
+      {room?.backsplash && !room.plate_url && (
         <mesh position={[build.product.center.x, splashY, wallZ + 0.004]} receiveShadow>
           <planeGeometry args={[splashW, splashH]} />
           <meshStandardMaterial key={photo.get('splash')?.uuid ?? 'plain'} color={photo.get('splash') ? '#ffffff' : room.backsplash.color} map={photo.get('splash') ?? undefined} roughness={0.35} />
@@ -735,12 +770,12 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef, onBoard }: { buil
       ctx.strokeStyle = '#8fe4ff';
       ctx.lineWidth = 4;
       ctx.strokeRect(3, 3, 614, 474);
-      ctx.fillStyle = '#cfe9ff';
+      ctx.fillStyle = '#ffffff';
       ctx.font = '600 44px sans-serif';
       ctx.textBaseline = 'top';
       ctx.fillText(stepIndex ? `STEP ${stepIndex}` : 'THE KIT', 28, 24);
       ctx.font = '400 26px monospace';
-      ctx.fillStyle = '#8fd8ff';
+      ctx.fillStyle = '#ffffff';
       ctx.fillText(`page ${step.page}`, 470, 34);
       const used = step.parts_used.slice(0, 6);
       used.forEach((u, i) => {
@@ -748,7 +783,7 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef, onBoard }: { buil
         if (idx < 0) return;
         const x = 44 + i * 96;
         numberBadge(ctx, partNumber(idx), x, 438, 18, '#ffd08a', '#0e1e30');
-        ctx.fillStyle = '#cfe9ff';
+        ctx.fillStyle = '#ffffff';
         ctx.font = '500 22px monospace';
         ctx.fillText(`×${u.quantity}`, x + 24, 427);
       });
@@ -768,24 +803,8 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef, onBoard }: { buil
       const k = Math.min(560 / sw, 300 / sh);
       const w = Math.round(sw * k);
       const h = Math.round(sh * k);
-      const tmpCanvas = Object.assign(document.createElement('canvas'), { width: w, height: h });
-      const t = tmpCanvas.getContext('2d', { willReadFrequently: true });
-      if (!t) return;
-      t.drawImage(img, x0 * img.naturalWidth, y0 * img.naturalHeight, sw, sh, 0, 0, w, h);
-      try {
-        const data = t.getImageData(0, 0, w, h);
-        for (let i = 0; i < data.data.length; i += 4) {
-          const ink = 255 - data.data[i];
-          data.data[i] = 190;
-          data.data[i + 1] = 236;
-          data.data[i + 2] = 255;
-          data.data[i + 3] = Math.min(255, ink * 1.6);
-        }
-        t.putImageData(data, 0, 0);
-      } catch {
-        return;
-      }
-      ctx.drawImage(tmpCanvas, (620 - w) / 2, 96 + (300 - h) / 2);
+      const lines = blueprintInk(img, x0 * img.naturalWidth, y0 * img.naturalHeight, sw, sh, w, h, 1);
+      ctx.drawImage(lines, (620 - w) / 2, 96 + (300 - h) / 2);
       if (stepTexRef.current) stepTexRef.current.needsUpdate = true;
     };
     img.src = pageUrl;
@@ -807,13 +826,13 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef, onBoard }: { buil
     ctx.lineWidth = 4;
     ctx.strokeRect(3, 3, 614, 474);
     ctx.textBaseline = 'top';
-    ctx.fillStyle = '#cfe9ff';
+    ctx.fillStyle = '#ffffff';
     ctx.font = '600 34px sans-serif';
     ctx.fillText('HARDWARE', 28, 22);
     const total = build.hardwareTotal;
     const inCount = build.items.filter((it) => it.kind === 'hardware' && xRef.current >= it.ta - 1e-6).length;
     ctx.font = '400 24px monospace';
-    ctx.fillStyle = '#8fd8ff';
+    ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'right';
     ctx.fillText(`${inCount} / ${total} in`, 590, 30);
     ctx.textAlign = 'left';
@@ -822,10 +841,10 @@ function SceneBoards({ build, guide, stepIndex, pageUrl, xRef, onBoard }: { buil
       const got = partCountAt(build, p.id, xRef.current);
       const shown = Math.min(p.quantity, 24);
       numberBadge(ctx, numberOf(p), 44, y + 20, 17, '#cfe9ff', '#0e1e30');
-      ctx.fillStyle = '#cfe9ff';
+      ctx.fillStyle = '#ffffff';
       ctx.font = '500 22px sans-serif';
       ctx.fillText(p.name.slice(0, 15), 72, y);
-      ctx.fillStyle = '#7fb8d8';
+      ctx.fillStyle = '#e6f3ff';
       ctx.font = '400 18px monospace';
       ctx.fillText(p.code || '—', 72, y + 24);
       const bw = Math.min(14, 300 / shown);
