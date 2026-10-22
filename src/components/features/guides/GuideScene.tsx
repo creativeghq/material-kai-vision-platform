@@ -20,7 +20,7 @@ import {
   EDGE_BANDING, HOLE_COLOR, WOOD_TINT, hardwareGeometry, hardwareLook, hardwareShape, lookForPart, panelHoles, partNumber, useFinishLooks, usePhotoCrops, useStudioLight, woodTexture,
   type FinishLook, type Hole,
 } from './partModels';
-import { ProjectedRoom, type PhotoSpace } from './projectedRoom';
+import { ElevationRoom, type PhotoElevation } from './photoElevation';
 
 export type GuideView = 'room' | 'drawing' | 'photo';
 
@@ -50,7 +50,7 @@ interface Props {
   follow: boolean;
   appearance?: GuideAppearance | null;
   photoUrl?: string | null;
-  photoSpace?: PhotoSpace | null;
+  elevation?: PhotoElevation | null;
 }
 
 type Looks = { appearance: GuideAppearance | null; looks: Map<string, FinishLook>; hideKit: boolean };
@@ -903,8 +903,8 @@ export const GuideScene: React.FC<Props> = (props) => {
             shadow-normalBias={0.03}
           />
           <directionalLight position={[4, 3, -2]} intensity={0.6} color="#9fc4ff" />
-          {view === 'photo' && props.photoSpace ? <ProjectedRoom space={props.photoSpace} build={build} /> : props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} /> : <Room build={build} />}
-          {build.hasAssembly && !(view === 'photo' && props.photoSpace) && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} onBoard={props.onBoard} />}
+          {view === 'photo' && props.elevation ? <ElevationRoom elevation={props.elevation} build={build} /> : props.appearance ? <RealRoom build={build} room={props.appearance.room} photoUrl={props.photoUrl ?? null} /> : <Room build={build} />}
+          {build.hasAssembly && !(view === 'photo' && props.elevation) && <SceneBoards build={build} guide={guide} stepIndex={props.stepIndex} pageUrl={props.pageUrl} xRef={xRef} onBoard={props.onBoard} />}
         </>
       ) : (
         <>

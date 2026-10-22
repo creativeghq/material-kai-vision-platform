@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { FormField } from '@/components/core/ui/form-layout';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Switch } from '@/components/core/ui/switch';
 import { hardwareShape, partNumber } from '@/components/features/guides/partModels';
 import type { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -39,68 +38,68 @@ function Swatch({ finish, photoUrl }: { finish: GuideFinish; photoUrl: string | 
   return <span className="block h-9 w-9 shrink-0 rounded-sm border border-hairline" style={style} />;
 }
 
-function SpaceCorners({ room, imageUrl, onChange }: { room: GuideRoom; imageUrl: string; onChange: (corners: GuideRoom['corners']) => void }) {
+const OUTLINE_LABELS = ['Floor, left end', 'Floor, right end', 'Top, right end', 'Top, left end'];
+
+function defaultOutline(room: GuideRoom): Array<{ x: number; y: number }> {
+  const floor = room.floor_line ?? 0.85;
+  return [{ x: 0.05, y: floor }, { x: 0.95, y: floor }, { x: 0.95, y: 0.05 }, { x: 0.05, y: 0.05 }];
+}
+
+function WallOutline({ outline, imageUrl, onChange }: { outline: Array<{ x: number; y: number }>; imageUrl: string; onChange: (o: Array<{ x: number; y: number }>) => void }) {
   const box = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
-  const at = (clientX: number) => {
+  const [dragging, setDragging] = useState<number | null>(null);
+  const move = (i: number, clientX: number, clientY: number) => {
     const r = box.current?.getBoundingClientRect();
-    return r ? Math.min(1, Math.max(0, (clientX - r.left) / r.width)) : 0.5;
+    if (!r) return;
+    const next = outline.slice();
+    next[i] = { x: Math.min(1, Math.max(0, (clientX - r.left) / r.width)), y: Math.min(1.2, Math.max(-0.2, (clientY - r.top) / r.height)) };
+    onChange(next);
   };
-  const sides = [
-    { side: 'left' as const, label: 'Corner on the left', x: room.corners.left, fallback: room.front ? Math.min(...room.front.map((p) => p.x)) : 0.2 },
-    { side: 'right' as const, label: 'Corner on the right', x: room.corners.right, fallback: room.front ? Math.max(...room.front.map((p) => p.x)) : 0.8 },
-  ];
   return (
-    <div className="space-y-3">
-      <div
-        ref={box}
-        className="relative inline-block max-w-full touch-none select-none"
-        onPointerMove={(e) => { if (dragging) onChange({ ...room.corners, [dragging]: at(e.clientX) }); }}
-        onPointerUp={() => setDragging(null)}
-        onPointerLeave={() => setDragging(null)}
-      >
-        <img src={imageUrl} alt="The photographed room" className="block max-h-[28rem] w-auto max-w-full rounded-sm border border-hairline" draggable={false} />
-        {sides.map((c) => c.x != null && (
-          <div
-            key={c.side}
-            role="slider"
-            aria-label={c.label}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(c.x * 100)}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              const step = e.key === 'ArrowLeft' ? -0.005 : e.key === 'ArrowRight' ? 0.005 : 0;
-              if (step) onChange({ ...room.corners, [c.side]: Math.min(1, Math.max(0, (c.x ?? 0) + step)) });
-            }}
-            onPointerDown={(e) => {
-              setDragging(c.side);
-              try {
-                e.currentTarget.setPointerCapture(e.pointerId);
-              } catch {
-                // A pointer the browser cannot capture still drags through the parent's move handler.
-              }
-            }}
-            onPointerMove={(e) => { if (dragging === c.side) onChange({ ...room.corners, [c.side]: at(e.clientX) }); }}
-            onPointerUp={() => setDragging(null)}
-            className="absolute inset-y-0 -ml-3 w-6 cursor-ew-resize focus-visible:outline-none"
-            style={{ left: `${c.x * 100}%` }}
-          >
-            <div className="mx-auto h-full w-[3px] bg-primary shadow-[0_0_0_1px_rgba(0,0,0,0.5)]" />
-            <span className="absolute left-1/2 top-2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-primary px-1.5 py-0.5 text-[11px] font-semibold text-primary-foreground">
-              {c.side === 'left' ? 'Left corner' : 'Right corner'}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-5">
-        {sides.map((c) => (
-          <label key={c.side} className="flex items-center gap-2 text-sm">
-            <Switch checked={c.x != null} onCheckedChange={(on) => onChange({ ...room.corners, [c.side]: on ? c.fallback : null })} />
-            {c.label}
-          </label>
-        ))}
-      </div>
+    <div
+      ref={box}
+      className="relative inline-block max-w-full touch-none select-none"
+      onPointerMove={(e) => { if (dragging !== null) move(dragging, e.clientX, e.clientY); }}
+      onPointerUp={() => setDragging(null)}
+      onPointerLeave={() => setDragging(null)}
+    >
+      <img src={imageUrl} alt="The photographed room" className="block max-h-[28rem] w-auto max-w-full rounded-sm border border-hairline" draggable={false} />
+      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+        <polygon
+          points={outline.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+          className="fill-primary/15 stroke-primary"
+          strokeWidth={0.6}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      {outline.map((p, i) => (
+        <button
+          key={OUTLINE_LABELS[i]}
+          type="button"
+          aria-label={`${OUTLINE_LABELS[i]} of the back wall`}
+          title={OUTLINE_LABELS[i]}
+          onKeyDown={(e) => {
+            const d = { ArrowLeft: [-0.005, 0], ArrowRight: [0.005, 0], ArrowUp: [0, -0.005], ArrowDown: [0, 0.005] }[e.key];
+            if (!d) return;
+            e.preventDefault();
+            const next = outline.slice();
+            next[i] = { x: Math.min(1, Math.max(0, p.x + d[0])), y: Math.min(1.2, Math.max(-0.2, p.y + d[1])) };
+            onChange(next);
+          }}
+          onPointerDown={(e) => {
+            setDragging(i);
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              // A pointer the browser cannot capture still drags through the parent's move handler.
+            }
+          }}
+          onPointerMove={(e) => { if (dragging === i) move(i, e.clientX, e.clientY); }}
+          onPointerUp={() => setDragging(null)}
+          className="absolute -ml-2 -mt-2 h-4 w-4 cursor-move rounded-sm border-2 border-white bg-primary shadow-[0_0_0_1px_rgba(0,0,0,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
+        />
+      ))}
     </div>
   );
 }
@@ -327,14 +326,14 @@ export function GuideLookEditor({ row, onSaved, toast }: {
               <CardHeader>
                 <CardTitle>Your space</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  The 3D builds this room: the wall behind the product, and a side wall wherever the room turns a corner. Drag each line onto the vertical line where two walls meet, or switch a side off if the wall carries on. Save the look to apply it.
+                  The 3D straightens the wall behind the product into a flat, level backdrop and builds the room around it. Drag the four points onto the back wall's corners: the two bottom ones where it meets the floor, the two top ones where it meets the ceiling (or the top of the photo). An end that stops at a room corner gets a side wall. Save the look to apply it.
                 </p>
               </CardHeader>
               <CardContent>
-                <SpaceCorners
-                  room={draft.room}
+                <WallOutline
+                  outline={draft.room.wall_outline ?? defaultOutline(draft.room)}
                   imageUrl={draft.room.plate_url ?? photoUrl ?? ''}
-                  onChange={(corners) => draft.room && setDraft({ ...draft, room: { ...draft.room, corners } })}
+                  onChange={(wall_outline) => draft.room && setDraft({ ...draft, room: { ...draft.room, wall_outline } })}
                 />
               </CardContent>
             </Card>

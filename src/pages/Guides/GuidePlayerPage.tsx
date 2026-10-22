@@ -17,7 +17,7 @@ import { usePageAspects } from '@/components/features/guides/usePageAspects';
 import { PartInspector } from '@/components/features/guides/PartInspector';
 import { partNumber } from '@/components/features/guides/partModels';
 import { blueprintInk } from '@/components/features/guides/blueprintInk';
-import { usePhotoSpace } from '@/components/features/guides/projectedRoom';
+import { usePhotoElevation } from '@/components/features/guides/photoElevation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { buildGuide, countsAt, partCountAt, partUsedTotal, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
@@ -175,14 +175,10 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
   toast: ReturnType<typeof useToast>['toast'];
   shared?: boolean;
 }) {
-  const baseBuild = useMemo(() => buildGuide(guide), [guide]);
+  const build = useMemo(() => buildGuide(guide), [guide]);
   const [view, setView] = useState<GuideView>('room');
-  const photoSpace = usePhotoSpace(row.appearance?.room, photoUrl, baseBuild);
-  const inSpace = view === 'photo' && !!photoSpace;
-  const build = useMemo(
-    () => (inSpace && photoSpace ? buildGuide(guide, { within: { x0: photoSpace.xL, x1: photoSpace.xR } }) : baseBuild),
-    [inSpace, photoSpace, guide, baseBuild],
-  );
+  const elevation = usePhotoElevation(row.appearance?.room, photoUrl, build);
+  const inSpace = view === 'photo' && !!elevation;
   const pageAspects = usePageAspects(pageUrls, row.page_aspect);
   const K = build.steps;
   const xRef = useRef(0);
@@ -194,7 +190,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
   const [x, setX] = useState(0);
   const [cine, setCine] = useState(true);
   const [exploded, setExploded] = useState(false);
-  const hasSpace = !!photoSpace;
+  const hasSpace = !!elevation;
   const [bookOpen, setBookOpen] = useState(false);
   const [labels, setLabels] = useState(true);
   const [followCam, setFollowCam] = useState(true);
@@ -220,15 +216,10 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
   const stepShot = exploded ? build.explodedCamera : x >= K - 1e-6 ? build.finalCamera : build.cameras[Math.min(step, build.cameras.length - 1)];
   const shot = useMemo(
     () => {
-      if (!inSpace || !photoSpace) return stepShot;
-      const pitch = Math.max(0.15, photoSpace.pitch);
-      const dist = Math.min(stepShot.dist, photoSpace.eye.distanceTo(new THREE.Vector3(stepShot.target.x, stepShot.target.y, stepShot.target.z)) * 0.92);
-      const reach = Math.cos(pitch) * dist;
-      const camX = Math.min(photoSpace.xR - 0.25, Math.max(photoSpace.xL + 0.25, stepShot.target.x + Math.sin(photoSpace.yaw) * reach));
-      const yaw = Math.asin(Math.max(-1, Math.min(1, (camX - stepShot.target.x) / (reach || 1))));
-      return { ...stepShot, yaw, pitch, dist };
+      if (!inSpace) return stepShot;
+      return { ...stepShot, yaw: Math.max(-0.3, Math.min(0.3, stepShot.yaw)) };
     },
-    [inSpace, photoSpace, stepShot],
+    [inSpace, stepShot],
   );
 
   const setCinematic = useCallback((on: boolean) => {
@@ -414,7 +405,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
                 onBoard={(b) => { halt(); setBoard(b); }}
                 appearance={row.appearance}
                 photoUrl={photoUrl}
-                photoSpace={inSpace ? photoSpace : null}
+                elevation={inSpace ? elevation : null}
               />
             </Canvas>
           </Suspense>

@@ -296,7 +296,7 @@ export interface GuideRoom {
   floor_line: number | null;
   plate_url: string | null;
   front: Array<{ x: number; y: number }> | null;
-  corners: { left: number | null; right: number | null };
+  wall_outline: Array<{ x: number; y: number }> | null;
 }
 
 export interface GuideAppearance {
@@ -339,10 +339,8 @@ export const APPEARANCE_READ_SCHEMA = closed({
     floor_line: num,
     front_shown: bool,
     front: closed({ bl_x: num, bl_y: num, br_x: num, br_y: num, tr_x: num, tr_y: num, tl_x: num, tl_y: num }),
-    left_corner_shown: bool,
-    left_corner_x: num,
-    right_corner_shown: bool,
-    right_corner_x: num,
+    back_wall_shown: bool,
+    back_wall: closed({ bl_x: num, bl_y: num, br_x: num, br_y: num, tr_x: num, tr_y: num, tl_x: num, tl_y: num }),
   }),
 });
 
@@ -376,13 +374,17 @@ function sanitizeFront(raw: Record<string, unknown>): GuideRoom['front'] {
   return pts.map(([x, y]) => ({ x: x as number, y: y as number }));
 }
 
-function sanitizeCorners(raw: Record<string, unknown>): GuideRoom['corners'] {
-  const at = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : null);
-  if (isObj(raw.corners)) return { left: at(raw.corners.left), right: at(raw.corners.right) };
-  return {
-    left: raw.left_corner_shown === true ? at(raw.left_corner_x) : null,
-    right: raw.right_corner_shown === true ? at(raw.right_corner_x) : null,
-  };
+function sanitizeWallOutline(raw: Record<string, unknown>): GuideRoom['wall_outline'] {
+  const inRange = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= -0.5 && v <= 1.5;
+  if (Array.isArray(raw.wall_outline)) {
+    const pts = raw.wall_outline.filter(isObj).map((p) => ({ x: p.x, y: p.y }));
+    return pts.length === 4 && pts.every((p) => inRange(p.x) && inRange(p.y)) ? pts as Array<{ x: number; y: number }> : null;
+  }
+  if (raw.back_wall_shown !== true || !isObj(raw.back_wall)) return null;
+  const f = raw.back_wall;
+  const pts = [[f.bl_x, f.bl_y], [f.br_x, f.br_y], [f.tr_x, f.tr_y], [f.tl_x, f.tl_y]];
+  if (!pts.every(([x, y]) => inRange(x) && inRange(y))) return null;
+  return pts.map(([x, y]) => ({ x: x as number, y: y as number }));
 }
 
 function sanitizeRoom(raw: unknown): GuideRoom | null {
@@ -402,7 +404,7 @@ function sanitizeRoom(raw: unknown): GuideRoom | null {
     floor_line: typeof raw.floor_line === 'number' && raw.floor_line > 0.2 && raw.floor_line <= 1 ? raw.floor_line : null,
     plate_url: typeof raw.plate_url === 'string' && /^https:\/\//.test(raw.plate_url) ? raw.plate_url.slice(0, 1000) : null,
     front: sanitizeFront(raw),
-    corners: sanitizeCorners(raw),
+    wall_outline: sanitizeWallOutline(raw),
   };
 }
 

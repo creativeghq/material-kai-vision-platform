@@ -261,11 +261,7 @@ function mountFor(
   return null;
 }
 
-export interface BuildOptions {
-  within?: { x0: number; x1: number };
-}
-
-export function buildGuide(guide: InstallationGuideData, opts: BuildOptions = {}): GuideBuild {
+export function buildGuide(guide: InstallationGuideData): GuideBuild {
   const stepCount = Math.max(1, guide.steps.length - 1);
   const hasAssembly = guide.assembly.available && guide.assembly.placements.length > 0;
 
@@ -290,16 +286,14 @@ export function buildGuide(guide: InstallationGuideData, opts: BuildOptions = {}
     }
   });
 
-  const room = opts.within && opts.within.x1 - opts.within.x0 > 0.6 ? opts.within : null;
-  const rowLeft = room ? room.x0 + 0.1 : -Math.max(2.2, product.size.x * 1.7) / 2;
-  const rowRight = room ? room.x1 - 0.1 : -rowLeft;
+  const rowWidth = Math.max(2.2, product.size.x * 1.7);
   const kitZ0 = product.center.z + product.size.z / 2 + 0.55;
-  let cursorX = rowLeft;
+  let cursorX = -rowWidth / 2;
   let cursorZ = kitZ0;
   let rowDepth = 0;
   const place = (w: number, d: number): Vec3 => {
-    if (cursorX + w > rowRight && cursorX > rowLeft) {
-      cursorX = rowLeft;
+    if (cursorX + w > rowWidth / 2 && cursorX > -rowWidth / 2) {
+      cursorX = -rowWidth / 2;
       cursorZ += rowDepth + 0.1;
       rowDepth = 0;
     }
@@ -311,6 +305,9 @@ export function buildGuide(guide: InstallationGuideData, opts: BuildOptions = {}
 
   const items: BuildItem[] = [];
   const cards: KitCard[] = [];
+  const stackAt = v(product.center.x + product.size.x / 2 + 0.45, 0, product.center.z);
+  let stackHeight = 0;
+
   const panels = guide.parts
     .map((p, i) => ({ p, i }))
     .filter(({ p }) => p.kind === 'panel' || p.kind === 'fitting')
@@ -319,8 +316,6 @@ export function buildGuide(guide: InstallationGuideData, opts: BuildOptions = {}
       const fb = flatFootprint(partSizeCm(b.p));
       return fb.w * fb.d - fa.w * fa.d;
     });
-  const stackAt = v(product.center.x + product.size.x / 2 + 0.45, 0, product.center.z);
-  let stackHeight = 0;
   for (const { p, i } of panels) {
     const slots = slotsOf.get(p.id) ?? [];
     const own = placements
@@ -349,7 +344,7 @@ export function buildGuide(guide: InstallationGuideData, opts: BuildOptions = {}
     }
   }
 
-  cursorX = rowLeft;
+  cursorX = -rowWidth / 2;
   cursorZ += rowDepth + 0.25;
   rowDepth = 0;
   const panelIdx = items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.kind === 'panel');
