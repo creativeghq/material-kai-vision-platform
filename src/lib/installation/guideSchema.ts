@@ -296,6 +296,7 @@ export interface GuideRoom {
   floor_line: number | null;
   plate_url: string | null;
   footprint: Array<{ x: number; y: number }> | null;
+  front: Array<{ x: number; y: number }> | null;
 }
 
 export interface GuideAppearance {
@@ -338,6 +339,8 @@ export const APPEARANCE_READ_SCHEMA = closed({
     floor_line: num,
     footprint_shown: bool,
     footprint: closed({ fl_x: num, fl_y: num, fr_x: num, fr_y: num, br_x: num, br_y: num, bl_x: num, bl_y: num }),
+    front_shown: bool,
+    front: closed({ bl_x: num, bl_y: num, br_x: num, br_y: num, tr_x: num, tr_y: num, tl_x: num, tl_y: num }),
   }),
 });
 
@@ -371,6 +374,19 @@ function sanitizeFootprint(raw: Record<string, unknown>): GuideRoom['footprint']
   return pts.map(([x, y]) => ({ x: x as number, y: y as number }));
 }
 
+function sanitizeFront(raw: Record<string, unknown>): GuideRoom['front'] {
+  const inRange = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= -0.5 && v <= 1.5;
+  if (Array.isArray(raw.front)) {
+    const pts = raw.front.filter(isObj).map((p) => ({ x: p.x, y: p.y }));
+    return pts.length === 4 && pts.every((p) => inRange(p.x) && inRange(p.y)) ? pts as Array<{ x: number; y: number }> : null;
+  }
+  if (raw.front_shown !== true || !isObj(raw.front)) return null;
+  const f = raw.front;
+  const pts = [[f.bl_x, f.bl_y], [f.br_x, f.br_y], [f.tr_x, f.tr_y], [f.tl_x, f.tl_y]];
+  if (!pts.every(([x, y]) => inRange(x) && inRange(y))) return null;
+  return pts.map(([x, y]) => ({ x: x as number, y: y as number }));
+}
+
 function sanitizeRoom(raw: unknown): GuideRoom | null {
   if (!isObj(raw)) return null;
   if (raw.shown === false) return null;
@@ -388,6 +404,7 @@ function sanitizeRoom(raw: unknown): GuideRoom | null {
     floor_line: typeof raw.floor_line === 'number' && raw.floor_line > 0.2 && raw.floor_line <= 1 ? raw.floor_line : null,
     plate_url: typeof raw.plate_url === 'string' && /^https:\/\//.test(raw.plate_url) ? raw.plate_url.slice(0, 1000) : null,
     footprint: sanitizeFootprint(raw),
+    front: sanitizeFront(raw),
   };
 }
 

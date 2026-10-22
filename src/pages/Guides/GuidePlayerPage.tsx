@@ -17,7 +17,7 @@ import { usePageAspects } from '@/components/features/guides/usePageAspects';
 import { PartInspector } from '@/components/features/guides/PartInspector';
 import { partNumber } from '@/components/features/guides/partModels';
 import { blueprintInk } from '@/components/features/guides/blueprintInk';
-import { cameraOnProduct } from '@/lib/installation/photoPlacement';
+import { cameraOnFrontFace, cameraOnProduct } from '@/lib/installation/photoPlacement';
 import type { PhotoCamera } from '@/lib/installation/photoCamera';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -173,17 +173,20 @@ function usePhotoView(row: InstallationGuideRow, photoUrl: string | null, build:
   const [view, setView] = useState<{ url: string; w: number; h: number; cam: PhotoCamera } | null>(null);
   useEffect(() => {
     setView(null);
-    if (!src || !room?.footprint || !build.hasAssembly) return;
+    if (!src || !(room?.front || room?.footprint) || !build.hasAssembly) return;
     let live = true;
     const img = new Image();
     img.onload = () => {
       if (!live) return;
-      const cam = cameraOnProduct(room.footprint!, img.naturalWidth, img.naturalHeight, build.product.size.x, build.product.size.z, { x: build.product.center.x, z: build.product.center.z });
+      const p = build.product;
+      const top = p.center.y + p.size.y / 2;
+      const cam = (room.front && cameraOnFrontFace(room.front, img.naturalWidth, img.naturalHeight, p.size.x, top, { x: p.center.x, y: top / 2, z: p.center.z + p.size.z / 2 }))
+        || (room.footprint && cameraOnProduct(room.footprint, img.naturalWidth, img.naturalHeight, p.size.x, p.size.z, { x: p.center.x, z: p.center.z }));
       if (cam) setView({ url: src, w: img.naturalWidth, h: img.naturalHeight, cam });
     };
     img.src = src;
     return () => { live = false; };
-  }, [src, room?.footprint, build]);
+  }, [src, room?.front, room?.footprint, build]);
   return view;
 }
 
