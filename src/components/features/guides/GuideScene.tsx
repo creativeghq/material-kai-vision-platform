@@ -379,11 +379,13 @@ function RealRoom({ build, room, photoUrl }: { build: GuideBuild; room: GuideRoo
       </mesh>
       <mesh position={[0, wallH / 2, wallZ]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
-        <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />
+        {room?.plate_url
+          ? <meshBasicMaterial color={wall} toneMapped={false} />
+          : <meshStandardMaterial key={photo.get('wall')?.uuid ?? 'plain'} color={photo.get('wall') ? '#ffffff' : wall} map={photo.get('wall') ?? undefined} roughness={0.92} />}
       </mesh>
       <mesh position={[-span * 0.75, wallH / 2, floorZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
         <planeGeometry args={[size, wallH]} />
-        <meshStandardMaterial color={side} roughness={0.92} />
+        {room?.plate_url ? <meshBasicMaterial color={side} toneMapped={false} /> : <meshStandardMaterial color={side} roughness={0.92} />}
       </mesh>
       {room?.plate_url && room.product_box && <RoomPlate build={build} room={room} wallZ={wallZ} />}
       {room?.backsplash && !room.plate_url && (
