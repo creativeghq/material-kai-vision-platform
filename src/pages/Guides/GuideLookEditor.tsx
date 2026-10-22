@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, ImageIcon, Loader2, Search, Sparkles, Upload } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { FormField } from '@/components/core/ui/form-layout';
 import { Input } from '@/components/core/ui/input';
@@ -141,7 +142,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
     try {
       const found = await installationGuideService.findProductPhotos(row);
       setCandidates(found);
-      if (found.length === 0) toast({ title: 'No photos found', description: 'Paste the product page or photo address instead.' });
+      if (found.length === 0) toast({ title: 'The search found no photos', description: 'Upload your own photo, or paste the product page or photo address.' });
     } catch (e) {
       toast({ title: 'Photo search failed', description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
     } finally {
@@ -345,9 +346,16 @@ export function GuideLookEditor({ row, onSaved, toast }: {
         </>
       ) : (
         <Card>
-          <CardContent className="flex items-center gap-3 p-4 text-sm text-muted-foreground">
-            <ImageIcon className="h-5 w-5 shrink-0" />No finishes yet. The 3D shows plain laminate until a product photo is read.
-          </CardContent>
+          <HubEmptyState
+            icon={ImageIcon}
+            title="No finishes yet"
+            description="The 3D shows plain laminate until a product photo is read. Find one above, or upload your own."
+            action={(
+              <Button size="sm" variant="outline" className="gap-1.5" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+                <Upload className="h-4 w-4" />Upload your photo
+              </Button>
+            )}
+          />
         </Card>
       )}
     </div>
