@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import type { GuideBuild } from '@/lib/installation/guideBuild';
@@ -16,8 +15,6 @@ export interface PhotoElevation {
   topIsCeiling: boolean;
   wall: string;
   floor: string;
-  left: { color: string } | null;
-  right: { color: string } | null;
 }
 
 const PX_PER_M = 420;
@@ -86,8 +83,8 @@ export function usePhotoElevation(room: GuideRoom | null | undefined, photoUrl: 
       }
       const topIsCeiling = Math.min(tl.y, tr.y) / ih > EDGE;
       const fadeY = topIsCeiling ? 0 : ch * 0.08;
-      const fadeL = leftCorner ? 0 : cw * 0.1;
-      const fadeR = rightCorner ? 0 : cw * 0.1;
+      const fadeL = cw * (leftCorner ? 0.03 : 0.1);
+      const fadeR = cw * (rightCorner ? 0.03 : 0.1);
       const dst = octx.createImageData(cw, ch);
       const band: number[][] = [[], [], []];
       for (let y = 0; y < ch; y++) {
@@ -111,22 +108,6 @@ export function usePhotoElevation(room: GuideRoom | null | undefined, photoUrl: 
       octx.putImageData(dst, 0, 0);
       const median = (v: number[]) => (v.length ? [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)] : 220);
       const hex = (c: number[][]) => `#${c.map((ch2) => median(ch2).toString(16).padStart(2, '0')).join('')}`;
-      const beside = (edgeX: number, dir: -1 | 1) => {
-        const acc: number[][] = [[], [], []];
-        const y0 = Math.max(0, Math.round(Math.min(tl.y, tr.y) + (bl.y - tl.y) * 0.25));
-        const y1 = Math.min(ih - 1, Math.round(Math.min(bl.y, br.y) - (bl.y - tl.y) * 0.25));
-        for (let y = y0; y < y1; y += 4) {
-          for (let d = iw * 0.01; d < iw * 0.05; d += 3) {
-            const x = Math.round(edgeX + dir * d);
-            if (x < 0 || x >= iw) break;
-            const i = (y * iw + x) * 4;
-            acc[0].push(px[i]);
-            acc[1].push(px[i + 1]);
-            acc[2].push(px[i + 2]);
-          }
-        }
-        return hex(acc);
-      };
       const map = new THREE.CanvasTexture(out);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -140,8 +121,6 @@ export function usePhotoElevation(room: GuideRoom | null | undefined, photoUrl: 
         topIsCeiling,
         wall: hex(band),
         floor: room?.floor ?? '#d9d3c9',
-        left: leftCorner ? { color: beside(Math.min(bl.x, tl.x), -1) } : null,
-        right: rightCorner ? { color: beside(Math.max(br.x, tr.x), 1) } : null,
       });
     };
     img.src = url;
@@ -154,87 +133,33 @@ export function usePhotoElevation(room: GuideRoom | null | undefined, photoUrl: 
   return elevation;
 }
 
-function SideWall({ x, z, depth, height, turn, color }: { x: number; z: number; depth: number; height: number; turn: number; color: string }) {
-  const camera = useThree((st) => st.camera);
-  const material = useMemo(() => new THREE.MeshBasicMaterial({ color, toneMapped: false }), [color]);
-  const skirting = useMemo(() => new THREE.MeshStandardMaterial({ color: '#f7f6f3', roughness: 0.6 }), []);
-  useEffect(() => () => { material.dispose(); skirting.dispose(); }, [material, skirting]);
-  useFrame((_, delta) => {
-    const inward = turn > 0 ? camera.position.x - x : x - camera.position.x;
-    const want = inward < -0.1 ? 0.1 : 1;
-    for (const m of [material, skirting]) {
-      m.opacity += (want - m.opacity) * (1 - Math.exp(-delta * 8));
-      m.transparent = m.opacity < 0.99;
-      m.depthWrite = !m.transparent;
-    }
-  });
-  return (
-    <group position={[x, 0, z]} rotation={[0, turn, 0]}>
-      <mesh position={[0, height / 2, 0]} material={material}>
-        <planeGeometry args={[depth, height]} />
-      </mesh>
-      <mesh position={[0, 0.045, 0.008]} material={skirting}>
-        <boxGeometry args={[depth, 0.09, 0.016]} />
-      </mesh>
-    </group>
-  );
-}
-
 export function ElevationRoom({ elevation, build }: { elevation: PhotoElevation; build: GuideBuild }) {
   const e = elevation;
   const roomH = Math.max(2.5, e.topIsCeiling ? e.height : e.height + 0.4);
   const kitFront = build.kitBounds.center.z + build.kitBounds.size.z / 2;
   const depth = Math.max(4, kitFront - e.zWall + 2.5);
-  const alcove = build.product.size.z + 0.45;
-  const xL = e.x0;
-  const xR = e.x0 + e.width;
-  const cx = (xL + xR) / 2;
-  const reach = Math.max(4, build.kitBounds.size.x / 2 + 2);
+  const span = e.width + 2 * Math.max(4, build.kitBounds.size.x / 2 + 2);
+  const cx = e.x0 + e.width / 2;
+  const zBack = e.zWall - 0.03;
   const floorColor = useMemo(() => new THREE.Color(e.floor), [e.floor]);
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0, e.zWall + depth / 2]} receiveShadow>
-        <planeGeometry args={[xR - xL + reach * 2, depth]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, -0.002, zBack + depth / 2]} receiveShadow>
+        <planeGeometry args={[span, depth]} />
         <meshStandardMaterial color={floorColor} roughness={0.7} />
       </mesh>
-      <mesh position={[cx, roomH / 2, e.zWall - 0.004]}>
-        <planeGeometry args={[xR - xL, roomH]} />
+      <mesh position={[cx, roomH / 2, zBack - 0.004]}>
+        <planeGeometry args={[span, roomH]} />
         <meshBasicMaterial color={e.wall} toneMapped={false} />
       </mesh>
-      <mesh position={[e.x0 + e.width / 2, e.height / 2, e.zWall - 0.002]}>
+      <mesh position={[cx, e.height / 2, zBack - 0.002]}>
         <planeGeometry args={[e.width, e.height]} />
         <meshBasicMaterial key={e.map.uuid} map={e.map} transparent toneMapped={false} />
       </mesh>
-      <mesh position={[cx, roomH / 2, e.zWall]} receiveShadow>
-        <planeGeometry args={[xR - xL, roomH]} />
+      <mesh position={[cx, roomH / 2, zBack]} receiveShadow>
+        <planeGeometry args={[span, roomH]} />
         <shadowMaterial transparent opacity={0.18} />
       </mesh>
-      {e.left && <SideWall x={xL} z={e.zWall + alcove / 2} depth={alcove} height={roomH} turn={Math.PI / 2} color={e.left.color} />}
-      {e.right && <SideWall x={xR} z={e.zWall + alcove / 2} depth={alcove} height={roomH} turn={-Math.PI / 2} color={e.right.color} />}
-      {e.left && (
-        <mesh position={[xL - reach / 2, roomH / 2, e.zWall + alcove]}>
-          <planeGeometry args={[reach, roomH]} />
-          <meshBasicMaterial color={e.left.color} toneMapped={false} />
-        </mesh>
-      )}
-      {e.right && (
-        <mesh position={[xR + reach / 2, roomH / 2, e.zWall + alcove]}>
-          <planeGeometry args={[reach, roomH]} />
-          <meshBasicMaterial color={e.right.color} toneMapped={false} />
-        </mesh>
-      )}
-      {!e.left && (
-        <mesh position={[xL - reach / 2, roomH / 2, e.zWall - 0.004]}>
-          <planeGeometry args={[reach, roomH]} />
-          <meshBasicMaterial color={e.wall} toneMapped={false} />
-        </mesh>
-      )}
-      {!e.right && (
-        <mesh position={[xR + reach / 2, roomH / 2, e.zWall - 0.004]}>
-          <planeGeometry args={[reach, roomH]} />
-          <meshBasicMaterial color={e.wall} toneMapped={false} />
-        </mesh>
-      )}
       <pointLight position={[cx, roomH - 0.2, e.zWall + 0.8]} intensity={2.4} distance={8} color="#ffffff" />
       <directionalLight position={[cx + 1, 3.2, e.zWall + 4]} intensity={1.1} color="#ffffff" />
     </group>

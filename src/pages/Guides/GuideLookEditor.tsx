@@ -326,7 +326,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
               <CardHeader>
                 <CardTitle>Your space</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  The 3D straightens the wall behind the product into a flat, level backdrop and builds the room around it. Drag the four points onto the back wall's corners: the two bottom ones where it meets the floor, the two top ones where it meets the ceiling (or the top of the photo). An end that stops at a room corner gets a side wall. Save the look to apply it.
+                  The 3D straightens the wall behind the product into a flat, level backdrop and builds the room around it. Drag the four points onto the back wall's corners: the two bottom ones where it meets the floor, the two top ones where it meets the ceiling (or the top of the photo). Save the look to apply it.
                 </p>
               </CardHeader>
               <CardContent>

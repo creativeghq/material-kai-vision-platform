@@ -474,7 +474,7 @@ function Ghost({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObjec
     merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     return merged;
   }, build.ghost);
-  const material = useDisposable(() => new THREE.LineBasicMaterial({ color: GHOST, transparent: true, opacity: 0.8, depthWrite: false }), 'ghost');
+  const material = useDisposable(() => new THREE.LineBasicMaterial({ color: GHOST, transparent: true, opacity: 0.8, depthWrite: false, depthTest: false }), 'ghost');
   useFrame(() => {
     if (!group.current || !material) return;
     const fade = Math.min(1, Math.max(0, (build.steps - 0.4 - xRef.current) / 0.6));
@@ -484,7 +484,7 @@ function Ghost({ build, xRef }: { build: GuideBuild; xRef: React.MutableRefObjec
   if (!geometry || !material) return null;
   return (
     <group ref={group}>
-      <lineSegments geometry={geometry} material={material} />
+      <lineSegments geometry={geometry} material={material} renderOrder={10} />
     </group>
   );
 }
