@@ -372,3 +372,56 @@ describe('installation guide hardware stays inside the finished product', () => 
     expect(protruding(buildGuide(g), g.parts.map((p) => p.name))).toEqual([]);
   });
 });
+
+function seams(b: GuideBuild, names: string[]): string[] {
+  const panels = b.items.filter((it) => it.kind === 'panel' && it.placed);
+  const axes = ['x', 'y', 'z'] as const;
+  const out: string[] = [];
+  for (let i = 0; i < panels.length; i++) {
+    for (let j = i + 1; j < panels.length; j++) {
+      const [p, q] = [panels[i], panels[j]];
+      for (const a of axes) {
+        const others = axes.filter((o) => o !== a);
+        const shared = others.map((o) => Math.min(p.target.pos[o] + p.size[o] / 2, q.target.pos[o] + q.size[o] / 2) - Math.max(p.target.pos[o] - p.size[o] / 2, q.target.pos[o] - q.size[o] / 2));
+        if (shared.some((s) => s < 0.01)) continue;
+        const gap = Math.abs(p.target.pos[a] - q.target.pos[a]) - (p.size[a] + q.size[a]) / 2;
+        const label = `${names[p.partIndex]} / ${names[q.partIndex]} along ${a}: ${(gap * 100).toFixed(1)}cm`;
+        if (gap > 0.0005 && gap < 0.02) out.push(`gap ${label}`);
+        if (gap < -0.001) out.push(`overlap ${label}`);
+      }
+    }
+  }
+  return out;
+}
+
+describe('installation guide carcass read slightly off', () => {
+  it('closes the seams: top on the sides at full width, bottom between them, dividers on the bottom, back behind', () => {
+    const panel = (id: string, name: string, q: number) => ({ id, name, code: '', quantity: q, kind: 'panel', size_cm: { x: 10, y: 10, z: 10 }, size_stated: false });
+    const at = (part_id: string, instance: number, c: [number, number, number], e: [number, number, number]) =>
+      ({ part_id, instance, center_cm: { x: c[0], y: c[1], z: c[2] }, extent_cm: { x: e[0], y: e[1], z: e[2] }, step: 1 });
+    const g = sanitizeGuide({
+      ...raw,
+      parts: [panel('SIDE', 'Side panel', 2), panel('TB', 'Top/bottom panel', 2), panel('MID', 'Divider', 2), panel('BACK', 'Back panel', 1), panel('SHELF', 'Shelf', 1)],
+      steps: [raw.steps[0], { title: 'All', page: 3, box: { x0: 0, y0: 0, x1: 1, y1: 1 }, instruction: 'Build it.', parts_used: [], tools: [], warning: '', people: 1, action: 'place' }],
+      assembly: {
+        available: true,
+        placements: [
+          at('SIDE', 1, [-89.5, 38, 0], [3.5, 76, 40]),
+          at('SIDE', 2, [89.5, 38, 0], [3.5, 76, 40]),
+          at('TB', 1, [0, 78, 0], [179, 3.5, 40]),
+          at('TB', 2, [0, 2, 0], [179, 3.5, 40]),
+          at('MID', 1, [-30, 38, 0], [2, 76, 40]),
+          at('MID', 2, [30, 38, 0], [2, 76, 40]),
+          at('BACK', 1, [0, 40, -19.5], [179, 76, 1]),
+          at('SHELF', 1, [-59.4, 40, 1.5], [56.7, 1.8, 36]),
+        ],
+      },
+    }, 12);
+    const b = buildGuide(g);
+    expect(seams(b, g.parts.map((p) => p.name))).toEqual([]);
+    const top = b.items.filter((it) => it.partId === 'TB').sort((p, q) => q.target.pos.y - p.target.pos.y)[0];
+    const side = b.items.find((it) => it.partId === 'SIDE')!;
+    expect(top.size.x).toBeCloseTo(1.825, 3);
+    expect(top.target.pos.y - top.size.y / 2).toBeCloseTo(side.target.pos.y + side.size.y / 2, 4);
+  });
+});

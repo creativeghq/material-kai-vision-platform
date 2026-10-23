@@ -269,11 +269,63 @@ type Placed = GuidePlacement & { center: Vec3; size: Vec3 };
 const REVEAL = 0.003;
 const NEAR = 0.1;
 
+const isFrontPart = (guide: InstallationGuideData, pl: Placed) =>
+  smallestAxis(pl.size) === 'z' && /door|front/i.test(guide.parts.find((p) => p.id === pl.part_id)?.name ?? '');
+const lo = (pl: Placed, a: Axis) => pl.center[a] - pl.size[a] / 2;
+const hi = (pl: Placed, a: Axis) => pl.center[a] + pl.size[a] / 2;
+const span = (pl: Placed, a: Axis, from: number, to: number) => {
+  pl.center = { ...pl.center, [a]: (from + to) / 2 };
+  pl.size = { ...pl.size, [a]: Math.max(0.005, to - from) };
+};
+const SNAP = 0.02;
+
+function fitCarcass(guide: InstallationGuideData, placed: Placed[]): void {
+  const carcass = placed.filter((pl) => !isFrontPart(guide, pl));
+  const upright = carcass.filter((pl) => smallestAxis(pl.size) === 'x');
+  const flat = carcass.filter((pl) => smallestAxis(pl.size) === 'y');
+  const deep = (a: Placed, b: Placed) => Math.min(hi(a, 'z'), hi(b, 'z')) - Math.max(lo(a, 'z'), lo(b, 'z')) > 0.05;
+  for (const h of flat) {
+    for (const v of upright) {
+      if (!deep(h, v) || (lo(h, 'x') < lo(v, 'x') - 0.001 && hi(h, 'x') > hi(v, 'x') + 0.001)) continue;
+      const left = v.center.x < h.center.x;
+      const end = left ? lo(h, 'x') : hi(h, 'x');
+      if (end < lo(v, 'x') - SNAP || end > hi(v, 'x') + SNAP) continue;
+      const above = lo(h, 'y') >= hi(v, 'y') - SNAP && h.center.y > hi(v, 'y');
+      const below = hi(h, 'y') <= lo(v, 'y') + SNAP && h.center.y < lo(v, 'y');
+      if (above) span(h, 'y', hi(v, 'y'), hi(v, 'y') + h.size.y);
+      if (below) span(h, 'y', lo(v, 'y') - h.size.y, lo(v, 'y'));
+      const to = above || below ? (left ? lo(v, 'x') : hi(v, 'x')) : (left ? hi(v, 'x') : lo(v, 'x'));
+      if (left) span(h, 'x', to, hi(h, 'x'));
+      else span(h, 'x', lo(h, 'x'), to);
+    }
+  }
+  for (const v of upright) {
+    for (const h of flat) {
+      if (!deep(h, v) || !(lo(h, 'x') < lo(v, 'x') - 0.001 && hi(h, 'x') > hi(v, 'x') + 0.001)) continue;
+      if (Math.abs(h.center.y - lo(v, 'y')) < 0.1 && hi(h, 'y') < hi(v, 'y')) span(v, 'y', hi(h, 'y'), hi(v, 'y'));
+      else if (Math.abs(h.center.y - hi(v, 'y')) < 0.1 && lo(h, 'y') > lo(v, 'y')) span(v, 'y', lo(v, 'y'), lo(h, 'y'));
+    }
+  }
+  const frame = carcass.filter((pl) => smallestAxis(pl.size) !== 'z');
+  if (frame.length === 0) return;
+  const back = Math.min(...frame.map((pl) => lo(pl, 'z')));
+  const middle = (back + Math.max(...frame.map((pl) => hi(pl, 'z')))) / 2;
+  for (const pl of carcass) {
+    if (smallestAxis(pl.size) !== 'z' || pl.center.z >= middle || lo(pl, 'z') >= back + SNAP) continue;
+    span(pl, 'z', back - pl.size.z, back);
+    for (const a of ['x', 'y'] as const) {
+      const from = Math.min(...frame.map((f) => lo(f, a)));
+      const to = Math.max(...frame.map((f) => hi(f, a)));
+      span(pl, a, Math.abs(lo(pl, a) - from) < 0.04 ? from : lo(pl, a), Math.abs(hi(pl, a) - to) < 0.04 ? to : hi(pl, a));
+    }
+  }
+  for (const h of flat) {
+    if (lo(h, 'z') > back && lo(h, 'z') < back + 0.04) span(h, 'z', back, hi(h, 'z'));
+  }
+}
+
 function fitFronts(guide: InstallationGuideData, placed: Placed[]): void {
-  const name = (pl: Placed) => guide.parts.find((p) => p.id === pl.part_id)?.name ?? '';
-  const isFront = (pl: Placed) => smallestAxis(pl.size) === 'z' && /door|front/i.test(name(pl));
-  const lo = (pl: Placed, a: Axis) => pl.center[a] - pl.size[a] / 2;
-  const hi = (pl: Placed, a: Axis) => pl.center[a] + pl.size[a] / 2;
+  const isFront = (pl: Placed) => isFrontPart(guide, pl);
   const fronts = placed.filter(isFront);
   const frame = placed.filter((pl) => !isFront(pl) && smallestAxis(pl.size) === 'x');
   if (fronts.length === 0 || frame.length < 2) return;
@@ -288,12 +340,8 @@ function fitFronts(guide: InstallationGuideData, placed: Placed[]): void {
     if (Math.abs(line - x) > NEAR) return x;
     return line === x0 || line === x1 ? line : line - outward * (REVEAL / 2);
   };
-  const set = (pl: Placed, a: Axis, from: number, to: number) => {
-    pl.center = { ...pl.center, [a]: (from + to) / 2 };
-    pl.size = { ...pl.size, [a]: Math.max(0.01, to - from) };
-  };
   for (const pl of fronts) {
-    set(pl, 'x', snap(lo(pl, 'x'), -1), snap(hi(pl, 'x'), 1));
+    span(pl, 'x', snap(lo(pl, 'x'), -1), snap(hi(pl, 'x'), 1));
     pl.center = { ...pl.center, z: face + pl.size.z / 2 };
   }
   const columns: Placed[][] = [];
@@ -311,7 +359,7 @@ function fitFronts(guide: InstallationGuideData, placed: Placed[]): void {
     let y = y0;
     for (const pl of col) {
       const h = (pl.size.y / total) * room;
-      set(pl, 'y', y, y + h);
+      span(pl, 'y', y, y + h);
       y += h + REVEAL;
     }
   }
@@ -366,7 +414,10 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
     : { center: v(0, 0.4, 0), size: v(0.8, 0.8, 0.6) };
   const lift = hasAssembly ? -(productBox.center.y - productBox.size.y / 2) : 0;
   for (const p of placements) p.center = add(p.center, v(-productBox.center.x, lift, -productBox.center.z));
-  if (hasAssembly) fitFronts(guide, placements);
+  if (hasAssembly) {
+    fitCarcass(guide, placements);
+    fitFronts(guide, placements);
+  }
   const product = hasAssembly ? bounds(placements) : productBox;
   if (hasAssembly) placements.push(...drawerBox(guide, placements, product));
 
