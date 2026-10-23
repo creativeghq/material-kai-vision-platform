@@ -190,6 +190,9 @@ const HINGE = /hinge|mounting plate/i;
 const KNOB = /knob|handle|pull/i;
 const NAIL = /nail/i;
 const SCREW = /screw/i;
+const SEAT = /screw|bolt|nail|cam/i;
+const DOWEL = /dowel|pin/i;
+const FLAT = /rail|runner|slide|bar|rod|strip|bracket|plate/i;
 const isHinge = (name: string) => HINGE.test(name) && !SCREW.test(name);
 
 function spotOn(host: BuildItem, spot: GuideSpot, centre: Vec3): { offset: Vec3; normal: Axis; sign: number } {
@@ -263,6 +266,57 @@ function mountFor(
 
 type Placed = GuidePlacement & { center: Vec3; size: Vec3 };
 
+const REVEAL = 0.003;
+const NEAR = 0.1;
+
+function fitFronts(guide: InstallationGuideData, placed: Placed[]): void {
+  const name = (pl: Placed) => guide.parts.find((p) => p.id === pl.part_id)?.name ?? '';
+  const isFront = (pl: Placed) => smallestAxis(pl.size) === 'z' && /door|front/i.test(name(pl));
+  const lo = (pl: Placed, a: Axis) => pl.center[a] - pl.size[a] / 2;
+  const hi = (pl: Placed, a: Axis) => pl.center[a] + pl.size[a] / 2;
+  const fronts = placed.filter(isFront);
+  const frame = placed.filter((pl) => !isFront(pl) && smallestAxis(pl.size) === 'x');
+  if (fronts.length === 0 || frame.length < 2) return;
+  const x0 = Math.min(...frame.map((pl) => lo(pl, 'x')));
+  const x1 = Math.max(...frame.map((pl) => hi(pl, 'x')));
+  const y0 = Math.min(...frame.map((pl) => lo(pl, 'y')));
+  const y1 = Math.max(...frame.map((pl) => hi(pl, 'y')));
+  const face = Math.max(...placed.filter((pl) => !isFront(pl)).map((pl) => hi(pl, 'z')));
+  const lines = [x0, x1, ...frame.filter((pl) => lo(pl, 'x') > x0 + 0.001 && hi(pl, 'x') < x1 - 0.001).map((pl) => pl.center.x)];
+  const snap = (x: number, outward: -1 | 1) => {
+    const line = lines.reduce((b, l) => (Math.abs(l - x) < Math.abs(b - x) ? l : b), lines[0]);
+    if (Math.abs(line - x) > NEAR) return x;
+    return line === x0 || line === x1 ? line : line - outward * (REVEAL / 2);
+  };
+  const set = (pl: Placed, a: Axis, from: number, to: number) => {
+    pl.center = { ...pl.center, [a]: (from + to) / 2 };
+    pl.size = { ...pl.size, [a]: Math.max(0.01, to - from) };
+  };
+  for (const pl of fronts) {
+    set(pl, 'x', snap(lo(pl, 'x'), -1), snap(hi(pl, 'x'), 1));
+    pl.center = { ...pl.center, z: face + pl.size.z / 2 };
+  }
+  const columns: Placed[][] = [];
+  for (const pl of [...fronts].sort((a, b) => a.center.x - b.center.x)) {
+    const col = columns.find((c) => Math.min(hi(c[0], 'x'), hi(pl, 'x')) - Math.max(lo(c[0], 'x'), lo(pl, 'x')) > pl.size.x * 0.5);
+    if (col) col.push(pl);
+    else columns.push([pl]);
+  }
+  for (const col of columns) {
+    col.sort((a, b) => a.center.y - b.center.y);
+    const gaps = col.slice(1).map((pl, i) => Math.abs(lo(pl, 'y') - hi(col[i], 'y')));
+    if (lo(col[0], 'y') - y0 > NEAR || y1 - hi(col[col.length - 1], 'y') > NEAR || gaps.some((g) => g > NEAR)) continue;
+    const total = col.reduce((n, pl) => n + pl.size.y, 0);
+    const room = y1 - y0 - REVEAL * (col.length - 1);
+    let y = y0;
+    for (const pl of col) {
+      const h = (pl.size.y / total) * room;
+      set(pl, 'y', y, y + h);
+      y += h + REVEAL;
+    }
+  }
+}
+
 function drawerBox(guide: InstallationGuideData, placed: Placed[], product: Box): Placed[] {
   const front = placed.find((pl) => /drawer/i.test(guide.parts.find((p) => p.id === pl.part_id)?.name ?? '') && smallestAxis(pl.size) === 'z');
   if (!front) return [];
@@ -312,6 +366,7 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
     : { center: v(0, 0.4, 0), size: v(0.8, 0.8, 0.6) };
   const lift = hasAssembly ? -(productBox.center.y - productBox.size.y / 2) : 0;
   for (const p of placements) p.center = add(p.center, v(-productBox.center.x, lift, -productBox.center.z));
+  if (hasAssembly) fitFronts(guide, placements);
   const product = hasAssembly ? bounds(placements) : productBox;
   if (hasAssembly) placements.push(...drawerBox(guide, placements, product));
 
@@ -388,10 +443,11 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
   const panelIdx = items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.kind === 'panel');
   const boxOf = (it: BuildItem): Box => ({ center: it.target.pos, size: it.size });
 
+  const isFront = (it: BuildItem) => smallestAxis(it.size) === 'z' && /door|front/i.test(guide.parts[it.partIndex]?.name ?? '');
   const jointFor = (host: BuildItem): { box: Box; normal: Axis; sign: number } | null => {
     let best: { box: Box; area: number; other: BuildItem } | null = null;
     for (const { it: other } of panelIdx) {
-      if (other === host || !other.placed) continue;
+      if (other === host || !other.placed || (isFront(other) && !isFront(host))) continue;
       const c = contact(boxOf(host), boxOf(other), 0.012);
       if (!c) continue;
       const dims = AXES.map((a) => c.size[a]).sort((a, b) => b - a);
@@ -432,9 +488,11 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
       const sameStep = panelIdx.filter(({ it }) => it.step === use.step && it.placed);
       const pool = named.length ? named : sameStep.length ? sameStep : panelIdx.filter(({ it }) => it.placed && it.step <= use.step);
       const upcoming = pool.filter(({ it }) => it.step >= use.step).sort((a, b) => a.it.step - b.it.step);
-      const lowest = Math.min(...pool.map(({ it }) => it.target.pos.y - it.size.y / 2));
-      const hosts = FOOT.test(p.name) && pool.length
-        ? pool.filter(({ it }) => it.target.pos.y - it.size.y / 2 < lowest + 0.02)
+      const flat = panelIdx.filter(({ it }) => it.placed && smallestAxis(it.size) === 'y');
+      const under = flat.length ? flat : pool;
+      const lowest = Math.min(...under.map(({ it }) => it.target.pos.y - it.size.y / 2));
+      const hosts = FOOT.test(p.name) && under.length
+        ? under.filter(({ it }) => it.target.pos.y - it.size.y / 2 < lowest + 0.02)
         : upcoming.length ? upcoming.filter(({ it }) => it.step === upcoming[0].it.step) : pool.slice(-1);
       for (let k = 0; k < use.quantity && unitIndex < shown; k++, unitIndex++) {
         const kitPos = kitOf(unitIndex);
@@ -480,15 +538,42 @@ export function buildGuide(guide: InstallationGuideData): GuideBuild {
             pos[normal] += sign * (h.size[normal] / 2);
           }
           if (use.step <= h.step && !faceUp.has(hostIndex) && normal === smallestAxis(h.size)) faceUp.set(hostIndex, unit(normal, sign));
-          const embed = normal === smallestAxis(h.size) ? Math.min(dims.y * 0.2, h.size[normal] * 0.45) : dims.y * 0.2;
-          const seated = add(pos, scale(unit(normal, sign), dims.y / 2 - embed));
+          const long = FLAT.test(p.name) && !isHinge(p.name);
+          if (long) {
+            normal = smallestAxis(h.size);
+            sign = -Math.sign(h.target.pos[normal] - product.center[normal]) || 1;
+            pos[normal] = h.target.pos[normal] + sign * (h.size[normal] / 2);
+          }
+          const along = largestAxis(v(normal === 'x' ? 0 : h.size.x, normal === 'y' ? 0 : h.size.y, normal === 'z' ? 0 : h.size.z));
+          if (long) {
+            for (const a of AXES) {
+              if (a === normal) continue;
+              const room = Math.max(0, h.size[a] / 2 - (a === along ? dims.y : dims.x) / 2);
+              pos[a] = Math.min(h.target.pos[a] + room, Math.max(h.target.pos[a] - room, pos[a]));
+            }
+          }
+          const shallow = normal === smallestAxis(h.size) ? Math.min(dims.y * 0.2, h.size[normal] * 0.45) : dims.y * 0.2;
+          const embed = FOOT.test(p.name) || isHinge(p.name) || long ? shallow
+            : SEAT.test(p.name) ? dims.y - Math.min(0.004, dims.y * 0.15)
+            : DOWEL.test(p.name) ? dims.y / 2 : shallow;
+          const seated = add(pos, scale(unit(normal, sign), long ? dims.x / 2 : dims.y / 2 - embed));
+          if (!FOOT.test(p.name) && !KNOB.test(p.name)) {
+            const axis = long ? along : normal;
+            for (const a of AXES) {
+              const half = a === axis ? dims.y / 2 : dims.x / 2;
+              const over = seated[a] + half - (product.center[a] + product.size[a] / 2);
+              const under = product.center[a] - product.size[a] / 2 - (seated[a] - half);
+              if (over > 0) seated[a] -= over;
+              else if (under > 0) seated[a] += under;
+            }
+          }
           if (mount && FOOT.test(p.name)) footDrop = Math.max(footDrop, dims.y - embed);
           const local = sub(seated, h.target.pos);
           item = {
             key: `${p.id}#${unitIndex}`, partId: p.id, partIndex: i, instance: unitIndex, kind: 'hardware', step: use.step,
             t0: 0, ta: 0, size: dims, kit: { pos: kitPos, quat: lying },
-            approach: add(local, scale(unit(normal, sign), dims.y * 1.8 + 0.05)),
-            target: { pos: local, quat: outwardQuat(normal, sign) }, host: hostIndex,
+            approach: add(local, scale(unit(normal, sign), long ? 0.08 : dims.y * 1.8 + 0.05)),
+            target: { pos: local, quat: long ? outwardQuat(along, 1) : outwardQuat(normal, sign) }, host: hostIndex,
             spin: /screw|cam|bolt|lock|foot|leg/i.test(p.name), placed: true, explode: v(0, 0, 0), weight: 1,
           };
         } else {

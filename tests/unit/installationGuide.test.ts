@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 
 import { GUIDE_OUTPUT_SCHEMA, sanitizeGuide } from '@/lib/installation/guideSchema';
-import { buildGuide, countsAt, poseAt, stepAt } from '@/lib/installation/guideBuild';
+import { buildGuide, countsAt, poseAt, stepAt, type GuideBuild } from '@/lib/installation/guideBuild';
 import { hardwareShape, panelHoles } from '@/components/features/guides/partModels';
 
 const raw = {
@@ -282,5 +283,92 @@ describe('installation guide cabinet built upside down', () => {
     expect(box.every((it) => it.placed)).toBe(true);
     const front = b.items.find((it) => it.partId === 'FRONT')!;
     for (const it of box) expect(it.target.pos.z).toBeLessThan(front.target.pos.z);
+  });
+});
+
+describe('installation guide fronts cover the frame as the manual draws them', () => {
+  const panel = (id: string, name: string, q: number) => ({ id, name, code: '', quantity: q, kind: 'panel', size_cm: { x: 10, y: 10, z: 10 }, size_stated: false });
+  const at = (part_id: string, instance: number, c: [number, number, number], e: [number, number, number]) =>
+    ({ part_id, instance, center_cm: { x: c[0], y: c[1], z: c[2] }, extent_cm: { x: e[0], y: e[1], z: e[2] }, step: 1 });
+  const g = sanitizeGuide({
+    ...raw,
+    parts: [panel('SIDE', 'Side panel', 2), panel('MID', 'Divider', 1), panel('TOP', 'Top', 1), panel('DOOR', 'Door', 2), panel('DF', 'Drawer front', 1)],
+    steps: [raw.steps[0], { title: 'All', page: 3, box: { x0: 0, y0: 0, x1: 1, y1: 1 }, instruction: 'Build it.', parts_used: [], tools: [], warning: '', people: 1, action: 'place' }],
+    assembly: {
+      available: true,
+      placements: [
+        at('SIDE', 1, [-60, 38, 0], [2, 76, 40]),
+        at('SIDE', 2, [60, 38, 0], [2, 76, 40]),
+        at('MID', 1, [0, 38, 0], [2, 76, 40]),
+        at('TOP', 1, [0, 78, 0], [122, 3, 42]),
+        at('DOOR', 1, [-30, 36, 21], [56, 72, 2]),
+        at('DOOR', 2, [30, 30, 21], [56, 48, 2]),
+        at('DF', 1, [30, 60, 21], [56, 16, 2]),
+      ],
+    },
+  }, 12);
+  const b = buildGuide(g);
+  const front = (id: string, n = 0) => b.items.filter((it) => it.partId === id)[n];
+  const span = (it: ReturnType<typeof front>, a: 'x' | 'y') => [it.target.pos[a] - it.size[a] / 2, it.target.pos[a] + it.size[a] / 2];
+  const floor = b.items.find((it) => it.partId === 'SIDE')!;
+  const base = floor.target.pos.y - floor.size.y / 2;
+
+  it('runs a column of fronts from the bottom of the frame to the top of the sides, keeping their proportions', () => {
+    const [d0, d1] = span(front('DOOR', 1), 'y');
+    const [f0, f1] = span(front('DF'), 'y');
+    expect(d0 - base).toBeCloseTo(0, 3);
+    expect(f1 - base).toBeCloseTo(0.76, 3);
+    expect(f0 - d1).toBeGreaterThan(0);
+    expect(f0 - d1).toBeLessThan(0.005);
+    expect((d1 - d0) / (f1 - f0)).toBeCloseTo(48 / 16, 1);
+  });
+
+  it('meets the next front at the divider and stops at the outside of the end panels', () => {
+    const [l0, l1] = span(front('DOOR', 0), 'x');
+    const [r0] = span(front('DOOR', 1), 'x');
+    expect(l0).toBeCloseTo(-0.61, 3);
+    expect(r0 - l1).toBeGreaterThan(0);
+    expect(r0 - l1).toBeLessThan(0.005);
+  });
+
+  it('never stretches a front over the top panel the frame carries', () => {
+    expect(span(front('DOOR', 0), 'y')[1] - base).toBeCloseTo(0.76, 3);
+  });
+});
+
+function protruding(b: GuideBuild, names: string[]): string[] {
+  const p = b.product;
+  const out: string[] = [];
+  for (const it of b.items) {
+    const name = names[it.partIndex] ?? '';
+    if (!it.placed || it.kind !== 'hardware' || /foot|leg|level|knob/i.test(name)) continue;
+    const pose = poseAt(b, it, b.steps, 0);
+    const q = new THREE.Quaternion(...pose.quat);
+    for (const s of [-0.5, 0.5]) {
+      const e = new THREE.Vector3(0, it.size.y * s, 0).applyQuaternion(q).add(new THREE.Vector3(pose.pos.x, pose.pos.y, pose.pos.z));
+      const over = Math.max(...(['x', 'y', 'z'] as const).map((a) => Math.abs(e[a] - p.center[a]) - p.size[a] / 2));
+      if (over > 0.02) out.push(`${name} ${(over * 100).toFixed(1)}cm`);
+    }
+  }
+  return out;
+}
+
+describe('installation guide hardware stays inside the finished product', () => {
+  it('seats screws, lays brackets and rails inside, and leaves nothing sticking out of the outline', () => {
+    const g = sanitizeGuide({
+      ...raw,
+      parts: [
+        ...raw.parts.filter((p) => p.id !== 'BAD'),
+        { id: 'BRK', name: 'Corner bracket', code: '', quantity: 2, kind: 'hardware', size_cm: { x: 6, y: 6, z: 1 }, size_stated: false },
+        { id: 'RAIL', name: 'Drawer rail', code: '', quantity: 1, kind: 'hardware', size_cm: { x: 40, y: 2, z: 2 }, size_stated: false },
+        { id: 'SCR', name: 'Confirmat screw', code: '', quantity: 4, kind: 'hardware', size_cm: { x: 0.6, y: 0.6, z: 5 }, size_stated: false },
+        { id: 'CAM', name: 'Cam lock', code: '', quantity: 2, kind: 'hardware', size_cm: { x: 1.5, y: 1.5, z: 1 }, size_stated: false },
+      ],
+      steps: [...raw.steps, { title: 'Fix', page: 4, box: { x0: 0, y0: 0, x1: 1, y1: 1 }, instruction: 'Fix it.', parts_used: [
+        { part_id: 'BRK', quantity: 2, fixes_to: 'TOP' }, { part_id: 'RAIL', quantity: 1, fixes_to: 'SIDE' },
+        { part_id: 'SCR', quantity: 4, fixes_to: 'SIDE' }, { part_id: 'CAM', quantity: 2, fixes_to: 'TOP' },
+      ], tools: [], warning: '', people: 1, action: 'fix' }],
+    }, 12);
+    expect(protruding(buildGuide(g), g.parts.map((p) => p.name))).toEqual([]);
   });
 });
