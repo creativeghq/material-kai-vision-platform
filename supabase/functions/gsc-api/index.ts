@@ -25,7 +25,9 @@ const GOOGLE_REDIRECT_URI = () => Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI') || `
 // URL means asking for this later MERGES it into the existing authorization rather than
 // replacing it, so widening the scope cannot break a working Search Console connection —
 // the user re-consents once and keeps both.
-const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly openid email';
+// `webmasters` (not `.readonly`): sitemap submission and removal need write access.
+// `content`: Merchant Center — register the product feed and read item disapprovals.
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/webmasters https://www.googleapis.com/auth/content https://www.googleapis.com/auth/analytics.readonly openid email';
 const GA_ADMIN_URL = 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries';
 const GA_DATA_URL = (prop: string) => `https://analyticsdata.googleapis.com/v1beta/${prop}:runReport`;
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -193,6 +195,44 @@ async function listSites(accessToken: string): Promise<any[]> {
   if (!r.ok) throw new Error(j.error?.message || `sites list ${r.status}`);
   return j.siteEntry || [];
 }
+/**
+ * Submit the site's sitemap index and remove submitted sitemaps that no longer
+ * resolve (404/410). The index is the only file that should be submitted: its
+ * children are read through it, so nothing else is added.
+ */
+async function syncSitemaps(accessToken: string, property: string, indexUrl: string) {
+  const base = `${SITES_URL}/${encodeURIComponent(property)}/sitemaps`;
+  const auth = { Authorization: `Bearer ${accessToken}` };
+  const refused = async (r: Response, what: string) => {
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) throw new GrantRevokedError(j.error?.message);
+    if (r.status === 403) {
+      throw new HttpError(403, `Google refused to ${what} (${j.error?.message || 'forbidden'}). Reconnect Search Console to grant write access.`);
+    }
+    throw new Error(j.error?.message || `${what}: ${r.status}`);
+  };
+  const listed = await fetch(base, { headers: auth });
+  if (!listed.ok) await refused(listed, 'list the sitemaps');
+  const existing: string[] = ((await listed.json()).sitemap || []).map((s: { path: string }) => s.path);
+
+  const removed: string[] = [];
+  for (const path of existing) {
+    if (path === indexUrl) continue;
+    const probe = await fetch(path, { method: 'GET', redirect: 'manual' }).catch(() => null);
+    if (probe && (probe.status === 404 || probe.status === 410)) {
+      const del = await fetch(`${base}/${encodeURIComponent(path)}`, { method: 'DELETE', headers: auth });
+      if (!del.ok && del.status !== 404) await refused(del, `remove ${path}`);
+      removed.push(path);
+    }
+  }
+  const put = await fetch(`${base}/${encodeURIComponent(indexUrl)}`, { method: 'PUT', headers: auth });
+  if (!put.ok) await refused(put, `submit ${indexUrl}`);
+  return { submitted: indexUrl, removed, kept: existing.filter((p) => p !== indexUrl && !removed.includes(p)) };
+}
+
+const sitemapIndexOf = (site: { url: string; sitemap_url: string | null }) =>
+  site.sitemap_url || `${site.url.replace(/\/$/, '')}/sitemap-index.xml`;
+
 function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
 
 const GSC_ROW_LIMIT = 25000;
@@ -1096,6 +1136,24 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
     }
     return json({ ok: notReached.length === 0, sites: results, not_reached: notReached });
   }
+  // ── Cron/ops: resubmit every site's sitemap index, drop dead submissions ──
+  if (action === 'cron-submit-sitemaps') {
+    if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
+    const { data: conns, error: connErr } = await supabase.from('website_gsc_connections')
+      .select('website_id, workspace_id, property, access_token, refresh_secret_id, token_expires_at, user_websites!inner(url, sitemap_url)')
+      .eq('is_active', true).not('property', 'is', null).not('refresh_secret_id', 'is', null);
+    if (connErr) return json({ ok: false, error: connErr.message }, 500);
+    const results: unknown[] = [];
+    for (const c of conns || []) {
+      try {
+        const token = await validAccessToken(supabase, c);
+        results.push({ website_id: c.website_id, ...(await syncSitemaps(token, c.property, sitemapIndexOf((c as any).user_websites))) });
+      } catch (e) {
+        results.push({ website_id: c.website_id, error: String(e instanceof Error ? e.message : e).slice(0, 400) });
+      }
+    }
+    return json({ ok: results.every((r: any) => !r.error), sites: results });
+  }
   // ── Cron: refresh Analytics for every connection with a GA property ──
   if (action === 'cron-ga-sync') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
@@ -1311,6 +1369,20 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           return json({ ok: true, ...(await syncGaConnection(supabase, { ...conn, workspace_id: website.workspace_id }, days)) });
         } catch (e) {
           return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, errorStatus(e, 502));
+        }
+      }
+
+      case 'submit_sitemaps': {
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, property, access_token, refresh_secret_id, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_secret_id) return json({ error: 'Not connected' }, 400);
+        if (!conn.property) return json({ error: 'No Search Console property selected for this site yet.' }, 400);
+        const { data: site } = await supabase.from('user_websites').select('url, sitemap_url').eq('id', websiteId).maybeSingle();
+        try {
+          const token = await validAccessToken(supabase, conn);
+          return json({ ok: true, ...(await syncSitemaps(token, conn.property, sitemapIndexOf(site ?? { url: website.url, sitemap_url: null }))) });
+        } catch (e) {
+          return json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 500) }, errorStatus(e, 400));
         }
       }
 

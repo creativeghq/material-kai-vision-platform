@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { timeAgo } from '@/utils/datetime';
-import {
-  Loader2, RefreshCw, ExternalLink, CheckCircle2, AlertTriangle, LineChart, Unplug, ChevronRight,
-} from 'lucide-react';
+import { Loader2, RefreshCw, ExternalLink, CheckCircle2, AlertTriangle, LineChart, Unplug, ChevronRight, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import {
@@ -328,6 +326,9 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             />
             <Button variant="outline" size="sm" onClick={sync} disabled={syncing}>
               {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}Sync
+            </Button>
+            <Button variant="outline" size="sm" onClick={connect} disabled={connecting} title="Re-consent with Google to grant the access new features need (sitemap submission, Merchant Center)">
+              {connecting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-1" />}Update Google access
             </Button>
             <Button variant="ghost" size="icon" title="Disconnect" className="text-destructive hover:text-destructive" onClick={disconnect}><Unplug className="w-4 h-4" /></Button>
           </div>
