@@ -8,6 +8,7 @@ import { Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
@@ -33,6 +34,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [publishOnComplete, setPublishOnComplete] = useState(true);
+  const [multiBrand, setMultiBrand] = useState(false);
 
   // Load material categories from database
   useEffect(() => {
@@ -172,6 +174,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       formData.append('workspace_id', activeWorkspaceId);
       formData.append('title', file.name);
       formData.append('publish_on_complete', String(publishOnComplete));
+      formData.append('multi_brand', String(multiBrand));
 
       const response = await mivaaApi.uploadPDF(formData);
 
@@ -283,6 +286,26 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
             <p className="text-xs text-muted-foreground mt-1">
               Select the material category for products in this PDF
             </p>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="pdfuploadsection-multi-brand"
+              checked={multiBrand}
+              onCheckedChange={(v) => setMultiBrand(v === true)}
+              disabled={isUploading}
+              className="mt-0.5"
+            />
+            <div>
+              <label htmlFor="pdfuploadsection-multi-brand" className="text-sm font-medium block">
+                Multi-brand catalog (distributor)
+              </label>
+              <p className="text-xs text-muted-foreground mt-1">
+                {multiBrand
+                  ? 'Each product keeps its own brand. The catalog’s main company is recorded as a supplier of those products, so the same brand can have several distributors and the best one is picked by price.'
+                  : 'Leave off for a single-brand catalog: its main company is the brand of every product.'}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-start gap-3">
