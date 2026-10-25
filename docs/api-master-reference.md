@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (175)
+## 1. Supabase Edge Functions (176)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -308,6 +308,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `ai-pricing-updater` | cron | Weekly cron (Sunday 00:00 UTC): sync AI model prices from hardcoded reference tables |
 | `auto-recovery-cron` | cron | Every-5-minute cron: detect and recover stuck PDF, XML, scraping, and agent runs |
 | `campaign-processor` | secret | Every-minute cron: start scheduled campaigns and drip-send emails to recipients |
+| `dataforseo-reconcile` | cron | Nightly cron: record what DataForSEO charged per day and endpoint, and the account balance |
 | `email-contacts-sync-cron` | cron | Daily cron: push CRM contacts to each workspace's Resend audience |
 | `inbox-draft-cron` | cron | Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send. |
 | `job-cleanup-cron` | cron | Weekly cron (Sunday 03:00 UTC): purge old completed/failed jobs and logs |

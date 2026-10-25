@@ -22846,6 +22846,89 @@
         }
       }
     },
+    "/dataforseo-reconcile": {
+      "post": {
+        "tags": [
+          "Crons"
+        ],
+        "summary": "Nightly cron: record what DataForSEO charged per day and endpoint, and the account balance",
+        "operationId": "post_dataforseo_reconcile",
+        "description": "Reads DataForSEO id_list for every API over the last N days and upserts the provider-reported cost into provider_spend_daily, then snapshots the balance into provider_balance_snapshots. ops.provider_spend_unreconciled compares those against ai_usage_logs and fires on drift, a balance under $5, or a stalled run.\n\n**Response:** `{ ok, days, rows, balance_usd, failed: string[] }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "number",
+                    "description": "Window in days, default 2, max 30"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/data-integrity-runner": {
       "post": {
         "tags": [

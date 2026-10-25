@@ -111,6 +111,9 @@ verify_jwt = false
 [functions.seo-domain-tracker]
 verify_jwt = false
 
+[functions.dataforseo-reconcile]
+verify_jwt = false
+
 [functions.email-webhooks]
 verify_jwt = false
 

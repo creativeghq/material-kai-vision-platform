@@ -9,6 +9,7 @@ import { secretMatches } from '../../_shared/timing-safe.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts';
+import { logDataForSeoDirectSpend } from '../../_shared/tools/dataforseo-spend-log.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { loadOwnedArticle } from './article-access.ts';
 import { checkCoverage, type CoverageReport } from './coverage.ts';
@@ -85,6 +86,10 @@ async function askEngine(
     } catch (e) {
       run.error = (e as Error).message.slice(0, 300);
     }
+    await logDataForSeoDirectSpend(supabase, {
+      userId: wallet.userId, workspaceId: wallet.workspaceId, operation: `seo_answer_check.${spec.engine}`,
+      costUsd: client.spentUsd, ok: !!run.answer, note: client.unpricedCalls > 0 ? 'a response carried no cost' : undefined,
+    });
     const spent = client.unpricedCalls > 0 ? null : await serviceCredits(supabase, DATAFORSEO_SERVICE, client.spentUsd * 1000);
     run.credits = await settleStage(supabase, wallet, ceiling, spent, { engine: spec.engine, answered: !!run.answer });
   } catch (e) {

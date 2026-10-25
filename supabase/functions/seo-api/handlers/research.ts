@@ -22,6 +22,7 @@ import { resolveSecret } from '../../_shared/secrets.ts';
 import { readRankingPages } from '../serp-content.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts';
+import { logDataForSeoDirectSpend } from '../../_shared/tools/dataforseo-spend-log.ts';
 import { refundStage, reserveStage, serviceCredits, settleStage, type StageWallet } from './stage-billing.ts';
 import { countryForLocation } from './market.ts';
 import { resolveSeoMarket } from '../../_shared/seo-market.ts';
@@ -223,6 +224,10 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
         : Promise.resolve([] as Awaited<ReturnType<typeof client.serpOrganic>>),
     ]);
 
+    await logDataForSeoDirectSpend(supabase, {
+      userId, workspaceId, operation: 'seo_research', costUsd: client.spentUsd, ok: Object.keys(failedSources).length === 0,
+      note: client.unpricedCalls > 0 ? 'a response carried no cost' : undefined,
+    });
     research.aiModeAnswer = aiMode;
     if (Object.keys(failedSources).length) research.failedSources = failedSources;
     research.readerQuestions = readerQuestions(

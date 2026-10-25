@@ -6,6 +6,7 @@ import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts'
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
 import { openSpendGate } from '../../_shared/tools/dataforseo-spend-gate.ts';
+import { logDataForSeoDirectSpend } from '../../_shared/tools/dataforseo-spend-log.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import { resolveSeoMarket } from '../../_shared/seo-market.ts';
 
@@ -93,6 +94,10 @@ export async function handlePageIdeas(req: Request, body: any): Promise<Response
     return json({ success: false, error: `Keyword ideas failed: ${e instanceof Error ? e.message : String(e)}` }, 502);
   }
   await gate.settle(result.costUsd ?? undefined);
+  await logDataForSeoDirectSpend(supabase, {
+    userId: auth.userId, workspaceId: website.workspace_id, operation: 'seo_page_ideas',
+    costUsd: result.costUsd ?? 0, ok: true, note: result.costUsd == null ? 'response carried no cost' : undefined,
+  });
 
   return json({
     success: true,

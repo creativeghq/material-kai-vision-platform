@@ -12652,6 +12652,29 @@
     "response": "{ insights, model, source, generated_at, expires_at, cached }"
   },
   {
+    "name": "dataforseo-reconcile",
+    "tag": "Crons",
+    "summary": "Nightly cron: record what DataForSEO charged per day and endpoint, and the account balance",
+    "description": "Reads DataForSEO id_list for every API over the last N days and upserts the provider-reported cost into provider_spend_daily, then snapshots the balance into provider_balance_snapshots. ops.provider_spend_unreconciled compares those against ai_usage_logs and fires on drift, a balance under $5, or a stalled run.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "days",
+        "type": "number",
+        "required": false,
+        "desc": "Window in days, default 2, max 30"
+      }
+    ],
+    "response": "{ ok, days, rows, balance_usd, failed: string[] }"
+  },
+  {
     "name": "data-integrity-runner",
     "tag": "Admin",
     "summary": "Run the platform data-integrity check battery + manage checks/findings",
