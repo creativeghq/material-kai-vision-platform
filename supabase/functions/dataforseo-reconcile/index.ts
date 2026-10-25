@@ -102,7 +102,9 @@ Deno.serve(withApiLogging('dataforseo-reconcile', async (req: Request) => {
     if (error) return json({ ok: false, error: `provider_spend_daily not stored: ${error.message}` }, 500);
   }
 
-  const userData = await dfsPost(auth, '/v3/appendix/user_data', []).catch((e: Error) => ({ error: e.message }));
+  const userData = await fetch(`${BASE_URL}/v3/appendix/user_data`, { headers: { Authorization: auth }, signal: AbortSignal.timeout(25_000) })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`user_data HTTP ${r.status}`))))
+    .catch((e: Error) => ({ error: e.message }));
   const money = userData?.tasks?.[0]?.result?.[0]?.money;
   if (typeof money?.balance !== 'number') {
     return json({ ok: false, error: `balance not read: ${userData?.error ?? 'no money block in user_data'}`, failed }, 502);
