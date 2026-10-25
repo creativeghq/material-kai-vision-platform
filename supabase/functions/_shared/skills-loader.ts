@@ -21,6 +21,28 @@ import materialSpecExtraction   from './skills/material-spec-extraction/skill.ts
 import propertyLeadToViewing   from './skills/property-lead-to-viewing/skill.ts';
 import seoOpportunityTriage    from './skills/seo-opportunity-triage/skill.ts';
 
+import assumptionAudit from './skills/assumption-audit/skill.ts';
+import businessCaseBuilder from './skills/business-case-builder/skill.ts';
+import competitiveIntel from './skills/competitive-intel/skill.ts';
+import customerSegmentation from './skills/customer-segmentation/skill.ts';
+import decisionMemo from './skills/decision-memo/skill.ts';
+import growthBarriers from './skills/growth-barriers/skill.ts';
+import initiativePrioritizer from './skills/initiative-prioritizer/skill.ts';
+import kpiArchitect from './skills/kpi-architect/skill.ts';
+import marketMapping from './skills/market-mapping/skill.ts';
+import narrativeBuilder from './skills/narrative-builder/skill.ts';
+import operatingModelDesign from './skills/operating-model-design/skill.ts';
+import portfolioReview from './skills/portfolio-review/skill.ts';
+import pricingStrategy from './skills/pricing-strategy/skill.ts';
+import profitPoolAnalysis from './skills/profit-pool-analysis/skill.ts';
+import riskMitigation from './skills/risk-mitigation/skill.ts';
+import situationAssessment from './skills/situation-assessment/skill.ts';
+import stakeholderAlignment from './skills/stakeholder-alignment/skill.ts';
+import strategicOptions from './skills/strategic-options/skill.ts';
+import transformationRoadmap from './skills/transformation-roadmap/skill.ts';
+import valueRealization from './skills/value-realization/skill.ts';
+import warGaming from './skills/war-gaming/skill.ts';
+
 const SKILL_FILES: Record<string, string> = {
   'b2b-manufacturer-research': b2bManufacturerResearch,
   'customer-facing-reply':     customerFacingReply,
@@ -29,6 +51,27 @@ const SKILL_FILES: Record<string, string> = {
   'material-spec-extraction':  materialSpecExtraction,
   'property-lead-to-viewing':  propertyLeadToViewing,
   'seo-opportunity-triage':    seoOpportunityTriage,
+  'assumption-audit': assumptionAudit,
+  'business-case-builder': businessCaseBuilder,
+  'competitive-intel': competitiveIntel,
+  'customer-segmentation': customerSegmentation,
+  'decision-memo': decisionMemo,
+  'growth-barriers': growthBarriers,
+  'initiative-prioritizer': initiativePrioritizer,
+  'kpi-architect': kpiArchitect,
+  'market-mapping': marketMapping,
+  'narrative-builder': narrativeBuilder,
+  'operating-model-design': operatingModelDesign,
+  'portfolio-review': portfolioReview,
+  'pricing-strategy': pricingStrategy,
+  'profit-pool-analysis': profitPoolAnalysis,
+  'risk-mitigation': riskMitigation,
+  'situation-assessment': situationAssessment,
+  'stakeholder-alignment': stakeholderAlignment,
+  'strategic-options': strategicOptions,
+  'transformation-roadmap': transformationRoadmap,
+  'value-realization': valueRealization,
+  'war-gaming': warGaming,
 };
 
 /**
