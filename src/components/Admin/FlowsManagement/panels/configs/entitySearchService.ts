@@ -55,6 +55,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'crm-meeting-reminders', label: 'crm-meeting-reminders', sublabel: 'Cron: send reminders for upcoming CRM meetings whose reminder time has arrived.' },
   { id: 'customer-assets-api', label: 'customer-assets-api', sublabel: "Installed base: a customer's equipment, its warranties and its recurring service schedules (#343)." },
   { id: 'dashboard-insights', label: 'dashboard-insights', sublabel: 'Generate cached AI insights for the home dashboard' },
+  { id: 'dataforseo-reconcile', label: 'dataforseo-reconcile', sublabel: 'Nightly cron: record what DataForSEO charged per day and endpoint, and the account balance' },
   { id: 'data-integrity-runner', label: 'data-integrity-runner', sublabel: 'Run the platform data-integrity check battery + manage checks/findings' },
   { id: 'embed-agent', label: 'embed-agent', sublabel: 'Public agent surface for the website embed — allowlisted tools, no model turn (embed-key authenticated)' },
   { id: 'email-api', label: 'email-api', sublabel: 'Action-discriminated email sending, domain management, logs, and analytics via Resend.' },

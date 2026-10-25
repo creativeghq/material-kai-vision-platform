@@ -70,7 +70,7 @@ function fakeDb() {
     b.limit = async () => ({ data: table === 'user_website_pages' ? [PAGE] : [] });
     b.maybeSingle = async () => ({ data: { research_data: { readerQuestions: ['πόσα πλακάκια χρειάζομαι'] } } });
     b.insert = async (row: Record<string, unknown>) => {
-      inserted.push(row);
+      if (table === 'seo_article_answer_checks') inserted.push(row);
       return { error: null };
     };
     return b;
