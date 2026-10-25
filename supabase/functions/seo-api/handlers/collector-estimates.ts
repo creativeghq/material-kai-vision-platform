@@ -7,6 +7,7 @@ import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts'
 import { ceilingCreditsFor } from '../../_shared/tools/dataforseo-spend-gate.ts';
 import { COLLECTOR_CADENCES, RANK_SERP_CALLS_PER_KEYWORD_MAX } from '../../_shared/seo/collectorSchedules.generated.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
+import { RANK_SERP_DEPTH } from '../../_shared/seo/serp-price.ts';
 
 /** Pages one scheduled crawl reads at most; mirrors MAX_BACKFILL_PER_RUN in crawl-user-website. */
 export const CRAWL_PAGES_PER_RUN = 50;
@@ -31,13 +32,13 @@ export async function handleCollectorEstimates(req: Request, body: any): Promise
     supabase.from('cron_billing_registry').select('credit_cost, metered').eq('cron_key', 'seo-website-crawl').maybeSingle(),
     supabase.from('user_website_pages').select('id', { count: 'exact', head: true }).eq('website_id', websiteId).eq('is_active', true).is('content_text', null),
   ]);
-  const many = (kind: string, n: number) => Array.from({ length: n }, () => ({ kind }));
+  const many = (kind: string, n: number, params?: Record<string, unknown>) => Array.from({ length: n }, () => ({ kind, params }));
 
   const rank = kwRes.error
     ? unknown(`The tracked keywords could not be counted: ${kwRes.error.message}`)
     : await (async () => {
       const kw = kwRes.count ?? 0;
-      const credits = await ceilingCreditsFor(supabase, many('serp_google_organic', kw * RANK_SERP_CALLS_PER_KEYWORD_MAX));
+      const credits = await ceilingCreditsFor(supabase, many('serp_google_organic', kw * RANK_SERP_CALLS_PER_KEYWORD_MAX, { depth: RANK_SERP_DEPTH }));
       return credits == null ? unknown('DataForSEO has no price row, so a run cannot be priced.') : {
         per_run_max_credits: credits, backlog_max_credits: null,
         basis: `${kw} tracked keyword${kw === 1 ? '' : 's'}; one results page each, up to ${RANK_SERP_CALLS_PER_KEYWORD_MAX} when Google has to be asked again`,

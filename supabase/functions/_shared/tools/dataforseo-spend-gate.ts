@@ -5,6 +5,7 @@ import { getServicePricing, debitOrRefuseTracked, recordExternalServiceOutcome }
 import { settleCredits } from '../credit-reserve.ts';
 import { resolveEntitledWorkspace } from '../entitlement.ts';
 import { keyWorkspaceFence } from '../request-context.ts';
+import { serpLiveAdvancedUnits } from '../seo/serp-price.ts';
 
 /** `ai_model_pricing.model_key` for DataForSEO spend. One unit = $0.001 of provider cost. */
 export const DATAFORSEO_SERVICE = 'dataforseo-request';
@@ -101,6 +102,10 @@ export async function ceilingCreditsFor(sb: Sb, calls: { kind: string; params?: 
 }
 
 export function ceilingUnitsFor(kind: string, params?: Record<string, unknown>): number {
+  if (kind === 'serp_google_organic') {
+    const nested = (params?.params as Record<string, unknown> | undefined)?.depth;
+    return serpLiveAdvancedUnits(Number(params?.depth ?? nested ?? 10));
+  }
   const base = CEILING_UNITS.find((c) => c.match.test(kind))?.units ?? DEFAULT_CEILING_UNITS;
   if (/^(composite_)?onpage/.test(kind)) {
     const pages = Number(params?.max_crawl_pages ?? params?.max_pages ?? 0);

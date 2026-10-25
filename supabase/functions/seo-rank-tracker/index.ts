@@ -9,6 +9,7 @@ import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 import { agentReviewLink } from '../_shared/agent-handoff.ts';
 import { callDataForSEO, gatedGatewayPost } from '../_shared/tools/dataforseo-dispatch.ts';
+import { RANK_SERP_DEPTH } from '../_shared/seo/serp-price.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -127,7 +128,7 @@ type SerpTarget = Pick<DueKeyword, 'keyword' | 'country_code' | 'language_code' 
 
 async function serp(
   kw: SerpTarget, userId: string | null,
-  acceptPartial = false, depth = 100, deadline = Number.POSITIVE_INFINITY,
+  acceptPartial = false, depth = RANK_SERP_DEPTH, deadline = Number.POSITIVE_INFINITY,
 ): Promise<any> {
   // Whichever comes first: a hung call, or the end of the run. Without the second
   // term the timeout is per CALL and the run's own budget means nothing — three deep
@@ -214,7 +215,7 @@ async function recheckDrop(kw: DueKeyword, userId: string | null, deadline: numb
   for (let i = 0; i < DROP_RECHECKS; i++) {
     if (deadline - Date.now() < MIN_CALL_BUDGET_MS) break;
     try {
-      const r = await serp(kw, userId, false, 100, deadline);
+      const r = await serp(kw, userId, false, RANK_SERP_DEPTH, deadline);
       rechecked = true;
       const p = findPosition(r.items || [], hostOf(kw.url)).position;
       if (p != null && (best == null || p < best)) best = p;
@@ -339,7 +340,7 @@ async function trackKeywords(
   const rowFrom = (kw: DueKeyword, r: any, items: any[]): Record<string, unknown> => {
     const host = hostFor(kw.url);
     const { position, url } = findPosition(items, host);
-    const depth = Number(r.depth) || 100;
+    const depth = Number(r.depth) || RANK_SERP_DEPTH;
     if (position == null && kw.last_position != null && kw.last_position > depth) {
       throw new Error(`read to depth ${depth} only; last answered at #${kw.last_position}, deeper pages unavailable`);
     }
