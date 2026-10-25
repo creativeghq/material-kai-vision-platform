@@ -227,7 +227,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Search the web for B2B companies of a requested TYPE that deal in a product category.',
     params: [
       { name: 'category', type: 'string', optional: false, description: 'Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")' },
-      { name: 'company_types', type: 'array', enum: ['manufacturer', 'distributor', 'importer_exporter', 'stock_trader', 'retailer_showroom', 'contractor_installer'], optional: true, description: 'What kind of company to find — one or more. Omit for manufacturers. A stock trader deals in surplus, end-of-series, second-choice or liquidation lots.' },
+      { name: 'company_types', type: 'array', enum: ['manufacturer', 'distributor', 'importer_exporter', 'agent', 'stock_trader', 'retailer_showroom', 'contractor_installer'], optional: true, description: 'What kind of company to find — one or more. Omit for manufacturers. An agent holds the representation of foreign brands for a territory. A stock trader deals in surplus, end-of-series, second-choice or liquidation lots.' },
       { name: 'keywords', type: 'array', optional: true, description: 'Extra search terms from the user, e.g. "outlet", "stock lots", "container export".' },
       { name: 'country', type: 'string', optional: true, description: 'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.' },
       { name: 'region', type: 'string', optional: true, description: 'A whole market group. Ignored if `country` is provided.' },
@@ -401,8 +401,10 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createCompanyRegistryLookupTool',
     description: 'Look a company up in the OFFICIAL public registries.',
     params: [
-      { name: 'company_name', type: 'string', optional: false, description: 'Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required.' },
-      { name: 'country', type: 'string', optional: true, description: '2-letter ISO country code (PL, CZ, SK, RO, FR, FI, EE have a national register wired; anywhere else still gets GLEIF). Narrows every source.' },
+      { name: 'company_name', type: 'string', optional: true, description: 'Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required. Omit when listing by activity_code.' },
+      { name: 'activity_code', type: 'string', optional: true, description: 'LIST active companies registered under a NACE class instead of looking one up, e.g. "27.40". Needs country FR, CZ, FI or NO. Returns leads, 25 per page.' },
+      { name: 'page', type: 'number', optional: true, description: 'Page of the activity_code listing, from 1.' },
+      { name: 'country', type: 'string', optional: true, description: '2-letter ISO country code (PL, CZ, SK, RO, FR, FI, EE, NO have a national register wired; anywhere else still gets GLEIF). Narrows every source.' },
       { name: 'registration_id', type: 'string', optional: true, description: 'A known national registration number, if you have one — Polish KRS, Romanian CUI. Usually unnecessary: GLEIF supplies it.' },
       { name: 'domain', type: 'string', optional: true, description: 'The company website domain, if you have one. Adds a free age check (domain registration date, falling back to the Internet Archive): a maker trading for decades has an old domain, and a real-on-paper company whose site appeared last month is worth a second look.' },
     ],

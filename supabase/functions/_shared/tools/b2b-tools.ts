@@ -48,6 +48,9 @@ import {
 import {
   classifyCompanyRows, companyTypesLabel, normaliseCompanyTypes, normaliseKeywords, renderCompanySearch, searchCountryCode,
 } from '../b2b-company-query.ts';
+import { verifyEvidenceQuotes } from '../b2b-quote-check.ts';
+import { fetchPageText } from '../b2b-page-fetch.ts';
+import { ACTIVITY_REGISTRIES, currentVersion, MAX_ACTIVITY_PAGE_SIZE, mapNo, parseActivityCode } from '../registry-activity.ts';
 import { escapeLike, foldForSearch } from '../searchFold.ts';
 import { domainFromUrl } from '../seo-website.ts';
 import { transliterateToLatin } from '../transliterate.ts';
@@ -382,7 +385,12 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
     // CRM write at the end of a free-form parse is what security invariant 9 forbids.
     const recordBlock = blocks.find((b) => b.type === 'tool_use' && b.name === RECORD_COMPANIES_TOOL.name);
     const recorded: CompanyRow[] = Array.isArray(recordBlock?.input?.companies) ? recordBlock.input.companies : [];
-    const { matches, unverified } = classifyCompanyRows(recorded, companyTypes, known.domains, domainFromUrl);
+    const classified = classifyCompanyRows(recorded, companyTypes, known.domains, domainFromUrl);
+    // Skipped when the search already used most of the 90s tool budget: the check is a bonus, never a reason to time out.
+    const quoteCheck = Date.now() - searchStartedAt < 75_000
+      ? await verifyEvidenceQuotes(classified.matches, classified.unverified, { fetchPage: fetchPageText, maxRows: 8, timeoutMs: 6000 })
+      : classified;
+    const { matches, unverified } = quoteCheck;
 
     // Cost attribution: SEARCH_MODEL's rate from ai_model_pricing + the web_search fee (~$0.01/use,
     // not broken out by Anthropic, so priced at the budget we set).
@@ -558,7 +566,7 @@ export const createB2BCompanySearchTool = (
       schema: z.object({
         category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
         company_types: z.array(z.enum(B2B_COMPANY_TYPES)).optional().describe(
-          'What kind of company to find — one or more. Omit for manufacturers. A stock trader deals in surplus, end-of-series, second-choice or liquidation lots.',
+          'What kind of company to find — one or more. Omit for manufacturers. An agent holds the representation of foreign brands for a territory. A stock trader deals in surplus, end-of-series, second-choice or liquidation lots.',
         ),
         keywords: z.array(z.string()).optional().describe(
           'Extra search terms from the user, e.g. "outlet", "stock lots", "container export".',
@@ -1247,14 +1255,6 @@ async function lookupGleif(name: string, country?: string): Promise<RegistrySour
 }
 
 /** The national-registry routing table. */
-/** Pick the CURRENT entry out of a register's versioned list. */
-function currentVersion<T extends Record<string, any>>(arr: unknown, from: string, to: string): T | null {
-  if (!Array.isArray(arr) || !arr.length) return null;
-  const open = arr.filter((x) => x && !x[to]);
-  const pool = open.length ? open : arr;
-  return pool.reduce((best, x) => (String(x?.[from] ?? '') > String(best?.[from] ?? '') ? x : best), pool[0]) as T;
-}
-
 /**
  * Put the still-trading companies first, keeping the register's own order within each group.
  *
@@ -1476,6 +1476,20 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
     },
   },
 
+  NO: {
+    register: 'Brønnøysund Register Centre (Enhetsregisteret)',
+    keyedBy: 'name',
+    lookup: async ({ name }) => {
+      const r = await registryFetch(`https://data.brreg.no/enhetsregisteret/api/enheter?navn=${encodeURIComponent(name)}&size=5`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!r.ok) return { status: 'unavailable', error: r.error || `Brreg HTTP ${r.status}` };
+      const page = mapNo(r.body);
+      if (!page.companies.length) return { status: 'miss' };
+      return { status: 'hit', total: page.total ?? page.companies.length, matches: page.companies.map(({ lead: _l, verified_as_manufacturer: _v, ...c }) => c) };
+    },
+  },
+
   RO: {
     register: 'ANAF (Romanian tax authority)',
     keyedBy: 'id',
@@ -1518,12 +1532,58 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
 /** Countries with a national register wired in, derived from the table so nothing can drift out of step. */
 const REGISTRY_COUNTRIES = Object.keys(NATIONAL_REGISTRIES).sort();
 
+/** One polite request (one page, capped) to a register's activity-code listing. Registry rows are leads, never verified makers. */
+async function listByActivityCode(
+  rawCode: string,
+  cc: string | undefined,
+  page: number | undefined,
+  onProgress?: (status: string) => void,
+): Promise<string> {
+  const covered = Object.keys(ACTIVITY_REGISTRIES).sort();
+  const code = parseActivityCode(rawCode);
+  if (!code) return JSON.stringify({ success: false, error: 'activity_code needs a four-digit NACE class such as "27.40".' });
+  const registry = cc ? ACTIVITY_REGISTRIES[cc] : undefined;
+  if (!cc || !registry) {
+    return JSON.stringify({
+      success: false,
+      error: `Listing by activity code needs a country with a keyless register wired: ${covered.join(', ')}.`,
+    });
+  }
+  const pageNo = Math.max(1, Math.floor(page ?? 1));
+  onProgress?.(`Listing ${cc} companies registered under ${rawCode}…`);
+  const req = registry.request(code, pageNo, MAX_ACTIVITY_PAGE_SIZE);
+  const r = await registryFetch(req.url, { ...req.init, headers: req.init?.headers ?? { Accept: 'application/json' } });
+  if (!r.ok) {
+    const detail = typeof r.body?.erreur === 'string' ? r.body.erreur.slice(0, 200) : (r.error || `HTTP ${r.status}`);
+    return JSON.stringify({ success: false, retryable: r.status === 0 || r.status >= 500, error: `${registry.register} did not answer: ${detail}` });
+  }
+  const mapped = registry.map(r.body);
+  const companies = mapped.companies.slice(0, MAX_ACTIVITY_PAGE_SIZE);
+  return JSON.stringify({
+    success: true,
+    mode: 'activity_code',
+    found: companies.length > 0,
+    country: cc,
+    activity_code: rawCode,
+    register: registry.register,
+    page: pageNo,
+    total_registered: mapped.total,
+    has_more: mapped.total != null ? pageNo * (cc === 'FI' ? 100 : MAX_ACTIVITY_PAGE_SIZE) < mapped.total : companies.length === MAX_ACTIVITY_PAGE_SIZE,
+    inactive_dropped: mapped.dropped_inactive,
+    companies,
+    note: 'Registry rows are LEADS: a registration under this activity code does not prove the business makes anything. '
+      + 'Confirm each one on its own website (b2b_company_search) before treating it as a manufacturer. Some are holding companies.',
+    cost: { credits: 0, note: 'Official public registries — no key, no account, no charge.' },
+  });
+}
+
 export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (status: string) => void) => {
   return tool(
-    async ({ company_name, country, registration_id, domain }) => {
+    async ({ company_name, country, registration_id, domain, activity_code, page }) => {
       const name = String(company_name || '').trim();
-      if (!name) return JSON.stringify({ success: false, error: 'Provide a company name.' });
       const cc = String(country || '').trim().toUpperCase().slice(0, 2) || undefined;
+      if (activity_code) return await listByActivityCode(activity_code, cc, page, onProgress);
+      if (!name) return JSON.stringify({ success: false, error: 'Provide a company name, or an activity_code with a country.' });
 
       onProgress?.(`Checking official registries for ${name}…`);
       const startTime = Date.now();
@@ -1620,7 +1680,7 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
       description:
         'Look a company up in the OFFICIAL public registries. FREE: no credits, no API key, no '
         + 'account. GLEIF covers legal entities WORLDWIDE, and on top of it the national register '
-        + 'for Czechia, Estonia, Finland, France, Poland, Romania and Slovakia. Returns the legal '
+        + 'for Czechia, Estonia, Finland, France, Norway, Poland, Romania and Slovakia. With `activity_code` it instead LISTS active companies registered under a NACE code (FR, CZ, FI, NO) as unverified leads. Returns the legal '
         + 'name, legal form, registered address, registration number, activity code and whether the '
         + 'entity is still active — the things that tell you a factory is real and actually makes '
         + 'things. ALWAYS start here before any PAID enrichment: it costs nothing, and the '
@@ -1628,11 +1688,13 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
         + 'VIES. It does NOT return employee counts, revenue or technologies — use '
         + '`company_enrichment` for those, and only when they are actually needed.',
       schema: z.object({
-        company_name: z.string().describe('Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required.'),
+        company_name: z.string().optional().describe('Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required. Omit when listing by activity_code.'),
+        activity_code: z.string().optional().describe('LIST active companies registered under a NACE class instead of looking one up, e.g. "27.40". Needs country FR, CZ, FI or NO. Returns leads, 25 per page.'),
+        page: z.number().optional().describe('Page of the activity_code listing, from 1.'),
         // Deliberately a plain string, not a z.enum of the covered countries: any country is worth
         // asking about because GLEIF is worldwide, and an enum would advertise that the seven with
         // a national register are the only ones this tool can answer for.
-        country: z.string().optional().describe('2-letter ISO country code (PL, CZ, SK, RO, FR, FI, EE have a national register wired; anywhere else still gets GLEIF). Narrows every source.'),
+        country: z.string().optional().describe('2-letter ISO country code (PL, CZ, SK, RO, FR, FI, EE, NO have a national register wired; anywhere else still gets GLEIF). Narrows every source.'),
         registration_id: z.string().optional().describe('A known national registration number, if you have one — Polish KRS, Romanian CUI. Usually unnecessary: GLEIF supplies it.'),
         domain: z.string().optional().describe(
           'The company website domain, if you have one. Adds a free age check (domain registration date, '

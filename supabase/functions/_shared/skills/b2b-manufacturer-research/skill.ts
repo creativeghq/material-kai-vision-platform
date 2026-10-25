@@ -20,7 +20,7 @@ Follow this procedure exactly when the user asks you to research a specific manu
 
 1. **Identify the target.** Extract the company name, any known website, country, and material category from the user's message. If ambiguous (e.g. "Marazzi" — Italian tile vs. US distributor), ask one clarifying question before proceeding.
 
-2. **Run \`b2b_company_search\`** with the company name as the primary query and \`company_types\` set to what the company is claimed to be (\`manufacturer\`, \`distributor\`, \`importer_exporter\`, \`stock_trader\`, \`retailer_showroom\`, \`contractor_installer\`). Every row it returns carries \`company_type\` and a \`type_evidence\` quote from the company's own site; a row in \`unverified\` is NOT confirmed — say why, using its \`unverified_reason\`.
+2. **Run \`b2b_company_search\`** with the company name as the primary query and \`company_types\` set to what the company is claimed to be (\`manufacturer\`, \`distributor\`, \`importer_exporter\`, \`agent\`, \`stock_trader\`, \`retailer_showroom\`, \`contractor_installer\`). Every row it returns carries \`company_type\` and a \`type_evidence\` quote from the company's own site; a row in \`unverified\` is NOT confirmed — say why, using its \`unverified_reason\`.
 
 3. **If a website is surfaced, run \`analyze_inspiration_url\`** on the official domain. This scrapes the site and extracts what materials/categories they actually produce — a sanity check against the web-search summary.
 

@@ -103,6 +103,7 @@ describe('CRM party role is stated, never defaulted', () => {
     for (const t of B2B_COMPANY_TYPES) expect(B2B_COMPANY_TYPE_PARTY_ROLE[t], t).toMatch(/^(supplier|customer)$/);
     expect(B2B_COMPANY_TYPE_PARTY_ROLE.manufacturer).toBe('supplier');
     expect(B2B_COMPANY_TYPE_PARTY_ROLE.stock_trader).toBe('supplier');
+    expect(B2B_COMPANY_TYPE_PARTY_ROLE.agent).toBe('supplier');
     expect(B2B_COMPANY_TYPE_PARTY_ROLE.retailer_showroom).toBe('customer');
     expect(B2B_COMPANY_TYPE_PARTY_ROLE.contractor_installer).toBe('customer');
   });
