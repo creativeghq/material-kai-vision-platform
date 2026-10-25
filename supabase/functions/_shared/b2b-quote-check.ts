@@ -52,22 +52,50 @@ function windowShare(units: string[], size: number, hay: string, join: string): 
   return hit / total;
 }
 
-/** True when the quote is on the page: exact after normalising, or at least 60% of its six-word windows (eight-character windows for unspaced scripts). */
-export function quoteIsOnPage(quote: string, pageText: string): boolean {
-  const q = normaliseForMatch(quote);
-  const page = normaliseForMatch(pageText);
-  if (!q || !page) return false;
-  if ((` ${page} `).includes(` ${q} `)) return true;
-  const qCompact = q.replace(/ /g, '');
-  const pageCompact = page.replace(/ /g, '');
-  const unspaced = (qCompact.match(UNSPACED)?.length ?? 0) > qCompact.length / 2;
-  if (unspaced) {
-    return pageCompact.includes(qCompact) || windowShare([...qCompact], CHAR_WINDOW, pageCompact, '') >= THRESHOLD;
-  }
-  return windowShare(q.split(' '), WORD_WINDOW, ` ${page} `, ' ') >= THRESHOLD;
+export interface NormalisedPage {
+  spaced: string;
+  compact: string;
 }
 
-export type PageFetcher = (url: string, timeoutMs: number) => Promise<string>;
+const MAX_HTML_CHARS = 1_000_000;
+const MAX_TEXT_CHARS = 400_000;
+
+/** Page text normalised once; capped so eight pages in parallel cannot hold the event loop. */
+export function normalisePage(pageText: string): NormalisedPage {
+  const spaced = normaliseForMatch(pageText.slice(0, MAX_TEXT_CHARS));
+  return { spaced, compact: spaced.replace(/ /g, '') };
+}
+
+export function quoteWordCount(quote: string): number {
+  const q = normaliseForMatch(quote);
+  return q ? q.split(' ').length : 0;
+}
+
+/** True when the quote is on the page: exact after normalising, or at least 60% of its six-word windows (eight-character windows for unspaced scripts). */
+export function quoteInPage(quote: string, page: NormalisedPage): boolean {
+  const q = normaliseForMatch(quote);
+  if (!q || !page.spaced) return false;
+  if ((` ${page.spaced} `).includes(` ${q} `)) return true;
+  const qCompact = q.replace(/ /g, '');
+  const unspaced = (qCompact.match(UNSPACED)?.length ?? 0) > qCompact.length / 2;
+  if (unspaced) {
+    return page.compact.includes(qCompact) || windowShare([...qCompact], CHAR_WINDOW, page.compact, '') >= THRESHOLD;
+  }
+  return windowShare(q.split(' '), WORD_WINDOW, ` ${page.spaced} `, ' ') >= THRESHOLD;
+}
+
+export function quoteIsOnPage(quote: string, pageText: string): boolean {
+  return quoteInPage(quote, normalisePage(pageText));
+}
+
+export interface FetchedPage {
+  text: string;
+  contentType: string | null;
+  /** The body hit the byte cap, so absence from it proves nothing. */
+  truncated: boolean;
+}
+
+export type PageFetcher = (url: string, timeoutMs: number) => Promise<FetchedPage>;
 
 export interface QuoteCheckOptions {
   fetchPage: PageFetcher;
@@ -76,8 +104,28 @@ export interface QuoteCheckOptions {
 }
 
 export const QUOTE_NOT_FOUND = 'quote not found on the cited page';
+export const NOT_OWN_SITE = "evidence page is not on the company's own site";
+const MIN_READABLE_CHARS = 400;
 
-/** Matches whose quote is absent from the cited page move to `unverified`; a fetch failure keeps the match with `evidence_verified: null`. */
+const hostOf = (u: unknown): string | null => {
+  if (typeof u !== 'string' || !u.trim()) return null;
+  try {
+    return new URL(/^[a-z]+:\/\//i.test(u.trim()) ? u.trim() : `https://${u.trim()}`).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+};
+
+/** True when `evidenceUrl` is the company's own host or one of its subdomains (www ignored). */
+export function isOwnSite(evidenceUrl: unknown, row: Record<string, any>): boolean {
+  const ev = hostOf(evidenceUrl);
+  const own = hostOf(row.domain) ?? hostOf(row.website);
+  return !!ev && !!own && (ev === own || ev.endsWith(`.${own}`));
+}
+
+type Verdict = { verified: boolean | null; note?: string };
+
+/** Matches whose quote is absent from a readable page on the company's own site move to `unverified`; anything inconclusive keeps the match with `evidence_verified: null`. */
 export async function verifyEvidenceQuotes<R extends Record<string, any>>(
   matches: R[],
   unverified: R[],
@@ -85,20 +133,38 @@ export async function verifyEvidenceQuotes<R extends Record<string, any>>(
 ): Promise<{ matches: R[]; unverified: R[] }> {
   const max = opts.maxRows ?? 8;
   const timeout = opts.timeoutMs ?? 6000;
-  const verdicts = await Promise.all(matches.map(async (row, i): Promise<boolean | null> => {
+  const pages = new Map<string, Promise<{ page: NormalisedPage; readable: boolean; fetched: FetchedPage }>>();
+  const load = (url: string) => {
+    let p = pages.get(url);
+    if (!p) {
+      p = opts.fetchPage(url, timeout).then((fetched) => {
+        const text = htmlToText(fetched.text.slice(0, MAX_HTML_CHARS));
+        const html = /html|xml/i.test(fetched.contentType ?? '');
+        return { page: normalisePage(text), readable: html && text.trim().length >= MIN_READABLE_CHARS && !fetched.truncated, fetched };
+      });
+      pages.set(url, p);
+    }
+    return p;
+  };
+  const verdicts = await Promise.all(matches.map(async (row, i): Promise<Verdict> => {
     const url = typeof row.type_evidence_url === 'string' ? row.type_evidence_url.trim() : '';
-    if (i >= max || !url || typeof row.type_evidence !== 'string') return null;
+    if (i >= max || !url || typeof row.type_evidence !== 'string') return { verified: null };
+    if (!isOwnSite(url, row)) return { verified: null, note: NOT_OWN_SITE };
     try {
-      return quoteIsOnPage(row.type_evidence, htmlToText(await opts.fetchPage(url, timeout)));
+      const { page, readable } = await load(url);
+      if (quoteInPage(row.type_evidence, page)) return { verified: true };
+      if (!readable || quoteWordCount(row.type_evidence) < WORD_WINDOW) return { verified: null };
+      return { verified: false };
     } catch {
-      return null;
+      return { verified: null };
     }
   }));
   const kept: R[] = [];
   const moved: R[] = [];
   matches.forEach((row, i) => {
-    if (verdicts[i] === false) moved.push({ ...row, evidence_verified: false, unverified_reason: QUOTE_NOT_FOUND });
-    else kept.push({ ...row, evidence_verified: verdicts[i] });
+    const v = verdicts[i];
+    if (v.verified === false) moved.push({ ...row, evidence_verified: false, unverified_reason: QUOTE_NOT_FOUND });
+    else kept.push({ ...row, evidence_verified: v.verified, ...(v.note ? { evidence_note: v.note } : {}) });
   });
   return { matches: kept, unverified: [...unverified, ...moved] };
 }

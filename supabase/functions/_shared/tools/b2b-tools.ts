@@ -50,7 +50,7 @@ import {
 } from '../b2b-company-query.ts';
 import { verifyEvidenceQuotes } from '../b2b-quote-check.ts';
 import { fetchPageText } from '../b2b-page-fetch.ts';
-import { ACTIVITY_REGISTRIES, currentVersion, MAX_ACTIVITY_PAGE_SIZE, mapNo, parseActivityCode } from '../registry-activity.ts';
+import { ACTIVITY_REGISTRIES, currentVersion, MAX_ACTIVITY_PAGE_SIZE, mapRegisterRows, parseActivityCode } from '../registry-activity.ts';
 import { escapeLike, foldForSearch } from '../searchFold.ts';
 import { domainFromUrl } from '../seo-website.ts';
 import { transliterateToLatin } from '../transliterate.ts';
@@ -1269,6 +1269,13 @@ function activeFirst<T extends { registration_status?: string | null }>(matches:
   return [...matches.filter(isActive), ...matches.filter((m) => !isActive(m))];
 }
 
+/** Shared by the by-name lookups of the four registers whose responses registry-activity.ts maps. */
+function registerHit(cc: string, body: any): RegistrySource {
+  const { total, rows } = mapRegisterRows(cc, body);
+  if (!rows.length) return { status: 'miss' };
+  return { status: 'hit', total: total ?? rows.length, matches: activeFirst(rows.slice(0, 5)) };
+}
+
 type RegistryLookupArgs = { name: string; registrationId?: string };
 type NationalRegistry = {
   /** Human name, used in the tool description and the response. */
@@ -1291,19 +1298,7 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
         body: JSON.stringify({ obchodniJmeno: name, pocet: 5 }),
       });
       if (!r.ok) return { status: 'unavailable', error: r.error || `ARES HTTP ${r.status}` };
-      const rows = Array.isArray(r.body?.ekonomickeSubjekty) ? r.body.ekonomickeSubjekty : [];
-      if (!rows.length) return { status: 'miss' };
-      return {
-        status: 'hit',
-        total: r.body?.pocetCelkem ?? rows.length,
-        matches: rows.map((row: any) => ({
-          registration_id: row.ico ?? null,
-          legal_name: row.obchodniJmeno ?? null,
-          address: row.sidlo?.textovaAdresa ?? null,
-          city: row.sidlo?.nazevObce ?? null,
-          country: row.sidlo?.kodStatu ?? 'CZ',
-        })),
-      };
+      return registerHit('CZ', r.body);
     },
   },
 
@@ -1380,26 +1375,7 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
         headers: { Accept: 'application/json' },
       });
       if (!r.ok) return { status: 'unavailable', error: r.error || `PRH HTTP ${r.status}` };
-      const rows = Array.isArray(r.body?.companies) ? r.body.companies : [];
-      if (!rows.length) return { status: 'miss' };
-      return {
-        status: 'hit',
-        total: r.body?.totalResults ?? rows.length,
-        matches: activeFirst(rows.slice(0, 5).map((row: any) => {
-          // Same versioned shape as Slovakia, different field names.
-          const nm = currentVersion<any>(row.names, 'registrationDate', 'endDate');
-          const addr = currentVersion<any>(row.addresses, 'registrationDate', 'endDate');
-          return {
-            registration_id: row.businessId?.value ?? null,
-            legal_name: nm?.name ?? null,
-            address: addr ? [addr.street, addr.buildingNumber, addr.postCode, addr.postOffices?.[0]?.city].filter(Boolean).join(' ') || null : null,
-            activity_code: row.mainBusinessLine?.type ?? null,
-            // Same reasoning as Slovakia: no open name version means the company is wound up.
-            registration_status: nm?.endDate ? `DISSOLVED (${nm.endDate})` : 'ACTIVE',
-            country: 'FI',
-          };
-        })),
-      };
+      return registerHit('FI', r.body);
     },
   },
 
@@ -1411,27 +1387,7 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
         headers: { Accept: 'application/json' },
       });
       if (!r.ok) return { status: 'unavailable', error: r.error || `Recherche Entreprises HTTP ${r.status}` };
-      const rows = Array.isArray(r.body?.results) ? r.body.results : [];
-      if (!rows.length) return { status: 'miss' };
-      return {
-        status: 'hit',
-        total: r.body?.total_results ?? rows.length,
-        matches: rows.slice(0, 5).map((row: any) => ({
-          registration_id: row.siren ?? null,
-          legal_name: row.nom_raison_sociale || row.nom_complet || null,
-          address: row.siege?.adresse ?? null,
-          city: row.siege?.libelle_commune ?? null,
-          postal_code: row.siege?.code_postal ?? null,
-          // NAF is the French NACE code — 23.44Z is "manufacture of other technical ceramic
-          // products", which is the single most useful field here for telling a factory from a
-          // reseller without reading a website.
-          activity_code_naf: row.siege?.activite_principale ?? null,
-          employee_range: row.tranche_effectif_salarie ?? null,
-          establishments: row.nombre_etablissements_ouverts ?? null,
-          registration_status: row.etat_administratif === 'A' ? 'ACTIVE' : (row.etat_administratif ?? null),
-          country: 'FR',
-        })),
-      };
+      return registerHit('FR', r.body);
     },
   },
 
@@ -1484,9 +1440,7 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
         headers: { Accept: 'application/json' },
       });
       if (!r.ok) return { status: 'unavailable', error: r.error || `Brreg HTTP ${r.status}` };
-      const page = mapNo(r.body);
-      if (!page.companies.length) return { status: 'miss' };
-      return { status: 'hit', total: page.total ?? page.companies.length, matches: page.companies.map(({ lead: _l, verified_as_manufacturer: _v, ...c }) => c) };
+      return registerHit('NO', r.body);
     },
   },
 
@@ -1540,8 +1494,8 @@ async function listByActivityCode(
   onProgress?: (status: string) => void,
 ): Promise<string> {
   const covered = Object.keys(ACTIVITY_REGISTRIES).sort();
-  const code = parseActivityCode(rawCode);
-  if (!code) return JSON.stringify({ success: false, error: 'activity_code needs a four-digit NACE class such as "27.40".' });
+  const parsed = parseActivityCode(rawCode);
+  if (!parsed) return JSON.stringify({ success: false, error: 'activity_code needs a four- or five-digit NACE code such as "27.40".' });
   const registry = cc ? ACTIVITY_REGISTRIES[cc] : undefined;
   if (!cc || !registry) {
     return JSON.stringify({
@@ -1549,28 +1503,32 @@ async function listByActivityCode(
       error: `Listing by activity code needs a country with a keyless register wired: ${covered.join(', ')}.`,
     });
   }
+  const resolved = registry.resolveCode(parsed);
+  if ('error' in resolved) return JSON.stringify({ success: false, error: `${registry.register}: ${resolved.error}` });
   const pageNo = Math.max(1, Math.floor(page ?? 1));
-  onProgress?.(`Listing ${cc} companies registered under ${rawCode}…`);
-  const req = registry.request(code, pageNo, MAX_ACTIVITY_PAGE_SIZE);
+  onProgress?.(`Listing ${cc} companies registered under ${resolved.code}…`);
+  const req = registry.request(resolved.code, pageNo, MAX_ACTIVITY_PAGE_SIZE);
   const r = await registryFetch(req.url, { ...req.init, headers: req.init?.headers ?? { Accept: 'application/json' } });
   if (!r.ok) {
     const detail = typeof r.body?.erreur === 'string' ? r.body.erreur.slice(0, 200) : (r.error || `HTTP ${r.status}`);
     return JSON.stringify({ success: false, retryable: r.status === 0 || r.status >= 500, error: `${registry.register} did not answer: ${detail}` });
   }
   const mapped = registry.map(r.body);
-  const companies = mapped.companies.slice(0, MAX_ACTIVITY_PAGE_SIZE);
+  const perPage = registry.rowsPerPage(MAX_ACTIVITY_PAGE_SIZE);
   return JSON.stringify({
     success: true,
     mode: 'activity_code',
-    found: companies.length > 0,
+    found: mapped.companies.length > 0,
     country: cc,
     activity_code: rawCode,
+    queried_code: resolved.code,
     register: registry.register,
     page: pageNo,
+    rows_per_page: perPage,
     total_registered: mapped.total,
-    has_more: mapped.total != null ? pageNo * (cc === 'FI' ? 100 : MAX_ACTIVITY_PAGE_SIZE) < mapped.total : companies.length === MAX_ACTIVITY_PAGE_SIZE,
+    has_more: mapped.total != null ? (pageNo - 1) * perPage + mapped.returned < mapped.total : mapped.returned >= perPage,
     inactive_dropped: mapped.dropped_inactive,
-    companies,
+    companies: mapped.companies,
     note: 'Registry rows are LEADS: a registration under this activity code does not prove the business makes anything. '
       + 'Confirm each one on its own website (b2b_company_search) before treating it as a manufacturer. Some are holding companies.',
     cost: { credits: 0, note: 'Official public registries — no key, no account, no charge.' },

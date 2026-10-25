@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToText, quoteIsOnPage, verifyEvidenceQuotes } from '../../supabase/functions/_shared/b2b-quote-check.ts';
+import { htmlToText, isOwnSite, quoteIsOnPage, verifyEvidenceQuotes, type FetchedPage } from '../../supabase/functions/_shared/b2b-quote-check.ts';
 
 describe('quoteIsOnPage', () => {
   const page = htmlToText('<html><style>.a{}</style><body><h1>About us</h1><p>We are the exclusive distributor for Greece &amp; Cyprus of several European brands.</p><script>secretToken()</script></body></html>');
@@ -37,35 +37,88 @@ describe('quoteIsOnPage', () => {
   });
 });
 
+const FILLER = ' Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'.repeat(5);
+const html = (body: string, over: Partial<FetchedPage> = {}): FetchedPage => ({
+  text: `<html><body><p>${body}</p><p>${FILLER}</p></body></html>`, contentType: 'text/html; charset=utf-8', truncated: false, ...over,
+});
+const Q = 'official representative for Greece and Cyprus';
+const row = (url: string | null, q = Q, domain: string | null = 'acme.gr') => ({ company_name: 'X', domain, website: null, type_evidence: q, type_evidence_url: url });
+
 describe('verifyEvidenceQuotes', () => {
-  const row = (url: string | null, q = 'official representative for Greece') => ({ company_name: 'X', type_evidence: q, type_evidence_url: url });
-  it('verifies, moves, and tolerates fetch failures', async () => {
-    const pages: Record<string, string> = {
-      'https://a.test/ok': '<p>Official representative for Greece</p>',
-      'https://a.test/no': '<p>Nothing relevant here at all</p>',
-    };
-    const fetchPage = async (u: string) => {
+  const run = async (rows: ReturnType<typeof row>[], pages: Record<string, FetchedPage>) => verifyEvidenceQuotes(rows, [], {
+    fetchPage: async (u) => {
       if (!pages[u]) throw new Error('boom');
       return pages[u];
-    };
-    const out = await verifyEvidenceQuotes(
-      [row('https://a.test/ok'), row('https://a.test/no'), row('https://a.test/dead'), row(null)],
-      [],
-      { fetchPage },
+    },
+  });
+  it('verifies a present quote and demotes an absent one from a readable page', async () => {
+    const out = await run(
+      [row('https://acme.gr/ok'), row('https://www.acme.gr/no')],
+      { 'https://acme.gr/ok': html(Q), 'https://www.acme.gr/no': html('Nothing relevant here') },
     );
-    expect(out.matches.map((m) => m.evidence_verified)).toEqual([true, null, null]);
-    expect(out.unverified).toHaveLength(1);
+    expect(out.matches.map((m) => m.evidence_verified)).toEqual([true]);
     expect(out.unverified[0]).toMatchObject({ evidence_verified: false, unverified_reason: 'quote not found on the cited page' });
   });
-  it('checks at most eight rows', async () => {
+  it('keeps the match with null on a fetch failure or missing URL', async () => {
+    const out = await run([row('https://acme.gr/dead'), row(null)], {});
+    expect(out.matches.map((m) => m.evidence_verified)).toEqual([null, null]);
+    expect(out.unverified).toHaveLength(0);
+  });
+  it.each([
+    ['a near-empty page', { ...html('x'), text: '<html><body>Loading</body></html>' }],
+    ['a PDF', html('Nothing relevant here', { contentType: 'application/pdf' })],
+    ['a missing content type', html('Nothing relevant here', { contentType: null })],
+    ['a body cut at the byte cap', html('Nothing relevant here', { truncated: true })],
+  ])('does not demote on %s', async (_name, fetched) => {
+    const out = await run([row('https://acme.gr/p')], { 'https://acme.gr/p': fetched });
+    expect(out.unverified).toHaveLength(0);
+    expect(out.matches[0].evidence_verified).toBeNull();
+  });
+  it('does not demote a short quote that is not an exact substring', async () => {
+    const out = await run([row('https://acme.gr/p', 'sole agent greece')], { 'https://acme.gr/p': html('Nothing relevant here') });
+    expect(out.unverified).toHaveLength(0);
+    expect(out.matches[0].evidence_verified).toBeNull();
+  });
+  it('still verifies a short exact quote', async () => {
+    const out = await run([row('https://acme.gr/p', 'sole agent greece')], { 'https://acme.gr/p': html('We are the Sole Agent, Greece.') });
+    expect(out.matches[0].evidence_verified).toBe(true);
+  });
+  it('never marks true when the evidence is on another host', async () => {
+    let fetched = 0;
+    const out = await verifyEvidenceQuotes([row('https://directory.example/acme'), row('https://acme.gr.evil.test/x')], [], {
+      fetchPage: async () => {
+        fetched++;
+        return html(Q);
+      },
+    });
+    expect(fetched).toBe(0);
+    expect(out.matches.map((m) => m.evidence_verified)).toEqual([null, null]);
+    expect(out.matches[0]).toHaveProperty('evidence_note');
+  });
+  it('treats a row with no domain or website as unverifiable', async () => {
+    const out = await run([row('https://acme.gr/p', Q, null)], { 'https://acme.gr/p': html(Q) });
+    expect(out.matches[0].evidence_verified).toBeNull();
+  });
+  it('fetches each URL once and checks at most eight rows', async () => {
     let calls = 0;
-    const fetchPage = async () => {
-      calls++;
-      return 'official representative for Greece';
-    };
-    const rows = Array.from({ length: 10 }, () => row('https://a.test/x'));
-    const out = await verifyEvidenceQuotes(rows, [], { fetchPage });
-    expect(calls).toBe(8);
+    const rows = Array.from({ length: 10 }, () => row('https://acme.gr/x'));
+    const out = await verifyEvidenceQuotes(rows, [], {
+      fetchPage: async () => {
+        calls++;
+        return html(Q);
+      },
+    });
+    expect(calls).toBe(1);
     expect(out.matches.filter((m) => m.evidence_verified === null)).toHaveLength(2);
+  });
+});
+
+describe('isOwnSite', () => {
+  it('accepts the host, www and subdomains, and rejects look-alikes', () => {
+    const r = { domain: 'acme.gr', website: null };
+    expect(isOwnSite('https://www.acme.gr/a', r)).toBe(true);
+    expect(isOwnSite('https://shop.acme.gr/a', r)).toBe(true);
+    expect(isOwnSite('https://notacme.gr/a', r)).toBe(false);
+    expect(isOwnSite('https://acme.gr/a', { domain: null, website: 'https://www.acme.gr' })).toBe(true);
   });
 });
